@@ -22,6 +22,75 @@ func NewConfigurationSetRepository(db database.Database) *ConfigurationSetReposi
 	return &ConfigurationSetRepository{db: db}
 }
 
+// CreateFull creates a configuration set and all dependent assignments in one transaction.
+func (r *ConfigurationSetRepository) CreateFull(cs *models.ConfigurationSet) (int64, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	id, err := r.Create(tx, cs)
+	if err != nil {
+		return 0, err
+	}
+	configSetID := int(id)
+	if err := r.SaveNotificationSetting(tx, configSetID, cloneOptionalInt(cs.NotificationSettingID)); err != nil {
+		return 0, err
+	}
+	if err := r.SaveWorkspaceAssignments(tx, configSetID, cs.WorkspaceIDs); err != nil {
+		return 0, err
+	}
+	if err := r.SaveScreenAssignments(tx, configSetID, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
+		return 0, err
+	}
+	if err := r.SaveItemTypeConfigs(tx, configSetID, cs.ItemTypeConfigs); err != nil {
+		return 0, err
+	}
+	if err := r.SavePriorityAssignments(tx, configSetID, cs.PriorityIDs); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// UpdateFull updates a configuration set and all dependent assignments in one transaction.
+func (r *ConfigurationSetRepository) UpdateFull(id int, cs *models.ConfigurationSet) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := r.Update(tx, id, cs); err != nil {
+		return err
+	}
+	if err := r.SaveNotificationSetting(tx, id, cloneOptionalInt(cs.NotificationSettingID)); err != nil {
+		return err
+	}
+	if err := r.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
+		return err
+	}
+	if err := r.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
+		return err
+	}
+	if err := r.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
+		return err
+	}
+	if err := r.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func cloneOptionalInt(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	cloned := *v
+	return &cloned
+}
+
 // Subquery for notification setting columns
 const notificationSettingSubquery = `
 	(

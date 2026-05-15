@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 
@@ -22,8 +21,10 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	itemRepo := repository.NewItemRepository(h.db)
+
 	// Verify the work item exists and check view permission
-	workItemWorkspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(workItemID)
+	workItemWorkspaceID, err := itemRepo.GetWorkspaceID(workItemID)
 	if err != nil {
 		respondNotFound(w, r, "Item")
 		return
@@ -40,13 +41,8 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user's personal workspace
-	var personalWorkspaceID int
-	err = h.db.QueryRow(`
-		SELECT id FROM workspaces
-		WHERE is_personal = ? AND owner_id = ? AND active = ?
-	`, true, user.ID, true).Scan(&personalWorkspaceID)
-
-	if errors.Is(err, sql.ErrNoRows) {
+	personalWorkspaceID, err := repository.NewWorkspaceRepository(h.db).GetActivePersonalWorkspaceID(user.ID)
+	if errors.Is(err, repository.ErrNotFound) {
 		// User has no personal workspace, return empty list
 		respondJSONOK(w, []models.Item{})
 		return
@@ -56,7 +52,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := repository.NewItemRepository(h.db).ListRelatedPersonalItems(workItemID, personalWorkspaceID)
+	items, err := itemRepo.ListRelatedPersonalItems(workItemID, personalWorkspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -81,8 +77,10 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	itemRepo := repository.NewItemRepository(h.db)
+
 	// Verify the item exists and belongs to user's personal workspace
-	ownership, err := repository.NewItemRepository(h.db).GetItemWorkspaceOwnership(itemID)
+	ownership, err := itemRepo.GetItemWorkspaceOwnership(itemID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
@@ -99,13 +97,7 @@ func (h *ItemHandler) RemoveRelatedWorkItem(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Remove the relationship
-	_, err = h.db.Exec(`
-		UPDATE items
-		SET related_work_item_id = NULL, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, itemID)
-
-	if err != nil {
+	if err := itemRepo.ClearRelatedWorkItem(itemID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -160,7 +161,9 @@ func (h *LogbookNodeExecutionHandler) executeCreateItem(nodeConfig string, event
 			CreatorID:   &creatorID,
 		}
 		// Load workspace key for event emission
-		_ = h.db.QueryRow(`SELECT key FROM workspaces WHERE id = ?`, config.WorkspaceID).Scan(&item.WorkspaceKey)
+		if key, err := repository.NewWorkspaceRepository(h.db).GetKey(config.WorkspaceID); err == nil {
+			item.WorkspaceKey = key
+		}
 
 		h.eventCoordinator.EmitItemCreatedWithContext(item, creatorID, services.ActionContext{
 			TriggeredByAction: true,
@@ -200,17 +203,20 @@ func (h *LogbookNodeExecutionHandler) executeCreateAsset(nodeConfig string, even
 		}
 	}
 
-	var assetID int64
-	if err := h.db.QueryRow(`
-		INSERT INTO assets (set_id, asset_type_id, title, description, asset_tag, category_id, status_id, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`,
-		config.AssetSetID, config.AssetTypeID, title, config.Description, config.AssetTag,
-		config.CategoryID, config.StatusID,
-		event.ActorUserID, time.Now(), time.Now(),
-	).Scan(&assetID); err != nil {
-		return nil, fmt.Errorf("failed to create asset: %w", err)
+	createdAt := time.Now()
+	assetID, err := repository.NewAssetRepository(h.db).CreateAsset(repository.CreateAssetInput{
+		SetID:       config.AssetSetID,
+		AssetTypeID: config.AssetTypeID,
+		CategoryID:  config.CategoryID,
+		StatusID:    config.StatusID,
+		Title:       title,
+		Description: config.Description,
+		AssetTag:    config.AssetTag,
+		CreatedBy:   event.ActorUserID,
+		CreatedAt:   createdAt,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Emit asset action event with cascade context (once asset action service exists)

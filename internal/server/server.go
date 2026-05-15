@@ -560,8 +560,8 @@ func (s *Server) initialize() error {
 	// Initialize invitation handler
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
-	themeHandler := handlers.NewThemeHandler(s.db, logger.NewAuditor(s.db))
-	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
+	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db))
+	userPreferencesHandler := handlers.NewUserPreferencesHandler(services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db)))
 	homepageHandler := handlers.NewHomepageHandler(repository.NewWorkspaceRepository(s.db), repository.NewItemRepository(s.db), s.activityTracker, permService)
 
 	// Notification handlers

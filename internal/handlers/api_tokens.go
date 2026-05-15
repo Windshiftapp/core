@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,6 +13,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -46,6 +45,7 @@ func getAuthorizedVia(r *http.Request) string {
 type APITokenHandler struct {
 	db                database.Database
 	tokenManager      *auth.TokenManager
+	policyRepo        *repository.APITokenPolicyRepository
 	permissionService *services.PermissionService
 }
 
@@ -54,6 +54,7 @@ func NewAPITokenHandler(db database.Database, tokenManager *auth.TokenManager, p
 	return &APITokenHandler{
 		db:                db,
 		tokenManager:      tokenManager,
+		policyRepo:        repository.NewAPITokenPolicyRepository(db),
 		permissionService: permissionService,
 	}
 }
@@ -134,12 +135,12 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		targetIsAgent, targetOwnerID, exists, lookupErr := ath.loadAgentOwnership(*request.UserID)
+		ownership, lookupErr := ath.loadAgentOwnership(*request.UserID)
 		if lookupErr != nil {
 			respondInternalError(w, r, lookupErr)
 			return
 		}
-		if !exists {
+		if !ownership.Exists {
 			respondNotFound(w, r, "user")
 			return
 		}
@@ -147,10 +148,10 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		authorized := false
 		via := ""
 		switch {
-		case isSystemAdmin && targetIsAgent:
+		case isSystemAdmin && ownership.IsAgent:
 			authorized = true
 			via = "admin"
-		case targetIsAgent && targetOwnerID != nil && *targetOwnerID == user.ID:
+		case ownership.IsAgent && ownership.OwnerID != nil && *ownership.OwnerID == user.ID:
 			authorized = true
 			via = "owner"
 		}
@@ -159,7 +160,7 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 			// Distinguish reasons in the audit log so a genuine impersonation
 			// attempt stands out from an owner-scope mismatch.
 			reason := "target_not_agent"
-			if targetIsAgent && !isSystemAdmin {
+			if ownership.IsAgent && !isSystemAdmin {
 				reason = "not_agent_owner"
 			}
 			_ = logger.LogAudit(ath.db, logger.AuditEvent{
@@ -328,37 +329,22 @@ func (ath *APITokenHandler) canActOnUserTokens(caller *models.User, targetUserID
 		return true
 	}
 	isAdmin, _ := ath.permissionService.IsSystemAdmin(caller.ID)
-	targetIsAgent, targetOwnerID, exists, err := ath.loadAgentOwnership(targetUserID)
-	if err != nil || !exists {
+	ownership, err := ath.loadAgentOwnership(targetUserID)
+	if err != nil || !ownership.Exists {
 		return false
 	}
-	if isAdmin && targetIsAgent {
+	if isAdmin && ownership.IsAgent {
 		return true
 	}
-	if targetIsAgent && targetOwnerID != nil && *targetOwnerID == caller.ID {
+	if ownership.IsAgent && ownership.OwnerID != nil && *ownership.OwnerID == caller.ID {
 		return true
 	}
 	return false
 }
 
 // loadAgentOwnership reads the agent flag + owner link for a user ID.
-func (ath *APITokenHandler) loadAgentOwnership(userID int) (isAgent bool, ownerID *int, exists bool, err error) {
-	var ownerNullable sql.NullInt64
-	queryErr := ath.db.QueryRow(
-		"SELECT COALESCE(is_agent, false), agent_owner_user_id FROM users WHERE id = ?",
-		userID,
-	).Scan(&isAgent, &ownerNullable)
-	if errors.Is(queryErr, sql.ErrNoRows) {
-		return false, nil, false, nil
-	}
-	if queryErr != nil {
-		return false, nil, false, queryErr
-	}
-	if ownerNullable.Valid {
-		v := int(ownerNullable.Int64)
-		ownerID = &v
-	}
-	return isAgent, ownerID, true, nil
+func (ath *APITokenHandler) loadAgentOwnership(userID int) (repository.AgentOwnership, error) {
+	return ath.policyRepo.LoadAgentOwnership(userID)
 }
 
 // ValidateToken endpoint for testing token validity
@@ -562,9 +548,8 @@ func (ath *APITokenHandler) checkCreationPolicy(userID int) error {
 
 // getCreationPolicy reads the api_key_creation_policy setting.
 func (ath *APITokenHandler) getCreationPolicy() string {
-	var value string
-	err := ath.db.QueryRow("SELECT value FROM system_settings WHERE key = 'api_key_creation_policy'").Scan(&value)
-	if err != nil {
+	value, ok, err := ath.policyRepo.GetSystemSetting("api_key_creation_policy")
+	if err != nil || !ok {
 		return "all_users" // default
 	}
 	return value
@@ -572,9 +557,8 @@ func (ath *APITokenHandler) getCreationPolicy() string {
 
 // userInAllowedGroups checks if the user is a member of any group in the allowed list.
 func (ath *APITokenHandler) userInAllowedGroups(userID int) bool {
-	var groupIDsJSON string
-	err := ath.db.QueryRow("SELECT value FROM system_settings WHERE key = 'api_key_allowed_group_ids'").Scan(&groupIDsJSON)
-	if err != nil {
+	groupIDsJSON, ok, err := ath.policyRepo.GetSystemSetting("api_key_allowed_group_ids")
+	if err != nil || !ok {
 		return false
 	}
 
@@ -583,20 +567,6 @@ func (ath *APITokenHandler) userInAllowedGroups(userID int) bool {
 		return false
 	}
 
-	// Build placeholders
-	placeholders := make([]string, len(groupIDs))
-	args := make([]interface{}, 0, len(groupIDs)+1)
-	args = append(args, userID)
-	for i, gid := range groupIDs {
-		placeholders[i] = "?"
-		args = append(args, gid)
-	}
-
-	var count int
-	query := "SELECT COUNT(*) FROM group_members WHERE user_id = ? AND group_id IN (" + strings.Join(placeholders, ",") + ")"
-	if err := ath.db.QueryRow(query, args...).Scan(&count); err != nil {
-		return false
-	}
-
-	return count > 0
+	inGroup, err := ath.policyRepo.UserInAnyGroup(userID, groupIDs)
+	return err == nil && inGroup
 }

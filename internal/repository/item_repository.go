@@ -718,6 +718,18 @@ func (r *ItemRepository) GetCalendarData(itemID int) (sql.NullString, int, error
 	return data, workspaceID, nil
 }
 
+// UpdateCalendarData replaces an item's calendar_data payload.
+func (r *ItemRepository) UpdateCalendarData(itemID int, data string, updatedAt time.Time) error {
+	result, err := r.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?", data, updatedAt, itemID)
+	if err != nil {
+		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // itemCountableColumns is the allow-list of columns the CountByField method
 // may filter on. This keeps the column name out of dynamic SQL construction
 // (structurally prevents injection) while covering the handful of "is this
@@ -1456,6 +1468,67 @@ type HomepageMilestoneProgress struct {
 // the given milestone IDs, joining items/statuses/status_categories to derive
 // done counts. Missing IDs are silently omitted; results are ordered by
 // milestone ID ascending.
+// ClearRelatedWorkItem removes a personal task's related work item reference.
+func (r *ItemRepository) ClearRelatedWorkItem(itemID int) error {
+	res, err := r.db.Exec(`
+		UPDATE items
+		SET related_work_item_id = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, itemID)
+	if err != nil {
+		return fmt.Errorf("clear related work item for item %d: %w", itemID, err)
+	}
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// GetHistoryWithApprovals returns item history plus approval decision events as a single chronological feed.
+func (r *ItemRepository) GetHistoryWithApprovals(itemID int) ([]models.ItemHistory, error) {
+	query := `
+		SELECT
+			ih.id, ih.item_id, ih.user_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value,
+			COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
+			COALESCE(u.email, '') as user_email
+		FROM item_history ih
+		LEFT JOIN users u ON ih.user_id = u.id
+		WHERE ih.item_id = ?
+		UNION ALL
+		SELECT
+			-d.id AS id,
+			ar.item_id,
+			COALESCE(d.actor_user_id, 0) AS user_id,
+			d.created_at AS changed_at,
+			'approval_' || d.decision AS field_name,
+			NULL AS old_value,
+			d.comment AS new_value,
+			COALESCE(u.first_name || ' ' || u.last_name, u.username, 'System') AS user_name,
+			COALESCE(u.email, '') AS user_email
+		FROM approval_decisions d
+		JOIN approval_requests ar ON ar.id = d.approval_request_id
+		LEFT JOIN users u ON u.id = d.actor_user_id
+		WHERE ar.item_id = ?
+		ORDER BY changed_at DESC
+	`
+
+	rows, err := r.db.Query(query, itemID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	history := []models.ItemHistory{}
+	for rows.Next() {
+		var entry models.ItemHistory
+		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail); err != nil {
+			return nil, err
+		}
+		history = append(history, entry)
+	}
+	return history, rows.Err()
+}
+
 func (r *ItemRepository) HomepageMilestoneProgressByIDs(milestoneIDs []int) ([]HomepageMilestoneProgress, error) {
 	if len(milestoneIDs) == 0 {
 		return []HomepageMilestoneProgress{}, nil

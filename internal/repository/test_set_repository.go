@@ -94,6 +94,19 @@ func (r *TestSetRepository) FindAllWithStats(workspaceID int) ([]models.TestSet,
 	return sets, nil
 }
 
+// GetWorkspaceID resolves the owning workspace for a test set.
+func (r *TestSetRepository) GetWorkspaceID(id int) (int, error) {
+	var workspaceID int
+	err := r.db.QueryRow(`SELECT workspace_id FROM test_sets WHERE id = ?`, id).Scan(&workspaceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve test set workspace: %w", err)
+	}
+	return workspaceID, nil
+}
+
 // FindByID returns a single test set scoped to workspace.
 func (r *TestSetRepository) FindByID(id, workspaceID int) (*models.TestSet, error) {
 	var set models.TestSet

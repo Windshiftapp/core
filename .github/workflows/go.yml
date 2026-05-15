@@ -50,6 +50,11 @@ jobs:
         # Existing violations are recorded in scripts/.layering-baseline.
         run: bash scripts/check-layering.sh
 
+      - name: Run handler DB access guard
+        # Blocks new direct database access in production handlers.
+        # Existing handler offenders are recorded in docs/architecture/handler-db-access-allowlist.txt.
+        run: bash scripts/check-handler-db-access.sh
+
   deadcode:
     name: Deadcode Analysis
     runs-on: ubuntu-latest

@@ -147,6 +147,48 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 	return statuses, nil
 }
 
+// ListWorkflowStatuses returns statuses that participate in a workflow.
+func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, error) {
+	rows, err := s.db.Query(`
+		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+		       sc.name as category_name, sc.color as category_color, sc.is_completed
+		FROM workflow_transitions wt
+		JOIN statuses s ON s.id = wt.to_status_id OR (wt.from_status_id IS NOT NULL AND s.id = wt.from_status_id)
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		WHERE wt.workflow_id = ?
+		ORDER BY s.id
+	`, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow statuses: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var statuses []StatusResult
+	for rows.Next() {
+		var st StatusResult
+		var categoryName, categoryColor sql.NullString
+		var isCompleted sql.NullBool
+		if err := rows.Scan(
+			&st.ID, &st.Name, &st.Description, &st.CategoryID,
+			&st.IsDefault, &st.CreatedAt, &st.UpdatedAt,
+			&categoryName, &categoryColor, &isCompleted,
+		); err != nil {
+			return nil, fmt.Errorf("scan workflow status: %w", err)
+		}
+		st.CategoryName = categoryName.String
+		st.CategoryColor = categoryColor.String
+		st.IsCompleted = isCompleted.Bool
+		statuses = append(statuses, st)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workflow statuses: %w", err)
+	}
+	if statuses == nil {
+		statuses = []StatusResult{}
+	}
+	return statuses, nil
+}
+
 // StatusCategoryResult represents a status category.
 type StatusCategoryResult struct {
 	ID          int

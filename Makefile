@@ -114,6 +114,8 @@ lint:
 	else \
 		echo "golangci-lint not installed, run 'make dev-tools' first"; \
 	fi
+	@bash scripts/check-layering.sh
+	@bash scripts/check-handler-db-access.sh
 
 # Install git hooks
 hooks:

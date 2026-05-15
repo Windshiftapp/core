@@ -34,25 +34,33 @@ type RequirementListParams struct {
 }
 
 // FindConfigForWorkspace returns the workspace-level coverage configuration.
-// Returns sql.ErrNoRows if no config exists.
+// Returns ErrNotFound if no config exists.
 func (r *TestCoverageRepository) FindConfigForWorkspace(workspaceID int) (*models.TestCoverageConfiguration, error) {
-	return r.scanConfig(r.db.QueryRow(`
+	config, err := r.scanConfig(r.db.QueryRow(`
 		SELECT id, collection_id, workspace_id, requirement_item_type_ids, created_at, updated_at
 		FROM test_coverage_configurations
 		WHERE workspace_id = ? AND collection_id IS NULL`,
 		workspaceID,
 	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return config, err
 }
 
 // FindConfigForCollection returns the collection-level coverage configuration.
-// Returns sql.ErrNoRows if no config exists.
+// Returns ErrNotFound if no config exists.
 func (r *TestCoverageRepository) FindConfigForCollection(collectionID int) (*models.TestCoverageConfiguration, error) {
-	return r.scanConfig(r.db.QueryRow(`
+	config, err := r.scanConfig(r.db.QueryRow(`
 		SELECT id, collection_id, workspace_id, requirement_item_type_ids, created_at, updated_at
 		FROM test_coverage_configurations
 		WHERE collection_id = ?`,
 		collectionID,
 	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return config, err
 }
 
 // FindConfigByID returns the coverage configuration by its primary key.
@@ -162,6 +170,9 @@ func (r *TestCoverageRepository) GetRequirementTypeIDsForWorkspace(workspaceID i
 		WHERE workspace_id = ? AND collection_id IS NULL`,
 		workspaceID,
 	).Scan(&typeIDsJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +204,9 @@ func (r *TestCoverageRepository) GetRequirementTypeIDsForCollection(collectionID
 		).Scan(&typeIDsJSON, &workspaceID)
 	}
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, ErrNotFound
+	}
 	if err != nil {
 		return nil, 0, err
 	}

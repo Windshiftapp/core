@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -33,15 +32,16 @@ func (h *AIHandler) SummarizeTestPlanDescription(w http.ResponseWriter, r *http.
 		return
 	}
 
+	repo := repository.NewTestSetRepository(h.db)
+
 	// Resolve workspace from the test set itself (callers don't pass workspaceId).
-	var workspaceID int
-	err := h.db.QueryRow(`SELECT workspace_id FROM test_sets WHERE id = ?`, testSetID).Scan(&workspaceID)
-	if errors.Is(err, sql.ErrNoRows) {
+	workspaceID, err := repo.GetWorkspaceID(testSetID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_set")
 		return
 	}
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to resolve test set workspace: %w", err))
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -57,7 +57,6 @@ func (h *AIHandler) SummarizeTestPlanDescription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	repo := repository.NewTestSetRepository(h.db)
 	set, err := repo.FindByID(testSetID, workspaceID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_set")

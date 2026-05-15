@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -21,7 +22,108 @@ func NewPortalService(db database.Database) *PortalService {
 	return &PortalService{db: db}
 }
 
+// GetCustomerIDForUser returns the portal customer linked to an internal user.
+func (s *PortalService) GetCustomerIDForUser(ctx context.Context, userID int) (int, error) {
+	var customerID int
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM portal_customers WHERE user_id = ? LIMIT 1`, userID).Scan(&customerID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrPortalCustomerNotFound
+	}
+	return customerID, err
+}
+
+// GetUserRequesterTemplateVars returns requester template values for an internal user.
+func (s *PortalService) GetUserRequesterTemplateVars(ctx context.Context, userID int) (name, email string, err error) {
+	var firstName, lastName string
+	err = s.db.QueryRowContext(ctx, `SELECT first_name, last_name, email FROM users WHERE id = ?`, userID).Scan(&firstName, &lastName, &email)
+	if err != nil {
+		return "", "", err
+	}
+	return strings.TrimSpace(firstName + " " + lastName), email, nil
+}
+
+// GetCustomerRequesterTemplateVars returns requester template values for a portal customer.
+func (s *PortalService) GetCustomerRequesterTemplateVars(ctx context.Context, customerID int) (name, email string, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT name, email FROM portal_customers WHERE id = ?`, customerID).Scan(&name, &email)
+	return name, email, err
+}
+
+// GetCustomFieldNamesByID returns custom field definition names keyed by id.
+func (s *PortalService) GetCustomFieldNamesByID(ctx context.Context, ids []int) (map[int]string, error) {
+	if len(ids) == 0 {
+		return map[int]string{}, nil
+	}
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	rows, err := s.db.QueryContext(ctx, "SELECT id, name FROM custom_field_definitions WHERE id IN ("+placeholders+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[int]string{}
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
+}
+
 // PortalRequestSummary represents a summarized portal request
+// CreatedPortalComment describes a comment created by a portal request participant.
+type CreatedPortalComment struct {
+	ID               int64
+	ItemID           int
+	Content          string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	AuthorName       string
+	AuthorAvatar     string
+	AuthorID         *int
+	PortalCustomerID *int
+}
+
+// CreateRequestComment creates a comment as either an internal user or portal customer and enriches author details.
+func (s *PortalService) CreateRequestComment(ctx context.Context, itemID int, content string, internalUserID, portalCustomerID *int) (*CreatedPortalComment, error) {
+	now := time.Now()
+	out := &CreatedPortalComment{ItemID: itemID, Content: content, CreatedAt: now, UpdatedAt: now}
+	if internalUserID != nil {
+		err := s.db.QueryRowContext(ctx, `
+			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, itemID, *internalUserID, content, now, now).Scan(&out.ID)
+		if err != nil {
+			return nil, err
+		}
+		out.AuthorID = internalUserID
+		if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(first_name || ' ' || last_name, 'Unknown'), COALESCE(avatar_url, '') FROM users WHERE id = ?`, *internalUserID).Scan(&out.AuthorName, &out.AuthorAvatar); err != nil {
+			out.AuthorName = "Unknown"
+			out.AuthorAvatar = ""
+		}
+		return out, nil
+	}
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?) RETURNING id
+	`, itemID, *portalCustomerID, content, now, now).Scan(&out.ID)
+	if err != nil {
+		return nil, err
+	}
+	out.PortalCustomerID = portalCustomerID
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(name, 'Unknown') FROM portal_customers WHERE id = ?`, *portalCustomerID).Scan(&out.AuthorName); err != nil {
+		out.AuthorName = "Unknown"
+	}
+	out.AuthorAvatar = ""
+	return out, nil
+}
+
 type PortalRequestSummary struct {
 	ID                  int     `json:"id"`
 	WorkspaceID         int     `json:"workspace_id"`

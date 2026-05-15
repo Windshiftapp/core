@@ -106,8 +106,37 @@ func (r *WorkspaceRepository) ListActiveIDs() ([]int, error) {
 	return ids, rows.Err()
 }
 
+// ListActiveIDKeys returns active workspace id+key pairs.
+func (r *WorkspaceRepository) ListActiveIDKeys() ([]IDKey, error) {
+	rows, err := r.db.Query("SELECT id, key FROM workspaces WHERE active = true")
+	if err != nil {
+		return nil, fmt.Errorf("list active workspace id+keys: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var pairs []IDKey
+	for rows.Next() {
+		var p IDKey
+		if err := rows.Scan(&p.ID, &p.Key); err != nil {
+			return nil, fmt.Errorf("scan active workspace id+key: %w", err)
+		}
+		pairs = append(pairs, p)
+	}
+	return pairs, rows.Err()
+}
+
 // ListIDKeys returns every workspace's id+key pair, regardless of user
 // scope. Used by the workspace key cache to populate its in-memory map.
+// GetKey returns a workspace key by id.
+func (r *WorkspaceRepository) GetKey(id int) (string, error) {
+	var key string
+	err := r.db.QueryRow(`SELECT key FROM workspaces WHERE id = ?`, id).Scan(&key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return key, err
+}
+
 func (r *WorkspaceRepository) ListIDKeys() ([]IDKey, error) {
 	rows, err := r.db.Query("SELECT id, key FROM workspaces")
 	if err != nil {
@@ -221,6 +250,22 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 }
 
 // CreateTx inserts a new workspace within the given transaction and returns its ID.
+// GrantAdministratorRoleTx grants the Administrator role on a workspace to a user within a transaction.
+func (r *WorkspaceRepository) GrantAdministratorRoleTx(tx database.Tx, workspaceID int64, userID int) error {
+	result, err := tx.Exec(`
+		INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
+		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
+	`, workspaceID, userID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to grant admin role to workspace creator: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("administrator role not found; workspace creation aborted")
+	}
+	return nil
+}
+
 func (r *WorkspaceRepository) CreateTx(tx database.Tx, workspace *models.Workspace) (int64, error) {
 	now := time.Now()
 	var id int64
@@ -377,6 +422,40 @@ func (r *WorkspaceRepository) SaveTimeProjectCategories(workspaceID int, categor
 	}
 
 	return tx.Commit()
+}
+
+// ListActivePersonalWorkspaceIDs returns active personal workspace ids owned by userID.
+func (r *WorkspaceRepository) ListActivePersonalWorkspaceIDs(userID int) ([]int, error) {
+	rows, err := r.db.Query("SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ? AND active = true", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	ids := []int{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetActivePersonalWorkspaceID returns the active personal workspace owned by userID.
+func (r *WorkspaceRepository) GetActivePersonalWorkspaceID(userID int) (int, error) {
+	var id int
+	err := r.db.QueryRow(`
+		SELECT id FROM workspaces
+		WHERE is_personal = ? AND owner_id = ? AND active = ?
+	`, true, userID, true).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("get active personal workspace for user %d: %w", userID, err)
+	}
+	return id, nil
 }
 
 // CountNonPersonal returns the number of non-personal workspaces.
@@ -656,6 +735,55 @@ func (r *WorkspaceRepository) BuildWorkspaceMap() (map[string]int, error) {
 	}
 
 	return workspaceMap, rows.Err()
+}
+
+// GetHomepageLayoutJSON returns a workspace homepage layout JSON blob.
+func (r *WorkspaceRepository) GetHomepageLayoutJSON(workspaceID int) (string, error) {
+	var homepageLayout sql.NullString
+	err := r.db.QueryRow(`
+		SELECT homepage_layout
+		FROM workspaces
+		WHERE id = ?
+	`, workspaceID).Scan(&homepageLayout)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get homepage layout for workspace %d: %w", workspaceID, err)
+	}
+	if !homepageLayout.Valid {
+		return "", nil
+	}
+	return homepageLayout.String, nil
+}
+
+// UpdateHomepageLayoutJSON updates a workspace homepage layout JSON blob.
+func (r *WorkspaceRepository) UpdateHomepageLayoutJSON(workspaceID int, layoutJSON string, updatedAt time.Time) error {
+	res, err := r.db.Exec(`
+		UPDATE workspaces
+		SET homepage_layout = ?, updated_at = ?
+		WHERE id = ?
+	`, layoutJSON, updatedAt, workspaceID)
+	if err != nil {
+		return fmt.Errorf("update homepage layout for workspace %d: %w", workspaceID, err)
+	}
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountCollections returns the number of collections scoped to a workspace.
+func (r *WorkspaceRepository) CountCollections(workspaceID int) (int, error) {
+	var count int
+	if err := r.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM collections
+		WHERE workspace_id = ?
+	`, workspaceID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count collections for workspace %d: %w", workspaceID, err)
+	}
+	return count, nil
 }
 
 // GetCollectionQuery retrieves the QL query and workspace ID for a collection

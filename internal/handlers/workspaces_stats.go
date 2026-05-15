@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -96,11 +95,8 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			var collectionWorkspaceID sql.NullInt64
-			var collectionQuery sql.NullString
-			err = h.db.QueryRow(`SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).
-				Scan(&collectionWorkspaceID, &collectionQuery)
-			if errors.Is(err, sql.ErrNoRows) {
+			collectionWorkspaceID, collectionQuery, err := h.repo.GetCollectionQuery(collectionID)
+			if errors.Is(err, repository.ErrNotFound) {
 				respondNotFound(w, r, "collection")
 				return
 			}
@@ -109,13 +105,13 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			if collectionWorkspaceID.Valid && collectionWorkspaceID.Int64 != int64(workspaceID) {
+			if collectionWorkspaceID != nil && *collectionWorkspaceID != int64(workspaceID) {
 				respondBadRequest(w, r, "Collection does not belong to this workspace")
 				return
 			}
 
-			if collectionQuery.Valid && strings.TrimSpace(collectionQuery.String) != "" {
-				vqlQuery = collectionQuery.String
+			if strings.TrimSpace(collectionQuery) != "" {
+				vqlQuery = collectionQuery
 			}
 		}
 	}
@@ -146,13 +142,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Get total collections count
-	var collectionCount int
-	var err error
-	err = h.db.QueryRow(`
-		SELECT COUNT(*)
-		FROM collections
-		WHERE workspace_id = ?
-	`, workspaceID).Scan(&collectionCount)
+	collectionCount, err := h.repo.CountCollections(workspaceID)
 	if err != nil {
 		slog.Error("failed to count collections", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
 	}

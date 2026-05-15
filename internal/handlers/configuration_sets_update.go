@@ -122,57 +122,8 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Start transaction
-	tx, err := h.db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update the configuration set
-	if err = h.repo.Update(tx, id, &cs); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Save notification setting
-	var notificationSettingID *int
-	if cs.NotificationSettingID != nil {
-		nsID := *cs.NotificationSettingID
-		notificationSettingID = &nsID
-	}
-	if err = h.repo.SaveNotificationSetting(tx, id, notificationSettingID); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Save workspace assignments
-	if err = h.repo.SaveWorkspaceAssignments(tx, id, cs.WorkspaceIDs); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Save screen assignments
-	if err = h.repo.SaveScreenAssignments(tx, id, cs.CreateScreenID, cs.EditScreenID, cs.ViewScreenID); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Save item type configurations
-	if err = h.repo.SaveItemTypeConfigs(tx, id, cs.ItemTypeConfigs); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Save priority assignments
-	if err = h.repo.SavePriorityAssignments(tx, id, cs.PriorityIDs); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
+	// Update the configuration set and dependent assignments
+	if err = h.repo.UpdateFull(id, &cs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,14 +250,9 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	currentFracIndex := sql.NullString{}
-	if currentFrac != nil {
-		currentFracIndex = sql.NullString{String: *currentFrac, Valid: true}
-	}
-
 	// Check if the item is already in the correct position
-	if currentFracIndex.Valid {
-		current := currentFracIndex.String
+	if currentFrac != nil {
+		current := *currentFrac
 		// Item is already correctly positioned if:
 		// - It's after prev (or prev is empty)
 		// - It's before next (or next is empty)

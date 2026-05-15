@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -1208,7 +1207,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	}
 
 	managerType, actualManagerID, err := h.service.LookupManagerRow(ctx, managerID, channelID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "manager")
 		return
 	} else if err != nil {

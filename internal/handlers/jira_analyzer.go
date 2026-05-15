@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"windshift/internal/jira"
+	"windshift/internal/repository"
 )
 
 // GetProjects handles GET /api/admin/jira-import/projects?connection_id={id}&open_issues_only=true
@@ -291,11 +292,11 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert user map to slice and try to match with existing Windshift users
+	userRepo := repository.NewUserRepository(h.db)
 	for _, user := range userMap {
 		if user.Email != "" {
 			// Try to find matching Windshift user by email
-			var userID int
-			err = h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, user.Email).Scan(&userID)
+			userID, err := userRepo.GetIDByEmail(user.Email)
 			if err == nil {
 				user.MatchedUserID = &userID
 			}

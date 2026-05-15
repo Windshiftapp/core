@@ -13,6 +13,9 @@ import (
 	"windshift/internal/database"
 )
 
+// ErrAnalyticsCollectionNotFound is returned when an analytics collection does not exist.
+var ErrAnalyticsCollectionNotFound = sql.ErrNoRows
+
 // AnalyticsService provides analytics computations for collection/workspace data.
 type AnalyticsService struct {
 	db database.Database

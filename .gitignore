@@ -145,6 +145,8 @@ releases/v0.3.2.md
 scripts/*
 !scripts/pre-commit
 !scripts/check-layering.sh
+!scripts/check-handler-db-access.sh
+!scripts/report-handler-db-access.sh
 !scripts/.layering-baseline
 !scripts/openapi-convert/
 !scripts/openapi-convert/**
@@ -153,3 +155,4 @@ blog/
 .fallow/
 .windshift-local
 SECURITY_REVIEW_2026-05-06.md
+/docs

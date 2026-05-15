@@ -52,51 +52,8 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 	// is the single chronological feed (approve/reject/comment text included).
 	// Synthetic IDs for approval rows are negated to avoid colliding with
 	// item_history IDs in the response.
-	query := `
-		SELECT
-			ih.id, ih.item_id, ih.user_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value,
-			COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
-			COALESCE(u.email, '') as user_email
-		FROM item_history ih
-		LEFT JOIN users u ON ih.user_id = u.id
-		WHERE ih.item_id = ?
-		UNION ALL
-		SELECT
-			-d.id AS id,
-			ar.item_id,
-			COALESCE(d.actor_user_id, 0) AS user_id,
-			d.created_at AS changed_at,
-			'approval_' || d.decision AS field_name,
-			NULL AS old_value,
-			d.comment AS new_value,
-			COALESCE(u.first_name || ' ' || u.last_name, u.username, 'System') AS user_name,
-			COALESCE(u.email, '') AS user_email
-		FROM approval_decisions d
-		JOIN approval_requests ar ON ar.id = d.approval_request_id
-		LEFT JOIN users u ON u.id = d.actor_user_id
-		WHERE ar.item_id = ?
-		ORDER BY changed_at DESC
-	`
-
-	rows, err := h.db.Query(query, id, id)
+	history, err := repository.NewItemRepository(h.db).GetHistoryWithApprovals(id)
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	history := []models.ItemHistory{}
-	for rows.Next() {
-		var entry models.ItemHistory
-		err = rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		history = append(history, entry)
-	}
-
-	if err = rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

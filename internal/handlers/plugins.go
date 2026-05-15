@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -11,22 +10,25 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/plugins"
+	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/utils"
 )
 
 // PluginHandler handles plugin-related HTTP requests
 type PluginHandler struct {
-	db              database.Database
 	manager         *plugins.Manager
+	registry        *repository.PluginRegistryRepository
+	auditor         *logger.Auditor
 	pluginsDisabled bool
 }
 
 // NewPluginHandler creates a new plugin handler
 func NewPluginHandler(db database.Database, manager *plugins.Manager, disabled bool) *PluginHandler {
 	return &PluginHandler{
-		db:              db,
 		manager:         manager,
+		registry:        repository.NewPluginRegistryRepository(db),
+		auditor:         logger.NewAuditor(db),
 		pluginsDisabled: disabled,
 	}
 }
@@ -51,51 +53,28 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get plugins from database
-	rows, err := h.db.Query(`
-		SELECT id, name, version, description, author, enabled, routes, extensions, installed_at
-		FROM plugin_registry
-		ORDER BY name
-	`)
+	entries, err := h.registry.List()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	var pluginList []PluginInfo
-	for rows.Next() {
-		var p PluginInfo
-		var routesJSON sql.NullString
-		var extensionsJSON sql.NullString
-
-		err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.Description, &p.Author, &p.Enabled, &routesJSON, &extensionsJSON, &p.InstalledAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
+	pluginList := make([]PluginInfo, 0, len(entries))
+	for _, entry := range entries {
+		info := PluginInfo{
+			ID:          entry.ID,
+			Name:        entry.Name,
+			Version:     entry.Version,
+			Description: entry.Description,
+			Author:      entry.Author,
+			Enabled:     entry.Enabled,
+			Routes:      entry.Routes,
+			InstalledAt: entry.InstalledAt,
 		}
-
-		// Parse routes JSON
-		if routesJSON.Valid && routesJSON.String != "" {
-			var routes []map[string]string
-			if err := json.Unmarshal([]byte(routesJSON.String), &routes); err == nil {
-				p.Routes = routes
-			}
+		if entry.ExtensionsJSON != "" {
+			_ = json.Unmarshal([]byte(entry.ExtensionsJSON), &info.Extensions)
 		}
-
-		// Parse extensions JSON
-		if extensionsJSON.Valid && extensionsJSON.String != "" {
-			var extensions []plugins.Extension
-			if err := json.Unmarshal([]byte(extensionsJSON.String), &extensions); err == nil {
-				p.Extensions = extensions
-			}
-		}
-
-		pluginList = append(pluginList, p)
-	}
-	if err := rows.Err(); err != nil {
-		respondInternalError(w, r, err)
-		return
+		pluginList = append(pluginList, info)
 	}
 
 	// Check for loaded plugins not in database (skip if manager is nil)
@@ -206,7 +185,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionPluginUpload, logger.ResourcePlugin, nil, header.Filename)
+		h.auditor.Log(r, currentUser, logger.ActionPluginUpload, logger.ResourcePlugin, nil, header.Filename)
 	}
 	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
 }
@@ -284,8 +263,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update database
-	_, err = h.db.ExecWrite("UPDATE plugin_registry SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?", req.Enabled, pluginName)
-	if err != nil {
+	if err := h.registry.SetEnabled(pluginName, req.Enabled); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -309,15 +287,14 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete from database
-	_, err := h.db.ExecWrite("DELETE FROM plugin_registry WHERE name = ?", pluginName)
-	if err != nil {
+	if err := h.registry.Delete(pluginName); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionPluginDelete, logger.ResourcePlugin, nil, pluginName)
+		h.auditor.Log(r, currentUser, logger.ActionPluginDelete, logger.ResourcePlugin, nil, pluginName)
 	}
 	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin deleted successfully"})
 }
@@ -357,28 +334,17 @@ func (h *PluginHandler) syncPluginToDatabase() {
 				"description": r.Description,
 			})
 		}
-		routesJSON, _ := json.Marshal(routes)
-
-		// Convert extensions to JSON
 		extensionsJSON, _ := json.Marshal(p.Manifest.Extensions)
-
-		// Upsert plugin record
-		_, err := h.db.ExecWrite(`
-			INSERT INTO plugin_registry (name, version, description, author, path, routes, extensions, enabled)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(name) DO UPDATE SET
-				version = excluded.version,
-				description = excluded.description,
-				author = excluded.author,
-				path = excluded.path,
-				routes = excluded.routes,
-				extensions = excluded.extensions,
-				enabled = excluded.enabled,
-				updated_at = CURRENT_TIMESTAMP
-		`, p.Manifest.Name, p.Manifest.Version, p.Manifest.Description,
-			p.Manifest.Author, p.Path, string(routesJSON), string(extensionsJSON), p.Enabled)
-
-		if err != nil {
+		if err := h.registry.Upsert(repository.PluginRegistryUpsert{
+			Name:           p.Manifest.Name,
+			Version:        p.Manifest.Version,
+			Description:    p.Manifest.Description,
+			Author:         p.Manifest.Author,
+			Path:           p.Path,
+			Routes:         routes,
+			ExtensionsJSON: string(extensionsJSON),
+			Enabled:        p.Enabled,
+		}); err != nil {
 			// Log error but continue
 			slog.Error("failed to sync plugin to database", slog.String("plugin", p.Manifest.Name), slog.Any("error", err))
 		}

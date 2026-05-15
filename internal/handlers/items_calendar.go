@@ -99,9 +99,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the database
-	_, err = h.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?",
-		string(updatedJSON), time.Now().UTC(), id)
-	if err != nil {
+	if err := repository.NewItemRepository(h.db).UpdateCalendarData(id, string(updatedJSON), time.Now().UTC()); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -195,9 +193,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the database
-	_, err = h.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?",
-		string(updatedJSON), time.Now().UTC(), id)
-	if err != nil {
+	if err := repository.NewItemRepository(h.db).UpdateCalendarData(id, string(updatedJSON), time.Now().UTC()); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

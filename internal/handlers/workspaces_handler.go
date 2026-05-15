@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -257,16 +256,8 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return 0, err
 		}
 
-		result, err := tx.Exec(`
-			INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
-			SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
-		`, newID, user.ID, user.ID)
-		if err != nil {
-			return 0, fmt.Errorf("failed to grant admin role to workspace creator: %w", err)
-		}
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
-			return 0, fmt.Errorf("administrator role not found; workspace creation aborted")
+		if err := h.repo.GrantAdministratorRoleTx(tx, newID, user.ID); err != nil {
+			return 0, err
 		}
 		return newID, nil
 	})

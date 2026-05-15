@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -49,7 +48,7 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 		config, err = repo.FindConfigForCollection(collectionID)
 	}
 
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_coverage_configuration")
 		return
 	}
@@ -147,7 +146,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 
 	typeIDs, workspaceID, err := h.getRequirementTypeIDs(repo, id, r.URL.Query().Get("workspace_id"))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondJSONOK(w, models.TestCoverageSummary{})
 			return
 		}
@@ -197,7 +196,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 
 	typeIDs, workspaceID, err := h.getRequirementTypeIDs(repo, id, r.URL.Query().Get("workspace_id"))
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondJSONOK(w, emptyResponse())
 			return
 		}
@@ -262,7 +261,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 func (h *TestCoverageHandler) getRequirementTypeIDs(repo *repository.TestCoverageRepository, id, workspaceIDStr string) (typeIDs []int, workspaceID int, err error) {
 	if id == "default" {
 		if workspaceIDStr == "" {
-			return nil, 0, sql.ErrNoRows
+			return nil, 0, repository.ErrNotFound
 		}
 		workspaceID, err = strconv.Atoi(workspaceIDStr)
 		if err != nil {

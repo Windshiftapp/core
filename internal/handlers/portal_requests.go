@@ -222,69 +222,27 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Sanitize comment content to prevent XSS (strips HTML tags + dangerous Markdown URLs)
 	sanitizedContent := utils.SanitizeCommentContent(commentData.Content)
 
-	// Insert comment based on auth type
-	var err error
-	now := time.Now()
-	var commentID int64
-	var authorName, authorAvatar string
-	var responseAuthorID *int
-	var responsePortalCustomerID *int
-
-	if internalUserID != nil {
-		// Internal user: use author_id
-		insertQuery := `
-			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?) RETURNING id
-		`
-		err = h.db.QueryRowContext(ctx, insertQuery, itemID, *internalUserID, sanitizedContent, now, now).Scan(&commentID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Fetch the user's name for the response
-		nameQuery := `SELECT COALESCE(first_name || ' ' || last_name, 'Unknown'), COALESCE(avatar_url, '') FROM users WHERE id = ?`
-		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *internalUserID).Scan(&authorName, &authorAvatar); scanErr != nil {
-			authorName = "Unknown"
-			authorAvatar = ""
-		}
-		responseAuthorID = internalUserID
-	} else {
-		// Portal customer: use portal_customer_id
-		insertQuery := `
-			INSERT INTO comments (item_id, portal_customer_id, content, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?) RETURNING id
-		`
-		err = h.db.QueryRowContext(ctx, insertQuery, itemID, *portalCustomerID, sanitizedContent, now, now).Scan(&commentID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Fetch the portal customer's name for the response
-		nameQuery := `SELECT COALESCE(name, 'Unknown') FROM portal_customers WHERE id = ?`
-		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *portalCustomerID).Scan(&authorName); scanErr != nil {
-			authorName = "Unknown"
-		}
-		authorAvatar = ""
-		responsePortalCustomerID = portalCustomerID
+	comment, err := h.portalService.CreateRequestComment(ctx, itemID, sanitizedContent, internalUserID, portalCustomerID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Return the created comment
 	response := map[string]interface{}{
-		"id":            commentID,
-		"item_id":       itemID,
-		"content":       sanitizedContent,
-		"created_at":    now,
-		"updated_at":    now,
-		"author_name":   authorName,
-		"author_avatar": authorAvatar,
+		"id":            comment.ID,
+		"item_id":       comment.ItemID,
+		"content":       comment.Content,
+		"created_at":    comment.CreatedAt,
+		"updated_at":    comment.UpdatedAt,
+		"author_name":   comment.AuthorName,
+		"author_avatar": comment.AuthorAvatar,
 	}
-	if responseAuthorID != nil {
-		response["author_id"] = *responseAuthorID
+	if comment.AuthorID != nil {
+		response["author_id"] = *comment.AuthorID
 	}
-	if responsePortalCustomerID != nil {
-		response["portal_customer_id"] = *responsePortalCustomerID
+	if comment.PortalCustomerID != nil {
+		response["portal_customer_id"] = *comment.PortalCustomerID
 	}
 
 	respondJSONCreated(w, response)

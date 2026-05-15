@@ -20,6 +20,20 @@ func NewTeamRepository(db database.Database) *TeamRepository {
 	return &TeamRepository{db: db}
 }
 
+// UserExists reports whether a user exists.
+func (r *TeamRepository) UserExists(userID int) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userID).Scan(&exists)
+	return exists, err
+}
+
+// GroupExists reports whether a group exists.
+func (r *TeamRepository) GroupExists(groupID int) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", groupID).Scan(&exists)
+	return exists, err
+}
+
 // GetByID retrieves a team by ID with created_by_name, direct_member_count, and group_count
 func (r *TeamRepository) GetByID(id int) (*models.Team, error) {
 	var team models.Team

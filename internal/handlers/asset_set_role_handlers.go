@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -165,7 +164,7 @@ func (h *AssetHandler) ensureNotLastAdmin(w http.ResponseWriter, r *http.Request
 
 	// Is the assignment being revoked an admin assignment?
 	assignmentRoleID, err := h.repo.GetAssignmentRoleID(setID, roleAssignmentID, assignmentType)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, repository.ErrNotFound) {
 		// Missing row is handled by the subsequent DELETE path.
 		return true
 	}

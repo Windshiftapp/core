@@ -41,21 +41,12 @@ func (h *PortalHandler) renderPortalTitle(ctx context.Context, rt *models.Reques
 
 	switch {
 	case userID != nil:
-		var firstName, lastName, email string
-		if err := h.db.QueryRowContext(ctx,
-			`SELECT first_name, last_name, email FROM users WHERE id = ?`,
-			*userID,
-		).Scan(&firstName, &lastName, &email); err == nil {
-			name := strings.TrimSpace(firstName + " " + lastName)
+		if name, email, err := h.portalService.GetUserRequesterTemplateVars(ctx, *userID); err == nil {
 			vars["requester.name"] = name
 			vars["requester.email"] = email
 		}
 	case customerID != nil:
-		var name, email string
-		if err := h.db.QueryRowContext(ctx,
-			`SELECT name, email FROM portal_customers WHERE id = ?`,
-			*customerID,
-		).Scan(&name, &email); err == nil {
+		if name, email, err := h.portalService.GetCustomerRequesterTemplateVars(ctx, *customerID); err == nil {
 			vars["requester.name"] = name
 			vars["requester.email"] = email
 		}
@@ -77,43 +68,28 @@ func resolveCustomFieldNames(ctx context.Context, h *PortalHandler, customFields
 		return nil
 	}
 
-	var ids []interface{}
-	keyToValue := map[string]interface{}{}
+	var ids []int
+	keyToValue := map[int]interface{}{}
 	for k, v := range customFields {
-		if _, err := strconv.Atoi(k); err == nil {
-			ids = append(ids, k)
-			keyToValue[k] = v
+		if id, err := strconv.Atoi(k); err == nil {
+			ids = append(ids, id)
+			keyToValue[id] = v
 		}
 	}
 	if len(ids) == 0 {
 		return nil
 	}
 
-	placeholders := strings.Repeat("?,", len(ids))
-	placeholders = placeholders[:len(placeholders)-1]
-	rows, err := h.db.QueryContext(ctx,
-		"SELECT id, name FROM custom_field_definitions WHERE id IN ("+placeholders+")",
-		ids...,
-	)
+	names, err := h.portalService.GetCustomFieldNamesByID(ctx, ids)
 	if err != nil {
 		return nil
 	}
-	defer func() { _ = rows.Close() }()
 
 	out := map[string]string{}
-	for rows.Next() {
-		var id int
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			continue
-		}
-		idStr := strconv.Itoa(id)
-		if v, ok := keyToValue[idStr]; ok && name != "" {
+	for id, name := range names {
+		if v, ok := keyToValue[id]; ok && name != "" {
 			out[name] = formatTemplateValue(v)
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil
 	}
 	return out
 }

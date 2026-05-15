@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,6 +16,11 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
+
+// rowScanner abstracts sql.Row and sql.Rows for Scan.
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
 
 // respondJSON sends a JSON response with the given status code
 func respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
@@ -192,46 +196,16 @@ type channelResult struct {
 // single implementation behind PortalHandler.findChannelByPortalSlug and
 // FormHandler.findChannelByFormSlug.
 func findChannelBySlug(ctx context.Context, db database.Database, channelType, slug string, slugFromConfig func(*models.ChannelConfig) string) (*channelResult, error) {
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = ?
-		ORDER BY created_at DESC
-	`
-
-	rows, err := db.QueryContext(ctx, query, channelType)
+	candidates, err := repository.NewChannelRepository(db).ListSlugCandidates(ctx, channelType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query %s channels: %w", channelType, err)
+		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var ch models.Channel
-		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Type, &ch.Config, &ch.Status); err != nil {
-			// Log instead of silently dropping the row so operators see scan
-			// failures (driver issues, schema drift) instead of misdiagnosing
-			// them as "channel not found".
-			slog.Warn("findChannelBySlug scan failed", slog.String("component", "handlers"), slog.String("channel_type", channelType), slog.Any("error", err))
-			continue
-		}
-
-		var cfg models.ChannelConfig
-		if ch.Config != "" {
-			if err := json.Unmarshal([]byte(ch.Config), &cfg); err != nil {
-				slog.Warn("findChannelBySlug config unmarshal failed", slog.String("component", "handlers"), slog.String("channel_type", channelType), slog.Int("channel_id", ch.ID), slog.Any("error", err))
-				continue
-			}
-		}
-
-		if slugFromConfig(&cfg) == slug && ch.Status == "enabled" {
-			return &channelResult{channel: ch, config: cfg}, nil
+	for _, candidate := range candidates {
+		cfg := candidate.Config
+		if slugFromConfig(&cfg) == slug && candidate.Channel.Status == "enabled" {
+			return &channelResult{channel: candidate.Channel, config: candidate.Config}, nil
 		}
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate %s channels: %w", channelType, err)
-	}
-
 	return nil, fmt.Errorf("%s channel not found", channelType)
 }
 

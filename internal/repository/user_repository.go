@@ -36,6 +36,16 @@ func (r *UserRepository) Exists(id int) (bool, error) {
 	return ok, nil
 }
 
+// GetIDByEmail returns the user ID for an email address.
+func (r *UserRepository) GetIDByEmail(email string) (int, error) {
+	var id int
+	err := r.db.QueryRow(`SELECT id FROM users WHERE email = ?`, email).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return id, err
+}
+
 // GetFullName returns "first_name last_name" for a user. Used to enrich
 // audit details on channel-manager add/remove and similar admin actions.
 // Returns empty string + nil if the row is missing (caller treats that as

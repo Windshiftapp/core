@@ -562,8 +562,7 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 // --- Capability management endpoints ---
 
 func (h *ActionsHandler) isEnabledLLMConnection(connectionID int) bool {
-	var exists int
-	return h.db.QueryRow(`SELECT 1 FROM llm_connections WHERE id = ? AND is_enabled = true`, connectionID).Scan(&exists) == nil
+	return h.repo.IsEnabledLLMConnection(connectionID)
 }
 
 func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http.Request, capType models.CapabilityType, configStr string) bool {

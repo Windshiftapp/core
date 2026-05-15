@@ -373,8 +373,7 @@ func (h *TeamHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 
 	for _, userID := range req.UserIDs {
 		// Check user exists
-		var userExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", userID).Scan(&userExists)
+		userExists, err := h.teamRepo.UserExists(userID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -475,8 +474,7 @@ func (h *TeamHandler) AddGroups(w http.ResponseWriter, r *http.Request) {
 
 	for _, groupID := range req.GroupIDs {
 		// Check group exists
-		var groupExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", groupID).Scan(&groupExists)
+		groupExists, err := h.teamRepo.GroupExists(groupID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return

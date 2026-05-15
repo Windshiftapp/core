@@ -282,17 +282,12 @@ func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
 	if user == nil || permService == nil {
 		return []int{}, nil
 	}
-	rows, err := db.Query("SELECT id FROM workspaces WHERE active = true")
+	activeIDs, err := repository.NewWorkspaceRepository(db).ListActiveIDs()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			continue
-		}
+	for _, id := range activeIDs {
 		hasView, err := permService.HasWorkspacePermission(user.ID, id, models.PermissionItemView)
 		if err != nil {
 			slog.Error("error checking view permission", slog.Int("workspace_id", id), slog.Any("error", err))
@@ -302,7 +297,7 @@ func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
 			ids = append(ids, id)
 		}
 	}
-	return ids, rows.Err()
+	return ids, nil
 }
 
 // GetAccessibleWorkspaceKeys returns a set of workspace keys the user can view.
@@ -311,27 +306,21 @@ func GetAccessibleWorkspaceKeys(user *models.User, db database.Database,
 	if user == nil || permService == nil {
 		return map[string]bool{}, nil
 	}
-	rows, err := db.Query("SELECT id, key FROM workspaces WHERE active = true")
+	pairs, err := repository.NewWorkspaceRepository(db).ListActiveIDKeys()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query workspaces: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 	keys := make(map[string]bool)
-	for rows.Next() {
-		var id int
-		var key string
-		if err := rows.Scan(&id, &key); err != nil {
-			continue
-		}
-		hasView, err := permService.HasWorkspacePermission(user.ID, id, models.PermissionItemView)
+	for _, pair := range pairs {
+		hasView, err := permService.HasWorkspacePermission(user.ID, pair.ID, models.PermissionItemView)
 		if err != nil {
 			continue
 		}
 		if hasView {
-			keys[key] = true
+			keys[pair.Key] = true
 		}
 	}
-	return keys, rows.Err()
+	return keys, nil
 }
 
 // BuildWorkspaceIDPlaceholders builds a parameterized IN clause for workspace IDs.

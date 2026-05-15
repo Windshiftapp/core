@@ -24,6 +24,44 @@ func NewChannelRepository(db database.Database) *ChannelRepository {
 	return &ChannelRepository{db: db}
 }
 
+// SlugCandidate is a minimal channel row used for slug matching from JSON config.
+type SlugCandidate struct {
+	Channel models.Channel
+	Config  models.ChannelConfig
+}
+
+// ListSlugCandidates returns channels of a type with parsed config, newest first.
+func (r *ChannelRepository) ListSlugCandidates(ctx context.Context, channelType string) ([]SlugCandidate, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name, type, config, status
+		FROM channels
+		WHERE type = ?
+		ORDER BY created_at DESC
+	`, channelType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query %s channels: %w", channelType, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	candidates := []SlugCandidate{}
+	for rows.Next() {
+		var ch models.Channel
+		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Type, &ch.Config, &ch.Status); err != nil {
+			slog.Warn("ListSlugCandidates scan failed", slog.String("component", "repository"), slog.String("channel_type", channelType), slog.Any("error", err))
+			continue
+		}
+		var cfg models.ChannelConfig
+		if ch.Config != "" {
+			if err := json.Unmarshal([]byte(ch.Config), &cfg); err != nil {
+				slog.Warn("ListSlugCandidates config unmarshal failed", slog.String("component", "repository"), slog.String("channel_type", channelType), slog.Int("channel_id", ch.ID), slog.Any("error", err))
+				continue
+			}
+		}
+		candidates = append(candidates, SlugCandidate{Channel: ch, Config: cfg})
+	}
+	return candidates, rows.Err()
+}
+
 // ChannelListFilters contains filter parameters for listing channels
 type ChannelListFilters struct {
 	CategoryID      *int   // Filter by category (nil = all, -1 = uncategorized)
@@ -434,6 +472,9 @@ func (r *ChannelRepository) FindManagerRow(ctx context.Context, id, channelID in
 		`SELECT manager_type, manager_id FROM channel_managers WHERE id = ? AND channel_id = ?`,
 		id, channelID,
 	).Scan(&managerType, &managerID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", 0, ErrNotFound
+	}
 	return
 }
 

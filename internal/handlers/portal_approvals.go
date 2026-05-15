@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -137,12 +136,11 @@ func (h *PortalHandler) requirePortalCustomerID(w http.ResponseWriter, r *http.R
 	}
 	// Fall back to looking up a customer row linked to the internal user.
 	if internalUserID != nil {
-		var cid int
-		err := h.db.QueryRow(`SELECT id FROM portal_customers WHERE user_id = ? LIMIT 1`, *internalUserID).Scan(&cid)
+		cid, err := h.portalService.GetCustomerIDForUser(r.Context(), *internalUserID)
 		if err == nil && cid > 0 {
 			return cid, true
 		}
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !errors.Is(err, services.ErrPortalCustomerNotFound) {
 			respondInternalError(w, r, err)
 			return 0, false
 		}

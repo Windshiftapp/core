@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -47,19 +47,12 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get workspace homepage_layout from database
-	var homepageLayout sql.NullString
-	err := h.db.QueryRow(`
-		SELECT homepage_layout
-		FROM workspaces
-		WHERE id = ?
-	`, workspaceID).Scan(&homepageLayout)
-
+	homepageLayout, err := h.repo.GetHomepageLayoutJSON(workspaceID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "workspace")
+		return
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			respondNotFound(w, r, "workspace")
-			return
-		}
 		slog.Error("failed to get homepage layout", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
@@ -67,8 +60,8 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 
 	// If no layout exists, return empty structure
 	var layout models.WorkspaceHomepageLayout
-	if homepageLayout.Valid && homepageLayout.String != "" {
-		if err := json.Unmarshal([]byte(homepageLayout.String), &layout); err != nil {
+	if homepageLayout != "" {
+		if err := json.Unmarshal([]byte(homepageLayout), &layout); err != nil {
 			slog.Error("failed to parse homepage layout JSON", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
 			respondInternalError(w, r, err)
 			return
@@ -179,13 +172,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	}
 
 	// Update database
-	_, err = h.db.Exec(`
-		UPDATE workspaces
-		SET homepage_layout = ?, updated_at = ?
-		WHERE id = ?
-	`, string(layoutJSON), time.Now(), workspaceID)
-
-	if err != nil {
+	if err := h.repo.UpdateHomepageLayoutJSON(workspaceID, string(layoutJSON), time.Now()); err != nil {
 		slog.Error("failed to update homepage layout", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
@@ -229,59 +216,32 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 
 	// Fall back to default workflow if service returned nil (e.g. personal workspace)
 	if workflowID == nil {
-		var defaultID int
-		err = h.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true LIMIT 1`).Scan(&defaultID)
-		if err != nil {
+		workflowID, err = workflowService.GetDefaultWorkflowID()
+		if err != nil || workflowID == nil {
 			respondJSONOK(w, []models.Status{})
 			return
 		}
-		workflowID = &defaultID
 	}
 
-	// Get statuses from workflow transitions
-	rows, err := h.db.Query(`
-		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed
-		FROM workflow_transitions wt
-		JOIN statuses s ON s.id = wt.to_status_id OR (wt.from_status_id IS NOT NULL AND s.id = wt.from_status_id)
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE wt.workflow_id = ?
-		ORDER BY s.id
-	`, *workflowID)
+	statusResults, err := services.NewStatusService(h.db).ListWorkflowStatuses(*workflowID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var statuses []models.Status
-	for rows.Next() {
-		var status models.Status
-		var categoryName, categoryColor sql.NullString
-		var isCompleted sql.NullBool
-		err := rows.Scan(
-			&status.ID, &status.Name, &status.Description, &status.CategoryID,
-			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-			&categoryName, &categoryColor, &isCompleted,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		status.CategoryName = categoryName.String
-		status.CategoryColor = categoryColor.String
-		status.IsCompleted = isCompleted.Bool
-
-		statuses = append(statuses, status)
-	}
-	if err := rows.Err(); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if statuses == nil {
-		statuses = []models.Status{}
+	statuses := make([]models.Status, 0, len(statusResults))
+	for _, st := range statusResults {
+		statuses = append(statuses, models.Status{
+			ID:            st.ID,
+			Name:          st.Name,
+			Description:   st.Description,
+			CategoryID:    st.CategoryID,
+			IsDefault:     st.IsDefault,
+			CreatedAt:     st.CreatedAt,
+			UpdatedAt:     st.UpdatedAt,
+			CategoryName:  st.CategoryName,
+			CategoryColor: st.CategoryColor,
+			IsCompleted:   st.IsCompleted,
+		})
 	}
 
 	respondJSONOK(w, statuses)

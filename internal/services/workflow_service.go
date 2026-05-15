@@ -185,6 +185,16 @@ func (s *WorkflowService) GetWorkflowIDForItem(workspaceID int, itemTypeID *int)
 	return nil, nil
 }
 
+// GetDefaultWorkflowID returns the global default workflow ID.
+func (s *WorkflowService) GetDefaultWorkflowID() (*int, error) {
+	var defaultID int
+	err := s.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true LIMIT 1`).Scan(&defaultID)
+	if err != nil {
+		return nil, err
+	}
+	return &defaultID, nil
+}
+
 // IsValidStatusTransition checks if a status transition is allowed by the workflow
 // Uses the full fallback chain to determine the correct workflow
 func (s *WorkflowService) IsValidStatusTransition(workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64) (bool, error) {

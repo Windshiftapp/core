@@ -1,98 +1,40 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type ThemeHandler struct {
-	DB interface {
-		Query(query string, args ...interface{}) (*sql.Rows, error)
-		QueryRow(query string, args ...interface{}) *sql.Row
-		Exec(query string, args ...interface{}) (sql.Result, error)
-	}
+	service *services.ThemeService
 	auditor *logger.Auditor
 }
 
-func NewThemeHandler(db interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
-	Exec(query string, args ...interface{}) (sql.Result, error)
-}, auditor *logger.Auditor) *ThemeHandler {
-	return &ThemeHandler{DB: db, auditor: auditor}
-}
-
-// themeColumns is the shared SELECT column list used by every theme query.
-const themeColumns = `id, name, description, is_default, is_active,
-	nav_background_color_light, nav_text_color_light,
-	nav_background_color_dark, nav_text_color_dark,
-	created_at, updated_at`
-
-// rowScanner abstracts sql.Row and sql.Rows for Scan.
-type rowScanner interface {
-	Scan(dest ...interface{}) error
-}
-
-// scanTheme reads a themes row from s into t.
-func scanTheme(s rowScanner, t *models.Theme) error {
-	return s.Scan(
-		&t.ID, &t.Name, &t.Description,
-		&t.IsDefault, &t.IsActive,
-		&t.NavBackgroundColorLight, &t.NavTextColorLight,
-		&t.NavBackgroundColorDark, &t.NavTextColorDark,
-		&t.CreatedAt, &t.UpdatedAt,
-	)
-}
-
-// getThemeByID fetches a single theme by primary key.
-func (h *ThemeHandler) getThemeByID(id int64) (models.Theme, error) {
-	var theme models.Theme
-	err := scanTheme(h.DB.QueryRow(`SELECT `+themeColumns+` FROM themes WHERE id = ?`, id), &theme)
-	return theme, err
+func NewThemeHandler(service *services.ThemeService, auditor *logger.Auditor) *ThemeHandler {
+	return &ThemeHandler{service: service, auditor: auditor}
 }
 
 // GetThemes returns all themes
 func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(`SELECT ` + themeColumns + ` FROM themes ORDER BY is_default DESC, name ASC`)
+	themes, err := h.service.List()
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query themes: %w", err))
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var themes []models.Theme
-	for rows.Next() {
-		var theme models.Theme
-		if err := scanTheme(rows, &theme); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to scan theme: %w", err))
-			return
-		}
-		themes = append(themes, theme)
-	}
-
-	if err := rows.Err(); err != nil {
-		respondInternalError(w, r, fmt.Errorf("error iterating themes: %w", err))
-		return
-	}
-
 	respondJSONOK(w, themes)
 }
 
 // GetActiveTheme returns the currently active theme
 func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
-	var theme models.Theme
-	err := scanTheme(
-		h.DB.QueryRow(`SELECT `+themeColumns+` FROM themes WHERE is_active = true ORDER BY is_default DESC LIMIT 1`),
-		&theme,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
+	theme, err := h.service.GetActive()
+	if errors.Is(err, repository.ErrNotFound) {
 		// No active theme found - return null
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("null"))
@@ -102,7 +44,6 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, fmt.Errorf("failed to get active theme: %w", err))
 		return
 	}
-
 	respondJSONOK(w, theme)
 }
 
@@ -132,37 +73,21 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
 
-	query := `
-		INSERT INTO themes (name, description, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`
-
-	now := time.Now()
-	var themeID int64
-	err := h.DB.QueryRow(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, now, now).Scan(&themeID)
+	theme, err := h.service.Create(req)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to create theme: %w", err))
 		return
 	}
 
-	theme, err := h.getThemeByID(themeID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to get created theme: %w", err))
-		return
-	}
-
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		themeIDInt := int(themeID)
-		h.auditor.Log(r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &themeIDInt, theme.Name)
+		h.auditor.Log(r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &theme.ID, theme.Name)
 	}
-
 	respondJSONCreated(w, theme)
 }
 
@@ -172,42 +97,22 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
 	req, ok := decodeJSON[models.ThemeUpdateRequest](w, r)
 	if !ok {
 		return
 	}
-
 	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
 
-	// If activating this theme, deactivate all others
-	if req.IsActive {
-		if _, err := h.DB.Exec("UPDATE themes SET is_active = false WHERE id != ?", themeID); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to deactivate other themes: %w", err))
-			return
-		}
-	}
-
-	query := `
-		UPDATE themes
-		SET name = ?, description = ?, nav_background_color_light = ?, nav_text_color_light = ?,
-		    nav_background_color_dark = ?, nav_text_color_dark = ?, is_active = ?, updated_at = ?
-		WHERE id = ?
-	`
-
-	now := time.Now()
-	_, err := h.DB.Exec(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.IsActive, now, themeID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to update theme: %w", err))
+	theme, err := h.service.Update(themeID, req)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "theme")
 		return
 	}
-
-	theme, err := h.getThemeByID(int64(themeID))
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to get updated theme: %w", err))
+		respondInternalError(w, r, fmt.Errorf("failed to update theme: %w", err))
 		return
 	}
 
@@ -215,7 +120,6 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionThemeUpdate, logger.ResourceTheme, &themeID, theme.Name)
 	}
-
 	respondJSONOK(w, theme)
 }
 
@@ -226,26 +130,15 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	// Check if theme exists and is not default
-	var isDefault bool
-	err = h.DB.QueryRow("SELECT is_default FROM themes WHERE id = ?", themeID).Scan(&isDefault)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			respondNotFound(w, r, "theme")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to check theme: %w", err))
+	err := h.service.Delete(themeID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "theme")
 		return
 	}
-
-	if isDefault {
+	if errors.Is(err, services.ErrDefaultThemeDelete) {
 		respondValidationError(w, r, "Cannot delete default theme")
 		return
 	}
-
-	_, err = h.DB.Exec("DELETE FROM themes WHERE id = ?", themeID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to delete theme: %w", err))
 		return
@@ -255,7 +148,6 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionThemeDelete, logger.ResourceTheme, &themeID, "")
 	}
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -266,29 +158,11 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	// Check if theme exists
-	var exists bool
-	err = h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM themes WHERE id = ?)", themeID).Scan(&exists)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to check theme: %w", err))
-		return
-	}
-
-	if !exists {
+	err := h.service.Activate(themeID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "theme")
 		return
 	}
-
-	// Deactivate all themes and activate the selected one
-	_, err = h.DB.Exec("UPDATE themes SET is_active = false")
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to deactivate themes: %w", err))
-		return
-	}
-
-	_, err = h.DB.Exec("UPDATE themes SET is_active = true, updated_at = ? WHERE id = ?", time.Now(), themeID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to activate theme: %w", err))
 		return
@@ -298,7 +172,6 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionThemeActivate, logger.ResourceTheme, &themeID, "")
 	}
-
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"success": true}`))
 }

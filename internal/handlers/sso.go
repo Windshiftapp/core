@@ -20,6 +20,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/plugins"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
@@ -287,10 +288,7 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	state := generateRandomState()
 
 	// Store state token with redirect_uri and remember_me
-	_, storeErr := h.db.Exec(`
-		INSERT INTO sso_state_tokens (provider_id, state, redirect_uri, remember_me, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, provider.ID, state, redirectAfterLogin, rememberMe, time.Now().Add(5*time.Minute))
+	storeErr := repository.NewSSOStateRepository(h.db).Store(provider.ID, state, redirectAfterLogin, rememberMe, time.Now().Add(5*time.Minute))
 	if storeErr != nil {
 		slog.Error("failed to store OIDC state token", "error", storeErr)
 		respondInternalError(w, r, storeErr)
@@ -373,19 +371,15 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		// most likely the 5-minute expiry elapsed — fail closed instead of
 		// silently defaulting to "/", so the user gets a retry prompt and the
 		// audit log carries a discrete signal.
-		var stateTokenID int
-		var storedRedirectURI string
-		var rememberMe bool
-		stateErr := h.db.QueryRow(`
-			SELECT id, redirect_uri, remember_me FROM sso_state_tokens
-			WHERE state = ? AND provider_id = ? AND expires_at > ?
-		`, state, provider.ID, time.Now()).Scan(&stateTokenID, &storedRedirectURI, &rememberMe)
+		token, stateErr := repository.NewSSOStateRepository(h.db).GetValid(state, provider.ID, time.Now())
 		if stateErr != nil {
 			slog.Warn("OIDC state token missing or expired", slog.String("component", "sso"), slog.String("provider", provider.Slug))
 			h.redirectWithError(w, r, "Login session expired. Please try signing in again.")
 			return
 		}
-		_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
+		_ = repository.NewSSOStateRepository(h.db).Delete(token.ID)
+		storedRedirectURI := token.RedirectURI
+		rememberMe := token.RememberMe
 		if storedRedirectURI == "" || !isValidRedirectURI(storedRedirectURI) {
 			storedRedirectURI = "/"
 		}

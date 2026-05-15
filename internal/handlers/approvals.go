@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -73,7 +72,7 @@ func (h *ApprovalHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	req, err := h.approvalService.GetRequest(requestID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, services.ErrApprovalNotFound) {
 			respondNotFound(w, r, "Approval request")
 			return
 		}
@@ -196,7 +195,7 @@ func (h *ApprovalHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 
 	req, err := h.approvalService.GetRequest(requestID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, services.ErrApprovalNotFound) {
 			respondNotFound(w, r, "Approval request")
 			return
 		}
@@ -433,7 +432,7 @@ func (h *ApprovalHandler) userCanViewRequest(user *models.User, req *models.Appr
 func (h *ApprovalHandler) requestItemIDOrNotFound(w http.ResponseWriter, r *http.Request, requestID int) (int, bool) {
 	itemID, err := h.approvalService.GetItemIDForRequest(r.Context(), requestID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, services.ErrApprovalNotFound) {
 			respondNotFound(w, r, "Approval request")
 		} else {
 			respondInternalError(w, r, err)

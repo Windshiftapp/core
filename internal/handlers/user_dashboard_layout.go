@@ -1,13 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"windshift/internal/models"
 )
@@ -37,26 +33,11 @@ func (h *UserPreferencesHandler) GetDashboardLayout(w http.ResponseWriter, r *ht
 		return
 	}
 
-	prefs, err := h.loadUserPreferences(user.ID)
+	layout, err := h.service.GetDashboardLayout(user.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	layout := models.UserDashboardLayout{
-		Sections: []models.UserDashboardSection{},
-		Widgets:  []models.UserDashboardWidget{},
-	}
-	if prefs.DashboardLayout != nil {
-		layout = *prefs.DashboardLayout
-		if layout.Sections == nil {
-			layout.Sections = []models.UserDashboardSection{}
-		}
-		if layout.Widgets == nil {
-			layout.Widgets = []models.UserDashboardWidget{}
-		}
-	}
-
 	respondJSONOK(w, layout)
 }
 
@@ -119,67 +100,11 @@ func (h *UserPreferencesHandler) UpdateDashboardLayout(w http.ResponseWriter, r 
 		}
 	}
 
-	// Merge layout into existing preferences so we don't clobber color_mode / theme_id.
-	prefs, err := h.loadUserPreferences(user.ID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	prefs.DashboardLayout = &layout
-
-	if err := h.saveUserPreferences(user.ID, prefs); err != nil {
+	if err := h.service.UpdateDashboardLayout(user.ID, layout); err != nil {
 		slog.Error("failed to save dashboard layout", slog.String("component", "user_preferences"), slog.Int("user_id", user.ID), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}
 
 	respondJSONOK(w, layout)
-}
-
-// loadUserPreferences reads and parses the user's preferences JSON, returning a
-// zero value when no row exists.
-func (h *UserPreferencesHandler) loadUserPreferences(userID int) (models.UserPreferencesData, error) {
-	var prefs models.UserPreferencesData
-	var raw string
-	err := h.DB.QueryRow("SELECT preferences FROM user_preferences WHERE user_id = ?", userID).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return prefs, nil
-	}
-	if err != nil {
-		return prefs, err
-	}
-	if raw == "" {
-		return prefs, nil
-	}
-	if err := json.Unmarshal([]byte(raw), &prefs); err != nil {
-		return prefs, err
-	}
-	return prefs, nil
-}
-
-// saveUserPreferences writes the preferences JSON, inserting when no row exists.
-func (h *UserPreferencesHandler) saveUserPreferences(userID int, prefs models.UserPreferencesData) error {
-	bytes, err := json.Marshal(prefs)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-
-	var existing string
-	err = h.DB.QueryRow("SELECT preferences FROM user_preferences WHERE user_id = ?", userID).Scan(&existing)
-	if errors.Is(err, sql.ErrNoRows) {
-		_, err = h.DB.Exec(
-			"INSERT INTO user_preferences (user_id, preferences, created_at, updated_at) VALUES (?, ?, ?, ?)",
-			userID, string(bytes), now, now,
-		)
-		return err
-	}
-	if err != nil {
-		return err
-	}
-	_, err = h.DB.Exec(
-		"UPDATE user_preferences SET preferences = ?, updated_at = ? WHERE user_id = ?",
-		string(bytes), now, userID,
-	)
-	return err
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/logger"
+	"windshift/internal/repository"
 	"windshift/internal/sso"
 )
 
@@ -113,10 +114,7 @@ func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store state token for CSRF protection
-	_, storeErr := h.db.Exec(`
-		INSERT INTO sso_state_tokens (provider_id, state, redirect_uri, remember_me, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, provider.ID, state, redirectURI, rememberMe, time.Now().Add(5*time.Minute))
+	storeErr := repository.NewSSOStateRepository(h.db).Store(provider.ID, state, redirectURI, rememberMe, time.Now().Add(5*time.Minute))
 	if storeErr != nil {
 		slog.Error("failed to store SAML state token", "error", storeErr)
 		h.redirectWithError(w, r, "Internal server error")
@@ -166,20 +164,16 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 	}
 
 	// Validate state token
-	var stateTokenID int
-	var redirectURI string
-	var rememberMe bool
-	err = h.db.QueryRow(`
-		SELECT id, redirect_uri, remember_me FROM sso_state_tokens
-		WHERE state = ? AND provider_id = ? AND expires_at > ?
-	`, relayState, provider.ID, time.Now()).Scan(&stateTokenID, &redirectURI, &rememberMe)
+	token, err := repository.NewSSOStateRepository(h.db).GetValid(relayState, provider.ID, time.Now())
 	if err != nil {
 		slog.Warn("SAML state token not found, rejecting request", "provider", provider.Slug)
 		h.redirectWithError(w, r, "Invalid or expired authentication request. Please try again.")
 		return
 	}
+	redirectURI := token.RedirectURI
+	rememberMe := token.RememberMe
 	// Delete used state token (single-use)
-	_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
+	_ = repository.NewSSOStateRepository(h.db).Delete(token.ID)
 
 	// Convert SAML attributes to OIDCClaims for reuse of FindOrCreateUser
 	claims := h.samlAssertionToClaims(assertionInfo, provider)

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
@@ -77,7 +76,7 @@ func (h *AnalyticsHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) 
 	// Hide existence (404) rather than 403, per repo-wide convention.
 	if collectionID > 0 {
 		collWsID, err := h.analyticsService.GetCollectionWorkspaceID(collectionID)
-		if errors.Is(err, sql.ErrNoRows) || collWsID == 0 || collWsID != workspaceID {
+		if errors.Is(err, services.ErrAnalyticsCollectionNotFound) || collWsID == 0 || collWsID != workspaceID {
 			respondNotFound(w, r, "Collection")
 			return
 		}

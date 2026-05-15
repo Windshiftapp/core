@@ -650,7 +650,7 @@ func (r *AssetRepository) DeleteGroupRoleAssignment(assignmentID, setID int) err
 
 // GetAssignmentRoleID returns the role_id of a specific assignment for use in
 // admin-guard checks. kind is "user" or "group" (anything else treated as user).
-// Returns sql.ErrNoRows when the assignment does not exist.
+// Returns ErrNotFound when the assignment does not exist.
 func (r *AssetRepository) GetAssignmentRoleID(setID, assignmentID int, kind string) (int, error) {
 	var query string
 	if kind == "group" {
@@ -660,6 +660,9 @@ func (r *AssetRepository) GetAssignmentRoleID(setID, assignmentID int, kind stri
 	}
 	var roleID int
 	err := r.db.QueryRow(query, assignmentID, setID).Scan(&roleID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
 	return roleID, err
 }
 

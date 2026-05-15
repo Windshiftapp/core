@@ -86,20 +86,8 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find user's personal workspace IDs so we include all items from them
-	var personalWSIDs []int
-	pwsRows, err := h.db.Query("SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ? AND active = true", user.ID)
+	personalWSIDs, err := repository.NewWorkspaceRepository(h.db).ListActivePersonalWorkspaceIDs(user.ID)
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = pwsRows.Close() }()
-	for pwsRows.Next() {
-		var id int
-		if err = pwsRows.Scan(&id); err == nil {
-			personalWSIDs = append(personalWSIDs, id)
-		}
-	}
-	if err := pwsRows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -310,36 +298,25 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id int
-	var content, date, updatedAtStr string
-	err := h.db.QueryRow(
-		`SELECT id, content, date, updated_at FROM daily_briefings WHERE user_id = ? AND error IS NULL ORDER BY date DESC LIMIT 1`,
-		user.ID,
-	).Scan(&id, &content, &date, &updatedAtStr)
-
+	briefing, err := repository.NewAIRepository(h.db).GetLatestSuccessfulDailyBriefing(user.ID)
 	if err != nil {
 		slog.Warn("GetDailyBriefing: no briefing found", slog.Int("user_id", user.ID), slog.Any("error", err))
 		respondJSONOK(w, map[string]interface{}{"content": ""})
 		return
 	}
 
-	generatedAt := updatedAtStr
-	if t, parseErr := time.Parse("2006-01-02 15:04:05", updatedAtStr); parseErr == nil {
-		generatedAt = t.Format(time.RFC3339)
-	}
-
 	slog.Info("GetDailyBriefing: returning briefing",
 		slog.Int("user_id", user.ID),
-		slog.Int("id", id),
-		slog.String("date", date),
-		slog.String("updated_at_str", updatedAtStr),
-		slog.String("generated_at", generatedAt),
-		slog.Int("content_len", len(content)),
+		slog.Int("id", briefing.ID),
+		slog.String("date", briefing.Date),
+		slog.String("updated_at_str", briefing.UpdatedAt),
+		slog.String("generated_at", briefing.GeneratedAt),
+		slog.Int("content_len", len(briefing.Content)),
 	)
 
 	// Extract and resolve item key references from content
 	itemKeyRe := regexp.MustCompile(`[A-Z]{2,10}-\d+`)
-	keys := itemKeyRe.FindAllString(content, -1)
+	keys := itemKeyRe.FindAllString(briefing.Content, -1)
 
 	references := map[string]interface{}{}
 	if len(keys) > 0 {
@@ -363,10 +340,10 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, map[string]interface{}{
-		"id":           id,
-		"content":      content,
-		"date":         date,
-		"generated_at": generatedAt,
+		"id":           briefing.ID,
+		"content":      briefing.Content,
+		"date":         briefing.Date,
+		"generated_at": briefing.GeneratedAt,
 		"references":   references,
 	})
 }
