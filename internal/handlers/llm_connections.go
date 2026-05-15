@@ -51,7 +51,7 @@ func (h *LLMConnectionHandler) GetConnection(w http.ResponseWriter, r *http.Requ
 }
 
 // validateConnectionRequest checks that name, provider_type, and model are
-// non-empty and that base_url (when provided) is a valid external URL.
+// non-empty and that base_url (when provided) is a valid admin-configured HTTP(S) URL.
 // Returns true when validation passes; on failure it writes the error response
 // and returns false.
 func validateConnectionRequest(w http.ResponseWriter, r *http.Request, name string, providerType llm.ProviderType, model, baseURL string) bool {
@@ -60,7 +60,7 @@ func validateConnectionRequest(w http.ResponseWriter, r *http.Request, name stri
 		return false
 	}
 	if baseURL != "" {
-		if err := utils.ValidateExternalURL(baseURL); err != nil {
+		if err := utils.ValidateHTTPBaseURL(baseURL); err != nil {
 			respondBadRequest(w, r, "invalid base URL: "+err.Error())
 			return false
 		}

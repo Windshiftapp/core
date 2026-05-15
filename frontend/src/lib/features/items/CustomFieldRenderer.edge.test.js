@@ -39,7 +39,7 @@ function renderStatic(props) {
 //   - Malformed field.options JSON (corrupt DB row or mid-migration state)
 //   - Type-mismatched value (data drift after a field_type change)
 //   - Duplicate ids in a multiselect array (no server-side dedup)
-//   - URL field with a javascript: scheme (XSS guard — see notes below)
+//   - URL field with dangerous schemes (XSS guard)
 
 describe('unknown field_type', () => {
   test('falls through to text rendering, no crash', () => {
@@ -154,31 +154,34 @@ describe('type-mismatched values (data drift)', () => {
 });
 
 describe('URL field with dangerous schemes (XSS guard)', () => {
-  test('LATENT: javascript: URL is rendered verbatim as href in static variant', () => {
-    // ⚠️  The URL field branch does `<a href={value}>{value}</a>` without
-    // sanitizing the scheme. A javascript: URL stored in cfv would be
-    // executable if a user clicks it. The backend doesn't sanitize cfv
-    // strings, so this is a real (if low-likelihood) XSS vector.
-    //
-    // This test documents current behavior. Suggested fix: either sanitize
-    // the value on the renderer side (`value.startsWith('http')` gate),
-    // or sanitize on POST /items at the cfv level. Once fixed, flip
-    // the assertion: the href must NOT contain "javascript:".
+  test('javascript: URL is displayed as text but not used as the href', () => {
     renderStatic({
       field: { field_type: 'url', name: 'Link' },
       value: 'javascript:alert(1)',
     });
     const link = screen.getByRole('link');
-    expect(link.getAttribute('href')).toBe('javascript:alert(1)');
+    expect(link).toHaveTextContent('javascript:alert(1)');
+    expect(link.getAttribute('href')).toBe('#');
   });
 
-  test('LATENT: data: URL is also rendered without sanitization', () => {
+  test('data: URL is displayed as text but not used as the href', () => {
     renderStatic({
       field: { field_type: 'url', name: 'Link' },
       value: 'data:text/html,<script>alert(1)</script>',
     });
     const link = screen.getByRole('link');
-    expect(link.getAttribute('href')).toContain('data:');
+    expect(link).toHaveTextContent('data:text/html,<script>alert(1)</script>');
+    expect(link.getAttribute('href')).toBe('#');
+  });
+
+  test('protocol-relative URL is displayed as text but not used as the href', () => {
+    renderStatic({
+      field: { field_type: 'url', name: 'Link' },
+      value: '//evil.example/path',
+    });
+    const link = screen.getByRole('link');
+    expect(link).toHaveTextContent('//evil.example/path');
+    expect(link.getAttribute('href')).toBe('#');
   });
 
   test('safe https URL renders unchanged', () => {

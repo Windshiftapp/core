@@ -118,6 +118,9 @@ export function safeHref(url: string | null | undefined): string {
   if (!url) return '#';
   const trimmed = String(url).trim();
   if (!trimmed) return '#';
+  // Reject protocol-relative URLs (`//evil.com`): browsers resolve them as
+  // external links using the current page's scheme.
+  if (trimmed.startsWith('//')) return '#';
   // Allow same-origin paths and fragments without further checks.
   if (trimmed.startsWith('/') || trimmed.startsWith('#')) return trimmed;
   if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;

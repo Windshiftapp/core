@@ -40,6 +40,38 @@ func ValidateClientRedirectURL(rawURL string) error {
 	return nil
 }
 
+// ValidateHTTPBaseURL checks that a server-configured base URL is syntactically
+// valid for outbound HTTP clients. It intentionally does not resolve DNS or
+// reject private hosts: some admin-configured integrations (notably local/custom
+// LLM providers such as Ollama) are expected to point at localhost or private
+// network addresses. Use ValidateExternalURL instead for untrusted/user-provided
+// URLs that need SSRF protection.
+func ValidateHTTPBaseURL(rawURL string) error {
+	if rawURL == "" {
+		return fmt.Errorf("URL must not be empty")
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL")
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("URL must use HTTP(S) scheme")
+	}
+
+	if parsed.Hostname() == "" {
+		return fmt.Errorf("URL must have a valid hostname")
+	}
+
+	if parsed.Fragment != "" {
+		return fmt.Errorf("URL must not include a fragment")
+	}
+
+	return nil
+}
+
 // ValidateExternalURL checks that a URL is safe for server-side requests.
 // It enforces HTTPS scheme and rejects URLs that resolve to private/loopback/link-local IPs.
 func ValidateExternalURL(rawURL string) error {

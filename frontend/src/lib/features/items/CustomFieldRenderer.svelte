@@ -14,6 +14,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { formatCustomFieldDate } from '../../utils/dateFormatter.js';
   import { parseFieldOptions, resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
+  import { safeHref } from '../../utils/sanitize';
 
   // Helper to parse field options into [{id, label}] items
   function parseOptions(optionsStr) {
@@ -410,7 +411,7 @@
           {:else if field.field_type === 'url'}
             <div class="flex items-center gap-2">
               <ExternalLink class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <a href={value} target="_blank" rel="noopener noreferrer" class="hover:underline truncate" style="color: var(--ds-text);">{value}</a>
+              <a href={safeHref(value)} target="_blank" rel="noopener noreferrer" class="hover:underline truncate" style="color: var(--ds-text);">{value}</a>
             </div>
           {:else if field.field_type === 'number'}
             <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
