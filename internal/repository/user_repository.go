@@ -127,10 +127,39 @@ func (r *UserRepository) ListAdmin() ([]models.User, error) {
 		u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
 		users = append(users, u)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate admin users: %w", err)
+	}
 	if users == nil {
 		users = []models.User{}
 	}
 	return users, nil
+}
+
+// GetByEmailOrUsernameForAuth returns a user with password fields for login/change-password flows.
+func (r *UserRepository) GetByEmailOrUsernameForAuth(emailOrUsername string) (*models.User, error) {
+	var u models.User
+	var avatarURL sql.NullString
+	err := r.db.QueryRow(`
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, COALESCE(is_agent, false), created_at, updated_at
+		FROM users
+		WHERE email = ? OR username = ?
+	`, emailOrUsername, emailOrUsername).Scan(
+		&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName,
+		&u.IsActive, &avatarURL, &u.PasswordHash,
+		&u.RequiresPasswordReset, &u.IsAgent, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get auth user %q: %w", emailOrUsername, err)
+	}
+	if avatarURL.Valid {
+		u.AvatarURL = avatarURL.String
+	}
+	u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
+	return &u, nil
 }
 
 // GetByID returns a user with the same column set as the admin Get endpoint

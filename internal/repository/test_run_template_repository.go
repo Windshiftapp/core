@@ -51,6 +51,9 @@ func (r *TestRunTemplateRepository) FindAll(workspaceID int) ([]models.TestRunTe
 		}
 		templates = append(templates, template)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test run templates: %w", err)
+	}
 	return templates, nil
 }
 
@@ -165,6 +168,9 @@ func (r *TestRunTemplateRepository) FindExecutions(templateID, workspaceID int) 
 		}
 		runs = append(runs, run)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate template executions: %w", err)
+	}
 	return runs, nil
 }
 
@@ -220,6 +226,10 @@ func (r *TestRunTemplateRepository) Execute(workspaceID, templateID, setID int, 
 			return nil, fmt.Errorf("failed to scan test case id: %w", err)
 		}
 		testCaseIDs = append(testCaseIDs, id)
+	}
+	if err := caseRows.Err(); err != nil {
+		_ = caseRows.Close()
+		return nil, fmt.Errorf("failed to iterate set test cases: %w", err)
 	}
 	_ = caseRows.Close()
 

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 
@@ -30,6 +30,8 @@ var dummyPasswordHash = []byte("$2a$10$dummyHashForTimingAttackPrevention1234567
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	db                       database.Database
+	userRepo                 *repository.UserRepository
+	credentialRepo           *repository.CredentialRepository
 	sessionManager           *auth.SessionManager
 	rateLimiter              *middleware.RateLimiter
 	permissionService        *services.PermissionService
@@ -82,6 +84,8 @@ type SessionInfo struct {
 func NewAuthHandler(db database.Database, sessionManager *auth.SessionManager, rateLimiter *middleware.RateLimiter, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, ipExtractor *utils.IPExtractor, authPolicyHandler *AuthPolicyHandler, adminRateLimiter *middleware.AdminFallbackRateLimiter) *AuthHandler {
 	return &AuthHandler{
 		db:                       db,
+		userRepo:                 repository.NewUserRepository(db),
+		credentialRepo:           repository.NewCredentialRepository(db),
 		sessionManager:           sessionManager,
 		rateLimiter:              rateLimiter,
 		permissionService:        permissionService,
@@ -128,7 +132,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Find user by email or username
 	user, err := h.findUserByEmailOrUsername(req.EmailOrUsername)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrNotFound) {
 			// Record failed attempt
 			h.rateLimiter.RecordFailedLogin(ipAddress)
 			// Always perform bcrypt comparison to prevent timing attacks
@@ -487,34 +491,9 @@ func hashIdentifier(s string) string {
 	return "sha256:" + hex.EncodeToString(sum[:8])
 }
 
-// findUserByEmailOrUsername finds a user by email or username
+// findUserByEmailOrUsername finds a user by email or username.
 func (h *AuthHandler) findUserByEmailOrUsername(emailOrUsername string) (*models.User, error) {
-	query := `
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, COALESCE(is_agent, false), created_at, updated_at
-		FROM users
-		WHERE email = ? OR username = ?
-	`
-
-	row := h.db.QueryRow(query, emailOrUsername, emailOrUsername)
-
-	user := &models.User{}
-	var avatarURL sql.NullString
-
-	err := row.Scan(
-		&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &user.PasswordHash,
-		&user.RequiresPasswordReset, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if avatarURL.Valid {
-		user.AvatarURL = avatarURL.String
-	}
-
-	return user, nil
+	return h.userRepo.GetByEmailOrUsernameForAuth(emailOrUsername)
 }
 
 // getClientIP extracts the client IP with proxy validation
@@ -524,12 +503,8 @@ func (h *AuthHandler) getClientIP(r *http.Request) string {
 
 // userHasPasskey checks if a user has an active FIDO/passkey credential
 func (h *AuthHandler) userHasPasskey(userID int) bool {
-	var count int
-	err := h.db.QueryRow(`
-		SELECT COUNT(*) FROM user_credentials
-		WHERE user_id = ? AND credential_type = 'fido' AND is_active = true
-	`, userID).Scan(&count)
-	return err == nil && count > 0
+	hasPasskey, err := h.credentialRepo.HasActiveFIDO(userID)
+	return err == nil && hasPasskey
 }
 
 // ChangePassword allows authenticated users to change their password
@@ -573,9 +548,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update password in database
-	query := `UPDATE users SET password_hash = ?, requires_password_reset = false, updated_at = ? WHERE id = ?`
-	_, err = h.db.ExecWrite(query, string(hashedPassword), time.Now(), session.UserID)
-	if err != nil {
+	if err = h.userRepo.SetPassword(session.UserID, string(hashedPassword), false); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

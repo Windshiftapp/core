@@ -133,6 +133,9 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 
 		rules = append(rules, rule)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate recurrence rules: %w", err)
+	}
 
 	return rules, nil
 }
@@ -240,6 +243,9 @@ func (r *RecurrenceRepository) GetExistingInstanceDates(ruleID int) (map[string]
 		}
 		dates[date.Format("2006-01-02")] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate existing instance dates: %w", err)
+	}
 
 	return dates, nil
 }
@@ -316,6 +322,9 @@ func (r *RecurrenceRepository) GetInstancesByRuleID(ruleID, limit, offset int) (
 
 		instances = append(instances, instance)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate instances: %w", err)
+	}
 
 	return instances, nil
 }
@@ -372,6 +381,9 @@ func (r *RecurrenceRepository) ListByWorkspace(workspaceID int) ([]*models.Recur
 		assignRecurrenceNullableFields(rule, dtend, lastGenUntil, nextGenCheck, statusOnCreate, createdBy)
 
 		rules = append(rules, rule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate recurrence rules: %w", err)
 	}
 
 	return rules, nil

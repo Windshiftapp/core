@@ -36,7 +36,7 @@
     "jscpd": "^4.0.9",
     "jsdom": "^27.4.0",
     "rollup-plugin-visualizer": "^6.0.3",
-    "svelte": "^5.49.1",
+    "svelte": "^5.55.7",
     "svelte-check": "^4.4.8",
     "svelte-check-native": "^0.3.7",
     "typescript": "^5.7.0",
@@ -46,7 +46,7 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.6",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
-    "@excalidraw/excalidraw": "^0.18.0",
+    "@excalidraw/excalidraw": "0.18.0",
     "@fontsource/geist-sans": "^5.2.5",
     "@fontsource/inter": "^5.2.8",
     "@github/hotkey": "^3.1.1",
@@ -77,13 +77,14 @@
     "@tailwindcss/vite": {
       "vite": "$vite"
     },
-    "mermaid": "^10.9.4",
+    "mermaid": "^10.9.6",
     "@excalidraw/excalidraw": {
       "nanoid": "^3.3.8"
     },
     "@excalidraw/mermaid-to-excalidraw": {
-      "mermaid": "^10.9.4",
+      "mermaid": "^10.9.6",
       "nanoid": "^5.0.9"
-    }
+    },
+    "devalue": "^5.8.1"
   }
 }

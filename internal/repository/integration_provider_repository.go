@@ -82,6 +82,9 @@ func (r *IntegrationProviderRepository) List() ([]IntegrationProvider, error) {
 		}
 		providers = append(providers, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate integration_providers: %w", err)
+	}
 	return providers, nil
 }
 

@@ -82,6 +82,9 @@ func (r *WorkspaceRepository) ListNameKeyToIDMap() (map[string]int, error) {
 		m[strings.ToLower(name)] = id
 		m[strings.ToLower(key)] = id
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workspace name/key map: %w", err)
+	}
 	return m, nil
 }
 
@@ -125,8 +128,6 @@ func (r *WorkspaceRepository) ListActiveIDKeys() ([]IDKey, error) {
 	return pairs, rows.Err()
 }
 
-// ListIDKeys returns every workspace's id+key pair, regardless of user
-// scope. Used by the workspace key cache to populate its in-memory map.
 // GetKey returns a workspace key by id.
 func (r *WorkspaceRepository) GetKey(id int) (string, error) {
 	var key string
@@ -152,7 +153,7 @@ func (r *WorkspaceRepository) ListIDKeys() ([]IDKey, error) {
 		}
 		pairs = append(pairs, p)
 	}
-	return pairs, nil
+	return pairs, rows.Err()
 }
 
 // FindByID retrieves a workspace by ID with project count and time project name
@@ -249,7 +250,6 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 	return workspaces, rows.Err()
 }
 
-// CreateTx inserts a new workspace within the given transaction and returns its ID.
 // GrantAdministratorRoleTx grants the Administrator role on a workspace to a user within a transaction.
 func (r *WorkspaceRepository) GrantAdministratorRoleTx(tx database.Tx, workspaceID int64, userID int) error {
 	result, err := tx.Exec(`
@@ -311,7 +311,6 @@ func (r *WorkspaceRepository) Delete(id int) error {
 	return err
 }
 
-// Exists checks if a workspace exists
 // FindMissingOrPersonal accepts a set of workspace IDs and returns those that
 // don't exist or are flagged as personal — i.e. invalid as portal/form
 // submission targets. Used by UpdateChannelConfig to reject bogus IDs before

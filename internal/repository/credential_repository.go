@@ -112,6 +112,19 @@ func (r *CredentialRepository) CreateSSH(userID int, name, credentialJSON, finge
 	return id, nil
 }
 
+// HasActiveFIDO reports whether a user has an active legacy FIDO/passkey credential.
+func (r *CredentialRepository) HasActiveFIDO(userID int) (bool, error) {
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM user_credentials
+		WHERE user_id = ? AND credential_type = 'fido' AND is_active = true
+	`, userID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("count active fido credentials for user %d: %w", userID, err)
+	}
+	return count > 0, nil
+}
+
 // GetLegacySummary returns type/name for a legacy credential scoped to user.
 func (r *CredentialRepository) GetLegacySummary(id, userID int) (LegacyCredentialSummary, error) {
 	var out LegacyCredentialSummary

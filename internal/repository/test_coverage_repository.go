@@ -331,6 +331,9 @@ func (r *TestCoverageRepository) ListRequirements(params RequirementListParams) 
 		item.IsCovered = item.LinkedTestCount > 0
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate requirements: %w", err)
+	}
 	return items, nil
 }
 

@@ -67,6 +67,9 @@ func (r *ItemRepository) GetHistory(itemID, limit int) ([]HistoryEntry, error) {
 		}
 		entries = append(entries, entry)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate history entries: %w", err)
+	}
 
 	return entries, nil
 }
@@ -101,6 +104,9 @@ func (r *ItemRepository) GetHistoryWithDetails(itemID, limit int) ([]models.Item
 		entry.UserName = userName
 		entry.UserEmail = userEmail
 		entries = append(entries, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate history entries with details: %w", err)
 	}
 
 	return entries, nil

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -35,14 +34,8 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 		return
 	}
 	workspaceID := item.WorkspaceID
-	currentStatusID := sql.NullInt64{}
-	if item.StatusID != nil {
-		currentStatusID = sql.NullInt64{Int64: int64(*item.StatusID), Valid: true}
-	}
-	itemTypeID := sql.NullInt64{}
-	if item.ItemTypeID != nil {
-		itemTypeID = sql.NullInt64{Int64: int64(*item.ItemTypeID), Valid: true}
-	}
+	currentStatusID := item.StatusID
+	itemTypeIDPtr := item.ItemTypeID
 
 	// Check if user has permission to view this item's workspace
 	canView, permErr := h.canViewItem(user.ID, workspaceID)
@@ -55,19 +48,19 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 		return
 	}
 
+	workflowService := services.NewWorkflowService(h.db)
+
 	// Get current status name for response
-	var currentStatusName string
-	if currentStatusID.Valid {
-		_ = h.db.QueryRow(`SELECT name FROM statuses WHERE id = ?`, currentStatusID.Int64).Scan(&currentStatusName)
+	currentStatusName := ""
+	if currentStatusID != nil {
+		currentStatusName, err = workflowService.GetStatusName(int64(*currentStatusID))
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	// Get the workflow using WorkflowService (considers item type override)
-	workflowService := services.NewWorkflowService(h.db)
-	var itemTypeIDPtr *int
-	if itemTypeID.Valid {
-		itemTypeIDInt := int(itemTypeID.Int64)
-		itemTypeIDPtr = &itemTypeIDInt
-	}
 	workflowID, err := workflowService.GetWorkflowIDForItem(workspaceID, itemTypeIDPtr)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -89,62 +82,22 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	var pendingApproval *services.PendingApprovalSummary
 
 	// Always include current status first
-	if currentStatusID.Valid {
-		var statusName string
-		var categoryColor sql.NullString
-		err = h.db.QueryRow(`
-			SELECT s.name, sc.color
-			FROM statuses s
-			LEFT JOIN status_categories sc ON s.category_id = sc.id
-			WHERE s.id = ?
-		`, currentStatusID.Int64).Scan(&statusName, &categoryColor)
-		if err == nil {
-			transition := map[string]interface{}{
-				"id":    int(currentStatusID.Int64),
-				"name":  statusName,
-				"value": strings.ToLower(strings.ReplaceAll(statusName, " ", "_")),
-			}
-			if categoryColor.Valid {
-				transition["category_color"] = categoryColor.String
-			}
-			availableTransitions = append(availableTransitions, transition)
+	if currentStatusID != nil {
+		currentOption, optionErr := workflowService.GetStatusTransitionOption(int64(*currentStatusID))
+		if optionErr != nil {
+			respondInternalError(w, r, optionErr)
+			return
+		}
+		if currentOption != nil {
+			availableTransitions = append(availableTransitions, transitionOptionResponse(*currentOption))
 		}
 	}
 
 	// Get valid transitions from current status
-	if currentStatusID.Valid {
-		rows, err := h.db.Query(`
-			SELECT wt.id, s.id, s.name, sc.color
-			FROM workflow_transitions wt
-			JOIN statuses s ON wt.to_status_id = s.id
-			LEFT JOIN status_categories sc ON s.category_id = sc.id
-			WHERE wt.workflow_id = ? AND wt.from_status_id = ?
-		`, *workflowID, currentStatusID.Int64)
-
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		defer func() { _ = rows.Close() }()
-
-		// Collect transitions with their IDs for condition filtering
-		type rawTransition struct {
-			transitionID  int
-			statusID      int
-			statusName    string
-			categoryColor sql.NullString
-		}
-		var rawTransitions []rawTransition
-
-		for rows.Next() {
-			var rt rawTransition
-			if err := rows.Scan(&rt.transitionID, &rt.statusID, &rt.statusName, &rt.categoryColor); err != nil {
-				continue
-			}
-			rawTransitions = append(rawTransitions, rt)
-		}
-		if err := rows.Err(); err != nil {
-			respondInternalError(w, r, err)
+	if currentStatusID != nil {
+		rawTransitions, listErr := workflowService.ListAvailableTransitionOptions(*workflowID, int64(*currentStatusID))
+		if listErr != nil {
+			respondInternalError(w, r, listErr)
 			return
 		}
 
@@ -163,7 +116,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 				}
 				kept := rawTransitions[:0]
 				for _, rt := range rawTransitions {
-					if !gated[rt.transitionID] {
+					if !gated[rt.TransitionID] {
 						kept = append(kept, rt)
 					}
 				}
@@ -177,19 +130,19 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 			conditionSetID, csErr := h.conditionService.GetConditionSetIDForItem(workspaceID, itemTypeIDPtr)
 			if csErr == nil && conditionSetID != nil {
 				// Build item context for condition evaluation
-				itemCtx := services.BuildItemContext(h.db, itemID, workspaceID, currentStatusID, itemTypeID)
+				itemCtx := services.BuildItemContextFromIDs(h.db, itemID, workspaceID, currentStatusID, itemTypeIDPtr)
 
 				// Convert to TransitionWithID for filtering
 				var twids []services.TransitionWithID
 				for _, rt := range rawTransitions {
 					color := ""
-					if rt.categoryColor.Valid {
-						color = rt.categoryColor.String
+					if rt.CategoryColor != nil {
+						color = *rt.CategoryColor
 					}
 					twids = append(twids, services.TransitionWithID{
-						TransitionID:  rt.transitionID,
-						StatusID:      rt.statusID,
-						StatusName:    rt.statusName,
+						TransitionID:  rt.TransitionID,
+						StatusID:      rt.StatusID,
+						StatusName:    rt.StatusName,
 						CategoryColor: color,
 					})
 				}
@@ -206,39 +159,30 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 					// Rebuild rawTransitions from filtered results
 					rawTransitions = nil
 					for _, f := range filtered {
-						var cc sql.NullString
+						var categoryColor *string
 						if f.CategoryColor != "" {
-							cc = sql.NullString{String: f.CategoryColor, Valid: true}
+							color := f.CategoryColor
+							categoryColor = &color
 						}
-						rawTransitions = append(rawTransitions, rawTransition{
-							transitionID:  f.TransitionID,
-							statusID:      f.StatusID,
-							statusName:    f.StatusName,
-							categoryColor: cc,
+						rawTransitions = append(rawTransitions, services.StatusTransitionOption{
+							TransitionID:  f.TransitionID,
+							StatusID:      f.StatusID,
+							StatusName:    f.StatusName,
+							CategoryColor: categoryColor,
 						})
 					}
 				}
 			}
 		}
 
-		// Track IDs we've already added to avoid duplicates
-		addedIDs := map[int]bool{}
-		if currentStatusID.Valid {
-			addedIDs[int(currentStatusID.Int64)] = true
-		}
+		// Track IDs we've already added to avoid duplicates.
+		// currentStatusID is non-nil in this block.
+		addedIDs := map[int]bool{*currentStatusID: true}
 
 		for _, rt := range rawTransitions {
-			if !addedIDs[rt.statusID] {
-				transition := map[string]interface{}{
-					"id":    rt.statusID,
-					"name":  rt.statusName,
-					"value": strings.ToLower(strings.ReplaceAll(rt.statusName, " ", "_")),
-				}
-				if rt.categoryColor.Valid {
-					transition["category_color"] = rt.categoryColor.String
-				}
-				availableTransitions = append(availableTransitions, transition)
-				addedIDs[rt.statusID] = true
+			if !addedIDs[rt.StatusID] {
+				availableTransitions = append(availableTransitions, transitionOptionResponse(rt))
+				addedIDs[rt.StatusID] = true
 			}
 		}
 	}
@@ -250,4 +194,16 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	respondJSONOK(w, response)
+}
+
+func transitionOptionResponse(option services.StatusTransitionOption) map[string]interface{} {
+	transition := map[string]interface{}{
+		"id":    option.StatusID,
+		"name":  option.StatusName,
+		"value": strings.ToLower(strings.ReplaceAll(option.StatusName, " ", "_")),
+	}
+	if option.CategoryColor != nil {
+		transition["category_color"] = *option.CategoryColor
+	}
+	return transition
 }

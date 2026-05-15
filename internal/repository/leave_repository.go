@@ -108,6 +108,9 @@ func (r *LeaveRepository) GetForUser(userID int) ([]models.UserLeavePeriod, erro
 		lp.SubstituteName = substituteName.String
 		periods = append(periods, lp)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return periods, nil
 }

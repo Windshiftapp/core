@@ -308,6 +308,9 @@ func (r *TestRunRepository) FindResultsWithTestCase(runID, workspaceID int) ([]T
 		}
 		results = append(results, res)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test results with test case: %w", err)
+	}
 	return results, nil
 }
 
@@ -440,6 +443,9 @@ func (r *TestRunRepository) FindStepResultsForRun(runID, workspaceID int) ([]Ste
 		}
 		results = append(results, row)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate step results: %w", err)
+	}
 	return results, nil
 }
 
@@ -460,6 +466,9 @@ func (r *TestRunRepository) FindStepResultStatuses(testResultID int) ([]string, 
 			return nil, fmt.Errorf("failed to scan step status: %w", err)
 		}
 		statuses = append(statuses, status)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate step statuses: %w", err)
 	}
 	return statuses, nil
 }

@@ -122,6 +122,9 @@ func (r *SchedulerRunRepository) GetRecent(opts RecentSchedulerRunsOpts) ([]*mod
 
 		result = append(result, run)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate scheduler runs: %w", err)
+	}
 
 	return result, nil
 }
@@ -192,6 +195,9 @@ func (r *SchedulerRunRepository) Stats(since time.Time) ([]*SchedulerStats, erro
 			s.TotalProcessed = &v
 		}
 		result = append(result, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate scheduler stats: %w", err)
 	}
 
 	return result, nil

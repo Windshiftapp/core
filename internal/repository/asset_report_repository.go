@@ -77,6 +77,9 @@ func (r *AssetReportRepository) ListByChannel(channelID int) ([]models.AssetRepo
 		}
 		out = append(out, ar)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate asset_reports: %w", err)
+	}
 	if out == nil {
 		out = []models.AssetReport{}
 	}
@@ -323,6 +326,9 @@ func (r *AssetReportRepository) ListFields(assetReportID int) ([]models.AssetRep
 			return nil, fmt.Errorf("scan asset_report field: %w", err)
 		}
 		fields = append(fields, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate asset_report fields: %w", err)
 	}
 	if fields == nil {
 		fields = []models.AssetReportField{}

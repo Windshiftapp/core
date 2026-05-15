@@ -140,6 +140,9 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 
 		actions = append(actions, action)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate actions: %w", err)
+	}
 
 	return actions, nil
 }
@@ -191,6 +194,9 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 		action.Edges = edges
 
 		actions = append(actions, action)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate enabled actions: %w", err)
 	}
 
 	return actions, nil
@@ -612,6 +618,9 @@ func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) 
 
 		logs = append(logs, log)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate recent execution logs: %w", err)
+	}
 
 	return logs, nil
 }
@@ -771,6 +780,9 @@ func (r *ActionRepository) queryCapabilities(errLabel, query string, args ...int
 		}
 		caps = append(caps, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate capabilities: %w", err)
+	}
 
 	if err := r.populateWorkspaceIDs(caps); err != nil {
 		return nil, err
@@ -810,6 +822,9 @@ func (r *ActionRepository) populateWorkspaceIDs(caps []*models.ActionCapability)
 		if c, ok := scopedByID[capID]; ok {
 			c.WorkspaceIDs = append(c.WorkspaceIDs, wsID)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate capability workspace scope rows: %w", err)
 	}
 	return nil
 }
@@ -895,6 +910,9 @@ func (r *ActionRepository) GetCapabilityWorkspaceIDs(capabilityID int) ([]int, e
 			return nil, fmt.Errorf("failed to scan capability workspace id: %w", err)
 		}
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate capability workspace ids: %w", err)
 	}
 	return ids, nil
 }

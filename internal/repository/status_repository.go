@@ -18,6 +18,14 @@ type StatusRepository struct {
 	db database.Database
 }
 
+// StatusTransitionOption is a status option exposed by a workflow transition.
+type StatusTransitionOption struct {
+	TransitionID  int
+	StatusID      int
+	StatusName    string
+	CategoryColor *string
+}
+
 // NewStatusRepository creates a StatusRepository.
 func NewStatusRepository(db database.Database) *StatusRepository {
 	return &StatusRepository{db: db}
@@ -46,6 +54,9 @@ func (r *StatusRepository) List() ([]models.Status, error) {
 		}
 		statuses = append(statuses, s)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate statuses: %w", err)
+	}
 	if statuses == nil {
 		statuses = []models.Status{}
 	}
@@ -63,6 +74,71 @@ func (r *StatusRepository) GetByID(id int) (*models.Status, error) {
 		return nil, fmt.Errorf("get status %d: %w", id, err)
 	}
 	return &s, nil
+}
+
+// GetName returns a status name. Missing statuses return an empty name for
+// compatibility with the status-transition API.
+func (r *StatusRepository) GetName(statusID int64) (string, error) {
+	var name string
+	err := r.db.QueryRow(`SELECT name FROM statuses WHERE id = ?`, statusID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return name, err
+}
+
+// GetTransitionOption returns display metadata for a status.
+func (r *StatusRepository) GetTransitionOption(statusID int64) (*StatusTransitionOption, error) {
+	var option StatusTransitionOption
+	var categoryColor sql.NullString
+	err := r.db.QueryRow(`
+		SELECT s.id, s.name, sc.color
+		FROM statuses s
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		WHERE s.id = ?
+	`, statusID).Scan(&option.StatusID, &option.StatusName, &categoryColor)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if categoryColor.Valid {
+		option.CategoryColor = &categoryColor.String
+	}
+	return &option, nil
+}
+
+// ListAvailableTransitionOptions returns direct workflow transitions from a status.
+func (r *StatusRepository) ListAvailableTransitionOptions(workflowID int, fromStatusID int64) ([]StatusTransitionOption, error) {
+	rows, err := r.db.Query(`
+		SELECT wt.id, s.id, s.name, sc.color
+		FROM workflow_transitions wt
+		JOIN statuses s ON wt.to_status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		WHERE wt.workflow_id = ? AND wt.from_status_id = ?
+	`, workflowID, fromStatusID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var options []StatusTransitionOption
+	for rows.Next() {
+		var option StatusTransitionOption
+		var categoryColor sql.NullString
+		if err := rows.Scan(&option.TransitionID, &option.StatusID, &option.StatusName, &categoryColor); err != nil {
+			continue
+		}
+		if categoryColor.Valid {
+			option.CategoryColor = &categoryColor.String
+		}
+		options = append(options, option)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return options, nil
 }
 
 // Create inserts a status row and returns the new id and timestamp it stamped.
@@ -169,6 +245,9 @@ func (r *StatusRepository) ListNonDoneIDs() ([]int, error) {
 			return nil, fmt.Errorf("scan status id: %w", err)
 		}
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate status ids: %w", err)
 	}
 	if ids == nil {
 		ids = []int{}

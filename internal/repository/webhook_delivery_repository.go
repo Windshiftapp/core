@@ -135,6 +135,9 @@ func (r *WebhookDeliveryRepository) GetRecent(opts RecentDeliveriesOpts) ([]*mod
 
 		result = append(result, d)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate webhook deliveries: %w", err)
+	}
 
 	return result, nil
 }
@@ -203,6 +206,9 @@ func (r *WebhookDeliveryRepository) Stats(since time.Time) ([]*ChannelDeliverySt
 			s.LastFailure = &v
 		}
 		result = append(result, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate webhook delivery stats: %w", err)
 	}
 
 	return result, nil

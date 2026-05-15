@@ -95,6 +95,10 @@ func (r *ItemRepository) ComputeWorkspaceItemStats(workspaceID int, filterSQL st
 			stats.ItemsByStatusCategory[categoryName.String] = count
 		}
 	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, fmt.Errorf("iterate status breakdown: %w", err)
+	}
 	_ = rows.Close()
 
 	// 3. Assignment distribution (since cutoff)
@@ -132,6 +136,10 @@ func (r *ItemRepository) ComputeWorkspaceItemStats(workspaceID int, filterSQL st
 		}
 		assignNullableInt(&row.UserID, assigneeID)
 		stats.AssignmentDistribution = append(stats.AssignmentDistribution, row)
+	}
+	if err := assignRows.Err(); err != nil {
+		_ = assignRows.Close()
+		return nil, fmt.Errorf("iterate assignment rows: %w", err)
 	}
 	_ = assignRows.Close()
 
@@ -176,6 +184,10 @@ func (r *ItemRepository) ComputeWorkspaceItemStats(workspaceID int, filterSQL st
 		row.ProjectColor = projectColor.String
 		stats.ProjectStatistics = append(stats.ProjectStatistics, row)
 	}
+	if err := projectRows.Err(); err != nil {
+		_ = projectRows.Close()
+		return nil, fmt.Errorf("iterate project rows: %w", err)
+	}
 	_ = projectRows.Close()
 
 	// 5. Priority breakdown (since cutoff)
@@ -206,6 +218,10 @@ func (r *ItemRepository) ComputeWorkspaceItemStats(workspaceID int, filterSQL st
 			return nil, fmt.Errorf("scan priority row: %w", err)
 		}
 		stats.PriorityBreakdown[priority] = count
+	}
+	if err := priorityRows.Err(); err != nil {
+		_ = priorityRows.Close()
+		return nil, fmt.Errorf("iterate priority rows: %w", err)
 	}
 	_ = priorityRows.Close()
 

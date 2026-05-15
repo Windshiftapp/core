@@ -78,5 +78,8 @@ func (r *ScreenRepository) ListFields(screenID int) ([]ScreenFieldRow, error) {
 		}
 		out = append(out, sfr)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate screen_fields: %w", err)
+	}
 	return out, nil
 }

@@ -46,6 +46,9 @@ func (r *CustomerOrganisationRepository) List() ([]models.CustomerOrganisation, 
 		}
 		customers = append(customers, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate customer_organisations: %w", err)
+	}
 	return customers, nil
 }
 

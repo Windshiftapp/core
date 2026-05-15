@@ -47,6 +47,9 @@ func (r *TestFolderRepository) FindAllWithCounts(workspaceID int) ([]models.Test
 		}
 		folders = append(folders, folder)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test folders: %w", err)
+	}
 	return folders, nil
 }
 

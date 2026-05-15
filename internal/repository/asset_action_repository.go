@@ -96,6 +96,9 @@ func (r *AssetActionRepository) ListBySet(setID int) ([]*models.AssetAction, err
 
 		actions = append(actions, action)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset actions: %w", err)
+	}
 
 	return actions, nil
 }
@@ -135,6 +138,9 @@ func (r *AssetActionRepository) ListEnabledBySet(setID int) ([]*models.AssetActi
 		}
 
 		actions = append(actions, action)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate enabled asset actions: %w", err)
 	}
 
 	return actions, nil

@@ -76,7 +76,6 @@ func (s *PortalService) GetCustomFieldNamesByID(ctx context.Context, ids []int) 
 	return out, rows.Err()
 }
 
-// PortalRequestSummary represents a summarized portal request
 // CreatedPortalComment describes a comment created by a portal request participant.
 type CreatedPortalComment struct {
 	ID               int64

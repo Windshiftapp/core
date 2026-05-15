@@ -279,6 +279,9 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 
 		configSets = append(configSets, cs)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate configuration sets: %w", err)
+	}
 
 	if configSets == nil {
 		configSets = []models.ConfigurationSet{}
@@ -400,6 +403,9 @@ func (r *ConfigurationSetRepository) loadWorkspaces(configSetID int) (ids []int,
 		workspaceIDs = append(workspaceIDs, id)
 		workspaceNames = append(workspaceNames, name)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("failed to iterate workspaces: %w", err)
+	}
 
 	return workspaceIDs, workspaceNames, nil
 }
@@ -437,6 +443,9 @@ func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) er
 			cs.ViewScreenID = &screenID
 			cs.ViewScreenName = screenName
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate screens: %w", err)
 	}
 
 	return nil
@@ -529,6 +538,9 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 
 		configs = append(configs, config)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item type configs: %w", err)
+	}
 
 	return configs, nil
 }
@@ -557,6 +569,9 @@ func (r *ConfigurationSetRepository) loadPriorities(configSetID int) ([]int, []m
 		}
 		priorityIDs = append(priorityIDs, priority.ID)
 		priorities = append(priorities, priority)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("failed to iterate priorities: %w", err)
 	}
 
 	return priorityIDs, priorities, nil
@@ -596,6 +611,9 @@ func (r *ConfigurationSetRepository) ListWorkspaceIDsForConfigSet(configSetID in
 			return nil, fmt.Errorf("scan workspace id for config set: %w", err)
 		}
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workspace ids for config set: %w", err)
 	}
 	return ids, nil
 }

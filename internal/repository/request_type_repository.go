@@ -70,6 +70,9 @@ func (r *RequestTypeRepository) ListByChannel(channelID int) ([]models.RequestTy
 		}
 		out = append(out, rt)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate request_types: %w", err)
+	}
 	if out == nil {
 		out = []models.RequestType{}
 	}
@@ -328,6 +331,9 @@ func (r *RequestTypeRepository) ListFields(requestTypeID int) ([]models.RequestT
 			return nil, fmt.Errorf("scan request_type field: %w", err)
 		}
 		fields = append(fields, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate request_type fields: %w", err)
 	}
 	if fields == nil {
 		fields = []models.RequestTypeField{}

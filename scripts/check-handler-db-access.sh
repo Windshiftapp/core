@@ -11,7 +11,9 @@ cd "$REPO_ROOT"
 ALLOWLIST="docs/architecture/handler-db-access-allowlist.txt"
 [[ -f "$ALLOWLIST" ]] || touch "$ALLOWLIST"
 
-PATTERN='\.(QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|Query|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\('
+# Match direct DB methods while avoiding URL query parsing (`r.URL.Query()`).
+# Plain `.Query(...)` is only counted when it has at least one argument.
+PATTERN='\.(QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\(|\.Query[[:space:]]*\([[:space:]]*[^)]'
 violations=()
 
 while IFS= read -r file; do

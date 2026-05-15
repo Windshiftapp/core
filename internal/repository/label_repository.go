@@ -237,6 +237,9 @@ func (r *LabelRepository) LoadForItems(items []models.Item) error {
 		}
 		labelMap[itemID] = append(labelMap[itemID], label)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate labels: %w", err)
+	}
 
 	for i := range items {
 		if labels, ok := labelMap[items[i].ID]; ok {

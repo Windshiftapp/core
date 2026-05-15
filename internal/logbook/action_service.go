@@ -228,6 +228,9 @@ func (s *LogbookActionService) refreshActionCache() error {
 		}
 		bucketIDs = append(bucketIDs, bucketID)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate buckets with actions: %w", err)
+	}
 
 	for _, bucketID := range bucketIDs {
 		actions, err := s.repo.ListEnabledByBucket(bucketID)

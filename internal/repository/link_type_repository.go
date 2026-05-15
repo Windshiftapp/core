@@ -151,6 +151,9 @@ func (r *LinkTypeRepository) List(includeInactive bool) ([]models.LinkType, erro
 		}
 		linkTypes = append(linkTypes, lt)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate link_types: %w", err)
+	}
 	return linkTypes, nil
 }
 

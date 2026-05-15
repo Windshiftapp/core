@@ -76,6 +76,9 @@ func (r *DiagramRepository) ListByItem(itemID int) ([]models.ItemDiagram, error)
 		}
 		diagrams = append(diagrams, d)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate diagrams: %w", err)
+	}
 	return diagrams, nil
 }
 

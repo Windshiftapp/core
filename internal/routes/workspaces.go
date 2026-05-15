@@ -11,6 +11,7 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
+	workspaceView := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionItemView)
 
 	// Workspace endpoints
 	api.HandleH("GET /workspaces", auth(http.HandlerFunc(deps.Workspaces.Workspace.GetAll)))
@@ -19,13 +20,13 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("GET /workspaces/{id}", auth(http.HandlerFunc(deps.Workspaces.Workspace.Get)))
 	api.HandleH("PUT /workspaces/{id}", auth(http.HandlerFunc(deps.Workspaces.Workspace.Update)))
 	api.HandleH("DELETE /workspaces/{id}", auth(http.HandlerFunc(deps.Workspaces.Workspace.Delete)))
-	api.HandleH("GET /workspaces/{id}/stats", auth(http.HandlerFunc(deps.Workspaces.Workspace.GetStats)))
+	api.HandleH("GET /workspaces/{id}/stats", auth(workspaceView(http.HandlerFunc(deps.Workspaces.Workspace.GetStats))))
 	api.HandleH("GET /workspaces/{id}/statuses", auth(http.HandlerFunc(deps.Workspaces.Workspace.GetStatuses)))
 	api.HandleH("GET /workspaces/{id}/homepage/layout", auth(http.HandlerFunc(deps.Workspaces.Workspace.GetHomepageLayout)))
 	api.HandleH("PUT /workspaces/{id}/homepage/layout", auth(http.HandlerFunc(deps.Workspaces.Workspace.UpdateHomepageLayout)))
 
 	// Workspace-scoped time projects (with category restrictions)
-	api.HandleH("GET /workspaces/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByWorkspace)))
+	api.HandleH("GET /workspaces/{id}/projects", auth(workspaceView(http.HandlerFunc(deps.TimeTracking.Project.GetByWorkspace))))
 
 	// Screen endpoints
 	api.HandleH("GET /screens", auth(http.HandlerFunc(deps.Workspaces.Screen.GetAll)))

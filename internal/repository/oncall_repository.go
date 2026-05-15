@@ -179,6 +179,9 @@ func (r *OnCallRepository) ListSchedulesForTeam(teamID int) ([]models.OnCallSche
 		s.CreatedByName = createdByName.String
 		schedules = append(schedules, s)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return schedules, nil
 }
@@ -251,6 +254,9 @@ func (r *OnCallRepository) GetLayersForSchedule(scheduleID int) ([]models.OnCall
 
 		layers = append(layers, l)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return layers, nil
 }
@@ -311,6 +317,9 @@ func (r *OnCallRepository) GetLayerMembers(layerID int) ([]models.OnCallSchedule
 			return nil, err
 		}
 		members = append(members, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return members, nil
@@ -420,6 +429,9 @@ func (r *OnCallRepository) GetActiveOverrides(scheduleID int) ([]models.OnCallSc
 		o.CreatedByName = createdByName.String
 		overrides = append(overrides, o)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return overrides, nil
 }
@@ -500,6 +512,9 @@ func (r *OnCallRepository) ListPoliciesForTeam(teamID int) ([]models.OnCallEscal
 		p.CreatedByName = createdByName.String
 		policies = append(policies, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return policies, nil
 }
@@ -563,6 +578,9 @@ func (r *OnCallRepository) GetEscalationRules(policyID int) ([]models.OnCallEsca
 
 		rules = append(rules, rule)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return rules, nil
 }
@@ -624,6 +642,9 @@ func (r *OnCallRepository) GetNotificationRulesForStep(escalationRuleID int) ([]
 		}
 		nr.RepeatIntervalMinutes = nullIntPtr(repeatInterval)
 		rules = append(rules, nr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return rules, nil
@@ -765,6 +786,9 @@ func (r *OnCallRepository) GetActiveIncidents(policyID *int, status string) ([]m
 
 		t.populate(&inc)
 		incidents = append(incidents, inc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return incidents, nil

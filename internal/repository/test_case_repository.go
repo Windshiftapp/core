@@ -103,6 +103,9 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 
 		testCases = append(testCases, tc)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test cases: %w", err)
+	}
 
 	return testCases, nil
 }
@@ -303,6 +306,9 @@ func (r *TestCaseRepository) FindSteps(testCaseID int) ([]models.TestStep, error
 			return nil, fmt.Errorf("failed to scan test step: %w", err)
 		}
 		steps = append(steps, step)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test steps: %w", err)
 	}
 
 	return steps, nil
@@ -609,6 +615,9 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 		}
 		connections.TestSets = append(connections.TestSets, summary)
 	}
+	if err := setRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test sets: %w", err)
+	}
 
 	// Get run templates
 	tmplRows, err := r.db.Query(`
@@ -630,6 +639,9 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 			return nil, fmt.Errorf("failed to scan run template: %w", err)
 		}
 		connections.RunTemplates = append(connections.RunTemplates, summary)
+	}
+	if err := tmplRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate run templates: %w", err)
 	}
 
 	// Get executions
@@ -683,6 +695,9 @@ func (r *TestCaseRepository) GetConnections(testCaseID, workspaceID int) (*TestC
 			execution.TemplateName = record.TemplateName
 		}
 		connections.Executions = append(connections.Executions, execution)
+	}
+	if err := runRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate executions: %w", err)
 	}
 
 	return connections, nil

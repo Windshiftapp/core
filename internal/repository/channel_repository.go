@@ -205,6 +205,9 @@ func (r *ChannelRepository) ListEnabledByTypeAndDirection(ctx context.Context, c
 		}
 		channels = append(channels, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate channels: %w", err)
+	}
 	return channels, nil
 }
 

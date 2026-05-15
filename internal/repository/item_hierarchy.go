@@ -161,6 +161,9 @@ func (r *ItemRepository) GetDescendantIDs(parentID int) ([]int, error) {
 		}
 		ids = append(ids, id)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate descendant ids: %w", err)
+	}
 
 	return ids, nil
 }

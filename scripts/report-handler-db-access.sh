@@ -6,7 +6,9 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-PATTERN='\.(QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|Query|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\('
+# Match direct DB methods while avoiding URL query parsing (`r.URL.Query()`).
+# Plain `.Query(...)` is only counted when it has at least one argument.
+PATTERN='\.(QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\(|\.Query[[:space:]]*\([[:space:]]*[^)]'
 
 total_files=0
 offending_files=0

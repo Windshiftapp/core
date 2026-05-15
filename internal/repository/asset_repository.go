@@ -80,6 +80,9 @@ func (r *AssetRepository) ListSetsForUser(userID int, isAdmin bool) ([]models.As
 		set.Description = description.String
 		sets = append(sets, set)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset sets: %w", err)
+	}
 
 	return sets, nil
 }
@@ -408,6 +411,9 @@ func (r *AssetRepository) ListAllRoles() ([]models.AssetRole, error) {
 		}
 		roles = append(roles, role)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate roles: %w", err)
+	}
 
 	return roles, nil
 }
@@ -451,6 +457,9 @@ func (r *AssetRepository) GetRolePermissions(roleID int) ([]models.AssetPermissi
 		}
 		permissions = append(permissions, perm)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate role permissions: %w", err)
+	}
 
 	return permissions, nil
 }
@@ -490,6 +499,9 @@ func (r *AssetRepository) GetSetUserRoles(setID int) ([]models.UserAssetSetRole,
 		role.GrantedByName = grantedByName.String
 		roles = append(roles, role)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate user roles: %w", err)
+	}
 
 	return roles, nil
 }
@@ -523,6 +535,9 @@ func (r *AssetRepository) GetSetGroupRoles(setID int) ([]models.GroupAssetSetRol
 		}
 		role.GrantedByName = grantedByName.String
 		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate group roles: %w", err)
 	}
 
 	return roles, nil
@@ -566,6 +581,9 @@ func (r *AssetRepository) FindSetUserRolesByGrantDate(setID int) ([]models.UserA
 		role.GrantedByName = grantedByName.String
 		roles = append(roles, role)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate user roles by grant date: %w", err)
+	}
 	return roles, nil
 }
 
@@ -603,6 +621,9 @@ func (r *AssetRepository) FindSetGroupRolesByGrantDate(setID int) ([]models.Grou
 		role.RoleName = roleName.String
 		role.GrantedByName = grantedByName.String
 		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate group roles by grant date: %w", err)
 	}
 	return roles, nil
 }
@@ -977,6 +998,9 @@ func (r *AssetRepository) FindAssetTypesForSet(setID int) ([]models.AssetType, e
 		}
 		types = append(types, at)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset types: %w", err)
+	}
 	return types, nil
 }
 
@@ -1155,6 +1179,9 @@ func (r *AssetRepository) FindAssetTypeFields(typeID int) ([]models.AssetTypeFie
 		}
 		fields = append(fields, field)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset type fields: %w", err)
+	}
 	return fields, nil
 }
 
@@ -1247,6 +1274,9 @@ func (r *AssetRepository) FindAssetCategoriesForSet(setID int) ([]models.AssetCa
 			return nil, err
 		}
 		categories = append(categories, cat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset categories: %w", err)
 	}
 	return categories, nil
 }
@@ -1466,7 +1496,11 @@ func (r *AssetRepository) IsAssetCategoryDescendantOf(potentialDescendant, ances
 		return false, fmt.Errorf("failed to query category ancestors: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	return rows.Next(), nil
+	found := rows.Next()
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("failed to iterate category ancestors: %w", err)
+	}
+	return found, nil
 }
 
 // updateCategoryParentCounts refreshes children_count/has_children on a parent and
@@ -1671,6 +1705,9 @@ func (r *AssetRepository) ListAssets(f AssetListFilter) ([]AssetRow, error) {
 			return nil, err
 		}
 		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate assets: %w", err)
 	}
 	return result, nil
 }
@@ -1973,6 +2010,9 @@ func (r *AssetRepository) ListImportJobs(setID, limit int) ([]ImportJobRow, erro
 		}
 		jobs = append(jobs, job)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate import jobs: %w", err)
+	}
 	return jobs, nil
 }
 
@@ -1992,6 +2032,9 @@ func (r *AssetRepository) ListInterruptedImportJobIDs() ([]string, error) {
 			return nil, fmt.Errorf("failed to scan interrupted import job id: %w", err)
 		}
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate interrupted import job ids: %w", err)
 	}
 	return ids, nil
 }
@@ -2225,6 +2268,9 @@ func (r *AssetRepository) FindCustomFieldIDsByType(assetTypeID int, fieldType st
 		}
 		fieldIDs[id] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom field ids: %w", err)
+	}
 	return fieldIDs, nil
 }
 
@@ -2297,6 +2343,9 @@ func (r *AssetRepository) FindAssetStatusesForSet(setID int) ([]models.AssetStat
 			return nil, err
 		}
 		statuses = append(statuses, status)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset statuses: %w", err)
 	}
 	return statuses, nil
 }
@@ -2456,6 +2505,9 @@ func (r *AssetRepository) GetCQLSetMap() (map[string]int, error) {
 		}
 		setMap[strings.ToLower(name)] = id
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate asset sets: %w", err)
+	}
 	return setMap, nil
 }
 
@@ -2483,6 +2535,9 @@ func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (map[string]int, error
 			return nil, fmt.Errorf("failed to scan custom field: %w", err)
 		}
 		cfMap[name] = id
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)
 	}
 	return cfMap, nil
 }

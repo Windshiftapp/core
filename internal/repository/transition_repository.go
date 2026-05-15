@@ -98,5 +98,8 @@ func (r *TransitionRepository) ListConditionSetTouches(transitionID int) ([]Cond
 		}
 		touches = append(touches, ct)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate condition_set touches: %w", err)
+	}
 	return touches, nil
 }

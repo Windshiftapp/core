@@ -279,7 +279,8 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		if target == "" || !isValidRedirectURI(target) {
 			target = "/"
 		}
-		http.Redirect(w, r, target, http.StatusFound)
+		// target is validated by isValidRedirectURI (relative path only).
+		http.Redirect(w, r, target, http.StatusFound) // #nosec G710
 	}
 }
 

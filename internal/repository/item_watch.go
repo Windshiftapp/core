@@ -72,6 +72,9 @@ func (r *ItemRepository) GetWatchers(itemID int) ([]int, error) {
 		}
 		userIDs = append(userIDs, userID)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate watchers: %w", err)
+	}
 
 	return userIDs, nil
 }
@@ -94,6 +97,9 @@ func (r *ItemRepository) GetUserWatchedItems(userID int) ([]int, error) {
 			return nil, fmt.Errorf("failed to scan watched item: %w", err)
 		}
 		itemIDs = append(itemIDs, itemID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate watched items: %w", err)
 	}
 
 	return itemIDs, nil

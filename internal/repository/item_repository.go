@@ -1464,10 +1464,6 @@ type HomepageMilestoneProgress struct {
 	DoneItems     int
 }
 
-// HomepageMilestoneProgressByIDs returns per-milestone completion stats for
-// the given milestone IDs, joining items/statuses/status_categories to derive
-// done counts. Missing IDs are silently omitted; results are ordered by
-// milestone ID ascending.
 // ClearRelatedWorkItem removes a personal task's related work item reference.
 func (r *ItemRepository) ClearRelatedWorkItem(itemID int) error {
 	res, err := r.db.Exec(`

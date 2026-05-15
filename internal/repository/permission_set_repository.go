@@ -43,6 +43,9 @@ func (r *PermissionSetRepository) List() ([]models.PermissionSet, error) {
 		}
 		sets = append(sets, ps)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate permission_sets: %w", err)
+	}
 	if sets == nil {
 		sets = []models.PermissionSet{}
 	}
@@ -93,6 +96,9 @@ func (r *PermissionSetRepository) GetByIDWithPermissions(id int) (*models.Permis
 			continue
 		}
 		ps.Permissions = append(ps.Permissions, perm)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate permission_set permissions: %w", err)
 	}
 	return ps, nil
 }
@@ -239,6 +245,9 @@ func (r *PermissionSetRepository) ListAssignments(setID int) (PermissionSetAssig
 		ra.Role = &role
 		out.RoleAssignments = append(out.RoleAssignments, ra)
 	}
+	if err := roleRows.Err(); err != nil {
+		return out, fmt.Errorf("iterate role assignments for set %d: %w", setID, err)
+	}
 
 	groupRows, err := r.db.Query(`
 		SELECT ga.id, ga.permission_set_id, ga.permission_id, ga.group_id, ga.created_by, ga.created_at,
@@ -267,6 +276,9 @@ func (r *PermissionSetRepository) ListAssignments(setID int) (PermissionSetAssig
 		ga.Permission = &perm
 		ga.Group = &group
 		out.GroupAssignments = append(out.GroupAssignments, ga)
+	}
+	if err := groupRows.Err(); err != nil {
+		return out, fmt.Errorf("iterate group assignments for set %d: %w", setID, err)
 	}
 
 	userRows, err := r.db.Query(`
@@ -297,6 +309,9 @@ func (r *PermissionSetRepository) ListAssignments(setID int) (PermissionSetAssig
 		ua.Permission = &perm
 		ua.User = &user
 		out.UserAssignments = append(out.UserAssignments, ua)
+	}
+	if err := userRows.Err(); err != nil {
+		return out, fmt.Errorf("iterate user assignments for set %d: %w", setID, err)
 	}
 
 	return out, nil

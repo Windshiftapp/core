@@ -14,6 +14,9 @@ import (
 	"windshift/internal/repository"
 )
 
+// ErrApprovalNotFound is returned when an approval request or related approval resource is not found.
+var ErrApprovalNotFound = sql.ErrNoRows
+
 // ApprovalService is the asynchronous sibling of ConditionService. Where
 // conditions/validators evaluate at transition time, approvals open a stateful
 // request that one or more approvers decide over time.
@@ -34,9 +37,6 @@ import (
 //
 // The configured approve/deny transitions cannot be invoked directly by users —
 // PerformTransition rejects those attempts with code "approval_must_decide".
-// ErrApprovalNotFound is returned when an approval request or related approval resource is not found.
-var ErrApprovalNotFound = sql.ErrNoRows
-
 type ApprovalService struct {
 	db              database.Database
 	permService     *PermissionService

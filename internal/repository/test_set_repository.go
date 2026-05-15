@@ -91,6 +91,9 @@ func (r *TestSetRepository) FindAllWithStats(workspaceID int) ([]models.TestSet,
 
 		sets = append(sets, set)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test sets: %w", err)
+	}
 	return sets, nil
 }
 
@@ -192,6 +195,9 @@ func (r *TestSetRepository) FindTestCases(setID, workspaceID int) ([]models.Test
 		}
 		testCases = append(testCases, tc)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate test cases in set: %w", err)
+	}
 	return testCases, nil
 }
 
@@ -239,6 +245,9 @@ func (r *TestSetRepository) FindRuns(setID, workspaceID int) ([]models.TestRun, 
 			return nil, fmt.Errorf("failed to scan test run row: %w", err)
 		}
 		runs = append(runs, run)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate runs for set: %w", err)
 	}
 	return runs, nil
 }

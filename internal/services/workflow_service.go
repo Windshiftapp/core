@@ -40,6 +40,9 @@ type WorkflowService struct {
 	lastSweepUnixNano atomic.Int64
 }
 
+// StatusTransitionOption is a status option exposed by a workflow transition.
+type StatusTransitionOption = repository.StatusTransitionOption
+
 // NewWorkflowService creates a new workflow service
 func NewWorkflowService(db database.Database) *WorkflowService {
 	return &WorkflowService{db: db}
@@ -193,6 +196,22 @@ func (s *WorkflowService) GetDefaultWorkflowID() (*int, error) {
 		return nil, err
 	}
 	return &defaultID, nil
+}
+
+// GetStatusName returns a status name. Missing statuses return an empty name
+// for compatibility with the previous transition-list handler behavior.
+func (s *WorkflowService) GetStatusName(statusID int64) (string, error) {
+	return repository.NewStatusRepository(s.db).GetName(statusID)
+}
+
+// GetStatusTransitionOption returns display metadata for a status.
+func (s *WorkflowService) GetStatusTransitionOption(statusID int64) (*StatusTransitionOption, error) {
+	return repository.NewStatusRepository(s.db).GetTransitionOption(statusID)
+}
+
+// ListAvailableTransitionOptions returns the direct workflow transitions from a status.
+func (s *WorkflowService) ListAvailableTransitionOptions(workflowID int, fromStatusID int64) ([]StatusTransitionOption, error) {
+	return repository.NewStatusRepository(s.db).ListAvailableTransitionOptions(workflowID, fromStatusID)
 }
 
 // IsValidStatusTransition checks if a status transition is allowed by the workflow

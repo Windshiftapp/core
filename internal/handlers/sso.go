@@ -476,7 +476,8 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		if result.NeedsEmailVerification && !user.EmailVerified {
 			http.Redirect(w, r, "/?verify_email=pending", http.StatusFound)
 		} else {
-			http.Redirect(w, r, storedRedirectURI, http.StatusFound)
+			// storedRedirectURI is validated above by isValidRedirectURI (relative path only).
+			http.Redirect(w, r, storedRedirectURI, http.StatusFound) // #nosec G710
 		}
 	})
 

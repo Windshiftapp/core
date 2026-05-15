@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -30,6 +30,7 @@ const cliAuthCodeTTL = 2 * time.Minute
 // the machine that started the flow.
 type CLIAuthHandler struct {
 	db                database.Database
+	cliAuthRepo       *repository.CLIAuthRepository
 	agent             *AgentHandler
 	tokenManager      *auth.TokenManager
 	apiToken          *APITokenHandler
@@ -41,6 +42,7 @@ type CLIAuthHandler struct {
 func NewCLIAuthHandler(db database.Database, agent *AgentHandler, tm *auth.TokenManager, apiToken *APITokenHandler, permService *services.PermissionService) *CLIAuthHandler {
 	return &CLIAuthHandler{
 		db:                db,
+		cliAuthRepo:       repository.NewCLIAuthRepository(db),
 		agent:             agent,
 		tokenManager:      tm,
 		apiToken:          apiToken,
@@ -221,10 +223,19 @@ func (h *CLIAuthHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	}
 	scopesCSV := strings.Join(req.Scopes, ",")
 	expires := time.Now().Add(cliAuthCodeTTL)
-	if _, err = h.db.Exec(`
-		INSERT INTO cli_auth_codes (code, state, callback_url, hostname, agent_name, requested_scopes, status, approved_by_user_id, agent_id, token_id, token_plaintext, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?)
-	`, code, req.State, req.CallbackURL, req.Hostname, agentName, scopesCSV, currentUser.ID, agent.ID, tokenResp.APIToken.ID, tokenResp.Token, expires); err != nil {
+	if err = h.cliAuthRepo.StoreApproved(repository.ApprovedCLIAuthCode{
+		Code:             code,
+		State:            req.State,
+		CallbackURL:      req.CallbackURL,
+		Hostname:         req.Hostname,
+		AgentName:        agentName,
+		RequestedScopes:  scopesCSV,
+		ApprovedByUserID: currentUser.ID,
+		AgentID:          agent.ID,
+		TokenID:          tokenResp.APIToken.ID,
+		TokenPlaintext:   tokenResp.Token,
+		ExpiresAt:        expires,
+	}); err != nil {
 		// Best-effort: revoke the just-minted token so we don't leave a
 		// live credential stranded on the server.
 		_ = h.tokenManager.AdminRevokeToken(tokenResp.APIToken.ID)
@@ -306,26 +317,8 @@ func (h *CLIAuthHandler) Exchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var (
-		rowID       int64
-		state       string
-		status      string
-		tokenText   sql.NullString
-		agentID     sql.NullInt64
-		agentName   string
-		hostname    string
-		scopes      string
-		expiresAt   time.Time
-		consumedAt  sql.NullTime
-		approvedBy  sql.NullInt64
-		callbackURL string
-	)
-	err := h.db.QueryRow(`
-		SELECT id, state, status, token_plaintext, agent_id, agent_name, hostname, requested_scopes, expires_at, consumed_at, approved_by_user_id, callback_url
-		FROM cli_auth_codes
-		WHERE code = ?
-	`, req.Code).Scan(&rowID, &state, &status, &tokenText, &agentID, &agentName, &hostname, &scopes, &expiresAt, &consumedAt, &approvedBy, &callbackURL)
-	if errors.Is(err, sql.ErrNoRows) {
+	codeRow, err := h.cliAuthRepo.FindByCode(req.Code)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "auth code")
 		return
 	}
@@ -334,53 +327,49 @@ func (h *CLIAuthHandler) Exchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if state != req.State {
+	if codeRow.State != req.State {
 		respondBadRequest(w, r, "state mismatch")
 		return
 	}
-	if status != "approved" {
-		respondBadRequest(w, r, fmt.Sprintf("auth code is %s", status))
+	if codeRow.Status != "approved" {
+		respondBadRequest(w, r, fmt.Sprintf("auth code is %s", codeRow.Status))
 		return
 	}
-	if consumedAt.Valid {
+	if codeRow.ConsumedAt != nil {
 		respondBadRequest(w, r, "auth code already consumed")
 		return
 	}
-	if time.Now().After(expiresAt) {
+	if time.Now().After(codeRow.ExpiresAt) {
 		// Mark expired so a later garbage-collection pass can clean up.
-		_, _ = h.db.Exec(`UPDATE cli_auth_codes SET status = 'expired', token_plaintext = NULL WHERE id = ?`, rowID)
+		_ = h.cliAuthRepo.MarkExpired(codeRow.ID)
 		respondBadRequest(w, r, "auth code expired")
 		return
 	}
-	if !tokenText.Valid || tokenText.String == "" {
+	if codeRow.TokenPlaintext == nil || *codeRow.TokenPlaintext == "" {
 		respondInternalError(w, r, fmt.Errorf("auth code has no token payload"))
 		return
 	}
 
 	// Consume atomically: only the first caller to flip status wins. The
 	// UPDATE guard protects against a replay racing a second exchange.
-	res, err := h.db.Exec(`
-		UPDATE cli_auth_codes
-		SET status = 'consumed', consumed_at = CURRENT_TIMESTAMP, token_plaintext = NULL
-		WHERE id = ? AND status = 'approved' AND consumed_at IS NULL
-	`, rowID)
+	consumed, err := h.cliAuthRepo.ConsumeApproved(codeRow.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if rows, _ := res.RowsAffected(); rows != 1 {
+	if !consumed {
 		respondBadRequest(w, r, "auth code already consumed")
 		return
 	}
 
 	respondJSONOK(w, map[string]interface{}{
-		"token": tokenText.String,
+		"token": *codeRow.TokenPlaintext,
 		"agent": map[string]interface{}{
-			"id":       agentID.Int64,
-			"username": agentName,
+			"id":       cliAuthAgentID(codeRow),
+			"username": codeRow.AgentName,
 		},
-		"scopes":   strings.Split(scopes, ","),
-		"hostname": hostname,
+		"scopes":   strings.Split(codeRow.RequestedScopes, ","),
+		"hostname": codeRow.Hostname,
 	})
 }
 
@@ -444,6 +433,13 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+func cliAuthAgentID(code *repository.CLIAuthCode) int64 {
+	if code.AgentID == nil {
+		return 0
+	}
+	return *code.AgentID
 }
 
 func (h *CLIAuthHandler) auditApproveFailure(r *http.Request, user *models.User, agentName, reason string) {

@@ -84,6 +84,10 @@ func (r *ApprovalRepository) FindFullRequestByID(ctx context.Context, requestID 
 			}
 			si.Approvers = append(si.Approvers, a)
 		}
+		if err := appRows.Err(); err != nil {
+			_ = appRows.Close()
+			return nil, fmt.Errorf("iterate approvers: %w", err)
+		}
 		_ = appRows.Close()
 		req.StepInstances = append(req.StepInstances, si)
 	}

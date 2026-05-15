@@ -149,6 +149,9 @@ func (r *MilestoneAttachRepository) LoadForItems(items []models.Item) error {
 		}
 		milestoneMap[itemID] = append(milestoneMap[itemID], m)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate milestones for items: %w", err)
+	}
 
 	for i := range items {
 		if ms, ok := milestoneMap[items[i].ID]; ok {

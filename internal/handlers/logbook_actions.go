@@ -224,7 +224,7 @@ func (h *LogbookNodeExecutionHandler) executeCreateAsset(nodeConfig string, even
 		h.eventCoordinator.GetAssetActionService().EmitAssetActionEvent(&models.AssetActionEvent{
 			EventType:         models.AssetTriggerAssetCreated,
 			SetID:             config.AssetSetID,
-			AssetID:           int(assetID),
+			AssetID:           assetID,
 			ActorUserID:       event.ActorUserID,
 			TriggeredByAction: true,
 			ExecutionChainID:  req.ExecutionChainID,
