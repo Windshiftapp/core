@@ -174,7 +174,11 @@ func (s *IssueSyncService) syncConfig(ctx context.Context, provider IssueProvide
 		opts.Labels = filterLabels
 	}
 
-	// Paginate through all issues
+	// Paginate through all issues. Per-issue errors are collected and returned
+	// together so callers do NOT advance last_full_sync_at when any issue fails
+	// — otherwise a broken issue would be silently skipped forever (the next
+	// pull uses last_full_sync_at as the "since" cutoff).
+	var issueErrs []error
 	page := 1
 	for {
 		opts.Page = page
@@ -192,6 +196,7 @@ func (s *IssueSyncService) syncConfig(ctx context.Context, provider IssueProvide
 			}
 			if err := s.syncIssue(ctx, provider, config, owner, repo, &issues[i]); err != nil {
 				slog.Error("sync issue", "config_id", config.ID, "issue_number", issues[i].Number, "error", err)
+				issueErrs = append(issueErrs, fmt.Errorf("issue #%d: %w", issues[i].Number, err))
 			}
 		}
 
@@ -201,6 +206,9 @@ func (s *IssueSyncService) syncConfig(ctx context.Context, provider IssueProvide
 		page++
 	}
 
+	if len(issueErrs) > 0 {
+		return fmt.Errorf("sync config %d: %d issue(s) failed: %w", config.ID, len(issueErrs), errors.Join(issueErrs...))
+	}
 	return nil
 }
 
@@ -359,13 +367,26 @@ func (s *IssueSyncService) updateItemFromIssue(ctx context.Context, config *mode
 	defer func() { _ = tx.Rollback() }()
 
 	if err := s.itemRepo.UpdateFields(tx, itemID, map[string]interface{}{
-		"title":        issue.Title,
-		"description":  issue.Body,
-		"status_id":    statusID,
-		"assignee_id":  assigneeID,
-		"milestone_id": milestoneID,
+		"title":       issue.Title,
+		"description": issue.Body,
+		"status_id":   statusID,
+		"assignee_id": assigneeID,
 	}); err != nil {
 		return fmt.Errorf("update item: %w", err)
+	}
+
+	// Milestones live in item_milestones, not on items. Replace whatever's there
+	// so a removed-on-GitHub milestone is cleared locally too.
+	if _, err := tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", itemID); err != nil {
+		return fmt.Errorf("clear milestones: %w", err)
+	}
+	if milestoneID != nil {
+		if _, err := tx.Exec(
+			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+			itemID, *milestoneID, time.Now(),
+		); err != nil {
+			return fmt.Errorf("attach milestone: %w", err)
+		}
 	}
 
 	// Update sync tracking
@@ -425,12 +446,10 @@ func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID, newSt
 		return // No mapping for this status
 	}
 
-	// Set sync lock before pushing
-	_, _ = s.db.ExecContext(ctx,
-		"UPDATE issue_sync_items SET sync_lock = ?, updated_at = ? WHERE id = ?",
-		true, time.Now(), syncItemID)
-
-	// Resolve provider
+	// Resolve provider. Note: we deliberately do NOT set sync_lock yet — the lock
+	// is the signal to the next inbound sync to skip one cycle (loopback
+	// prevention), so we only set it if we actually issue the GitHub PATCH.
+	// Setting it earlier and bailing on preflight would wedge the item.
 	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
@@ -448,6 +467,11 @@ func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID, newSt
 	if len(parts) != 2 {
 		return
 	}
+
+	// Preflight passed — claim the lock immediately before the remote write.
+	_, _ = s.db.ExecContext(ctx,
+		"UPDATE issue_sync_items SET sync_lock = ?, updated_at = ? WHERE id = ?",
+		true, time.Now(), syncItemID)
 
 	_, err = issueProvider.UpdateIssue(ctx, parts[0], parts[1], issueNumber, UpdateIssueOptions{
 		State: &ghState,
@@ -754,6 +778,29 @@ func (s *IssueSyncService) VerifyRepositoryInWorkspace(ctx context.Context, work
 // CreateSyncConfig inserts a new issue sync configuration row, applying the
 // caller-supplied request defaults. Returns the new config ID.
 func (s *IssueSyncService) CreateSyncConfig(ctx context.Context, createdByUserID int, req models.IssueSyncConfigRequest) (int, error) {
+	// Enforce one config per workspace. The workspace-scoped Get/Update/Delete
+	// endpoints assume a single config; the schema's UNIQUE is only per repo,
+	// so without this guard a workspace could end up with multiple configs and
+	// GetSyncConfigForWorkspace's LIMIT 1 would silently pick whichever the DB
+	// returned first. Look up the target workspace via the requested repo.
+	var existingID int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT isc.id
+		FROM issue_sync_configs isc
+		JOIN workspace_repositories wr_existing ON wr_existing.id = isc.workspace_repository_id
+		JOIN workspace_scm_connections wsc_existing ON wsc_existing.id = wr_existing.workspace_scm_connection_id
+		JOIN workspace_repositories wr_target ON wr_target.id = ?
+		JOIN workspace_scm_connections wsc_target ON wsc_target.id = wr_target.workspace_scm_connection_id
+		WHERE wsc_existing.workspace_id = wsc_target.workspace_id
+		LIMIT 1
+	`, req.WorkspaceRepositoryID).Scan(&existingID)
+	if err == nil {
+		return 0, ErrSyncConfigExists
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("check existing sync config: %w", err)
+	}
+
 	if req.StatusMapping == "" {
 		req.StatusMapping = "{}"
 	}
@@ -777,7 +824,7 @@ func (s *IssueSyncService) CreateSyncConfig(ctx context.Context, createdByUserID
 	}
 
 	var configID int
-	err := s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowContext(ctx, `
 		INSERT INTO issue_sync_configs (
 			workspace_repository_id, sync_enabled,
 			status_mapping, reverse_status_mapping,
@@ -1052,7 +1099,17 @@ func (s *IssueSyncService) recordSyncError(configID int, errMsg string) {
 }
 
 // GetGitHubLabels fetches labels from a GitHub repository for mapping UI.
-func (s *IssueSyncService) GetGitHubLabels(ctx context.Context, workspaceRepoID int) ([]IssueLabel, error) {
+// workspaceID gates the lookup: the repo must belong to that workspace, otherwise
+// ErrRepositoryNotInWorkspace is returned (handlers map this to 404).
+func (s *IssueSyncService) GetGitHubLabels(ctx context.Context, workspaceID, workspaceRepoID int) ([]IssueLabel, error) {
+	belongs, err := s.VerifyRepositoryInWorkspace(ctx, workspaceRepoID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if !belongs {
+		return nil, ErrRepositoryNotInWorkspace
+	}
+
 	provider, repoName, err := s.resolveProviderForRepo(ctx, workspaceRepoID)
 	if err != nil {
 		return nil, err
@@ -1072,7 +1129,16 @@ func (s *IssueSyncService) GetGitHubLabels(ctx context.Context, workspaceRepoID 
 }
 
 // GetGitHubMilestones fetches milestones from a GitHub repository for mapping UI.
-func (s *IssueSyncService) GetGitHubMilestones(ctx context.Context, workspaceRepoID int) ([]IssueMilestone, error) {
+// See GetGitHubLabels for the workspaceID gating contract.
+func (s *IssueSyncService) GetGitHubMilestones(ctx context.Context, workspaceID, workspaceRepoID int) ([]IssueMilestone, error) {
+	belongs, err := s.VerifyRepositoryInWorkspace(ctx, workspaceRepoID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if !belongs {
+		return nil, ErrRepositoryNotInWorkspace
+	}
+
 	provider, repoName, err := s.resolveProviderForRepo(ctx, workspaceRepoID)
 	if err != nil {
 		return nil, err

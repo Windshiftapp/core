@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -114,6 +115,10 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	if _, err := h.issueSyncService.CreateSyncConfig(r.Context(), user.ID, req); err != nil {
+		if errors.Is(err, scm.ErrSyncConfigExists) {
+			respondConflict(w, r, "issue sync config already exists for this workspace")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -289,7 +294,7 @@ func requireRepoIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
 
 // GetGitHubLabels fetches labels from the linked GitHub repo for the mapping UI.
 func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Request) {
-	_, _, ok := h.requireAuthWorkspaceID(w, r)
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
 		return
 	}
@@ -299,8 +304,12 @@ func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	labels, err := h.issueSyncService.GetGitHubLabels(r.Context(), repoID)
+	labels, err := h.issueSyncService.GetGitHubLabels(r.Context(), workspaceID, repoID)
 	if err != nil {
+		if errors.Is(err, scm.ErrRepositoryNotInWorkspace) {
+			respondNotFound(w, r, "repository")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -310,7 +319,7 @@ func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Reques
 
 // GetGitHubMilestones fetches milestones from the linked GitHub repo for the mapping UI.
 func (h *IssueSyncHandler) GetGitHubMilestones(w http.ResponseWriter, r *http.Request) {
-	_, _, ok := h.requireAuthWorkspaceID(w, r)
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
 		return
 	}
@@ -320,8 +329,12 @@ func (h *IssueSyncHandler) GetGitHubMilestones(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	milestones, err := h.issueSyncService.GetGitHubMilestones(r.Context(), repoID)
+	milestones, err := h.issueSyncService.GetGitHubMilestones(r.Context(), workspaceID, repoID)
 	if err != nil {
+		if errors.Is(err, scm.ErrRepositoryNotInWorkspace) {
+			respondNotFound(w, r, "repository")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
