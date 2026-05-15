@@ -69,6 +69,7 @@ linters:
     generated: lax
     presets: []
     paths:
+      - ^\.claude/
       - frontend/node_modules
     rules:
       # AI tool executors intentionally return error details as JSON strings with nil error

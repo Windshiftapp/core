@@ -188,6 +188,10 @@ func (h *TimeProjectHandler) respondTimeProjects(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if projects == nil {
 		projects = []models.TimeProject{}
 	}
@@ -260,6 +264,10 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	projects, ok := scanTimeProjectRows(w, r, rows)
 	if !ok {
+		return
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -547,6 +555,11 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		allowedCategories = append(allowedCategories, categoryID)
+	}
+	if err := categoryRows.Err(); err != nil {
+		_ = categoryRows.Close()
+		respondInternalError(w, r, err)
+		return
 	}
 	_ = categoryRows.Close()
 

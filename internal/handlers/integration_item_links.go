@@ -115,6 +115,10 @@ func (h *IntegrationItemLinksHandler) GetItemLinks(w http.ResponseWriter, r *htt
 		}
 		links = append(links, link)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, links)
 }

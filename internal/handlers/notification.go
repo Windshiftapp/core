@@ -337,6 +337,9 @@ func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int
 
 		notifications = append(notifications, n)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Update cache with loaded data (only if we got the full first page)
 	if offset == 0 && len(notifications) > 0 {

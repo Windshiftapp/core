@@ -143,6 +143,10 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 			}
 			rawTransitions = append(rawTransitions, rt)
 		}
+		if err := rows.Err(); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 
 		// Apply approval gating: drop transitions whose ID is the approve or
 		// deny target of an in-flight approval on this item.

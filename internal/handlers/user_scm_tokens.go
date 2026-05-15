@@ -88,6 +88,10 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 
 		connections = append(connections, conn)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, connections)
 }
@@ -354,6 +358,10 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 		}
 
 		providers = append(providers, p)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, providers)

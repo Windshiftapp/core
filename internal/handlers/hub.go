@@ -264,6 +264,9 @@ func (h *HubHandler) getUserGroupIDs(ctx context.Context, userID int) []int {
 			groupIDs = append(groupIDs, groupID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil
+	}
 	return groupIDs
 }
 

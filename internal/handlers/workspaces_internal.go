@@ -26,6 +26,9 @@ func (h *WorkspaceHandler) buildWorkspaceMap() (map[string]int, error) {
 		workspaceMap[strings.ToLower(name)] = id
 		workspaceMap[strings.ToLower(key)] = id
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return workspaceMap, nil
 }

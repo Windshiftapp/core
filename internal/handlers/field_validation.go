@@ -87,6 +87,9 @@ func validateAndSeparateFields(ctx context.Context, db database.Database, reques
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate request type fields: %w", err)
+	}
 
 	if len(virtualFieldIDs) > 0 && customFields != nil {
 		result.virtualFieldValues = make(map[string]interface{})

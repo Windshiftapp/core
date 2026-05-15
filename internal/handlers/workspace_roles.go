@@ -66,6 +66,10 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 		roles = append(roles, role)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if roles == nil {
 		roles = []models.WorkspaceRole{}
@@ -127,6 +131,10 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			role.Permissions = append(role.Permissions, perm)
 		}
+	}
+	if err := permRows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, role)
@@ -371,6 +379,10 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 			roles = append(roles, role)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if roles == nil {
 		roles = []models.WorkspaceRole{}
@@ -467,6 +479,10 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 			RoleDescription: roleDescription,
 			AssignmentID:    assignmentID,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Convert map to slice
@@ -607,6 +623,7 @@ func (h *WorkspaceRoleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 				affected[uid] = true
 			}
 		}
+		_ = rows.Err()
 		_ = rows.Close()
 	}
 	if rows, err := h.db.Query(`
@@ -621,6 +638,7 @@ func (h *WorkspaceRoleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 				affected[uid] = true
 			}
 		}
+		_ = rows.Err()
 		_ = rows.Close()
 	}
 

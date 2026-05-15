@@ -74,6 +74,10 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 		}
 		providers = append(providers, p)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, providers)
 }

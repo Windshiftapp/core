@@ -86,6 +86,10 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 		}
 		providers = append(providers, row.toResponse())
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, providers)
 }

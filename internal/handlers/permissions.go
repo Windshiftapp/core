@@ -59,6 +59,10 @@ func (h *PermissionHandler) GetAllPermissions(w http.ResponseWriter, r *http.Req
 		}
 		permissions = append(permissions, p)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, permissions)
 }
@@ -356,6 +360,9 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 					userIDs = append(userIDs, userID)
 				}
 			}
+			if err := rows.Err(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("group_id:%d", req.GroupID)))
+			}
 
 			// Invalidate cache for each user in the group
 			for _, userID := range userIDs {
@@ -441,6 +448,9 @@ func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWrite
 				if err := rows.Scan(&userID); err == nil {
 					userIDs = append(userIDs, userID)
 				}
+			}
+			if err := rows.Err(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("group_id:%d", groupID)))
 			}
 
 			// Invalidate cache for each user in the group
@@ -540,6 +550,9 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 			summary.HasSystemAdmin = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Get permissions inherited from groups
 	groupPermissionsQuery := `
@@ -579,6 +592,9 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 		if p.PermissionKey == models.PermissionSystemAdmin {
 			summary.HasSystemAdmin = true
 		}
+	}
+	if err := groupRows.Err(); err != nil {
+		return nil, err
 	}
 
 	// Get workspace permissions from explicit role assignments
@@ -629,6 +645,9 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 		}
 		addedPerms[uwp.WorkspaceID][p.PermissionKey] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Supplement with group-based and "Everyone" implicit permissions from the
 	// permission cache.  The cache already resolves all three sources (explicit,
@@ -652,6 +671,7 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 						permLookup[p.PermissionKey] = &cp
 					}
 				}
+				_ = permRows.Err()
 			}
 
 			// Build a workspace ID → Workspace lookup for workspaces we haven't seen yet.
@@ -687,6 +707,7 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 							}
 						}
 					}
+					_ = wsRows.Err()
 				}
 			}
 
@@ -778,6 +799,10 @@ func (h *PermissionHandler) GetAllGroupPermissions(w http.ResponseWriter, r *htt
 			continue
 		}
 		groupPermissions = append(groupPermissions, gp)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, groupPermissions)

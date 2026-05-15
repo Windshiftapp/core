@@ -42,6 +42,10 @@ func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 		screens = append(screens, screen)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if screens == nil {
 		screens = []models.Screen{}
@@ -395,6 +399,9 @@ func (h *ScreenHandler) getScreenFields(screenID int) ([]models.ScreenField, err
 
 		fields = append(fields, field)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return fields, nil
 }
@@ -419,6 +426,9 @@ func (h *ScreenHandler) getSystemFields(screenID int) ([]string, error) {
 			return nil, err
 		}
 		systemFields = append(systemFields, fieldName)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return systemFields, nil

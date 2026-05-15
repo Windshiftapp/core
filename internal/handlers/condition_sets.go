@@ -455,6 +455,9 @@ func (h *ConditionSetHandler) loadConditionSet(id int) (*models.ConditionSet, er
 		tc.FromStatusName = fromName.String
 		tcs = append(tcs, tc)
 	}
+	if err := tcRows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Load conditions for each transition condition
 	for i := range tcs {
@@ -478,6 +481,10 @@ func (h *ConditionSetHandler) loadConditionSet(id int) (*models.ConditionSet, er
 			}
 			c.Config = json.RawMessage(configStr)
 			conditions = append(conditions, c)
+		}
+		if err := condRows.Err(); err != nil {
+			_ = condRows.Close()
+			return nil, err
 		}
 		_ = condRows.Close()
 

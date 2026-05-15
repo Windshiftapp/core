@@ -379,6 +379,10 @@ func (h *AgentHandler) List(w http.ResponseWriter, r *http.Request) {
 		u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
 		agents = append(agents, u)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, agents)
 }

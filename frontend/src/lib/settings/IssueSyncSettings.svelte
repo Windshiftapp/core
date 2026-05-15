@@ -14,6 +14,7 @@
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
+  import { safeHref } from '../utils/sanitize';
 
   let { workspaceId } = $props();
 
@@ -608,7 +609,7 @@
                     <span class="font-medium" style="color: var(--ds-text-subtle);">{item.workspace_key}-{item.workspace_item_number}</span>
                     {item.item_title}
                   </span>
-                  <a href={item.github_issue_url} target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-xs hover:underline" style="color: var(--ds-link);">
+                  <a href={safeHref(item.github_issue_url)} target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-xs hover:underline" style="color: var(--ds-link);">
                     #{item.github_issue_number}
                     <ExternalLink class="w-3 h-3" />
                   </a>

@@ -89,6 +89,10 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 		labels = append(labels, label)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, labels)
 }
@@ -567,6 +571,10 @@ func (h *PersonalLabelHandler) respondItemPersonalLabels(w http.ResponseWriter, 
 		}
 		labels = append(labels, label)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, labels)
 }
@@ -617,6 +625,9 @@ func LoadPersonalLabelsForItems(db database.Database, items []models.Item, viewi
 			label.UserID = &v
 		}
 		labelMap[itemID] = append(labelMap[itemID], label)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate personal labels: %w", err)
 	}
 
 	for i := range items {

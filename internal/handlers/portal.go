@@ -128,6 +128,9 @@ func (h *PortalHandler) getInternalUserGroupIDs(ctx context.Context, r *http.Req
 		}
 		groupIDs = append(groupIDs, groupID)
 	}
+	if err := rows.Err(); err != nil {
+		return nil
+	}
 	return groupIDs
 }
 
@@ -491,6 +494,10 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
 			requestTypes = append(requestTypes, rt)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if requestTypes == nil {

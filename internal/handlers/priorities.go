@@ -87,12 +87,21 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			configSetIDs = append(configSetIDs, configSetID)
 			configSetNames = append(configSetNames, configSetName)
 		}
+		if err := configSetRows.Err(); err != nil {
+			_ = configSetRows.Close()
+			respondInternalError(w, r, err)
+			return
+		}
 		_ = configSetRows.Close()
 
 		p.ConfigurationSetIDs = configSetIDs
 		p.ConfigurationSetNames = configSetNames
 
 		priorities = append(priorities, p)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if priorities == nil {
@@ -152,6 +161,10 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 		configSetIDs = append(configSetIDs, configSetID)
 		configSetNames = append(configSetNames, configSetName)
+	}
+	if err := configSetRows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	p.ConfigurationSetIDs = configSetIDs

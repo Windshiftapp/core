@@ -172,6 +172,10 @@ func (h *FormHandler) GetForms(w http.ResponseWriter, r *http.Request) {
 
 		forms = append(forms, fi)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if forms == nil {
 		forms = []formInfo{}

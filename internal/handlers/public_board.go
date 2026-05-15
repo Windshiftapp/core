@@ -412,6 +412,9 @@ func (h *PublicBoardHandler) loadColumnsWithStatuses(configID int) ([]boardColum
 		}
 		colRows = append(colRows, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	columns := make([]boardColumnInfo, len(colRows))
 	for i, cr := range colRows {
@@ -434,6 +437,10 @@ func (h *PublicBoardHandler) loadColumnsWithStatuses(configID int) ([]boardColum
 				return nil, err
 			}
 			statusIDs = append(statusIDs, sid)
+		}
+		if err := srows.Err(); err != nil {
+			_ = srows.Close()
+			return nil, err
 		}
 		_ = srows.Close()
 		columns[i].statusIDs = statusIDs
@@ -463,6 +470,9 @@ func (h *PublicBoardHandler) buildDefaultColumns() ([]boardColumnInfo, error) {
 		}
 		categories = append(categories, c)
 	}
+	if err := catRows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Load all statuses grouped by category
 	statusRows, err := h.db.Query(`SELECT id, category_id FROM statuses ORDER BY id ASC`)
@@ -478,6 +488,9 @@ func (h *PublicBoardHandler) buildDefaultColumns() ([]boardColumnInfo, error) {
 			return nil, err
 		}
 		statusesByCat[catID] = append(statusesByCat[catID], sid)
+	}
+	if err := statusRows.Err(); err != nil {
+		return nil, err
 	}
 
 	// Build columns: one per category
@@ -506,6 +519,9 @@ func (h *PublicBoardHandler) getAllActiveWorkspaceIDs() ([]int, error) {
 			return nil, err
 		}
 		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return ids, nil
 }
@@ -587,6 +603,9 @@ func (h *PublicBoardHandler) loadSingleItemLabels(itemID int) []publicLabel {
 		}
 		labels = append(labels, l)
 	}
+	if err := rows.Err(); err != nil {
+		return labels
+	}
 	return labels
 }
 
@@ -613,6 +632,9 @@ func (h *PublicBoardHandler) loadPublicComments(itemID int) ([]publicComment, er
 			return nil, fmt.Errorf("failed to scan comment: %w", err)
 		}
 		comments = append(comments, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	if comments == nil {
 		comments = []publicComment{}

@@ -125,6 +125,10 @@ func (h *LDAPHandler) ListConfigs(w http.ResponseWriter, r *http.Request) {
 
 		configs = append(configs, LDAPConfigResponse{LDAPConfig: c, HasBindPassword: true})
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, configs)
 }

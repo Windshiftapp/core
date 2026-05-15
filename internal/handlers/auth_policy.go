@@ -380,6 +380,10 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 		u.FullName = strings.TrimSpace(firstName + " " + lastName)
 		users = append(users, u)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, users)
 }

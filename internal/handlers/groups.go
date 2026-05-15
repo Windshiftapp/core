@@ -108,6 +108,10 @@ func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		nf.applyTo(&group)
 		groups = append(groups, group)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if groups == nil {
 		groups = []models.TeamGroup{}
@@ -727,6 +731,10 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 
 		nf.applyTo(&group)
 		groups = append(groups, group)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if groups == nil {

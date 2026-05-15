@@ -316,6 +316,10 @@ func (h *SetupHandler) GetAIFeaturesConfig(w http.ResponseWriter, r *http.Reques
 				connections = append(connections, c)
 			}
 		}
+		if err := rows.Err(); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 	if connections == nil {
 		connections = []connInfo{}

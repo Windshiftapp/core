@@ -86,6 +86,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			}
 			affectedWorkspaces = append(affectedWorkspaces, workspaceID)
 		}
+		if err := workspaceRows.Err(); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	// Handle empty workspace list
@@ -180,6 +184,11 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 					normalizedName := normalizeStatusName(status.Name)
 					workflowStatuses[normalizedName] = status
 				}
+				if err := workflowStatusRows.Err(); err != nil {
+					_ = workflowStatusRows.Close()
+					respondInternalError(w, r, err)
+					return
+				}
 				_ = workflowStatusRows.Close()
 
 				workflowStatusesCache[*workflowID] = workflowStatuses
@@ -245,6 +254,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			}
 			normalizedName := normalizeStatusName(status.Name)
 			workflowStatuses[normalizedName] = status
+		}
+		if err := workflowStatusRows.Err(); err != nil {
+			respondInternalError(w, r, err)
+			return
 		}
 
 		// Analyze each current status
@@ -427,6 +440,7 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 			_ = rows.Scan(&id, &name)
 			sourceItemTypes[id] = name
 		}
+		_ = rows.Err()
 	}
 
 	// Get item types in target config set
@@ -447,6 +461,7 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 			targetItemTypes[target.ID] = target
 			availableTargets = append(availableTargets, target)
 		}
+		_ = rows.Err()
 	}
 
 	// If target config set has no explicit item types, it accepts ALL item types
@@ -464,6 +479,7 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 				targetItemTypes[target.ID] = target
 				availableTargets = append(availableTargets, target)
 			}
+			_ = rows.Err()
 		}
 	}
 
@@ -553,6 +569,7 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 				fieldType string
 			}{name, fieldType}
 		}
+		_ = rows.Err()
 	}
 
 	// Get custom fields from target config set screens
@@ -582,6 +599,7 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 				required  bool
 			}{name, fieldType, required}
 		}
+		_ = rows.Err()
 	}
 
 	var migrations []models.CustomFieldMigrationInfo
@@ -662,6 +680,7 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 			_ = rows.Scan(&id, &name)
 			sourcePriorities[id] = name
 		}
+		_ = rows.Err()
 	}
 
 	// Get priorities in target config set
@@ -682,6 +701,7 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 			targetPriorities[target.ID] = target
 			availableTargets = append(availableTargets, target)
 		}
+		_ = rows.Err()
 	}
 
 	// If target config set has no explicit priorities, it accepts ALL priorities
@@ -699,6 +719,7 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 				targetPriorities[target.ID] = target
 				availableTargets = append(availableTargets, target)
 			}
+			_ = rows.Err()
 		}
 	}
 
@@ -798,6 +819,9 @@ func (h *ConfigurationSetHandler) analyzeStatusMigrationAgainstWorkflow(workspac
 		_ = rows.Scan(&status.ID, &status.Name)
 		normalizedName := normalizeStatusName(status.Name)
 		workflowStatuses[normalizedName] = status
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false
 	}
 
 	// Get current statuses used in workspace

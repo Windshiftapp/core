@@ -56,6 +56,10 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		workflows = append(workflows, workflow)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Always return an array, even if empty
 	if workflows == nil {
@@ -356,6 +360,11 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			key := transitionKeyStr(fromID, toID)
 			oldTransitions[key] = oldID
 		}
+		if err := oldRows.Err(); err != nil {
+			_ = oldRows.Close()
+			respondInternalError(w, r, err)
+			return
+		}
 		_ = oldRows.Close()
 	}
 
@@ -519,6 +528,10 @@ func (h *WorkflowHandler) GetAvailableTransitions(w http.ResponseWriter, r *http
 
 		transitions = append(transitions, transition)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Always return an array, even if empty
 	if transitions == nil {
@@ -579,6 +592,9 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]models.Workf
 		}
 
 		transitions = append(transitions, transition)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	// Always return an array, even if empty

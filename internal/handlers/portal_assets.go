@@ -377,6 +377,10 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 		assets = append(assets, asset)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if assets == nil {
 		assets = []AssetResult{}
@@ -475,6 +479,10 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 		if vc.isAdmin || ar.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
 			assetReports = append(assetReports, ar)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if assetReports == nil {
@@ -625,6 +633,9 @@ func (h *PortalHandler) loadAssetReportFields(ctx context.Context, assetReportID
 			return nil, err
 		}
 		out = append(out, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

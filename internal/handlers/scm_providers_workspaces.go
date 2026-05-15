@@ -73,6 +73,10 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 		}
 		allowlist = append(allowlist, entry)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if allowlist == nil {
 		allowlist = []models.SCMProviderWorkspaceAllowlist{}

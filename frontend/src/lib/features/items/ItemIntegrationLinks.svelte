@@ -7,6 +7,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
+  import { safeHref } from '../../utils/sanitize';
 
   let { itemId, onaddlink } = $props();
 
@@ -179,7 +180,7 @@
 
             <div class="flex-1 min-w-0">
               <a
-                href={link.external_url}
+                href={safeHref(link.external_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 class="text-sm truncate block hover:underline"

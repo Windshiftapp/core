@@ -198,6 +198,9 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		}
 		repos = append(repos, r)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate repositories: %w", err)
+	}
 
 	slog.Debug("Found active repositories to sync", slog.String("component", "scm"), slog.Int("count", len(repos)))
 
@@ -1033,6 +1036,9 @@ func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 		}
 		linksByConnection[connectionID] = append(linksByConnection[connectionID], linkID)
 		totalLinks++
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate PR links: %w", err)
 	}
 	if totalLinks == 0 {
 		return nil

@@ -275,6 +275,10 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 		}
 		connections = append(connections, conn)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, connections)
 }
@@ -343,6 +347,10 @@ func (h *IntegrationOAuthHandler) GetAvailableProviders(w http.ResponseWriter, r
 			continue
 		}
 		providers = append(providers, p)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, providers)

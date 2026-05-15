@@ -175,6 +175,10 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 		customers = append(customers, c)
 		customerIDs = append(customerIDs, c.ID)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Batched role lookup avoids the previous N+1 per customer.
 	rolesByCustomer, err := h.loadRolesForCustomers(customerIDs)
@@ -267,6 +271,10 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 			return
 		}
 		channels = append(channels, ca)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if channels == nil {
@@ -651,6 +659,10 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 		contacts = append(contacts, c)
 		contactIDs = append(contactIDs, c.ID)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	rolesByContact, err := h.loadRolesForCustomers(contactIDs)
 	if err != nil {
@@ -783,6 +795,9 @@ func (h *PortalCustomersHandler) loadPortalCustomerRoles(customerID int) ([]mode
 		}
 
 		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	if roles == nil {

@@ -121,6 +121,10 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 		collections = append(collections, collection)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, collections)
 }

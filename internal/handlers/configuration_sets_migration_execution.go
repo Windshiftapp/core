@@ -462,6 +462,9 @@ func (h *ConfigurationSetHandler) allowedItemTypesForConfigSet(configSetID int) 
 		}
 		allowed[id] = struct{}{}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	if len(allowed) > 0 {
 		return allowed, nil
 	}
@@ -477,6 +480,9 @@ func (h *ConfigurationSetHandler) allowedItemTypesForConfigSet(configSetID int) 
 			return nil, err
 		}
 		allowed[id] = struct{}{}
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, err
 	}
 	return allowed, nil
 }
@@ -501,6 +507,9 @@ func (h *ConfigurationSetHandler) allowedPrioritiesForConfigSet(configSetID int)
 		}
 		allowed[id] = struct{}{}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	if len(allowed) > 0 {
 		return allowed, nil
 	}
@@ -515,6 +524,9 @@ func (h *ConfigurationSetHandler) allowedPrioritiesForConfigSet(configSetID int)
 			return nil, err
 		}
 		allowed[id] = struct{}{}
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, err
 	}
 	return allowed, nil
 }

@@ -160,6 +160,10 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 		}
 		connections = append(connections, conn)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, connections)
 }

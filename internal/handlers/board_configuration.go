@@ -693,6 +693,9 @@ func (h *BoardConfigurationHandler) getColumns(configID int) ([]models.BoardColu
 		}
 		columns = append(columns, col)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return columns, nil
 }
 
@@ -722,6 +725,10 @@ func (h *BoardConfigurationHandler) getColumnsWithStatuses(configID int) ([]mode
 				return nil, err
 			}
 			statusIDs = append(statusIDs, statusID)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
 		}
 		_ = rows.Close()
 		columns[i].StatusIDs = statusIDs

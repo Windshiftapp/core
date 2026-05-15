@@ -15,6 +15,7 @@
   import Label from '../../components/Label.svelte';
   import { milestonesStore } from '../../stores/milestones.js';
   import { formatDateShort, daysUntil } from '../../utils/dateFormatter.js';
+  import { safeHref } from '../../utils/sanitize';
   import {
     PROGRESS_CHART_CIRCUMFERENCE,
     PROGRESS_CHART_RADIUS,
@@ -298,7 +299,7 @@
                 {/if}
                 {#if release.scm_release_url}
                   <a
-                    href={release.scm_release_url}
+                    href={safeHref(release.scm_release_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="hover:underline inline-flex items-center gap-1"
@@ -315,7 +316,7 @@
           <div class="flex items-center gap-2 text-sm mt-2">
             <Tag class="w-4 h-4" style="color: var(--ds-text-subtle);" />
             <a
-              href={milestone.latest_release.scm_release_url}
+              href={safeHref(milestone.latest_release.scm_release_url)}
               target="_blank"
               rel="noopener noreferrer"
               class="hover:underline"

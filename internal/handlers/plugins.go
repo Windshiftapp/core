@@ -93,6 +93,10 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 
 		pluginList = append(pluginList, p)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Check for loaded plugins not in database (skip if manager is nil)
 	if h.manager != nil {

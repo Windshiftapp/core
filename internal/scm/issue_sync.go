@@ -115,6 +115,9 @@ func (s *IssueSyncService) SyncAll(ctx context.Context) error {
 		j.config.WorkspaceID = j.workspaceID
 		jobs = append(jobs, j)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate issue sync configs: %w", err)
+	}
 
 	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
 
@@ -861,6 +864,9 @@ func (s *IssueSyncService) GetSyncedItems(ctx context.Context, configID int) ([]
 			item.LastGitHubUpdatedAt = &lastGH.Time
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return items, nil
 }

@@ -15,6 +15,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { safeHref } from '../utils/sanitize';
 
   // State
   let showWizard = $state(false);
@@ -144,7 +145,7 @@
                     <span class="font-medium" style="color: var(--ds-text);">
                       {connection.instance_name || 'Jira Cloud'}
                     </span>
-                    <a href={connection.instance_url}
+                    <a href={safeHref(connection.instance_url)}
                        target="_blank"
                        rel="noopener noreferrer"
                        class="hover:opacity-70">

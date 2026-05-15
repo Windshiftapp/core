@@ -6,6 +6,7 @@
   import Text from '../../components/Text.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
+  import { safeHref } from '../../utils/sanitize';
 
   let { itemId, onaddlink, oncreatebranch, oncreatepr } = $props();
 
@@ -336,7 +337,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <!-- Title/Number -->
         <a
-          href={link.external_url}
+          href={safeHref(link.external_url)}
           target="_blank"
           rel="noopener noreferrer"
           class="text-sm font-medium hover:underline truncate"
@@ -403,7 +404,7 @@
         <RefreshCw class="w-3 h-3 {refreshing ? 'animate-spin' : ''}" />
       </button>
       <a
-        href={link.external_url}
+        href={safeHref(link.external_url)}
         target="_blank"
         rel="noopener noreferrer"
         class="p-1 rounded hover:bg-opacity-50"

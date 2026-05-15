@@ -311,6 +311,9 @@ func (h *ItemLinkHandler) accessibleAssetSetIDSet(user *models.User) map[int]boo
 			set[id] = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return make(map[int]bool)
+	}
 	return set
 }
 
@@ -656,6 +659,11 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		asset.Direction = "outgoing"
 		linkedAssets = append(linkedAssets, asset)
 	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		respondInternalError(w, r, err)
+		return
+	}
 	_ = rows.Close()
 
 	// Process incoming links
@@ -684,6 +692,11 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		asset.LinkLabel = linkLabel.String
 		asset.Direction = "incoming"
 		linkedAssets = append(linkedAssets, asset)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		respondInternalError(w, r, err)
+		return
 	}
 	_ = rows.Close()
 
@@ -831,6 +844,9 @@ func (h *ItemLinkHandler) getLinksWhere(whereClause string, args ...interface{})
 		}
 		links = append(links, link)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return links, nil
 }
@@ -893,6 +909,9 @@ func (h *ItemLinkHandler) searchTestCases(query string, limit int, accessibleWor
 		item.Description = summary.String
 		item.Type = "test_case"
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return items, nil
@@ -964,6 +983,9 @@ func (h *ItemLinkHandler) searchAssets(user *models.User, query string, limit in
 
 		item.Type = "asset"
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return items, nil

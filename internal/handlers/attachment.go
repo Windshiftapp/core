@@ -637,6 +637,10 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 
 		attachments = append(attachments, attachment)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Create paginated response
 	response := models.PaginatedAttachmentsResponse{

@@ -85,6 +85,10 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 
 		credentials = append(credentials, cred)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	// Query WebAuthn credentials from webauthn_credentials table
 	webauthnQuery := `
@@ -129,6 +133,10 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		}
 
 		credentials = append(credentials, cred)
+	}
+	if err := webauthnRows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Sort all credentials by created_at DESC

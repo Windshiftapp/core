@@ -118,6 +118,10 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 
 		jobs = append(jobs, job)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, jobs)
 }
@@ -233,6 +237,10 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			continue
 		}
 		mappings = append(mappings, m)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Delete entities in order (most dependent first)
@@ -376,6 +384,10 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 			}
 		}
 	nextRow:
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, imports)

@@ -275,6 +275,10 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 
 		statuses = append(statuses, status)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if statuses == nil {
 		statuses = []models.Status{}

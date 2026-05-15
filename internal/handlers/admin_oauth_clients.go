@@ -112,6 +112,10 @@ func (h *AdminOAuthClientHandler) GetClients(w http.ResponseWriter, r *http.Requ
 		}
 		clients = append(clients, c)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	respondJSONOK(w, clients)
 }
 

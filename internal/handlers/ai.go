@@ -88,14 +88,20 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 	// Find user's personal workspace IDs so we include all items from them
 	var personalWSIDs []int
 	pwsRows, err := h.db.Query("SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ? AND active = true", user.ID)
-	if err == nil {
-		defer func() { _ = pwsRows.Close() }()
-		for pwsRows.Next() {
-			var id int
-			if err = pwsRows.Scan(&id); err == nil {
-				personalWSIDs = append(personalWSIDs, id)
-			}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = pwsRows.Close() }()
+	for pwsRows.Next() {
+		var id int
+		if err = pwsRows.Scan(&id); err == nil {
+			personalWSIDs = append(personalWSIDs, id)
 		}
+	}
+	if err := pwsRows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Build filter: include items assigned to user OR items in their personal workspace(s)

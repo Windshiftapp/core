@@ -67,6 +67,10 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		itemTypes = append(itemTypes, it)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if itemTypes == nil {
 		itemTypes = []models.ItemType{}
@@ -469,6 +473,9 @@ func (h *ItemTypeHandler) loadConfigurationSets(itemTypeID int) (ids []int, name
 		}
 		ids = append(ids, id)
 		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
 	}
 
 	return ids, names, nil

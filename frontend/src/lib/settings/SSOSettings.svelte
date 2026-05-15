@@ -23,6 +23,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
+  import { safeHref } from '../utils/sanitize';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
@@ -332,7 +333,7 @@
             </div>
             <div>
               <span style="color: var(--ds-text-subtle);">{t('settings.sso.issuerUrl')}:</span>
-              <a href={provider.issuer_url} target="_blank" rel="noopener noreferrer" class="ml-2 hover:underline flex items-center gap-1 inline-flex" style="color: var(--ds-link);">
+              <a href={safeHref(provider.issuer_url)} target="_blank" rel="noopener noreferrer" class="ml-2 hover:underline flex items-center gap-1 inline-flex" style="color: var(--ds-link);">
                 {provider.issuer_url}
                 <ExternalLink class="w-3 h-3" />
               </a>

@@ -160,6 +160,10 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 
 		connections = append(connections, conn)
 	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, connections)
 }
@@ -516,6 +520,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 				linkedMap[extID] = true
 			}
 		}
+		_ = linkedRows.Err()
 	}
 
 	// Build response with linked status
@@ -603,6 +608,10 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 		}
 
 		repos = append(repos, repo)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, repos)
@@ -801,6 +810,10 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 		}
 		p.IsConnected = isConnected == 1
 		providers = append(providers, p)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, providers)

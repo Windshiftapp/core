@@ -112,6 +112,9 @@ func resolveCustomFieldNames(ctx context.Context, h *PortalHandler, customFields
 			out[name] = formatTemplateValue(v)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil
+	}
 	return out
 }
 

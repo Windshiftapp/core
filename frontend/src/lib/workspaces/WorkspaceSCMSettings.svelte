@@ -9,6 +9,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import { safeHref } from '../utils/sanitize';
 
   let { workspaceId } = $props();
 
@@ -414,7 +415,7 @@
                         </div>
                         <div class="flex items-center gap-2">
                           <a
-                            href={repo.repository_url}
+                            href={safeHref(repo.repository_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             class="p-1 rounded hover:bg-opacity-50"
