@@ -59,10 +59,13 @@ type AssetEvaluator struct {
 	workspaceMap map[string]int // For linkedOf() inner queries against items
 }
 
-// NewAssetEvaluator creates a new QL evaluator for assets
-func NewAssetEvaluator(setMap, workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *AssetEvaluator {
+// NewAssetEvaluator creates a new QL evaluator for assets. assetCustomFieldMap
+// covers asset-side custom fields; itemCustomFieldMap is passed through to
+// inner item queries spawned by linkedOf() and may be nil if those are not
+// expected to filter on item custom fields.
+func NewAssetEvaluator(setMap, workspaceMap map[string]int, assetCustomFieldMap, itemCustomFieldMap CustomFieldMap, dbDriver string) *AssetEvaluator {
 	return &AssetEvaluator{
-		sqlGenerator: NewAssetSQLGenerator(setMap, customFieldMap, dbDriver),
+		sqlGenerator: NewAssetSQLGenerator(setMap, assetCustomFieldMap, itemCustomFieldMap, dbDriver),
 		workspaceMap: workspaceMap,
 	}
 }

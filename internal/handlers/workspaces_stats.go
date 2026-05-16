@@ -124,7 +124,12 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 			return
 		}
-		evaluator := cql.NewEvaluator(workspaceMap, nil, h.db.GetDriverName())
+		customFieldMap, cfErr := repository.NewItemRepository(h.db).GetCQLCustomFieldMap()
+		if cfErr != nil {
+			respondInternalError(w, r, cfErr)
+			return
+		}
+		evaluator := cql.NewEvaluator(workspaceMap, customFieldMap, h.db.GetDriverName())
 		resolvedQuery := cql.SubstituteFunctions(vqlQuery, cql.UserContext(authUser.ID))
 		filterSQL, filterArgs, err = evaluator.EvaluateToSQL(resolvedQuery)
 		if err != nil {

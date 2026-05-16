@@ -539,6 +539,96 @@ func TestTokenizer_DottedCustomIdentifier(t *testing.T) {
 	}
 }
 
+// linkedOf() inside an asset query spawns an inner item-side generator. That
+// inner generator must receive the item-side custom-field map so cf_<name>
+// resolves to the right numeric JSON key — not the asset map (which would map
+// asset CFs) and not nil (which would fall back to legacy name extraction).
+func TestGenerator_AssetLinkedOfInnerQueryUsesItemCustomFieldMap(t *testing.T) {
+	ast, err := parseQL(t, `linkedOf("relates", "cf_Severity = \"High\"")`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	assetMap := CustomFieldMap{"size": {ID: 7, Kind: CFKindScalar}}
+	itemMap := CustomFieldMap{"severity": {ID: 123, Kind: CFKindScalar}}
+	gen := NewAssetSQLGenerator(map[string]int{}, assetMap, itemMap, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, `'$."123"'`) {
+		t.Fatalf("expected inner item query to resolve cf_Severity to id 123, got: %s", sqlStr)
+	}
+	if strings.Contains(sqlStr, "Severity") {
+		t.Fatalf("expected name to be replaced by numeric id in inner SQL, got: %s", sqlStr)
+	}
+}
+
+// Reference custom fields can store either a direct scalar id or an object
+// {id, name, ...}; IN must check both forms, like the equality path.
+func TestGenerator_ReferenceCustomField_INChecksDirectAndNested_SQLite(t *testing.T) {
+	ast, err := parseQL(t, `cf_Owner IN (7, 8)`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"owner": {ID: 123, Kind: CFKindReference}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, args, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, `'$."123"'`) {
+		t.Fatalf("expected direct extract '$.\"123\"' in SQL, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, `'$."123".id'`) {
+		t.Fatalf("expected nested .id extract '$.\"123\".id' in SQL, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, " OR ") {
+		t.Fatalf("expected OR joining direct/nested branches, got: %s", sqlStr)
+	}
+	// Each of 7 and 8 should appear twice (once per branch).
+	if len(args) != 4 {
+		t.Fatalf("expected 4 bound args (2 values x 2 branches), got %d: %#v", len(args), args)
+	}
+}
+
+func TestGenerator_ReferenceCustomField_NOTINNegatesBothBranches(t *testing.T) {
+	ast, err := parseQL(t, `cf_Owner NOT IN (7, 8)`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"owner": {ID: 123, Kind: CFKindReference}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "NOT IN") {
+		t.Fatalf("expected NOT IN in SQL, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, " AND ") {
+		t.Fatalf("expected AND joining direct/nested NOT IN branches, got: %s", sqlStr)
+	}
+}
+
+func TestGenerator_ReferenceCustomField_INPostgres(t *testing.T) {
+	ast, err := parseQL(t, `cf_Owner IN (7, 8)`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"owner": {ID: 123, Kind: CFKindReference}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "postgres")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "->>'123'") {
+		t.Fatalf("expected direct ->>'123' in SQL, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, "->'123'->>'id'") {
+		t.Fatalf("expected nested ->'123'->>'id' in SQL, got: %s", sqlStr)
+	}
+}
+
 func TestGenerator_TildeEscapesLikeWildcards(t *testing.T) {
 	ast, err := parseQL(t, `title ~ "50%"`)
 	if err != nil {

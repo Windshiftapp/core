@@ -132,8 +132,13 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", err))
 			return
 		}
+		itemCustomFieldMap, err := repository.NewItemRepository(h.db).GetCQLCustomFieldMap()
+		if err != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load item custom field mapping: %w", err))
+			return
+		}
 
-		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, itemCustomFieldMap, h.db.GetDriverName())
 		resolvedQuery := cql.SubstituteFunctions(cqlQuery, cql.UserContext(user.ID))
 		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(resolvedQuery)
 		if err != nil {

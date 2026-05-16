@@ -11,6 +11,7 @@ import (
 
 	"windshift/internal/cql"
 	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // ErrAnalyticsCollectionNotFound is returned when an analytics collection does not exist.
@@ -214,8 +215,12 @@ func (s *AnalyticsService) evaluateQLToItemIDs(qlQuery string, workspaceID, user
 		return nil, err
 	}
 
+	customFieldMap, err := repository.NewItemRepository(s.db).GetCQLCustomFieldMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build custom field map: %w", err)
+	}
 	resolvedQuery := cql.SubstituteFunctions(qlQuery, cql.UserContext(userID))
-	evaluator := cql.NewEvaluator(workspaceMap, nil, s.db.GetDriverName())
+	evaluator := cql.NewEvaluator(workspaceMap, customFieldMap, s.db.GetDriverName())
 	sqlWhere, sqlArgs, err := evaluator.EvaluateToSQL(resolvedQuery)
 	if err != nil {
 		return nil, fmt.Errorf("CQL evaluation failed: %w", err)

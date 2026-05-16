@@ -147,7 +147,11 @@ func init() {
 			}
 			if args.Filter != "" {
 				wsMap := workspaceLookupMap(env.DB)
-				evaluator := cql.NewEvaluator(wsMap, nil, env.DB.GetDriverName())
+				customFieldMap, cfErr := repository.NewItemRepository(env.DB).GetCQLCustomFieldMap()
+				if cfErr != nil {
+					return map[string]string{"error": fmt.Sprintf("failed to build custom field map: %s", cfErr.Error())}, nil
+				}
+				evaluator := cql.NewEvaluator(wsMap, customFieldMap, env.DB.GetDriverName())
 				resolved := cql.SubstituteFunctions(args.Filter, cql.UserContext(env.UserID))
 				cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(resolved)
 				if err != nil {

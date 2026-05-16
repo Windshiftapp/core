@@ -259,7 +259,12 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", cfErr))
 			return
 		}
-		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
+		itemCustomFieldMap, icErr := repository.NewItemRepository(h.db).GetCQLCustomFieldMap()
+		if icErr != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load item custom field mapping: %w", icErr))
+			return
+		}
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, itemCustomFieldMap, h.db.GetDriverName())
 		var evalErr error
 		cqlSQL, cqlArgs, evalErr = evaluator.EvaluateToSQL(cqlQuery)
 		if evalErr != nil {

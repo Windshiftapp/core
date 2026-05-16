@@ -11,12 +11,13 @@ import (
 
 // SQLGenerator converts QL AST to SQL WHERE clause
 type SQLGenerator struct {
-	workspaceMap   map[string]int // Maps workspace names/keys to IDs
-	aliasPrefix    string         // Prefix for table aliases ("" for outer, "inner_" for inner queries)
-	entityType     EntityType     // Type of entity being queried (item or asset)
-	setMap         map[string]int // Maps asset set names to IDs (for asset queries)
-	dbDriver       string         // Database driver name ("sqlite" or "postgres")
-	customFieldMap CustomFieldMap // Maps lowercase custom field name to {ID, Kind}
+	workspaceMap       map[string]int // Maps workspace names/keys to IDs
+	aliasPrefix        string         // Prefix for table aliases ("" for outer, "inner_" for inner queries)
+	entityType         EntityType     // Type of entity being queried (item or asset)
+	setMap             map[string]int // Maps asset set names to IDs (for asset queries)
+	dbDriver           string         // Database driver name ("sqlite" or "postgres")
+	customFieldMap     CustomFieldMap // Maps lowercase custom field name to {ID, Kind} for the entity being queried
+	itemCustomFieldMap CustomFieldMap // Item-side custom field map, used by inner item queries inside asset linkedOf()
 }
 
 // NewSQLGenerator creates a new SQL generator for outer queries (work items).
@@ -24,11 +25,12 @@ type SQLGenerator struct {
 // JSON extraction (legacy behavior).
 func NewSQLGenerator(workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		workspaceMap:   workspaceMap,
-		aliasPrefix:    "",
-		entityType:     EntityTypeItem,
-		dbDriver:       dbDriver,
-		customFieldMap: customFieldMap,
+		workspaceMap:       workspaceMap,
+		aliasPrefix:        "",
+		entityType:         EntityTypeItem,
+		dbDriver:           dbDriver,
+		customFieldMap:     customFieldMap,
+		itemCustomFieldMap: customFieldMap,
 	}
 }
 
@@ -36,22 +38,26 @@ func NewSQLGenerator(workspaceMap map[string]int, customFieldMap CustomFieldMap,
 // Uses "inner_" prefix for table aliases to avoid collision with outer query.
 func NewInnerSQLGenerator(workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		workspaceMap:   workspaceMap,
-		aliasPrefix:    "inner_",
-		entityType:     EntityTypeItem,
-		dbDriver:       dbDriver,
-		customFieldMap: customFieldMap,
+		workspaceMap:       workspaceMap,
+		aliasPrefix:        "inner_",
+		entityType:         EntityTypeItem,
+		dbDriver:           dbDriver,
+		customFieldMap:     customFieldMap,
+		itemCustomFieldMap: customFieldMap,
 	}
 }
 
-// NewAssetSQLGenerator creates a new SQL generator for asset queries.
-func NewAssetSQLGenerator(setMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
+// NewAssetSQLGenerator creates a new SQL generator for asset queries. The
+// assetCustomFieldMap covers asset-side custom fields; the itemCustomFieldMap
+// is used by inner item queries spawned from linkedOf().
+func NewAssetSQLGenerator(setMap map[string]int, assetCustomFieldMap, itemCustomFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		setMap:         setMap,
-		aliasPrefix:    "",
-		entityType:     EntityTypeAsset,
-		dbDriver:       dbDriver,
-		customFieldMap: customFieldMap,
+		setMap:             setMap,
+		aliasPrefix:        "",
+		entityType:         EntityTypeAsset,
+		dbDriver:           dbDriver,
+		customFieldMap:     assetCustomFieldMap,
+		itemCustomFieldMap: itemCustomFieldMap,
 	}
 }
 
@@ -645,6 +651,8 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []i
 				return g.generateMultiselectCustomFieldInExpression(node, info)
 			case CFKindLinking:
 				return g.generateLinkingCustomFieldInExpression(node, info)
+			case CFKindReference:
+				return g.generateReferenceCustomFieldInExpression(node, info)
 			}
 		}
 	}
@@ -1007,9 +1015,10 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 	}
 
 	// Use item SQL generator for the inner query (querying items, not assets).
-	// Inner item queries don't currently have access to the item customFieldMap;
-	// pass nil — the generator falls back to name-based extraction.
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, nil, g.dbDriver)
+	// itemCustomFieldMap is the item-side custom-field map supplied by the
+	// asset evaluator's caller — required for cf_<name> inside linkedOf() to
+	// resolve to the numeric JSON key used in items.custom_field_values.
+	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.itemCustomFieldMap, g.dbDriver)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -1185,6 +1194,37 @@ func (g *SQLGenerator) generateReferenceCustomFieldComparison(node *ASTNode, inf
 	default:
 		return "", nil, fmt.Errorf("operator %q is not supported on reference custom fields", node.Operator)
 	}
+}
+
+// generateReferenceCustomFieldInExpression handles `cf_x IN (...)` and
+// `cf_x NOT IN (...)` for reference kind. Like the equality path, this checks
+// both the direct scalar and the nested .id so legacy scalar storage and
+// object-backed storage both match.
+func (g *SQLGenerator) generateReferenceCustomFieldInExpression(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	if node.Values.Type != NodeList {
+		return "", nil, errors.New("IN expression requires a list of values")
+	}
+	placeholders := make([]string, 0, len(node.Values.Arguments))
+	values := make([]interface{}, 0, len(node.Values.Arguments))
+	for _, v := range node.Values.Arguments {
+		placeholders = append(placeholders, "?")
+		values = append(values, g.convertLiteral(v))
+	}
+	placeholderList := strings.Join(placeholders, ", ")
+	column := g.customFieldColumn()
+	directExpr, nestedExpr := g.referenceExtractExpressions(column, info.ID)
+
+	// Bind values twice — once for each branch of the OR / AND.
+	args = make([]interface{}, 0, len(values)*2)
+	args = append(args, values...)
+	args = append(args, values...)
+
+	if strings.EqualFold(node.Operator, "NOT IN") {
+		// Match rows where neither form is in the list. Missing field (both
+		// extracts NULL) does not match — standard SQL NULL semantics.
+		return fmt.Sprintf("(%s NOT IN (%s) AND %s NOT IN (%s))", directExpr, placeholderList, nestedExpr, placeholderList), args, nil
+	}
+	return fmt.Sprintf("(%s IN (%s) OR %s IN (%s))", directExpr, placeholderList, nestedExpr, placeholderList), args, nil
 }
 
 // referenceExtractExpressions returns the SQL expressions to read the direct
