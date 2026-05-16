@@ -369,7 +369,7 @@ func (r *ItemRepository) buildOrderByClause(sortBy string, sortAsc bool) string 
 		expr = fmt.Sprintf("(i.custom_field_values->>'%s')", sortBy)
 	} else {
 		// SQLite
-		expr = fmt.Sprintf(`NULLIF(i.custom_field_values, '') ->> '$.\"%s\"'`, sortBy)
+		expr = fmt.Sprintf(`NULLIF(i.custom_field_values, '') ->> '$.%q'`, sortBy)
 	}
 
 	// Wrap in CAST for numeric types
