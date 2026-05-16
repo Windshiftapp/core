@@ -2512,13 +2512,14 @@ func (r *AssetRepository) GetCQLSetMap() (map[string]int, error) {
 	return setMap, nil
 }
 
-// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind} map for the custom
-// fields attached to asset types in a set. Lets CQL queries reference human-
-// readable field names even though the DB stores numeric keys, and lets the
-// generator pick the right extraction strategy per field type.
+// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind, ...} map for the
+// custom fields attached to asset types in a set. Lets CQL queries reference
+// human-readable field names even though the DB stores numeric keys, and lets
+// the generator pick the right extraction strategy per field type. For linking
+// fields, also reads options to detect mirror fields and target-type constraints.
 func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (cql.CustomFieldMap, error) {
 	rows, err := r.db.Query(`
-		SELECT DISTINCT cfd.id, LOWER(cfd.name), cfd.field_type
+		SELECT DISTINCT cfd.id, LOWER(cfd.name), cfd.field_type, COALESCE(cfd.options, '')
 		FROM custom_field_definitions cfd
 		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
 		JOIN asset_types at2 ON atf.asset_type_id = at2.id
@@ -2532,11 +2533,19 @@ func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (cql.CustomFieldMap, e
 	cfMap := make(cql.CustomFieldMap)
 	for rows.Next() {
 		var id int
-		var name, fieldType string
-		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+		var name, fieldType, options string
+		if err := rows.Scan(&id, &name, &fieldType, &options); err != nil {
 			return nil, fmt.Errorf("failed to scan custom field: %w", err)
 		}
-		cfMap[name] = cql.CustomFieldInfo{ID: id, Kind: cql.ClassifyCustomFieldKind(fieldType)}
+		info := cql.CustomFieldInfo{
+			ID:        id,
+			Kind:      cql.ClassifyCustomFieldKind(fieldType),
+			FieldType: strings.ToLower(fieldType),
+		}
+		if info.Kind == cql.CFKindLinking {
+			info.MirrorOfFieldID, info.AllowedTargetTypes = cql.LinkingFieldOptions(options)
+		}
+		cfMap[name] = info
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)

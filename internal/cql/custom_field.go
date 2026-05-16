@@ -1,6 +1,9 @@
 package cql
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // CustomFieldKind classifies a custom field by how its value is stored, which
 // determines the SQL lowering strategy used by the generator.
@@ -26,9 +29,43 @@ const (
 
 // CustomFieldInfo identifies a custom field by its numeric ID and how its value
 // is stored. Used by the QL generator to route comparisons to the right extractor.
+//
+// MirrorOfFieldID is non-zero for mirror linking fields: the row's id refers to
+// the mirror definition, but the actual link rows in item_links live under the
+// primary's id. The generator must query in the reverse direction (source ↔
+// target) and use the primary id for the custom_field_id filter.
+//
+// AllowedTargetTypes lists the entity types valid as link targets (e.g.
+// ["item"] or ["item","asset"]). When non-empty the generator constrains
+// target_type (or source_type, for mirrors) to that set so a target_id of 42
+// doesn't ambiguously match across entity types.
 type CustomFieldInfo struct {
 	ID   int
 	Kind CustomFieldKind
+	// FieldType is the lowercase field_type string from the DB (e.g. "date",
+	// "number", "text"). The generator uses this to match the per-field
+	// Postgres expression indexes created in handlers/custom_fields.go —
+	// date fields wrap the extract in CAST(... AS TEXT), so QL must too.
+	FieldType          string
+	MirrorOfFieldID    int
+	AllowedTargetTypes []string
+}
+
+// LinkingFieldOptions extracts the linking-relevant fields from a custom field
+// definition's options JSON. Returns zero values when the JSON is empty or
+// invalid — callers should treat that as "no mirror, no entity-type constraint."
+func LinkingFieldOptions(optionsJSON string) (mirrorOfFieldID int, allowedTargetTypes []string) {
+	if strings.TrimSpace(optionsJSON) == "" {
+		return 0, nil
+	}
+	var opts struct {
+		MirrorOfFieldID    int      `json:"mirror_of_field_id"`
+		AllowedEntityTypes []string `json:"allowed_entity_types"`
+	}
+	if err := json.Unmarshal([]byte(optionsJSON), &opts); err != nil {
+		return 0, nil
+	}
+	return opts.MirrorOfFieldID, opts.AllowedEntityTypes
 }
 
 // CustomFieldMap maps a lowercase custom-field name to its info. The generator

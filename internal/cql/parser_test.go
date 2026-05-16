@@ -591,8 +591,141 @@ func TestGenerator_ReferenceCustomField_INChecksDirectAndNested_SQLite(t *testin
 	}
 }
 
-func TestGenerator_ReferenceCustomField_NOTINNegatesBothBranches(t *testing.T) {
-	ast, err := parseQL(t, `cf_Owner NOT IN (7, 8)`)
+// Postgres date custom-field indexes use CAST(... AS TEXT) per the DDL in
+// handlers/custom_fields.go. The generator must mirror that wrapper so the
+// planner can match the index expression.
+func TestGenerator_DateCustomField_PostgresWrapsInCastText(t *testing.T) {
+	ast, err := parseQL(t, `cf_BirthDate = "2020-01-01"`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"birthdate": {ID: 123, Kind: CFKindScalar, FieldType: "date"}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "postgres")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "CAST(") || !strings.Contains(sqlStr, "AS TEXT") {
+		t.Fatalf("expected CAST(... AS TEXT) wrap to match index, got: %s", sqlStr)
+	}
+}
+
+// Non-date scalar fields don't get the extra CAST wrap on Postgres.
+func TestGenerator_NonDateScalarOnPostgresNoExtraCast(t *testing.T) {
+	ast, err := parseQL(t, `cf_Severity = "High"`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"severity": {ID: 123, Kind: CFKindScalar, FieldType: "text"}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "postgres")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if strings.Contains(sqlStr, "AS TEXT") {
+		t.Fatalf("expected no AS TEXT wrap for text field on PG, got: %s", sqlStr)
+	}
+}
+
+// Mirror linking fields store nothing on their own side — the actual link rows
+// live under the primary field's id, with source/target swapped. QL must query
+// in the reverse direction (current item = target, value = source).
+func TestGenerator_LinkingCustomField_MirrorReversesDirection(t *testing.T) {
+	ast, err := parseQL(t, `cf_RelatedTo = 42`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"relatedto": {ID: 99, Kind: CFKindLinking, MirrorOfFieldID: 7}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	// custom_field_id should match the PRIMARY's id (7), not the mirror's (99).
+	if !strings.Contains(sqlStr, "custom_field_id = 7") {
+		t.Fatalf("expected custom_field_id = 7 (mirror_of_field_id), got: %s", sqlStr)
+	}
+	// Current item should appear on the target side, value on the source side.
+	if !strings.Contains(sqlStr, "il.target_id = i.id") {
+		t.Fatalf("expected mirror to put current item on target side, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, "il.source_id IN (?)") {
+		t.Fatalf("expected mirror to put bound value on source side, got: %s", sqlStr)
+	}
+}
+
+// AllowedTargetTypes constrains the type column on the other side of the link
+// so a target_id of 42 doesn't accidentally match across entity types.
+func TestGenerator_LinkingCustomField_TargetTypeConstraint(t *testing.T) {
+	ast, err := parseQL(t, `cf_Asset = 42`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"asset": {ID: 7, Kind: CFKindLinking, AllowedTargetTypes: []string{"asset"}}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "il.target_type = 'asset'") {
+		t.Fatalf("expected target_type = 'asset' constraint, got: %s", sqlStr)
+	}
+}
+
+// Multi-value AllowedTargetTypes becomes an IN clause.
+func TestGenerator_LinkingCustomField_TargetTypeMultiAllowedUsesIN(t *testing.T) {
+	ast, err := parseQL(t, `cf_Reference = 42`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"reference": {ID: 7, Kind: CFKindLinking, AllowedTargetTypes: []string{"item", "asset"}}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "il.target_type IN ('item', 'asset')") {
+		t.Fatalf("expected target_type IN list, got: %s", sqlStr)
+	}
+}
+
+// cfid_<id> is the stable, collision-free QL form: addresses the field by its
+// numeric DB id directly, with no name lookup. Useful when custom-field names
+// collide across scopes.
+func TestGenerator_CFIDIdentifierResolvesDirectlyToJSONKey_SQLite(t *testing.T) {
+	ast, err := parseQL(t, `cfid_123 = "High"`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	gen := NewSQLGenerator(map[string]int{}, nil, "sqlite")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, `'$."123"'`) {
+		t.Fatalf("expected inlined '$.\"123\"' JSON path, got: %s", sqlStr)
+	}
+}
+
+func TestGenerator_CFIDIdentifierResolvesDirectlyToJSONKey_Postgres(t *testing.T) {
+	ast, err := parseQL(t, `cfid_123 = "High"`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	gen := NewSQLGenerator(map[string]int{}, nil, "postgres")
+	sqlStr, _, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "->>'123'") {
+		t.Fatalf("expected inlined ->>'123', got: %s", sqlStr)
+	}
+}
+
+// cfid_<id> picks up the Kind from the map when one is provided, so per-kind
+// dispatch (reference, multiselect, linking) routes correctly.
+func TestGenerator_CFIDIdentifierUsesMapKindForReferenceDispatch(t *testing.T) {
+	ast, err := parseQL(t, `cfid_123 = 7`)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -602,11 +735,71 @@ func TestGenerator_ReferenceCustomField_NOTINNegatesBothBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
+	if !strings.Contains(sqlStr, `'$."123".id'`) {
+		t.Fatalf("expected reference dispatch (nested .id check), got: %s", sqlStr)
+	}
+}
+
+// Backticked custom-field names starting with a digit (e.g. "123 Score")
+// previously failed validation. The relaxed regex allows them through.
+func TestGenerator_CustomFieldNameWithLeadingDigit(t *testing.T) {
+	ast, err := parseQL(t, "`cf_123 Score` = 5")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	gen := NewSQLGenerator(map[string]int{}, nil, "sqlite")
+	if _, _, err := gen.GenerateSQL(ast); err != nil {
+		t.Fatalf("expected generation to succeed for digit-prefixed CF name, got: %v", err)
+	}
+}
+
+// Reference != uses COALESCE(nested, direct) so legacy scalar storage works
+// alongside object-backed storage. The previous (direct != ? AND nested != ?)
+// form returned NULL (filtering the row out) when nested was NULL.
+func TestGenerator_ReferenceCustomField_NotEqualUsesCoalesce(t *testing.T) {
+	ast, err := parseQL(t, `cf_Owner != 7`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"owner": {ID: 123, Kind: CFKindReference}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, args, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(sqlStr, "COALESCE(") {
+		t.Fatalf("expected COALESCE wrapper for null-safe !=, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, "!=") {
+		t.Fatalf("expected != in SQL, got: %s", sqlStr)
+	}
+	if len(args) != 1 {
+		t.Fatalf("expected 1 bound arg, got %d: %#v", len(args), args)
+	}
+}
+
+// NOT IN uses COALESCE(nested, direct) to collapse object/scalar dual storage
+// into one effective ID — the naive AND of two != branches drops rows where the
+// nested form is NULL (true AND NULL = NULL, filtered out).
+func TestGenerator_ReferenceCustomField_NOTINUsesCoalesce(t *testing.T) {
+	ast, err := parseQL(t, `cf_Owner NOT IN (7, 8)`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cfMap := CustomFieldMap{"owner": {ID: 123, Kind: CFKindReference}}
+	gen := NewSQLGenerator(map[string]int{}, cfMap, "sqlite")
+	sqlStr, args, err := gen.GenerateSQL(ast)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
 	if !strings.Contains(sqlStr, "NOT IN") {
 		t.Fatalf("expected NOT IN in SQL, got: %s", sqlStr)
 	}
-	if !strings.Contains(sqlStr, " AND ") {
-		t.Fatalf("expected AND joining direct/nested NOT IN branches, got: %s", sqlStr)
+	if !strings.Contains(sqlStr, "COALESCE(") {
+		t.Fatalf("expected COALESCE wrapper for null-safe NOT IN, got: %s", sqlStr)
+	}
+	if len(args) != 2 {
+		t.Fatalf("expected 2 bound args (single IN list), got %d: %#v", len(args), args)
 	}
 }
 

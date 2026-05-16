@@ -1585,13 +1585,14 @@ func (r *ItemRepository) HomepageMilestoneProgressByIDs(milestoneIDs []int) ([]H
 	return results, rows.Err()
 }
 
-// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind} map of every custom
-// field definition. Item custom fields are global (custom_field_definitions and
-// request_types are not workspace-scoped in the schema), so the map is returned
-// in full and used by CQL to resolve UI-supplied names like cf_Severity to the
-// numeric JSON key used in items.custom_field_values.
+// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind, ...} map of every
+// custom field definition. Item custom fields are global (custom_field_definitions
+// and request_types are not workspace-scoped in the schema), so the map is
+// returned in full and used by CQL to resolve UI-supplied names like cf_Severity
+// to the numeric JSON key used in items.custom_field_values. For linking fields,
+// also reads options to detect mirror fields and target-type constraints.
 func (r *ItemRepository) GetCQLCustomFieldMap() (cql.CustomFieldMap, error) {
-	rows, err := r.db.Query(`SELECT id, LOWER(name), field_type FROM custom_field_definitions`)
+	rows, err := r.db.Query(`SELECT id, LOWER(name), field_type, COALESCE(options, '') FROM custom_field_definitions`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query item custom fields: %w", err)
 	}
@@ -1600,11 +1601,19 @@ func (r *ItemRepository) GetCQLCustomFieldMap() (cql.CustomFieldMap, error) {
 	cfMap := make(cql.CustomFieldMap)
 	for rows.Next() {
 		var id int
-		var name, fieldType string
-		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+		var name, fieldType, options string
+		if err := rows.Scan(&id, &name, &fieldType, &options); err != nil {
 			return nil, fmt.Errorf("failed to scan custom field: %w", err)
 		}
-		cfMap[name] = cql.CustomFieldInfo{ID: id, Kind: cql.ClassifyCustomFieldKind(fieldType)}
+		info := cql.CustomFieldInfo{
+			ID:        id,
+			Kind:      cql.ClassifyCustomFieldKind(fieldType),
+			FieldType: strings.ToLower(fieldType),
+		}
+		if info.Kind == cql.CFKindLinking {
+			info.MirrorOfFieldID, info.AllowedTargetTypes = cql.LinkingFieldOptions(options)
+		}
+		cfMap[name] = info
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)
