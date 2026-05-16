@@ -147,7 +147,7 @@ func init() {
 			}
 			if args.Filter != "" {
 				wsMap := workspaceLookupMap(env.DB)
-				evaluator := cql.NewEvaluator(wsMap, env.DB.GetDriverName())
+				evaluator := cql.NewEvaluator(wsMap, nil, env.DB.GetDriverName())
 				resolved := cql.SubstituteFunctions(args.Filter, cql.UserContext(env.UserID))
 				cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(resolved)
 				if err != nil {

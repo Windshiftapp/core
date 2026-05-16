@@ -150,11 +150,41 @@ func (p *Parser) comparison() (*ASTNode, error) {
 		return nil, err
 	}
 
+	// IS NULL / IS NOT NULL — null check on an identifier or expression.
+	if p.match(IS, IsNot) {
+		isToken := p.advance()
+		if !p.match(NULL) {
+			return nil, p.Error("expected NULL after IS / IS NOT")
+		}
+		p.advance() // consume NULL
+		op := "IS NULL"
+		if isToken.Type == IsNot {
+			op = "IS NOT NULL"
+		}
+		return &ASTNode{
+			Type:     NodeNullCheck,
+			Operator: op,
+			Left:     left,
+		}, nil
+	}
+
 	if p.match(EQUALS, NotEquals, LessThan, LessEqual, GreaterThan, GreaterEqual, CONTAINS) {
 		operator := p.advance()
 		right, err := p.primary()
 		if err != nil {
 			return nil, err
+		}
+		// `x = null` / `x != null` are syntactic sugar for IS NULL / IS NOT NULL.
+		if right.Type == NodeLiteral && right.DataType == NULL {
+			op := "IS NULL"
+			if operator.Type == NotEquals {
+				op = "IS NOT NULL"
+			}
+			return &ASTNode{
+				Type:     NodeNullCheck,
+				Operator: op,
+				Left:     left,
+			}, nil
 		}
 		return &ASTNode{
 			Type:     NodeComparison,
@@ -199,7 +229,7 @@ func (p *Parser) primary() (*ASTNode, error) {
 		}, nil
 	}
 
-	if p.match(STRING, NUMBER, DATE, BOOLEAN) {
+	if p.match(STRING, NUMBER, DATE, BOOLEAN, NULL) {
 		token := p.advance()
 		return &ASTNode{
 			Type:     NodeLiteral,

@@ -888,9 +888,14 @@ export class QLBuilder {
 
       case 'user':
       case 'reference':
-        // Numeric IDs stay unquoted; string values (e.g. group names) get quoted
-        if (!Number.isNaN(value) && value !== '') {
+        // Numeric IDs stay unquoted; string values (e.g. group names) get quoted.
+        // Number.isNaN('abc') is false, so the previous check let strings escape
+        // unquoted — switch to a real numeric typeof check.
+        if (typeof value === 'number' && Number.isFinite(value)) {
           return String(value);
+        }
+        if (typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value) && value !== '') {
+          return value;
         }
         return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 

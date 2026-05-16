@@ -65,6 +65,7 @@ const (
 	NUMBER
 	DATE
 	BOOLEAN
+	NULL
 
 	// Operators
 	EQUALS       // =
@@ -76,6 +77,8 @@ const (
 	CONTAINS     // ~
 	IN           // IN
 	NotIn        // NOT IN
+	IS           // IS (used with NULL)
+	IsNot        // IS NOT (used with NULL)
 
 	// Logical operators
 	AND
@@ -95,8 +98,8 @@ const (
 // String returns a string representation of the token type
 func (t TokenType) String() string {
 	names := []string{
-		"IDENTIFIER", "STRING", "NUMBER", "DATE", "BOOLEAN",
-		"EQUALS", "NotEquals", "LessThan", "LessEqual", "GreaterThan", "GreaterEqual", "CONTAINS", "IN", "NotIn",
+		"IDENTIFIER", "STRING", "NUMBER", "DATE", "BOOLEAN", "NULL",
+		"EQUALS", "NotEquals", "LessThan", "LessEqual", "GreaterThan", "GreaterEqual", "CONTAINS", "IN", "NotIn", "IS", "IsNot",
 		"AND", "OR", "NOT",
 		"LPAREN", "RPAREN", "COMMA",
 		"EOF", "FUNCTION",
@@ -118,6 +121,9 @@ const (
 	NodeLiteral
 	NodeFunction
 	NodeList
+	// NodeNullCheck represents `<field> IS NULL` / `<field> IS NOT NULL`.
+	// Left holds the field; Operator is "IS NULL" or "IS NOT NULL".
+	NodeNullCheck
 )
 
 // ASTNode represents a node in the Abstract Syntax Tree

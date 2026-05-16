@@ -341,7 +341,11 @@ func (s *ItemCRUDService) evaluateQL(qlQuery string, ctx cql.FunctionContext) (q
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build workspace map: %w", err)
 	}
-	evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
+	customFieldMap, err := s.repo.GetCQLCustomFieldMap()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build custom field map: %w", err)
+	}
+	evaluator := cql.NewEvaluator(workspaceMap, customFieldMap, s.db.GetDriverName())
 	qlSQL, qlArgs, err = evaluator.EvaluateToSQL(qlQuery)
 	if err != nil {
 		return "", nil, fmt.Errorf("QL query error: %w", err)

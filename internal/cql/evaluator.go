@@ -10,10 +10,11 @@ type Evaluator struct {
 	sqlGenerator *SQLGenerator
 }
 
-// NewEvaluator creates a new QL evaluator
-func NewEvaluator(workspaceMap map[string]int, dbDriver string) *Evaluator {
+// NewEvaluator creates a new QL evaluator. customFieldMap may be nil; when nil
+// the generator falls back to name-based JSON extraction (legacy behavior).
+func NewEvaluator(workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *Evaluator {
 	return &Evaluator{
-		sqlGenerator: NewSQLGenerator(workspaceMap, dbDriver),
+		sqlGenerator: NewSQLGenerator(workspaceMap, customFieldMap, dbDriver),
 	}
 }
 
@@ -59,7 +60,7 @@ type AssetEvaluator struct {
 }
 
 // NewAssetEvaluator creates a new QL evaluator for assets
-func NewAssetEvaluator(setMap, workspaceMap, customFieldMap map[string]int, dbDriver string) *AssetEvaluator {
+func NewAssetEvaluator(setMap, workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *AssetEvaluator {
 	return &AssetEvaluator{
 		sqlGenerator: NewAssetSQLGenerator(setMap, customFieldMap, dbDriver),
 		workspaceMap: workspaceMap,

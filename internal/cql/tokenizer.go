@@ -85,10 +85,13 @@ func (t *Tokenizer) readNumber() string {
 	return value.String()
 }
 
-// readIdentifier reads an identifier or keyword
+// readIdentifier reads an identifier or keyword. The `.` separator is allowed
+// inside identifiers so that documented syntax like `custom.epicLink` tokenizes
+// as a single identifier; downstream safety is enforced by validCustomFieldNameRegex
+// for the part after `cf_` / `custom.`.
 func (t *Tokenizer) readIdentifier() string {
 	var value strings.Builder
-	for t.current != 0 && (unicode.IsLetter(t.current) || unicode.IsDigit(t.current) || t.current == '_' || t.current == '-') {
+	for t.current != 0 && (unicode.IsLetter(t.current) || unicode.IsDigit(t.current) || t.current == '_' || t.current == '-' || t.current == '.') {
 		value.WriteRune(t.current)
 		t.advance()
 	}
@@ -102,6 +105,34 @@ func (t *Tokenizer) peekAhead(offset int) rune { //nolint:unparam // offset kept
 		return 0
 	}
 	return rune(t.input[pos])
+}
+
+// isIdentifierContinuation reports whether r could continue an identifier — used
+// when peeking past keywords like "IS NOT" to ensure we're not partial-matching.
+func isIdentifierContinuation(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || r == '.'
+}
+
+// previousNonWhitespaceTokenType returns the last appended token's type, or EOF
+// if the slice is empty. Used to decide whether a leading `-` introduces a
+// negative numeric literal (only valid after operators, commas, or `(`).
+func previousNonWhitespaceTokenType(tokens []Token) TokenType {
+	if len(tokens) == 0 {
+		return EOF
+	}
+	return tokens[len(tokens)-1].Type
+}
+
+// canPrefixUnaryMinus reports whether a `-` following the given previous-token
+// type should be treated as a unary minus introducing a negative numeric literal.
+// QL has no binary minus operator, so the rule is: only after operators, IN/NotIn,
+// commas, or an opening paren.
+func canPrefixUnaryMinus(prev TokenType) bool {
+	switch prev {
+	case EOF, EQUALS, NotEquals, LessThan, LessEqual, GreaterThan, GreaterEqual, CONTAINS, IN, NotIn, COMMA, LPAREN, AND, OR, NOT:
+		return true
+	}
+	return false
 }
 
 // isDatePattern checks if the current position looks like a date (YYYY-MM-DD)
@@ -168,6 +199,16 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			continue
 		}
 
+		// Unary-minus prefix for negative numeric literals. Only legal in literal
+		// position (after an operator, comma, opening paren, or at start of input)
+		// — QL has no binary minus.
+		if t.current == '-' && unicode.IsDigit(t.peekAhead(1)) && canPrefixUnaryMinus(previousNonWhitespaceTokenType(tokens)) {
+			t.advance() // consume '-'
+			number := "-" + t.readNumber()
+			tokens = append(tokens, Token{Type: NUMBER, Value: number, Pos: start})
+			continue
+		}
+
 		// Identifiers and keywords
 		if unicode.IsLetter(t.current) || t.current == '_' {
 			identifier := t.readIdentifier()
@@ -195,6 +236,29 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				tokens = append(tokens, Token{Type: IN, Value: "IN", Pos: start})
 			case "TRUE", "FALSE":
 				tokens = append(tokens, Token{Type: BOOLEAN, Value: strings.ToLower(identifier), Pos: start})
+			case "NULL":
+				tokens = append(tokens, Token{Type: NULL, Value: "null", Pos: start})
+			case "IS":
+				// Look ahead for "IS NOT"
+				oldPos := t.position
+				t.skipWhitespace()
+				if t.position+3 <= len(t.input) && strings.ToUpper(t.input[t.position:t.position+3]) == "NOT" {
+					afterPos := t.position + 3
+					if afterPos == len(t.input) || !isIdentifierContinuation(rune(t.input[afterPos])) {
+						for i := 0; i < 3; i++ {
+							t.advance()
+						}
+						tokens = append(tokens, Token{Type: IsNot, Value: "IS NOT", Pos: start})
+						continue
+					}
+				}
+				t.position = oldPos
+				if t.position < len(t.input) {
+					t.current = rune(t.input[t.position])
+				} else {
+					t.current = 0
+				}
+				tokens = append(tokens, Token{Type: IS, Value: "IS", Pos: start})
 			default:
 				// Check if it's a function (followed by parentheses)
 				oldPos := t.position

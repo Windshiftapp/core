@@ -16,32 +16,36 @@ type SQLGenerator struct {
 	entityType     EntityType     // Type of entity being queried (item or asset)
 	setMap         map[string]int // Maps asset set names to IDs (for asset queries)
 	dbDriver       string         // Database driver name ("sqlite" or "postgres")
-	customFieldMap map[string]int // Maps lowercase custom field name to field ID (for asset queries)
+	customFieldMap CustomFieldMap // Maps lowercase custom field name to {ID, Kind}
 }
 
-// NewSQLGenerator creates a new SQL generator for outer queries (work items)
-func NewSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGenerator {
+// NewSQLGenerator creates a new SQL generator for outer queries (work items).
+// customFieldMap may be nil; when nil the generator falls back to name-based
+// JSON extraction (legacy behavior).
+func NewSQLGenerator(workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		workspaceMap: workspaceMap,
-		aliasPrefix:  "",
-		entityType:   EntityTypeItem,
-		dbDriver:     dbDriver,
+		workspaceMap:   workspaceMap,
+		aliasPrefix:    "",
+		entityType:     EntityTypeItem,
+		dbDriver:       dbDriver,
+		customFieldMap: customFieldMap,
 	}
 }
 
-// NewInnerSQLGenerator creates a new SQL generator for inner/nested queries (work items)
-// Uses "inner_" prefix for table aliases to avoid collision with outer query
-func NewInnerSQLGenerator(workspaceMap map[string]int, dbDriver string) *SQLGenerator {
+// NewInnerSQLGenerator creates a new SQL generator for inner/nested queries (work items).
+// Uses "inner_" prefix for table aliases to avoid collision with outer query.
+func NewInnerSQLGenerator(workspaceMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
-		workspaceMap: workspaceMap,
-		aliasPrefix:  "inner_",
-		entityType:   EntityTypeItem,
-		dbDriver:     dbDriver,
+		workspaceMap:   workspaceMap,
+		aliasPrefix:    "inner_",
+		entityType:     EntityTypeItem,
+		dbDriver:       dbDriver,
+		customFieldMap: customFieldMap,
 	}
 }
 
-// NewAssetSQLGenerator creates a new SQL generator for asset queries
-func NewAssetSQLGenerator(setMap, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
+// NewAssetSQLGenerator creates a new SQL generator for asset queries.
+func NewAssetSQLGenerator(setMap map[string]int, customFieldMap CustomFieldMap, dbDriver string) *SQLGenerator {
 	return &SQLGenerator{
 		setMap:         setMap,
 		aliasPrefix:    "",
@@ -64,6 +68,18 @@ func (g *SQLGenerator) jsonExtract(column, field string) (expr string, args []in
 	return fmt.Sprintf("NULLIF(%s, '') ->> '%s'", column, path), nil
 }
 
+// jsonExtractLiteralKey returns the DB-appropriate JSON extraction expression
+// with the numeric field ID inlined directly into the SQL. Safe because the ID
+// comes from a trusted DB scan (custom_field_definitions.id), never user input.
+// Inlining lets the Postgres planner match the per-field expression indexes
+// created in handlers/custom_fields.go (idx_cf_items_<id>).
+func (g *SQLGenerator) jsonExtractLiteralKey(column string, fieldID int) (expr string, args []interface{}) {
+	if g.dbDriver == "postgres" {
+		return fmt.Sprintf("%s->>'%d'", column, fieldID), nil
+	}
+	return fmt.Sprintf(`NULLIF(%s, '') ->> '$."%d"'`, column, fieldID), nil
+}
+
 // GenerateSQL converts a QL AST to SQL WHERE clause
 func (g *SQLGenerator) GenerateSQL(ast *ASTNode) (sql string, args []interface{}, err error) {
 	if ast == nil {
@@ -82,6 +98,8 @@ func (g *SQLGenerator) generateNode(node *ASTNode) (sql string, args []interface
 		return g.generateComparison(node)
 	case NodeInExpression:
 		return g.generateInExpression(node)
+	case NodeNullCheck:
+		return g.generateNullCheck(node)
 	case NodeIdentifier:
 		sql, args, err := g.mapFieldName(node.Value)
 		if err != nil {
@@ -95,6 +113,60 @@ func (g *SQLGenerator) generateNode(node *ASTNode) (sql string, args []interface
 	default:
 		return "", nil, fmt.Errorf("unsupported node type: %v", node.Type)
 	}
+}
+
+// generateNullCheck emits SQL for `<field> IS NULL` / `IS NOT NULL`. For most
+// fields this is a direct rewrite. For non-scalar custom-field kinds, the
+// stored value isn't a simple column — translate to (NOT) EXISTS against the
+// matching subquery.
+func (g *SQLGenerator) generateNullCheck(node *ASTNode) (sql string, args []interface{}, err error) {
+	negated := strings.EqualFold(node.Operator, "IS NOT NULL")
+	if node.Left.Type == NodeIdentifier {
+		if info, ok := g.lookupCustomFieldInfo(node.Left.Value); ok {
+			switch info.Kind {
+			case CFKindMultiselect:
+				column := g.customFieldColumn()
+				// Multiselect IS NULL/NOT NULL is a "field has at least one
+				// element" check — no bound value needed, so use a SELECT 1
+				// over the array iterator with no WHERE clause.
+				var expr string
+				if g.dbDriver == "postgres" {
+					expr = fmt.Sprintf("EXISTS (SELECT 1 FROM jsonb_array_elements_text(%s->'%d'))", column, info.ID)
+				} else {
+					expr = fmt.Sprintf(`EXISTS (SELECT 1 FROM json_each(%s, '$."%d"'))`, column, info.ID)
+				}
+				if negated {
+					return expr, nil, nil
+				}
+				return "NOT " + expr, nil, nil
+			case CFKindLinking:
+				sourceID := g.aliasPrefix + "i.id"
+				expr := fmt.Sprintf(
+					"EXISTS (SELECT 1 FROM item_links il WHERE il.source_type = 'item' AND il.source_id = %s AND il.custom_field_id = %d)",
+					sourceID, info.ID,
+				)
+				if negated {
+					return expr, nil, nil
+				}
+				return "NOT " + expr, nil, nil
+			case CFKindReference:
+				column := g.customFieldColumn()
+				direct, nested := g.referenceExtractExpressions(column, info.ID)
+				if negated {
+					return fmt.Sprintf("(%s IS NOT NULL OR %s IS NOT NULL)", direct, nested), nil, nil
+				}
+				return fmt.Sprintf("(%s IS NULL AND %s IS NULL)", direct, nested), nil, nil
+			}
+		}
+	}
+	leftSQL, leftArgs, err := g.generateNode(node.Left)
+	if err != nil {
+		return "", nil, err
+	}
+	if negated {
+		return fmt.Sprintf("%s IS NOT NULL", leftSQL), leftArgs, nil
+	}
+	return fmt.Sprintf("%s IS NULL", leftSQL), leftArgs, nil
 }
 
 // generateBinaryOp generates SQL for binary operations (AND, OR, NOT)
@@ -203,6 +275,16 @@ func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (sql string, arg
 	return sql, args, nil
 }
 
+// isLabelField reports whether the CQL field name refers to item labels.
+// The UI field picker exposes `labels` while older queries use `label`.
+func isLabelField(fieldName string) bool {
+	switch strings.ToLower(fieldName) {
+	case "label", "labels":
+		return true
+	}
+	return false
+}
+
 // isMilestoneField reports whether a CQL field name identifies a milestone
 // scalar (id) or name field. Used to route the comparison through EXISTS
 // against the item_milestones junction.
@@ -288,6 +370,31 @@ func (g *SQLGenerator) generateMilestoneInExpression(node *ASTNode) (sql string,
 		return "", nil, errors.New("IN expression requires a list of values")
 	}
 
+	// If the field is the generic "milestone" and all values are strings, treat
+	// as name comparison — the UI emits milestone IN with names rather than IDs
+	// for multi-select pickers. Mixed types are ambiguous and rejected.
+	if !byName && strings.EqualFold(node.Field.Value, "milestone") {
+		allString, allNumeric := true, true
+		for _, v := range node.Values.Arguments {
+			if v.Type != NodeLiteral {
+				allString, allNumeric = false, false
+				break
+			}
+			if v.DataType != STRING {
+				allString = false
+			}
+			if v.DataType != NUMBER {
+				allNumeric = false
+			}
+		}
+		switch {
+		case allString && len(node.Values.Arguments) > 0:
+			byName = true
+		case !allNumeric && !allString && len(node.Values.Arguments) > 0:
+			return "", nil, errors.New("milestone IN values must all be numeric IDs or all be string names")
+		}
+	}
+
 	var placeholders []string
 	for _, valueNode := range node.Values.Arguments {
 		if byName {
@@ -320,8 +427,9 @@ func (g *SQLGenerator) generateMilestoneInExpression(node *ASTNode) (sql string,
 
 // generateComparison generates SQL for comparison operations
 func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []interface{}, err error) {
-	// Special handling for label field - uses EXISTS subqueries for many-to-many
-	if node.Left.Type == NodeIdentifier && strings.EqualFold(node.Left.Value, "label") {
+	// Special handling for label field — uses EXISTS subqueries for many-to-many.
+	// Accept both `label` (canonical) and `labels` (UI plural) as aliases.
+	if node.Left.Type == NodeIdentifier && isLabelField(node.Left.Value) {
 		return g.generateLabelComparison(node)
 	}
 
@@ -330,6 +438,22 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 	// EXISTS subqueries against the junction.
 	if node.Left.Type == NodeIdentifier && isMilestoneField(node.Left.Value) {
 		return g.generateMilestoneComparison(node)
+	}
+
+	// Per-kind dispatch for custom fields whose stored shape differs from a plain
+	// scalar — reference objects, multiselect arrays, linking rows in item_links.
+	// Scalar/Boolean kinds and unresolved names fall through to the generic path.
+	if node.Left.Type == NodeIdentifier {
+		if info, ok := g.lookupCustomFieldInfo(node.Left.Value); ok {
+			switch info.Kind {
+			case CFKindReference:
+				return g.generateReferenceCustomFieldComparison(node, info)
+			case CFKindMultiselect:
+				return g.generateMultiselectCustomFieldComparison(node, info)
+			case CFKindLinking:
+				return g.generateLinkingCustomFieldComparison(node, info)
+			}
+		}
 	}
 
 	leftSQL, leftArgs, err := g.generateNode(node.Left)
@@ -410,10 +534,12 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 				leftSQL = fmt.Sprintf("CAST(%s AS TEXT)", leftSQL)
 			}
 		case BOOLEAN:
-			// JSON ->> extracts booleans as the text "true"/"false". Replace
-			// the integer bound argument from convertLiteral with that text
-			// form so the comparison round-trips against the stored value.
-			if len(leftArgs) > len(leftOnlyArgs) {
+			// Postgres ->> on a JSON boolean returns text "true"/"false"; rewrite
+			// the int bound arg to match. SQLite ->> on a JSON boolean returns
+			// INTEGER 1/0 (despite the SQLite 3.38 "->> always returns TEXT"
+			// docs, booleans surface as integers — verified empirically), so for
+			// SQLite the int64 bound arg already round-trips correctly.
+			if g.dbDriver == "postgres" && len(leftArgs) > len(leftOnlyArgs) {
 				rightIdx := len(leftOnlyArgs)
 				if v, ok := leftArgs[rightIdx].(int64); ok {
 					if v == 1 {
@@ -499,14 +625,28 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 
 // generateInExpression generates SQL for IN expressions
 func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []interface{}, err error) {
-	// Special handling for label field - uses EXISTS subqueries for many-to-many
-	if node.Field.Type == NodeIdentifier && strings.EqualFold(node.Field.Value, "label") {
+	// Special handling for label field — uses EXISTS subqueries for many-to-many.
+	// Accept both `label` (canonical) and `labels` (UI plural) as aliases.
+	if node.Field.Type == NodeIdentifier && isLabelField(node.Field.Value) {
 		return g.generateLabelInExpression(node)
 	}
 
 	// Milestones moved to a junction table — see comment in generateComparison.
 	if node.Field.Type == NodeIdentifier && isMilestoneField(node.Field.Value) {
 		return g.generateMilestoneInExpression(node)
+	}
+
+	// Per-kind dispatch for non-scalar custom fields. Same rationale as in
+	// generateComparison: multiselect/reference/linking need shape-aware SQL.
+	if node.Field.Type == NodeIdentifier {
+		if info, ok := g.lookupCustomFieldInfo(node.Field.Value); ok {
+			switch info.Kind {
+			case CFKindMultiselect:
+				return g.generateMultiselectCustomFieldInExpression(node, info)
+			case CFKindLinking:
+				return g.generateLinkingCustomFieldInExpression(node, info)
+			}
+		}
 	}
 
 	fieldSQL, fieldArgs, err := g.generateNode(node.Field)
@@ -695,7 +835,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []inter
 			return "", nil, fmt.Errorf("childrenOf() inner query parse error: %w", err)
 		}
 
-		innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
+		innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.customFieldMap, g.dbDriver)
 		innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 		if err != nil {
 			return "", nil, fmt.Errorf("childrenOf() inner query SQL generation error: %w", err)
@@ -774,7 +914,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []i
 		return "", nil, fmt.Errorf("linkedOf() inner query parse error: %w", err)
 	}
 
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
+	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.customFieldMap, g.dbDriver)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -866,8 +1006,10 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 		return "", nil, fmt.Errorf("linkedOf() inner query parse error: %w", err)
 	}
 
-	// Use item SQL generator for the inner query (querying items, not assets)
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.dbDriver)
+	// Use item SQL generator for the inner query (querying items, not assets).
+	// Inner item queries don't currently have access to the item customFieldMap;
+	// pass nil — the generator falls back to name-based extraction.
+	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, nil, g.dbDriver)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQL(innerAST)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -940,6 +1082,267 @@ func (g *SQLGenerator) mapFieldName(fieldName string) (expr string, args []inter
 	return g.mapItemFieldName(fieldName)
 }
 
+// extractCustomFieldScalar produces the SQL expression to extract a scalar
+// custom-field value from the given JSON column. When the name resolves through
+// customFieldMap, the numeric ID is inlined into the SQL (lets the Postgres
+// planner match the per-field expression indexes from handlers/custom_fields.go).
+// When the name does not resolve, the generator falls back to parameterized
+// name-based extraction (preserves legacy behavior for callers without a map).
+func (g *SQLGenerator) extractCustomFieldScalar(column, customFieldName string) (sql string, args []interface{}) {
+	if g.customFieldMap != nil {
+		if info, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
+			return g.jsonExtractLiteralKey(column, info.ID)
+		}
+	}
+	return g.jsonExtract(column, customFieldName)
+}
+
+// extractItemCustomFieldScalar is the item-table-scoped wrapper of extractCustomFieldScalar.
+func (g *SQLGenerator) extractItemCustomFieldScalar(prefix, customFieldName string) (sql string, args []interface{}) {
+	return g.extractCustomFieldScalar(prefix+"i.custom_field_values", customFieldName)
+}
+
+// customFieldNameFromIdentifier extracts the field name from a `cf_<name>` or
+// `custom.<name>` identifier value. Returns the trimmed name and true if the
+// identifier matches one of those custom-field prefixes.
+func customFieldNameFromIdentifier(identifier string) (string, bool) {
+	lower := strings.ToLower(identifier)
+	if strings.HasPrefix(lower, "cf_") {
+		return identifier[3:], true
+	}
+	if strings.HasPrefix(lower, "custom.") {
+		return identifier[7:], true
+	}
+	return "", false
+}
+
+// lookupCustomFieldInfo resolves a cf_/custom. identifier through customFieldMap.
+// Returns the field info and true only when both the identifier is a custom-field
+// reference AND the map contains an entry. When the map is nil or the name is
+// missing, returns false so callers fall back to the legacy scalar path.
+func (g *SQLGenerator) lookupCustomFieldInfo(identifier string) (CustomFieldInfo, bool) {
+	name, ok := customFieldNameFromIdentifier(identifier)
+	if !ok {
+		return CustomFieldInfo{}, false
+	}
+	if !validCustomFieldNameRegex.MatchString(name) {
+		return CustomFieldInfo{}, false
+	}
+	if g.customFieldMap == nil {
+		return CustomFieldInfo{}, false
+	}
+	info, ok := g.customFieldMap[strings.ToLower(name)]
+	if !ok {
+		return CustomFieldInfo{}, false
+	}
+	return info, true
+}
+
+// itemCustomFieldColumn returns the JSON column expression for the active entity.
+// Items: i.custom_field_values; assets: a.custom_field_values, with aliasPrefix
+// applied for nested queries.
+func (g *SQLGenerator) customFieldColumn() string {
+	if g.entityType == EntityTypeAsset {
+		return g.aliasPrefix + "a.custom_field_values"
+	}
+	return g.aliasPrefix + "i.custom_field_values"
+}
+
+// generateReferenceCustomFieldComparison emits SQL for a comparison on a
+// reference-kind custom field (user, asset, portalcustomer, customerorganisation).
+// Reference values may be stored as a direct scalar ID or as an object
+// {id, name, ...}. The same pattern is already used by the asset link graph in
+// internal/handlers/asset_link_handlers.go for graph traversal.
+//
+// For =/!=, both forms are compared against the same RHS.
+// For ~, only the direct form is matched with LIKE (object JSON LIKE is misleading).
+func (g *SQLGenerator) generateReferenceCustomFieldComparison(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	rightSQL, rightArgs, err := g.generateNode(node.Right)
+	if err != nil {
+		return "", nil, err
+	}
+	column := g.customFieldColumn()
+	directExpr, nestedExpr := g.referenceExtractExpressions(column, info.ID)
+
+	switch node.Operator {
+	case "=":
+		args := append([]interface{}{}, rightArgs...)
+		args = append(args, rightArgs...)
+		return fmt.Sprintf("(%s = %s OR %s = %s)", directExpr, rightSQL, nestedExpr, rightSQL), args, nil
+	case "!=", "<>":
+		args := append([]interface{}{}, rightArgs...)
+		args = append(args, rightArgs...)
+		// Match rows where neither form equals the RHS. Items without the field
+		// (both extracts NULL) do not match — standard SQL NULL semantics.
+		return fmt.Sprintf("(%s != %s AND %s != %s)", directExpr, rightSQL, nestedExpr, rightSQL), args, nil
+	case "~":
+		// LIKE on object JSON is misleading; restrict to the direct scalar form.
+		if len(rightArgs) != 1 {
+			return "", nil, errors.New("~ on reference custom field requires a single string value")
+		}
+		escaped := escapeLikePattern(rightArgs[0])
+		return fmt.Sprintf("(%s LIKE '%%' || ? || '%%' ESCAPE '\\')", directExpr), []interface{}{escaped}, nil
+	default:
+		return "", nil, fmt.Errorf("operator %q is not supported on reference custom fields", node.Operator)
+	}
+}
+
+// referenceExtractExpressions returns the SQL expressions to read the direct
+// scalar value and the nested .id from a reference custom-field JSON value.
+func (g *SQLGenerator) referenceExtractExpressions(column string, fieldID int) (direct, nested string) {
+	if g.dbDriver == "postgres" {
+		direct = fmt.Sprintf("%s->>'%d'", column, fieldID)
+		nested = fmt.Sprintf("%s->'%d'->>'id'", column, fieldID)
+		return direct, nested
+	}
+	direct = fmt.Sprintf(`NULLIF(%s, '') ->> '$."%d"'`, column, fieldID)
+	nested = fmt.Sprintf(`NULLIF(%s, '') ->> '$."%d".id'`, column, fieldID)
+	return direct, nested
+}
+
+// multiselectExistsExpression returns an EXISTS subquery that yields a row when
+// the multiselect custom-field array contains ANY of the placeholder-bound
+// values. SQLite uses json_each over the JSON path; Postgres uses
+// jsonb_array_elements_text. Values are compared as TEXT so integer option IDs
+// (the common case) and string option IDs both round-trip.
+func (g *SQLGenerator) multiselectExistsExpression(column string, fieldID int, placeholders []string) string {
+	values := strings.Join(placeholders, ", ")
+	if g.dbDriver == "postgres" {
+		return fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM jsonb_array_elements_text(%s->'%d') v WHERE v IN (%s))",
+			column, fieldID, values,
+		)
+	}
+	return fmt.Sprintf(
+		`EXISTS (SELECT 1 FROM json_each(%s, '$."%d"') WHERE CAST(value AS TEXT) IN (%s))`,
+		column, fieldID, values,
+	)
+}
+
+// generateMultiselectCustomFieldComparison handles =/!=/~/IN/NOT IN on a
+// multiselect custom field. Values are arrays of option IDs; semantics are
+// "contains any" (=/~/IN) or "contains none" (!=/NOT IN).
+func (g *SQLGenerator) generateMultiselectCustomFieldComparison(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	_, rightArgs, err := g.generateNode(node.Right)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(rightArgs) == 0 {
+		return "", nil, errors.New("multiselect custom field comparison requires a bound value")
+	}
+	textArgs := make([]interface{}, len(rightArgs))
+	for i, a := range rightArgs {
+		textArgs[i] = multiselectValueAsText(a)
+	}
+	column := g.customFieldColumn()
+	expr := g.multiselectExistsExpression(column, info.ID, []string{"?"})
+
+	switch node.Operator {
+	case "=", "~":
+		return expr, textArgs, nil
+	case "!=", "<>":
+		return "NOT " + expr, textArgs, nil
+	default:
+		return "", nil, fmt.Errorf("operator %q is not supported on multiselect custom fields", node.Operator)
+	}
+}
+
+// generateMultiselectCustomFieldInExpression handles `cf_x IN (...)` and
+// `cf_x NOT IN (...)` for multiselect kind. "Contains any of" semantics.
+func (g *SQLGenerator) generateMultiselectCustomFieldInExpression(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	if node.Values.Type != NodeList {
+		return "", nil, errors.New("IN expression requires a list of values")
+	}
+	placeholders := make([]string, 0, len(node.Values.Arguments))
+	args = make([]interface{}, 0, len(node.Values.Arguments))
+	for _, v := range node.Values.Arguments {
+		placeholders = append(placeholders, "?")
+		args = append(args, multiselectValueAsText(g.convertLiteral(v)))
+	}
+	column := g.customFieldColumn()
+	expr := g.multiselectExistsExpression(column, info.ID, placeholders)
+	if strings.EqualFold(node.Operator, "NOT IN") {
+		return "NOT " + expr, args, nil
+	}
+	return expr, args, nil
+}
+
+// generateLinkingCustomFieldComparison emits SQL for a linking-kind custom field.
+// Linking relations live in item_links keyed by custom_field_id; the value is
+// the target item's id. Equality lowers to an EXISTS subquery against
+// item_links for the current item id and the linking field id.
+func (g *SQLGenerator) generateLinkingCustomFieldComparison(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	if node.Operator == "~" {
+		return "", nil, errors.New("contains operator (~) is not supported on linking custom fields")
+	}
+	_, rightArgs, err := g.generateNode(node.Right)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(rightArgs) == 0 {
+		return "", nil, errors.New("linking custom field comparison requires a bound value")
+	}
+	sourceID := g.aliasPrefix + "i.id"
+	expr := fmt.Sprintf(
+		"EXISTS (SELECT 1 FROM item_links il WHERE il.source_type = 'item' AND il.source_id = %s AND il.custom_field_id = %d AND il.target_id = ?)",
+		sourceID, info.ID,
+	)
+	switch node.Operator {
+	case "=":
+		return expr, rightArgs, nil
+	case "!=", "<>":
+		return "NOT " + expr, rightArgs, nil
+	default:
+		return "", nil, fmt.Errorf("operator %q is not supported on linking custom fields", node.Operator)
+	}
+}
+
+// generateLinkingCustomFieldInExpression handles `cf_x IN (...)` for linking kind.
+func (g *SQLGenerator) generateLinkingCustomFieldInExpression(node *ASTNode, info CustomFieldInfo) (sql string, args []interface{}, err error) {
+	if node.Values.Type != NodeList {
+		return "", nil, errors.New("IN expression requires a list of values")
+	}
+	placeholders := make([]string, 0, len(node.Values.Arguments))
+	args = make([]interface{}, 0, len(node.Values.Arguments))
+	for _, v := range node.Values.Arguments {
+		placeholders = append(placeholders, "?")
+		args = append(args, g.convertLiteral(v))
+	}
+	sourceID := g.aliasPrefix + "i.id"
+	expr := fmt.Sprintf(
+		"EXISTS (SELECT 1 FROM item_links il WHERE il.source_type = 'item' AND il.source_id = %s AND il.custom_field_id = %d AND il.target_id IN (%s))",
+		sourceID, info.ID, strings.Join(placeholders, ", "),
+	)
+	if strings.EqualFold(node.Operator, "NOT IN") {
+		return "NOT " + expr, args, nil
+	}
+	return expr, args, nil
+}
+
+// multiselectValueAsText normalizes a bound value to its TEXT form for the
+// "value IN (?)" comparison inside the EXISTS subquery. Both option IDs stored
+// as JSON integers ([1,2]) and as JSON strings (["a","b"]) round-trip when the
+// bound arg is text and the row value is cast to TEXT.
+func multiselectValueAsText(v interface{}) interface{} {
+	switch x := v.(type) {
+	case string:
+		return x
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case int:
+		return strconv.Itoa(x)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case bool:
+		if x {
+			return "true"
+		}
+		return "false"
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
 // mapAssetFieldName maps QL field names to asset SQL column names
 // Supports custom fields using syntax: cf_fieldname or custom.fieldname
 func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []interface{}, err error) {
@@ -952,14 +1355,7 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		// Resolve human-readable name to numeric field ID for JSON key lookup
-		jsonKey := customFieldName
-		if g.customFieldMap != nil {
-			if id, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
-				jsonKey = strconv.Itoa(id)
-			}
-		}
-		sql, args := g.jsonExtract(prefix+"a.custom_field_values", jsonKey)
+		sql, args := g.extractCustomFieldScalar(prefix+"a.custom_field_values", customFieldName)
 		return sql, args, nil
 	}
 
@@ -968,14 +1364,7 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		// Resolve human-readable name to numeric field ID for JSON key lookup
-		jsonKey := customFieldName
-		if g.customFieldMap != nil {
-			if id, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
-				jsonKey = strconv.Itoa(id)
-			}
-		}
-		sql, args := g.jsonExtract(prefix+"a.custom_field_values", jsonKey)
+		sql, args := g.extractCustomFieldScalar(prefix+"a.custom_field_values", customFieldName)
 		return sql, args, nil
 	}
 
@@ -1049,7 +1438,7 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []i
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		sql, args := g.jsonExtract(prefix+"i.custom_field_values", customFieldName)
+		sql, args := g.extractItemCustomFieldScalar(prefix, customFieldName)
 		return sql, args, nil
 	}
 
@@ -1059,7 +1448,7 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []i
 		if !validCustomFieldNameRegex.MatchString(customFieldName) {
 			return "", nil, fmt.Errorf("invalid custom field name: %s", customFieldName)
 		}
-		sql, args := g.jsonExtract(prefix+"i.custom_field_values", customFieldName)
+		sql, args := g.extractItemCustomFieldScalar(prefix, customFieldName)
 		return sql, args, nil
 	}
 
@@ -1195,6 +1584,8 @@ func (g *SQLGenerator) convertLiteral(node *ASTNode) interface{} {
 			return id
 		}
 		return node.Value
+	case NULL:
+		return nil
 	default:
 		return node.Value
 	}

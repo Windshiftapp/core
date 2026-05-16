@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -2511,12 +2512,13 @@ func (r *AssetRepository) GetCQLSetMap() (map[string]int, error) {
 	return setMap, nil
 }
 
-// GetCQLCustomFieldMap returns a lowercase-name → custom-field-id map for the
-// custom fields attached to asset types in a set. Lets CQL queries reference
-// human-readable field names even though the DB stores numeric keys.
-func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (map[string]int, error) {
+// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind} map for the custom
+// fields attached to asset types in a set. Lets CQL queries reference human-
+// readable field names even though the DB stores numeric keys, and lets the
+// generator pick the right extraction strategy per field type.
+func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (cql.CustomFieldMap, error) {
 	rows, err := r.db.Query(`
-		SELECT DISTINCT cfd.id, LOWER(cfd.name)
+		SELECT DISTINCT cfd.id, LOWER(cfd.name), cfd.field_type
 		FROM custom_field_definitions cfd
 		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
 		JOIN asset_types at2 ON atf.asset_type_id = at2.id
@@ -2527,14 +2529,14 @@ func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (map[string]int, error
 	}
 	defer func() { _ = rows.Close() }()
 
-	cfMap := make(map[string]int)
+	cfMap := make(cql.CustomFieldMap)
 	for rows.Next() {
 		var id int
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		var name, fieldType string
+		if err := rows.Scan(&id, &name, &fieldType); err != nil {
 			return nil, fmt.Errorf("failed to scan custom field: %w", err)
 		}
-		cfMap[name] = id
+		cfMap[name] = cql.CustomFieldInfo{ID: id, Kind: cql.ClassifyCustomFieldKind(fieldType)}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)

@@ -97,6 +97,25 @@ describe('QLBuilder.tryParseToBuilder', () => {
     expect(r.dropped).toBe(true);
   });
 
+  test('formatValue quotes non-numeric string values for user/reference fields', () => {
+    // Number.isNaN('group-foo') is false, but it's still a string — make sure
+    // formatValue quotes it rather than emitting it bare as an identifier.
+    expect(QLBuilder.formatValue('group-foo', 'user')).toBe('"group-foo"');
+    expect(QLBuilder.formatValue('group-foo', 'reference')).toBe('"group-foo"');
+  });
+
+  test('formatValue leaves numeric ID values unquoted for user/reference fields', () => {
+    expect(QLBuilder.formatValue(42, 'user')).toBe('42');
+    // String form of a number also passes through unquoted (UI sometimes emits
+    // IDs as strings from picker components).
+    expect(QLBuilder.formatValue('42', 'reference')).toBe('42');
+  });
+
+  test('formatValue emits bare null for null/undefined', () => {
+    expect(QLBuilder.formatValue(null, 'text')).toBe('null');
+    expect(QLBuilder.formatValue(undefined, 'number')).toBe('null');
+  });
+
   test('round-trips a builder query back through buildQuery', () => {
     const original = QLBuilder.buildQuery({
       statuses: [3],

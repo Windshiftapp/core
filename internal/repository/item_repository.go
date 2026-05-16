@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -1582,4 +1583,31 @@ func (r *ItemRepository) HomepageMilestoneProgressByIDs(milestoneIDs []int) ([]H
 		results = append(results, progress)
 	}
 	return results, rows.Err()
+}
+
+// GetCQLCustomFieldMap returns a lowercase-name → {ID, Kind} map of every custom
+// field definition. Item custom fields are global (custom_field_definitions and
+// request_types are not workspace-scoped in the schema), so the map is returned
+// in full and used by CQL to resolve UI-supplied names like cf_Severity to the
+// numeric JSON key used in items.custom_field_values.
+func (r *ItemRepository) GetCQLCustomFieldMap() (cql.CustomFieldMap, error) {
+	rows, err := r.db.Query(`SELECT id, LOWER(name), field_type FROM custom_field_definitions`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query item custom fields: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	cfMap := make(cql.CustomFieldMap)
+	for rows.Next() {
+		var id int
+		var name, fieldType string
+		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+			return nil, fmt.Errorf("failed to scan custom field: %w", err)
+		}
+		cfMap[name] = cql.CustomFieldInfo{ID: id, Kind: cql.ClassifyCustomFieldKind(fieldType)}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)
+	}
+	return cfMap, nil
 }
