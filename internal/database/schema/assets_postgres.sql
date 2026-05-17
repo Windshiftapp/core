@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS asset_management_sets (
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_management_sets_name ON asset_management_sets(name);
@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS asset_roles (
 	description TEXT,
 	is_system BOOLEAN DEFAULT false,
 	display_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_roles_name ON asset_roles(name);
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS asset_permissions (
 	permission_key TEXT NOT NULL UNIQUE,
 	permission_name TEXT NOT NULL,
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_permissions_key ON asset_permissions(permission_key);
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS user_asset_set_roles (
 	set_id INTEGER NOT NULL,
 	role_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (role_id) REFERENCES asset_roles(id) ON DELETE CASCADE,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS group_asset_set_roles (
 	set_id INTEGER NOT NULL,
 	role_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (role_id) REFERENCES asset_roles(id) ON DELETE CASCADE,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS asset_set_everyone_roles (
 	set_id INTEGER PRIMARY KEY,
 	role_id INTEGER,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (role_id) REFERENCES asset_roles(id) ON DELETE SET NULL,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
@@ -146,8 +146,8 @@ CREATE TABLE IF NOT EXISTS asset_types (
 	color TEXT DEFAULT '#6b7280',
 	display_order INTEGER DEFAULT 0,
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	UNIQUE(set_id, name)
 );
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS asset_type_fields (
 	custom_field_id INTEGER NOT NULL,
 	is_required BOOLEAN DEFAULT false,
 	display_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (asset_type_id) REFERENCES asset_types(id) ON DELETE CASCADE,
 	FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
 	UNIQUE(asset_type_id, custom_field_id)
@@ -186,8 +186,8 @@ CREATE TABLE IF NOT EXISTS asset_categories (
 	children_count INTEGER DEFAULT 0,
 	descendants_count INTEGER DEFAULT 0,
 	frac_index TEXT COLLATE "C",
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE
 );
 
@@ -206,8 +206,8 @@ CREATE TABLE IF NOT EXISTS asset_statuses (
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
 	display_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	UNIQUE(set_id, name)
 );
@@ -230,8 +230,8 @@ CREATE TABLE IF NOT EXISTS assets (
 	frac_index TEXT COLLATE "C",
 	import_job_id TEXT,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (asset_type_id) REFERENCES asset_types(id) ON DELETE RESTRICT
 );
@@ -259,9 +259,9 @@ CREATE TABLE IF NOT EXISTS asset_import_jobs (
 	progress_json TEXT,
 	error_message TEXT,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	started_at TIMESTAMP,
-	completed_at TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	started_at TIMESTAMPTZ,
+	completed_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_set_id ON asset_import_jobs(set_id);

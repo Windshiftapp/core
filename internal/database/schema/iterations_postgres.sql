@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS iteration_types (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Iterations - can be global (shared) or local (workspace-specific)
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS iterations (
 	type_id INTEGER REFERENCES iteration_types(id) ON DELETE SET NULL,
 	is_global BOOLEAN NOT NULL DEFAULT FALSE,  -- FALSE=local to workspace, TRUE=global (shared across workspaces)
 	workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	CHECK (end_date >= start_date),
 	CHECK (
 		(is_global = TRUE AND workspace_id IS NULL) OR

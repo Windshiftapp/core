@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS integration_providers (
 	oauth_client_id TEXT,
 	oauth_client_secret_encrypted TEXT,
 	provider_config TEXT DEFAULT '{}',
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_integration_providers_slug ON integration_providers(slug);
@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS integration_oauth_state (
 	provider_id TEXT NOT NULL REFERENCES integration_providers(id) ON DELETE CASCADE,
 	state TEXT UNIQUE NOT NULL,
 	user_id TEXT NOT NULL,
-	expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	expires_at TIMESTAMPTZ NOT NULL,
+	created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_integration_oauth_state_state ON integration_oauth_state(state);
@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS user_integration_tokens (
 	integration_provider_id TEXT NOT NULL REFERENCES integration_providers(id) ON DELETE CASCADE,
 	oauth_access_token_encrypted TEXT NOT NULL,
 	provider_metadata TEXT DEFAULT '{}',
-	connected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+	connected_at TIMESTAMPTZ DEFAULT NOW(),
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	UNIQUE(user_id, integration_provider_id)
 );
 
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS item_integration_links (
 	link_type TEXT NOT NULL,
 	link_metadata TEXT DEFAULT '{}',
 	linked_by TEXT NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	UNIQUE(item_id, integration_provider_id, external_id)
 );
 

@@ -4,9 +4,48 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+// toUTCArgs walks the parameter list and converts any time.Time / *time.Time
+// values to UTC before they reach the driver. We do this at the wrapper
+// boundary because:
+//
+//   - The DSN-level _timezone parameter only exists from modernc.org/sqlite
+//     v1.46+; we pin to v1.44.3 today and don't want to couple this fix to
+//     a driver bump.
+//   - Without UTC normalization, time.Now() binds in the server's local
+//     offset (e.g. "+02:00"). Lex ordering of stored TEXT then disagrees
+//     with chronological ordering when rows span timezones — '+0' < '+2'
+//     in ASCII so a row written at 14:00 CEST sorts AFTER one written at
+//     14:00 UTC even though it happened two hours earlier.
+//
+// Returns a new slice (never mutates the caller's). A nil/empty input is
+// returned unchanged.
+func toUTCArgs(args []interface{}) []interface{} {
+	if len(args) == 0 {
+		return args
+	}
+	out := make([]interface{}, len(args))
+	for i, a := range args {
+		switch v := a.(type) {
+		case time.Time:
+			out[i] = v.UTC()
+		case *time.Time:
+			if v != nil {
+				u := v.UTC()
+				out[i] = &u
+			} else {
+				out[i] = v
+			}
+		default:
+			out[i] = a
+		}
+	}
+	return out
+}
 
 // writeQueryPrefixes are statement starts that always need the dedicated
 // write connection. WITH is included as an accepted false-positive: a
@@ -72,7 +111,7 @@ func (s *SQLiteDB) GetDriverName() string {
 
 // Query executes a query that returns rows
 func (s *SQLiteDB) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return s.DB.Query(query, args...)
+	return s.DB.Query(query, toUTCArgs(args)...)
 }
 
 // QueryRow executes a query that returns at most one row.
@@ -80,6 +119,7 @@ func (s *SQLiteDB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 // connection so that INSERT ... RETURNING does not race with other writers.
 // last review: ser, 210426, OPTIMIZE: Check whether the write fallback is still needed
 func (s *SQLiteDB) QueryRow(query string, args ...interface{}) *sql.Row {
+	args = toUTCArgs(args)
 	if isWriteQuery(query) {
 		return s.writeConn.QueryRow(query, args...)
 	}
@@ -89,7 +129,7 @@ func (s *SQLiteDB) QueryRow(query string, args ...interface{}) *sql.Row {
 // Exec executes a query that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return s.writeConn.Exec(query, args...)
+	return s.writeConn.Exec(query, toUTCArgs(args)...)
 }
 
 // QueryContext executes a query with context that returns rows.
@@ -97,6 +137,7 @@ func (s *SQLiteDB) Exec(query string, args ...interface{}) (sql.Result, error) {
 // must route through the write connection so they don't lose single-writer
 // serialization. Mirrors QueryRowContext, which already applies isWriteQuery.
 func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	args = toUTCArgs(args)
 	if isWriteQuery(query) {
 		return s.writeConn.QueryContext(ctx, query, args...)
 	}
@@ -107,6 +148,7 @@ func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...inter
 // Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
 // connection so that INSERT ... RETURNING does not race with other writers.
 func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	args = toUTCArgs(args)
 	if isWriteQuery(query) {
 		return s.writeConn.QueryRowContext(ctx, query, args...)
 	}
@@ -116,17 +158,17 @@ func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...in
 // ExecContext executes a query with context that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return s.writeConn.ExecContext(ctx, query, args...)
+	return s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
 }
 
 // ExecWrite explicitly executes a write query using the dedicated write connection
 func (s *SQLiteDB) ExecWrite(query string, args ...interface{}) (sql.Result, error) {
-	return s.writeConn.Exec(query, args...)
+	return s.writeConn.Exec(query, toUTCArgs(args)...)
 }
 
 // ExecWriteContext explicitly executes a write query with context using the dedicated write connection
 func (s *SQLiteDB) ExecWriteContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return s.writeConn.ExecContext(ctx, query, args...)
+	return s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
 }
 
 // Begin starts a new transaction (returns wrapped transaction)
@@ -161,5 +203,9 @@ func (s *SQLiteDB) Initialize() error {
 	if err := s.DB.Initialize(); err != nil {
 		return err
 	}
-	return runPendingMigrations(s, Catalog)
+	if err := runPendingMigrations(s, Catalog); err != nil {
+		return err
+	}
+	createDeferredSQLiteCustomFieldIndexes(s)
+	return nil
 }

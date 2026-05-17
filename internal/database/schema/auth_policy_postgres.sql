@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS auth_policy_audit (
     ip_address TEXT,
     user_agent TEXT,
     details JSONB,  -- JSON for additional context
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_policy_audit_user_id ON auth_policy_audit(user_id);
@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS admin_fallback_rate_limits (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ip_address TEXT NOT NULL,
     attempts INTEGER DEFAULT 1,
-    first_attempt_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    locked_until TIMESTAMP WITH TIME ZONE,
+    first_attempt_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    locked_until TIMESTAMPTZ,
     UNIQUE(user_id, ip_address)
 );
 

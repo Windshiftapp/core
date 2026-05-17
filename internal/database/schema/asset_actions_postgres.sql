@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS asset_actions (
 	trigger_type TEXT NOT NULL,    -- asset_created, asset_updated, asset_status_changed, manual
 	trigger_config TEXT,           -- JSON with trigger-specific conditions
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS asset_action_nodes (
 	node_config TEXT NOT NULL,     -- JSON configuration for the node
 	position_x REAL DEFAULT 0,
 	position_y REAL DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (action_id) REFERENCES asset_actions(id) ON DELETE CASCADE
 );
 
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS asset_action_edges (
 	edge_type TEXT DEFAULT 'default',  -- default, true, false (for conditions)
 	source_handle TEXT,
 	target_handle TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (action_id) REFERENCES asset_actions(id) ON DELETE CASCADE,
 	FOREIGN KEY (source_node_id) REFERENCES asset_action_nodes(id) ON DELETE CASCADE,
 	FOREIGN KEY (target_node_id) REFERENCES asset_action_nodes(id) ON DELETE CASCADE
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS asset_action_execution_logs (
 	asset_id INTEGER,
 	trigger_event TEXT NOT NULL,
 	status TEXT NOT NULL,          -- running, completed, failed, skipped
-	started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	completed_at TIMESTAMP,
+	started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	completed_at TIMESTAMPTZ,
 	error_message TEXT,
 	execution_trace TEXT,          -- JSON step log
 	FOREIGN KEY (action_id) REFERENCES asset_actions(id) ON DELETE CASCADE,

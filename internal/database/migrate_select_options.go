@@ -99,6 +99,9 @@ func migrateFieldDefinitions(db Database) (map[int]selectFieldInfo, error) {
 			fieldsToMigrate = append(fieldsToMigrate, fieldRow{id: id, fieldType: fieldType, options: optionsJSON})
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom_field_definitions: %w", err)
+	}
 
 	// Migrate legacy fields
 	for _, f := range fieldsToMigrate {
@@ -182,6 +185,9 @@ func migrateCustomFieldValues(db Database, tableName string, fieldMap map[int]se
 			updates = append(updates, rowToUpdate{id: id, newVal: string(b)})
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate %s: %w", tableName, err)
+	}
 
 	for _, u := range updates {
 		if _, err := db.ExecWrite(fmt.Sprintf(`UPDATE %s SET custom_field_values = ? WHERE id = ?`, tableName), u.newVal, u.id); err != nil {
@@ -263,6 +269,9 @@ func migratePortalCustomFieldValues(db Database, fieldMap map[int]selectFieldInf
 				updates = append(updates, rowToUpdate{id: id, newVal: string(b)})
 			}
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate custom_field_values: %w", err)
 	}
 
 	for _, u := range updates {

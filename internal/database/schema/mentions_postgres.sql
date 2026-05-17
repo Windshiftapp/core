@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS mentions (
 	created_by INTEGER,
 	mentioned_user_display_name TEXT NOT NULL,  -- Snapshot at mention time
 	notification_sent BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
 	FOREIGN KEY (mentioned_user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,

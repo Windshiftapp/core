@@ -21,7 +21,7 @@
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { errorToast } from '../stores/toasts.svelte.js';
+  import { errorToast, infoToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -384,14 +384,24 @@
         data.options = JSON.stringify(linkOpts);
       }
 
+      let saveResult = null;
       if (editingField) {
         // Include indexing state if field type supports it
         if (isIndexableType(formData.field_type)) {
           data.indexed = { items: indexedItems, assets: indexedAssets };
         }
-        await api.customFields.update(editingField.id, data);
+        saveResult = await api.customFields.update(editingField.id, data);
       } else {
-        await api.customFields.create(data);
+        saveResult = await api.customFields.create(data);
+      }
+
+      if (saveResult?.indexing_deferred) {
+        const tables = [];
+        if (saveResult.indexing_deferred.items) tables.push('items');
+        if (saveResult.indexing_deferred.assets) tables.push('assets');
+        infoToast(
+          `Custom field index creation for ${tables.join(' and ')} has been scheduled and will run during the next server restart. Searches may not speed up until then.`
+        );
       }
 
       await loadCustomFields();

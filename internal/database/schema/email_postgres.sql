@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS email_providers (
 	imap_host TEXT,
 	imap_port INTEGER,
 	imap_encryption TEXT CHECK(imap_encryption IN ('ssl', 'tls', 'starttls', 'none') OR imap_encryption IS NULL),
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_email_providers_slug ON email_providers(slug);
@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS email_channel_state (
 	channel_id INTEGER NOT NULL UNIQUE,
 	last_uid INTEGER DEFAULT 0,
 	uid_validity BIGINT DEFAULT 0,
-	last_checked_at TIMESTAMP,
+	last_checked_at TIMESTAMPTZ,
 	error_count INTEGER DEFAULT 0,
 	last_error TEXT,
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 );
 
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- attachments_status: see email.sql for the column contract.
 	attachments_status TEXT CHECK(attachments_status IN ('ok','partial','failed') OR attachments_status IS NULL),
 	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
-	processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	processed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
 	FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE SET NULL
@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS email_oauth_state (
 	channel_id INTEGER,
 	state TEXT UNIQUE NOT NULL,
 	user_id INTEGER NOT NULL,
-	expires_at TIMESTAMP NOT NULL,
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (provider_id) REFERENCES email_providers(id) ON DELETE CASCADE,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

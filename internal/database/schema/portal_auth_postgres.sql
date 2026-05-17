@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS portal_customer_magic_links (
 	portal_customer_id INTEGER NOT NULL,
 	token TEXT NOT NULL UNIQUE,
 	channel_id INTEGER,
-	expires_at TIMESTAMP NOT NULL,
-	used_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	used_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL
 );
@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS portal_customer_sessions (
 	portal_customer_id INTEGER NOT NULL,
 	session_token TEXT UNIQUE NOT NULL,
 	channel_id INTEGER,
-	expires_at TIMESTAMP NOT NULL,
+	expires_at TIMESTAMPTZ NOT NULL,
 	ip_address TEXT,
 	user_agent TEXT,
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL
 );

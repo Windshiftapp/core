@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	version    TEXT PRIMARY KEY,
 	name       TEXT NOT NULL,
 	checksum   TEXT NOT NULL DEFAULT '',
-	applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- System settings table for module configuration
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS system_settings (
 	value_type TEXT DEFAULT 'string', -- string, boolean, integer, json
 	description TEXT,
 	category TEXT DEFAULT 'general',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS personal_labels (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT DEFAULT '#3B82F6',
 	user_id INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 	review_date DATE NOT NULL,
 	review_type TEXT NOT NULL CHECK (review_type IN ('daily', 'weekly')),
 	review_data TEXT NOT NULL, -- JSON data for unstructured storage
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	UNIQUE(user_id, review_date, review_type) -- One review per user per date per type
 );
@@ -66,8 +66,8 @@ CREATE TABLE IF NOT EXISTS plugin_registry (
 	routes TEXT,
 	extensions TEXT,
 	enabled BOOLEAN DEFAULT true,
-	installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	installed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_plugin_registry_name ON plugin_registry(name);
@@ -81,11 +81,11 @@ CREATE TABLE api_tokens (
 	token_hash TEXT NOT NULL UNIQUE,
 	token_prefix TEXT NOT NULL,
 	permissions TEXT DEFAULT '["read"]',
-	expires_at TIMESTAMP NULL,
-	last_used_at TIMESTAMP NULL,
+	expires_at TIMESTAMPTZ NULL,
+	last_used_at TIMESTAMPTZ NULL,
 	is_temporary BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -110,8 +110,8 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
 	allowed_scopes TEXT NOT NULL DEFAULT '[]',
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
@@ -146,9 +146,9 @@ CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
 	code_challenge TEXT,
 	code_challenge_method TEXT,          -- 'S256' | 'plain'
 	state TEXT,
-	expires_at TIMESTAMP NOT NULL,
-	consumed_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	expires_at TIMESTAMPTZ NOT NULL,
+	consumed_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_code ON oauth_authorization_codes(code);
@@ -167,10 +167,10 @@ CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
 	user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
 	agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	scopes TEXT NOT NULL DEFAULT '[]',
-	expires_at TIMESTAMP NOT NULL,
-	revoked_at TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	revoked_at TIMESTAMPTZ,
 	rotated_to_id INTEGER REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_token_hash ON oauth_refresh_tokens(token_hash);
@@ -183,8 +183,8 @@ CREATE TABLE IF NOT EXISTS collection_categories (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL DEFAULT '#3b82f6',
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_collection_categories_name ON collection_categories(name);
@@ -201,8 +201,8 @@ CREATE TABLE IF NOT EXISTS collections (
 	category_id INTEGER,
 	created_by INTEGER,
 	public_slug TEXT UNIQUE,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (category_id) REFERENCES collection_categories(id) ON DELETE SET NULL,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
@@ -247,8 +247,8 @@ CREATE TABLE IF NOT EXISTS themes (
 	nav_text_color_light TEXT NOT NULL DEFAULT '#374151',
 	nav_background_color_dark TEXT NOT NULL DEFAULT '#1f2937',
 	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Board configuration tables
@@ -260,8 +260,8 @@ CREATE TABLE IF NOT EXISTS board_configurations (
 	list_columns TEXT, -- JSON array of list column configurations
 	roadmap_config TEXT, -- JSON object with roadmap view settings
 	card_fields TEXT, -- JSON array of card field configurations
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
 );
@@ -273,8 +273,8 @@ CREATE TABLE IF NOT EXISTS board_columns (
 	display_order INTEGER NOT NULL,
 	wip_limit INTEGER,
 	color TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (board_configuration_id) REFERENCES board_configurations(id) ON DELETE CASCADE
 );
 
@@ -282,7 +282,7 @@ CREATE TABLE IF NOT EXISTS board_column_statuses (
 	id SERIAL PRIMARY KEY,
 	board_column_id INTEGER NOT NULL,
 	status_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (board_column_id) REFERENCES board_columns(id) ON DELETE CASCADE,
 	FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE,
 	UNIQUE(board_column_id, status_id)
@@ -301,8 +301,8 @@ CREATE TABLE IF NOT EXISTS test_coverage_configurations (
 	workspace_id INTEGER,
 	collection_id INTEGER,
 	requirement_item_type_ids TEXT, -- JSON array of item type IDs
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
 );
@@ -313,7 +313,7 @@ CREATE INDEX IF NOT EXISTS idx_test_coverage_config_collection_id ON test_covera
 -- Audit logging table
 CREATE TABLE IF NOT EXISTS audit_logs (
 	id SERIAL PRIMARY KEY,
-	timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	user_id INTEGER,
 	username TEXT NOT NULL,
 	ip_address TEXT,
@@ -338,11 +338,11 @@ CREATE TABLE IF NOT EXISTS user_workspace_visits (
 	id SERIAL PRIMARY KEY,
 	user_id INTEGER NOT NULL,
 	workspace_id INTEGER NOT NULL,
-	last_visited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_visited_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	visit_count INTEGER DEFAULT 1,
-	expires_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	UNIQUE(user_id, workspace_id)
@@ -353,11 +353,11 @@ CREATE TABLE IF NOT EXISTS user_item_activities (
 	user_id INTEGER NOT NULL,
 	item_id INTEGER NOT NULL,
 	activity_type TEXT NOT NULL,
-	last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_activity_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	activity_count INTEGER DEFAULT 1,
-	expires_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	UNIQUE(user_id, item_id, activity_type)
@@ -369,8 +369,8 @@ CREATE TABLE IF NOT EXISTS item_watches (
 	user_id INTEGER NOT NULL,
 	is_active BOOLEAN DEFAULT true,
 	watch_reason TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	UNIQUE(user_id, item_id)
@@ -404,8 +404,8 @@ CREATE TABLE IF NOT EXISTS request_type_fields (
 	-- Virtual field support (field_type = 'virtual')
 	virtual_field_type TEXT,
 	virtual_field_options TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (request_type_id) REFERENCES request_types(id) ON DELETE CASCADE
 );
 
@@ -419,8 +419,8 @@ CREATE TABLE IF NOT EXISTS plugin_kv_store (
 	plugin_name TEXT NOT NULL,
 	key TEXT NOT NULL,
 	value TEXT NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(plugin_name, key)
 );
 
@@ -432,9 +432,9 @@ CREATE TABLE IF NOT EXISTS calendar_feed_tokens (
 	user_id INTEGER NOT NULL UNIQUE,
 	token TEXT NOT NULL UNIQUE,
 	is_active BOOLEAN DEFAULT true,
-	last_accessed_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_accessed_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -449,10 +449,10 @@ CREATE TABLE IF NOT EXISTS scim_tokens (
 	token_prefix TEXT NOT NULL,
 	is_active BOOLEAN DEFAULT true,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	expires_at TIMESTAMP,
-	last_used_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	expires_at TIMESTAMPTZ,
+	last_used_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_scim_tokens_token_prefix ON scim_tokens(token_prefix);
@@ -474,9 +474,9 @@ CREATE TABLE IF NOT EXISTS cli_auth_codes (
 	agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	token_id INTEGER REFERENCES api_tokens(id) ON DELETE SET NULL,
 	token_plaintext TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	expires_at TIMESTAMP NOT NULL,
-	consumed_at TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	consumed_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
@@ -489,8 +489,8 @@ CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expir
 CREATE TABLE IF NOT EXISTS scheduler_runs (
 	id SERIAL PRIMARY KEY,
 	scheduler_name TEXT NOT NULL,
-	started_at TIMESTAMP NOT NULL,
-	completed_at TIMESTAMP,
+	started_at TIMESTAMPTZ NOT NULL,
+	completed_at TIMESTAMPTZ,
 	duration_ms INTEGER,
 	items_processed INTEGER,
 	success BOOLEAN NOT NULL DEFAULT FALSE,
@@ -512,9 +512,9 @@ CREATE TABLE IF NOT EXISTS pending_custom_field_cleanups (
 	id SERIAL PRIMARY KEY,
 	field_id INTEGER NOT NULL,
 	status TEXT NOT NULL DEFAULT 'pending',
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	started_at TIMESTAMP,
-	completed_at TIMESTAMP,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	started_at TIMESTAMPTZ,
+	completed_at TIMESTAMPTZ,
 	items_processed INTEGER NOT NULL DEFAULT 0,
 	error_message TEXT
 );

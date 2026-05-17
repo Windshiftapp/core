@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS ldap_configs (
 	auto_provision_users BOOLEAN DEFAULT TRUE,
 	auto_deactivate_users BOOLEAN DEFAULT FALSE,
 	-- Metadata
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_ldap_configs_enabled ON ldap_configs(enabled);
@@ -42,14 +42,14 @@ CREATE TABLE IF NOT EXISTS ldap_sync_status (
 	id SERIAL PRIMARY KEY,
 	config_id INTEGER NOT NULL,
 	status TEXT NOT NULL DEFAULT 'pending',
-	started_at TIMESTAMP,
-	completed_at TIMESTAMP,
+	started_at TIMESTAMPTZ,
+	completed_at TIMESTAMPTZ,
 	users_synced INTEGER DEFAULT 0,
 	users_created INTEGER DEFAULT 0,
 	users_updated INTEGER DEFAULT 0,
 	users_deactivated INTEGER DEFAULT 0,
 	error_message TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (config_id) REFERENCES ldap_configs(id) ON DELETE CASCADE
 );
 
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS ldap_user_mappings (
 	user_id INTEGER NOT NULL,
 	ldap_dn TEXT NOT NULL,
 	ldap_uid TEXT NOT NULL,
-	last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_synced_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (config_id) REFERENCES ldap_configs(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	UNIQUE(config_id, ldap_dn)

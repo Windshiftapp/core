@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS approval_sets (
     name TEXT NOT NULL,
     description TEXT,
     workflow_id INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
 );
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS approval_set_statuses (
     deny_transition_id INTEGER NOT NULL,
     step_mode TEXT NOT NULL DEFAULT 'sequential',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_set_id) REFERENCES approval_sets(id) ON DELETE CASCADE,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE,
     FOREIGN KEY (approve_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS approval_steps (
     escalation_target_user_id INTEGER,
     max_escalations INTEGER,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_set_status_id) REFERENCES approval_set_statuses(id) ON DELETE CASCADE
 );
 
@@ -80,8 +80,8 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     from_status_id INTEGER,
     triggered_by_user_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ,
     FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
     FOREIGN KEY (approval_set_status_id) REFERENCES approval_set_statuses(id) ON DELETE RESTRICT,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE RESTRICT,
@@ -98,11 +98,11 @@ CREATE TABLE IF NOT EXISTS approval_step_instances (
     approval_step_id INTEGER NOT NULL,
     display_order INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
-    escalation_due_at TIMESTAMP,
+    escalation_due_at TIMESTAMPTZ,
     escalation_count INTEGER NOT NULL DEFAULT 0,
-    last_escalated_at TIMESTAMP,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
+    last_escalated_at TIMESTAMPTZ,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
     FOREIGN KEY (approval_request_id) REFERENCES approval_requests(id) ON DELETE CASCADE,
     FOREIGN KEY (approval_step_id) REFERENCES approval_steps(id) ON DELETE RESTRICT
 );
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS approval_step_approvers (
     source_group_id INTEGER,
     substituted_for_user_id INTEGER,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_step_instance_id) REFERENCES approval_step_instances(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
     FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE RESTRICT,
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS approval_decisions (
     comment TEXT,
     delegated_to_user_id INTEGER,
     metadata JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_request_id) REFERENCES approval_requests(id) ON DELETE CASCADE,
     FOREIGN KEY (approval_step_instance_id) REFERENCES approval_step_instances(id) ON DELETE CASCADE,
     FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,

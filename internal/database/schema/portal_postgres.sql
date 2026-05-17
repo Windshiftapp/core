@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS portal_customers (
 	customer_organisation_id INTEGER,
 	custom_field_values JSONB,
 	is_primary BOOLEAN DEFAULT false,
-	dismissed_passkey_prompt_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	dismissed_passkey_prompt_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
 	FOREIGN KEY (customer_organisation_id) REFERENCES customer_organisations(id) ON DELETE SET NULL
 );
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS portal_customer_channels (
 	id SERIAL PRIMARY KEY,
 	portal_customer_id INTEGER NOT NULL,
 	channel_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	UNIQUE(portal_customer_id, channel_id)
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS contact_roles (
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	is_system BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Portal customer roles (many-to-many relationship)
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS portal_customer_roles (
 	id SERIAL PRIMARY KEY,
 	portal_customer_id INTEGER NOT NULL,
 	contact_role_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE,
 	FOREIGN KEY (contact_role_id) REFERENCES contact_roles(id) ON DELETE CASCADE,
 	UNIQUE(portal_customer_id, contact_role_id)

@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS teams (
 	color TEXT,
 	avatar_url TEXT,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS team_members (
 	user_id INTEGER NOT NULL,
 	role TEXT DEFAULT 'member',
 	added_by INTEGER,
-	added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS team_groups (
 	team_id INTEGER NOT NULL,
 	group_id INTEGER NOT NULL,
 	added_by INTEGER,
-	added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
 	FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
 	FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS user_leave_periods (
 	end_date DATE NOT NULL,
 	reason TEXT,
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (substitute_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -81,9 +81,9 @@ CREATE TABLE IF NOT EXISTS team_round_robin_state (
 	action_node_id INTEGER NOT NULL,
 	team_id INTEGER NOT NULL,
 	last_assigned_user_id INTEGER,
-	last_assigned_at TIMESTAMP,
+	last_assigned_at TIMESTAMPTZ,
 	assignment_count INTEGER DEFAULT 0,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
 	FOREIGN KEY (last_assigned_user_id) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(action_node_id, team_id)
@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS on_call_schedules (
 	timezone TEXT DEFAULT 'UTC',
 	is_active BOOLEAN DEFAULT true,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -122,8 +122,8 @@ CREATE TABLE IF NOT EXISTS on_call_schedule_layers (
 	handoff_time TEXT DEFAULT '09:00',
 	start_date DATE NOT NULL,
 	end_date DATE,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (schedule_id) REFERENCES on_call_schedules(id) ON DELETE CASCADE
 );
 
@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS on_call_schedule_layer_members (
 	layer_id INTEGER NOT NULL,
 	user_id INTEGER NOT NULL,
 	position INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (layer_id) REFERENCES on_call_schedule_layers(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	UNIQUE(layer_id, user_id),
@@ -152,11 +152,11 @@ CREATE TABLE IF NOT EXISTS on_call_schedule_overrides (
 	schedule_id INTEGER NOT NULL,
 	user_id INTEGER NOT NULL,
 	override_user_id INTEGER NOT NULL,
-	start_time TIMESTAMP NOT NULL,
-	end_time TIMESTAMP NOT NULL,
+	start_time TIMESTAMPTZ NOT NULL,
+	end_time TIMESTAMPTZ NOT NULL,
 	reason TEXT,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (schedule_id) REFERENCES on_call_schedules(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (override_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -178,8 +178,8 @@ CREATE TABLE IF NOT EXISTS on_call_escalation_policies (
 	repeat_count INTEGER DEFAULT 1,
 	is_active BOOLEAN DEFAULT true,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS on_call_escalation_rules (
 	escalation_delay_minutes INTEGER DEFAULT 5,
 	target_type TEXT NOT NULL,
 	target_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (policy_id) REFERENCES on_call_escalation_policies(id) ON DELETE CASCADE
 );
 
@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS on_call_notification_rules (
 	delay_minutes INTEGER DEFAULT 0,
 	repeat_interval_minutes INTEGER,
 	repeat_count INTEGER DEFAULT 1,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (escalation_rule_id) REFERENCES on_call_escalation_rules(id) ON DELETE CASCADE
 );
 
@@ -225,11 +225,11 @@ CREATE TABLE IF NOT EXISTS on_call_swap_requests (
 	schedule_id INTEGER NOT NULL,
 	requester_user_id INTEGER NOT NULL,
 	target_user_id INTEGER NOT NULL,
-	swap_start TIMESTAMP NOT NULL,
-	swap_end TIMESTAMP NOT NULL,
+	swap_start TIMESTAMPTZ NOT NULL,
+	swap_end TIMESTAMPTZ NOT NULL,
 	status TEXT DEFAULT 'pending',
-	responded_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	responded_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (schedule_id) REFERENCES on_call_schedules(id) ON DELETE CASCADE,
 	FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -246,14 +246,14 @@ CREATE TABLE IF NOT EXISTS on_call_incidents (
 	escalation_policy_id INTEGER NOT NULL,
 	item_id INTEGER,
 	status TEXT DEFAULT 'triggered',
-	triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	acknowledged_at TIMESTAMP,
+	triggered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	acknowledged_at TIMESTAMPTZ,
 	acknowledged_by INTEGER,
-	resolved_at TIMESTAMP,
+	resolved_at TIMESTAMPTZ,
 	resolved_by INTEGER,
 	current_escalation_step INTEGER DEFAULT 0,
 	escalation_repeat_count INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (escalation_policy_id) REFERENCES on_call_escalation_policies(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
 	FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,

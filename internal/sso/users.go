@@ -381,6 +381,9 @@ func (s *UserStore) GetExternalAccountsForUser(userID int) ([]*ExternalAccount, 
 
 		accounts = append(accounts, &account)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return accounts, nil
 }

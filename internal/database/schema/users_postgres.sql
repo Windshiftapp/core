@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 	credential_data TEXT NOT NULL, -- JSON data specific to credential type
 	public_key_fingerprint TEXT, -- SHA256 fingerprint for SSH keys (indexed)
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_used_at TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_used_at TIMESTAMPTZ,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -22,11 +22,11 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 	id SERIAL PRIMARY KEY,
 	user_id INTEGER NOT NULL,
 	session_token TEXT UNIQUE NOT NULL,
-	expires_at TIMESTAMP NOT NULL,
+	expires_at TIMESTAMPTZ NOT NULL,
 	ip_address TEXT,
 	user_agent TEXT,
 	is_active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS user_invitations (
 	id SERIAL PRIMARY KEY,
 	user_id INTEGER NOT NULL,
 	token TEXT UNIQUE NOT NULL,
-	expires_at TIMESTAMP NOT NULL,
-	used_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	used_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

@@ -138,6 +138,9 @@ func (cs *CredentialStore) GetUserCredentials(userID int) ([]webauthn.Credential
 
 		credentials = append(credentials, cred)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate credentials: %w", err)
+	}
 
 	return credentials, nil
 }
@@ -219,6 +222,9 @@ func (cs *CredentialStore) GetUserCredentialsList(userID int) ([]WebAuthnCredent
 		}
 
 		credentials = append(credentials, cred)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate credentials: %w", err)
 	}
 
 	return credentials, nil

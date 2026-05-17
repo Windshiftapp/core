@@ -294,6 +294,14 @@ type updateRequest struct {
 	Indexed *models.CustomFieldIndexInfo `json:"indexed,omitempty"`
 }
 
+// updateResponse returns the updated custom field plus any index builds that
+// were deferred. SQLite cannot build indexes concurrently, so enabling an index
+// records the desired state and the physical index is created on next restart.
+type updateResponse struct {
+	models.CustomFieldDefinition
+	IndexingDeferred *models.CustomFieldIndexInfo `json:"indexing_deferred,omitempty"`
+}
+
 func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -332,6 +340,9 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.cleanupRemovedOptions(id, oldCF.Options, cf.Options, cf.FieldType)
 	}
 
+	deferredIndexes := &models.CustomFieldIndexInfo{}
+	indexingDeferred := false
+
 	// Handle indexing changes if provided
 	if req.Indexed != nil {
 		if !indexableFieldTypes[oldCF.FieldType] {
@@ -346,13 +357,23 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 			{"items", req.Indexed.Items},
 			{"assets", req.Indexed.Assets},
 		} {
-			if err := h.manageFieldIndex(id, oldCF.FieldType, table.name, table.wanted); err != nil {
+			deferred, err := h.manageFieldIndex(id, oldCF.FieldType, table.name, table.wanted)
+			if err != nil {
 				if strings.Contains(err.Error(), "index limit") {
 					respondBadRequest(w, r, err.Error())
 					return
 				}
 				respondInternalError(w, r, err)
 				return
+			}
+			if deferred {
+				indexingDeferred = true
+				switch table.name {
+				case "items":
+					deferredIndexes.Items = true
+				case "assets":
+					deferredIndexes.Assets = true
+				}
 			}
 		}
 	}
@@ -398,6 +419,14 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 			Details:      details,
 			Success:      true,
 		})
+	}
+
+	if indexingDeferred {
+		respondJSONOK(w, updateResponse{
+			CustomFieldDefinition: *updatedCF,
+			IndexingDeferred:      deferredIndexes,
+		})
+		return
 	}
 
 	respondJSONOK(w, updatedCF)
@@ -480,55 +509,67 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// manageFieldIndex creates or drops a database index for a custom field on a target table.
-func (h *CustomFieldHandler) manageFieldIndex(fieldID int, fieldType, targetTable string, enable bool) error {
+// manageFieldIndex creates, drops, or schedules a database index for a custom
+// field on a target table. It returns true when index creation was deferred.
+func (h *CustomFieldHandler) manageFieldIndex(fieldID int, fieldType, targetTable string, enable bool) (bool, error) {
 	if !indexableTargetTables[targetTable] {
-		return fmt.Errorf("invalid target table: %s", targetTable)
+		return false, fmt.Errorf("invalid target table: %s", targetTable)
 	}
 
 	indexName := fmt.Sprintf("idx_cf_%s_%d", targetTable, fieldID)
 
 	currentlyEnabled, err := h.repo.IsIndexRecorded(fieldID, targetTable)
 	if err != nil {
-		return fmt.Errorf("failed to check index state: %w", err)
+		return false, fmt.Errorf("failed to check index state: %w", err)
 	}
 
 	if enable == currentlyEnabled {
-		return nil
+		return false, nil
 	}
 
 	if enable {
 		currentCount, err := h.repo.CountIndexesForTable(targetTable)
 		if err != nil {
-			return fmt.Errorf("failed to count indexes: %w", err)
+			return false, fmt.Errorf("failed to count indexes: %w", err)
 		}
 
 		maxIndexes := h.maxIndexesPerTable()
 
 		if currentCount >= maxIndexes {
-			return fmt.Errorf("index limit reached: %d of %d indexes used on %s", currentCount, maxIndexes, targetTable)
+			return false, fmt.Errorf("index limit reached: %d of %d indexes used on %s", currentCount, maxIndexes, targetTable)
+		}
+
+		// SQLite cannot create indexes concurrently; on large item/asset tables the
+		// CREATE INDEX would block writes and tie up the admin request. Record the
+		// desired index now and create the physical index during the next restart,
+		// before the server begins handling traffic.
+		if h.repo.DriverName() == "sqlite" {
+			if err := h.repo.RecordIndex(fieldID, targetTable, indexName); err != nil {
+				return false, fmt.Errorf("failed to schedule index: %w", err)
+			}
+			return true, nil
 		}
 
 		createSQL := h.buildCreateIndexSQL(fieldID, fieldType, targetTable, indexName)
 		if err := h.repo.ExecDDL(createSQL); err != nil {
-			return fmt.Errorf("failed to create index: %w", err)
+			return false, fmt.Errorf("failed to create index: %w", err)
 		}
 
 		if err := h.repo.RecordIndex(fieldID, targetTable, indexName); err != nil {
 			// Attempt to drop the index we just created
 			_ = h.repo.ExecDDL(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName))
-			return fmt.Errorf("failed to record index: %w", err)
+			return false, fmt.Errorf("failed to record index: %w", err)
 		}
 	} else {
 		if err := h.repo.ExecDDL(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)); err != nil {
-			return fmt.Errorf("failed to drop index: %w", err)
+			return false, fmt.Errorf("failed to drop index: %w", err)
 		}
 		if err := h.repo.DeleteIndexRecord(fieldID, targetTable); err != nil {
-			return fmt.Errorf("failed to remove index record: %w", err)
+			return false, fmt.Errorf("failed to remove index record: %w", err)
 		}
 	}
 
-	return nil
+	return false, nil
 }
 
 type customFieldSettings struct {
@@ -629,7 +670,9 @@ func (h *CustomFieldHandler) buildCreateIndexSQL(fieldID int, fieldType, targetT
 	if fieldType == "number" {
 		castType = "NUMERIC"
 	}
-	return fmt.Sprintf(`CREATE INDEX %s ON %s(CAST(NULLIF(custom_field_values,'') ->> '$.\"%s\"' AS %s))`,
+	// %q would wrap the field ID in Go-style quoting and escape internal
+	// characters, breaking the JSON path literal embedded in the SQL.
+	return fmt.Sprintf(`CREATE INDEX %s ON %s(CAST(NULLIF(custom_field_values,'') ->> '$."%s"' AS %s))`, //nolint:gocritic // see comment above
 		indexName, targetTable, fieldIDStr, castType)
 }
 

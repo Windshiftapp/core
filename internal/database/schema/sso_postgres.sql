@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	saml_idp_certificate TEXT,   -- IdP X.509 certificate (PEM)
 	saml_sp_entity_id TEXT,      -- SP Entity ID (defaults to base URL)
 	saml_sign_requests BOOLEAN DEFAULT FALSE, -- Whether to sign AuthnRequests
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for SSO providers
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS sso_state_tokens (
 	nonce TEXT, -- OIDC nonce (NULL for SAML)
 	redirect_uri TEXT NOT NULL, -- Callback URL
 	remember_me BOOLEAN DEFAULT FALSE, -- Extended session flag
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	expires_at TIMESTAMP NOT NULL, -- 5-minute expiry
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL, -- 5-minute expiry
 	FOREIGN KEY (provider_id) REFERENCES sso_providers(id) ON DELETE CASCADE
 );
 
@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS user_external_accounts (
 	external_id TEXT NOT NULL, -- 'sub' claim for OIDC, NameID for SAML
 	email TEXT, -- Email from SSO provider (may differ from user email)
 	profile_data TEXT, -- JSON blob of raw claims/attributes for debugging
-	linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_login_at TIMESTAMP,
+	linked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_login_at TIMESTAMPTZ,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (provider_id) REFERENCES sso_providers(id) ON DELETE CASCADE,
 	UNIQUE(provider_id, external_id)

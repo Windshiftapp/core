@@ -18,14 +18,14 @@ CREATE TABLE IF NOT EXISTS recurrence_rules (
 	rrule TEXT NOT NULL,
 
 	-- Recurrence timing configuration
-	dtstart TIMESTAMP NOT NULL,
-	dtend TIMESTAMP,
+	dtstart TIMESTAMPTZ NOT NULL,
+	dtend TIMESTAMPTZ,
 	timezone TEXT DEFAULT 'UTC',
 
 	-- Generation settings
 	lead_time_days INTEGER DEFAULT 14,
-	last_generated_until TIMESTAMP,
-	next_generation_check TIMESTAMP,
+	last_generated_until TIMESTAMPTZ,
+	next_generation_check TIMESTAMPTZ,
 
 	-- Instance configuration (what to copy from template)
 	copy_assignee BOOLEAN DEFAULT TRUE,
@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS recurrence_rules (
 	-- Lifecycle
 	is_active BOOLEAN DEFAULT TRUE,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
 	FOREIGN KEY (template_item_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS recurrence_instances (
 	sequence_number INTEGER NOT NULL,
 
 	-- Tracking
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
 	FOREIGN KEY (recurrence_rule_id) REFERENCES recurrence_rules(id) ON DELETE CASCADE,
 	FOREIGN KEY (instance_item_id) REFERENCES items(id) ON DELETE CASCADE,

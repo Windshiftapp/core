@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 	title TEXT NOT NULL,
 	message TEXT NOT NULL,
 	type TEXT NOT NULL DEFAULT 'info', -- info, warning, error, success, assignment, comment, status_change, reminder, milestone
-	timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	read BOOLEAN DEFAULT false,
-	sent_at TIMESTAMP, -- When notification was sent via email (NULL if not sent)
+	sent_at TIMESTAMPTZ, -- When notification was sent via email (NULL if not sent)
 	-- Set to TRUE only when the scheduler tried to roll back sent_at after an SMTP
 	-- failure and the rollback ITSELF failed. Without this flag the row is wedged:
 	-- sent_at is set so the next tick's `WHERE sent_at IS NULL` skips it, and the
@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 	avatar TEXT, -- Initials or avatar identifier
 	action_url TEXT, -- URL to navigate to when clicked
 	metadata TEXT, -- JSON for additional data
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS notification_settings (
 	description TEXT,
 	is_active BOOLEAN DEFAULT true,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS notification_event_rules (
 	notify_workspace_admins BOOLEAN DEFAULT false,
 	custom_recipients TEXT, -- JSON array of user IDs or email addresses
 	message_template TEXT, -- Custom message template (optional)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (notification_setting_id) REFERENCES notification_settings(id) ON DELETE CASCADE,
 	UNIQUE(notification_setting_id, event_type)
 );
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_notification_settings (
 	id SERIAL PRIMARY KEY,
 	configuration_set_id INTEGER NOT NULL,
 	notification_setting_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (notification_setting_id) REFERENCES notification_settings(id) ON DELETE CASCADE,
 	UNIQUE(configuration_set_id, notification_setting_id)

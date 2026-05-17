@@ -340,6 +340,74 @@ func addUserFromObject(userObj map[string]interface{}, existingMap map[string]in
 	seen[accountID] = true
 }
 
+// extractCustomFieldValue resolves a single Jira custom field into the value
+// that belongs in the item's custom_field_values JSON bag. Returns (nil, false)
+// for any skip path so callers can use the same pattern for all types:
+//
+//	if v, ok := extractCustomFieldValue(mapping, &issue.Fields, userMap); ok { ... }
+//
+// Phase 0 only handles user/users mappings (the existing pre-refactor behavior);
+// additional WindshiftType cases are added in Phase 1.1 (B01/B07/B25).
+func extractCustomFieldValue(mapping CustomFieldMapping, fields *jira.JiraIssueFields, userMap map[string]int) (any, bool) {
+	if mapping.Action == "skip" {
+		return nil, false
+	}
+	// Only process user/users types for now
+	if mapping.WindshiftType != "user" && mapping.WindshiftType != "users" {
+		return nil, false
+	}
+	if fields == nil || fields.CustomFields == nil {
+		return nil, false
+	}
+	value, exists := fields.CustomFields[mapping.JiraID]
+	if !exists || value == nil {
+		return nil, false
+	}
+
+	switch mapping.WindshiftType {
+	case "user":
+		// Single user picker
+		userObj, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		accountID, ok := userObj["accountId"].(string)
+		if !ok {
+			return nil, false
+		}
+		uid, ok := userMap[accountID]
+		if !ok {
+			return nil, false
+		}
+		return uid, true
+	case "users":
+		// Multi-user picker (like Approvers)
+		users, ok := value.([]interface{})
+		if !ok {
+			return nil, false
+		}
+		var userIDs []int
+		for _, u := range users {
+			userObj, ok := u.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			accountID, ok := userObj["accountId"].(string)
+			if !ok {
+				continue
+			}
+			if uid, ok := userMap[accountID]; ok {
+				userIDs = append(userIDs, uid)
+			}
+		}
+		if len(userIDs) == 0 {
+			return nil, false
+		}
+		return userIDs, true
+	}
+	return nil, false
+}
+
 // importIssue imports a single Jira issue as a Windshift work item
 func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap, itemTypeMap, userMap map[string]int, usernameMap map[string]string, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
 	mentionResolver := jira.MentionResolver(func(accountID string) string {
@@ -432,47 +500,8 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		customFieldValues["_jira_resolved_at"] = resolved.UTC().Format(time.RFC3339)
 	}
 	for _, mapping := range customFieldMappings {
-		if mapping.Action == "skip" {
-			continue
-		}
-
-		// Only process user/users types for now
-		if mapping.WindshiftType != "user" && mapping.WindshiftType != "users" {
-			continue
-		}
-
-		value, exists := issue.Fields.CustomFields[mapping.JiraID]
-		if !exists || value == nil {
-			continue
-		}
-
-		switch mapping.WindshiftType {
-		case "user":
-			// Single user picker
-			if userObj, ok := value.(map[string]interface{}); ok {
-				if accountID, ok := userObj["accountId"].(string); ok {
-					if uid, ok := userMap[accountID]; ok {
-						customFieldValues[mapping.JiraID] = uid
-					}
-				}
-			}
-		case "users":
-			// Multi-user picker (like Approvers)
-			if users, ok := value.([]interface{}); ok {
-				var userIDs []int
-				for _, u := range users {
-					if userObj, ok := u.(map[string]interface{}); ok {
-						if accountID, ok := userObj["accountId"].(string); ok {
-							if uid, ok := userMap[accountID]; ok {
-								userIDs = append(userIDs, uid)
-							}
-						}
-					}
-				}
-				if len(userIDs) > 0 {
-					customFieldValues[mapping.JiraID] = userIDs
-				}
-			}
+		if v, ok := extractCustomFieldValue(mapping, &issue.Fields, userMap); ok {
+			customFieldValues[mapping.JiraID] = v
 		}
 	}
 

@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
 	default_view TEXT DEFAULT 'board', -- Default view when entering workspace (board, backlog, list, tree, map)
 	display_mode TEXT DEFAULT 'default', -- Display mode for workspace layout (default, board)
 	internal_comments_enabled BOOLEAN DEFAULT false, -- Allow internal comments on all items (not just portal requests)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspaces_is_personal ON workspaces(is_personal);
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS workspace_time_project_categories (
 	id SERIAL PRIMARY KEY,
 	workspace_id INTEGER NOT NULL,
 	time_project_category_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (time_project_category_id) REFERENCES time_project_categories(id) ON DELETE CASCADE,
 	UNIQUE(workspace_id, time_project_category_id)

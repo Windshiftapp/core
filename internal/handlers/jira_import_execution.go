@@ -52,13 +52,18 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 			}
 
 			// Wrap client in recording client
-			rc := newRecordingClient(client)
+			rc := newRecordingClient(client, captureDir)
 			client = rc
 
-			// Save responses when import completes (deferred)
+			// Save responses + post-import windshift snapshot when import
+			// completes (deferred so partial/failed runs still get a snapshot —
+			// that's the diff signal we want).
 			defer func() {
 				if err := rc.saveToFile(captureDir); err != nil {
 					slog.Error("Failed to save captured payloads", slog.String("component", "jira"), slog.Any("error", err))
+				}
+				if err := writeWindshiftExport(h.db, jobID, captureDir); err != nil {
+					slog.Error("Failed to save windshift export", slog.String("component", "jira"), slog.Any("error", err))
 				}
 			}()
 		}

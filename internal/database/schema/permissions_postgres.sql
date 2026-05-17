@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS permissions (
 	description TEXT,
 	scope TEXT NOT NULL CHECK (scope IN ('global', 'workspace')),
 	is_system BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS user_global_permissions (
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS user_global_permissions (
 	user_id INTEGER NOT NULL,
 	permission_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS workspace_roles (
 	-- See permissions.sql for semantics. true for seeded system roles;
 	-- admin-created custom roles default this to false (label-only).
 	permissions_enabled BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS user_workspace_roles (
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS user_workspace_roles (
 	workspace_id INTEGER NOT NULL,
 	role_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (role_id) REFERENCES workspace_roles(id) ON DELETE CASCADE,
@@ -75,14 +75,14 @@ CREATE TABLE IF NOT EXISTS groups (
 	ldap_distinguished_name TEXT,
 	ldap_common_name TEXT,
 	ldap_sync_enabled BOOLEAN DEFAULT false,
-	ldap_last_sync_at TIMESTAMP,
+	ldap_last_sync_at TIMESTAMPTZ,
 	is_system_group BOOLEAN DEFAULT false,
 	is_active BOOLEAN DEFAULT true,
 	scim_external_id TEXT, -- SCIM externalId from identity provider
 	scim_managed BOOLEAN DEFAULT false, -- If true, group is managed via SCIM
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS group_members (
@@ -90,12 +90,12 @@ CREATE TABLE IF NOT EXISTS group_members (
 	group_id INTEGER NOT NULL,
 	user_id INTEGER NOT NULL,
 	ldap_sync_enabled BOOLEAN DEFAULT false,
-	ldap_last_sync_at TIMESTAMP,
+	ldap_last_sync_at TIMESTAMPTZ,
 	scim_managed BOOLEAN DEFAULT false, -- If true, membership is managed via SCIM
 	added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-	added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	UNIQUE(group_id, user_id)
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS group_workspace_roles (
 	workspace_id INTEGER NOT NULL,
 	role_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (role_id) REFERENCES workspace_roles(id) ON DELETE CASCADE,
@@ -143,8 +143,8 @@ CREATE TABLE IF NOT EXISTS permission_sets (
 	description TEXT,
 	is_system BOOLEAN DEFAULT false,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS permission_set_permissions (
 	permission_set_id INTEGER NOT NULL,
 	permission_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (permission_set_id) REFERENCES permission_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS group_global_permissions (
 	group_id INTEGER NOT NULL,
 	permission_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
 	FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,

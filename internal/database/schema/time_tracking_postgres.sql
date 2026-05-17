@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS time_projects (
 	hourly_rate REAL DEFAULT 0,
 	settings TEXT,
 	active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (customer_id) REFERENCES customer_organisations(id) ON DELETE SET NULL,
 	FOREIGN KEY (category_id) REFERENCES time_project_categories(id) ON DELETE SET NULL
 );
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS time_project_managers (
 	manager_type TEXT NOT NULL CHECK (manager_type IN ('user', 'group')),
 	manager_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(project_id, manager_type, manager_id)
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS time_project_members (
 	member_type TEXT NOT NULL CHECK (member_type IN ('user', 'group')),
 	member_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(project_id, member_type, member_id)
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS customer_organisation_managers (
 	manager_type TEXT NOT NULL CHECK (manager_type IN ('user', 'group')),
 	manager_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (customer_organisation_id) REFERENCES customer_organisations(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(customer_organisation_id, manager_type, manager_id)
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS customer_organisation_members (
 	member_type TEXT NOT NULL CHECK (member_type IN ('user', 'group')),
 	member_id INTEGER NOT NULL,
 	granted_by INTEGER,
-	granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (customer_organisation_id) REFERENCES customer_organisations(id) ON DELETE CASCADE,
 	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(customer_organisation_id, member_type, member_id)

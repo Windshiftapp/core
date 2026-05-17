@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS milestone_categories (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS milestones (
@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS milestones (
 	category_id INTEGER,
 	is_global BOOLEAN NOT NULL DEFAULT true,  -- true=global, false=workspace-specific
 	workspace_id INTEGER,  -- NULL if global, workspace reference if local
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (category_id) REFERENCES milestone_categories(id) ON DELETE SET NULL,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	CONSTRAINT milestones_scope_check CHECK (
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS item_milestones (
 	id SERIAL PRIMARY KEY,
 	item_id INTEGER NOT NULL,
 	milestone_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	-- FK on item_id added in items_postgres.sql once items has been created.
 	FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
 	UNIQUE(item_id, milestone_id)

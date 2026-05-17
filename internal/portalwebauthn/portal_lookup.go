@@ -89,6 +89,9 @@ func (s *PortalLookupStore) FindEnabledPortalChannelBySlug(slug string) (*models
 			return &ch, nil
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate portal channels: %w", err)
+	}
 	return nil, ErrPortalChannelNotFound
 }
 

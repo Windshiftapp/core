@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS asset_reports (
 	item_type_id INTEGER DEFAULT NULL,  -- Used in form mode to resolve available custom fields
 	workspace_id INTEGER DEFAULT NULL,  -- Used in form mode to resolve custom fields
 	config TEXT DEFAULT NULL,  -- JSON config (submit button label, success message, etc.)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (asset_set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_type_id) REFERENCES item_types(id) ON DELETE SET NULL,
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS asset_report_fields (
 	step_number INTEGER DEFAULT 1,
 	virtual_field_type TEXT,
 	virtual_field_options TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (asset_report_id) REFERENCES asset_reports(id) ON DELETE CASCADE
 );
 

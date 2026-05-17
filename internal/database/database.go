@@ -162,6 +162,27 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 		"&_journal_mode=WAL" +
 		"&_foreign_keys=on" +
 		"&_txlock=immediate" +
+		// modernc.org/sqlite defaults to time.Time.String() when binding
+		// time.Time params (e.g. "2026-05-15 23:13:34.6 +0200 CEST m=+..."),
+		// which SQLite's DATE/STRFTIME/julianday can't parse — they return
+		// NULL and any consumer scanning into a non-nullable Go string
+		// blows up. _time_format=sqlite switches the bind side to
+		// "2006-01-02 15:04:05.999999999-07:00", which SQLite's date
+		// functions handle natively. Existing rows with the legacy format
+		// are normalized on startup by backfillLegacyDatetimeFormat.
+		//
+		// _timezone=UTC was added to the modernc driver in v1.46+, which
+		// post-dates our pinned v1.44.3 — silently ignored today, but kept
+		// so a future driver bump enables it for free. The actual UTC
+		// enforcement lives in toUTCArgs (sqlite.go): every time.Time
+		// param is .UTC()'d at the wrapper boundary before reaching the
+		// driver. Without UTC normalization, a row written at 14:00 CEST
+		// (+02:00) lex-sorts AFTER a row written at 14:00 UTC (+00:00)
+		// even though it happened TWO HOURS EARLIER, because '+0' < '+2'
+		// in ASCII. backfillLegacyDatetimeFormat rewrites pre-existing
+		// offset-bearing rows to UTC too.
+		"&_time_format=sqlite" +
+		"&_timezone=UTC" +
 		"&_pragma=synchronous(NORMAL)" +
 		"&_pragma=temp_store(MEMORY)" +
 		"&_pragma=cache_size(-16000)" +
@@ -1121,6 +1142,15 @@ func (db *DB) Initialize() error {
 			slog.Warn("cli_auth_codes migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Backfill legacy time.Time.String() values produced by older
+		// modernc.org/sqlite installs (before _time_format=sqlite was set
+		// on the DSN). Idempotent — no-op on a database that's already
+		// clean or freshly initialized. Uses writeConn so it respects the
+		// single-writer invariant.
+		if err := backfillLegacyDatetimeFormat(db.writeConn); err != nil {
+			slog.Warn("legacy datetime backfill failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Catalog-based migrations are run from SQLiteDB.Initialize after
 		// this returns (the catalog requires the Database interface, which
 		// only the wrapper implements).
@@ -1522,6 +1552,9 @@ func (db *DB) initializeDefaultData() error {
 			return fmt.Errorf("failed to link priority to default config set: %w", err)
 		}
 	}
+	if err := priorityRows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate priorities: %w", err)
+	}
 
 	// 14. Create default notification settings
 	// (built-in email templates are seeded by emailutil.SeedTemplates from
@@ -1811,6 +1844,9 @@ func migrateConditionUserSourceToFieldRef(db queryExecutor, pgPlaceholders ...bo
 		}
 		r.config = string(newConfig)
 		updates = append(updates, r)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	_ = rows.Close()
 

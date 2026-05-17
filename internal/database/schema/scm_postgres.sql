@@ -26,12 +26,12 @@ CREATE TABLE IF NOT EXISTS scm_providers (
 	-- OAuth token storage (after OAuth flow completion - DEPRECATED, use workspace_scm_connections)
 	oauth_access_token_encrypted TEXT,
 	oauth_refresh_token_encrypted TEXT,
-	oauth_token_expires_at TIMESTAMP,
+	oauth_token_expires_at TIMESTAMPTZ,
 	-- Provider settings
 	scopes TEXT DEFAULT 'repo',                   -- Space-separated scopes
 	workspace_restriction_mode TEXT DEFAULT 'unrestricted', -- 'unrestricted' or 'restricted'
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_scm_providers_slug ON scm_providers(slug);
@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS scm_oauth_state (
 	redirect_uri TEXT NOT NULL,                   -- Callback URL
 	user_id INTEGER NOT NULL,                     -- User initiating the connection
 	workspace_id INTEGER,                         -- If set, store credentials at workspace level
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	expires_at TIMESTAMP NOT NULL,                -- 5-minute expiry
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,                -- 5-minute expiry
 	FOREIGN KEY (provider_id) REFERENCES scm_providers(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
@@ -85,11 +85,11 @@ CREATE TABLE IF NOT EXISTS workspace_scm_connections (
 	-- Workspace-level credentials (for OAuth/PAT - GitHub Apps use provider-level)
 	oauth_access_token_encrypted TEXT,
 	oauth_refresh_token_encrypted TEXT,
-	oauth_token_expires_at TIMESTAMP,
+	oauth_token_expires_at TIMESTAMPTZ,
 	personal_access_token_encrypted TEXT,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (scm_provider_id) REFERENCES scm_providers(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -108,9 +108,9 @@ CREATE TABLE IF NOT EXISTS workspace_repositories (
 	repository_url TEXT NOT NULL,                 -- Clone/web URL
 	default_branch TEXT DEFAULT 'main',
 	is_active BOOLEAN DEFAULT TRUE,
-	last_synced_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_synced_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_scm_connection_id) REFERENCES workspace_scm_connections(id) ON DELETE CASCADE,
 	UNIQUE(workspace_scm_connection_id, repository_external_id)
 );
@@ -132,9 +132,9 @@ CREATE TABLE IF NOT EXISTS item_scm_links (
 	author_external_id TEXT,                      -- Author's external ID from SCM
 	author_name TEXT,                             -- Author display name
 	detection_source TEXT,                        -- 'webhook', 'manual', 'branch_name', 'pr_title', 'pr_body', 'commit_message'
-	smart_commits_applied_at TIMESTAMP,           -- When smart-commit actions for a merged PR body were last applied (prevents re-runs)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	smart_commits_applied_at TIMESTAMPTZ,           -- When smart-commit actions for a merged PR body were last applied (prevents re-runs)
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE,
 	UNIQUE(item_id, workspace_repository_id, link_type, external_id)
@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_item_scm_links_state ON item_scm_links(state);
 CREATE TABLE IF NOT EXISTS scm_processed_commits (
 	commit_sha              TEXT NOT NULL,
 	workspace_repository_id INTEGER NOT NULL,
-	processed_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	processed_at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	actions_applied         INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (commit_sha, workspace_repository_id),
 	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS scm_provider_workspace_allowlist (
 	id SERIAL PRIMARY KEY,
 	provider_id INTEGER NOT NULL,
 	workspace_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	created_by INTEGER,
 	FOREIGN KEY (provider_id) REFERENCES scm_providers(id) ON DELETE CASCADE,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -181,14 +181,14 @@ CREATE TABLE IF NOT EXISTS user_scm_oauth_tokens (
 	scm_provider_id INTEGER NOT NULL,
 	oauth_access_token_encrypted TEXT NOT NULL,
 	oauth_refresh_token_encrypted TEXT,
-	oauth_token_expires_at TIMESTAMP,
+	oauth_token_expires_at TIMESTAMPTZ,
 	scm_username TEXT,                            -- Username from SCM provider (e.g., GitHub username)
 	scm_user_id TEXT,                             -- External user ID from SCM
 	scm_avatar_url TEXT,                          -- Avatar URL from SCM
-	connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_used_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	connected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_used_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (scm_provider_id) REFERENCES scm_providers(id) ON DELETE CASCADE,
 	UNIQUE(user_id, scm_provider_id)
@@ -219,12 +219,12 @@ CREATE TABLE IF NOT EXISTS issue_sync_configs (
 	-- Comment sync
 	sync_comments BOOLEAN DEFAULT FALSE,
 	-- Sync state
-	last_full_sync_at TIMESTAMP,
+	last_full_sync_at TIMESTAMPTZ,
 	last_sync_error TEXT,
 	-- Audit
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
 );
 
@@ -239,11 +239,11 @@ CREATE TABLE IF NOT EXISTS issue_sync_items (
 	github_issue_number INTEGER NOT NULL,
 	github_issue_id BIGINT NOT NULL,                 -- GitHub's internal issue ID (int64)
 	github_issue_url TEXT NOT NULL,
-	last_synced_at TIMESTAMP,
-	last_github_updated_at TIMESTAMP,                -- GitHub's updated_at at last sync
+	last_synced_at TIMESTAMPTZ,
+	last_github_updated_at TIMESTAMPTZ,                -- GitHub's updated_at at last sync
 	sync_lock BOOLEAN DEFAULT FALSE,                 -- Prevents re-entrant sync during pushback
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (issue_sync_config_id) REFERENCES issue_sync_configs(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	UNIQUE(issue_sync_config_id, github_issue_number),
@@ -259,9 +259,9 @@ CREATE TABLE IF NOT EXISTS issue_sync_comments (
 	issue_sync_item_id INTEGER NOT NULL,
 	comment_id INTEGER,                              -- Windshift comment ID (NULL if comment deleted)
 	github_comment_id BIGINT NOT NULL,               -- GitHub comment ID
-	github_updated_at TIMESTAMP,                     -- GitHub comment updated_at for change detection
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	github_updated_at TIMESTAMPTZ,                     -- GitHub comment updated_at for change detection
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (issue_sync_item_id) REFERENCES issue_sync_items(id) ON DELETE CASCADE,
 	FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE SET NULL,
 	UNIQUE(issue_sync_item_id, github_comment_id)

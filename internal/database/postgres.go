@@ -158,6 +158,20 @@ type schemaFile struct {
 // NewPostgresDB creates a new PostgreSQL database connection.
 // maxConns sizes the pool (idle pool = maxConns/2, min 1).
 func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
+	// Force the lib/pq session timezone to UTC unless the caller explicitly
+	// set one in the DSN. With session timezone = UTC:
+	//
+	//   • bound time.Time values are written as their UTC wall-clock — no
+	//     more "stored CEST, read back as UTC" drift on TIMESTAMP cols;
+	//   • TIMESTAMPTZ reads come back in UTC consistently regardless of
+	//     where the Postgres server is configured;
+	//   • cross-deployment lex ordering of timestamp-bearing TEXT columns
+	//     (e.g. JSON fields) stays correct.
+	//
+	// Pairs with _timezone=UTC on the SQLite DSN so both engines share the
+	// same convention — every timestamp on disk is UTC.
+	connectionString = ensurePostgresTimezoneUTC(connectionString)
+
 	// Open connection
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
@@ -179,6 +193,34 @@ func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
 		db:  db,
 		dsn: connectionString,
 	}, nil
+}
+
+// ensurePostgresTimezoneUTC appends a timezone=UTC parameter to dsn unless
+// the caller has already pinned one. Works for both URL-style DSNs
+// ("postgresql://...?sslmode=disable") and keyword-value DSNs
+// ("host=... user=... dbname=..."). Case-insensitive check on "timezone" so
+// a user-supplied "TimeZone=Europe/Berlin" or "timezone=America/Denver" is
+// respected — we only add the default when nothing is set.
+func ensurePostgresTimezoneUTC(dsn string) string {
+	if strings.Contains(strings.ToLower(dsn), "timezone=") {
+		return dsn
+	}
+	// URL-style DSNs start with "postgres://" or "postgresql://". Anything
+	// else (including the empty string) is keyword-value.
+	lower := strings.ToLower(dsn)
+	urlStyle := strings.HasPrefix(lower, "postgres://") || strings.HasPrefix(lower, "postgresql://")
+	if urlStyle {
+		if strings.Contains(dsn, "?") {
+			return dsn + "&timezone=UTC"
+		}
+		return dsn + "?timezone=UTC"
+	}
+	// Keyword-value form: space-separated. Empty DSN means "use defaults
+	// from PG* env vars" — append directly.
+	if dsn == "" {
+		return "timezone=UTC"
+	}
+	return dsn + " timezone=UTC"
 }
 
 // ConvertPlaceholders converts SQLite-style ? placeholders to PostgreSQL-style $1, $2, etc.
@@ -385,7 +427,7 @@ func (p *PostgresDB) Initialize() error {
 			version    TEXT PRIMARY KEY,
 			name       TEXT NOT NULL,
 			checksum   TEXT NOT NULL DEFAULT '',
-			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 		);
 	`); err != nil {
 		return fmt.Errorf("failed to bootstrap schema_migrations: %w", err)
@@ -420,8 +462,8 @@ func (p *PostgresDB) Initialize() error {
 				allowed_scopes TEXT NOT NULL DEFAULT '[]',
 				enabled BOOLEAN NOT NULL DEFAULT true,
 				created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 			);
 			CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
 			CREATE INDEX IF NOT EXISTS idx_oauth_clients_enabled ON oauth_clients(enabled);
@@ -437,9 +479,9 @@ func (p *PostgresDB) Initialize() error {
 				code_challenge TEXT,
 				code_challenge_method TEXT,
 				state TEXT,
-				expires_at TIMESTAMP NOT NULL,
-				consumed_at TIMESTAMP,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				expires_at TIMESTAMPTZ NOT NULL,
+				consumed_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 			);
 			CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_code ON oauth_authorization_codes(code);
 			CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_expires_at ON oauth_authorization_codes(expires_at);
@@ -452,10 +494,10 @@ func (p *PostgresDB) Initialize() error {
 				user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
 				agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 				scopes TEXT NOT NULL DEFAULT '[]',
-				expires_at TIMESTAMP NOT NULL,
-				revoked_at TIMESTAMP,
+				expires_at TIMESTAMPTZ NOT NULL,
+				revoked_at TIMESTAMPTZ,
 				rotated_to_id INTEGER REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 			);
 			CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_token_hash ON oauth_refresh_tokens(token_hash);
 			CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_api_token_id ON oauth_refresh_tokens(api_token_id);
@@ -471,7 +513,7 @@ func (p *PostgresDB) Initialize() error {
 		if _, err = p.db.Exec(`
 			CREATE TABLE IF NOT EXISTS audit_logs (
 				id SERIAL PRIMARY KEY,
-				timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				user_id INTEGER,
 				username TEXT NOT NULL,
 				ip_address TEXT,
@@ -651,8 +693,8 @@ func (p *PostgresDB) Initialize() error {
 			CREATE TABLE IF NOT EXISTS scheduler_runs (
 				id SERIAL PRIMARY KEY,
 				scheduler_name TEXT NOT NULL,
-				started_at TIMESTAMP NOT NULL,
-				completed_at TIMESTAMP,
+				started_at TIMESTAMPTZ NOT NULL,
+				completed_at TIMESTAMPTZ,
 				duration_ms INTEGER,
 				items_processed INTEGER,
 				success BOOLEAN NOT NULL DEFAULT FALSE,
@@ -674,9 +716,9 @@ func (p *PostgresDB) Initialize() error {
 				id SERIAL PRIMARY KEY,
 				field_id INTEGER NOT NULL,
 				status TEXT NOT NULL DEFAULT 'pending',
-				created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-				started_at TIMESTAMP,
-				completed_at TIMESTAMP,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				started_at TIMESTAMPTZ,
+				completed_at TIMESTAMPTZ,
 				items_processed INTEGER NOT NULL DEFAULT 0,
 				error_message TEXT
 			);
@@ -777,9 +819,9 @@ func (p *PostgresDB) Initialize() error {
 				id SERIAL PRIMARY KEY,
 				user_id INTEGER NOT NULL,
 				token TEXT UNIQUE NOT NULL,
-				expires_at TIMESTAMP NOT NULL,
-				used_at TIMESTAMP,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				expires_at TIMESTAMPTZ NOT NULL,
+				used_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			);
 			CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
@@ -795,7 +837,7 @@ func (p *PostgresDB) Initialize() error {
 				custom_field_id INTEGER NOT NULL,
 				target_table TEXT NOT NULL,
 				index_name TEXT NOT NULL,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
 				UNIQUE(custom_field_id, target_table)
 			)
@@ -1067,11 +1109,11 @@ func (p *PostgresDB) Initialize() error {
 				token_hash TEXT NOT NULL UNIQUE,
 				token_prefix TEXT NOT NULL,
 				permissions TEXT DEFAULT '["read"]',
-				expires_at TIMESTAMP NULL,
-				last_used_at TIMESTAMP NULL,
+				expires_at TIMESTAMPTZ NULL,
+				last_used_at TIMESTAMPTZ NULL,
 				is_temporary BOOLEAN DEFAULT false,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 			);
 			CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 			CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
@@ -1088,7 +1130,7 @@ func (p *PostgresDB) Initialize() error {
 			CREATE TABLE IF NOT EXISTS scm_processed_commits (
 				commit_sha              TEXT NOT NULL,
 				workspace_repository_id INTEGER NOT NULL,
-				processed_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				processed_at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 				actions_applied         INTEGER NOT NULL DEFAULT 0,
 				PRIMARY KEY (commit_sha, workspace_repository_id),
 				FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
@@ -1112,9 +1154,9 @@ func (p *PostgresDB) Initialize() error {
 				agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 				token_id INTEGER REFERENCES api_tokens(id) ON DELETE SET NULL,
 				token_plaintext TEXT,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				expires_at TIMESTAMP NOT NULL,
-				consumed_at TIMESTAMP
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				expires_at TIMESTAMPTZ NOT NULL,
+				consumed_at TIMESTAMPTZ
 			);
 			CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
 			CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expires_at);
@@ -1158,6 +1200,13 @@ func (p *PostgresDB) Initialize() error {
 	// Initialize default data for new installations
 	if err := p.initializePostgresDefaultData(); err != nil {
 		return fmt.Errorf("failed to initialize default data: %w", err)
+	}
+
+	// Convert any legacy TIMESTAMP (without time zone) columns to TIMESTAMPTZ
+	// for installs that predate the schema flip. Idempotent — no-op on a fresh
+	// install where the *_postgres.sql files already declared TIMESTAMPTZ.
+	if err := backfillPostgresTimestampTZ(p.db); err != nil {
+		slog.Warn("postgres TIMESTAMPTZ backfill failed", slog.String("component", "database"), slog.Any("error", err))
 	}
 
 	// On fresh installs, every catalog migration's Check returns true (the

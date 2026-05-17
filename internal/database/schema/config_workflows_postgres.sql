@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS statuses (
 	description TEXT,
 	category_id INTEGER NOT NULL,
 	is_default BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (category_id) REFERENCES status_categories(id) ON DELETE RESTRICT
 );
 
@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS configuration_sets (
 	default_item_type_id INTEGER REFERENCES item_types(id) ON DELETE SET NULL,
 	condition_set_id INTEGER,
 	approval_set_id INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS screen_fields (
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_item_types (
 	view_screen_id INTEGER,
 	condition_set_id INTEGER,
 	approval_set_id INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_type_id) REFERENCES item_types(id) ON DELETE CASCADE,
 	FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE SET NULL,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_priorities (
 	id SERIAL PRIMARY KEY,
 	configuration_set_id INTEGER NOT NULL,
 	priority_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (priority_id) REFERENCES priorities(id) ON DELETE CASCADE,
 	UNIQUE(configuration_set_id, priority_id)
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_screens (
 	configuration_set_id INTEGER NOT NULL,
 	screen_id INTEGER NOT NULL,
 	context TEXT NOT NULL DEFAULT 'create', -- create, edit, view
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (screen_id) REFERENCES screens(id) ON DELETE CASCADE,
 	UNIQUE(configuration_set_id, context) -- One screen per context per configuration set
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS workspace_configuration_sets (
 	id SERIAL PRIMARY KEY,
 	workspace_id INTEGER NOT NULL UNIQUE,
 	configuration_set_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE
 );
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS workflow_transitions (
 	display_order INTEGER DEFAULT 0,
 	source_handle TEXT,  -- Connection point on source status (top, right, bottom, left)
 	target_handle TEXT,  -- Connection point on target status (top, right, bottom, left)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
 	FOREIGN KEY (from_status_id) REFERENCES statuses(id) ON DELETE CASCADE,
 	FOREIGN KEY (to_status_id) REFERENCES statuses(id) ON DELETE CASCADE,

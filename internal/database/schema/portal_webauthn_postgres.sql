@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS portal_webauthn_credentials (
 	flags_user_verified BOOLEAN DEFAULT FALSE,
 	flags_backup_eligible BOOLEAN DEFAULT FALSE,
 	flags_backup_state BOOLEAN DEFAULT FALSE,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_used_at TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_used_at TIMESTAMPTZ,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE
 );
 
@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS portal_webauthn_sessions (
 	challenge TEXT NOT NULL,
 	session_data TEXT NOT NULL,
 	session_type TEXT NOT NULL,
-	expires_at TIMESTAMP NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE
 );
 
@@ -45,4 +45,4 @@ CREATE INDEX IF NOT EXISTS idx_portal_webauthn_sessions_expires    ON portal_web
 CREATE INDEX IF NOT EXISTS idx_portal_webauthn_sessions_type       ON portal_webauthn_sessions(session_type);
 
 -- Banner-dismissal state for the post-magic-link "set up a passkey" prompt.
-ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS dismissed_passkey_prompt_at TIMESTAMP NULL;
+ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS dismissed_passkey_prompt_at TIMESTAMPTZ NULL;

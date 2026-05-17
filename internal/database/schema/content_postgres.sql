@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 	has_thumbnail BOOLEAN DEFAULT false,
 	thumbnail_path TEXT,
 	category TEXT DEFAULT '',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS attachment_settings (
 	allowed_mime_types TEXT, -- JSON array of allowed MIME types
 	attachment_path TEXT NOT NULL,
 	enabled BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Comments System Tables
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS comments (
 	portal_customer_id INTEGER,
 	content TEXT NOT NULL,
 	is_private BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
 	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS item_diagrams (
 	item_id INTEGER NOT NULL,
 	name TEXT NOT NULL,
 	diagram_data TEXT NOT NULL, -- JSON with elements, appState, files
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	created_by INTEGER,
 	updated_by INTEGER,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
@@ -82,8 +82,8 @@ CREATE TABLE IF NOT EXISTS link_types (
 	is_system BOOLEAN DEFAULT false,
 	active BOOLEAN DEFAULT true,
 	allowed_entity_types TEXT DEFAULT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS item_links (
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS item_links (
 	target_id INTEGER NOT NULL,
 	created_by INTEGER,
 	custom_field_id INTEGER REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (link_type_id) REFERENCES link_types(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
 	UNIQUE(link_type_id, source_type, source_id, target_type, target_id)

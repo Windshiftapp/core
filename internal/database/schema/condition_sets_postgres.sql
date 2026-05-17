@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS condition_sets (
 	name TEXT NOT NULL,
 	description TEXT,
 	workflow_id INTEGER NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
 );
 
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS condition_set_transitions (
 	condition_set_id INTEGER NOT NULL,
 	transition_id INTEGER NOT NULL,
 	logic_mode TEXT NOT NULL DEFAULT 'and', -- 'and' or 'or'
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (condition_set_id) REFERENCES condition_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
 	UNIQUE(condition_set_id, transition_id)
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS conditions (
 	display_order INTEGER DEFAULT 0,
 	mode TEXT NOT NULL DEFAULT 'condition', -- 'condition' (hides transition) or 'validator' (blocks with error)
 	error_message TEXT,           -- optional message shown when condition fails (validator mode)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (condition_set_transition_id) REFERENCES condition_set_transitions(id) ON DELETE CASCADE
 );
 

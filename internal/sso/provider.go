@@ -200,6 +200,9 @@ func (s *ProviderStore) queryProviders(query string, args ...interface{}) ([]*SS
 		}
 		providers = append(providers, provider)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return providers, nil
 }
 

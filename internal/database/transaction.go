@@ -17,27 +17,27 @@ func NewSQLiteTx(tx *sql.Tx) Tx {
 }
 
 func (t *SQLiteTx) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return t.tx.Query(query, args...)
+	return t.tx.Query(query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) QueryRow(query string, args ...interface{}) *sql.Row {
-	return t.tx.QueryRow(query, args...)
+	return t.tx.QueryRow(query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return t.tx.Exec(query, args...)
+	return t.tx.Exec(query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return t.tx.QueryContext(ctx, query, args...)
+	return t.tx.QueryContext(ctx, query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	return t.tx.QueryRowContext(ctx, query, args...)
+	return t.tx.QueryRowContext(ctx, query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return t.tx.ExecContext(ctx, query, args...)
+	return t.tx.ExecContext(ctx, query, toUTCArgs(args)...)
 }
 
 func (t *SQLiteTx) Prepare(query string) (*sql.Stmt, error) {

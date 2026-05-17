@@ -35,6 +35,7 @@ internal/handlers/item_links.go|windshift/internal/database
 internal/handlers/item_types.go|windshift/internal/database
 internal/handlers/items.go|windshift/internal/database
 internal/handlers/iterations.go|windshift/internal/database
+internal/handlers/jira_capture_export.go|windshift/internal/database
 internal/handlers/jira_connector.go|windshift/internal/database
 internal/handlers/ldap.go|windshift/internal/database
 internal/handlers/logbook_actions.go|windshift/internal/database

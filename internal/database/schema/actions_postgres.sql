@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS actions (
 	created_by INTEGER,
 	actor_user_id INTEGER,         -- NULL = run as triggering user; set = impersonate (requires action.set_actor)
 	template_key TEXT,             -- Lineage stamp set when the action was created from a template (registry key)
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
 	FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS action_nodes (
 	node_config TEXT NOT NULL,     -- JSON configuration for the node
 	position_x REAL DEFAULT 0,
 	position_y REAL DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE
 );
 
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS action_edges (
 	edge_type TEXT DEFAULT 'default',  -- default, true, false (for conditions)
 	source_handle TEXT,
 	target_handle TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE,
 	FOREIGN KEY (source_node_id) REFERENCES action_nodes(id) ON DELETE CASCADE,
 	FOREIGN KEY (target_node_id) REFERENCES action_nodes(id) ON DELETE CASCADE
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS action_execution_logs (
 	status TEXT NOT NULL,          -- running, completed, failed, skipped
 	trigger_user_id INTEGER,            -- user whose event triggered the action
 	effective_actor_user_id INTEGER,    -- user whose perms governed execution (= actor override or trigger user)
-	started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	completed_at TIMESTAMP,
+	started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	completed_at TIMESTAMPTZ,
 	error_message TEXT,
 	execution_trace TEXT,          -- JSON step log
 	FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE,
@@ -96,8 +96,8 @@ CREATE TABLE IF NOT EXISTS action_capabilities (
 	-- pre-scoping behavior for legacy capabilities.
 	applies_to_all_workspaces BOOLEAN DEFAULT true,
 	created_by INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 

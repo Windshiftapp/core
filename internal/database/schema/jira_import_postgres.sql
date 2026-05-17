@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS jira_import_connections (
     instance_name TEXT,
     deployment_type TEXT DEFAULT 'cloud',
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_used_at TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_jira_connections_created_by ON jira_import_connections(created_by);
@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS jira_import_jobs (
     result_json TEXT,
     error_message TEXT,
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_jira_jobs_connection_id ON jira_import_jobs(connection_id);
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS jira_import_id_mappings (
     jira_key TEXT,
     windshift_id INTEGER NOT NULL,
     metadata_json TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(job_id, entity_type, jira_id)
 );
 
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS jira_import_user_mappings (
     jira_display_name TEXT,
     windshift_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     was_created BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(job_id, jira_account_id)
 );
 

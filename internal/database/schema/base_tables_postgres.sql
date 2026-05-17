@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 	language TEXT DEFAULT 'en',
 	email_verified BOOLEAN DEFAULT true, -- Default true for backwards compatibility
 	email_verification_token TEXT, -- Token for email verification flow
-	email_verification_expires TIMESTAMP, -- Expiry time for verification token
+	email_verification_expires TIMESTAMPTZ, -- Expiry time for verification token
 	scim_external_id TEXT, -- SCIM externalId from identity provider
 	scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
 	is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS users (
 	-- run base_tables before system, and Postgres validates FK target tables
 	-- exist at CREATE TABLE time (unlike SQLite, which is lazy).
 	oauth_client_id INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true),
 	CONSTRAINT users_oauth_provenance_requires_client CHECK (agent_provenance != 'oauth' OR oauth_client_id IS NOT NULL),
 	CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))
@@ -80,8 +80,8 @@ CREATE TABLE IF NOT EXISTS channel_categories (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL DEFAULT '#3b82f6',
 	description TEXT,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- From channels_postgres.sql
@@ -97,9 +97,9 @@ CREATE TABLE IF NOT EXISTS channels (
 	plugin_name TEXT, -- NULL for user-created, plugin name for plugin-managed
 	plugin_webhook_id TEXT, -- Plugin's internal webhook identifier
 	category_id INTEGER REFERENCES channel_categories(id) ON DELETE SET NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_activity TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_activity TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_channels_type ON channels(type);
@@ -118,8 +118,8 @@ CREATE TABLE IF NOT EXISTS customer_organisations (
 	active BOOLEAN DEFAULT true,
 	avatar_url TEXT,
 	custom_field_values JSONB,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS time_project_categories (
@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS time_project_categories (
 	description TEXT,
 	color TEXT DEFAULT '#3B82F6',
 	display_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From core_postgres.sql
@@ -139,8 +139,8 @@ CREATE TABLE IF NOT EXISTS projects (
 	name TEXT NOT NULL,
 	description TEXT,
 	active BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_projects_workspace_id ON projects(workspace_id);
@@ -156,8 +156,8 @@ CREATE TABLE IF NOT EXISTS custom_field_definitions (
 	system_default BOOLEAN DEFAULT false,
 	applies_to_portal_customers BOOLEAN DEFAULT false,
 	applies_to_customer_organisations BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS custom_field_indexes (
@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS custom_field_indexes (
 	custom_field_id INTEGER NOT NULL,
 	target_table TEXT NOT NULL,
 	index_name TEXT NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (custom_field_id) REFERENCES custom_field_definitions(id) ON DELETE CASCADE,
 	UNIQUE(custom_field_id, target_table)
 );
@@ -176,16 +176,16 @@ CREATE TABLE IF NOT EXISTS workflows (
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS screens (
 	id SERIAL PRIMARY KEY,
 	name TEXT NOT NULL,
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(name)
 );
 
@@ -197,8 +197,8 @@ CREATE TABLE IF NOT EXISTS priorities (
 	icon TEXT DEFAULT 'AlertCircle',
 	color TEXT DEFAULT '#3b82f6',
 	sort_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS item_types (
@@ -211,8 +211,8 @@ CREATE TABLE IF NOT EXISTS item_types (
 	color TEXT DEFAULT '#3b82f6',
 	hierarchy_level INTEGER DEFAULT 3,
 	sort_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS hierarchy_levels (
@@ -220,8 +220,8 @@ CREATE TABLE IF NOT EXISTS hierarchy_levels (
 	level INTEGER NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	description TEXT DEFAULT '',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS status_categories (
@@ -231,8 +231,8 @@ CREATE TABLE IF NOT EXISTS status_categories (
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
 	is_completed BOOLEAN NOT NULL DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From milestones_postgres.sql
@@ -241,8 +241,8 @@ CREATE TABLE IF NOT EXISTS milestone_categories (
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From permissions_postgres.sql
@@ -253,8 +253,8 @@ CREATE TABLE IF NOT EXISTS permissions (
 	description TEXT,
 	scope TEXT NOT NULL CHECK (scope IN ('global', 'workspace')),
 	is_system BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- workspace_roles is fully defined in permissions_postgres.sql (which runs
@@ -270,8 +270,8 @@ CREATE TABLE IF NOT EXISTS system_settings (
 	value_type TEXT DEFAULT 'string', -- string, boolean, integer, json
 	description TEXT,
 	category TEXT DEFAULT 'general',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
@@ -287,8 +287,8 @@ CREATE TABLE IF NOT EXISTS themes (
 	nav_text_color_light TEXT NOT NULL DEFAULT '#374151',
 	nav_background_color_dark TEXT NOT NULL DEFAULT '#1f2937',
 	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS board_configurations (
@@ -299,8 +299,8 @@ CREATE TABLE IF NOT EXISTS board_configurations (
 	list_columns TEXT,
 	roadmap_config TEXT,
 	card_fields TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From content_postgres.sql
@@ -310,8 +310,8 @@ CREATE TABLE IF NOT EXISTS attachment_settings (
 	allowed_mime_types TEXT, -- JSON array of allowed MIME types
 	attachment_path TEXT NOT NULL,
 	enabled BOOLEAN DEFAULT true,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS link_types (
@@ -324,8 +324,8 @@ CREATE TABLE IF NOT EXISTS link_types (
 	is_system BOOLEAN DEFAULT false,
 	active BOOLEAN DEFAULT true,
 	allowed_entity_types TEXT DEFAULT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Email templates: per-sender HTML/text/subject Go templates editable from the
@@ -348,8 +348,8 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	template_body TEXT, -- legacy, unused
 	template_variables TEXT, -- legacy, unused
 	channel_type TEXT DEFAULT 'in_app', -- legacy, unused
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From tests_postgres.sql (simplified for base tables - full definition with FKs in tests_postgres.sql)
@@ -360,8 +360,8 @@ CREATE TABLE IF NOT EXISTS test_folders (
 	name TEXT NOT NULL,
 	description TEXT,
 	sort_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_folders_parent_id ON test_folders(parent_id);
@@ -372,8 +372,8 @@ CREATE TABLE IF NOT EXISTS test_labels (
 	name TEXT NOT NULL,
 	color TEXT NOT NULL DEFAULT '#3B82F6',
 	description TEXT DEFAULT '',
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(workspace_id, name)
 );
 
@@ -384,8 +384,8 @@ CREATE TABLE IF NOT EXISTS iteration_types (
 	color TEXT DEFAULT '#6b7280',
 	duration_days INTEGER NOT NULL DEFAULT 14,
 	description TEXT,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- From portal_postgres.sql
@@ -394,7 +394,7 @@ CREATE TABLE IF NOT EXISTS contact_roles (
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	is_system BOOLEAN DEFAULT false,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================

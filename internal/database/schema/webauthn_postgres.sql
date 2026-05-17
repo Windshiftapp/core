@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS webauthn_credentials (
 	flags_user_verified BOOLEAN DEFAULT FALSE,
 	flags_backup_eligible BOOLEAN DEFAULT FALSE, -- Passkey sync capability
 	flags_backup_state BOOLEAN DEFAULT FALSE, -- Currently backed up
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	last_used_at TIMESTAMP,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_used_at TIMESTAMPTZ,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS webauthn_sessions (
 	challenge TEXT NOT NULL, -- Base64 encoded challenge
 	session_data TEXT NOT NULL, -- JSON serialized SessionData from go-webauthn
 	session_type TEXT NOT NULL, -- 'registration' or 'authentication'
-	expires_at TIMESTAMP NOT NULL, -- Challenge expiration
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMPTZ NOT NULL, -- Challenge expiration
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

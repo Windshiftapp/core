@@ -128,6 +128,9 @@ func (cs *CredentialStore) GetCustomerCredentials(portalCustomerID int) ([]webau
 			},
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate credentials: %w", err)
+	}
 	return credentials, nil
 }
 
@@ -207,6 +210,9 @@ func (cs *CredentialStore) GetCustomerCredentialsList(portalCustomerID int) ([]C
 			c.LastUsedAt = &s
 		}
 		credentials = append(credentials, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate credentials: %w", err)
 	}
 	return credentials, nil
 }
