@@ -58,24 +58,28 @@ func (c *dataCenterClient) setHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json")
 }
 
-// handleErrorResponse handles non-2xx responses
+// handleErrorResponse handles non-2xx responses. Jira's response body is
+// preserved on every branch — see the matching comment in client.go for why
+// (DC's own auth quirks are even more varied: PAT vs Basic, reverse proxies
+// stripping headers, captcha lockouts).
 func (c *dataCenterClient) handleErrorResponse(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
+	snippet := truncateBody(body)
 
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
-		return ErrInvalidCredentials
+		return fmt.Errorf("%w (jira said: %s)", ErrInvalidCredentials, snippet)
 	case http.StatusForbidden:
 		if strings.Contains(string(body), "rate limit") {
 			return ErrRateLimited
 		}
-		return ErrForbidden
+		return fmt.Errorf("%w (jira said: %s)", ErrForbidden, snippet)
 	case http.StatusNotFound:
-		return ErrNotFound
+		return fmt.Errorf("%w (jira said: %s)", ErrNotFound, snippet)
 	case http.StatusTooManyRequests:
 		return ErrRateLimited
 	default:
-		return fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(body))
+		return fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, snippet)
 	}
 }
 

@@ -72,7 +72,21 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	instanceInfo, err := client.TestConnection(ctx)
 	if err != nil {
-		respondUnauthorized(w, r)
+		// Map upstream Jira failures (bad credentials, unreachable host, wrong URL)
+		// to 400 — never 401. A Windshift 401 here would trigger the frontend's
+		// session-expired interceptor and log the user out for a third-party error.
+		//
+		// Log the upstream message at warn so operators can see *why* Jira rejected
+		// the request (deprecated Basic auth, SSO required, email/token mismatch).
+		// instance_url + email + deployment go to the log; the API token never does.
+		slog.Warn("Jira connection test failed",
+			slog.String("component", "jira"),
+			slog.String("instance_url", req.InstanceURL),
+			slog.String("email", req.Email),
+			slog.String("deployment", string(deploymentType)),
+			slog.Any("error", err),
+		)
+		respondBadRequest(w, r, fmt.Sprintf("Jira connection test failed: %v", err))
 		return
 	}
 

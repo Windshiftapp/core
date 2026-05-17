@@ -184,26 +184,45 @@ func (c *cloudClient) setHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json")
 }
 
-// handleErrorResponse handles non-2xx responses
+// handleErrorResponse handles non-2xx responses. Jira's response body is
+// preserved on every branch — operators debugging "my token should work"
+// need the upstream message (deprecated auth scheme, SSO required, account
+// locked, etc.) rather than a bare sentinel error.
 func (c *cloudClient) handleErrorResponse(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
+	snippet := truncateBody(body)
 
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
-		return ErrInvalidCredentials
+		return fmt.Errorf("%w (jira said: %s)", ErrInvalidCredentials, snippet)
 	case http.StatusForbidden:
 		// Check for rate limiting
 		if strings.Contains(string(body), "rate limit") {
 			return ErrRateLimited
 		}
-		return ErrForbidden
+		return fmt.Errorf("%w (jira said: %s)", ErrForbidden, snippet)
 	case http.StatusNotFound:
-		return ErrNotFound
+		return fmt.Errorf("%w (jira said: %s)", ErrNotFound, snippet)
 	case http.StatusTooManyRequests:
 		return ErrRateLimited
 	default:
-		return fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(body))
+		return fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, snippet)
 	}
+}
+
+// truncateBody trims a Jira response body to a length safe for inclusion in
+// error strings and logs. Jira HTML error pages can be huge; the first ~512
+// bytes contain the diagnostic message in every case we've seen.
+func truncateBody(b []byte) string {
+	const maxLen = 512
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return "(empty response body)"
+	}
+	if len(s) > maxLen {
+		return s[:maxLen] + "…(truncated)"
+	}
+	return s
 }
 
 // ================================================================
