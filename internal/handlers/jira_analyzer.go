@@ -1,24 +1,38 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
+	"sync"
 
 	"windshift/internal/jira"
 	"windshift/internal/repository"
 )
 
+// projectCountConcurrency caps parallel Jira count requests. Picked to stay
+// well under the Jira client's default 10 req/s ceiling while still being
+// markedly faster than the previous fully-serial loop.
+const projectCountConcurrency = 6
+
 // GetProjects handles GET /api/admin/jira-import/projects?connection_id={id}&open_issues_only=true
+// GetProjects returns the metadata for every project on the connection. Issue
+// counts are intentionally NOT fetched by default — they used to cost one
+// serial Jira request per project, which dominated wizard latency on large
+// instances (500 projects ≈ 50s at the 10 req/s client cap). Callers that
+// want counts can pass ?include_counts=true (kept for parity with old
+// behavior) or, preferred, call POST /admin/jira-import/projects/counts to
+// batch counts in parallel for just the visible/selected keys.
 func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 	connectionID := r.URL.Query().Get("connection_id")
 	if connectionID == "" {
 		respondValidationError(w, r, "connection_id is required")
 		return
 	}
-
-	// Check if we should only count open issues
+	includeCounts := r.URL.Query().Get("include_counts") == "true"
 	openIssuesOnly := r.URL.Query().Get("open_issues_only") == "true"
 
 	client, err := h.getClientForConnection(r.Context(), connectionID)
@@ -33,35 +47,127 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get issue counts for each project (in parallel would be better, but keeping it simple)
 	projectInfos := make([]JiraProjectInfo, len(projects))
 	for i, p := range projects {
-		count, err := client.GetIssueCount(r.Context(), p.Key, openIssuesOnly)
-		if err != nil {
-			slog.Warn("Failed to get issue count for project", slog.String("component", "jira"), slog.String("project", p.Key), slog.Any("error", err))
-			// Continue with 0 count on error
-		}
-
 		avatarURL := ""
 		if p.AvatarURLs != nil {
 			if url, ok := p.AvatarURLs["48x48"]; ok {
 				avatarURL = url
 			}
 		}
-
 		projectInfos[i] = JiraProjectInfo{
 			Key:           p.Key,
 			ID:            p.ID,
 			Name:          p.Name,
 			Description:   p.Description,
 			ProjectType:   p.ProjectType,
-			IssueCount:    count,
 			AvatarURL:     avatarURL,
 			IsTeamManaged: p.Simplified || p.Style == "next-gen",
 		}
 	}
 
+	if includeCounts {
+		keys := make([]string, len(projects))
+		for i, p := range projects {
+			keys[i] = p.Key
+		}
+		counts := fetchProjectCounts(r.Context(), client, keys, openIssuesOnly)
+		for i := range projectInfos {
+			if c, ok := counts[projectInfos[i].Key]; ok {
+				v := c
+				projectInfos[i].IssueCount = &v
+			}
+		}
+	}
+
 	respondJSONOK(w, projectInfos)
+}
+
+// GetProjectCountsRequest is the body for POST /admin/jira-import/projects/counts.
+type GetProjectCountsRequest struct {
+	ConnectionID   string   `json:"connection_id"`
+	Keys           []string `json:"keys"`
+	OpenIssuesOnly bool     `json:"open_issues_only"`
+}
+
+// GetProjectCounts handles POST /admin/jira-import/projects/counts and
+// returns {key: count} for the requested project keys, fetched with bounded
+// concurrency. Errors per project are logged and silently omitted from the
+// response — the frontend treats a missing key as "unknown" and the UI can
+// retry visible projects.
+func (h *JiraImportHandler) GetProjectCounts(w http.ResponseWriter, r *http.Request) {
+	req, ok := decodeJSON[GetProjectCountsRequest](w, r)
+	if !ok {
+		return
+	}
+	if req.ConnectionID == "" {
+		respondValidationError(w, r, "connection_id is required")
+		return
+	}
+	keys := dedupeNonEmpty(req.Keys)
+	if len(keys) == 0 {
+		respondJSONOK(w, map[string]int{})
+		return
+	}
+
+	client, err := h.getClientForConnection(r.Context(), req.ConnectionID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	counts := fetchProjectCounts(r.Context(), client, keys, req.OpenIssuesOnly)
+	respondJSONOK(w, counts)
+}
+
+// fetchProjectCounts fans out GetIssueCount calls with bounded concurrency
+// and returns a {key: count} map. Failed lookups are logged and omitted.
+func fetchProjectCounts(ctx context.Context, client jira.Client, keys []string, openIssuesOnly bool) map[string]int {
+	counts := make(map[string]int, len(keys))
+	if len(keys) == 0 {
+		return counts
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, projectCountConcurrency)
+
+	for _, k := range keys {
+		k := k
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			count, err := client.GetIssueCount(ctx, k, openIssuesOnly)
+			if err != nil {
+				slog.Warn("Failed to get issue count for project",
+					slog.String("component", "jira"), slog.String("project", k), slog.Any("error", err))
+				return
+			}
+			mu.Lock()
+			counts[k] = count
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return counts
+}
+
+func dedupeNonEmpty(in []string) []string {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 // Analyze handles POST /api/admin/jira-import/analyze

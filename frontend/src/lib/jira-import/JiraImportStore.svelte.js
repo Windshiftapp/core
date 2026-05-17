@@ -37,6 +37,7 @@ let projectsState = $state({
   selected: [],
   openIssuesOnly: false,
   isLoading: false,
+  isLoadingCounts: false,
   error: null,
 });
 
@@ -196,7 +197,9 @@ export const jiraImport = {
     connectionState.deploymentType = type;
   },
 
-  // Project methods
+  // Project methods. loadProjects returns the lightweight metadata list
+  // immediately (no counts) and kicks off the count fetch in the background;
+  // toggling openIssuesOnly only re-fires counts, not the full project list.
   async loadProjects() {
     if (!connectionState.connectionId) return;
 
@@ -204,21 +207,50 @@ export const jiraImport = {
     projectsState.error = null;
 
     try {
-      const projects = await api.jiraImport.getProjects(
-        connectionState.connectionId,
-        projectsState.openIssuesOnly
-      );
+      const projects = await api.jiraImport.getProjects(connectionState.connectionId);
       projectsState.available = projects;
     } catch (err) {
       projectsState.error = err.message || 'Failed to load projects';
     } finally {
       projectsState.isLoading = false;
     }
+
+    // Fire-and-forget: counts populate cards after the wizard has already moved on.
+    this.loadProjectCounts();
   },
 
-  // Reload projects with the current filter (called when toggle changes)
+  async loadProjectCounts() {
+    if (!connectionState.connectionId) return;
+    const keys = projectsState.available.map((p) => p.key);
+    if (keys.length === 0) return;
+
+    // Capture the request token so a stale openIssuesOnly toggle can't
+    // overwrite newer state when its slower response finally lands.
+    const requestedOpenOnly = projectsState.openIssuesOnly;
+    projectsState.isLoadingCounts = true;
+    try {
+      const counts = await api.jiraImport.getProjectCounts(
+        connectionState.connectionId,
+        keys,
+        requestedOpenOnly
+      );
+      if (requestedOpenOnly !== projectsState.openIssuesOnly) return; // stale
+      projectsState.available = projectsState.available.map((p) => ({
+        ...p,
+        issue_count: counts[p.key] ?? null,
+      }));
+    } catch (err) {
+      // Non-fatal: cards still render without counts.
+      console.warn('Failed to load Jira project counts:', err);
+    } finally {
+      projectsState.isLoadingCounts = false;
+    }
+  },
+
+  // Re-fetch counts only — the project list itself doesn't change when the
+  // open-issues filter toggles.
   async reloadProjectsWithFilter() {
-    await this.loadProjects();
+    await this.loadProjectCounts();
   },
 
   // Toggle open issues only filter
@@ -528,6 +560,7 @@ export const jiraImport = {
       selected: [],
       openIssuesOnly: false,
       isLoading: false,
+      isLoadingCounts: false,
       error: null,
     };
 

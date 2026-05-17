@@ -24,14 +24,17 @@ type JiraConnectResponse struct {
 	InstanceInfo *jira.JiraInstanceInfo `json:"instance_info"`
 }
 
-// JiraProjectInfo contains information about a Jira project for display
+// JiraProjectInfo contains information about a Jira project for display.
+// IssueCount is a pointer so the JSON omits it when the caller hasn't asked
+// for counts — distinguishes "not loaded yet" from "zero issues" on the
+// frontend, which uses two separate calls to keep the project list responsive.
 type JiraProjectInfo struct {
 	Key           string `json:"key"`
 	ID            string `json:"id"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	ProjectType   string `json:"project_type"`
-	IssueCount    int    `json:"issue_count"`
+	IssueCount    *int   `json:"issue_count,omitempty"`
 	AvatarURL     string `json:"avatar_url,omitempty"`
 	IsTeamManaged bool   `json:"is_team_managed"` // True for next-gen/team-managed projects
 }

@@ -513,7 +513,9 @@
                           {project.key}
                         </span>
                         <span class="text-xs" style="color: var(--ds-text-subtle);">
-                          {t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
+                          {project.issue_count == null
+                            ? '…'
+                            : t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
                         </span>
                       </div>
                     </div>
@@ -866,7 +868,9 @@
                   </span>
                 </div>
                 <span class="text-sm" style="color: var(--ds-text-subtle);">
-                  {t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
+                  {project.issue_count == null
+                    ? '…'
+                    : t('jiraImport.projects.issues', { count: project.issue_count.toLocaleString() })}
                 </span>
               </div>
             {/each}

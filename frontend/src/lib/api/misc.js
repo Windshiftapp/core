@@ -237,11 +237,21 @@ export const jiraImport = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  // Get available Jira projects
-  getProjects: (connectionId, openIssuesOnly = false) =>
-    fetchAPI(
-      `/admin/jira-import/projects?connection_id=${connectionId}&open_issues_only=${openIssuesOnly}`
-    ),
+  // Get available Jira projects. Counts are NOT fetched here by default —
+  // use getProjectCounts() to batch counts for visible/selected projects so
+  // the wizard advances immediately on large instances.
+  getProjects: (connectionId) =>
+    fetchAPI(`/admin/jira-import/projects?connection_id=${connectionId}`),
+  // Batch fetch issue counts for a list of project keys.
+  getProjectCounts: (connectionId, keys, openIssuesOnly = false) =>
+    fetchAPI('/admin/jira-import/projects/counts', {
+      method: 'POST',
+      body: JSON.stringify({
+        connection_id: connectionId,
+        keys,
+        open_issues_only: openIssuesOnly,
+      }),
+    }),
   // Analyze selected projects
   analyzeProjects: (connectionId, projectKeys, openIssuesOnly = false) =>
     fetchAPI('/admin/jira-import/analyze', {
