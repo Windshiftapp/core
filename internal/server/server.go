@@ -79,6 +79,7 @@ type Server struct {
 	issueSyncStopChan         chan struct{}
 	magicLinkStopChan         chan struct{}
 	cleanupStopChan           chan struct{}
+	jiraHostStopChan          chan struct{}
 	cleanupTicker             *time.Ticker
 	pluginManager             *plugins.Manager
 
@@ -114,6 +115,7 @@ func New(cfg Config) (*Server, error) {
 		issueSyncStopChan: make(chan struct{}),
 		magicLinkStopChan: make(chan struct{}),
 		cleanupStopChan:   make(chan struct{}),
+		jiraHostStopChan:  make(chan struct{}),
 	}
 
 	if err := s.initialize(); err != nil {
@@ -1246,8 +1248,13 @@ func (s *Server) initialize() error {
 		}
 	}
 
+	// Maintain a small in-memory list of configured Jira instance origins so the
+	// CSP `img-src` directive allows project avatars served from each tenant.
+	jiraHosts := NewJiraHostAllowlist(s.db, 60*time.Second)
+	go jiraHosts.Start(s.jiraHostStopChan)
+
 	// Apply middleware (recovery is outermost to catch all panics)
-	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs)
+	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs, jiraHosts.Allowed)
 	compressionMiddleware := middleware.CreateCompressionMiddleware(cfg.UseProxy)
 	handler := middleware.Recovery(compressionMiddleware(securityMiddleware(mux)))
 
@@ -1361,6 +1368,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	safeClose(s.cleanupStopChan)
 	s.cleanupStopChan = nil
+
+	safeClose(s.jiraHostStopChan)
+	s.jiraHostStopChan = nil
 
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")

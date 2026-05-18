@@ -193,7 +193,7 @@ func isDefaultPort(scheme, port string) bool {
 	return (scheme == "https" && port == "443") || (scheme == "http" && port == "80")
 }
 
-func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.IP) func(http.Handler) http.Handler {
+func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.IP, jiraOrigins func() []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-XSS-Protection", "1; mode=block")
@@ -224,10 +224,17 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 			ctx := context.WithValue(r.Context(), contextKeyCSPNonce, nonce)
 			r = r.WithContext(ctx)
 
+			imgSrc := "'self' data: blob: https://images.unsplash.com"
+			if jiraOrigins != nil {
+				for _, origin := range jiraOrigins() {
+					imgSrc += " " + origin
+				}
+			}
+
 			csp := "default-src 'self'; " +
 				"script-src 'self' 'nonce-" + nonce + "'; " +
 				"style-src 'self' 'unsafe-inline'; " +
-				"img-src 'self' data: blob: https://images.unsplash.com; " +
+				"img-src " + imgSrc + "; " +
 				"font-src 'self'; " +
 				"connect-src 'self'; " +
 				"media-src 'self'; " +
