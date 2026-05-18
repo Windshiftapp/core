@@ -343,17 +343,52 @@ func SaveAIFeaturesConfig(db database.Database, cfg models.AIFeaturesConfig) err
 
 // ResolveForFeature resolves an LLM client respecting per-feature configuration.
 func (m *ConnectionManager) ResolveForFeature(featureKey string) (Client, error) {
+	return m.ResolveForFeatureWithOverride(featureKey, 0)
+}
+
+// ResolveForFeatureWithOverride resolves an LLM client respecting per-feature
+// admin configuration, optionally honoring a user-supplied connection override.
+//
+// Policy:
+//   - Mode == Disabled → returns ErrFeatureDisabled regardless of override.
+//   - Mode == Specific → ignores override, returns the pinned connection.
+//     This is the security-critical case: a user who supplies a different
+//     connection_id MUST NOT be able to escape the admin's pin.
+//   - Mode == Default (or no entry) → uses override if > 0, else the default
+//     enabled connection.
+func (m *ConnectionManager) ResolveForFeatureWithOverride(featureKey string, userOverrideConnectionID int) (Client, error) {
 	cfg, err := LoadAIFeaturesConfig(m.db)
 	if err != nil {
 		return nil, err
 	}
-	fc, ok := cfg[featureKey]
-	if !ok || fc.Mode == models.AIFeatureModeDefault {
-		return m.Resolve(0)
-	}
-	if fc.Mode == models.AIFeatureModeDisabled {
+	decision := decideFeatureResolution(cfg[featureKey], userOverrideConnectionID)
+	if decision.disabled {
 		return nil, ErrFeatureDisabled
 	}
-	// specific
-	return m.Resolve(fc.ConnectionID)
+	return m.Resolve(decision.connectionID)
+}
+
+// featureResolution is the outcome of applying the feature policy: either the
+// feature is disabled, or we know which connection_id to pass to Resolve.
+type featureResolution struct {
+	disabled     bool
+	connectionID int // 0 means "use the default enabled connection"
+}
+
+// decideFeatureResolution is the pure policy function. Extracted so the rules
+// can be unit-tested without spinning up a database or a manager.
+func decideFeatureResolution(fc models.AIFeatureConfig, userOverrideConnectionID int) featureResolution {
+	switch fc.Mode {
+	case models.AIFeatureModeDisabled:
+		return featureResolution{disabled: true}
+	case models.AIFeatureModeSpecific:
+		// Admin pinned this feature to a specific connection — ignore the
+		// caller's override so it cannot escape the pin.
+		return featureResolution{connectionID: fc.ConnectionID}
+	default: // AIFeatureModeDefault (or unrecognized — treat as default)
+		if userOverrideConnectionID > 0 {
+			return featureResolution{connectionID: userOverrideConnectionID}
+		}
+		return featureResolution{connectionID: 0}
+	}
 }

@@ -37,13 +37,12 @@ func requireLLMClient(w http.ResponseWriter, r *http.Request, manager *llm.Conne
 }
 
 // requireLLMClientForFeature resolves an LLM client respecting per-feature admin
-// configuration. If the user provides an explicit connection override (> 0) it
-// takes precedence, preserving the Chat UI's connection selector.
+// configuration. The user-supplied override (Chat UI's connection selector) is
+// only honored when the feature is in default mode — a feature that's pinned
+// to a specific connection or fully disabled cannot be bypassed by sending a
+// different connection_id.
 func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager *llm.ConnectionManager, featureKey string, userOverrideConnectionID int) llm.Client {
-	if userOverrideConnectionID > 0 {
-		return requireLLMClient(w, r, manager, userOverrideConnectionID)
-	}
-	client, err := manager.ResolveForFeature(featureKey)
+	client, err := manager.ResolveForFeatureWithOverride(featureKey, userOverrideConnectionID)
 	if err != nil {
 		if errors.Is(err, llm.ErrFeatureDisabled) {
 			restapi.RespondErrorWithMessage(w, r, http.StatusForbidden, "feature_disabled", err.Error())
