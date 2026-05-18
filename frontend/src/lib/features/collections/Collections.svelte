@@ -98,7 +98,7 @@
       if (!collection) return;
       currentCollection = collection;
       slugSaved = !!(collection.is_public && collection.public_slug);
-      hydrateFromCollection(collection);
+      await hydrateFromCollection(collection);
       await store.executeSearch({ page: 1, limit: itemsPerPage });
 
       const url = new URL(window.location.href);
@@ -109,7 +109,7 @@
     }
   }
 
-  function hydrateFromCollection(collection) {
+  async function hydrateFromCollection(collection) {
     const storedQl = collection.ql_query || '';
     const filterState = parseFilterState(collection.filter_state);
 
@@ -122,8 +122,12 @@
         dynamicFields: Array.isArray(filterState.dynamicFields) ? filterState.dynamicFields : [],
       });
     } else if (storedQl.trim()) {
-      // Legacy collection with QL but no persisted builder state → raw mode.
-      store.hydrate({ rawQl: storedQl });
+      // Legacy collection with QL but no persisted builder state. Try to
+      // recover into builder fields first (WI-6); tryHydrateFromQl falls back
+      // to raw mode internally when the parser would drop clauses, so the
+      // user never loses content.
+      store.hydrate({});
+      await store.tryHydrateFromQl(storedQl);
     } else {
       store.hydrate({});
     }

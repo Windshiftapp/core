@@ -222,7 +222,9 @@ export function createWorkItemSearchStore() {
     qlError.set(null);
   }
 
-  async function resetToBuilder() {
+  // Parse a CQL string and apply the resulting builder state. Returns the
+  // raw parser result so callers can branch on `dropped` / null.
+  async function parseQlAndApplyBuilderState(qlString) {
     let customFieldsCatalog = [];
     try {
       const cf = await api.customFields.getAll();
@@ -235,7 +237,7 @@ export function createWorkItemSearchStore() {
       console.warn('Failed to load custom fields for builder recovery:', err);
     }
 
-    const parsed = QLBuilder.tryParseToBuilder(get(rawQlQuery), {
+    const parsed = QLBuilder.tryParseToBuilder(qlString, {
       customFields: customFieldsCatalog,
     });
 
@@ -250,13 +252,39 @@ export function createWorkItemSearchStore() {
     searchQuery.set(parsed ? parsed.search : '');
     dynamicFilters.set(parsed ? parsed.dynamicFields : []);
 
-    if (parsed?.dropped) {
-      warningToast(t('collections.builderRecoveryDropped'));
-    }
-
     rawQlQuery.set('');
     rawMode.set(false);
     qlError.set(null);
+
+    return parsed;
+  }
+
+  async function resetToBuilder() {
+    const parsed = await parseQlAndApplyBuilderState(get(rawQlQuery));
+    if (parsed?.dropped) {
+      warningToast(t('collections.builderRecoveryDropped'));
+    }
+  }
+
+  // Try to hydrate builder state from a stored QL (no toast, no confirm).
+  // Returns true when the QL was fully recovered into builder fields; the
+  // caller should fall back to raw mode otherwise so dropped clauses aren't
+  // silently lost.
+  async function tryHydrateFromQl(qlString) {
+    if (!qlString?.trim()) return false;
+    const parsed = await parseQlAndApplyBuilderState(qlString);
+    if (!parsed || parsed.dropped) {
+      // Restore raw mode with the original QL so nothing is lost.
+      selectedWorkspaces.set([]);
+      selectedStatuses.set([]);
+      selectedPriorities.set([]);
+      searchQuery.set('');
+      dynamicFilters.set([]);
+      rawQlQuery.set(qlString);
+      rawMode.set(true);
+      return false;
+    }
+    return true;
   }
 
   // ===== URL round-trip =====
@@ -393,6 +421,7 @@ export function createWorkItemSearchStore() {
     setQlError: (msg) => qlError.set(msg),
     enterRawMode,
     resetToBuilder,
+    tryHydrateFromQl,
 
     // ===== Hydration helpers (used by Collections.svelte to load a saved collection) =====
     hydrate({
