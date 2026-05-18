@@ -102,33 +102,22 @@ func (c *dataCenterClient) doJSON(ctx context.Context, method, reqURL string, bo
 // Connection Methods
 // ================================================================
 
-// TestConnection tests if the credentials are valid
+// TestConnection tests if the credentials are valid.
+//
+// See the matching comment in client.go: probe /serverInfo first so a
+// scope-limited PAT (which may not have read:me but still has read:project
+// and friends) is accepted, and treat /myself as best-effort enrichment for
+// the display name only.
 func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) {
-	// Use /myself endpoint to verify credentials
-	resp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
+	serverResp, err := c.do(ctx, "GET", c.baseURL+"/serverInfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
-	var user JiraUser
-	if err = json.NewDecoder(resp.Body).Decode(&user); err != nil { //nolint:gocritic // intentionally reusing err to avoid shadowing
-		return nil, err
-	}
-
-	// Get server info for additional details
-	serverResp, err := c.do(ctx, "GET", c.baseURL+"/serverInfo", nil)
-	if err != nil {
-		return &JiraInstanceInfo{
-			DisplayName: user.DisplayName,
-			URL:         c.baseURL,
-		}, nil
-	}
 	defer func() { _ = serverResp.Body.Close() }()
+
+	if serverResp.StatusCode != http.StatusOK {
+		return nil, c.handleErrorResponse(serverResp)
+	}
 
 	var serverInfo struct {
 		BaseURL        string `json:"baseUrl"`
@@ -137,16 +126,31 @@ func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInf
 		ServerTitle    string `json:"serverTitle"`
 	}
 	if err := json.NewDecoder(serverResp.Body).Decode(&serverInfo); err != nil {
-		return &JiraInstanceInfo{
-			DisplayName: user.DisplayName,
-			URL:         c.baseURL,
-		}, nil
+		return nil, fmt.Errorf("decode serverInfo: %w", err)
 	}
 
-	return &JiraInstanceInfo{
+	info := &JiraInstanceInfo{
 		DisplayName: serverInfo.ServerTitle,
 		URL:         serverInfo.BaseURL,
-	}, nil
+	}
+	if info.URL == "" {
+		info.URL = c.baseURL
+	}
+
+	if userResp, userErr := c.do(ctx, "GET", c.baseURL+"/myself", nil); userErr == nil {
+		defer func() { _ = userResp.Body.Close() }()
+		if userResp.StatusCode == http.StatusOK {
+			var user JiraUser
+			if decodeErr := json.NewDecoder(userResp.Body).Decode(&user); decodeErr == nil && user.DisplayName != "" {
+				info.DisplayName = user.DisplayName
+			}
+		}
+	}
+
+	if info.DisplayName == "" {
+		info.DisplayName = info.URL
+	}
+	return info, nil
 }
 
 // ================================================================

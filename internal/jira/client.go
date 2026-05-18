@@ -229,34 +229,25 @@ func truncateBody(b []byte) string {
 // Connection Methods
 // ================================================================
 
-// TestConnection tests if the credentials are valid
+// TestConnection tests if the credentials are valid.
+//
+// Probe order is deliberate: /serverInfo first, /myself second. Atlassian's
+// scoped API tokens (rolled out 2024) can grant read access to projects /
+// fields / issues without granting read:me, so /myself returns 401 even
+// though the token is perfectly usable for the importer. Probing with
+// /serverInfo confirms credentials reach the instance without depending on
+// the account-identity scope. /myself is then a best-effort enrichment for
+// the human-readable connection label — failure is logged and ignored.
 func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) {
-	// Use /myself endpoint to verify credentials
-	resp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
+	serverResp, err := c.do(ctx, "GET", c.baseURL+"/serverInfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
-	var user JiraUser
-	if err = json.NewDecoder(resp.Body).Decode(&user); err != nil { //nolint:gocritic // intentionally reusing err to avoid shadowing
-		return nil, err
-	}
-
-	// Get server info for additional details
-	serverResp, err := c.do(ctx, "GET", c.baseURL+"/serverInfo", nil)
-	if err != nil {
-		// If we can't get server info, just return basic info
-		return &JiraInstanceInfo{
-			DisplayName: user.DisplayName,
-			URL:         c.baseURL,
-		}, nil
-	}
 	defer func() { _ = serverResp.Body.Close() }()
+
+	if serverResp.StatusCode != http.StatusOK {
+		return nil, c.handleErrorResponse(serverResp)
+	}
 
 	var serverInfo struct {
 		BaseURL        string `json:"baseUrl"`
@@ -265,16 +256,34 @@ func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, er
 		ServerTitle    string `json:"serverTitle"`
 	}
 	if err := json.NewDecoder(serverResp.Body).Decode(&serverInfo); err != nil {
-		return &JiraInstanceInfo{
-			DisplayName: user.DisplayName,
-			URL:         c.baseURL,
-		}, nil
+		return nil, fmt.Errorf("decode serverInfo: %w", err)
 	}
 
-	return &JiraInstanceInfo{
+	info := &JiraInstanceInfo{
 		DisplayName: serverInfo.ServerTitle,
 		URL:         serverInfo.BaseURL,
-	}, nil
+	}
+	if info.URL == "" {
+		info.URL = c.baseURL
+	}
+
+	// Best-effort: enrich DisplayName with the authenticating user's name.
+	// 401 here is expected for scoped tokens without read:me — do not fail
+	// the whole TestConnection over it.
+	if userResp, userErr := c.do(ctx, "GET", c.baseURL+"/myself", nil); userErr == nil {
+		defer func() { _ = userResp.Body.Close() }()
+		if userResp.StatusCode == http.StatusOK {
+			var user JiraUser
+			if decodeErr := json.NewDecoder(userResp.Body).Decode(&user); decodeErr == nil && user.DisplayName != "" {
+				info.DisplayName = user.DisplayName
+			}
+		}
+	}
+
+	if info.DisplayName == "" {
+		info.DisplayName = info.URL
+	}
+	return info, nil
 }
 
 // ================================================================
