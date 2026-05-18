@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -140,10 +141,15 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 				Result:    result,
 			})
 
-			// Append tool result message
+			// Append tool result message, wrapping the result in a
+			// trust-marked envelope. Tool output frequently echoes
+			// user-controlled data (item titles/comments, HTTP bodies, …) and
+			// has been a vector for indirect prompt injection — the envelope
+			// pairs with system-prompt guidance telling the model to treat
+			// everything inside as data, not instructions.
 			messages = append(messages, Message{
 				Role:       "tool",
-				Content:    result,
+				Content:    wrapUntrustedToolResult(tc.Function.Name, result),
 				ToolCallID: tc.ID,
 				Name:       tc.Function.Name,
 			})
@@ -167,6 +173,23 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 		StopReason: StopReasonMaxIterations,
 		Usage:      totalUsage,
 	}, nil
+}
+
+// wrapUntrustedToolResult fences tool output in a delimiter the system prompt
+// teaches the model to recognize as untrusted-data, not instructions. The
+// envelope is defense-in-depth, not a parser-level guarantee: the model
+// might still be tricked by sufficiently aggressive injection inside the
+// payload, but pairing the fence with the system-prompt rule forces the
+// attacker through both layers instead of just a single missing rule.
+//
+// Inner occurrences of the close tag are neutralized by zero-width-inserting
+// a slash so the envelope can't be balanced from inside.
+func wrapUntrustedToolResult(toolName, payload string) string {
+	const closer = "</tool_result>"
+	if strings.Contains(payload, closer) {
+		payload = strings.ReplaceAll(payload, closer, "<\\/tool_result>")
+	}
+	return fmt.Sprintf(`<tool_result name=%q trust="untrusted">%s</tool_result>`, toolName, payload)
 }
 
 // toolReturnedError is a best-effort check for the "soft error" convention
