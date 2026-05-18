@@ -21,6 +21,7 @@ import (
 type ActionsHandler struct {
 	db                database.Database
 	repo              *repository.ActionRepository
+	credentialRepo    *repository.ActionCredentialRepository
 	actionService     *services.ActionService
 	permissionService *services.PermissionService
 	keyCache          *WorkspaceKeyCache
@@ -31,6 +32,7 @@ func NewActionsHandler(db database.Database, actionService *services.ActionServi
 	return &ActionsHandler{
 		db:                db,
 		repo:              repository.NewActionRepository(db),
+		credentialRepo:    repository.NewActionCredentialRepository(db),
 		actionService:     actionService,
 		permissionService: permissionService,
 		keyCache:          keyCache,
@@ -668,7 +670,7 @@ func (h *ActionsHandler) isEnabledLLMConnection(connectionID int) bool {
 	return h.repo.IsEnabledLLMConnection(connectionID)
 }
 
-func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http.Request, capType models.CapabilityType, configStr string) bool {
+func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http.Request, capType models.CapabilityType, configStr string, appliesToAllWorkspaces bool, capabilityWorkspaceIDs []int) bool {
 	switch capType {
 	case models.CapabilityDockerEnvironment:
 		var config models.DockerEnvironmentConfig
@@ -705,6 +707,18 @@ func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http
 				return false
 			}
 		}
+		// default_headers must hold non-sensitive literals only. Auth tokens
+		// live in the credential store; an inline Authorization header here
+		// would be readable by anyone who can list workspace capabilities.
+		for header := range config.DefaultHeaders {
+			if models.IsSensitiveHeaderName(header) {
+				respondValidationError(w, r, fmt.Sprintf("Header %q is sensitive — use auth/secret_header_refs to reference a credential instead of placing it in default_headers", header))
+				return false
+			}
+		}
+		if !h.validateHTTPAuthRefs(w, r, &config, appliesToAllWorkspaces, capabilityWorkspaceIDs) {
+			return false
+		}
 	case models.CapabilityLLMConnection:
 		var config models.LLMConnectionCapabilityConfig
 		if err := json.Unmarshal([]byte(configStr), &config); err != nil {
@@ -717,6 +731,89 @@ func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http
 		}
 		if !h.isEnabledLLMConnection(config.ConnectionID) {
 			respondValidationError(w, r, fmt.Sprintf("LLM connection %d does not exist or is disabled", config.ConnectionID))
+			return false
+		}
+	}
+	return true
+}
+
+// validateHTTPAuthRefs ensures the credentials referenced by Auth /
+// SecretHeaderRefs exist and are in-scope for the capability:
+//   - a global capability (appliesToAllWorkspaces=true) may reference global
+//     credentials only;
+//   - a workspace-scoped capability may reference globals OR credentials
+//     scoped to one of the capability's workspaces.
+//
+// The header names used by Auth/SecretHeaderRefs must themselves be marked as
+// sensitive — i.e. you don't quietly hide a credential reference inside a
+// header that wouldn't otherwise be policed.
+func (h *ActionsHandler) validateHTTPAuthRefs(w http.ResponseWriter, r *http.Request, config *models.HTTPClientConfig, appliesToAllWorkspaces bool, capabilityWorkspaceIDs []int) bool {
+	checkCredScope := func(credentialID int, where string) bool {
+		cred, err := h.credentialRepo.GetActionCredentialByID(credentialID)
+		if err != nil {
+			respondValidationError(w, r, fmt.Sprintf("%s references credential %d which does not exist", where, credentialID))
+			return false
+		}
+		if !cred.IsEnabled {
+			respondValidationError(w, r, fmt.Sprintf("%s references credential %d which is disabled", where, credentialID))
+			return false
+		}
+		if appliesToAllWorkspaces {
+			if cred.WorkspaceID != nil {
+				respondValidationError(w, r, fmt.Sprintf("%s references workspace-scoped credential %d, but the capability applies to all workspaces — use a global credential", where, credentialID))
+				return false
+			}
+			return true
+		}
+		// Workspace-scoped capability: global creds OR a cred scoped to one of
+		// the listed workspaces are allowed.
+		if cred.WorkspaceID == nil {
+			return true
+		}
+		for _, ws := range capabilityWorkspaceIDs {
+			if ws == *cred.WorkspaceID {
+				return true
+			}
+		}
+		respondValidationError(w, r, fmt.Sprintf("%s references credential %d scoped to workspace %d, which is not in the capability's workspace allowlist", where, credentialID, *cred.WorkspaceID))
+		return false
+	}
+
+	if config.Auth != nil {
+		if config.Auth.CredentialID <= 0 {
+			respondValidationError(w, r, "auth.credential_id is required when auth is set")
+			return false
+		}
+		if strings.TrimSpace(config.Auth.HeaderName) == "" {
+			respondValidationError(w, r, "auth.header_name is required when auth is set")
+			return false
+		}
+		if !models.IsSensitiveHeaderName(config.Auth.HeaderName) {
+			respondValidationError(w, r, fmt.Sprintf("auth.header_name %q is not in the sensitive-header allowlist; rename it to a known auth header (e.g. Authorization, X-API-Key) or use default_headers for non-secret literals", config.Auth.HeaderName))
+			return false
+		}
+		if config.Auth.Placement != "" && config.Auth.Placement != "header" {
+			respondValidationError(w, r, fmt.Sprintf("auth.placement %q is not supported (use \"header\")", config.Auth.Placement))
+			return false
+		}
+		if !checkCredScope(config.Auth.CredentialID, "auth") {
+			return false
+		}
+	}
+	for headerName, credentialID := range config.SecretHeaderRefs {
+		if strings.TrimSpace(headerName) == "" {
+			respondValidationError(w, r, "secret_header_refs contains an empty header name")
+			return false
+		}
+		if !models.IsSensitiveHeaderName(headerName) {
+			respondValidationError(w, r, fmt.Sprintf("secret_header_refs header %q is not in the sensitive-header allowlist; use default_headers for non-secret literals", headerName))
+			return false
+		}
+		if credentialID <= 0 {
+			respondValidationError(w, r, fmt.Sprintf("secret_header_refs[%q] must reference a credential id > 0", headerName))
+			return false
+		}
+		if !checkCredScope(credentialID, fmt.Sprintf("secret_header_refs[%q]", headerName)) {
 			return false
 		}
 	}
@@ -791,15 +888,6 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		respondValidationError(w, r, "Config is required")
 		return
 	}
-	if !h.validateCapabilityConfig(w, r, req.CapabilityType, req.Config) {
-		return
-	}
-
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
 	// Default applies_to_all_workspaces to TRUE when the field is omitted —
 	// matches the legacy "global" behavior so old clients still get a usable
 	// capability. If a client explicitly restricts scope, at least one workspace
@@ -810,6 +898,14 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 	}
 	if !appliesAll && len(req.WorkspaceIDs) == 0 {
 		respondValidationError(w, r, "At least one workspace is required when restricting capability scope")
+		return
+	}
+	if !h.validateCapabilityConfig(w, r, req.CapabilityType, req.Config, appliesAll, req.WorkspaceIDs) {
+		return
+	}
+
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -865,27 +961,32 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 	if req.Name != nil {
 		capability.Name = *req.Name
 	}
-	if req.Config != nil {
-		if !h.validateCapabilityConfig(w, r, capability.CapabilityType, *req.Config) {
-			return
-		}
-		capability.Config = *req.Config
-	}
 	if req.IsEnabled != nil {
 		capability.IsEnabled = *req.IsEnabled
 	}
 	if req.AppliesToAllWorkspaces != nil {
 		capability.AppliesToAllWorkspaces = *req.AppliesToAllWorkspaces
 	}
+	// Resolve the effective workspace allowlist for the updated capability so
+	// validateCapabilityConfig can check credential refs against the same
+	// scope that will be persisted moments later.
+	effectiveWorkspaceIDs := capability.WorkspaceIDs
 	if !capability.AppliesToAllWorkspaces {
-		workspaceIDs := capability.WorkspaceIDs
 		if req.WorkspaceIDs != nil {
-			workspaceIDs = *req.WorkspaceIDs
+			effectiveWorkspaceIDs = *req.WorkspaceIDs
 		}
-		if len(workspaceIDs) == 0 {
+		if len(effectiveWorkspaceIDs) == 0 {
 			respondValidationError(w, r, "At least one workspace is required when restricting capability scope")
 			return
 		}
+	} else {
+		effectiveWorkspaceIDs = nil
+	}
+	if req.Config != nil {
+		if !h.validateCapabilityConfig(w, r, capability.CapabilityType, *req.Config, capability.AppliesToAllWorkspaces, effectiveWorkspaceIDs) {
+			return
+		}
+		capability.Config = *req.Config
 	}
 
 	if err := h.repo.UpdateCapability(capability); err != nil {
@@ -953,7 +1054,78 @@ func (h *ActionsHandler) ListWorkspaceCapabilities(w http.ResponseWriter, r *htt
 		caps = []*models.ActionCapability{}
 	}
 
-	respondJSONOK(w, caps)
+	respondJSONOK(w, sanitizeCapabilitiesForWorkspace(caps))
+}
+
+// sanitizeCapabilitiesForWorkspace strips potentially sensitive material from
+// http_client capability configs before exposing them via the workspace
+// listing endpoint. Specifically:
+//   - default_headers loses any key matching IsSensitiveHeaderName so a
+//     legacy inline Authorization token never reaches a workspace-admin view;
+//   - secret_header_refs maps every entry to a 1 sentinel so the workspace
+//     side learns which header names are present without seeing the
+//     credential IDs (which would let a hostile workspace admin probe
+//     other workspaces' credentials).
+//
+// The admin endpoint (ListCapabilities / GetCapability) returns the
+// unsanitized config; system admins legitimately need to see the refs to
+// manage them.
+func sanitizeCapabilitiesForWorkspace(caps []*models.ActionCapability) []*models.ActionCapability {
+	if len(caps) == 0 {
+		return caps
+	}
+	out := make([]*models.ActionCapability, 0, len(caps))
+	for _, c := range caps {
+		if c.CapabilityType != models.CapabilityHTTPClient {
+			out = append(out, c)
+			continue
+		}
+		var cfg models.HTTPClientConfig
+		if err := json.Unmarshal([]byte(c.Config), &cfg); err != nil {
+			// Malformed config — return as-is so the editor can show an
+			// actionable error. (Default headers in an unparsable blob can't
+			// be selectively stripped without parsing.)
+			out = append(out, c)
+			continue
+		}
+		if len(cfg.DefaultHeaders) > 0 {
+			cleaned := make(map[string]string, len(cfg.DefaultHeaders))
+			for k, v := range cfg.DefaultHeaders {
+				if models.IsSensitiveHeaderName(k) {
+					continue
+				}
+				cleaned[k] = v
+			}
+			cfg.DefaultHeaders = cleaned
+		}
+		if len(cfg.SecretHeaderRefs) > 0 {
+			redacted := make(map[string]int, len(cfg.SecretHeaderRefs))
+			for k := range cfg.SecretHeaderRefs {
+				redacted[k] = 1 // presence indicator, not the credential id
+			}
+			cfg.SecretHeaderRefs = redacted
+		}
+		if cfg.Auth != nil {
+			// Hide the credential ID from workspace view — a workspace admin
+			// doesn't need it to use the capability, and exposing it would
+			// invite cross-workspace fishing.
+			cfg.Auth = &models.HTTPAuthRef{
+				CredentialID: 0,
+				Placement:    cfg.Auth.Placement,
+				HeaderName:   cfg.Auth.HeaderName,
+				Scheme:       cfg.Auth.Scheme,
+			}
+		}
+		newBytes, err := json.Marshal(cfg)
+		if err != nil {
+			out = append(out, c)
+			continue
+		}
+		cp := *c
+		cp.Config = string(newBytes)
+		out = append(out, &cp)
+	}
+	return out
 }
 
 // DeleteCapability deletes a capability

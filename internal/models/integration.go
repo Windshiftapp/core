@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -1196,10 +1197,69 @@ type HealthCheckConfig struct {
 }
 
 // HTTPClientConfig is the config for an http_client capability.
+//
+// DefaultHeaders must contain only non-sensitive literals (Accept,
+// User-Agent, etc.). Sensitive auth material (API tokens, API keys, basic
+// auth) is referenced by ID via Auth / SecretHeaderRefs and resolved at
+// execution time from the action_credentials store. The capability
+// validator rejects any DefaultHeaders key whose name matches the
+// sensitive list (see IsSensitiveHeaderName).
 type HTTPClientConfig struct {
 	AllowedURLPatterns []string          `json:"allowed_url_patterns"`
 	DefaultHeaders     map[string]string `json:"default_headers,omitempty"`
 	TimeoutSecs        int               `json:"timeout_secs"`
+	// Auth is the primary auth header (e.g. Authorization: Bearer <token>).
+	// Single header per capability; multi-secret APIs use SecretHeaderRefs.
+	Auth *HTTPAuthRef `json:"auth,omitempty"`
+	// SecretHeaderRefs maps additional secret header names to credential IDs
+	// (e.g. {"X-API-Key": 12, "X-Signature": 14}). Used by APIs that require
+	// multiple secret headers per request.
+	SecretHeaderRefs map[string]int `json:"secret_header_refs,omitempty"`
+}
+
+// HTTPAuthRef captures the primary auth header for an http_client capability.
+// The credential is resolved server-side at execution time; the credential ID
+// is the only secret-adjacent value that ever flows over the wire.
+type HTTPAuthRef struct {
+	CredentialID int    `json:"credential_id"`
+	Placement    string `json:"placement,omitempty"` // "header" (only value supported in v1)
+	HeaderName   string `json:"header_name"`         // e.g. "Authorization"
+	Scheme       string `json:"scheme,omitempty"`    // e.g. "Bearer"
+}
+
+// IsSensitiveHeaderName reports whether the given HTTP header name is
+// considered sensitive and must therefore not appear as a literal in
+// DefaultHeaders or in an HTTPRequestNodeConfig.Headers map. Matching is
+// case-insensitive. The list errs on the side of caution — a benign header
+// that happens to match (e.g. "token-style-something") is just blocked, and
+// the user can rename it.
+func IsSensitiveHeaderName(name string) bool {
+	lk := strings.ToLower(strings.TrimSpace(name))
+	if lk == "" {
+		return false
+	}
+	switch lk {
+	case
+		"authorization",
+		"proxy-authorization",
+		"cookie",
+		"set-cookie",
+		"x-api-key",
+		"api-key",
+		"x-auth-token",
+		"x-access-token",
+		"x-secret-key",
+		"x-amz-security-token",
+		"x-github-token":
+		return true
+	}
+	// Generic patterns: anything ending in -token/-key/-secret/-password is
+	// almost certainly secret material. Standard headers like Content-Type,
+	// Accept, User-Agent, X-Request-Id don't trip these suffixes.
+	return strings.HasSuffix(lk, "-token") ||
+		strings.HasSuffix(lk, "-key") ||
+		strings.HasSuffix(lk, "-secret") ||
+		strings.HasSuffix(lk, "-password")
 }
 
 // LLMConnectionCapabilityConfig is the config for an llm_connection capability.
