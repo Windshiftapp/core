@@ -2271,6 +2271,12 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 	if maxSteps <= 0 {
 		maxSteps = 10
 	}
+	// Defensive clamp: the catalog validator rejects max_steps > MaxAIAgentSteps
+	// at create/update time, but stale rows persisted before the rule was added
+	// (or any future bypass) still flow through this executor.
+	if maxSteps > models.MaxAIAgentSteps {
+		maxSteps = models.MaxAIAgentSteps
+	}
 
 	// Run agent loop
 	agentResult, err := llm.RunAgent(

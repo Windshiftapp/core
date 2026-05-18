@@ -1109,13 +1109,19 @@ type AIExtractNodeConfig struct {
 	CapabilityID int    `json:"capability_id"` // References an llm_connection capability
 }
 
+// MaxAIAgentSteps is the hard upper bound on AIAgentNodeConfig.MaxSteps.
+// The UI caps the input at this value; the catalog validator and the action
+// executor both enforce it server-side so REST / MCP / aitool create paths
+// can't bypass it and trigger runaway LLM loops.
+const MaxAIAgentSteps = 50
+
 // AIAgentNodeConfig configures an ai_agent node — agentic execution with
 // a purpose-built tool set. Never receives raw untrusted input.
 type AIAgentNodeConfig struct {
 	Prompt       string   `json:"prompt"`        // System prompt (can reference {{variables}})
 	InputFields  []string `json:"input_fields"`  // Which context variables to include in the user message
 	Tools        []string `json:"tools"`         // Capability IDs to enable as tools
-	MaxSteps     int      `json:"max_steps"`     // Max agent loop iterations
+	MaxSteps     int      `json:"max_steps"`     // Max agent loop iterations (server-capped to MaxAIAgentSteps)
 	OutputField  string   `json:"output_field"`  // Variable name to store the agent's result
 	CapabilityID int      `json:"capability_id"` // References an llm_connection capability
 }

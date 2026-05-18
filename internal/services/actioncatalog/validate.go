@@ -191,6 +191,14 @@ func Validate(c *Catalog, def ActionDefinition, workspaceID int, caps Capability
 			// we'd inspect might not even exist on the parsed shape.
 			continue
 		}
+		if msg, field := validateNodeConfigValues(n); msg != "" {
+			errs = append(errs, ValidationError{
+				Code:    CodeInvalidConfig,
+				Message: msg,
+				Path:    path + ".node_config." + field,
+			})
+			continue
+		}
 		if caps != nil && workspaceID > 0 {
 			if capID, field := capabilityRef(n); capID > 0 {
 				if !caps.HasCapability(workspaceID, capID) {
@@ -378,6 +386,23 @@ func iteratorBodyClosure(iteratorID int, edges []models.ActionEdge) map[int]bool
 		}
 	}
 	return body
+}
+
+// validateNodeConfigValues runs value-level checks that can't be expressed
+// in the JSON schema reflected from the config struct (the jsonschema-go
+// library only supports schema *shape*, not numeric bounds via struct tags).
+// Returns an empty message string when there's nothing to flag; otherwise
+// the message and the offending field name to plug into the error path.
+func validateNodeConfigValues(n models.ActionNode) (msg, field string) {
+	if n.NodeType == models.ActionNodeAIAgent {
+		var cfg models.AIAgentNodeConfig
+		if err := json.Unmarshal([]byte(n.NodeConfig), &cfg); err == nil {
+			if cfg.MaxSteps > models.MaxAIAgentSteps {
+				return fmt.Sprintf("max_steps must be <= %d", models.MaxAIAgentSteps), "max_steps"
+			}
+		}
+	}
+	return "", ""
 }
 
 // capabilityRef pulls the capability_id field out of a node's config

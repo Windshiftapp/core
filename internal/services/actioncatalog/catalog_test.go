@@ -244,6 +244,61 @@ func TestValidateRejectsBrokenShapes(t *testing.T) {
 		}
 	})
 
+	t.Run("ai_agent max_steps over cap", func(t *testing.T) {
+		def := actioncatalog.ActionDefinition{
+			Name:        "x",
+			TriggerType: models.ActionTriggerManual,
+			Nodes: []models.ActionNode{
+				{ID: 1, NodeType: models.ActionNodeTrigger},
+				{
+					ID:       2,
+					NodeType: models.ActionNodeAIAgent,
+					NodeConfig: `{"prompt":"hello","input_fields":["title"],"tools":[],` +
+						`"max_steps":51,"output_field":"out","capability_id":1}`,
+				},
+			},
+			Edges: []models.ActionEdge{{SourceNodeID: 1, TargetNodeID: 2, EdgeType: "default"}},
+		}
+		errs := actioncatalog.Validate(cat, def, 0, nil)
+		if !errs.Has(actioncatalog.CodeInvalidConfig) {
+			t.Fatalf("expected invalid_config for max_steps over cap, got %v", errs)
+		}
+		var foundPath bool
+		for _, e := range errs {
+			if strings.Contains(e.Path, "max_steps") {
+				foundPath = true
+			}
+		}
+		if !foundPath {
+			t.Errorf("expected error path to point at max_steps; got %v", errs)
+		}
+	})
+
+	t.Run("ai_agent max_steps at cap accepted", func(t *testing.T) {
+		def := actioncatalog.ActionDefinition{
+			Name:        "x",
+			TriggerType: models.ActionTriggerManual,
+			Nodes: []models.ActionNode{
+				{ID: 1, NodeType: models.ActionNodeTrigger},
+				{
+					ID:       2,
+					NodeType: models.ActionNodeAIAgent,
+					NodeConfig: `{"prompt":"hello","input_fields":["title"],"tools":[],` +
+						`"max_steps":50,"output_field":"out","capability_id":1}`,
+				},
+			},
+			Edges: []models.ActionEdge{{SourceNodeID: 1, TargetNodeID: 2, EdgeType: "default"}},
+		}
+		errs := actioncatalog.Validate(cat, def, 0, nil)
+		// caps resolver is nil so unknown_capability is skipped — we only
+		// care that no invalid_config fires for max_steps.
+		for _, e := range errs {
+			if strings.Contains(e.Path, "max_steps") {
+				t.Fatalf("did not expect max_steps error at the cap, got %v", errs)
+			}
+		}
+	})
+
 	t.Run("trigger config wrong shape", func(t *testing.T) {
 		// status_transition config has an int field; pass a string.
 		def := actioncatalog.ActionDefinition{
