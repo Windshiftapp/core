@@ -3,9 +3,11 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"windshift/internal/models"
@@ -229,6 +231,76 @@ func validateSecretMetadata(metadata string) error {
 		}
 	}
 	return nil
+}
+
+// ScanLegacyInlineSecrets walks every http_client capability and emits a
+// structured warning for any default_headers key whose name is sensitive.
+// We never log the value — only the capability ID and header name — so an
+// operator gets a clear signal that legacy inline tokens still exist and
+// should be migrated to the credential store, without the scanner itself
+// becoming a leak vector.
+//
+// Returns the number of (capability, header) pairs that triggered a
+// warning, which is convenient for tests and for the server bootstrap log.
+func ScanLegacyInlineSecrets(db scanLegacyDB) int {
+	rows, err := db.Query(`
+		SELECT id, name, config
+		FROM action_capabilities
+		WHERE capability_type = 'http_client'
+	`)
+	if err != nil {
+		slog.Warn("action_credentials_migration.scan_failed",
+			slog.String("component", "actions"),
+			slog.Any("error", err))
+		return 0
+	}
+	defer func() { _ = rows.Close() }()
+
+	hits := 0
+	for rows.Next() {
+		var id int
+		var name, cfg string
+		if err := rows.Scan(&id, &name, &cfg); err != nil {
+			continue
+		}
+		var hc map[string]interface{}
+		if err := json.Unmarshal([]byte(cfg), &hc); err != nil {
+			continue
+		}
+		raw, ok := hc["default_headers"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for header := range raw {
+			if !models.IsSensitiveHeaderName(header) {
+				continue
+			}
+			hits++
+			slog.Warn("action_credentials_migration.legacy_inline_secret",
+				slog.String("component", "actions"),
+				slog.Int("capability_id", id),
+				slog.String("capability_name", name),
+				slog.String("header_name", header),
+				slog.String("hint", "move to auth.credential_id or secret_header_refs in the capability config"))
+		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.Warn("action_credentials_migration.iter_failed",
+			slog.String("component", "actions"),
+			slog.Any("error", err))
+	}
+	if hits > 0 {
+		slog.Warn("action_credentials_migration.summary",
+			slog.String("component", "actions"),
+			slog.Int("legacy_inline_secret_count", hits))
+	}
+	return hits
+}
+
+// scanLegacyDB narrows the database.Database interface to the one method
+// the scanner needs, so tests can pass a stub.
+type scanLegacyDB interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
 // isSensitiveMetadataKey rejects keys that look like they hold plaintext

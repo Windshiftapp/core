@@ -516,6 +516,10 @@ func (s *Server) initialize() error {
 		repository.NewActionCredentialRepository(s.db),
 		cfg.Auth.SessionSecret,
 	))
+	// One-shot scanner: warn about any legacy capability whose
+	// default_headers still holds a sensitive header value. The scanner logs
+	// capability ID + header name only — never the value.
+	services.ScanLegacyInlineSecrets(s.db)
 
 	// Team handlers
 	teamRepo := repository.NewTeamRepository(s.db)

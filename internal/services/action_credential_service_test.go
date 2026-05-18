@@ -206,3 +206,29 @@ func TestCanCapabilityReference(t *testing.T) {
 }
 
 func ptrInt(v int) *int { return &v }
+
+func TestScanLegacyInlineSecrets(t *testing.T) {
+	db, err := database.NewSQLiteDB("file::memory:?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec(`
+		CREATE TABLE action_capabilities (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			capability_type TEXT NOT NULL,
+			config TEXT NOT NULL
+		);
+		INSERT INTO action_capabilities (name, capability_type, config) VALUES
+			('clean', 'http_client', '{"allowed_url_patterns":["https://x"],"default_headers":{"Accept":"application/json"},"timeout_secs":30}'),
+			('dirty', 'http_client', '{"allowed_url_patterns":["https://y"],"default_headers":{"Authorization":"Bearer LEAK","X-API-Key":"k1"},"timeout_secs":30}'),
+			('docker', 'docker_environment', '{"image":"alpine"}');
+	`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	hits := ScanLegacyInlineSecrets(db)
+	if hits != 2 {
+		t.Fatalf("want 2 sensitive headers detected, got %d", hits)
+	}
+}
