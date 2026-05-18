@@ -115,3 +115,28 @@ CREATE TABLE IF NOT EXISTS action_capability_workspaces (
 );
 
 CREATE INDEX IF NOT EXISTS idx_action_capability_workspaces_workspace ON action_capability_workspaces(workspace_id);
+
+-- Action credentials: encrypted API tokens / API keys / basic-auth pairs that
+-- HTTP capabilities reference instead of embedding plaintext in JSON config.
+-- workspace_id NULL = global credential (system-admin only). workspace_id set
+-- = workspace-scoped credential (requires action.credential.manage in that
+-- workspace). The secret is never returned to clients; the API exposes only
+-- metadata (name, type, prefix, has_secret).
+CREATE TABLE IF NOT EXISTS action_credentials (
+	id SERIAL PRIMARY KEY,
+	name TEXT NOT NULL,
+	credential_type TEXT NOT NULL,   -- bearer_token, api_key, basic_auth, custom_header
+	workspace_id INTEGER,            -- NULL = global
+	created_by INTEGER,
+	encrypted_secret TEXT NOT NULL,  -- AES-GCM ciphertext (label-bound HKDF key)
+	secret_prefix TEXT,              -- non-sensitive fingerprint (first 4 chars + "…")
+	secret_metadata TEXT,            -- JSON: provider, scopes, expires_at, etc. Must not contain secrets.
+	is_enabled BOOLEAN DEFAULT true,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_credentials_workspace ON action_credentials(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_action_credentials_enabled ON action_credentials(is_enabled);

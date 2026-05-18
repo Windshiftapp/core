@@ -28,6 +28,11 @@ const secretEncryptionInfo = "windshift-sso-secret-encryption-v1" //nolint:gosec
 // then falls back to a legacy SHA-256(serverSecret) key so ciphertexts written
 // before the HKDF migration keep decrypting. Any successful legacy decrypt
 // is a candidate for re-encryption by the caller.
+//
+// The legacy key is only attached when info matches the original SSO label —
+// realms with a different label (e.g. action credentials) get an isolated
+// keyspace with no SHA-256 fallback, so a ciphertext from one realm can't be
+// silently decrypted with another realm's key material.
 type SecretEncryption struct {
 	key       []byte // primary (HKDF)
 	legacyKey []byte // SHA-256(serverSecret) — for back-compat decrypt only
@@ -36,17 +41,36 @@ type SecretEncryption struct {
 // NewSecretEncryption creates a new encryption instance
 // The serverSecret should be a long, random string stored securely (e.g., in environment variable)
 func NewSecretEncryption(serverSecret string) *SecretEncryption {
+	return newSecretEncryptionWithInfo(serverSecret, secretEncryptionInfo, true)
+}
+
+// NewSecretEncryptionWithInfo creates an encryption instance scoped to a
+// dedicated HKDF info label (e.g. "windshift-action-credentials-encryption-v1").
+// Different labels derive independent keys from the same server secret, so
+// callers in different realms can't decrypt each other's ciphertexts even by
+// accident. No SHA-256 legacy fallback is attached.
+func NewSecretEncryptionWithInfo(serverSecret, info string) *SecretEncryption {
+	return newSecretEncryptionWithInfo(serverSecret, info, false)
+}
+
+func newSecretEncryptionWithInfo(serverSecret, info string, withLegacy bool) *SecretEncryption {
 	hkdfKey := make([]byte, 32)
-	reader := hkdf.New(sha256.New, []byte(serverSecret), nil, []byte(secretEncryptionInfo))
+	reader := hkdf.New(sha256.New, []byte(serverSecret), nil, []byte(info))
 	if _, err := io.ReadFull(reader, hkdfKey); err != nil {
 		// HKDF over SHA-256 with constant inputs cannot fail in practice;
 		// fall through to the legacy key as a last resort.
 		legacy := sha256.Sum256([]byte(serverSecret))
-		return &SecretEncryption{key: legacy[:], legacyKey: legacy[:]}
+		if withLegacy {
+			return &SecretEncryption{key: legacy[:], legacyKey: legacy[:]}
+		}
+		return &SecretEncryption{key: legacy[:]}
 	}
 
-	legacy := sha256.Sum256([]byte(serverSecret))
-	return &SecretEncryption{key: hkdfKey, legacyKey: legacy[:]}
+	if withLegacy {
+		legacy := sha256.Sum256([]byte(serverSecret))
+		return &SecretEncryption{key: hkdfKey, legacyKey: legacy[:]}
+	}
+	return &SecretEncryption{key: hkdfKey}
 }
 
 // Encrypt encrypts plaintext and returns base64-encoded ciphertext

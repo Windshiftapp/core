@@ -84,6 +84,40 @@ func encryptWithLegacyKey(serverSecret, plaintext string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ct), nil
 }
 
+// Two SecretEncryption instances built from the same server secret but
+// different HKDF info labels must not be able to read each other's ciphertext.
+// This is the cross-realm isolation guarantee that lets action credentials
+// share SSO_SECRET safely.
+func TestSecretEncryption_WithInfo_IsolatesRealms(t *testing.T) {
+	ssoEnc := NewSecretEncryption(testSecret)
+	actionEnc := NewSecretEncryptionWithInfo(testSecret, "windshift-action-credentials-encryption-v1")
+
+	plaintext := "credential-value"
+	actionCT, err := actionEnc.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("action encrypt: %v", err)
+	}
+
+	// The action-realm ciphertext must round-trip in its own realm.
+	if got, err := actionEnc.Decrypt(actionCT); err != nil || got != plaintext {
+		t.Fatalf("action round-trip: got %q err %v", got, err)
+	}
+
+	// And the SSO realm must NOT be able to decrypt it.
+	if _, err := ssoEnc.Decrypt(actionCT); err == nil {
+		t.Fatalf("SSO realm decrypted an action-credential ciphertext — realms are not isolated")
+	}
+
+	// Conversely the action realm must not decrypt SSO-realm ciphertext.
+	ssoCT, err := ssoEnc.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("sso encrypt: %v", err)
+	}
+	if _, err := actionEnc.Decrypt(ssoCT); err == nil {
+		t.Fatalf("action realm decrypted an SSO ciphertext — realms are not isolated")
+	}
+}
+
 func TestSecretEncryption_RejectsTamperedCiphertext(t *testing.T) {
 	enc := NewSecretEncryption(testSecret)
 	ct, err := enc.Encrypt("orig")
