@@ -41,6 +41,34 @@
 	// Count of comments that arrived via polling and the user hasn't acknowledged.
 	let newCount = $state(0);
 
+	// Per-author cache of agent owner info, keyed by author_id. Populated
+	// lazily after comments load. A null entry means "we already asked and
+	// the requester isn't allowed to see this agent's owner" so the tooltip
+	// falls back to the generic message instead of re-fetching on every poll.
+	let agentOwnerCache = $state({});
+
+	async function ensureAgentOwnerLoaded(authorId) {
+		if (authorId == null || authorId in agentOwnerCache) return;
+		agentOwnerCache = { ...agentOwnerCache, [authorId]: undefined };
+		try {
+			const info = await api.getAgentOwner(authorId);
+			agentOwnerCache = { ...agentOwnerCache, [authorId]: info };
+		} catch {
+			// 403/404/network failure — keep null so the UI shows the generic
+			// "Authored by an AI agent" tooltip without retrying every poll.
+			agentOwnerCache = { ...agentOwnerCache, [authorId]: null };
+		}
+	}
+
+	function agentTooltipContent(comment) {
+		if (!comment.is_agent) return '';
+		const info = agentOwnerCache[comment.author_id];
+		if (info?.owner_name) {
+			return t('comments.agentOwnedBy', { owner: info.owner_name });
+		}
+		return t('comments.agentAuthored');
+	}
+
 	const sortedComments = $derived.by(() => {
 		return [...comments].sort((a, b) => {
 			const dateA = new Date(a.created_at).getTime();
@@ -104,6 +132,7 @@
 
 		if (initial) {
 			comments = next;
+			prefetchAgentOwners(next);
 			onCommentsLoaded?.({ count: comments.length });
 			return;
 		}
@@ -121,8 +150,19 @@
 		// created_at so ordering is stable. Local-only state (editingCommentId,
 		// newCommentContent) is tracked separately and isn't touched.
 		comments = next;
+		prefetchAgentOwners(next);
 		if (arrived > 0) newCount += arrived;
 		onCommentsLoaded?.({ count: comments.length });
+	}
+
+	function prefetchAgentOwners(list) {
+		const seen = new Set();
+		for (const c of list) {
+			if (!c.is_agent || c.author_id == null) continue;
+			if (seen.has(c.author_id)) continue;
+			seen.add(c.author_id);
+			ensureAgentOwnerLoaded(c.author_id);
+		}
 	}
 
 	async function submitComment() {
@@ -301,7 +341,7 @@
 										<Shield class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
 									</Tooltip>
 								{:else if comment.is_agent}
-									<Tooltip content="Authored by an AI agent" placement="top">
+									<Tooltip content={agentTooltipContent(comment)} placement="top">
 										<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
 									</Tooltip>
 								{/if}

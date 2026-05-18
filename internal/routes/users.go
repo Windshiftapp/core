@@ -13,6 +13,7 @@ func RegisterUserRoutes(deps *Deps) {
 	api.HandleH("POST /users", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.Create))))
 	api.HandleH("POST /users/invite", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.InviteUser))))
 	api.HandleH("GET /users/{id}", auth(http.HandlerFunc(deps.Users.User.Get)))
+	api.HandleH("GET /users/{id}/agent-owner", auth(http.HandlerFunc(deps.Users.User.GetAgentOwner)))
 	api.HandleH("PUT /users/{id}", admin(http.HandlerFunc(deps.Users.User.Update)))
 	api.HandleH("DELETE /users/{id}", admin(http.HandlerFunc(deps.Users.User.Delete)))
 	api.HandleH("POST /users/{id}/reset-password", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.ResetPassword))))

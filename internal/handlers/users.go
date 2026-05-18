@@ -746,6 +746,43 @@ func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, users)
 }
 
+// GetAgentOwner returns the owner attribution for an agent user. Gated on
+// user.list (or system admin) so callers without permission to see other
+// users' profiles can't dereference agents to their human owners. 404 is
+// returned both when the target isn't an agent and when an unauthorized
+// caller asks — keeping the responses indistinguishable prevents probing
+// for which user IDs are agents.
+func (h *UserHandler) GetAgentOwner(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
+	hasListPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionUserList)
+	if !isAdmin && !hasListPerm {
+		respondNotFound(w, r, "agent")
+		return
+	}
+
+	info, err := h.repo.GetAgentOwner(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "agent")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, info)
+}
+
 // ActivateUser activates a user account
 func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")

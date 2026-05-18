@@ -5,6 +5,7 @@ export const getUsers = () => fetchAPI('/users');
 export const getAssignableUsers = (workspaceId) =>
   fetchAPI(`/workspaces/${workspaceId}/assignable-users`);
 export const getUser = (id) => fetchAPI(`/users/${id}`);
+export const getAgentOwner = (id) => fetchAPI(`/users/${id}/agent-owner`);
 export const createUser = (data) =>
   fetchAPI('/users', {
     method: 'POST',

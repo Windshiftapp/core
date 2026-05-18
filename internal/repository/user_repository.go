@@ -194,6 +194,44 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 	return &u, nil
 }
 
+// AgentOwnerInfo carries just the fields the UI needs to attribute an agent
+// row to its owner. Only populated for users where is_agent = TRUE and
+// agent_owner_user_id is non-NULL.
+type AgentOwnerInfo struct {
+	UserID        int    `json:"user_id"`
+	OwnerUserID   int    `json:"owner_user_id"`
+	OwnerName     string `json:"owner_name"`
+	OwnerUsername string `json:"owner_username,omitempty"`
+}
+
+// GetAgentOwner returns the owner attribution for an agent user, or
+// ErrNotFound when the user isn't an agent or has no owner. Callers gate
+// access on user.list / system admin — this method doesn't enforce that
+// itself, it just returns the joined row.
+func (r *UserRepository) GetAgentOwner(agentUserID int) (*AgentOwnerInfo, error) {
+	var info AgentOwnerInfo
+	var ownerFirst, ownerLast, ownerUsername sql.NullString
+	err := r.db.QueryRow(`
+		SELECT a.id, owner.id, owner.first_name, owner.last_name, owner.username
+		FROM users a
+		JOIN users owner ON owner.id = a.agent_owner_user_id
+		WHERE a.id = ? AND COALESCE(a.is_agent, FALSE) = TRUE
+	`, agentUserID).Scan(&info.UserID, &info.OwnerUserID, &ownerFirst, &ownerLast, &ownerUsername)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get agent owner for user %d: %w", agentUserID, err)
+	}
+	name := strings.TrimSpace(ownerFirst.String + " " + ownerLast.String)
+	if name == "" {
+		name = ownerUsername.String
+	}
+	info.OwnerName = name
+	info.OwnerUsername = ownerUsername.String
+	return &info, nil
+}
+
 // EmailExists / UsernameExists test for collisions on the unique columns.
 // excludeID > 0 excludes that row from the check (so an Update doesn't
 // collide with itself).

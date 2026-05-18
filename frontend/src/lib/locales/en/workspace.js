@@ -306,6 +306,8 @@ export default {
     internal: 'Internal',
     oldestFirst: 'Oldest first',
     newestFirst: 'Newest first',
+    agentAuthored: 'Authored by an AI agent',
+    agentOwnedBy: 'AI agent owned by {owner}',
   },
 
   todo: {
