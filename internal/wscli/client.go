@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -510,6 +511,82 @@ func (c *Client) UpdateDiagram(id int, name, diagramData string) (*Diagram, erro
 // DeleteDiagram removes a diagram.
 func (c *Client) DeleteDiagram(id int) error {
 	return c.DELETE(fmt.Sprintf("/api/diagrams/%d", id))
+}
+
+// ============================================
+// Attachment Methods
+// ============================================
+//
+// Both endpoints live on the public REST v1 surface. The legacy
+// /api/attachments/{id}/download route explicitly rejects bearer tokens
+// (cookie-auth only), so the CLI must use /rest/api/v1/*.
+
+// ListAttachments returns all attachments on an item.
+func (c *Client) ListAttachments(itemID int) ([]Attachment, error) {
+	var atts []Attachment
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/items/%d/attachments", itemID), &atts); err != nil {
+		return nil, err
+	}
+	return atts, nil
+}
+
+// DownloadAttachment streams the attachment bytes for the given id into w
+// and returns the filename suggested by the server's Content-Disposition
+// header. Falls back to "attachment-<id>" if no filename is advertised.
+func (c *Client) DownloadAttachment(id int, w io.Writer) (string, error) {
+	reqURL := c.baseURL + fmt.Sprintf("/rest/api/v1/attachments/%d/download", id)
+	if debugHTTP {
+		_, _ = fmt.Fprintf(stderr, "[ws-debug] GET %s\n", reqURL)
+	}
+
+	req, err := http.NewRequest("GET", reqURL, http.NoBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: URL from server config
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if debugHTTP {
+		_, _ = fmt.Fprintf(stderr, "[ws-debug] -> status=%d content-type=%s\n", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		var apiErr APIError
+		if jerr := json.Unmarshal(body, &apiErr); jerr == nil && (apiErr.Code != "" || apiErr.Message != "") {
+			return "", &apiErr
+		}
+		return "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	filename := parseContentDispositionFilename(resp.Header.Get("Content-Disposition"))
+	if filename == "" {
+		filename = fmt.Sprintf("attachment-%d", id)
+	}
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return filename, fmt.Errorf("failed to stream file: %w", err)
+	}
+	return filename, nil
+}
+
+// parseContentDispositionFilename extracts the filename from a
+// Content-Disposition header. Returns "" if the header is missing,
+// malformed, or has no filename parameter.
+func parseContentDispositionFilename(header string) string {
+	if header == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(header)
+	if err != nil {
+		return ""
+	}
+	return params["filename"]
 }
 
 // ============================================

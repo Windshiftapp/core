@@ -20,6 +20,10 @@ type Deps struct {
 	// surface. v1 falls back to "next periodic refresh" when nil, which is
 	// fine for cold-start tooling but worth wiring for production.
 	ActionService *services.ActionService
+	// AttachmentPath is the base directory where attachment blobs are stored.
+	// Empty when attachments are disabled — the v1 download route falls back
+	// to a not-enabled response in that case.
+	AttachmentPath string
 }
 
 // SetupRoutesFunc is a function type for setting up v1 routes

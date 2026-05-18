@@ -1177,6 +1177,7 @@ func (s *Server) initialize() error {
 		TokenManager:      tokenManager,
 		PermissionService: permService,
 		ActionService:     s.actionService,
+		AttachmentPath:    cfg.AttachmentPath,
 	}, v1.RegisterRoutes)
 
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true

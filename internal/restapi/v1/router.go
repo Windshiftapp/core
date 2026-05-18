@@ -83,6 +83,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 	actionHandler := handlers.NewActionHandler(db, permissionService, deps.ActionService)
+	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.AttachmentPath)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter
@@ -106,6 +107,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	v1.HandleWithMiddleware("GET /items/{id}/transitions", itemHandler.GetTransitions, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("POST /items/{id}/transition", itemHandler.Transition, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /items/{id}/attachments", itemHandler.GetAttachments, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /attachments/{id}/download", attachmentHandler.Download, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /items/{id}/children", itemHandler.GetChildren, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
 
 	// ============================================

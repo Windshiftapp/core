@@ -79,6 +79,8 @@ func (o *Output) printTable(data interface{}) {
 		o.printCommentsTable(w, v)
 	case *Comment:
 		o.printCommentDetailTable(w, v)
+	case []Attachment:
+		o.printAttachmentsTable(w, v)
 	case []Milestone:
 		o.printMilestonesTable(w, v)
 	case *PaginatedResponse[Milestone]:
@@ -136,6 +138,8 @@ func (o *Output) printCSV(data interface{}) {
 		o.printCommentsCSV(w, v)
 	case *Comment:
 		o.printCommentCSV(w, v)
+	case []Attachment:
+		o.printAttachmentsCSV(w, v)
 	case []Milestone:
 		o.printMilestonesCSV(w, v)
 	case *PaginatedResponse[Milestone]:
@@ -552,6 +556,63 @@ func (o *Output) printCommentsTable(w *tabwriter.Writer, comments []Comment) {
 		created := c.CreatedAt.Format("2006-01-02 15:04")
 		content := truncateString(c.Content, 50)
 		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", c.ID, author, created, content)
+	}
+}
+
+func (o *Output) printAttachmentsTable(w *tabwriter.Writer, atts []Attachment) {
+	_, _ = fmt.Fprintln(w, "ID\tFILENAME\tSIZE\tMIME\tUPLOADER\tCREATED")
+	_, _ = fmt.Fprintln(w, "--\t--------\t----\t----\t--------\t-------")
+	for _, a := range atts {
+		uploader := "-"
+		if a.Uploader != nil && a.Uploader.Name != "" {
+			uploader = a.Uploader.Name
+		}
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
+			a.ID,
+			truncateString(a.OriginalFilename, 50),
+			humanFileSize(a.FileSize),
+			a.MimeType,
+			uploader,
+			a.CreatedAt.Format("2006-01-02 15:04"),
+		)
+	}
+}
+
+func (o *Output) printAttachmentsCSV(w *csv.Writer, atts []Attachment) {
+	_ = w.Write([]string{"ID", "FILENAME", "SIZE", "MIME", "UPLOADER", "CREATED"})
+	for _, a := range atts {
+		uploader := ""
+		if a.Uploader != nil {
+			uploader = a.Uploader.Name
+		}
+		_ = w.Write([]string{
+			fmt.Sprintf("%d", a.ID),
+			a.OriginalFilename,
+			fmt.Sprintf("%d", a.FileSize),
+			a.MimeType,
+			uploader,
+			a.CreatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+// humanFileSize formats a byte count in a compact form (e.g. "12 KB",
+// "3.4 MB"). Used only for table output; CSV keeps the raw byte count.
+func humanFileSize(n int64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+	)
+	switch {
+	case n >= GB:
+		return fmt.Sprintf("%.1f GB", float64(n)/float64(GB))
+	case n >= MB:
+		return fmt.Sprintf("%.1f MB", float64(n)/float64(MB))
+	case n >= KB:
+		return fmt.Sprintf("%.1f KB", float64(n)/float64(KB))
+	default:
+		return fmt.Sprintf("%d B", n)
 	}
 }
 
