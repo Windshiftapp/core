@@ -87,8 +87,14 @@ type cloudClient struct {
 	limiter    *rate.Limiter
 }
 
-// NewClient creates a new Jira API client
-// Returns a Cloud or Data Center client based on cfg.DeploymentType
+// NewClient creates a new Jira API client.
+// Returns a Cloud or Data Center client based on cfg.DeploymentType.
+//
+// For Cloud, NewClient runs a one-time auto-probe against the operator's
+// instance URL to detect whether the supplied API token is a **scoped**
+// Atlassian token or a **legacy unscoped** one, and picks the appropriate
+// base URL. See cloudRoutingProbe for the algorithm and Atlassian's
+// rationale.
 func NewClient(cfg Config) (Client, error) {
 	// Validate and normalize the instance URL
 	baseURL := strings.TrimSuffix(cfg.InstanceURL, "/")
@@ -138,15 +144,144 @@ func NewClient(cfg Config) (Client, error) {
 		}, nil
 	}
 
-	// Default to Cloud client
+	// Cloud: probe to pick site URL vs api.atlassian.com gateway.
+	routing := cloudRoutingProbe(baseURL, authHeader, httpClient)
 	return &cloudClient{
-		baseURL:    baseURL + "/rest/api/3",
-		assetsURL:  baseURL + "/rest/assets/1.0",
-		agileURL:   baseURL + "/rest/agile/1.0",
+		baseURL:    routing.platformBase, // /rest/api/3 already appended by probe
+		assetsURL:  routing.assetsBase,
+		agileURL:   routing.agileBase,
 		authHeader: authHeader,
 		httpClient: httpClient,
 		limiter:    limiter,
 	}, nil
+}
+
+// cloudRouting holds the resolved base URLs for a Cloud client. All three
+// already include their respective REST path prefix so the caller can
+// concatenate sub-paths directly.
+type cloudRouting struct {
+	platformBase string // .../rest/api/3
+	agileBase    string // .../rest/agile/1.0
+	assetsBase   string // .../rest/assets/1.0  (always site URL; gateway path differs)
+	viaGateway   bool   // chosen routing, for logging only
+}
+
+// cloudRoutingProbe decides whether to call Jira via the operator's site URL
+// (works for legacy unscoped API tokens) or via the api.atlassian.com gateway
+// (required for scoped Atlassian API tokens — see
+// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/).
+//
+// Why the routing matters: a scoped token sent to <site>.atlassian.net is
+// silently downgraded to anonymous by Atlassian — endpoints that allow
+// anonymous reads return data, permission-filtered endpoints return empty
+// arrays, and only the /myself endpoint surfaces the 401. The wizard's
+// project list then looks empty with no actionable error. Routing via
+// api.atlassian.com/ex/jira/{cloudId}/ presents the token correctly.
+//
+// Algorithm: fetch the public /_edge/tenant_info to learn the cloudId, then
+// hit /rest/api/3/myself on the gateway. A 200 confirms scoped-token
+// routing works for this caller; anything else (including 401, which is
+// what a legacy token sees on the gateway) falls back to the site URL,
+// which works for legacy tokens.
+//
+// The probe is best-effort: if /_edge/tenant_info fails or returns an
+// unparseable response, we fall back to the site URL. That preserves the
+// pre-probe behavior for instances where the well-known endpoint isn't
+// reachable (private network, weird proxy, etc.).
+func cloudRoutingProbe(siteURL, authHeader string, httpClient *http.Client) cloudRouting {
+	siteRouting := cloudRouting{
+		platformBase: siteURL + "/rest/api/3",
+		agileBase:    siteURL + "/rest/agile/1.0",
+		assetsBase:   siteURL + "/rest/assets/1.0",
+		viaGateway:   false,
+	}
+
+	cloudID, err := discoverCloudID(siteURL, httpClient)
+	if err != nil || cloudID == "" {
+		slog.Debug("Jira cloud routing: tenant_info lookup failed, using site URL",
+			slog.String("component", "jira"),
+			slog.String("site_url", siteURL),
+			slog.Any("error", err),
+		)
+		return siteRouting
+	}
+
+	gatewayBase := "https://api.atlassian.com/ex/jira/" + cloudID
+	if !gatewayAuthProbe(gatewayBase, authHeader, httpClient) {
+		slog.Info("Jira cloud routing: gateway probe declined, using site URL",
+			slog.String("component", "jira"),
+			slog.String("cloud_id", cloudID),
+		)
+		return siteRouting
+	}
+
+	slog.Info("Jira cloud routing: using api.atlassian.com gateway (scoped token detected)",
+		slog.String("component", "jira"),
+		slog.String("cloud_id", cloudID),
+	)
+	return cloudRouting{
+		platformBase: gatewayBase + "/rest/api/3",
+		agileBase:    gatewayBase + "/rest/agile/1.0",
+		// Assets endpoint path on the gateway uses /jsm/assets/workspace/...
+		// rather than /rest/assets/1.0. Routing for Assets is intentionally
+		// left on the site URL until the importer actually consumes Assets
+		// data — touching it now without a test surface would be guesswork.
+		assetsBase: siteURL + "/rest/assets/1.0",
+		viaGateway: true,
+	}
+}
+
+// discoverCloudID calls the public /_edge/tenant_info well-known endpoint,
+// which returns the site's stable cloud identifier. The endpoint is
+// unauthenticated.
+func discoverCloudID(siteURL string, httpClient *http.Client) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", siteURL+"/_edge/tenant_info", http.NoBody)
+	if err != nil {
+		return "", err
+	}
+	resp, err := httpClient.Do(req) //nolint:gosec // siteURL is operator-supplied Jira base URL
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("tenant_info HTTP %d", resp.StatusCode)
+	}
+	var body struct {
+		CloudID string `json:"cloudId"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return "", err
+	}
+	return body.CloudID, nil
+}
+
+// gatewayAuthProbe asks "does this token authenticate against the gateway?"
+// by hitting /rest/api/3/myself. A 200 means scoped-token routing is in
+// effect for this caller; anything else means it isn't (legacy token, or a
+// scoped token that the gateway has rejected outright).
+//
+// /myself is the right probe here: it requires an authenticated identity,
+// so the response distinguishes "auth succeeded" (200) from "auth was
+// silently dropped to anonymous" (401). Other endpoints like /serverInfo
+// return 200 even anonymously and would give false positives.
+func gatewayAuthProbe(gatewayBase, authHeader string, httpClient *http.Client) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", gatewayBase+"/rest/api/3/myself", http.NoBody)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", authHeader)
+	req.Header.Set("Accept", "application/json")
+	resp, err := httpClient.Do(req) //nolint:gosec // gatewayBase derived from discovered cloudId
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return resp.StatusCode == http.StatusOK
 }
 
 // do performs an HTTP request with rate limiting

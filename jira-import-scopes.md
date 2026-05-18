@@ -5,36 +5,62 @@ Data Center PAT) for the Windshift Jira importer.
 
 ## TL;DR — Atlassian Cloud
 
-**Use a legacy (unscoped) API token.** Scoped tokens do not work with the
-Windshift importer today.
+The importer accepts **both legacy unscoped tokens and scoped tokens**.
+The host routing required for scoped tokens is detected automatically; no
+operator action beyond picking the right scopes is needed.
 
-Create one at <https://id.atlassian.com/manage-profile/security/api-tokens>
-via the **"Create API token"** button (the plain one — *not* "Create API
-token with scopes"). The token inherits the account's full Jira
-permissions; no scope selection is needed or possible.
+Create either via <https://id.atlassian.com/manage-profile/security/api-tokens>:
 
-If your org policy forbids unscoped tokens, see [Scoped token support](#scoped-token-support-not-implemented)
-below — the importer needs a code change before scoped tokens will work.
+- **"Create API token"** (plain) — unscoped/legacy. Inherits the account's
+  full Jira permissions, no scope picker.
+- **"Create API token with scopes"** — scoped. Pick the scopes listed
+  below. **Must include `read:me`** or the importer's auto-probe can't
+  recognise the routing (see [Edge case](#edge-case-scoped-tokens-without-readme)
+  below if your security policy forbids it).
 
-## Why scoped tokens don't work (yet)
+The connection wizard requires only the site URL
+(`https://<your-site>.atlassian.net`) and the token; the importer
+discovers the cloud ID and switches transports as needed.
 
-Atlassian's scoped API tokens (rolled out 2024) cannot be used against the
-standard site URL `https://<site>.atlassian.net/rest/api/3/...`. They must
-be routed through `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`.
+## Recommended scopes — scoped tokens
 
-If you hit the direct site URL with a scoped token, Atlassian silently
-treats the request as **anonymous** instead of returning 401. Endpoints
-that allow anonymous reads return generic data (e.g. `/serverInfo`,
-`/field` system catalog); permission-filtered endpoints return empty
-arrays (`/project`, `/project/search`, `/issuetype`, `/status`, `/search`);
-endpoints that require an authenticated user return 401 (`/myself`).
+Picked in the Atlassian token UI:
 
-The Windshift importer (`internal/jira/client.go::NewClient`) currently
-hardcodes the direct site URL, so scoped tokens fail silently in exactly
-this way: connection test now succeeds (we probe `/serverInfo`, which is
-anonymous-readable), but no projects appear in the wizard.
+| Classic scope (UI label) | Why the importer needs it |
+|---|---|
+| **`read:jira-work`** ("Read Jira project data") | Projects, issues, fields, JQL search, bulkfetch, project versions |
+| **`read:jira-user`** ("View Jira user info") | Resolve assignees / reporters / creators back to email & display name |
+| **`read:me`** ("View your Atlassian account") | Identity probe used by the routing auto-detector |
+| **`read:jira-software`** *(optional)* | Boards & sprints (`/rest/agile/1.0/...`) |
 
-Atlassian source confirming this:
+Granular alternative (recommended by Atlassian for new integrations) —
+see [Atlassian's scope reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/)
+for the canonical list. The importer minimally needs:
+
+- `read:project:jira`, `read:project-version:jira`
+- `read:issue:jira`, `read:issue-meta:jira`,
+  `read:issue.changelog:jira`, `read:issue.comment:jira`,
+  `read:issue.attachment:jira`, `read:issue.worklog:jira`
+- `read:issue-type:jira`, `read:status:jira`, `read:field:jira`
+- `read:user:jira`
+- `read:me` (for the routing probe)
+- `read:board-scope:jira-software`, `read:sprint:jira-software`
+  (for boards/sprints)
+
+The importer is **read-only**. Don't grant `write:*` or `manage:*` —
+they're unused and broaden the blast radius of a leaked token.
+
+## Why two URL hosts exist
+
+Atlassian rolled out scoped API tokens in 2024 with a quirk that catches
+every long-standing integration: **scoped tokens cannot be used against
+`https://<site>.atlassian.net/...` directly**. Atlassian silently
+downgrades the request to anonymous instead of returning 401. Endpoints
+that allow anonymous reads return generic data; permission-filtered
+endpoints return empty arrays; only `/myself` surfaces the 401. The
+wizard's project list ends up empty with no actionable error.
+
+Atlassian's documented routing for scoped tokens is:
 
 > "You need to call the Atlassian API to use API tokens with scopes for
 > Jira `https://api.atlassian.com/ex/jira/{cloudId}` or Confluence
@@ -42,109 +68,70 @@ Atlassian source confirming this:
 >
 > — [Manage API tokens for your Atlassian account](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/)
 
-## Scoped token support (not implemented)
+Legacy unscoped tokens, by contrast, must keep using the site URL.
 
-To support scoped tokens, the importer would need:
+**How the importer handles both** (`internal/jira/client.go::cloudRoutingProbe`):
 
-1. At connect time, fetch the cloud ID from the well-known endpoint:
-   ```
-   GET https://<site>.atlassian.net/_edge/tenant_info
-   → {"cloudId": "..."}
-   ```
-   This endpoint is unauthenticated and stable.
+1. Fetch the unauthenticated `<site>/_edge/tenant_info` to learn the
+   cloud ID.
+2. Hit `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/myself`
+   with the token.
+3. If that returns 200, the token is scoped and the importer uses the
+   gateway URLs for every subsequent call. Otherwise it falls back to
+   the site URL (legacy token, or `tenant_info` unreachable).
 
-2. Store `cloudId` on the connection record.
+Decision is logged at info level (`Jira cloud routing: using
+api.atlassian.com gateway` or `… using site URL`).
 
-3. Rewrite client base URLs from
-   `https://<site>.atlassian.net/rest/api/3/...` to
-   `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`
-   for every importer call.
+## Edge case: scoped tokens without read:me
 
-4. Same change for the Agile (`/rest/agile/1.0/...`) and Assets
-   (`/rest/assets/1.0/...`) clients.
+The probe above uses `/myself` because it's the only endpoint that
+reliably distinguishes "authenticated" from "anonymous-because-silently-downgraded".
+A scoped token created without the `read:me` scope returns 401 on
+`/myself` even when routed correctly, so the probe will fall back to the
+site URL — where the token also fails.
 
-5. Accept both URL shapes from the operator (we already accept the site
-   URL; the cloudId comes from step 1).
+If org policy forbids `read:me`, use a legacy unscoped token instead. We
+can switch the probe to a different endpoint (e.g.
+`POST /rest/api/3/permissions/check`) if this becomes a recurring
+constraint.
 
-When implemented, the per-endpoint scope requirements are documented
-below for selecting scopes during token creation.
+## Account-level Jira permissions
 
-## Scope reference (for future scoped-token support)
-
-Per [Atlassian's official scope docs](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/),
-the classic scopes the importer would need are:
-
-| Classic scope | Covers |
-|---|---|
-| `read:jira-work` | Read Jira project and issue data, search for issues and objects associated with issues like attachments and worklogs |
-| `read:jira-user` | View user information in Jira that the user has access to, including usernames, email addresses, and avatars |
-
-Add `read:jira-software` (Jira Software classic scope) if importing
-boards/sprints, and the CMDB scope (`read:cmdb-object:jira` or similar)
-if importing Insight / Assets.
-
-**Important caveat from Atlassian**:
+Scope grants are necessary but not sufficient:
 
 > "Jira permissions also control access to data and aren't overridden by
 > scopes. For example, if a user does not have the Browse projects
 > permission then the Get project operation won't be able to access
 > project data even if the app has the manage:jira-project and other
 > required scopes."
+>
+> — [Atlassian scopes reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/)
 
-So scope grants are necessary but not sufficient — the underlying account
-must also have project-level Browse permission in Jira's permission
-schemes.
-
-### Granular scopes (recommended for new integrations)
-
-Atlassian recommends granular scopes for tighter least-privilege. The
-endpoint → granular-scope mapping is documented per-operation in the REST
-API reference at
-<https://developer.atlassian.com/cloud/jira/platform/rest/v3/>.
-The importer would minimally need:
-
-- `read:project:jira` — list / fetch projects
-- `read:project-version:jira` — fetch project versions (fix versions)
-- `read:issue:jira` — fetch issues
-- `read:issue-meta:jira` — issue metadata (also used by JQL search)
-- `read:issue.changelog:jira`, `read:issue.comment:jira`, `read:issue.attachment:jira`, `read:issue.worklog:jira` — issue children
-- `read:issue-type:jira` — list issue types
-- `read:status:jira` — list statuses
-- `read:field:jira` — list custom fields
-- `read:user:jira` — resolve assignees / reporters / creators
-
-For boards & sprints add `read:board-scope:jira-software` and
-`read:sprint:jira-software`. For Insight / Assets add the corresponding
-`read:cmdb-*:jira` scopes.
-
-`read:me` is **not** required — the importer's `TestConnection` probes
-`/serverInfo` (no scope needed) and treats `/myself` as best-effort
-enrichment that's silently ignored on 401.
+The account that owns the token must have **Browse Projects** on every
+project to import, plus **View Issues** in the project's Permission
+Scheme. Verify by signing in to the Jira UI as that account and checking
+the project switcher — if it's empty there, scopes don't matter.
 
 ## Diagnosing failures
 
-After the connection-test fix, every Jira 4xx response is logged at warn
-on the Windshift server and surfaced to the UI with Jira's verbatim
-error text. Common shapes:
+Every Jira 4xx response is logged at warn on the Windshift server and
+surfaced to the UI with Jira's verbatim error text:
 
 | Jira says | Means |
 |---|---|
-| `Client must be authenticated to access this resource.` | Scoped token used against the direct site URL — Atlassian dropped your identity. Use an unscoped token, or wait for scoped-token routing support. |
-| `You do not have the permission to see the specified issue.` | Token is valid; the account lacks per-project Browse permission in Jira's permission scheme. |
-| `Unbounded JQL queries are not allowed here.` | Importer bug, not a token problem — JQL must include a restriction. |
-| Empty `[]` from `/project`, `/issuetype`, etc. with no error | Almost certainly a scoped token used against the site URL. Atlassian routes the call as anonymous; everything permission-filtered returns empty. |
-
-The server log line is `Jira connection test failed` (warn) for the
-connect step and `Failed to ...` (error) for in-flight import calls.
-Both include the Jira response body when the upstream returns a non-2xx.
+| `Client must be authenticated to access this resource.` | Routing probe likely fell back to site URL with a scoped token. Confirm `read:me` is on the token's scope list, or switch to a legacy unscoped token. |
+| `You do not have the permission to see the specified issue.` | Token routing OK; the account lacks per-project Browse permission. Adjust the project's Permission Scheme. |
+| `Unbounded JQL queries are not allowed here.` | Importer bug, not a token problem. |
+| Empty `[]` from `/project`, `/issuetype`, etc. with no error | Should no longer happen since the auto-probe shipped. If it does: check the server log for `Jira cloud routing:` — if it says "using site URL" with a scoped token, the probe failed. |
 
 ## Data Center
 
 Atlassian Data Center uses **Personal Access Tokens (PATs)**. PATs have
 no selectable scopes — they inherit the **creating user's** Jira
-permissions verbatim, and they use Basic auth against the standard site
-URL with no special routing. To make a PAT work end-to-end, the user
-account needs:
+permissions verbatim, use Basic auth against the standard site URL, and
+the auto-probe is skipped entirely (it's Cloud-only). The PAT account
+needs:
 
 - **Browse Projects** on every project to import
 - **View Issues** in the relevant Permission Scheme
@@ -154,7 +141,7 @@ account needs:
 
 ## Sources
 
-- [Manage API tokens for your Atlassian account](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) — official, explains scoped vs unscoped token endpoint requirements
+- [Manage API tokens for your Atlassian account](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) — official, scoped-token gateway routing requirement
+- [Manage API tokens for service accounts](https://support.atlassian.com/user-management/docs/manage-api-tokens-for-service-accounts/) — official, includes the "Check your endpoint format" troubleshooting section
 - [Jira scopes for OAuth 2.0 (3LO) and Forge apps](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) — canonical classic + granular scope list
 - [Jira Cloud platform REST API v3](https://developer.atlassian.com/cloud/jira/platform/rest/v3/) — per-operation scope requirements
-- [How to use a Scoped API key for user query](https://community.atlassian.com/forums/Jira-questions/How-to-use-a-Scoped-API-key-for-user-query/qaq-p/3114697) — community thread documenting the URL-routing requirement
