@@ -4,6 +4,21 @@
 import { api } from '../api.js';
 import { createWizardNavigation } from '../utils/wizardNavigation.js';
 
+// toProjectError normalizes whatever shape fetchAPI threw into a stable
+// { message, code, status } the wizard renders. The `code` is the upstream
+// classification (JIRA_AUTH_FAILED / JIRA_FORBIDDEN / JIRA_RATE_LIMITED /
+// JIRA_UPSTREAM_ERROR) when the backend identified a Jira-side failure;
+// it's null for everything else.
+function toProjectError(err) {
+  /** @type {any} */
+  const e = err || {};
+  return {
+    message: e.message || 'Failed to load Jira projects',
+    code: e.code || e.errorCode || null,
+    status: e.status || null,
+  };
+}
+
 // Saved connections list (for management page)
 let savedConnectionsState = $state({
   items: [],
@@ -200,21 +215,27 @@ export const jiraImport = {
   // Project methods. loadProjects returns the lightweight metadata list
   // immediately (no counts) and kicks off the count fetch in the background;
   // toggling openIssuesOnly only re-fires counts, not the full project list.
+  //
+  // Errors are stored as a structured object so the UI can branch on `.code`
+  // (e.g. JIRA_AUTH_FAILED → show "Reconnect" CTA, JIRA_RATE_LIMITED → wait).
+  // Callers should check `projects.error` before advancing the wizard.
   async loadProjects() {
     if (!connectionState.connectionId) return;
 
     projectsState.isLoading = true;
     projectsState.error = null;
+    projectsState.available = [];
 
     try {
       const projects = await api.jiraImport.getProjects(connectionState.connectionId);
       projectsState.available = projects;
     } catch (err) {
-      projectsState.error = err.message || 'Failed to load projects';
+      projectsState.error = toProjectError(err);
     } finally {
       projectsState.isLoading = false;
     }
 
+    if (projectsState.error) return; // Don't chase counts when the list itself failed.
     // Fire-and-forget: counts populate cards after the wizard has already moved on.
     this.loadProjectCounts();
   },
@@ -240,8 +261,15 @@ export const jiraImport = {
         issue_count: counts[p.key] ?? null,
       }));
     } catch (err) {
-      // Non-fatal: cards still render without counts.
-      console.warn('Failed to load Jira project counts:', err);
+      // Surface upstream Jira errors (e.g. token revoked between project list
+      // and counts) the same way as loadProjects so the UI banner can render.
+      // Other errors are non-fatal — cards just keep showing "…".
+      const e = toProjectError(err);
+      if (e.code?.startsWith('JIRA_')) {
+        projectsState.error = e;
+      } else {
+        console.warn('Failed to load Jira project counts:', err);
+      }
     } finally {
       projectsState.isLoadingCounts = false;
     }

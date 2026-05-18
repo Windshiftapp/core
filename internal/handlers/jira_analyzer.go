@@ -43,7 +43,7 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 
 	projects, err := client.ListProjects(r.Context())
 	if err != nil {
-		respondInternalError(w, r, err)
+		respondJiraUpstreamError(w, r, err)
 		return
 	}
 
@@ -71,7 +71,11 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 		for i, p := range projects {
 			keys[i] = p.Key
 		}
-		counts := fetchProjectCounts(r.Context(), client, keys, openIssuesOnly)
+		counts, upstreamErr := fetchProjectCounts(r.Context(), client, keys, openIssuesOnly)
+		if upstreamErr != nil {
+			respondJiraUpstreamError(w, r, upstreamErr)
+			return
+		}
 		for i := range projectInfos {
 			if c, ok := counts[projectInfos[i].Key]; ok {
 				v := c
@@ -116,19 +120,31 @@ func (h *JiraImportHandler) GetProjectCounts(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	counts := fetchProjectCounts(r.Context(), client, keys, req.OpenIssuesOnly)
+	counts, upstreamErr := fetchProjectCounts(r.Context(), client, keys, req.OpenIssuesOnly)
+	if upstreamErr != nil {
+		respondJiraUpstreamError(w, r, upstreamErr)
+		return
+	}
 	respondJSONOK(w, counts)
 }
 
 // fetchProjectCounts fans out GetIssueCount calls with bounded concurrency
-// and returns a {key: count} map. Failed lookups are logged and omitted.
-func fetchProjectCounts(ctx context.Context, client jira.Client, keys []string, openIssuesOnly bool) map[string]int {
+// and returns a {key: count} map plus the first credential/upstream error if
+// any goroutine saw one. Other (per-project) failures stay logged-and-omitted
+// because they're typically permission-scoped; a credential failure on the
+// other hand means every count is going to fail and the caller should surface
+// it rather than return a quietly empty map.
+func fetchProjectCounts(ctx context.Context, client jira.Client, keys []string, openIssuesOnly bool) (map[string]int, error) {
 	counts := make(map[string]int, len(keys))
 	if len(keys) == 0 {
-		return counts
+		return counts, nil
 	}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
+	var (
+		mu           sync.Mutex
+		wg           sync.WaitGroup
+		upstreamErr  error
+		upstreamOnce sync.Once
+	)
 	sem := make(chan struct{}, projectCountConcurrency)
 
 	for _, k := range keys {
@@ -142,6 +158,9 @@ func fetchProjectCounts(ctx context.Context, client jira.Client, keys []string, 
 			if err != nil {
 				slog.Warn("Failed to get issue count for project",
 					slog.String("component", "jira"), slog.String("project", k), slog.Any("error", err))
+				if isJiraUpstreamError(err) {
+					upstreamOnce.Do(func() { upstreamErr = err })
+				}
 				return
 			}
 			mu.Lock()
@@ -150,7 +169,15 @@ func fetchProjectCounts(ctx context.Context, client jira.Client, keys []string, 
 		}()
 	}
 	wg.Wait()
-	return counts
+	return counts, upstreamErr
+}
+
+// isJiraUpstreamError reports whether the error is one the wizard should
+// surface to the user rather than silently swallow.
+func isJiraUpstreamError(err error) bool {
+	return errors.Is(err, jira.ErrInvalidCredentials) ||
+		errors.Is(err, jira.ErrForbidden) ||
+		errors.Is(err, jira.ErrRateLimited)
 }
 
 func dedupeNonEmpty(in []string) []string {

@@ -79,6 +79,22 @@
     )
   );
 
+  // After loadProjects(), check whether Jira rejected us upstream and surface
+  // it instead of advancing into an empty Projects step. JIRA_AUTH_FAILED is
+  // unrecoverable from here (the saved token is bad), so we stay on Connect
+  // and toast; other codes (rate-limit, generic upstream) advance so the
+  // user can see the persistent banner and retry.
+  function reportProjectsLoadOutcome() {
+    const err = projects.error;
+    if (!err) return { ok: true, advance: true };
+    addToast({
+      message: err.message,
+      variant: 'error',
+      title: err.code === 'JIRA_AUTH_FAILED' ? 'Reconnect required' : 'Jira request failed',
+    });
+    return { ok: false, advance: err.code !== 'JIRA_AUTH_FAILED' };
+  }
+
   // Handle connection test (new connection)
   async function handleConnect() {
     const result = await jiraImport.testConnection(jiraUrl, email, apiToken, deploymentType);
@@ -87,7 +103,8 @@
       addToast({ message: `Connected to ${instanceType} successfully!`, variant: 'success' });
       // Load projects after connecting
       await jiraImport.loadProjects();
-      safeNextStep();
+      const outcome = reportProjectsLoadOutcome();
+      if (outcome.advance) safeNextStep();
     } else {
       addToast({ message: result.error, variant: 'error', title: 'Connection Failed' });
     }
@@ -101,7 +118,8 @@
     addToast({ message: `Connected to ${conn.instance_name || instanceType}`, variant: 'success' });
     await jiraImport.loadProjects();
     isLoadingSavedConnection = false;
-    safeNextStep();
+    const outcome = reportProjectsLoadOutcome();
+    if (outcome.advance) safeNextStep();
   }
 
   // State for loading saved connection
@@ -152,6 +170,8 @@
           isContinueLoading = true;
           await jiraImport.loadProjects();
           isContinueLoading = false;
+          const outcome = reportProjectsLoadOutcome();
+          if (!outcome.advance) return;
         }
         safeNextStep();
       } else {
@@ -465,6 +485,31 @@
             bind:value={projectSearch}
             placeholder="Search projects..."
           />
+
+          {#if projects.error && projects.available.length === 0}
+            <AlertBox variant="error" class="mb-4">
+              <div class="flex items-start gap-3 w-full">
+                <p class="flex-1 font-medium">{projects.error.message}</p>
+                {#if projects.error.code === 'JIRA_AUTH_FAILED'}
+                  <Button
+                    variant="primary"
+                    size="small"
+                    onclick={() => jiraImport.goToStep(0)}
+                  >
+                    Back to Connect
+                  </Button>
+                {:else}
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onclick={() => jiraImport.loadProjects()}
+                  >
+                    Retry
+                  </Button>
+                {/if}
+              </div>
+            </AlertBox>
+          {/if}
 
           {#if projects.isLoading}
             <div class="flex items-center justify-center py-12">

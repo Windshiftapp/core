@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"windshift/internal/jira"
 	"windshift/internal/restapi"
 	"windshift/internal/services"
 )
@@ -92,6 +94,36 @@ func respondInternalError(w http.ResponseWriter, r *http.Request, err error) {
 		slog.String("method", r.Method),
 	)
 	restapi.RespondError(w, r, restapi.ErrInternalError)
+}
+
+// respondJiraUpstreamError returns 502 Bad Gateway with a stable code/message
+// pair the frontend can branch on for upstream Jira failures.
+//
+// We intentionally avoid 401 because the frontend's fetchAPI treats every 401
+// as "Windshift session expired" and force-logs the user out — a revoked Jira
+// token is an *upstream* problem, not a session one. 502 captures that
+// distinction and lets the wizard show a "Reconnect" CTA without touching
+// the user's Windshift auth.
+func respondJiraUpstreamError(w http.ResponseWriter, r *http.Request, err error) {
+	code := "JIRA_UPSTREAM_ERROR"
+	message := "Jira request failed."
+	switch {
+	case errors.Is(err, jira.ErrInvalidCredentials):
+		code = "JIRA_AUTH_FAILED"
+		message = "Jira authentication failed — the saved token may be expired or revoked. Reconnect this Jira connection to continue."
+	case errors.Is(err, jira.ErrForbidden):
+		code = "JIRA_FORBIDDEN"
+		message = "Jira denied the request. Check that the user the token belongs to has access to these projects."
+	case errors.Is(err, jira.ErrRateLimited):
+		code = "JIRA_RATE_LIMITED"
+		message = "Jira rate limit hit — wait a moment and try again."
+	}
+	slog.Warn("jira upstream error",
+		slog.Any("error", err),
+		slog.String("code", code),
+		slog.String("path", r.URL.Path),
+	)
+	restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadGateway, code, message))
 }
 
 // respondBadRequest writes a 400 Bad Request JSON response with a custom message
