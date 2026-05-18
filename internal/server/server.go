@@ -1084,6 +1084,7 @@ func (s *Server) initialize() error {
 				repository.NewActionRepository(s.db),
 				repository.NewWebhookDeliveryRepository(s.db),
 				repository.NewSchedulerRunRepository(s.db),
+				repository.NewFracIndexRepository(s.db),
 				logger.NewAuditor(s.db),
 			),
 		},

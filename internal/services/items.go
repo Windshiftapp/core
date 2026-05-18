@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -150,12 +151,6 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		updatedAt = *params.UpdatedAt
 	}
 
-	// Generate fractional index for manual ordering
-	fracIndex, err := GenerateFracIndexForNewItem(db, params.WorkspaceID, params.ParentID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to generate frac_index: %w", err)
-	}
-
 	// Resolve status ID BEFORE starting the transaction to avoid holding the TX open during lookups
 	// Direct ID takes precedence, then text mapping, then workflow initial status (cached)
 	var statusID *int
@@ -182,7 +177,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	// If priority is still nil, get the default priority scoped to the workspace's configuration set
 	if priorityID == nil {
 		var defaultPriorityID int
-		err = db.QueryRow(`
+		err := db.QueryRow(`
 			SELECT p.id FROM priorities p
 			INNER JOIN configuration_set_priorities csp ON p.id = csp.priority_id
 			INNER JOIN workspace_configuration_sets wcs ON csp.configuration_set_id = wcs.configuration_set_id
@@ -198,87 +193,118 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		}
 	}
 
-	// Start transaction for atomic item creation (minimal scope: number gen + INSERT)
-	tx, err := db.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Get next workspace-specific item number (within transaction to prevent race conditions)
-	var nextWorkspaceItemNumber int
-	err = tx.QueryRow(`
-		SELECT COALESCE(MAX(workspace_item_number), 0) + 1
-		FROM items
-		WHERE workspace_id = ?
-	`, params.WorkspaceID).Scan(&nextWorkspaceItemNumber)
-	if err != nil {
-		return 0, fmt.Errorf("failed to generate workspace item number: %w", err)
-	}
-
-	// Insert item with all fields
-	// Note: Uses RETURNING id for both SQLite (3.35+) and PostgreSQL
-	insertQuery := `
-		INSERT INTO items (
-			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
-			iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
-			channel_id, request_type_id, due_date, start_date, end_date, related_work_item_id,
-			story_points, custom_field_values, parent_id,
-			frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`
-
-	var itemID int64
-	err = tx.QueryRow(insertQuery,
-		params.WorkspaceID,
-		nextWorkspaceItemNumber,
-		params.ItemTypeID,
-		params.Title,
-		params.Description,
-		statusID,
-		priorityID,
-		params.IsTask,
-		params.IterationID,
-		params.ProjectID,
-		params.InheritProject,
-		params.TimeProjectID,
-		params.AssigneeID,
-		params.ReporterID,
-		params.CreatorID,
-		params.CreatorPortalCustomerID,
-		params.ChannelID,
-		params.RequestTypeID,
-		params.DueDate,
-		params.StartDate,
-		params.EndDate,
-		params.RelatedWorkItemID,
-		params.StoryPoints,
-		nullString(params.CustomFieldValuesJSON),
-		params.ParentID,
-		fracIndex,
-		createdAt,
-		updatedAt,
-	).Scan(&itemID)
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert item: %w", err)
-	}
-
-	// Attach milestones inside the same transaction so a milestone-validation
-	// failure rolls back the item insert. Empty/nil slice = no milestones.
-	for _, mID := range params.MilestoneIDs {
-		if _, err := tx.Exec(
-			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-			itemID, mID, now,
-		); err != nil {
-			return 0, fmt.Errorf("failed to attach milestone %d to new item: %w", mID, err)
+	// runInsertTx executes the per-attempt portion of CreateItem with a fresh
+	// frac_index. Hoisted into a closure so the retry loop can re-issue the
+	// whole transaction (number-gen + INSERT + milestone attach) without
+	// re-running the upstream item-type / status / priority resolution.
+	runInsertTx := func(fracIndex string) (int64, error) {
+		tx, err := db.Begin()
+		if err != nil {
+			return 0, fmt.Errorf("failed to start transaction: %w", err)
 		}
+		defer func() { _ = tx.Rollback() }()
+
+		// Get next workspace-specific item number (within transaction to prevent race conditions)
+		var nextWorkspaceItemNumber int
+		if err := tx.QueryRow(`
+			SELECT COALESCE(MAX(workspace_item_number), 0) + 1
+			FROM items
+			WHERE workspace_id = ?
+		`, params.WorkspaceID).Scan(&nextWorkspaceItemNumber); err != nil {
+			return 0, fmt.Errorf("failed to generate workspace item number: %w", err)
+		}
+
+		// Insert item with all fields
+		// Note: Uses RETURNING id for both SQLite (3.35+) and PostgreSQL
+		insertQuery := `
+			INSERT INTO items (
+				workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
+				iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
+				channel_id, request_type_id, due_date, start_date, end_date, related_work_item_id,
+				story_points, custom_field_values, parent_id,
+				frac_index, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			RETURNING id
+		`
+
+		var itemID int64
+		if err := tx.QueryRow(insertQuery,
+			params.WorkspaceID,
+			nextWorkspaceItemNumber,
+			params.ItemTypeID,
+			params.Title,
+			params.Description,
+			statusID,
+			priorityID,
+			params.IsTask,
+			params.IterationID,
+			params.ProjectID,
+			params.InheritProject,
+			params.TimeProjectID,
+			params.AssigneeID,
+			params.ReporterID,
+			params.CreatorID,
+			params.CreatorPortalCustomerID,
+			params.ChannelID,
+			params.RequestTypeID,
+			params.DueDate,
+			params.StartDate,
+			params.EndDate,
+			params.RelatedWorkItemID,
+			params.StoryPoints,
+			nullString(params.CustomFieldValuesJSON),
+			params.ParentID,
+			fracIndex,
+			createdAt,
+			updatedAt,
+		).Scan(&itemID); err != nil {
+			return 0, fmt.Errorf("failed to insert item: %w", err)
+		}
+
+		// Attach milestones inside the same transaction so a milestone-validation
+		// failure rolls back the item insert. Empty/nil slice = no milestones.
+		for _, mID := range params.MilestoneIDs {
+			if _, err := tx.Exec(
+				"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+				itemID, mID, now,
+			); err != nil {
+				return 0, fmt.Errorf("failed to attach milestone %d to new item: %w", mID, err)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return 0, fmt.Errorf("failed to commit transaction: %w", err)
+		}
+		return itemID, nil
 	}
 
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
-		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	// Catch-only retry on idx_items_frac_index unique violation. The success
+	// path takes one iteration; the loop body only spins when the cache has
+	// drifted from the DB max (poisoning, or column-collation mismatch). On
+	// each conflict the cache is invalidated so the next Generate call
+	// re-reads MAX(frac_index) from the DB.
+	var itemID int64
+	for attempt := 0; attempt < fracIndexMaxRetries; attempt++ {
+		fracIndex, gerr := GenerateFracIndexForNewItem(db, params.WorkspaceID, params.ParentID)
+		if gerr != nil {
+			return 0, fmt.Errorf("failed to generate frac_index: %w", gerr)
+		}
+		id, ierr := runInsertTx(fracIndex)
+		if ierr == nil {
+			itemID = id
+			break
+		}
+		if !IsFracIndexUniqueViolation(ierr) {
+			return 0, ierr
+		}
+		slog.Warn("frac_index unique violation, retrying",
+			slog.Int("attempt", attempt+1),
+			slog.String("frac_index", fracIndex),
+			slog.String("component", "fracindex"))
+		InvalidateFracIndexCache()
+		if attempt == fracIndexMaxRetries-1 {
+			return 0, fmt.Errorf("failed to insert item after %d frac_index retries: %w", fracIndexMaxRetries, ierr)
+		}
 	}
 
 	// Record item creation history asynchronously if a creator is specified

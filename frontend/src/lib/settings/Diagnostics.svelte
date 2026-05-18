@@ -7,12 +7,14 @@
   import ActionLogsSection from './diagnostics/ActionLogsSection.svelte';
   import WebhookDeliveriesSection from './diagnostics/WebhookDeliveriesSection.svelte';
   import SchedulerRunsSection from './diagnostics/SchedulerRunsSection.svelte';
+  import FracIndexSection from './diagnostics/FracIndexSection.svelte';
 
   const tabs = [
     { id: 'clock', label: 'Server clock' },
     { id: 'actions', label: 'Action executions' },
     { id: 'webhooks', label: 'Webhook deliveries' },
     { id: 'schedulers', label: 'Background jobs' },
+    { id: 'fracindex', label: 'Frac index' },
   ];
 
   const subtab = $derived($currentRoute.query?.subtab || 'clock');
@@ -36,6 +38,8 @@
         <WebhookDeliveriesSection />
       {:else if subtab === 'schedulers'}
         <SchedulerRunsSection />
+      {:else if subtab === 'fracindex'}
+        <FracIndexSection />
       {/if}
     </div>
   </div>

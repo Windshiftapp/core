@@ -33,12 +33,15 @@ type managedContainer struct {
 // "skip --network when mode is none" shortcut caused Docker to fall back to
 // its default bridge, defeating isolation.
 func buildDockerRunArgs(envConfig models.DockerEnvironmentConfig, hostPort int) []string {
-	args := []string{
+	// Fixed args: run, -d, --memory <v>, --cpus <v>, -p <v>, --network <v> (10)
+	// + 2 per env var (-e <k=v>) + 1 for the image at the tail.
+	args := make([]string, 0, 10+2*len(envConfig.EnvVars)+1)
+	args = append(args,
 		"run", "-d",
 		"--memory", envConfig.ResourceLimits.Memory,
 		"--cpus", envConfig.ResourceLimits.CPUs,
 		"-p", fmt.Sprintf("%d:8080", hostPort),
-	}
+	)
 
 	networkMode := envConfig.NetworkMode
 	if networkMode == "" {

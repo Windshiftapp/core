@@ -21,21 +21,6 @@ func parseConnectionIDParam(r *http.Request) int {
 	return connectionID
 }
 
-// requireLLMClient resolves and validates an LLM client. On failure it writes
-// a structured error response and returns nil — the caller should return immediately.
-func requireLLMClient(w http.ResponseWriter, r *http.Request, manager *llm.ConnectionManager, connectionID int) llm.Client {
-	client, err := manager.Resolve(connectionID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to resolve LLM connection: %w", err))
-		return nil
-	}
-	if !client.Available() {
-		respondServiceUnavailable(w, r, "AI features are not available. LLM service is not configured.")
-		return nil
-	}
-	return client
-}
-
 // requireLLMClientForFeature resolves an LLM client respecting per-feature admin
 // configuration. The user-supplied override (Chat UI's connection selector) is
 // only honored when the feature is in default mode — a feature that's pinned

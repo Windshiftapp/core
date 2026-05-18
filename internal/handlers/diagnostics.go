@@ -10,6 +10,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
@@ -22,6 +23,7 @@ type DiagnosticsHandler struct {
 	actionRepo       *repository.ActionRepository
 	deliveryRepo     *repository.WebhookDeliveryRepository
 	schedulerRunRepo *repository.SchedulerRunRepository
+	fracIndexRepo    *repository.FracIndexRepository
 	auditor          *logger.Auditor
 }
 
@@ -30,14 +32,37 @@ func NewDiagnosticsHandler(
 	actionRepo *repository.ActionRepository,
 	deliveryRepo *repository.WebhookDeliveryRepository,
 	schedulerRunRepo *repository.SchedulerRunRepository,
+	fracIndexRepo *repository.FracIndexRepository,
 	auditor *logger.Auditor,
 ) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
 		actionRepo:       actionRepo,
 		deliveryRepo:     deliveryRepo,
 		schedulerRunRepo: schedulerRunRepo,
+		fracIndexRepo:    fracIndexRepo,
 		auditor:          auditor,
 	}
+}
+
+// GetFracIndexState returns a snapshot of in-memory cache state and DB state
+// for the items.frac_index column, scoped to the admin diagnostics panel.
+// "healthy" is false when the column collation diverges from byte ordering
+// or when the cache's predicted-next key already exists in the table.
+//
+// GET /api/admin/diagnostics/frac-index
+func (h *DiagnosticsHandler) GetFracIndexState(w http.ResponseWriter, r *http.Request) {
+	cache := services.GetFracIndexCacheStats()
+	dbState, err := h.fracIndexRepo.GetDBStats(cache.NextWouldBe)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	healthy := !dbState.CollationMismatch && dbState.PredictedCollision == nil
+	respondJSONOK(w, map[string]any{
+		"cache":   cache,
+		"db":      dbState,
+		"healthy": healthy,
+	})
 }
 
 // GetActionLogs returns recent cross-workspace action execution logs.

@@ -20,6 +20,7 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /admin/diagnostics/scheduler-runs", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSchedulerRuns)))
 	api.HandleH("GET /admin/diagnostics/scheduler-stats", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSchedulerStats)))
 	api.HandleH("POST /admin/diagnostics/scheduler-runs/purge", admin(http.HandlerFunc(deps.Admin.Diagnostics.PurgeSchedulerRuns)))
+	api.HandleH("GET /admin/diagnostics/frac-index", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetFracIndexState)))
 
 	// Authentication policy endpoints (admin only)
 	api.HandleH("GET /admin/auth-policy", admin(http.HandlerFunc(deps.Admin.AuthPolicy.GetAuthPolicy)))

@@ -10,8 +10,35 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/lib/pq"
+
 	"windshift/internal/database"
 )
+
+// fracIndexMaxRetries caps the number of unique-violation retries on the
+// item INSERT / reorder UPDATE paths. The retry path only fires when the
+// in-memory cache has drifted from the DB max (or, on Postgres, when the
+// column collation differs from the algorithm's byte ordering — see the
+// admin diagnostics frac-index panel for live detection).
+const fracIndexMaxRetries = 5
+
+// IsFracIndexUniqueViolation reports whether err is specifically a
+// UNIQUE-constraint violation on idx_items_frac_index. Other unique
+// violations (e.g. workspace_item_number) must not trigger the retry,
+// so a generic check would be too broad. Exported for use by handlers
+// that wrap reorder writes in their own retry loop.
+func IsFracIndexUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pqErr.Code == "23505" &&
+			(pqErr.Constraint == "idx_items_frac_index" ||
+				strings.Contains(pqErr.Message, "idx_items_frac_index"))
+	}
+	return strings.Contains(err.Error(), "UNIQUE constraint failed: items.frac_index")
+}
 
 // Fractional indexing implementation based on https://github.com/rocicorp/fracdex
 // This provides lexicographically sortable keys for ordering items
@@ -386,13 +413,57 @@ func InvalidateFracIndexCache() {
 	fracIndexCache.Store((*string)(nil))
 }
 
-// UpdateItemFracIndex updates the frac_index of an item
+// UpdateItemFracIndex updates the frac_index of an item and advances the
+// generator cache so subsequent creates don't reuse the persisted key.
+// Callers must NOT skip this function and write frac_index by hand — the
+// cache coherence guarantee depends on every external persist going through
+// here.
 func UpdateItemFracIndex(db database.Database, itemID int, fracIndex string) error {
 	query := "UPDATE items SET frac_index = ? WHERE id = ?"
 	_, err := db.Exec(query, fracIndex, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to update frac_index: %w", err)
 	}
-
+	MaybeAdvanceFracIndexCache(fracIndex)
 	return nil
+}
+
+// FracIndexCacheStats describes the in-process generator cache for the admin
+// diagnostics panel. It is a read-only snapshot.
+type FracIndexCacheStats struct {
+	Cached      *string `json:"cached"`                  // current cached "last" key; nil if uninitialized
+	NextWouldBe *string `json:"next_would_be,omitempty"` // KeyBetween(cached, "") preview
+	NextError   string  `json:"next_error,omitempty"`
+	Hits        int64   `json:"hits"`
+	Misses      int64   `json:"misses"`
+}
+
+// GetFracIndexCacheStats returns a snapshot of the generator cache state.
+// It briefly takes the cache mutex; contention is negligible because
+// readers are diagnostic-only.
+func GetFracIndexCacheStats() FracIndexCacheStats {
+	fracIndexCacheMutex.Lock()
+	defer fracIndexCacheMutex.Unlock()
+
+	var cached *string
+	if v := fracIndexCache.Load(); v != nil {
+		if s, ok := v.(*string); ok && s != nil {
+			c := *s
+			cached = &c
+		}
+	}
+	out := FracIndexCacheStats{
+		Cached: cached,
+		Hits:   atomic.LoadInt64(&fracIndexCacheHits),
+		Misses: atomic.LoadInt64(&fracIndexCacheMiss),
+	}
+	if cached != nil {
+		next, err := KeyBetween(*cached, "")
+		if err != nil {
+			out.NextError = err.Error()
+		} else {
+			out.NextWouldBe = &next
+		}
+	}
+	return out
 }

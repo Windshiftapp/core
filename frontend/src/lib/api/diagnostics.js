@@ -99,3 +99,17 @@ export function purgeSchedulerRuns(olderThan) {
     body: JSON.stringify({ older_than: olderThan }),
   });
 }
+
+/**
+ * Snapshot of the items.frac_index generator state.
+ *
+ * Returns:
+ *   - cache: in-memory generator state (cached key, predicted next key, hit/miss counters)
+ *   - db: persisted state (column collation, linguistic vs byte-wise max, top 10, predicted collision)
+ *   - healthy: true when collation matches AND the predicted next key does not already exist
+ *
+ * @returns {Promise<{cache: object, db: object, healthy: boolean}>}
+ */
+export function getFracIndexState() {
+  return fetchAPI('/admin/diagnostics/frac-index');
+}
