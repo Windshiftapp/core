@@ -2,7 +2,14 @@
 
 import { actions } from './actions.js';
 import { oauthClients, securitySettings, setup, system, themes } from './admin.js';
-import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
+import {
+  actionCapabilities,
+  actionCredentials,
+  ai,
+  aiFeatures,
+  llmConnections,
+  llmProviders,
+} from './ai.js';
 import { analytics } from './analytics.js';
 import { approvalSets } from './approvalSets.js';
 import { approvals } from './approvals.js';
@@ -416,6 +423,9 @@ export const api = {
 
   // Action Capabilities (admin)
   actionCapabilities,
+
+  // Action Credentials (admin + workspace; encrypted API tokens)
+  actionCredentials,
 
   // Analytics (workspace-level velocity, CFD, cycle time, forecast)
   analytics,

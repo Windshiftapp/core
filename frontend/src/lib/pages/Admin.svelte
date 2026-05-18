@@ -27,6 +27,7 @@
   import SecuritySettings from '../settings/SecuritySettings.svelte';
   import AIContainer from '../settings/AIContainer.svelte';
   import CapabilityManager from '../settings/CapabilityManager.svelte';
+  import ActionCredentialManager from '../settings/ActionCredentialManager.svelte';
   import AssetManager from '../features/assets/AssetManager.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
@@ -126,6 +127,7 @@
       items: [
         { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: IconSparkles, description: t('settings.adminItems.llmConnections.description') },
         { id: 'action-capabilities', label: t('settings.adminItems.actionCapabilities.title'), icon: IconBolt, description: t('settings.adminItems.actionCapabilities.description') },
+        { id: 'action-credentials', label: 'Action Credentials', icon: IconBolt, description: 'Encrypted API tokens that HTTP capabilities reference. Secrets are write-only — once stored they cannot be read back.' },
         { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: IconGitMerge, description: t('settings.adminItems.scmProviders.description') },
         { id: 'integration-providers', label: 'Integrations', icon: IconPlug, description: 'Manage outbound integrations Windshift connects to and inbound apps that authorize via OAuth.' },
         { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: IconCloudDownload, description: t('settings.adminItems.systemImport.description') },
@@ -594,6 +596,11 @@
   <!-- Action Capabilities Tab -->
   {#if activeTab === 'action-capabilities'}
     <CapabilityManager />
+  {/if}
+
+  <!-- Action Credentials Tab -->
+  {#if activeTab === 'action-credentials'}
+    <ActionCredentialManager />
   {/if}
 
   <!-- System Import Tab -->
