@@ -65,3 +65,28 @@ export const actionCapabilities = {
     return get(`/workspaces/${workspaceId}/action-capabilities${qs}`);
   },
 };
+
+// actionCredentials: workspace-aware credential store referenced by HTTP
+// capabilities. The plaintext secret travels only on create/rotate; every
+// response is the sanitized DTO (has_secret + prefix; no ciphertext).
+export const actionCredentials = {
+  // Global (workspace_id IS NULL) credentials — system-admin only.
+  getAllGlobal: () => get('/admin/action-credentials'),
+  createGlobal: (data) => post('/admin/action-credentials', data),
+  updateGlobal: (id, data) => put(`/admin/action-credentials/${id}`, data),
+  rotateGlobal: (id, secret) => post(`/admin/action-credentials/${id}/rotate`, { secret }),
+  deleteGlobal: (id) => del(`/admin/action-credentials/${id}`),
+
+  // Workspace-scoped credentials — gated by action.credential.manage. The
+  // list endpoint also returns globals (workspace_id null) so a single call
+  // populates the credential picker.
+  getForWorkspace: (workspaceId) => get(`/workspaces/${workspaceId}/action-credentials`),
+  createForWorkspace: (workspaceId, data) =>
+    post(`/workspaces/${workspaceId}/action-credentials`, data),
+  updateForWorkspace: (workspaceId, id, data) =>
+    put(`/workspaces/${workspaceId}/action-credentials/${id}`, data),
+  rotateForWorkspace: (workspaceId, id, secret) =>
+    post(`/workspaces/${workspaceId}/action-credentials/${id}/rotate`, { secret }),
+  deleteForWorkspace: (workspaceId, id) =>
+    del(`/workspaces/${workspaceId}/action-credentials/${id}`),
+};
