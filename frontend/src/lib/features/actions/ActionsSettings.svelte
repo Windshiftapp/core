@@ -38,10 +38,15 @@
     showTemplatePicker = false;
     successToast(t('common.created'));
     await loadActions();
-    // Open the freshly created action in the editor.
+    // Open the freshly created action in the editor. The list endpoint omits
+    // nodes/edges, so fetch the full action by id (same as handleEdit).
     if (result?.action_id) {
-      const created = actions.find(a => a.id === result.action_id);
-      if (created) editingAction = created;
+      try {
+        editingAction = await api.get(`/workspaces/${workspaceId}/actions/${result.action_id}`);
+      } catch (error) {
+        console.error('Failed to load created action:', error);
+        errorToast(t('errors.failedToLoad'));
+      }
     }
   }
 

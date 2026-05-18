@@ -886,7 +886,7 @@ func (s *Server) initialize() error {
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
 	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager, logger.NewAuditor(s.db))
 	promptStore := llm.NewPromptStore(cfg.LLM.PromptsDir)
-	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, timerService, promptStore)
+	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, timerService, promptStore, s.actionService)
 
 	// Briefing scheduler (generates daily briefings for all users)
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
@@ -1156,7 +1156,13 @@ func (s *Server) initialize() error {
 	}
 
 	// REST API v1
-	restapi.SetupRoutes(mux, s.db, tokenManager, permService, v1.RegisterRoutes)
+	restapi.SetupRoutes(restapi.Deps{
+		Mux:               mux,
+		DB:                s.db,
+		TokenManager:      tokenManager,
+		PermissionService: permService,
+		ActionService:     s.actionService,
+	}, v1.RegisterRoutes)
 
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true
 	if cfg.MCPEnabled {
@@ -1167,6 +1173,7 @@ func (s *Server) initialize() error {
 			TimePermissionService: timePermissionService,
 			TimerService:          timerService,
 			CommentService:        commentService,
+			ActionService:         s.actionService,
 		})
 		mux.Handle("GET /mcp", mcpServer.Handler())
 		mux.Handle("POST /mcp", mcpServer.Handler())

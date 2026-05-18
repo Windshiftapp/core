@@ -22,6 +22,10 @@ type Deps struct {
 	TimePermissionService *services.TimePermissionService
 	TimerService          *services.TimerService
 	CommentService        *services.CommentService
+	// ActionService is the optional cache-invalidation hook used by the
+	// create_action tool. Nil-safe — when unset, newly created actions
+	// fire after the next periodic cache refresh instead of immediately.
+	ActionService *services.ActionService
 }
 
 // MCPServer wraps the MCP SDK server and its HTTP handler.

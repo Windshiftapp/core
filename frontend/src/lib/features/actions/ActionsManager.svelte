@@ -91,6 +91,7 @@
         <Button
           variant="ghost"
           icon={Sparkles}
+          dataTestid="actions-from-template"
           onclick={handleFromTemplate}
         >
           {t('actions.templates.fromTemplate', 'From template')}

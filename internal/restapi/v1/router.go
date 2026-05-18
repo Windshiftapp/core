@@ -50,23 +50,19 @@
 package v1
 
 import (
-	"net/http"
-
-	"windshift/internal/auth"
-	"windshift/internal/database"
+	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/handlers"
 	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/router"
-	"windshift/internal/services"
 )
 
 // RegisterRoutes registers all v1 API routes on the given ServeMux
-func RegisterRoutes(
-	mux *http.ServeMux,
-	db database.Database,
-	tokenManager *auth.TokenManager,
-	permissionService *services.PermissionService,
-) {
+func RegisterRoutes(deps restapi.Deps) {
+	mux := deps.Mux
+	db := deps.DB
+	tokenManager := deps.TokenManager
+	permissionService := deps.PermissionService
+
 	// Create auth middleware (with permission service for admin checks)
 	bearerAuth := middleware.NewBearerAuthWithPermissions(tokenManager, permissionService)
 
@@ -86,6 +82,7 @@ func RegisterRoutes(
 	milestoneHandler := handlers.NewMilestoneHandler(db, permissionService)
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
+	actionHandler := handlers.NewActionHandler(db, permissionService, deps.ActionService)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter
@@ -227,6 +224,16 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("GET /collections", collectionHandler.List, bearerAuth.RequirePermission("collections:read"))
 	v1.HandleWithMiddleware("GET /collections/{key}", collectionHandler.Get, bearerAuth.RequirePermission("collections:read"))
 	v1.HandleWithMiddleware("GET /collections/{key}/items", collectionHandler.GetItems, bearerAuth.RequirePermission("collections:read", "items:read"))
+
+	// ============================================
+	// Actions (workspace-scoped automation graphs)
+	// ============================================
+	v1.HandleWithMiddleware("GET /workspaces/{id}/action-catalog", actionHandler.GetCatalog, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/actions", actionHandler.ListActions, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("POST /workspaces/{id}/actions", actionHandler.CreateAction, bearerAuth.RequirePermission("actions:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("POST /workspaces/{id}/actions/validate", actionHandler.ValidateAction, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/actions/{actionId}", actionHandler.GetAction, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("PUT /workspaces/{id}/actions/{actionId}", actionHandler.UpdateAction, bearerAuth.RequirePermission("actions:write"), router.RequireNumericID)
 
 	// ============================================
 	// Search

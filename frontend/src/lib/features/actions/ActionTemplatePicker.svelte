@@ -80,6 +80,7 @@
                 variant="primary"
                 size="sm"
                 disabled={applyingKey !== null}
+                dataTestid={`action-template-apply-${tmpl.key}`}
                 onclick={() => applyTemplate(tmpl.key)}
               >
                 {applyingKey === tmpl.key ? t('common.applying', 'Applying...') : t('actions.templates.apply', 'Apply')}

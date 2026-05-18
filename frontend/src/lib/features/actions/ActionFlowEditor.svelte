@@ -93,20 +93,75 @@
     return `var(--ds-accent-${accent})`;
   }
 
-  // Node palette - available node types to drag
-  const nodePalette = [
-    { type: 'set_field', label: t('actions.nodes.setField'), icon: Pencil },
-    { type: 'set_status', label: t('actions.nodes.setStatus'), icon: RefreshCw },
-    { type: 'add_comment', label: t('actions.nodes.addComment'), icon: MessageSquare },
-    { type: 'notify_user', label: t('actions.nodes.notifyUser'), icon: Bell },
-    { type: 'condition', label: t('actions.nodes.condition'), icon: HelpCircle },
-    { type: 'update_asset', label: t('actions.nodes.updateAsset'), icon: Database },
-    { type: 'create_asset', label: t('actions.nodes.createAsset'), icon: PlusSquare },
-    { type: 'http_request', label: t('actions.nodes.httpRequest'), icon: Globe },
-    { type: 'container_run', label: t('actions.nodes.containerRun'), icon: Box },
-    { type: 'ai_extract', label: t('actions.nodes.aiExtract'), icon: Sparkles },
-    { type: 'ai_agent', label: t('actions.nodes.aiAgent'), icon: Bot },
-  ];
+  // Map node types to lucide icons (icons stay client-side; everything else
+  // about the palette comes from the server-provided catalog so adding a new
+  // node type only requires registering it in internal/services/actioncatalog
+  // and rebuilding — the editor picks it up automatically). Types missing
+  // from this map render with the trigger icon as a neutral fallback.
+  const typeIcons = {
+    set_field: Pencil,
+    set_status: RefreshCw,
+    add_comment: MessageSquare,
+    notify_user: Bell,
+    condition: HelpCircle,
+    update_asset: Database,
+    create_asset: PlusSquare,
+    http_request: Globe,
+    container_run: Box,
+    ai_extract: Sparkles,
+    ai_agent: Bot,
+    transition_item: RefreshCw,
+    related_items: RefreshCw,
+    round_robin_assign: Bell,
+  };
+
+  // i18n keys for node types. When a type isn't in this map, the palette
+  // falls back to the server-provided label string (English). New node types
+  // can ship as catalog-only entries; translations land here in a follow-up.
+  const typeI18nKeys = {
+    set_field: 'actions.nodes.setField',
+    set_status: 'actions.nodes.setStatus',
+    add_comment: 'actions.nodes.addComment',
+    notify_user: 'actions.nodes.notifyUser',
+    condition: 'actions.nodes.condition',
+    update_asset: 'actions.nodes.updateAsset',
+    create_asset: 'actions.nodes.createAsset',
+    http_request: 'actions.nodes.httpRequest',
+    container_run: 'actions.nodes.containerRun',
+    ai_extract: 'actions.nodes.aiExtract',
+    ai_agent: 'actions.nodes.aiAgent',
+  };
+
+  // nodePalette is built from the catalog response on mount. Trigger nodes
+  // are filtered out (they're created implicitly by the editor) along with
+  // any type the editor doesn't yet have a custom Svelte node component for.
+  let nodePalette = $state([]);
+  let triggerTypes = $state([]);
+
+  function buildPaletteFromCatalog(catalog) {
+    nodePalette = (catalog?.nodes ?? [])
+      .filter((n) => n.type !== 'trigger' && nodeTypes[n.type])
+      .map((n) => ({
+        type: n.type,
+        label: typeI18nKeys[n.type] ? t(typeI18nKeys[n.type]) : n.label,
+        icon: typeIcons[n.type] ?? Pencil,
+      }));
+    triggerTypes = (catalog?.triggers ?? []).map((tr) => ({
+      value: tr.type,
+      label: triggerI18nKey(tr.type) ? t(triggerI18nKey(tr.type)) : tr.label,
+    }));
+  }
+
+  function triggerI18nKey(triggerType) {
+    switch (triggerType) {
+      case 'status_transition': return 'actions.trigger.statusTransition';
+      case 'item_created': return 'actions.trigger.itemCreated';
+      case 'item_updated': return 'actions.trigger.itemUpdated';
+      case 'item_linked': return 'actions.trigger.itemLinked';
+      case 'manual': return 'actions.trigger.manual';
+      default: return null;
+    }
+  }
 
   // Workspace-scoped capability lists for the picker. Loaded once per
   // capability type when the editor mounts, then reused as the user clicks
@@ -127,8 +182,19 @@
     }
   }
 
+  async function loadCatalog() {
+    if (!action?.workspace_id) return;
+    try {
+      const catalog = await api.actions.getCatalog(action.workspace_id);
+      buildPaletteFromCatalog(catalog);
+    } catch (err) {
+      console.error('Failed to load action catalog; palette will be empty', err);
+    }
+  }
+
   onMount(() => {
     if (action?.workspace_id) {
+      loadCatalog();
       loadCapabilities('docker_environment');
       loadCapabilities('http_client');
       loadCapabilities('llm_connection');
@@ -143,15 +209,6 @@
     }
     return empty.concat(list.map((c) => ({ value: String(c.id), label: c.name })));
   }
-
-  // Trigger type options
-  const triggerTypes = [
-    { value: 'status_transition', label: t('actions.trigger.statusTransition') },
-    { value: 'item_created', label: t('actions.trigger.itemCreated') },
-    { value: 'item_updated', label: t('actions.trigger.itemUpdated') },
-    { value: 'item_linked', label: t('actions.trigger.itemLinked') },
-    { value: 'manual', label: t('actions.trigger.manual') }
-  ];
 
   async function handleSave(apiData) {
     // Inject actor override before forwarding to the caller. Backend only

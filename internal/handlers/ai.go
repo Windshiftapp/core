@@ -24,6 +24,10 @@ type AIHandler struct {
 	timePermService *services.TimePermissionService
 	timerService    *services.TimerService
 	promptStore     *llm.PromptStore
+	// actionService is the cache-invalidation hook for tools that mutate
+	// actions (create_action). Optional — when nil, newly created actions
+	// fire after the next periodic cache refresh.
+	actionService *services.ActionService
 }
 
 // NewAIHandler creates a new AI handler.
@@ -34,6 +38,7 @@ func NewAIHandler(
 	timePermService *services.TimePermissionService,
 	timerService *services.TimerService,
 	promptStore *llm.PromptStore,
+	actionService *services.ActionService,
 ) *AIHandler {
 	return &AIHandler{
 		db:              db,
@@ -42,6 +47,7 @@ func NewAIHandler(
 		timePermService: timePermService,
 		timerService:    timerService,
 		promptStore:     promptStore,
+		actionService:   actionService,
 	}
 }
 

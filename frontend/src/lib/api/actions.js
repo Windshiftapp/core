@@ -1,6 +1,12 @@
 import { fetchAPI } from './core.js';
 
 export const actions = {
+  // getCatalog returns the workspace-scoped action catalog: every available
+  // trigger and node type with its JSON-Schema config, plus the action
+  // capabilities reachable from this workspace. The visual palette is
+  // built from this rather than a hardcoded list so adding a node type
+  // server-side automatically surfaces it in the editor.
+  getCatalog: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/action-catalog`),
   getAll: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/actions`),
   get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/actions/${id}`),
   create: (workspaceId, data) =>

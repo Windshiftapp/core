@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "actioncatalog.ValidationError": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "dto.AttachmentResponse": {
         "properties": {
           "created_at": {
@@ -698,6 +712,9 @@
             "additionalProperties": true,
             "type": "object"
           },
+          "error_message": {
+            "type": "string"
+          },
           "id": {
             "type": "integer"
           },
@@ -717,6 +734,9 @@
             "type": "boolean"
           },
           "timestamp": {
+            "type": "string"
+          },
+          "user_agent": {
             "type": "string"
           },
           "user_id": {
@@ -1283,6 +1303,132 @@
         },
         "type": "object"
       },
+      "handlers.actionDefinitionRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/models.ActionEdge"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/models.ActionNode"
+            },
+            "type": "array"
+          },
+          "trigger_config": {
+            "type": "string"
+          },
+          "trigger_type": {
+            "$ref": "#/components/schemas/models.ActionTriggerType"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.capabilityDTO": {
+        "properties": {
+          "capability_type": {
+            "$ref": "#/components/schemas/models.CapabilityType"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.catalogResponse": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/handlers.capabilityDTO"
+            },
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/handlers.nodeTypeDTO"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "triggers": {
+            "items": {
+              "$ref": "#/components/schemas/handlers.triggerTypeDTO"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.nodeTypeDTO": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "config_schema": {
+            "type": "object"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_iterator": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": {
+            "$ref": "#/components/schemas/models.ActionNodeType"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.triggerTypeDTO": {
+        "properties": {
+          "config_schema": {
+            "type": "object"
+          },
+          "description": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/models.ActionTriggerType"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.validateActionResponse": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/actioncatalog.ValidationError"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "models.APIToken": {
         "properties": {
           "created_at": {
@@ -1328,6 +1474,192 @@
           }
         },
         "type": "object"
+      },
+      "models.Action": {
+        "properties": {
+          "actor_name": {
+            "type": "string"
+          },
+          "actor_user_id": {
+            "description": "ActorUserID overrides the execution actor. NULL means the action runs under\nthe triggering user's permissions. Setting this field requires the global\naction.set_actor permission because it grants cross-workspace impersonation.",
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "integer"
+          },
+          "creator_name": {
+            "description": "Joined fields for API responses",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/models.ActionEdge"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/models.ActionNode"
+            },
+            "type": "array"
+          },
+          "trigger_config": {
+            "description": "JSON with trigger-specific conditions",
+            "type": "string"
+          },
+          "trigger_type": {
+            "$ref": "#/components/schemas/models.ActionTriggerType"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "models.ActionEdge": {
+        "properties": {
+          "action_id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "edge_type": {
+            "description": "default, true, false (for conditions)",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "source_handle": {
+            "type": "string"
+          },
+          "source_node_id": {
+            "type": "integer"
+          },
+          "target_handle": {
+            "type": "string"
+          },
+          "target_node_id": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "models.ActionNode": {
+        "properties": {
+          "action_id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "node_config": {
+            "description": "JSON configuration for the node",
+            "type": "string"
+          },
+          "node_type": {
+            "$ref": "#/components/schemas/models.ActionNodeType"
+          },
+          "position_x": {
+            "type": "number"
+          },
+          "position_y": {
+            "type": "number"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "models.ActionNodeType": {
+        "enum": [
+          "trigger",
+          "set_field",
+          "set_status",
+          "add_comment",
+          "notify_user",
+          "condition",
+          "update_asset",
+          "create_asset",
+          "round_robin_assign",
+          "ai_extract",
+          "ai_agent",
+          "container_run",
+          "http_request",
+          "transition_item",
+          "related_items"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "ActionNodeTrigger",
+          "ActionNodeSetField",
+          "ActionNodeSetStatus",
+          "ActionNodeAddComment",
+          "ActionNodeNotifyUser",
+          "ActionNodeCondition",
+          "ActionNodeUpdateAsset",
+          "ActionNodeCreateAsset",
+          "ActionNodeRoundRobinAssign",
+          "ActionNodeAIExtract",
+          "ActionNodeAIAgent",
+          "ActionNodeContainerRun",
+          "ActionNodeHTTPRequest",
+          "ActionNodeTransitionItem",
+          "ActionNodeRelatedItems"
+        ]
+      },
+      "models.ActionTriggerType": {
+        "enum": [
+          "status_transition",
+          "item_created",
+          "item_updated",
+          "item_linked",
+          "manual"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "ActionTriggerStatusTransition",
+          "ActionTriggerItemCreated",
+          "ActionTriggerItemUpdated",
+          "ActionTriggerItemLinked",
+          "ActionTriggerManual"
+        ]
+      },
+      "models.CapabilityType": {
+        "enum": [
+          "docker_environment",
+          "http_client",
+          "llm_connection"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "CapabilityDockerEnvironment",
+          "CapabilityHTTPClient",
+          "CapabilityLLMConnection"
+        ]
       },
       "restapi.PaginationMeta": {
         "properties": {
@@ -7025,6 +7357,419 @@
         "summary": "Update a workspace",
         "tags": [
           "workspaces"
+        ]
+      }
+    },
+    "/workspaces/{id}/action-catalog": {
+      "get": {
+        "description": "Lists every available trigger and node type with its JSON-Schema-typed config, plus the action capabilities (LLM, HTTP, docker) reachable from this workspace. Agents call this to discover what they can build before submitting a new action.",
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.catalogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Token lacks the actions:read scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Workspace not found or no action.manage permission"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Action catalog for a workspace",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
+    "/workspaces/{id}/actions": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/models.Action"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List actions in a workspace",
+        "tags": [
+          "actions"
+        ]
+      },
+      "post": {
+        "description": "Agents call this with a full nodes/edges graph. The body is validated against the catalog: every trigger and node config must satisfy its JSON Schema, edges must reference existing nodes, the graph must be acyclic, and iterator bodies must be self-contained. Capability IDs are checked for workspace scope.",
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/handlers.actionDefinitionRequest"
+              }
+            }
+          },
+          "description": "Action definition",
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/models.Action"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed — see details.errors"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Token lacks actions:write"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create an action from a JSON definition",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
+    "/workspaces/{id}/actions/validate": {
+      "post": {
+        "description": "Runs the same catalog validator the create/update endpoints use, without persisting. Useful for agents that want to iterate on a draft before committing.",
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/handlers.actionDefinitionRequest"
+              }
+            }
+          },
+          "description": "Definition to validate",
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.validateActionResponse"
+                }
+              }
+            },
+            "description": "Validation result — errors is empty when the definition would persist"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Dry-run validate an action definition",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
+    "/workspaces/{id}/actions/{actionId}": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Action ID",
+            "in": "path",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/models.Action"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get a single action",
+        "tags": [
+          "actions"
+        ]
+      },
+      "put": {
+        "description": "Validates the new graph against the catalog before persisting. Pass the full action body (the legacy partial-update semantics aren't supported on v1 — agents should fetch, mutate, and PUT back).",
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Action ID",
+            "in": "path",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/handlers.actionDefinitionRequest"
+              }
+            }
+          },
+          "description": "Updated definition",
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/models.Action"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Replace an action's definition",
+        "tags": [
+          "actions"
         ]
       }
     },

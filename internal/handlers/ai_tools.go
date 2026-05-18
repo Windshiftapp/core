@@ -21,6 +21,7 @@ type ToolExecutor struct {
 	permService            *services.PermissionService
 	commentService         *services.CommentService
 	timerService           *services.TimerService
+	actionService          *services.ActionService
 }
 
 // NewToolExecutor creates a tool executor scoped to the given user's accessible workspaces.
@@ -32,6 +33,7 @@ func NewToolExecutor(
 	permService *services.PermissionService,
 	commentService *services.CommentService,
 	timerService *services.TimerService,
+	actionService *services.ActionService,
 ) *ToolExecutor {
 	return &ToolExecutor{
 		db:                     db,
@@ -41,6 +43,7 @@ func NewToolExecutor(
 		permService:            permService,
 		commentService:         commentService,
 		timerService:           timerService,
+		actionService:          actionService,
 	}
 }
 
@@ -67,6 +70,7 @@ func (e *ToolExecutor) env() *aitools.Env {
 		TimePermService:        e.timePermService,
 		TimerService:           e.timerService,
 		CommentService:         e.commentService,
+		ActionService:          e.actionService,
 	}
 }
 

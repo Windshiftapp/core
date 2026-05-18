@@ -31,6 +31,11 @@ type Env struct {
 	TimerService    *services.TimerService
 	CommentService  *services.CommentService
 	ApprovalService *services.ApprovalService
+	// ActionService is the optional cache-invalidation hook for tools that
+	// create or mutate actions. Nil-safe: tools must check before calling
+	// InvalidateWorkspaceCache so they degrade to "next periodic refresh"
+	// when the adapter (chat handler / MCP server) wasn't wired with one.
+	ActionService *services.ActionService
 }
 
 // HasWorkspaceAccess reports whether the caller can touch the given workspace.

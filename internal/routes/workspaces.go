@@ -158,6 +158,7 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	if deps.Workspaces.Actions != nil {
 		actionManage := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionActionManage)
 
+		api.HandleH("GET /workspaces/{workspaceId}/action-catalog", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetActionCatalog))))
 		api.HandleH("GET /workspaces/{workspaceId}/actions", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ListActions))))
 		api.HandleH("POST /workspaces/{workspaceId}/actions", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.CreateAction))))
 		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetAction))))

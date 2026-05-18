@@ -71,6 +71,11 @@ const (
 	// Collections
 	ScopeCollectionsRead = "collections:read"
 
+	// Actions (automation graphs — node-catalog discovery, action CRUD).
+	// :write is required for create/update; :read covers catalog + list/get.
+	ScopeActionsRead  = "actions:read"
+	ScopeActionsWrite = "actions:write"
+
 	// Admin scopes (require system admin role AND scope on token)
 	ScopeAdminUsersRead      = "admin:users:read"
 	ScopeAdminUsersWrite     = "admin:users:write"
@@ -93,6 +98,7 @@ var AllValidScopes = []string{
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
 	ScopeMCPAccess,
 	ScopeCollectionsRead,
+	ScopeActionsRead, ScopeActionsWrite,
 	ScopeAdminUsersRead, ScopeAdminUsersWrite,
 	ScopeAdminGroupsRead, ScopeAdminGroupsWrite,
 	ScopeAdminAuditLogsRead,
@@ -105,6 +111,7 @@ var allNonAdminReadScopes = []string{
 	ScopeWorkflowsRead, ScopeItemTypesRead, ScopePrioritiesRead,
 	ScopeCustomFieldsRead, ScopeUsersRead, ScopeMilestonesRead,
 	ScopeIterationsRead, ScopeProjectsRead, ScopeCollectionsRead,
+	ScopeActionsRead,
 }
 
 // allNonAdminScopes is the set of all non-admin scopes (for legacy "write" mapping).
@@ -119,6 +126,7 @@ var allNonAdminScopes = []string{
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
 	ScopeMCPAccess,
 	ScopeCollectionsRead,
+	ScopeActionsRead, ScopeActionsWrite,
 }
 
 // AdminScopes returns the set of scopes that require system admin role.

@@ -11,7 +11,9 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
+	"windshift/internal/restapi"
 	"windshift/internal/services"
+	"windshift/internal/services/actioncatalog"
 	"windshift/internal/utils"
 )
 
@@ -67,6 +69,34 @@ func (h *ActionsHandler) requireCapability(w http.ResponseWriter, r *http.Reques
 	return capability, true
 }
 
+// HasCapability implements actioncatalog.CapabilityResolver. A capability is
+// reachable when it exists, is enabled, and is either workspace-wide or
+// explicitly scoped to the given workspace via the join table.
+func (h *ActionsHandler) HasCapability(workspaceID, capabilityID int) bool {
+	capability, err := h.repo.GetCapabilityByID(capabilityID)
+	if err != nil || capability == nil || !capability.IsEnabled {
+		return false
+	}
+	scoped, err := h.repo.IsCapabilityScopedToWorkspace(capabilityID, workspaceID)
+	return err == nil && scoped
+}
+
+// validateActionDefinition runs the unified actioncatalog validator and
+// responds with a structured 400 if any errors were found. Returns true
+// when the action is safe to persist. The legacy surface emits the first
+// error's message as the human-readable text and the full list under
+// details.errors so older clients still see something useful.
+func (h *ActionsHandler) validateActionDefinition(w http.ResponseWriter, r *http.Request, workspaceID int, def actioncatalog.ActionDefinition) bool {
+	errs := actioncatalog.Validate(actioncatalog.Default(), def, workspaceID, h)
+	if len(errs) == 0 {
+		return true
+	}
+	apiErr := restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, errs[0].Message).
+		WithDetails(map[string]any{"errors": errs})
+	restapi.RespondError(w, r, apiErr)
+	return false
+}
+
 // requireAction fetches an action by ID and verifies workspace ownership.
 // Returns nil, false if not found or mismatched (error already written).
 // last review: ser, 260503, FIXME: requireWorkspaceAction overlap
@@ -81,6 +111,91 @@ func (h *ActionsHandler) requireAction(w http.ResponseWriter, r *http.Request, a
 		return nil, false
 	}
 	return action, true
+}
+
+// actionCatalogResponse is the shape the cookie-auth /action-catalog
+// endpoint and (separately) the v1 surface return. Kept in handlers since
+// only the legacy palette consumes the cookie-auth variant — v1 has its
+// own DTOs in restapi/v1/handlers/actions.go.
+type actionCatalogResponse struct {
+	Scope        string                     `json:"scope"`
+	Triggers     []catalogTriggerEntry      `json:"triggers"`
+	Nodes        []catalogNodeEntry         `json:"nodes"`
+	Capabilities []catalogCapabilitySummary `json:"capabilities"`
+}
+
+type catalogTriggerEntry struct {
+	Type         models.ActionTriggerType `json:"type"`
+	Label        string                   `json:"label"`
+	Description  string                   `json:"description"`
+	ConfigSchema json.RawMessage          `json:"config_schema"`
+}
+
+type catalogNodeEntry struct {
+	Type         models.ActionNodeType `json:"type"`
+	Label        string                `json:"label"`
+	Description  string                `json:"description"`
+	Category     string                `json:"category"`
+	ConfigSchema json.RawMessage       `json:"config_schema"`
+	IsIterator   bool                  `json:"is_iterator"`
+	Outputs      []string              `json:"outputs"`
+}
+
+type catalogCapabilitySummary struct {
+	ID             int                   `json:"id"`
+	Name           string                `json:"name"`
+	CapabilityType models.CapabilityType `json:"capability_type"`
+}
+
+// GetActionCatalog returns the workspace-scoped action catalog used by the
+// visual palette. Gated by the same action.manage permission as the rest
+// of the actions surface; the catalog itself is workspace-independent but
+// the included capabilities list is filtered to the workspace's reach.
+func (h *ActionsHandler) GetActionCatalog(w http.ResponseWriter, r *http.Request) {
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	if !ok {
+		return
+	}
+
+	cat := actioncatalog.Default()
+	resp := actionCatalogResponse{Scope: "workspace"}
+	for _, t := range cat.Triggers() {
+		schemaJSON, _ := json.Marshal(t.ConfigSchema)
+		resp.Triggers = append(resp.Triggers, catalogTriggerEntry{
+			Type:         t.Type,
+			Label:        t.Label,
+			Description:  t.Description,
+			ConfigSchema: schemaJSON,
+		})
+	}
+	for _, n := range cat.Nodes() {
+		schemaJSON, _ := json.Marshal(n.ConfigSchema)
+		resp.Nodes = append(resp.Nodes, catalogNodeEntry{
+			Type:         n.Type,
+			Label:        n.Label,
+			Description:  n.Description,
+			Category:     n.Category,
+			ConfigSchema: schemaJSON,
+			IsIterator:   n.IsIterator,
+			Outputs:      n.Outputs,
+		})
+	}
+	caps, err := h.repo.ListCapabilitiesForWorkspace(workspaceID, "")
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	for _, c := range caps {
+		resp.Capabilities = append(resp.Capabilities, catalogCapabilitySummary{
+			ID:             c.ID,
+			Name:           c.Name,
+			CapabilityType: c.CapabilityType,
+		})
+	}
+	if resp.Capabilities == nil {
+		resp.Capabilities = []catalogCapabilitySummary{}
+	}
+	respondJSONOK(w, resp)
 }
 
 // ListActions lists all actions for a workspace
@@ -126,13 +241,11 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if msg := actionutil.ValidateActionFields(req.Name, string(req.TriggerType)); msg != "" {
-		respondValidationError(w, r, msg)
-		return
-	}
-	if msg := validateActionFlow(req.Nodes, req.Edges); msg != "" {
-		respondValidationError(w, r, msg)
+	// Unified validator covers required fields, trigger/node config schemas,
+	// edge sanity, graph cycles, iterator-body containment, and capability
+	// existence in one pass — replacing the older required-fields +
+	// ambiguous-flow split that lived inline here.
+	if !h.validateActionDefinition(w, r, workspaceID, actioncatalog.FromCreateRequest(&req)) {
 		return
 	}
 
@@ -213,26 +326,6 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdAction)
 }
 
-// validateActionFlow rejects action flows whose node/edge topology would run
-// ambiguously at execution time: specifically, multiple non-trigger nodes with
-// no edges between them would execute in map-iteration order via the topo-sort
-// fallback. Returns "" when the flow is acceptable.
-func validateActionFlow(nodes []models.ActionNode, edges []models.ActionEdge) string {
-	if len(edges) > 0 || len(nodes) == 0 {
-		return ""
-	}
-	var nonTrigger int
-	for _, n := range nodes {
-		if n.NodeType != models.ActionNodeTrigger {
-			nonTrigger++
-		}
-	}
-	if nonTrigger > 1 {
-		return "action with multiple non-trigger nodes must declare edges between them"
-	}
-	return ""
-}
-
 // applyActionUpdateFields applies non-nil fields from the update request to the action.
 func applyActionUpdateFields(action *models.Action, req *models.UpdateActionRequest) {
 	if req.Name != nil {
@@ -293,10 +386,20 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	applyActionUpdateFields(action, &req)
 
-	// If nodes and edges are provided, update them atomically
+	// If nodes and edges are provided, update them atomically. Run the
+	// unified validator against the post-merge effective state so a partial
+	// update can't violate the catalog invariants (schema shape, cycle
+	// freedom, iterator-body containment, capability scope).
 	if req.Nodes != nil {
-		if msg := validateActionFlow(req.Nodes, req.Edges); msg != "" {
-			respondValidationError(w, r, msg)
+		def := actioncatalog.ActionDefinition{
+			Name:          action.Name,
+			Description:   action.Description,
+			TriggerType:   action.TriggerType,
+			TriggerConfig: action.TriggerConfig,
+			Nodes:         req.Nodes,
+			Edges:         req.Edges,
+		}
+		if !h.validateActionDefinition(w, r, workspaceID, def) {
 			return
 		}
 		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
