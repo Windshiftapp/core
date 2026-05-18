@@ -12,6 +12,14 @@ import (
 	"windshift/internal/services"
 )
 
+// Source identifies which adapter is invoking a tool. Used by mutating tools
+// to tag audit-log entries so cookie-auth writes (HTTP handlers) can be
+// distinguished from agent-driven writes (chat / MCP).
+const (
+	SourceAIChat = "ai_chat"
+	SourceMCP    = "mcp"
+)
+
 // Env carries everything a tool's Run function needs: the database handle,
 // the calling user, their accessible workspace IDs (pre-computed by the
 // adapter), and the services it might call into.
@@ -24,6 +32,8 @@ import (
 type Env struct {
 	DB                     database.Database
 	UserID                 int
+	Username               string // Cached at Env-construction time for audit logs
+	Source                 string // SourceAIChat | SourceMCP — for audit trail
 	AccessibleWorkspaceIDs []int
 
 	PermService     *services.PermissionService

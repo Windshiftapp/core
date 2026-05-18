@@ -4,15 +4,52 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
 	"windshift/internal/services/actioncatalog"
 	"windshift/internal/services/actiontemplates"
 )
+
+// emitActionAudit writes an audit row for an agent-driven action mutation.
+// IP/UserAgent are empty by design — the call originates from the chat/MCP
+// adapter, not a direct HTTP request. The Source field on Env tags which
+// surface initiated it (ai_chat vs mcp) so the audit trail can distinguish
+// agent writes from cookie-auth writes. Best-effort: failures are logged,
+// never propagated up so a working tool call isn't broken by an audit miss.
+func emitActionAudit(env *Env, actionType string, workspaceID, actionID int, actionName string) {
+	id := actionID
+	source := env.Source
+	if source == "" {
+		source = "unknown"
+	}
+	err := logger.LogAudit(env.DB, logger.AuditEvent{
+		UserID:       env.UserID,
+		Username:     env.Username,
+		ActionType:   actionType,
+		ResourceType: logger.ResourceAutomation,
+		ResourceID:   &id,
+		ResourceName: actionName,
+		Details: map[string]interface{}{
+			"source":       source,
+			"workspace_id": workspaceID,
+		},
+		Success: true,
+	})
+	if err != nil {
+		slog.Warn("aitool audit log failed",
+			slog.String("component", "aitools"),
+			slog.String("action_type", actionType),
+			slog.Int("action_id", actionID),
+			slog.Any("error", err),
+		)
+	}
+}
 
 // ----------------------------------------------------------------------------
 // Shared types
@@ -372,6 +409,8 @@ func init() {
 				env.ActionService.InvalidateWorkspaceCache(args.WorkspaceID)
 			}
 
+			emitActionAudit(env, logger.ActionAutomationCreate, args.WorkspaceID, actionID, def.Name)
+
 			created, err := repo.GetByID(actionID)
 			if err != nil {
 				// Action was created but we can't refetch — return the bare summary
@@ -495,6 +534,8 @@ func init() {
 			if env.ActionService != nil {
 				env.ActionService.InvalidateWorkspaceCache(args.WorkspaceID)
 			}
+
+			emitActionAudit(env, logger.ActionAutomationUpdate, args.WorkspaceID, args.ActionID, def.Name)
 
 			updated, err := repo.GetByID(args.ActionID)
 			if err != nil {

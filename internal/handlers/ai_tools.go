@@ -17,6 +17,7 @@ type ToolExecutor struct {
 	db                     database.Database
 	accessibleWorkspaceIDs []int
 	userID                 int
+	username               string
 	timePermService        *services.TimePermissionService
 	permService            *services.PermissionService
 	commentService         *services.CommentService
@@ -29,6 +30,7 @@ func NewToolExecutor(
 	db database.Database,
 	accessibleWorkspaceIDs []int,
 	userID int,
+	username string,
 	timePermService *services.TimePermissionService,
 	permService *services.PermissionService,
 	commentService *services.CommentService,
@@ -39,6 +41,7 @@ func NewToolExecutor(
 		db:                     db,
 		accessibleWorkspaceIDs: accessibleWorkspaceIDs,
 		userID:                 userID,
+		username:               username,
 		timePermService:        timePermService,
 		permService:            permService,
 		commentService:         commentService,
@@ -65,6 +68,8 @@ func (e *ToolExecutor) env() *aitools.Env {
 	return &aitools.Env{
 		DB:                     e.db,
 		UserID:                 e.userID,
+		Username:               e.username,
+		Source:                 aitools.SourceAIChat,
 		AccessibleWorkspaceIDs: e.accessibleWorkspaceIDs,
 		PermService:            e.permService,
 		TimePermService:        e.timePermService,

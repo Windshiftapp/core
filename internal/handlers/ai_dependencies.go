@@ -593,7 +593,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build tool executor
-	executor := NewToolExecutor(h.db, accessibleWSIDs, user.ID, h.timePermService, h.permService, services.NewCommentService(h.db), h.timerService, h.actionService)
+	executor := NewToolExecutor(h.db, accessibleWSIDs, user.ID, user.FullName, h.timePermService, h.permService, services.NewCommentService(h.db), h.timerService, h.actionService)
 
 	// Determine current date in user's timezone
 	chatTimezone := user.Timezone

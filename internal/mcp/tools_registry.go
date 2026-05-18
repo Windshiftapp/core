@@ -7,6 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"windshift/internal/aitools"
+	"windshift/internal/models"
 )
 
 // registerAITools registers every tool from the shared aitools registry
@@ -31,7 +32,7 @@ func (ms *MCPServer) registerAITools() {
 				res, _, _ := errNoAuth()
 				return res, nil
 			}
-			env, err := ms.buildEnv(user.ID)
+			env, err := ms.buildEnv(user)
 			if err != nil {
 				res, _, _ := errInternal("build env", err)
 				return res, nil
@@ -60,17 +61,19 @@ func (ms *MCPServer) registerAITools() {
 	}
 }
 
-// buildEnv constructs an aitools.Env scoped to userID. Permissions are
-// resolved fresh on each call (no per-session caching) — fine because
+// buildEnv constructs an aitools.Env scoped to the calling user. Permissions
+// are resolved fresh on each call (no per-session caching) — fine because
 // MCP requests are usually one-shot.
-func (ms *MCPServer) buildEnv(userID int) (*aitools.Env, error) {
-	wsIDs, err := ms.accessibleWorkspaceIDs(userID)
+func (ms *MCPServer) buildEnv(user *models.User) (*aitools.Env, error) {
+	wsIDs, err := ms.accessibleWorkspaceIDs(user.ID)
 	if err != nil {
 		return nil, err
 	}
 	return &aitools.Env{
 		DB:                     ms.deps.DB,
-		UserID:                 userID,
+		UserID:                 user.ID,
+		Username:               user.FullName,
+		Source:                 aitools.SourceMCP,
 		AccessibleWorkspaceIDs: wsIDs,
 		PermService:            ms.deps.PermissionService,
 		TimePermService:        ms.deps.TimePermissionService,
