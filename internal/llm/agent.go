@@ -27,11 +27,24 @@ type ToolCallRecord struct {
 	Result    string `json:"result"`
 }
 
+// StopReason describes why the agent loop ended. Callers use it to
+// distinguish a clean answer from a budget exhaustion, so the chat UI can
+// flag the latter instead of silently passing off the boilerplate "I
+// wasn't able to complete..." message as a normal reply.
+type StopReason string
+
+const (
+	StopReasonDone          StopReason = "done"
+	StopReasonMaxIterations StopReason = "max_iterations"
+)
+
 // AgentResult contains the outcome of an agent run.
 type AgentResult struct {
 	Answer     string           `json:"answer"`
 	ToolCalls  []ToolCallRecord `json:"tool_calls,omitempty"`
 	Iterations int              `json:"iterations"`
+	MaxIter    int              `json:"max_iterations"`
+	StopReason StopReason       `json:"stop_reason"`
 	Usage      Usage            `json:"usage"`
 }
 
@@ -84,10 +97,19 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 
 		// If no tool calls, this is the final answer
 		if choice.FinishReason != "tool_calls" || len(choice.Message.ToolCalls) == 0 {
+			slog.Info("agent loop finished",
+				slog.String("stop_reason", string(StopReasonDone)),
+				slog.Int("iterations", i+1),
+				slog.Int("max_iterations", maxIter),
+				slog.Int("tool_calls", len(allToolCalls)),
+				slog.Int("total_tokens", totalUsage.TotalTokens),
+			)
 			return &AgentResult{
 				Answer:     choice.Message.Content,
 				ToolCalls:  allToolCalls,
 				Iterations: i + 1,
+				MaxIter:    maxIter,
+				StopReason: StopReasonDone,
 				Usage:      totalUsage,
 			}, nil
 		}
@@ -97,12 +119,20 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 
 		// Execute each tool call
 		for _, tc := range choice.Message.ToolCalls {
-			slog.Debug("agent executing tool", slog.String("tool", tc.Function.Name), slog.String("id", tc.ID))
-
+			start := time.Now()
 			result, execErr := executeTool(ctx, tc.Function.Name, tc.Function.Arguments)
 			if execErr != nil {
 				result = fmt.Sprintf(`{"error": "%s"}`, execErr.Error()) //nolint:gocritic // JSON string, not Go quoting
 			}
+			slog.Info("agent tool call",
+				slog.Int("iteration", i+1),
+				slog.String("tool", tc.Function.Name),
+				slog.Int("arg_bytes", len(tc.Function.Arguments)),
+				slog.Int("result_bytes", len(result)),
+				slog.Duration("duration", time.Since(start)),
+				slog.Bool("exec_error", execErr != nil),
+				slog.Bool("tool_returned_error", toolReturnedError(result)),
+			)
 
 			allToolCalls = append(allToolCalls, ToolCallRecord{
 				Name:      tc.Function.Name,
@@ -120,11 +150,48 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 		}
 	}
 
-	// Max iterations reached — return whatever we have
+	// Max iterations reached — return whatever we have. Callers should
+	// surface this as a visible warning, not a normal answer.
+	slog.Warn("agent loop exhausted iteration budget",
+		slog.String("stop_reason", string(StopReasonMaxIterations)),
+		slog.Int("iterations", maxIter),
+		slog.Int("max_iterations", maxIter),
+		slog.Int("tool_calls", len(allToolCalls)),
+		slog.Int("total_tokens", totalUsage.TotalTokens),
+	)
 	return &AgentResult{
 		Answer:     "I wasn't able to complete the task within the allowed number of steps. Here's what I found so far based on the tool calls I made.",
 		ToolCalls:  allToolCalls,
 		Iterations: maxIter,
+		MaxIter:    maxIter,
+		StopReason: StopReasonMaxIterations,
 		Usage:      totalUsage,
 	}, nil
+}
+
+// toolReturnedError is a best-effort check for the "soft error" convention
+// used by the aitools registry: a tool returns success at the Go level but
+// signals a user-facing problem by setting an "error" field on its JSON
+// result. Used only for logging — never for control flow.
+func toolReturnedError(result string) bool {
+	// Avoid pulling in encoding/json for a single substring probe on the
+	// hot path. The convention is `{"error":` (optionally preceded by
+	// whitespace and `{`), which this catches without false positives on
+	// keys like "errors" that contain it as a substring inside another
+	// JSON value would require escaping.
+	if len(result) < 8 {
+		return false
+	}
+	for i := 0; i < len(result) && i < 8; i++ {
+		c := result[i]
+		if c == '{' {
+			rest := result[i+1:]
+			// Trim leading whitespace.
+			for rest != "" && (rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n') {
+				rest = rest[1:]
+			}
+			return len(rest) >= 8 && (rest[:8] == `"error":` || rest[:8] == `"error" `)
+		}
+	}
+	return false
 }

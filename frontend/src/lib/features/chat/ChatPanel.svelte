@@ -3,6 +3,7 @@
   import { IconMessage, IconX, IconLoader2, IconSend, IconChevronDown, IconRefresh } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import ChatToolTrace from './ChatToolTrace.svelte';
   import { chatStore } from '../../stores/chatStore.svelte.js';
   import { activeActionEditor } from '../../stores/activeActionEditor.svelte.js';
   import { navigate, currentRoute } from '../../router.js';
@@ -314,6 +315,12 @@
                   <div class="chat-message-content">
                     <MilkdownEditor content={preprocessItemKeys(msg.content)} readonly={true} showToolbar={false} compact={true} />
                   </div>
+                  <ChatToolTrace
+                    toolCalls={msg.toolCalls}
+                    iterations={msg.iterations}
+                    maxIterations={msg.maxIterations}
+                    stopReason={msg.stopReason}
+                  />
                 {/if}
               </div>
             </div>

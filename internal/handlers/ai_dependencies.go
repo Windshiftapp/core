@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -539,8 +540,8 @@ func buildChatContextHint(ctx *ChatContext) string {
 	if ctx.View == "workspace-actions" {
 		if ctx.ActionID > 0 {
 			return fmt.Sprintf(
-				"\n\nThe user is currently editing action %d in workspace %d. To improve it, call describe_action_catalog if you need to recall the available nodes, then update_action with the full new graph — the editor live-reloads when the call succeeds. Validate non-trivial changes with validate_action first.",
-				ctx.ActionID, ctx.WorkspaceID,
+				"\n\nThe user is currently editing action %d in workspace %d. Workflow: (1) call get_action with workspace_id=%d, action_id=%d to read the current graph; (2) call describe_action_catalog with workspace_id=%d if you need to recall node configs; (3) compose the full replacement graph and call update_action — the editor live-reloads on success. Optionally validate non-trivial changes with validate_action before the write. update_action is a full replace (not a patch), so you must include every node and edge you want to keep.",
+				ctx.ActionID, ctx.WorkspaceID, ctx.WorkspaceID, ctx.ActionID, ctx.WorkspaceID,
 			)
 		}
 		if ctx.WorkspaceID > 0 {
@@ -555,9 +556,11 @@ func buildChatContextHint(ctx *ChatContext) string {
 
 // ChatResponse is the response from the agentic chat endpoint.
 type ChatResponse struct {
-	Answer     string               `json:"answer"`
-	ToolCalls  []llm.ToolCallRecord `json:"tool_calls,omitempty"`
-	Iterations int                  `json:"iterations"`
+	Answer        string               `json:"answer"`
+	ToolCalls     []llm.ToolCallRecord `json:"tool_calls,omitempty"`
+	Iterations    int                  `json:"iterations"`
+	MaxIterations int                  `json:"max_iterations"`
+	StopReason    string               `json:"stop_reason"`
 }
 
 // Chat handles agentic chat where the LLM can query workspaces and items via tool calls.
@@ -619,16 +622,55 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		Tools:         BuildLLMTools(),
 		MaxTokens:     2048,
 		Temperature:   0.1,
-		MaxIterations: 6,
+		MaxIterations: 12,
 	}, req.Message, executor.Execute, history)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "chat agent run failed",
+			slog.Int("user_id", user.ID),
+			slog.String("ctx_view", chatContextView(req.Context)),
+			slog.String("error", err.Error()),
+		)
 		respondLLMError(w, r, err)
 		return
 	}
 
+	slog.InfoContext(r.Context(), "chat agent run",
+		slog.Int("user_id", user.ID),
+		slog.String("ctx_view", chatContextView(req.Context)),
+		slog.Int("ctx_workspace_id", chatContextWorkspaceID(req.Context)),
+		slog.Int("ctx_action_id", chatContextActionID(req.Context)),
+		slog.String("stop_reason", string(result.StopReason)),
+		slog.Int("iterations", result.Iterations),
+		slog.Int("max_iterations", result.MaxIter),
+		slog.Int("tool_calls", len(result.ToolCalls)),
+	)
+
 	respondJSONOK(w, ChatResponse{
-		Answer:     result.Answer,
-		ToolCalls:  result.ToolCalls,
-		Iterations: result.Iterations,
+		Answer:        result.Answer,
+		ToolCalls:     result.ToolCalls,
+		Iterations:    result.Iterations,
+		MaxIterations: result.MaxIter,
+		StopReason:    string(result.StopReason),
 	})
+}
+
+// chatContextView / WorkspaceID / ActionID safely read fields off a
+// possibly-nil ChatContext for slog calls.
+func chatContextView(c *ChatContext) string {
+	if c == nil {
+		return ""
+	}
+	return c.View
+}
+func chatContextWorkspaceID(c *ChatContext) int {
+	if c == nil {
+		return 0
+	}
+	return c.WorkspaceID
+}
+func chatContextActionID(c *ChatContext) int {
+	if c == nil {
+		return 0
+	}
+	return c.ActionID
 }

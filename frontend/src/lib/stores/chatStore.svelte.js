@@ -57,6 +57,8 @@ async function sendMessage(text, context) {
       content: result.answer || '',
       toolCalls: result.tool_calls || [],
       iterations: result.iterations || 0,
+      maxIterations: result.max_iterations || 0,
+      stopReason: result.stop_reason || '',
     };
     messages = [...messages, assistantMsg];
     extractItemKeys(assistantMsg.toolCalls);

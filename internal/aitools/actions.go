@@ -172,13 +172,49 @@ type createActionOut struct {
 }
 
 // ----------------------------------------------------------------------------
+// get_action
+// ----------------------------------------------------------------------------
+
+type getActionArgs struct {
+	WorkspaceID int `json:"workspace_id" jsonschema:"Workspace the action lives in. Mismatches return 'action not found' (no cross-workspace probing)."`
+	ActionID    int `json:"action_id" jsonschema:"ID of the action to fetch"`
+}
+
+type actionNodeOut struct {
+	ID         int                   `json:"id"`
+	NodeType   models.ActionNodeType `json:"node_type"`
+	NodeConfig string                `json:"node_config"`
+	PositionX  float64               `json:"position_x,omitempty"`
+	PositionY  float64               `json:"position_y,omitempty"`
+}
+
+type actionEdgeOut struct {
+	ID           int    `json:"id"`
+	SourceNodeID int    `json:"source_node_id"`
+	TargetNodeID int    `json:"target_node_id"`
+	EdgeType     string `json:"edge_type,omitempty"`
+}
+
+type getActionOut struct {
+	ID            int                      `json:"id"`
+	WorkspaceID   int                      `json:"workspace_id"`
+	Name          string                   `json:"name"`
+	Description   string                   `json:"description,omitempty"`
+	IsEnabled     bool                     `json:"is_enabled"`
+	TriggerType   models.ActionTriggerType `json:"trigger_type"`
+	TriggerConfig string                   `json:"trigger_config,omitempty"`
+	Nodes         []actionNodeOut          `json:"nodes"`
+	Edges         []actionEdgeOut          `json:"edges"`
+}
+
+// ----------------------------------------------------------------------------
 // update_action
 // ----------------------------------------------------------------------------
 
 type updateActionArgs struct {
 	WorkspaceID int                 `json:"workspace_id" jsonschema:"Workspace the action lives in. Must match the action's stored workspace; mismatches return 'workspace not found' to avoid leaking that a cross-workspace id exists."`
 	ActionID    int                 `json:"action_id" jsonschema:"ID of the action to replace"`
-	Action      actionDefinitionArg `json:"action" jsonschema:"Full replacement graph. Updates are not partial — fetch the existing action via get_action / the REST API first, mutate, and send the complete definition back."`
+	Action      actionDefinitionArg `json:"action" jsonschema:"Full replacement graph. Updates are not partial — call get_action first to read the existing graph, mutate, and send the complete definition back. Anything you omit is deleted."`
 }
 
 // ----------------------------------------------------------------------------
@@ -364,6 +400,57 @@ func init() {
 				NodeCount:     len(created.Nodes),
 				EdgeCount:     len(created.Edges),
 			}, nil
+		},
+	})
+
+	Register(Default, Tool[getActionArgs]{
+		Name:        "get_action",
+		Description: "Fetch the full definition of an existing action — trigger, trigger config, every node with its node_config, and every edge. Use this before update_action so you know exactly what graph you are replacing. Caller must have action.manage on the workspace.",
+		Run: func(_ context.Context, env *Env, args getActionArgs) (any, error) {
+			if !env.HasWorkspaceAccess(args.WorkspaceID) {
+				return map[string]string{"error": "workspace not found"}, nil
+			}
+			ok, err := env.PermService.HasWorkspacePermission(env.UserID, args.WorkspaceID, models.PermissionActionManage)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				return map[string]string{"error": "permission denied"}, nil
+			}
+			repo := repository.NewActionRepository(env.DB)
+			action, err := repo.GetByID(args.ActionID)
+			if err != nil || action == nil || action.WorkspaceID != args.WorkspaceID {
+				return map[string]string{"error": "action not found"}, nil //nolint:nilerr // intentional: don't leak existence of cross-workspace actions
+			}
+			out := getActionOut{
+				ID:            action.ID,
+				WorkspaceID:   action.WorkspaceID,
+				Name:          action.Name,
+				Description:   action.Description,
+				IsEnabled:     action.IsEnabled,
+				TriggerType:   action.TriggerType,
+				TriggerConfig: action.TriggerConfig,
+				Nodes:         make([]actionNodeOut, 0, len(action.Nodes)),
+				Edges:         make([]actionEdgeOut, 0, len(action.Edges)),
+			}
+			for _, n := range action.Nodes {
+				out.Nodes = append(out.Nodes, actionNodeOut{
+					ID:         n.ID,
+					NodeType:   n.NodeType,
+					NodeConfig: n.NodeConfig,
+					PositionX:  n.PositionX,
+					PositionY:  n.PositionY,
+				})
+			}
+			for _, e := range action.Edges {
+				out.Edges = append(out.Edges, actionEdgeOut{
+					ID:           e.ID,
+					SourceNodeID: e.SourceNodeID,
+					TargetNodeID: e.TargetNodeID,
+					EdgeType:     e.EdgeType,
+				})
+			}
+			return out, nil
 		},
 	})
 
