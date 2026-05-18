@@ -25,6 +25,35 @@ type managedContainer struct {
 	startedAt   time.Time
 }
 
+// buildDockerRunArgs assembles the argv passed to `docker` for an ephemeral
+// container start. Pulled out as a pure function so the policy bits — memory,
+// cpu, network isolation — can be unit-tested without invoking docker.
+//
+// Network mode defaults to "none" and is always passed explicitly. The earlier
+// "skip --network when mode is none" shortcut caused Docker to fall back to
+// its default bridge, defeating isolation.
+func buildDockerRunArgs(envConfig models.DockerEnvironmentConfig, hostPort int) []string {
+	args := []string{
+		"run", "-d",
+		"--memory", envConfig.ResourceLimits.Memory,
+		"--cpus", envConfig.ResourceLimits.CPUs,
+		"-p", fmt.Sprintf("%d:8080", hostPort),
+	}
+
+	networkMode := envConfig.NetworkMode
+	if networkMode == "" {
+		networkMode = "none"
+	}
+	args = append(args, "--network", networkMode)
+
+	for k, v := range envConfig.EnvVars {
+		args = append(args, "-e", fmt.Sprintf("%s=%s", k, v))
+	}
+
+	args = append(args, envConfig.Image)
+	return args
+}
+
 // StartContainer starts an ephemeral Docker container from the given environment config.
 // Returns container info including the assigned host port.
 func (cs *ContainerService) StartContainer(ctx context.Context, envConfig models.DockerEnvironmentConfig, timeoutSecs int) (*models.ContainerInfo, error) {
@@ -35,29 +64,7 @@ func (cs *ContainerService) StartContainer(ctx context.Context, envConfig models
 	// Pick a random high port for the container
 	hostPort := 30000 + rand.IntN(30000) //nolint:gosec // non-security random port selection
 
-	args := []string{
-		"run", "-d",
-		"--memory", envConfig.ResourceLimits.Memory,
-		"--cpus", envConfig.ResourceLimits.CPUs,
-		"-p", fmt.Sprintf("%d:8080", hostPort),
-	}
-
-	// Network mode
-	networkMode := envConfig.NetworkMode
-	if networkMode == "" {
-		networkMode = "none"
-	}
-	// Only apply network restriction if not exposing ports
-	if networkMode != "none" {
-		args = append(args, "--network", networkMode)
-	}
-
-	// Environment variables
-	for k, v := range envConfig.EnvVars {
-		args = append(args, "-e", fmt.Sprintf("%s=%s", k, v))
-	}
-
-	args = append(args, envConfig.Image)
+	args := buildDockerRunArgs(envConfig, hostPort)
 
 	slog.Debug("starting container",
 		slog.String("component", "container_service"),
