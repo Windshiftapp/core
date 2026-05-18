@@ -148,7 +148,8 @@ Examples:
 var taskGetCmd = &cobra.Command{
 	Use:   "get <id|KEY-123>",
 	Short: "Get task details",
-	Long: `Get detailed information about a task, including available status transitions.
+	Long: `Get detailed information about a task, including available status transitions
+and the latest 10 comments (newest first).
 
 Examples:
   ws task get 123                         # Get by ID
@@ -166,10 +167,15 @@ Examples:
 			return fmt.Errorf("failed to resolve item: %w", err)
 		}
 
-		// Get item with transitions expanded
-		item, err := client.GetItem(itemID, "transitions")
+		// Get item with transitions and comments expanded. Server returns
+		// comments newest-first; we keep at most the latest 10 so the output
+		// stays scannable on busy items.
+		item, err := client.GetItem(itemID, "transitions,comments")
 		if err != nil {
 			return fmt.Errorf("failed to get item: %w", err)
+		}
+		if len(item.Comments) > taskGetCommentLimit {
+			item.Comments = item.Comments[:taskGetCommentLimit]
 		}
 
 		// Open in browser if requested
@@ -604,6 +610,10 @@ func applyDateFilters(filters map[string]string, createdFilter, updatedFilter st
 	}
 	return nil
 }
+
+// taskGetCommentLimit is the maximum number of comments embedded in `ws task get`
+// output. Server returns comments newest-first, so this keeps the most recent ones.
+const taskGetCommentLimit = 10
 
 // Flags for task commands
 var (
