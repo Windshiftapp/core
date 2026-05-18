@@ -971,6 +971,18 @@ func (db *DB) Initialize() error {
 			slog.Warn("public_board.manage permission migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Add action.credential.manage permission if it doesn't exist (workspace-scoped
+		// permission gating action credential CRUD).
+		if _, err := db.Exec(`INSERT OR IGNORE INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('action.credential.manage', 'Manage Action Credentials', 'Can create, rotate, and delete workspace-scoped action credentials (API tokens for HTTP capabilities)', 'workspace', 0)`); err != nil {
+			slog.Warn("action.credential.manage permission migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err := db.Exec(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+			SELECT r.id, p.id FROM workspace_roles r
+			JOIN permissions p ON p.permission_key = 'action.credential.manage'
+			WHERE r.name = 'Administrator'`); err != nil {
+			slog.Warn("action.credential.manage admin grant failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Add public_slug column to collections
 		var slugColCount int
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('collections') WHERE name='public_slug'").Scan(&slugColCount); err == nil && slugColCount == 0 {

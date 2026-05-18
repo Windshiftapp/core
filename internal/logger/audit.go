@@ -598,6 +598,10 @@ const (
 	ActionAutomationCapabilityCreate = "automation_capability.create"
 	ActionAutomationCapabilityUpdate = "automation_capability.update"
 	ActionAutomationCapabilityDelete = "automation_capability.delete"
+	ActionActionCredentialCreate     = "action_credential.create"
+	ActionActionCredentialUpdate     = "action_credential.update"
+	ActionActionCredentialRotate     = "action_credential.rotate"
+	ActionActionCredentialDelete     = "action_credential.delete"
 
 	// Test Folder management
 	ActionTestFolderCreate = "test_folder.create"
@@ -774,6 +778,7 @@ const (
 	ResourceIteration            = "iteration"
 	ResourceAutomation           = "automation"
 	ResourceAutomationCapability = "automation_capability"
+	ResourceActionCredential     = "action_credential"
 	ResourceTestFolder           = "test_folder"
 	ResourceTimeCategory         = "time_category"
 	ResourceTimeCustomer         = "time_customer"

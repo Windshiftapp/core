@@ -923,6 +923,18 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("teams.manage permission postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Add action.credential.manage permission if it doesn't exist
+		if _, err = p.db.Exec(`INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('action.credential.manage', 'Manage Action Credentials', 'Can create, rotate, and delete workspace-scoped action credentials (API tokens for HTTP capabilities)', 'workspace', false) ON CONFLICT (permission_key) DO NOTHING`); err != nil {
+			slog.Warn("action.credential.manage permission postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec(`INSERT INTO role_permissions (role_id, permission_id)
+			SELECT r.id, p.id FROM workspace_roles r
+			JOIN permissions p ON p.permission_key = 'action.credential.manage'
+			WHERE r.name = 'Administrator'
+			ON CONFLICT (role_id, permission_id) DO NOTHING`); err != nil {
+			slog.Warn("action.credential.manage admin grant postgres failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Add public_slug column to collections
 		var slugColCount int
 		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='collections' AND column_name='public_slug'`).Scan(&slugColCount); err == nil && slugColCount == 0 {

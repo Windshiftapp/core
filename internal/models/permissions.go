@@ -89,7 +89,8 @@ const (
 	PermissionTestManage  = "test.manage"  // Create, edit, delete test cases, sets, and folders
 
 	// Action management permissions
-	PermissionActionManage = "action.manage" // Create, edit, delete, and execute workspace actions
+	PermissionActionManage           = "action.manage"            // Create, edit, delete, and execute workspace actions
+	PermissionActionCredentialManage = "action.credential.manage" // Create, rotate, delete workspace-scoped action credentials
 
 	// Team management permissions
 	PermissionTeamsManage = "teams.manage" // Create, edit, delete teams
