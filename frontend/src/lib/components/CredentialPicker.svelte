@@ -19,10 +19,12 @@
 <script>
   import { onMount } from 'svelte';
   import Select from './Select.svelte';
-  import { actionCredentials } from '$lib/api/ai.js';
+  import { actionCredentials } from '../api/ai.js';
 
   let {
-    workspaceId,
+    // workspaceId: when 0 or omitted, the picker loads global credentials
+    // only — appropriate for global capability configs.
+    workspaceId = 0,
     value = $bindable(0),
     placeholder = 'Select a credential…',
     types = null,
@@ -40,7 +42,9 @@
     loading = true;
     loadError = '';
     try {
-      const data = await actionCredentials.getForWorkspace(workspaceId);
+      const data = workspaceId
+        ? await actionCredentials.getForWorkspace(workspaceId)
+        : await actionCredentials.getAllGlobal();
       credentials = Array.isArray(data) ? data : [];
     } catch (err) {
       loadError = err?.message || 'Failed to load credentials';

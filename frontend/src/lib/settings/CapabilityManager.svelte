@@ -10,6 +10,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import Select from '../components/Select.svelte';
   import DataTable from '../components/DataTable.svelte';
+  import CredentialPicker from '../components/CredentialPicker.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -58,6 +59,13 @@
     http_allowed_patterns: [],
     http_default_headers: [],
     http_timeout: 30,
+    // HTTP auth — primary credential ref (Authorization-style header) and
+    // a per-header map for APIs that need additional secret headers.
+    http_auth_enabled: false,
+    http_auth_credential_id: 0,
+    http_auth_header_name: 'Authorization',
+    http_auth_scheme: 'Bearer',
+    http_secret_header_refs: [],
     // LLM fields
     llm_connection_id: '',
   });
@@ -80,6 +88,11 @@
       http_allowed_patterns: [],
       http_default_headers: [],
       http_timeout: 30,
+      http_auth_enabled: false,
+      http_auth_credential_id: 0,
+      http_auth_header_name: 'Authorization',
+      http_auth_scheme: 'Bearer',
+      http_secret_header_refs: [],
       llm_connection_id: '',
     };
   }
@@ -120,6 +133,23 @@
           if (kv.key) config.default_headers[kv.key] = kv.value;
         }
       }
+      if (form.http_auth_enabled && form.http_auth_credential_id) {
+        config.auth = {
+          credential_id: Number(form.http_auth_credential_id),
+          placement: 'header',
+          header_name: form.http_auth_header_name || 'Authorization',
+          scheme: form.http_auth_scheme || '',
+        };
+      }
+      const refs = {};
+      for (const row of form.http_secret_header_refs) {
+        if (row.header && row.credential_id) {
+          refs[row.header] = Number(row.credential_id);
+        }
+      }
+      if (Object.keys(refs).length > 0) {
+        config.secret_header_refs = refs;
+      }
       return JSON.stringify(config);
     }
     if (form.capability_type === 'llm_connection') {
@@ -147,6 +177,26 @@
         form.http_timeout = config.timeout_secs || 30;
         form.http_default_headers = config.default_headers
           ? Object.entries(config.default_headers).map(([key, value]) => ({ key, value }))
+          : [];
+        // Auth ref — the workspace listing returns header_name + scheme but
+        // intentionally zeroes credential_id; the admin endpoint returns the
+        // real credential_id. Either way the form mirrors what we got back.
+        if (config.auth) {
+          form.http_auth_enabled = true;
+          form.http_auth_credential_id = config.auth.credential_id || 0;
+          form.http_auth_header_name = config.auth.header_name || 'Authorization';
+          form.http_auth_scheme = config.auth.scheme || '';
+        } else {
+          form.http_auth_enabled = false;
+          form.http_auth_credential_id = 0;
+          form.http_auth_header_name = 'Authorization';
+          form.http_auth_scheme = 'Bearer';
+        }
+        form.http_secret_header_refs = config.secret_header_refs
+          ? Object.entries(config.secret_header_refs).map(([header, credential_id]) => ({
+              header,
+              credential_id: credential_id || 0,
+            }))
           : [];
       } else if (type === 'llm_connection') {
         form.llm_connection_id = config.connection_id ? String(config.connection_id) : '';
@@ -305,6 +355,15 @@
   }
   function removeHeader(index) {
     form.http_default_headers = form.http_default_headers.filter((_, i) => i !== index);
+  }
+  function addSecretHeaderRef() {
+    form.http_secret_header_refs = [
+      ...form.http_secret_header_refs,
+      { header: '', credential_id: 0 },
+    ];
+  }
+  function removeSecretHeaderRef(index) {
+    form.http_secret_header_refs = form.http_secret_header_refs.filter((_, i) => i !== index);
   }
 
   function hasValidTypeConfig() {
@@ -684,12 +743,15 @@
       {/each}
     </div>
 
-    <!-- Default Headers -->
+    <!-- Default Headers (non-sensitive literals only) -->
     <div>
       <div class="flex items-center justify-between mb-1">
         <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.http.defaultHeaders')}</div>
         <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addHeader}>+ {t('settings.actionCapabilities.http.addHeader')}</button>
       </div>
+      <p class="text-xs mb-1" style="color: var(--ds-text-subtle);">
+        Non-sensitive headers only (Accept, User-Agent, …). Auth tokens go in the Authentication section below.
+      </p>
       {#each form.http_default_headers as header, i}
         <div class="flex gap-2 mb-1">
           <input
@@ -707,6 +769,86 @@
             style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
           />
           <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removeHeader(i)}>
+            <Trash2 size={14} />
+          </button>
+        </div>
+      {/each}
+    </div>
+
+    <!-- Authentication (credential refs) -->
+    <div class="rounded-md border p-3" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
+      <label class="flex items-center gap-2 mb-2">
+        <input type="checkbox" bind:checked={form.http_auth_enabled} />
+        <span class="text-sm font-medium" style="color: var(--ds-text);">Use an auth credential</span>
+      </label>
+      {#if form.http_auth_enabled}
+        <div class="space-y-2 mt-2">
+          <div>
+            <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Credential</div>
+            <CredentialPicker
+              workspaceId={form.applies_to_all_workspaces ? 0 : form.workspace_ids[0] || 0}
+              bind:value={form.http_auth_credential_id}
+              types={['bearer_token', 'api_key', 'basic_auth', 'custom_header']}
+            />
+            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              {#if form.applies_to_all_workspaces}
+                Global capabilities can only reference global credentials.
+              {:else}
+                Workspace-scoped capabilities can reference globals or credentials in their workspace allowlist.
+              {/if}
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block">
+              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">Header name</span>
+              <input
+                type="text"
+                bind:value={form.http_auth_header_name}
+                placeholder="Authorization"
+                class="mt-1 w-full px-3 py-1.5 text-sm rounded-md border"
+                style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
+              />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">Scheme (bearer tokens only)</span>
+              <input
+                type="text"
+                bind:value={form.http_auth_scheme}
+                placeholder="Bearer"
+                class="mt-1 w-full px-3 py-1.5 text-sm rounded-md border"
+                style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
+              />
+            </label>
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Secret header refs (APIs that need multiple secret headers) -->
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Additional secret headers</div>
+        <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addSecretHeaderRef}>+ Add secret header</button>
+      </div>
+      <p class="text-xs mb-1" style="color: var(--ds-text-subtle);">
+        For APIs that need more than one secret header (e.g. X-API-Key + X-Signature). Each row resolves a credential at request time.
+      </p>
+      {#each form.http_secret_header_refs as ref, i}
+        <div class="flex gap-2 mb-1">
+          <input
+            type="text"
+            bind:value={ref.header}
+            placeholder="X-API-Key"
+            class="flex-1 px-3 py-1.5 text-sm rounded-md border"
+            style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
+          />
+          <div class="flex-1">
+            <CredentialPicker
+              workspaceId={form.applies_to_all_workspaces ? 0 : form.workspace_ids[0] || 0}
+              bind:value={ref.credential_id}
+            />
+          </div>
+          <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removeSecretHeaderRef(i)}>
             <Trash2 size={14} />
           </button>
         </div>
