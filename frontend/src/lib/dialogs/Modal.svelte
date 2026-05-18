@@ -15,6 +15,7 @@
     zIndexClass = 'z-50',
     noBackdrop = false,
     onclose = null,
+    onKeydown = null,
     children
   } = $props();
 
@@ -46,7 +47,10 @@
   }
 
   function handleKeydown(e) {
+    onKeydown?.(e);
     e.stopPropagation();
+    if (e.defaultPrevented) return;
+
     // Check for cancel shortcut (Escape)
     if (matchesShortcut(e, cancelShortcut)) {
       close();

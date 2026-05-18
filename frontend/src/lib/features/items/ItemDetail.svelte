@@ -99,7 +99,7 @@ import Button from '../../components/Button.svelte';
   });
 
   // Handle global keyboard shortcuts for item detail
-  useEventListener(() => document, 'keydown', (e) => {
+  function handleItemDetailShortcuts(e) {
     // Only handle if item is loaded
     if (!item) return;
 
@@ -126,7 +126,9 @@ import Button from '../../components/Button.svelte';
       if (availableSubIssueTypes?.length) handleHotkeyW();
       return;
     }
-  });
+  }
+
+  useEventListener(() => document, 'keydown', handleItemDetailShortcuts);
 
   // Reload child items when a new child is created against the item currently open.
   useEventListener(() => window, 'refresh-work-items', (/** @type {CustomEvent<{parentId?: number}>} */ event) => {
@@ -1099,7 +1101,9 @@ import Button from '../../components/Button.svelte';
   <Modal
     isOpen={true}
     maxWidth={'max-w-6xl'}
+    autoFocus={false}
     onclose={closeModal}
+    onKeydown={handleItemDetailShortcuts}
   >
     <div
       bind:this={modalElement}

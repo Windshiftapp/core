@@ -35,6 +35,25 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: ['@milkdown/core', '@milkdown/kit', '@milkdown/theme-nord'],
+    // exclude deps that are only loaded via dynamic import() behind a
+    // runtime guard (isTauri, route-level lazy loads). Pre-bundling them
+    // wastes startup time and — worse — when Vite's scanner misses one
+    // (e.g. @tauri-apps/plugin-dialog) the dep gets discovered on the
+    // first hit, triggering a re-bundle and full reload that costs
+    // ~30 s in our codebase. Excluded deps are loaded on demand from
+    // their original location.
+    exclude: [
+      '@tauri-apps/api',
+      '@tauri-apps/api/path',
+      '@tauri-apps/plugin-dialog',
+      '@tauri-apps/plugin-fs',
+      'tauri-pty',
+      '@excalidraw/excalidraw',
+      '@excalidraw/mermaid-to-excalidraw',
+      '@xterm/xterm',
+      '@xterm/addon-fit',
+      '@xterm/addon-webgl',
+    ],
   },
   server: {
     port: 5555,
