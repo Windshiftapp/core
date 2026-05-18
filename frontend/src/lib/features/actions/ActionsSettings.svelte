@@ -5,6 +5,7 @@
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { statusCategoriesStore } from '../../stores/statusCategories.svelte.js';
   import { workspacePermissions } from '../../stores';
+  import { activeActionEditor } from '../../stores/activeActionEditor.svelte.js';
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
   import ActionLogs from './ActionLogs.svelte';
@@ -25,6 +26,14 @@
   let viewingLogsAction = $state(null);
   let showCreateModal = $state(false);
   let showTemplatePicker = $state(false);
+
+  // Mirror the currently-edited action's id into a shared store so the AI
+  // chat panel can include it as request context. Cleared when we leave
+  // the editor or unmount the page entirely.
+  $effect(() => {
+    activeActionEditor.set(editingAction?.id ?? 0);
+  });
+  $effect(() => () => activeActionEditor.set(0));
 
   // New action form data
   let newActionName = $state('');

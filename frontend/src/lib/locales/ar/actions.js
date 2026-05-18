@@ -48,7 +48,11 @@ export default {
       condition: 'شرط',
       updateAsset: 'تحديث أصل',
       createAsset: 'إنشاء أصل',
+      relatedItems: 'لكل عنصر مرتبط',
+      transitionItem: 'نقل العنصر',
     },
+
+    aiUpdated: 'تم تحديث الإجراء بواسطة الذكاء الاصطناعي',
 
     // Node palette and tips
     addNodes: 'إضافة عقد',

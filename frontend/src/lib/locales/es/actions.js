@@ -49,7 +49,11 @@ export default {
       condition: 'Condición',
       updateAsset: 'Actualizar Activo',
       createAsset: 'Crear Activo',
+      relatedItems: 'Para cada elemento relacionado',
+      transitionItem: 'Transicionar elemento',
     },
+
+    aiUpdated: 'Acción actualizada por IA',
 
     // Node palette and tips
     addNodes: 'Agregar Nodos',

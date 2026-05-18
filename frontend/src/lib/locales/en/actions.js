@@ -53,7 +53,12 @@ export default {
       containerRun: 'Run Container',
       aiExtract: 'AI Extract',
       aiAgent: 'AI Agent',
+      relatedItems: 'For each related item',
+      transitionItem: 'Transition item',
     },
+
+    // Toast shown when the AI chat updates the open action via update_action.
+    aiUpdated: 'Action updated by AI',
 
     // Actor override (run-as)
     runAs: 'Run as',

@@ -47,7 +47,11 @@ export default {
       condition: 'Bedingung',
       updateAsset: 'Asset aktualisieren',
       createAsset: 'Asset erstellen',
+      relatedItems: 'Für jedes verwandte Element',
+      transitionItem: 'Element überführen',
     },
+
+    aiUpdated: 'Aktion durch KI aktualisiert',
 
     addNodes: 'Knoten hinzufügen',
     tips: 'Tipps',

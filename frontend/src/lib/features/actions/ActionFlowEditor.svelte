@@ -28,6 +28,8 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import { permissionStore } from '../../stores';
+  import { actionMutations } from '../../stores/actionMutations.svelte.js';
+  import { infoToast } from '../../stores/toasts.svelte.js';
 
   let {
     action,
@@ -199,6 +201,21 @@
       loadCapabilities('http_client');
       loadCapabilities('llm_connection');
     }
+
+    // Live-reload: when the AI chat lands a create_action / update_action
+    // for the action we currently have open, refetch and rehydrate so the
+    // canvas reflects the agent's changes immediately.
+    const unsub = actionMutations.subscribe(async (mutatedId) => {
+      if (!action?.id || mutatedId !== action.id) return;
+      try {
+        const fresh = await api.get(`/workspaces/${action.workspace_id}/actions/${action.id}`);
+        actionFlowStore.init(fresh);
+        infoToast(t('actions.aiUpdated', 'Action updated by AI'));
+      } catch (err) {
+        console.error('Failed to reload action after AI mutation:', err);
+      }
+    });
+    return unsub;
   });
 
   function capabilityOptions(type) {

@@ -4,7 +4,8 @@
   import { useEventListener } from 'runed';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { chatStore } from '../../stores/chatStore.svelte.js';
-  import { navigate } from '../../router.js';
+  import { activeActionEditor } from '../../stores/activeActionEditor.svelte.js';
+  import { navigate, currentRoute } from '../../router.js';
   import Select from '../../components/Select.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
 
@@ -142,11 +143,26 @@
     }
   }
 
+  // Build a per-request context blob. The backend appends a narrow,
+  // surface-specific hint to the system prompt only on action surfaces, so
+  // we only fill in context when we're actually on one — everywhere else
+  // the chat stays unaware of the user's location to keep the prompt clean.
+  function buildContext() {
+    const route = $currentRoute;
+    if (route?.view !== 'workspace-actions') return undefined;
+    const ctx = { view: route.view };
+    const wsId = Number(route.params?.id);
+    if (wsId) ctx.workspace_id = wsId;
+    const actionId = activeActionEditor.id;
+    if (actionId) ctx.action_id = actionId;
+    return ctx;
+  }
+
   function send() {
     const text = inputText.trim();
     if (!text || chatStore.loading) return;
     inputText = '';
-    chatStore.sendMessage(text);
+    chatStore.sendMessage(text, buildContext());
     // Reset textarea height
     if (textareaEl) {
       textareaEl.style.height = 'auto';

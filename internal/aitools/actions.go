@@ -172,6 +172,16 @@ type createActionOut struct {
 }
 
 // ----------------------------------------------------------------------------
+// update_action
+// ----------------------------------------------------------------------------
+
+type updateActionArgs struct {
+	WorkspaceID int                 `json:"workspace_id" jsonschema:"Workspace the action lives in. Must match the action's stored workspace; mismatches return 'workspace not found' to avoid leaking that a cross-workspace id exists."`
+	ActionID    int                 `json:"action_id" jsonschema:"ID of the action to replace"`
+	Action      actionDefinitionArg `json:"action" jsonschema:"Full replacement graph. Updates are not partial — fetch the existing action via get_action / the REST API first, mutate, and send the complete definition back."`
+}
+
+// ----------------------------------------------------------------------------
 // list_action_templates
 // ----------------------------------------------------------------------------
 
@@ -353,6 +363,76 @@ func init() {
 				TriggerConfig: created.TriggerConfig,
 				NodeCount:     len(created.Nodes),
 				EdgeCount:     len(created.Edges),
+			}, nil
+		},
+	})
+
+	Register(Default, Tool[updateActionArgs]{
+		Name:        "update_action",
+		Description: "Replace an existing action's full definition. The new graph is validated against the catalog before persisting (same checks as create_action). On success the workspace action cache is invalidated so the new automation takes effect immediately, and any in-app editor open on this action live-reloads. Caller must have action.manage on the workspace.",
+		Run: func(_ context.Context, env *Env, args updateActionArgs) (any, error) {
+			if !env.HasWorkspaceAccess(args.WorkspaceID) {
+				return map[string]string{"error": "workspace not found"}, nil
+			}
+			ok, err := env.PermService.HasWorkspacePermission(env.UserID, args.WorkspaceID, models.PermissionActionManage)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				return map[string]string{"error": "permission denied"}, nil
+			}
+			repo := repository.NewActionRepository(env.DB)
+			existing, err := repo.GetByID(args.ActionID)
+			if err != nil || existing == nil || existing.WorkspaceID != args.WorkspaceID {
+				// 404 disclosure rule: same response for "not found", "wrong
+				// workspace", and "soft permission". An LLM should not be able
+				// to probe action ids by varying workspace_id.
+				return map[string]string{"error": "action not found"}, nil //nolint:nilerr // intentional: don't leak existence of cross-workspace actions
+			}
+
+			def := args.Action.toDefinition()
+			resolver := capabilityResolverForEnv{repo: repo}
+			if errs := actioncatalog.Validate(actioncatalog.Default(), def, args.WorkspaceID, resolver); len(errs) > 0 {
+				return map[string]any{"error": errs[0].Message, "validation_errors": errs}, nil
+			}
+
+			existing.Name = def.Name
+			existing.Description = def.Description
+			existing.TriggerType = def.TriggerType
+			existing.TriggerConfig = def.TriggerConfig
+
+			if err := repo.SaveActionWithNodesAndEdges(existing, def.Nodes, def.Edges); err != nil {
+				return nil, fmt.Errorf("save action: %w", err)
+			}
+
+			if env.ActionService != nil {
+				env.ActionService.InvalidateWorkspaceCache(args.WorkspaceID)
+			}
+
+			updated, err := repo.GetByID(args.ActionID)
+			if err != nil {
+				return createActionOut{ //nolint:nilerr // intentional: write succeeded; refetch is best-effort
+					ID:            args.ActionID,
+					WorkspaceID:   args.WorkspaceID,
+					Name:          def.Name,
+					Description:   def.Description,
+					IsEnabled:     existing.IsEnabled,
+					TriggerType:   def.TriggerType,
+					TriggerConfig: def.TriggerConfig,
+					NodeCount:     len(def.Nodes),
+					EdgeCount:     len(def.Edges),
+				}, nil
+			}
+			return createActionOut{
+				ID:            updated.ID,
+				WorkspaceID:   updated.WorkspaceID,
+				Name:          updated.Name,
+				Description:   updated.Description,
+				IsEnabled:     updated.IsEnabled,
+				TriggerType:   updated.TriggerType,
+				TriggerConfig: updated.TriggerConfig,
+				NodeCount:     len(updated.Nodes),
+				EdgeCount:     len(updated.Edges),
 			}, nil
 		},
 	})

@@ -510,11 +510,47 @@ type ChatMessage struct {
 	Content string `json:"content"`
 }
 
+// ChatContext describes where the user is in the app when they send a chat
+// message. The frontend supplies it; the backend uses it only to append
+// narrow, surface-specific hints to the system prompt. It is never used as
+// an authorization input — workspace access is re-checked inside each tool
+// from the authenticated user's accessibleWorkspaceIDs.
+type ChatContext struct {
+	View        string `json:"view,omitempty"`
+	WorkspaceID int    `json:"workspace_id,omitempty"`
+	ActionID    int    `json:"action_id,omitempty"`
+}
+
 // ChatRequest is the request body for the agentic chat endpoint.
 type ChatRequest struct {
 	Message      string        `json:"message"`
 	ConnectionID int           `json:"connection_id,omitempty"`
 	History      []ChatMessage `json:"history,omitempty"`
+	Context      *ChatContext  `json:"context,omitempty"`
+}
+
+// buildChatContextHint returns the extra system-prompt text for the caller's
+// current location, or "" when no surface-specific nudge applies. Kept as a
+// pure function so it is trivial to unit-test.
+func buildChatContextHint(ctx *ChatContext) string {
+	if ctx == nil {
+		return ""
+	}
+	if ctx.View == "workspace-actions" {
+		if ctx.ActionID > 0 {
+			return fmt.Sprintf(
+				"\n\nThe user is currently editing action %d in workspace %d. To improve it, call describe_action_catalog if you need to recall the available nodes, then update_action with the full new graph — the editor live-reloads when the call succeeds. Validate non-trivial changes with validate_action first.",
+				ctx.ActionID, ctx.WorkspaceID,
+			)
+		}
+		if ctx.WorkspaceID > 0 {
+			return fmt.Sprintf(
+				"\n\nThe user is on the action settings page for workspace %d. If they ask you to build an automation, use describe_action_catalog to discover available triggers and nodes, list_action_templates for shipped blueprints, then create_action to persist a new automation in this workspace.",
+				ctx.WorkspaceID,
+			)
+		}
+	}
+	return ""
 }
 
 // ChatResponse is the response from the agentic chat endpoint.
@@ -568,7 +604,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	systemPrompt := fmt.Sprintf(h.promptStore.Get(llm.PromptAIChat),
 		chatNow.Format("2006-01-02"), user.FullName, user.ID, user.ID,
-	)
+	) + buildChatContextHint(req.Context)
 
 	// Convert client history to LLM messages (only user/assistant roles allowed)
 	var history []llm.Message
