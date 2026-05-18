@@ -196,19 +196,15 @@ func isDefaultPort(scheme, port string) bool {
 func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.IP, jiraOrigins func() []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-XSS-Protection", "1; mode=block")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
 			// Public form pages and the embed widget must be loadable cross-origin
 			// so customers can iframe them into their own websites. All other routes
-			// keep strict frame protection.
-			embeddable := strings.HasPrefix(r.URL.Path, "/forms/")
+			// keep strict frame protection via CSP frame-ancestors.
 			frameAncestors := "'self'"
-			if embeddable {
+			if strings.HasPrefix(r.URL.Path, "/forms/") {
 				frameAncestors = "*"
-			} else {
-				w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 			}
 
 			// Generate a per-request cryptographic nonce for CSP script-src
