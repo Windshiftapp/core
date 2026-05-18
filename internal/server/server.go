@@ -508,6 +508,7 @@ func (s *Server) initialize() error {
 
 	// Actions handler
 	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService, workspaceKeyCache)
+	actionCredentialsHandler := handlers.NewActionCredentialsHandler(s.db, permService, workspaceKeyCache, cfg.Auth.SessionSecret)
 
 	// Team handlers
 	teamRepo := repository.NewTeamRepository(s.db)
@@ -1035,6 +1036,7 @@ func (s *Server) initialize() error {
 			StatusLegacy:          statusHandlerLegacy,
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
+			ActionCredentials:     actionCredentialsHandler,
 			ActionTemplates:       handlers.NewActionTemplatesHandler(services.NewActionTemplateService(s.db), s.actionService, workspaceKeyCache, logger.NewAuditor(s.db)),
 			Analytics:             handlers.NewAnalyticsHandler(services.NewAnalyticsService(s.db), permService, workspaceKeyCache),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),

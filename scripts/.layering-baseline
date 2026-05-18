@@ -1,4 +1,5 @@
 internal/database/seed_email_templates.go|windshift/internal/emailutil
+internal/handlers/action_credentials.go|windshift/internal/database
 internal/handlers/actions.go|windshift/internal/database
 internal/handlers/admin_oauth_clients.go|windshift/internal/database
 internal/handlers/agents.go|windshift/internal/database

@@ -191,5 +191,24 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 		api.HandleH("GET /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.GetCapability)))
 		api.HandleH("PUT /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.UpdateCapability)))
 		api.HandleH("DELETE /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.DeleteCapability)))
+
+		// Action credentials (encrypted API tokens referenced by HTTP capabilities)
+		if deps.Workspaces.ActionCredentials != nil {
+			// Global credentials — system-admin only.
+			api.HandleH("GET /admin/action-credentials", admin(http.HandlerFunc(deps.Workspaces.ActionCredentials.ListGlobal)))
+			api.HandleH("POST /admin/action-credentials", admin(http.HandlerFunc(deps.Workspaces.ActionCredentials.CreateGlobal)))
+			api.HandleH("PUT /admin/action-credentials/{credentialId}", admin(http.HandlerFunc(deps.Workspaces.ActionCredentials.UpdateGlobal)))
+			api.HandleH("POST /admin/action-credentials/{credentialId}/rotate", admin(http.HandlerFunc(deps.Workspaces.ActionCredentials.RotateGlobal)))
+			api.HandleH("DELETE /admin/action-credentials/{credentialId}", admin(http.HandlerFunc(deps.Workspaces.ActionCredentials.DeleteGlobal)))
+
+			// Workspace-scoped credentials — require action.credential.manage in
+			// the workspace (handler enforces, since 404-on-missing-perm needs to
+			// happen *after* path resolution to avoid leaking workspace existence).
+			api.HandleH("GET /workspaces/{workspaceId}/action-credentials", auth(http.HandlerFunc(deps.Workspaces.ActionCredentials.ListForWorkspace)))
+			api.HandleH("POST /workspaces/{workspaceId}/action-credentials", auth(http.HandlerFunc(deps.Workspaces.ActionCredentials.CreateForWorkspace)))
+			api.HandleH("PUT /workspaces/{workspaceId}/action-credentials/{credentialId}", auth(http.HandlerFunc(deps.Workspaces.ActionCredentials.UpdateForWorkspace)))
+			api.HandleH("POST /workspaces/{workspaceId}/action-credentials/{credentialId}/rotate", auth(http.HandlerFunc(deps.Workspaces.ActionCredentials.RotateForWorkspace)))
+			api.HandleH("DELETE /workspaces/{workspaceId}/action-credentials/{credentialId}", auth(http.HandlerFunc(deps.Workspaces.ActionCredentials.DeleteForWorkspace)))
+		}
 	}
 }

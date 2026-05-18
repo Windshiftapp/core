@@ -121,6 +121,7 @@ type WorkspaceHandlers struct {
 	StatusLegacy          *handlers.StatusHandler
 	Workflow              *handlers.WorkflowHandler
 	Actions               *handlers.ActionsHandler
+	ActionCredentials     *handlers.ActionCredentialsHandler
 	ActionTemplates       *handlers.ActionTemplatesHandler
 	Analytics             *handlers.AnalyticsHandler
 	ConditionSet          *handlers.ConditionSetHandler
