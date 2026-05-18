@@ -4,6 +4,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,6 +94,12 @@ type ActionService struct {
 	// ExecutionContext.EffectiveActorID) is the user evaluated against.
 	permissionService *PermissionService
 
+	// credentialService resolves action_credentials at execution time so HTTP
+	// capabilities can reference tokens by ID instead of embedding plaintext
+	// in capability/node JSON. Optional — when nil, capabilities that lack
+	// credential refs still work; capabilities WITH refs return an error.
+	credentialService *ActionCredentialService
+
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
 
@@ -136,6 +143,12 @@ func NewActionService(db database.Database, config ActionServiceConfig, chainSto
 // SetNotificationService sets the notification service for notify_user actions
 func (as *ActionService) SetNotificationService(ns *NotificationService) {
 	as.notificationService = ns
+}
+
+// SetCredentialService wires the action credential service so HTTP capabilities
+// can resolve credential refs at execution time.
+func (as *ActionService) SetCredentialService(cs *ActionCredentialService) {
+	as.credentialService = cs
 }
 
 // SetApprovalService wires the approval service so set_status actions are
@@ -2454,7 +2467,11 @@ func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceI
 		return "", fmt.Errorf("URL %q not allowed by capability %d", args.URL, capID)
 	}
 
-	return doHTTPRequest(ctx, args.Method, args.URL, args.Body, args.Headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
+	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(ctx, &httpConfig, args.Headers, workspaceID, capID)
+	if err != nil {
+		return "", err
+	}
+	return doHTTPRequest(ctx, args.Method, args.URL, args.Body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 }
 
 // executeContainerRun executes a container_run node.
@@ -2543,7 +2560,12 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 		return fmt.Errorf("URL %q not allowed by capability %d", url, config.CapabilityID)
 	}
 
-	result, err := doHTTPRequest(context.Background(), config.Method, url, body, headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
+	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(context.Background(), &httpConfig, headers, ctx.Event.WorkspaceID, config.CapabilityID)
+	if err != nil {
+		return fmt.Errorf("http_request: %w", err)
+	}
+
+	result, err := doHTTPRequest(context.Background(), config.Method, url, body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 	if err != nil {
 		return fmt.Errorf("http_request failed: %w", err)
 	}
@@ -2565,6 +2587,104 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 	)
 
 	return nil
+}
+
+// buildHTTPHeadersWithCredentials resolves all credential references on an
+// http_client capability and returns the final request headers map ready to
+// pass into doHTTPRequest. Layering order (later wins):
+//  1. capability.DefaultHeaders (non-sensitive literals)
+//  2. capability.Auth (decrypts the referenced credential, applies scheme)
+//  3. capability.SecretHeaderRefs (per-header credential lookups)
+//  4. caller-supplied per-request headers (the action node's Headers map, or
+//     the agent tool's headers arg)
+//
+// Sensitive caller-supplied header names are rejected here — node validation
+// is the primary gate, but the runtime double-checks so a future code path
+// that bypasses validation can't slip a raw token through.
+//
+// Returns a freshly allocated map so caller-side header maps are not mutated.
+func (as *ActionService) buildHTTPHeadersWithCredentials(ctx context.Context, httpConfig *models.HTTPClientConfig, callerHeaders map[string]string, workspaceID, capabilityID int) (map[string]string, error) {
+	merged := make(map[string]string, len(httpConfig.DefaultHeaders)+len(callerHeaders)+len(httpConfig.SecretHeaderRefs)+1)
+
+	// 1) default headers (non-sensitive literals).
+	for k, v := range httpConfig.DefaultHeaders {
+		if models.IsSensitiveHeaderName(k) {
+			// Validation should have caught this at save time. Drop silently
+			// at runtime as a belt-and-suspenders guard rather than letting
+			// a legacy inline token slip out.
+			continue
+		}
+		merged[k] = v
+	}
+
+	// 2) auth ref.
+	if httpConfig.Auth != nil && httpConfig.Auth.CredentialID > 0 {
+		if as.credentialService == nil {
+			return nil, fmt.Errorf("http capability %d references a credential but no credential service is wired", capabilityID)
+		}
+		plaintext, cred, err := as.credentialService.Resolve(ctx, httpConfig.Auth.CredentialID, workspaceID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve auth credential %d: %w", httpConfig.Auth.CredentialID, err)
+		}
+		value, err := formatCredentialHeaderValue(cred.CredentialType, httpConfig.Auth.Scheme, plaintext)
+		if err != nil {
+			return nil, fmt.Errorf("format auth credential %d: %w", httpConfig.Auth.CredentialID, err)
+		}
+		headerName := httpConfig.Auth.HeaderName
+		if strings.TrimSpace(headerName) == "" {
+			headerName = "Authorization"
+		}
+		merged[headerName] = value
+	}
+
+	// 3) secret_header_refs — each entry decrypts independently.
+	for headerName, credentialID := range httpConfig.SecretHeaderRefs {
+		if credentialID <= 0 || strings.TrimSpace(headerName) == "" {
+			continue
+		}
+		if as.credentialService == nil {
+			return nil, fmt.Errorf("http capability %d references secret_header_refs but no credential service is wired", capabilityID)
+		}
+		plaintext, cred, err := as.credentialService.Resolve(ctx, credentialID, workspaceID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve secret_header_refs[%q] credential %d: %w", headerName, credentialID, err)
+		}
+		value, err := formatCredentialHeaderValue(cred.CredentialType, "", plaintext)
+		if err != nil {
+			return nil, fmt.Errorf("format secret_header_refs[%q] credential %d: %w", headerName, credentialID, err)
+		}
+		merged[headerName] = value
+	}
+
+	// 4) caller-supplied headers — non-sensitive only.
+	for k, v := range callerHeaders {
+		if models.IsSensitiveHeaderName(k) {
+			return nil, fmt.Errorf("header %q is sensitive — reference a credential instead of supplying a raw value", k)
+		}
+		merged[k] = v
+	}
+	return merged, nil
+}
+
+// formatCredentialHeaderValue turns a credential's plaintext + scheme into
+// the header value to inject. For bearer/basic credentials, the scheme is
+// pre/suffixed accordingly; for custom-header and api_key types, the raw
+// plaintext is used as-is.
+func formatCredentialHeaderValue(credType models.ActionCredentialType, scheme, plaintext string) (string, error) {
+	switch credType {
+	case models.CredentialBearerToken:
+		s := strings.TrimSpace(scheme)
+		if s == "" {
+			s = "Bearer"
+		}
+		return s + " " + plaintext, nil
+	case models.CredentialBasicAuth:
+		// Stored secret is "username:password". Inject as RFC7617.
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(plaintext)), nil
+	case models.CredentialAPIKey, models.CredentialCustomHeader:
+		return plaintext, nil
+	}
+	return "", fmt.Errorf("unsupported credential type %q", credType)
 }
 
 // isURLAllowed checks if a URL matches any of the allowed patterns.

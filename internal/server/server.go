@@ -509,6 +509,13 @@ func (s *Server) initialize() error {
 	// Actions handler
 	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService, workspaceKeyCache)
 	actionCredentialsHandler := handlers.NewActionCredentialsHandler(s.db, permService, workspaceKeyCache, cfg.Auth.SessionSecret)
+	// Wire credential resolution into the action runtime so HTTP capabilities
+	// can reference tokens by ID. The service shares the same SSO_SECRET via
+	// a domain-separated HKDF label (ActionCredentialEncryptionInfo).
+	s.actionService.SetCredentialService(services.NewActionCredentialService(
+		repository.NewActionCredentialRepository(s.db),
+		cfg.Auth.SessionSecret,
+	))
 
 	// Team handlers
 	teamRepo := repository.NewTeamRepository(s.db)
