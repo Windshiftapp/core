@@ -283,9 +283,11 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sanitize user input to prevent XSS
-	input.ActualResult = utils.SanitizeCommentContent(input.ActualResult)
-	input.Notes = utils.SanitizeCommentContent(input.Notes)
+	// Sanitize user input to prevent XSS. Use SanitizeDescription (preserves
+	// <br /> blank-line markers emitted by MilkdownEditor) rather than
+	// SanitizeCommentContent (which strips all HTML including <br>).
+	input.ActualResult = utils.SanitizeDescription(input.ActualResult)
+	input.Notes = utils.SanitizeDescription(input.Notes)
 
 	if err := h.service.UpdateResult(runID, resultID, services.TestResultUpdateRequest{
 		Status:       input.Status,
@@ -356,9 +358,11 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Sanitize user input to prevent XSS
-	update.ActualResult = utils.SanitizeCommentContent(update.ActualResult)
-	update.Notes = utils.SanitizeCommentContent(update.Notes)
+	// Sanitize user input to prevent XSS. SanitizeDescription preserves
+	// <br /> blank-line markers from MilkdownEditor; SanitizeCommentContent
+	// would strip them along with all other HTML.
+	update.ActualResult = utils.SanitizeDescription(update.ActualResult)
+	update.Notes = utils.SanitizeDescription(update.Notes)
 
 	// Verify item belongs to same workspace if provided
 	if update.ItemID != nil {

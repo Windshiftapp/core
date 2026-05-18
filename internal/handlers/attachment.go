@@ -55,6 +55,43 @@ func (h *AttachmentHandler) SetApprovalService(ap *services.ApprovalService) {
 	h.approvalService = ap
 }
 
+// authorizeTestResultAttachmentAccess writes a 404 response and returns false
+// when the caller cannot read attachments scoped to the given test_result
+// (either the row is gone or the user lacks test.view on its workspace).
+// Mirrors the 404-not-403 invariant used for item attachments to avoid
+// disclosing existence of resources outside the caller's reach.
+func (h *AttachmentHandler) authorizeTestResultAttachmentAccess(w http.ResponseWriter, r *http.Request, testResultID int) bool {
+	var wsID int
+	err := h.db.QueryRow(`
+		SELECT run.workspace_id
+		FROM test_results tr
+		JOIN test_runs run ON tr.run_id = run.id
+		WHERE tr.id = ?
+	`, testResultID).Scan(&wsID)
+	if errors.Is(err, sql.ErrNoRows) {
+		respondNotFound(w, r, "attachment")
+		return false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return false
+	}
+	allowed, err := h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionTestView)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if !allowed {
+		respondNotFound(w, r, "attachment")
+		return false
+	}
+	return true
+}
+
 // checkItemAttachmentPermission checks if the user can modify attachments on an item
 // Internal users need item.edit permission in the workspace
 // Portal customers can only modify attachments on items they created
@@ -175,6 +212,41 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			exists, err = repository.NewItemRepository(h.db).Exists(entityID)
 		case "test_case":
 			err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM test_cases WHERE id = ?)", entityID).Scan(&exists)
+		case "test_result":
+			// Resolve workspace via test_results -> test_runs in one shot so we can
+			// gate the upload on the caller's test.execute permission for that workspace.
+			var wsID int
+			err = h.db.QueryRow(`
+				SELECT run.workspace_id
+				FROM test_results tr
+				JOIN test_runs run ON tr.run_id = run.id
+				WHERE tr.id = ?
+			`, entityID).Scan(&wsID)
+			if errors.Is(err, sql.ErrNoRows) {
+				respondNotFound(w, r, "test_result")
+				return
+			}
+			if err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			user, authOK := RequireAuth(w, r)
+			if !authOK {
+				return
+			}
+			var allowed bool
+			allowed, err = h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionTestExecute)
+			if err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			if !allowed {
+				// 404, not 403 — matches the repo's item-permission invariant
+				// (don't disclose existence of resources the caller can't access).
+				respondNotFound(w, r, "test_result")
+				return
+			}
+			exists = true
 		default:
 			slog.Debug("unknown entity type", slog.String("component", "attachments"), slog.String("entity_type", entityType))
 			respondValidationError(w, r, "Unknown entity type")
@@ -336,6 +408,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "hub_logos")
 	case "test_case":
 		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
+	case "test_result":
+		itemDir = filepath.Join(h.attachmentPath, "test_results", strconv.Itoa(entityID))
 	default: // "item"
 		itemDir = filepath.Join(h.attachmentPath, "items", strconv.Itoa(entityID))
 	}
@@ -672,11 +746,12 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("getting attachment info", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
 	var attachment models.Attachment
 	var itemID sql.NullInt64
+	var entityType sql.NullString
 	err = h.db.QueryRow(`
-		SELECT id, item_id, filename, original_filename, file_path, mime_type, file_size
+		SELECT id, item_id, entity_type, filename, original_filename, file_path, mime_type, file_size
 		FROM attachments WHERE id = ?
 	`, attachmentID).Scan(
-		&attachment.ID, &itemID, &attachment.Filename, &attachment.OriginalFilename,
+		&attachment.ID, &itemID, &entityType, &attachment.Filename, &attachment.OriginalFilename,
 		&attachment.FilePath, &attachment.MimeType, &attachment.FileSize,
 	)
 
@@ -696,12 +771,25 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
 
-	// Check item permission if attachment is associated with an item. Active
-	// approvers without workspace item.view are allowed through so they can
-	// download attachments referenced by the request they're reviewing.
-	if attachment.ItemID != nil {
-		if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, *attachment.ItemID, models.PermissionItemView) {
+	// Authorize based on entity type. test_result attachments resolve to a
+	// workspace via test_runs and require test.view in that workspace; item
+	// attachments use the long-standing item-permission check (with approval-
+	// pool fallback for item.view). Other entity types preserve the prior
+	// behavior so this change is non-invasive.
+	switch entityType.String {
+	case "test_result":
+		if attachment.ItemID == nil {
+			respondNotFound(w, r, "attachment")
 			return
+		}
+		if !h.authorizeTestResultAttachmentAccess(w, r, *attachment.ItemID) {
+			return
+		}
+	default:
+		if attachment.ItemID != nil {
+			if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, *attachment.ItemID, models.PermissionItemView) {
+				return
+			}
 		}
 	}
 
@@ -863,10 +951,11 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	var thumbnailPath string
 	var mimeType string
 	var thumbItemID sql.NullInt64
+	var thumbEntityType sql.NullString
 	err = h.db.QueryRow(`
-		SELECT has_thumbnail, thumbnail_path, mime_type, item_id
+		SELECT has_thumbnail, thumbnail_path, mime_type, item_id, entity_type
 		FROM attachments WHERE id = ?
-	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType, &thumbItemID)
+	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType, &thumbItemID, &thumbEntityType)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "attachment")
@@ -877,11 +966,22 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check item permission if attachment is associated with an item. Active
-	// approvers fall through the same exception used for the download path.
-	if thumbItemID.Valid {
-		if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, int(thumbItemID.Int64), models.PermissionItemView) {
+	// Authorize same as Download — test_result via workspace lookup, items via
+	// the existing item-permission check with approval-pool fallback.
+	switch thumbEntityType.String {
+	case "test_result":
+		if !thumbItemID.Valid {
+			respondNotFound(w, r, "attachment")
 			return
+		}
+		if !h.authorizeTestResultAttachmentAccess(w, r, int(thumbItemID.Int64)) {
+			return
+		}
+	default:
+		if thumbItemID.Valid {
+			if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, int(thumbItemID.Int64), models.PermissionItemView) {
+				return
+			}
 		}
 	}
 

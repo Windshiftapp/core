@@ -172,7 +172,7 @@
     try {
       // Load step results from the database
       const existingStepResults = await api.tests.testRuns.getStepResults(workspaceId, runId);
-      
+
       // Merge existing results with initialized results
       Object.keys(existingStepResults).forEach(stepId => {
         const existingResult = existingStepResults[stepId];
@@ -183,9 +183,28 @@
           defect_id: existingResult.defect_id || null
         };
       });
-      
+
       // Trigger reactivity
       stepResults = { ...stepResults };
+
+      // Load per-test-case result rows so we know the test_result.id to attach
+      // screenshots to. The row is created when the run starts, so it always
+      // exists by the time we get here.
+      try {
+        const resultRows = await api.tests.testRuns.getResults(workspaceId, runId);
+        if (Array.isArray(resultRows)) {
+          for (const row of resultRows) {
+            testResults[row.test_case_id] = {
+              ...(testResults[row.test_case_id] ?? {}),
+              id: row.id,
+              status: row.status || testResults[row.test_case_id]?.status || 'not_run',
+            };
+          }
+          testResults = { ...testResults };
+        }
+      } catch (resultErr) {
+        console.error('Failed to load test_result rows for attachments:', resultErr);
+      }
     } catch (error) {
       console.error('Failed to load existing step results:', error);
     }
@@ -697,23 +716,53 @@
               <!-- Actual Result -->
               <div class="mb-4">
                 <Label color="default" class="mb-2">{t('testing.actual')}</Label>
-                <Textarea
-                  value={stepResults[currentStep.id]?.actual_result || ''}
-                  oninput={(e) => updateStepResult(currentStep.id, 'actual_result', e.target.value)}
-                  rows={3}
-                  placeholder={t('testing.actualResultPlaceholder')}
-                />
+                {#if testResults[currentCase.id]?.id}
+                  {#key currentStep.id}
+                    <div class="border rounded overflow-hidden" style="border-color: var(--ds-border); min-height: 80px;">
+                      <MilkdownEditor
+                        content={stepResults[currentStep.id]?.actual_result || ''}
+                        entityType="test_result"
+                        entityId={testResults[currentCase.id].id}
+                        showToolbar={true}
+                        placeholder={t('testing.actualResultPlaceholder')}
+                        onContentChange={(value) => updateStepResult(currentStep.id, 'actual_result', value)}
+                      />
+                    </div>
+                  {/key}
+                {:else}
+                  <Textarea
+                    value={stepResults[currentStep.id]?.actual_result || ''}
+                    oninput={(e) => updateStepResult(currentStep.id, 'actual_result', e.target.value)}
+                    rows={3}
+                    placeholder={t('testing.actualResultPlaceholder')}
+                  />
+                {/if}
               </div>
 
               <!-- Notes -->
               <div class="mb-4">
                 <Label color="default" class="mb-2">{t('common.notes')}</Label>
-                <Textarea
-                  value={stepResults[currentStep.id]?.notes || ''}
-                  oninput={(e) => updateStepResult(currentStep.id, 'notes', e.target.value)}
-                  rows={2}
-                  placeholder={t('testing.notesPlaceholder')}
-                />
+                {#if testResults[currentCase.id]?.id}
+                  {#key `notes-${currentStep.id}`}
+                    <div class="border rounded overflow-hidden" style="border-color: var(--ds-border); min-height: 60px;">
+                      <MilkdownEditor
+                        content={stepResults[currentStep.id]?.notes || ''}
+                        entityType="test_result"
+                        entityId={testResults[currentCase.id].id}
+                        showToolbar={true}
+                        placeholder={t('testing.notesPlaceholder')}
+                        onContentChange={(value) => updateStepResult(currentStep.id, 'notes', value)}
+                      />
+                    </div>
+                  {/key}
+                {:else}
+                  <Textarea
+                    value={stepResults[currentStep.id]?.notes || ''}
+                    oninput={(e) => updateStepResult(currentStep.id, 'notes', e.target.value)}
+                    rows={2}
+                    placeholder={t('testing.notesPlaceholder')}
+                  />
+                {/if}
               </div>
 
               <!-- Link Issue (shown when failed) -->

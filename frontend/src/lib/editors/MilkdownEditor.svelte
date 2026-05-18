@@ -24,7 +24,7 @@
   let {
     content = $bindable(''), placeholder = '', readonly = false,
     showToolbar = false, hideToolbarUntilFocus = false, itemId = null, entityType = null,
-    entityId = null, onImageInsert = null, isPersonalWorkspace = false, compact = false,
+    entityId = null, onImageInsert = null, onContentChange = null, isPersonalWorkspace = false, compact = false,
     customUploadFn = null, downloadUrlBase = '/api/attachments'
   } = $props();
 
@@ -348,6 +348,7 @@
           ctx.set(defaultValueCtx, initialContent || '');
           ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
             content = markdown;
+            if (onContentChange) onContentChange(markdown);
           });
           // Use set instead of update to handle case where context may not be initialized
           ctx.set(editorViewOptionsCtx, {
