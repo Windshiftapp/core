@@ -244,6 +244,53 @@ func TestValidateRejectsBrokenShapes(t *testing.T) {
 		}
 	})
 
+	t.Run("http_request rejects sensitive Headers map", func(t *testing.T) {
+		def := actioncatalog.ActionDefinition{
+			Name:        "x",
+			TriggerType: models.ActionTriggerManual,
+			Nodes: []models.ActionNode{
+				{ID: 1, NodeType: models.ActionNodeTrigger},
+				{
+					ID:       2,
+					NodeType: models.ActionNodeHTTPRequest,
+					NodeConfig: `{"method":"GET","url_template":"https://x","output_field":"o","capability_id":1,` +
+						`"headers":{"Authorization":"Bearer LEAKED-FROM-NODE-CONFIG"}}`,
+				},
+			},
+			Edges: []models.ActionEdge{{SourceNodeID: 1, TargetNodeID: 2, EdgeType: "default"}},
+		}
+		errs := actioncatalog.Validate(cat, def, 0, nil)
+		if !errs.Has(actioncatalog.CodeInvalidConfig) {
+			t.Fatalf("expected invalid_config for sensitive node header, got %v", errs)
+		}
+		for _, e := range errs {
+			if strings.Contains(e.Message, "LEAKED-FROM-NODE-CONFIG") {
+				t.Errorf("validator leaked plaintext token into error: %v", e)
+			}
+		}
+	})
+
+	t.Run("http_request allows non-sensitive Headers", func(t *testing.T) {
+		def := actioncatalog.ActionDefinition{
+			Name:        "x",
+			TriggerType: models.ActionTriggerManual,
+			Nodes: []models.ActionNode{
+				{ID: 1, NodeType: models.ActionNodeTrigger},
+				{
+					ID:       2,
+					NodeType: models.ActionNodeHTTPRequest,
+					NodeConfig: `{"method":"GET","url_template":"https://x","output_field":"o","capability_id":1,` +
+						`"headers":{"Accept":"application/json","X-Request-Id":"abc"}}`,
+				},
+			},
+			Edges: []models.ActionEdge{{SourceNodeID: 1, TargetNodeID: 2, EdgeType: "default"}},
+		}
+		errs := actioncatalog.Validate(cat, def, 0, nil)
+		if errs.Has(actioncatalog.CodeInvalidConfig) {
+			t.Fatalf("non-sensitive headers must be accepted: %v", errs)
+		}
+	})
+
 	t.Run("ai_agent max_steps over cap", func(t *testing.T) {
 		def := actioncatalog.ActionDefinition{
 			Name:        "x",

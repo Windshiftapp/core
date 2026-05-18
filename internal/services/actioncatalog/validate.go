@@ -402,6 +402,20 @@ func validateNodeConfigValues(n models.ActionNode) (msg, field string) {
 			}
 		}
 	}
+	// HTTP node Headers map cannot carry sensitive auth literals — those must
+	// be referenced via the capability's Auth / SecretHeaderRefs. Catching
+	// this at save time keeps secret material out of action_nodes.node_config,
+	// which is readable by every editor of the action.
+	if n.NodeType == models.ActionNodeHTTPRequest {
+		var cfg models.HTTPRequestNodeConfig
+		if err := json.Unmarshal([]byte(n.NodeConfig), &cfg); err == nil {
+			for header := range cfg.Headers {
+				if models.IsSensitiveHeaderName(header) {
+					return fmt.Sprintf("Header %q is sensitive — reference a credential via the capability's auth/secret_header_refs instead of placing a raw value on the node", header), fmt.Sprintf("headers[%q]", header)
+				}
+			}
+		}
+	}
 	return "", ""
 }
 
