@@ -1,7 +1,7 @@
 # Multi-stage build for Windshift server
 
 # Stage 1: Build frontend
-FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS frontend-builder
+FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS frontend-builder
 
 WORKDIR /build
 
