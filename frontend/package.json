@@ -31,13 +31,13 @@
     "tauri:build": "cd ../../desktop && ./build.sh --all"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.11",
+    "@biomejs/biome": "2.5.2",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/svelte": "^5.3.1",
+    "@testing-library/svelte": "^5.4.2",
     "@types/dompurify": "^3.0.5",
     "@typescript/native-preview": "^7.0.0-dev.20260420.1",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "jscpd": "^4.0.9",
     "jsdom": "^27.4.0",
     "rollup-plugin-visualizer": "^6.0.3",
@@ -45,7 +45,7 @@
     "svelte-check": "^4.4.8",
     "svelte-check-native": "^0.3.7",
     "typescript": "^5.7.0",
-    "vite": "^8.0.0",
+    "vite": "^8.1.3",
     "vitest": "^4.1.0"
   },
   "dependencies": {
