@@ -70,7 +70,7 @@
     "@milkdown/theme-nord": "^7.18.0",
     "@tabler/icons-svelte-runes": "^3.40.0",
     "@tailwindcss/vite": "^4.1.11",
-    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-fs": "^2.2.0",
     "@xterm/addon-fit": "^0.11.0",
