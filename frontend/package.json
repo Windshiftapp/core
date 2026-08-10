@@ -32,7 +32,7 @@
     "tauri:build": "cd ../../desktop && ./build.sh --all"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.4",
+    "@biomejs/biome": "2.5.5",
     "@hugeicons/core-free-icons": "4.2.2",
     "@hugeicons/svelte": "1.1.4",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
