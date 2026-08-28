@@ -1,5 +1,7 @@
 <script>
   import DueMark from './DueMark.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
+  import { systemPriorityName, systemStatusName } from '../../utils/systemLabels.js';
 
   let {
     title,
@@ -34,8 +36,8 @@
       <span
         class="inline-block w-2 h-2 rounded-full flex-shrink-0"
         style={`background-color: ${priorityColor};`}
-        title={priorityName}
-        aria-label={`Priority: ${priorityName}`}
+        title={systemPriorityName(priorityName)}
+        aria-label={t('dashboard.widgetContent.priorityAria', { name: systemPriorityName(priorityName) })}
       ></span>
     {/if}
     <span class="text-sm truncate" style="color: var(--ds-text);">{title}</span>
@@ -50,7 +52,7 @@
           ? `background-color: ${statusColor}1f; color: ${statusColor};`
           : 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);'}
       >
-        {statusName}
+        {systemStatusName(statusName)}
       </span>
     {/if}
     {#if timestamp}

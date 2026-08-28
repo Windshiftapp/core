@@ -4,6 +4,7 @@
 
 export default {
   pickers: {
+    selectStatus: 'Выберите статус',
     select: 'Выбрать',
     search: 'Поиск',
     options: 'Варианты',
@@ -14,7 +15,7 @@ export default {
     noItemsAvailable: 'Нет доступных элементов',
     startTypingToSearch: 'Начните вводить текст для поиска…',
     searchPages: 'Поиск страниц…',
-    selectAsset: 'Выберите актив',
+    selectAsset: 'Выберите ресурс',
     noTag: 'Без тега',
     showingOfTotal: 'Показано {shown} из {total} — введите текст для поиска',
     selectUser: 'Выберите пользователя',
@@ -221,9 +222,9 @@ export default {
       resetBoardConfig: 'Восстановить стандартную конфигурацию доски? Пользовательская конфигурация будет удалена.',
       deleteCustomField: 'Удалить настраиваемое поле «{name}» из всех проектов?',
       deleteLinkType: 'Удалить этот тип связи и все связи этого типа?',
-      deleteAsset: 'Удалить этот актив?',
-      deleteAssetSet: 'Удалить этот набор вместе со всеми активами, типами и категориями?',
-      deleteAssetType: 'Удалить этот тип актива? Активы этого типа останутся без назначенного типа.',
+      deleteAsset: 'Удалить этот ресурс?',
+      deleteAssetSet: 'Удалить этот набор вместе со всеми ресурсами, типами и категориями?',
+      deleteAssetType: 'Удалить этот тип ресурса? Ресурсы этого типа останутся без назначенного типа.',
       deleteCategory: 'Удалить эту категорию? Дочерние категории будут перемещены к родителю.',
       revokeRole: 'Отозвать эту роль?',
       quitApplication: 'Завершить работу приложения? Сервер будет остановлен.',
@@ -342,6 +343,7 @@ export default {
   },
 
   widgets: {
+    stats: { collections: 'Коллекции', totalItems: 'Всего элементов' },
     removeWidget: 'Удалить виджет',
     defaultWidth: 'Стандартная ширина: {width} из {columns}',
     widthQuarter: 'Четверть',
@@ -394,6 +396,7 @@ export default {
       noStatus: 'Без статуса',
       activeMilestone: 'Активен',
       noCategorizedWork: 'Нет элементов по категориям',
+      chartAria: 'Распределение элементов этапа по статусам',
     },
     myTasks: {
       loadingText: 'Загрузка ваших задач…',
@@ -428,6 +431,25 @@ export default {
       emptyTitle: 'Активных итераций нет',
       emptySubtitle: 'Сроки итераций появятся здесь',
       loadError: 'Не удалось загрузить итерации',
+      active: 'Активна',
+      planned: 'Запланирована',
+      completed: 'Завершена',
+    },
+    testCoverage: {
+      loading: 'Загрузка данных о покрытии…',
+      loadError: 'Не удалось загрузить данные о покрытии',
+      emptyTitle: 'Требования не настроены',
+      emptyDescription: 'Настройте типы требований в отчётах о тестировании, чтобы увидеть покрытие.',
+      chartAria: 'Покрытие требований тест-кейсами',
+      covered: 'Покрыто',
+      notCovered: 'Не покрыто',
+      requirementCount: 'Покрыто требований: {covered} из {total}',
+      requirements: '{count} требований',
+      requirements_one: '{count} требование',
+      requirements_few: '{count} требования',
+      requirements_many: '{count} требований',
+      requirements_other: '{count} требования',
+      linkedCases: 'связаны с тест-кейсами',
     },
   },
 

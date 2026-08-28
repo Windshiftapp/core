@@ -1,6 +1,8 @@
 <script>
   import { FolderOpen, CheckCircle, Clock, AlertCircle } from '@lucide/svelte';
   import StatCard from './StatCard.svelte';
+  import { t } from '../stores/i18n.svelte.js';
+  import { systemStatusCategoryName } from '../utils/systemLabels.js';
 
   let { stats = {
     totalCollections: 0,
@@ -31,7 +33,7 @@
     icon={FolderOpen}
     bgColor="var(--ds-accent-blue-subtler)"
     iconColor="var(--ds-icon-accent-blue)"
-    label="Collections"
+    label={t('widgets.stats.collections')}
     value={stats.totalCollections}
   />
 
@@ -41,7 +43,7 @@
       icon={getCategoryIcon(category.name)}
       bgColor="{color}20"
       iconColor={color}
-      label={category.name}
+      label={systemStatusCategoryName(category)}
       value={stats.itemsByStatusCategory[category.name] || 0}
     />
   {/each}
@@ -51,7 +53,7 @@
       icon={FolderOpen}
       bgColor="var(--ds-background-accent-purple-subtler)"
       iconColor="var(--ds-icon-accent-purple)"
-      label="Total Items"
+      label={t('widgets.stats.totalItems')}
       value={stats.totalItems}
     />
   {/if}

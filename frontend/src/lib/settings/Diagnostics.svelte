@@ -15,37 +15,38 @@
   import RecurrenceVolumeSection from './diagnostics/RecurrenceVolumeSection.svelte';
   import DomainEventsSection from './diagnostics/DomainEventsSection.svelte';
   import SCMHealthSection from './diagnostics/SCMHealthSection.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
-  const diagnosticGroups = [
-    { label: 'Overview', tabs: [{ id: 'clock', label: 'Server clock' }] },
+  let diagnosticGroups = $derived([
+    { label: t('diagnostics.groups.overview'), tabs: [{ id: 'clock', label: t('diagnostics.tabs.clock') }] },
     {
-      label: 'Automation',
+      label: t('diagnostics.groups.automation'),
       tabs: [
-        { id: 'actions', label: 'Action executions' },
-        { id: 'webhooks', label: 'Webhook deliveries' },
-        { id: 'schedulers', label: 'Background jobs' },
-        { id: 'recurrence-volume', label: 'Recurrence' },
-        { id: 'domain-events', label: 'Domain events' },
+        { id: 'actions', label: t('diagnostics.tabs.actions') },
+        { id: 'webhooks', label: t('diagnostics.tabs.webhooks') },
+        { id: 'schedulers', label: t('diagnostics.tabs.schedulers') },
+        { id: 'recurrence-volume', label: t('diagnostics.tabs.recurrence') },
+        { id: 'domain-events', label: t('diagnostics.tabs.domainEvents') },
       ],
     },
-    { label: 'Data', tabs: [{ id: 'frac-index', label: 'Frac index' }] },
+    { label: t('diagnostics.groups.data'), tabs: [{ id: 'frac-index', label: t('diagnostics.tabs.fracIndex') }] },
     { label: 'AI / LLM', tabs: [{ id: 'llm-health', label: 'AI / LLM' }] },
     {
-      label: 'Infrastructure',
+      label: t('diagnostics.groups.infrastructure'),
       tabs: [
-        { id: 'runner-pools', label: 'Runner pools' },
-        { id: 'database-pools', label: 'Database pools' },
-        { id: 'cache-memory', label: 'Cache memory' },
+        { id: 'runner-pools', label: t('diagnostics.tabs.runnerPools') },
+        { id: 'database-pools', label: t('diagnostics.tabs.databasePools') },
+        { id: 'cache-memory', label: t('diagnostics.tabs.cacheMemory') },
       ],
     },
-    { label: 'SCM', tabs: [{ id: 'scm-health', label: 'SCM connections' }] },
-  ];
+    { label: 'SCM', tabs: [{ id: 'scm-health', label: t('diagnostics.tabs.scmConnections') }] },
+  ]);
 
-  const tabs = diagnosticGroups.map((group) => ({
+  let tabs = $derived(diagnosticGroups.map((group) => ({
     id: group.tabs[0].id,
     label: group.label,
     matches: group.tabs.map((tab) => tab.id),
-  }));
+  })));
 
   const subtab = $derived($currentRoute.query?.subtab || 'clock');
   const activeGroup = $derived(
@@ -56,8 +57,8 @@
 <PermissionGuard requireSystemAdmin={true}>
   <div class="space-y-6" data-testid="diagnostics-page">
     <SectionHeader
-      title="Diagnostics"
-      subtitle="Operational signals from the running system. Diagnostic warning thresholds can be adjusted without changing hard safety limits."
+      title={t('diagnostics.title')}
+      subtitle={t('diagnostics.subtitle')}
     />
 
     <TabNav {tabs} basePath="/admin/diagnostics" defaultTab="clock" />

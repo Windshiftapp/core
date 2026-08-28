@@ -5,6 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import { buildPieSegments } from '../utils/pieChart.js';
+  import { systemStatusCategoryName } from '../utils/systemLabels.js';
 
   let { milestones = [] } = $props();
 
@@ -29,7 +30,7 @@
     if (!Array.isArray(breakdown)) return [];
     return breakdown.map((segment, index) => {
       const label = typeof segment?.category_name === 'string' && segment.category_name.trim().length > 0
-        ? segment.category_name.trim()
+        ? systemStatusCategoryName(segment.category_name.trim())
         : t('widgets.milestoneProgress.noStatus');
       const color = segment?.category_color || fallbackColors[index % fallbackColors.length];
       const count = typeof segment?.item_count === 'number' && Number.isFinite(segment.item_count)
@@ -81,7 +82,7 @@
           <div class="card-body">
             <div class="pie-wrapper">
               {#if milestone.total_items > 0}
-                <svg viewBox="0 0 140 140" role="img" aria-label="Milestone status breakdown">
+                <svg viewBox="0 0 140 140" role="img" aria-label={t('widgets.milestoneProgress.chartAria')}>
                   <PieChartSegments {segments} {radius} />
                   <text class="pie-total" x="70" y="68">{milestone.total_items || 0}</text>
                   <text class="pie-label" x="70" y="84">{t('widgets.milestoneProgress.items')}</text>

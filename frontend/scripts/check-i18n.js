@@ -4,8 +4,8 @@
  * i18n Validation Script
  *
  * Validates locale files against English (reference locale) and detects:
- * - Missing or extra keys in non-English locales (while allowing valid
- *   locale-specific CLDR plural variants)
+ * - Missing-key coverage and invalid extra keys in non-English locales
+ *   (missing keys use the application's English runtime fallback)
  * - Source keys referenced in code but missing from English catalog
  * - Placeholder mismatches between English and other locales
  * - Untranslated English carryovers in non-English locales
@@ -16,12 +16,17 @@
 import { glob, readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ENGLISH_FALLBACK_KEYS } from '../src/lib/locales/adminOperationsFallback.js';
 import { mergeInto } from '../src/lib/locales/createLocale.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = join(__dirname, '..', 'src', 'lib', 'locales');
 const SRC_DIR = join(__dirname, '..', 'src');
 const REFERENCE_LOCALE = 'en';
+// Russian is shipped as a fully reviewed locale and must never silently fall
+// back to English. Older locales may remain partially translated while still
+// using the application's documented English runtime fallback.
+const REQUIRED_FULL_COVERAGE_LOCALES = new Set(['ru']);
 const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
 
 // These values intentionally retain product names, code syntax, URLs, or sample identifiers.
@@ -167,16 +172,25 @@ async function loadLocaleFiles(localeCode) {
 
   const merged = {};
   const fileKeyMap = {};
+  const fallbackKeys = new Set();
+  const explicitKeys = new Set();
 
   for (const file of files) {
     const mod = await import(join(localeDir, file));
     const data = mod.default || mod;
     const keys = new Set(flattenKeys(data));
+    const fileFallbackKeys = data[ENGLISH_FALLBACK_KEYS] ?? new Set();
     fileKeyMap[file] = keys;
+    for (const key of keys) {
+      if (fileFallbackKeys.has(key)) fallbackKeys.add(key);
+      else explicitKeys.add(key);
+    }
     mergeInto(merged, data);
   }
 
-  return { merged, fileKeyMap };
+  for (const key of explicitKeys) fallbackKeys.delete(key);
+
+  return { merged, fileKeyMap, fallbackKeys };
 }
 
 async function extractSourceKeys() {
@@ -197,7 +211,7 @@ async function extractSourceKeys() {
   return keys;
 }
 
-function detectCarryovers(english, other, localeCode) {
+function detectCarryovers(english, other, localeCode, fallbackKeys = new Set()) {
   const carryovers = [];
   const enEntries = Object.fromEntries(
     flattenAll(english).filter(([, v]) => typeof v === 'string')
@@ -207,6 +221,7 @@ function detectCarryovers(english, other, localeCode) {
 
   for (const [key, value] of flattenAll(other)) {
     if (INTENTIONAL_CARRYOVERS.has(key)) continue;
+    if (fallbackKeys.has(key)) continue;
     if (typeof value !== 'string') continue;
     const reference = findReferenceEntry(key, enEntries, pluralBases, localePluralCategories);
     if (!reference) continue;
@@ -287,6 +302,7 @@ async function main() {
   console.log('  --- Locale key parity ---');
   const otherLocales = localeDirs.filter((l) => l !== REFERENCE_LOCALE).sort();
   let totalMissing = 0;
+  let requiredMissing = 0;
   let totalExtra = 0;
 
   for (const locale of otherLocales) {
@@ -311,6 +327,7 @@ async function main() {
       .sort();
 
     totalMissing += missing.length;
+    if (REQUIRED_FULL_COVERAGE_LOCALES.has(locale)) requiredMissing += missing.length;
     totalExtra += extra.length;
 
     const coverage = (((refLeafKeys.size - missing.length) / refLeafKeys.size) * 100).toFixed(1);
@@ -321,9 +338,13 @@ async function main() {
           ? `, ${localePluralVariants.length} locale plural variant(s)`
           : '';
       console.log(`  ✓ ${locale}  ${coverage}% coverage  (${locKeys.size} keys${pluralSuffix})`);
-    } else {
+    } else if (extra.length > 0 || REQUIRED_FULL_COVERAGE_LOCALES.has(locale)) {
       console.log(
         `  ✗ ${locale}  ${coverage}% coverage  (${locKeys.size} keys, ${missing.length} missing, ${extra.length} extra)`
+      );
+    } else {
+      console.log(
+        `  ⚠ ${locale}  ${coverage}% coverage  (${locKeys.size} keys, ${missing.length} using English fallback)`
       );
     }
 
@@ -415,7 +436,7 @@ async function main() {
 
   for (const locale of otherLocales) {
     const loc = await loadLocaleFiles(locale);
-    const carryovers = detectCarryovers(ref.merged, loc.merged, locale);
+    const carryovers = detectCarryovers(ref.merged, loc.merged, locale, loc.fallbackKeys);
 
     if (carryovers.length > 0) {
       console.log(`  ✗ ${locale}: ${carryovers.length} suspected carryover(s):`);
@@ -440,7 +461,7 @@ async function main() {
   console.log('');
 
   // --- Summary ---
-  if (totalMissing > 0 || totalExtra > 0) {
+  if (requiredMissing > 0 || totalExtra > 0) {
     exitCode = 1;
   }
 
@@ -450,7 +471,8 @@ async function main() {
     const issues = [];
     if (missingFromEn.length > 0)
       issues.push(`${missingFromEn.length} source key(s) missing from English`);
-    if (totalMissing > 0) issues.push(`${totalMissing} missing locale key(s)`);
+    if (totalMissing > 0) issues.push(`${totalMissing} locale key(s) using English fallback`);
+    if (requiredMissing > 0) issues.push(`${requiredMissing} required locale key(s) missing`);
     if (totalExtra > 0) issues.push(`${totalExtra} extra locale key(s)`);
     if (placeholderErrors > 0) issues.push(`${placeholderErrors} placeholder mismatch(es)`);
     if (carryoverTotal > 0) issues.push(`${carryoverTotal} suspected carryover(s)`);

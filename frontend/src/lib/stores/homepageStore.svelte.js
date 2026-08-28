@@ -393,13 +393,13 @@ class HomepageStore {
 
     // Determine greeting based on time of day
     if (hour >= 5 && hour < 12) {
-      this.greeting = 'Good morning';
+      this.greeting = t('dashboard.goodMorning');
     } else if (hour >= 12 && hour < 18) {
-      this.greeting = 'Good afternoon';
+      this.greeting = t('dashboard.goodAfternoon');
     } else if (hour >= 18 && hour < 22) {
-      this.greeting = 'Good evening';
+      this.greeting = t('dashboard.goodEvening');
     } else {
-      this.greeting = 'Good night';
+      this.greeting = t('dashboard.goodNight');
     }
 
     // Format current date
@@ -447,7 +447,7 @@ class HomepageStore {
    * Format relative time.
    */
   formatRelativeTime(timestamp) {
-    if (!timestamp) return 'Unknown';
+    if (!timestamp) return t('dashboard.relative.unknown');
 
     const now = new Date();
     const then = new Date(timestamp);
@@ -456,10 +456,10 @@ class HomepageStore {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    if (diffMins < 1) return t('dashboard.relative.justNow');
+    if (diffMins < 60) return t('dashboard.relative.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('dashboard.relative.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('dashboard.relative.daysAgo', { count: diffDays });
 
     return formatDateSimple(then);
   }

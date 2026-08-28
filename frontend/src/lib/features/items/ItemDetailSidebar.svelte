@@ -33,6 +33,7 @@
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { isSystemFieldConfigured, systemFieldIdentifiers } from '../../utils/screenFields.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
+  import { systemPriorityName, systemStatusName } from '../../utils/systemLabels.js';
   import Badge from '../../components/Badge.svelte';
   import ApprovalsTimeline from './ApprovalsTimeline.svelte';
 
@@ -68,11 +69,11 @@
       source: (item) => priorityIconMap[item.icon] || AlertCircle
     },
     primary: {
-      text: (item) => item.name
+      text: (item) => systemPriorityName(item)
     },
     searchFields: ['name'],
     getValue: (item) => item.id,
-    getLabel: (item) => item.name
+    getLabel: (item) => systemPriorityName(item)
   };
 
   // Status picker configuration
@@ -83,11 +84,11 @@
       size: 'w-2 h-2'
     },
     primary: {
-      text: (item) => item.label
+      text: (item) => systemStatusName(item.label)
     },
     searchFields: ['label', 'value'],
     getValue: (item) => item.id,
-    getLabel: (item) => item.label
+    getLabel: (item) => systemStatusName(item.label)
   };
 
   // Project picker configuration
@@ -253,7 +254,7 @@
       if (item) item.labels = updated || [];
     } catch (err) {
       console.error('Failed to save labels:', err);
-      errorToast(err?.message || 'Failed to save labels');
+      errorToast(err?.message || t('items.failedToSaveLabels'));
     }
   }
 
@@ -507,7 +508,7 @@
     // Add "None" special item
     items.push({
       id: 'none',
-      name: 'None',
+      name: t('common.none'),
       isSpecial: true,
       specialType: 'none'
     });
@@ -540,7 +541,7 @@
     } else if (item?.project_id === null || item?.project_id === undefined) {
       return {
         id: 'none',
-        name: 'None',
+        name: t('common.none'),
         isSpecial: true,
         specialType: 'none'
       };
@@ -567,22 +568,22 @@
     if (item.inherit_project) {
       // Inheriting
       return item.effective_project_name
-        ? `${item.effective_project_name} (inherited)`
-        : 'Inherit';
+        ? t('items.projectInherited', { name: item.effective_project_name })
+        : t('items.inheritProject');
     }
     if (item.project_id === null || item.project_id === undefined) {
       // None
-      return 'Project: None';
+      return t('items.noProject');
     }
     // Direct assignment
-    return item.project_name || 'Set project';
+    return item.project_name || t('items.setProject');
   }
 
   function getInheritLabel(item) {
     if (item.effective_project_name) {
-      return `Inherit (${item.effective_project_name})`;
+      return t('items.inheritProjectFrom', { name: item.effective_project_name });
     }
-    return 'Inherit';
+    return t('items.inheritProject');
   }
 
   function handleClickOutsideSidebar() {
@@ -630,11 +631,11 @@
         >
           <div class="flex items-center gap-2">
             <Shield class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
-            <Text variant="subtle" size="sm">Approvals</Text>
+            <Text variant="subtle" size="sm">{t('items.approvals.title')}</Text>
             {#if pendingApproval?.you_can_decide}
-              <Badge variant="warning" size="xs">Action required</Badge>
+              <Badge variant="warning" size="xs">{t('items.approvals.actionRequired')}</Badge>
             {:else if pendingApproval}
-              <Badge variant="neutral" size="xs">Pending</Badge>
+              <Badge variant="neutral" size="xs">{t('items.approvals.statuses.pending')}</Badge>
             {/if}
           </div>
           {#if !approvalsForcedOpen}
@@ -668,7 +669,7 @@
         value={item?.status_id ?? null}
         items={statusOptions}
         config={statusConfig}
-        placeholder="Select status..."
+        placeholder={t('pickers.selectStatus')}
         showUnassigned={false}
         autoOpen={editingStatus}
         disabled={!canEdit || !isSystemFieldEditable('status')}
@@ -698,7 +699,7 @@
               </kbd>
             </div>
             {#if selectedStatus}
-              <StatusBadge status={selectedStatus} />
+              <StatusBadge status={{ ...selectedStatus, label: systemStatusName(selectedStatus.label) }} />
             {:else}
               <Text variant="subtle" size="sm">{t('items.setStatus')}</Text>
             {/if}
@@ -714,9 +715,9 @@
               <Shield class="w-3 h-3 mt-0.5 flex-shrink-0" />
               <span>
                 {#if pendingApproval.you_can_decide}
-                  Pending approval — your decision is required
+                  {t('items.approvals.decisionRequiredHint')}
                 {:else}
-                  Pending approval — gated transitions are hidden
+                  {t('items.approvals.transitionsHiddenHint')}
                 {/if}
               </span>
             </div>
@@ -731,9 +732,9 @@
           value={item?.priority_id ?? null}
           items={priorities}
           config={priorityConfig}
-          placeholder="Select priority..."
+          placeholder={t('pickers.selectPriority')}
           showUnassigned={true}
-          unassignedLabel="No priority"
+          unassignedLabel={t('pickers.noPriority')}
           disabled={!canEdit || !isSystemFieldEditable('priority')}
           class="w-full"
           onSelect={(selectedPriority) => {
@@ -755,7 +756,7 @@
                 {#if selectedPriority}
                   {@const PriorityIcon = priorityIconMap[selectedPriority.icon] || AlertCircle}
                   <PriorityIcon size={14} class="flex-shrink-0" style="color: {selectedPriority.color};" />
-                  <span style="color: var(--ds-text);">{selectedPriority.name}</span>
+                  <span style="color: var(--ds-text);">{systemPriorityName(selectedPriority)}</span>
                 {:else}
                   <Text variant="subtle" size="sm">{t('common.none')}</Text>
                 {/if}
@@ -773,7 +774,7 @@
             value={selectedProject?.id ?? null}
             items={projectItems}
             config={projectConfig}
-            placeholder="Select project..."
+            placeholder={t('pickers.selectProject')}
             showUnassigned={false}
             disabled={!canEdit || !isSystemFieldEditable('project')}
             class="w-full"
@@ -825,7 +826,7 @@
       <div class="mb-3">
         <UserPicker
           value={item.assignee_id ?? null}
-          placeholder="Select assignee..."
+          placeholder={t('items.selectAssignee')}
           showUnassigned={true}
           disabled={!canEdit || !isSystemFieldEditable('assignee')}
           workspaceId={item?.workspace_id}
@@ -911,9 +912,9 @@
           value={item?.iteration_id ?? null}
           items={iterations}
           config={iterationConfig}
-          placeholder="Select iteration..."
+          placeholder={t('pickers.selectIteration')}
           showUnassigned={true}
-          unassignedLabel="No iteration"
+          unassignedLabel={t('pickers.noIteration')}
           disabled={!canEdit || !isSystemFieldEditable('iteration')}
           class="w-full"
           onSelect={(selectedIteration) => {

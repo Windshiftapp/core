@@ -5,6 +5,7 @@
   import { workspaceIconMap } from '../utils/icons.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let { isOpen = $bindable(false), activeCategory = $bindable('built-in') } = $props();
 
@@ -14,20 +15,20 @@
   let currentWidgets = $derived(activeCategory === 'built-in' ? builtInWidgets : additionalWidgets);
 
   // Navigation categories
-  const categories = [
+  let categories = $derived([
     {
       id: 'built-in',
-      name: 'Built-in Widgets',
+      name: t('workspaceDashboard.customization.builtIn'),
       icon: BarChart3,
-      description: 'Core workspace widgets'
+      description: t('workspaceDashboard.customization.builtInDescription')
     },
     {
       id: 'additional',
-      name: 'Additional Widgets',
+      name: t('workspaceDashboard.customization.additional'),
       icon: Package,
-      description: 'Extended functionality widgets'
+      description: t('workspaceDashboard.customization.additionalDescription')
     }
-  ];
+  ]);
 
   // Handle ESC key to close sidebar
   function handleKeydown(event) {
@@ -74,7 +75,7 @@
   <!-- Right content panel (384px) -->
   <div class="w-96 flex flex-col" style="background-color: var(--ds-surface-raised);">
     <ModalHeader
-      title={categories.find(c => c.id === activeCategory)?.name || 'Widgets'}
+      title={categories.find(c => c.id === activeCategory)?.name || t('workspaceDashboard.customization.widgets')}
       subtitle={categories.find(c => c.id === activeCategory)?.description || ''}
       onClose={() => isOpen = false}
     />
@@ -103,15 +104,15 @@
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <h3 class="text-sm font-medium" style="color: var(--ds-text);">{widget.name}</h3>
+                    <h3 class="text-sm font-medium" style="color: var(--ds-text);">{t(widget.nameKey)}</h3>
                   </div>
-                  <DescriptionText>{widget.description}</DescriptionText>
+                  <DescriptionText>{t(widget.descriptionKey)}</DescriptionText>
                   <div class="flex items-center gap-2 mt-2">
                     <span class="text-xs px-2 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                      {widget.category}
+                      {categories.find(category => category.id === widget.category)?.name || widget.category}
                     </span>
                     <span class="text-xs" style="color: var(--ds-text-subtlest);">
-                      Default: {widget.defaultWidth}/3 width
+                      {t('workspaceDashboard.customization.defaultWidth', { width: widget.defaultWidth })}
                     </span>
                   </div>
                 </div>
@@ -128,7 +129,7 @@
         <!-- Help text -->
         <div class="mt-6 p-4 rounded" style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);">
           <p class="text-xs" style="color: var(--ds-text);">
-            <strong>Tip:</strong> Drag widgets from here to any section on your workspace homepage to add them.
+            <strong>{t('workspaceDashboard.customization.tipTitle')}:</strong> {t('workspaceDashboard.customization.tip')}
           </p>
         </div>
     </div>

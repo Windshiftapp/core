@@ -26,26 +26,26 @@
     Search,
   };
 
-  const categories = [
+  let categories = $derived([
     {
       id: dashboardWidgetCategories.ACTIVITY,
-      name: 'Activity',
+      name: t('dashboard.customization.activity'),
       icon: Clock,
-      description: 'Briefings, activity streams, and notifications',
+      description: t('dashboard.customization.activityDescription'),
     },
     {
       id: dashboardWidgetCategories.WORK,
-      name: 'Work',
+      name: t('dashboard.customization.work'),
       icon: CheckSquare,
-      description: 'Items, milestones, and things assigned to you',
+      description: t('dashboard.customization.workDescription'),
     },
     {
       id: dashboardWidgetCategories.NAVIGATION,
-      name: 'Navigation',
+      name: t('dashboard.customization.navigation'),
       icon: Compass,
-      description: 'Quick access to workspaces',
+      description: t('dashboard.customization.navigationDescription'),
     },
-  ];
+  ]);
 
   let currentWidgets = $derived(getDashboardWidgetsByCategory(activeCategory));
 
@@ -100,7 +100,7 @@
   <!-- Right content panel -->
   <div class="w-96 flex flex-col" style="background-color: var(--ds-surface-raised);">
     <ModalHeader
-      title={categories.find((c) => c.id === activeCategory)?.name || 'Widgets'}
+      title={categories.find((c) => c.id === activeCategory)?.name || t('dashboard.customization.widgets')}
       subtitle={categories.find((c) => c.id === activeCategory)?.description || ''}
       onClose={() => (isOpen = false)}
     />
@@ -130,14 +130,14 @@
                 <IconComponent class="w-5 h-5 text-white" />
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium" style="color: var(--ds-text);">{widget.name}</h3>
-                <DescriptionText>{widget.description}</DescriptionText>
+                <h3 class="text-sm font-medium" style="color: var(--ds-text);">{t(widget.nameKey)}</h3>
+                <DescriptionText>{t(widget.descriptionKey)}</DescriptionText>
                 <div class="flex items-center gap-2 mt-2">
                   <span
                     class="text-xs px-2 py-0.5 rounded"
                     style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
                   >
-                    {widget.category}
+                    {categories.find((category) => category.id === widget.category)?.name || widget.category}
                   </span>
                   <span class="text-xs" style="color: var(--ds-text-subtlest);">
                     {t('widgets.defaultWidth', {
@@ -163,7 +163,7 @@
         style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);"
       >
         <p class="text-xs" style="color: var(--ds-text);">
-          <strong>Tip:</strong> Drag widgets from here into any section on your dashboard.
+          <strong>{t('dashboard.customization.tipTitle')}:</strong> {t('dashboard.customization.tip')}
         </p>
       </div>
     </div>

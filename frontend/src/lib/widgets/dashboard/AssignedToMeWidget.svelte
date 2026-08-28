@@ -3,6 +3,7 @@
   import { authStore } from '../../stores';
   import { api } from '../../api.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import {
     assignedToMeQuery,
     normalizeTaskResponse,
@@ -64,8 +65,8 @@
   {errored}
   {tasks}
   icon={CheckSquare}
-  errorMessage="Couldn't load your assigned items"
-  emptyMessage="Nothing assigned to you right now"
+  errorMessage={t('dashboard.widgetContent.assignedLoadError')}
+  emptyMessage={t('dashboard.widgetContent.assignedEmpty')}
   {density}
   {openTask}
 />

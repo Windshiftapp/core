@@ -1,6 +1,7 @@
 <script>
   import { ChevronLeft, Plus } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { systemStatusName } from '../../utils/systemLabels.js';
 
   let {
     column,
@@ -37,7 +38,7 @@
     style="border-bottom-color: var(--ctx-border, var(--ds-border)); border-top-color: {column.color};"
   >
     <div class="flex items-center justify-between">
-      <h3 class="font-semibold" data-testid="column-header" style={textStyle}>{column.name}</h3>
+      <h3 class="font-semibold" data-testid="column-header" style={textStyle}>{systemStatusName(column.name)}</h3>
       <div class="flex items-center gap-0.5">
         {#if onadd}
           <button

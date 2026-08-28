@@ -995,6 +995,7 @@ export default {
 
     // Board Configuration
     boardConfig: {
+      configureBoard: 'Configure Board',
       columns: 'Columns',
       backlog: 'Backlog',
       dragToReorder: 'Drag to reorder',
@@ -1026,6 +1027,23 @@ export default {
       manageCustomFields: 'Manage custom fields',
       createCustomField: 'Create custom field',
       customFieldsGlobalNote: 'Custom fields are managed globally by a system administrator.',
+      latestFiftyRightmost: 'Show only the latest 50 items in the rightmost column',
+      latestFiftyRightmostHint: 'Useful for busy Done columns without limiting the rest of the board.',
+      hideCompletedByAge: 'Hide older completed items',
+      hideCompletedByAgeHint: 'Unfinished work stays visible; completed work is filtered by recent activity.',
+      recentActivityWindow: 'Recent activity window',
+      days: 'days',
+      retentionWindowHint: 'Completed items without activity during this period are hidden.',
+      retentionRangeError: 'Enter a whole number from 1 to 3650.',
+      backlogSelected: '{count} statuses selected for the backlog',
+      backlogSelected_one: '{count} status selected for the backlog',
+      backlogSelected_other: '{count} statuses selected for the backlog',
+      systemFieldNames: {
+        status: 'Status', priority: 'Priority', milestone: 'Milestone', iteration: 'Iteration',
+        due_date: 'Due Date', start_date: 'Start Date', end_date: 'End Date', labels: 'Labels',
+        created_at: 'Created', project: 'Project', parent: 'Parent', time_in_status: 'Time in Status',
+        story_points: 'Story Points', estimate: 'Estimate',
+      },
     },
   },
 

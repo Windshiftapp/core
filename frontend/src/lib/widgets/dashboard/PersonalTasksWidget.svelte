@@ -3,6 +3,7 @@
   import { authStore, workspacesStore } from '../../stores';
   import { api } from '../../api.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import {
     completedSinceCutoff,
     normalizeTaskResponse,
@@ -75,8 +76,8 @@
   {errored}
   {tasks}
   icon={ListChecks}
-  errorMessage="Couldn't load your personal tasks"
-  emptyMessage="Your personal todo list is empty"
+  errorMessage={t('dashboard.widgetContent.personalLoadError')}
+  emptyMessage={t('dashboard.widgetContent.personalEmpty')}
   {density}
   {openTask}
 />

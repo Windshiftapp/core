@@ -3,6 +3,7 @@
   import { homepageStore } from '../../stores';
   import { navigate } from '../../router.js';
   import DashboardItemRow from './DashboardItemRow.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let items = $derived(homepageStore.watchedItems);
   let loading = $derived(homepageStore.loading);
@@ -21,7 +22,7 @@
 {:else if items.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Eye class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">You aren't watching any items</p>
+    <p class="text-sm">{t('dashboard.widgetContent.watchedEmpty')}</p>
   </div>
 {:else}
   <ul class="flex flex-col gap-1.5">

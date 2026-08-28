@@ -5,6 +5,7 @@
 
 export default {
   pickers: {
+    selectStatus: 'Select status',
     // General
     select: 'Select',
     search: 'Search',
@@ -422,6 +423,7 @@ export default {
   },
 
   widgets: {
+    stats: { collections: 'Collections', totalItems: 'Total Items' },
     removeWidget: 'Remove widget',
     defaultWidth: 'Default: {width}/{columns} width',
     widthQuarter: 'Quarter',
@@ -483,6 +485,7 @@ export default {
       noStatus: 'No status',
       activeMilestone: 'Active',
       noCategorizedWork: 'No categorized work',
+      chartAria: 'Milestone status breakdown',
     },
     myTasks: {
       loadingText: 'Loading your tasks...',
@@ -517,6 +520,23 @@ export default {
       emptyTitle: 'No active iterations',
       emptySubtitle: 'Iteration timelines will appear here',
       loadError: 'Failed to load iterations',
+      active: 'Active',
+      planned: 'Planned',
+      completed: 'Completed',
+    },
+    testCoverage: {
+      loading: 'Loading coverage data…',
+      loadError: 'Failed to load coverage data',
+      emptyTitle: 'No requirements configured',
+      emptyDescription: 'Configure requirement types in Test Reports to see coverage data.',
+      chartAria: 'Test coverage breakdown',
+      covered: 'Covered',
+      notCovered: 'Not covered',
+      requirementCount: '{covered} of {total} requirements',
+      requirements: '{count} requirements',
+      requirements_other: '{count} requirements',
+      requirements_one: '{count} requirement',
+      linkedCases: 'have linked test cases',
     },
   },
 

@@ -3,6 +3,7 @@
   import { homepageStore, workspacesStore } from '../../stores';
   import { notifications, notificationActions } from '../../stores/notifications.js';
   import { navigate } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   const MAX_ENTRIES_PER_WORKSPACE = 5;
   const MAX_WORKSPACES = 5;
@@ -34,7 +35,7 @@
         workspaceId: parseInt(m[1], 10),
         timestamp: n.timestamp,
         source: 'notification',
-        title: n.message || n.title || 'Notification',
+        title: n.message || n.title || t('nav.notifications'),
         subtitle: null,
         link: actionUrl,
         read: n.read,
@@ -97,7 +98,7 @@
 {:else if groups.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Inbox class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">You're all caught up</p>
+    <p class="text-sm">{t('dashboard.allCaughtUp')}</p>
   </div>
 {:else}
   <div class="flex flex-col gap-3">

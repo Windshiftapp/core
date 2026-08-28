@@ -50,12 +50,12 @@
   let loadingPolicy = $state(false);
   let savingPolicy = $state(false);
 
-  const policyOptions = [
-    { value: 'password', label: 'Password Only', description: 'Standard password authentication (default)' },
-    { value: 'password_passkey_2fa', label: 'Password + Passkey 2FA', description: 'Password login followed by passkey verification', requiresNoSSO: true },
-    { value: 'passkey_only', label: 'Passkey Only', description: 'Passkey authentication only (password for initial enrollment)' },
-    { value: 'sso_primary', label: 'SSO Required', description: 'Single Sign-On only (password disabled)', requiresSSO: true }
-  ];
+  const policyOptions = $derived([
+    { value: 'password', label: t('securitySettings.policy.password'), description: t('securitySettings.policy.passwordDescription') },
+    { value: 'password_passkey_2fa', label: t('securitySettings.policy.passwordPasskey'), description: t('securitySettings.policy.passwordPasskeyDescription'), requiresNoSSO: true },
+    { value: 'passkey_only', label: t('securitySettings.policy.passkeyOnly'), description: t('securitySettings.policy.passkeyOnlyDescription') },
+    { value: 'sso_primary', label: t('securitySettings.policy.ssoRequired'), description: t('securitySettings.policy.ssoRequiredDescription'), requiresSSO: true }
+  ]);
 
   onMount(async () => {
     await Promise.all([loadSettings(), loadAuthPolicy(), loadAgentCentralized()]);
@@ -91,7 +91,7 @@
       });
       allowCentralizedAgentUsers = !!result.allow_centralized_service_users;
     } catch (err) {
-      errorToast(err?.message || 'Failed to update agent security setting');
+      errorToast(err?.message || t('securitySettings.agentUpdateFailed'));
       console.error('Failed to update agent security:', err);
       // Force-refresh so the toggle reflects server truth.
       await loadAgentCentralized();
@@ -180,7 +180,7 @@
       // Reload to get updated state
       await loadAuthPolicy();
     } catch (err) {
-      errorToast(err.message || 'Failed to save authentication policy');
+      errorToast(err.message || t('securitySettings.policySaveFailed'));
       console.error('Failed to save auth policy:', err);
     } finally {
       savingPolicy = false;
@@ -241,24 +241,24 @@
 
   function getPolicyDisabledReason(option) {
     if (option.requiresSSO && !authPolicyConfig.sso_configured) {
-      return 'Requires SSO to be configured';
+      return t('securitySettings.requiresSso');
     }
     if (option.requiresNoSSO && authPolicyConfig.sso_configured) {
-      return 'Not recommended when SSO is configured';
+      return t('securitySettings.notRecommendedWithSso');
     }
     return '';
   }
 
   function getPolicyLabel(option) {
     if (option.value === 'password' && authPolicyConfig.sso_configured) {
-      return 'Password or SSO';
+      return t('securitySettings.policy.passwordOrSso');
     }
     return option.label;
   }
 
   function getPolicyDescription(option) {
     if (option?.value === 'password' && authPolicyConfig.sso_configured) {
-      return 'Users can sign in with a password or an enabled SSO provider.';
+      return t('securitySettings.policy.passwordOrSsoDescription');
     }
     return option?.description || '';
   }
@@ -383,9 +383,9 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-4">
               <div class="min-w-0">
-                <h3 class="text-base font-medium" style="color: var(--ds-text);">Workspace-Managed Agents</h3>
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('securitySettings.workspaceAgents')}</h3>
                 <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                  Allow workspace admins to create agent identities owned by their workspace. Existing agents remain available when disabled; new agents can instead use enabled centralized service identities.
+                  {t('securitySettings.workspaceAgentsDescription')}
                 </p>
               </div>
               <Toggle
@@ -410,9 +410,9 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-4">
               <div class="min-w-0">
-                <h3 class="text-base font-medium" style="color: var(--ds-text);">User-Managed Agents</h3>
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('securitySettings.userAgents')}</h3>
                 <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                  Allow non-admin users to create their own agent users from their profile and mint API tokens for them. Agents inherit their owner's permissions at all times.
+                  {t('securitySettings.userAgentsDescription')}
                 </p>
               </div>
               <Toggle
@@ -425,7 +425,7 @@
             {#if allowUserManagedAgents}
               <div class="mt-4">
                 <label for="max-agents-per-user" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
-                  Max agents per user
+                  {t('securitySettings.maxAgentsPerUser')}
                 </label>
                 <div class="w-32">
                   <Input
@@ -440,7 +440,7 @@
                   />
                 </div>
                 <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-                  Caps the number of agents each non-admin may own. Admin-created service users are not subject to this limit.
+                  {t('securitySettings.maxAgentsDescription')}
                 </p>
               </div>
             {/if}
@@ -459,11 +459,9 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-4">
               <div class="min-w-0">
-                <h3 class="text-base font-medium" style="color: var(--ds-text);">Coding-Agent Centralized Service Users</h3>
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('securitySettings.centralizedUsers')}</h3>
                 <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                  Allow workspace admins to bind coding-agent runs to centralized service users.
-                  Without this, admins can only bind to agent users they own. Every change is
-                  audit-logged with the reason you supply at toggle time.
+                  {t('securitySettings.centralizedUsersDescription')}
                 </p>
               </div>
               {#if loadingAgentCentralized}
@@ -479,7 +477,7 @@
 
             {#if allowCentralizedAgentUsers}
               <div class="mt-3">
-                <AlertBox variant="warning" message="Centralized service users may act across workspaces. Only users in the allowlist below can be picked as a binding's acting identity." />
+                <AlertBox variant="warning" message={t('securitySettings.centralizedUsersWarning')} />
               </div>
             {/if}
 
@@ -501,9 +499,9 @@
         </div>
         <div class="min-w-0 flex-1">
           <div>
-            <h3 class="text-base font-medium" style="color: var(--ds-text);">Authentication Policy</h3>
+            <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('securitySettings.authenticationPolicy')}</h3>
             <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              Control how users authenticate to the application.
+              {t('securitySettings.authenticationPolicyDescription')}
             </p>
           </div>
 
@@ -515,7 +513,7 @@
             <!-- Policy Selector -->
             <div class="mt-4">
               <label for="auth-policy-select" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
-                Authentication Method
+                {t('securitySettings.authenticationMethod')}
               </label>
               <Select
                 id="auth-policy-select"
@@ -537,9 +535,9 @@
             {#if authPolicyConfig.policy !== 'password'}
               <div class="mt-4 flex items-center justify-between">
                 <div>
-                  <span class="text-sm font-medium" style="color: var(--ds-text);">Preview Mode</span>
+                  <span class="text-sm font-medium" style="color: var(--ds-text);">{t('securitySettings.previewMode')}</span>
                   <p class="text-xs" style="color: var(--ds-text-subtle);">
-                    See affected users without enforcing the policy
+                    {t('securitySettings.previewModeDescription')}
                   </p>
                 </div>
                 <Toggle
@@ -555,20 +553,20 @@
               <div class="mt-4 p-3 rounded-md" style="background-color: var(--ds-background-neutral);">
                 <div class="flex items-center gap-2 mb-2">
                   <Users class="w-4 h-4" style="color: var(--ds-icon);" />
-                  <span class="text-sm font-medium" style="color: var(--ds-text);">User Statistics</span>
+                  <span class="text-sm font-medium" style="color: var(--ds-text);">{t('securitySettings.userStatistics')}</span>
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-sm">
-                  <div style="color: var(--ds-text-subtle);">Total users:</div>
+                  <div style="color: var(--ds-text-subtle);">{t('securitySettings.totalUsers')}:</div>
                   <div style="color: var(--ds-text);">{authPolicyStats.total_users}</div>
-                  <div style="color: var(--ds-text-subtle);">With passkey:</div>
+                  <div style="color: var(--ds-text-subtle);">{t('securitySettings.withPasskey')}:</div>
                   <div style="color: var(--ds-text);">{authPolicyStats.users_with_passkey}</div>
-                  <div style="color: var(--ds-text-subtle);">Without passkey:</div>
+                  <div style="color: var(--ds-text-subtle);">{t('securitySettings.withoutPasskey')}:</div>
                   <div style="color: var(--ds-text);">{authPolicyStats.users_without_passkey}</div>
                   {#if authPolicyConfig.sso_configured}
-                    <div style="color: var(--ds-text-subtle);">SSO users:</div>
+                    <div style="color: var(--ds-text-subtle);">{t('securitySettings.ssoUsers')}:</div>
                     <div style="color: var(--ds-text);">{authPolicyStats.sso_users}</div>
                   {/if}
-                  <div style="color: var(--ds-text-subtle);">System admins:</div>
+                  <div style="color: var(--ds-text-subtle);">{t('securitySettings.systemAdmins')}:</div>
                   <div style="color: var(--ds-text);">{authPolicyStats.system_admins}</div>
                 </div>
               </div>
@@ -584,7 +582,7 @@
                   style="color: var(--ds-text);"
                 >
                   <AlertTriangle class="w-4 h-4" style="color: var(--ds-icon-warning);" />
-                  {affectedUsers.length} users will need to enroll
+                  {t('securitySettings.affectedUsers', { count: affectedUsers.length })}
                   {#if showAffectedUsers}
                     <ChevronUp class="w-4 h-4" />
                   {:else}
@@ -600,7 +598,7 @@
                         <div style="color: var(--ds-text-subtle);" class="text-xs">{user.email}</div>
                         <div class="flex gap-2 mt-1">
                           {#if user.is_admin}
-                            <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-brand-bold); color: white;">Admin</span>
+                            <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-brand-bold); color: white;">{t('securitySettings.admin')}</span>
                           {/if}
                           {#if user.has_sso}
                             <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">SSO</span>
@@ -617,9 +615,9 @@
             {#if authPolicyConfig.policy !== 'password' && !authPolicyConfig.preview_mode}
               <div class="mt-4">
                 <AlertBox variant="warning" class="security-fallback-alert">
-                  <strong>Policy Active:</strong> Users without the required authentication method will be prompted to enroll on their next login.
+                  <strong>{t('securitySettings.policyActive')}:</strong> {t('securitySettings.policyActiveDescription')}
                   {#if authPolicyConfig.fallback_enabled}
-                    System administrators have password fallback access (rate limited).
+                    {t('securitySettings.adminFallbackShort')}
                   {/if}
                 </AlertBox>
               </div>
@@ -629,15 +627,15 @@
             {#if authPolicyConfig.fallback_enabled}
               <div class="mt-4">
                 <AlertBox variant="warning">
-                  <strong>Fallback Enabled:</strong> System administrators can use password login as fallback (rate limited: 5/hour).
-                  To disable, restart the server without <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code>.
+                  <strong>{t('securitySettings.fallbackEnabled')}:</strong> {t('securitySettings.fallbackEnabledDescription')}
+                  {t('securitySettings.disableFallback')} <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code>.
                 </AlertBox>
               </div>
             {:else}
               <div class="mt-4">
                 <AlertBox variant="success" class="security-fallback-alert">
-                  <strong>Fallback Disabled:</strong> System administrators must comply with the authentication policy.
-                  To enable emergency fallback, restart the server with <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code> or <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">ENABLE_ADMIN_FALLBACK=true</code>.
+                  <strong>{t('securitySettings.fallbackDisabled')}:</strong> {t('securitySettings.fallbackDisabledDescription')}
+                  {t('securitySettings.enableFallback')} <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code> {t('common.or')} <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">ENABLE_ADMIN_FALLBACK=true</code>.
                 </AlertBox>
               </div>
             {/if}
@@ -652,13 +650,13 @@
 <ConfirmWithReasonDialog
   bind:show={agentReasonDialogOpen}
   variant="warning"
-  title={pendingAgentCentralizedValue ? 'Enable centralized agent service users?' : 'Disable centralized agent service users?'}
+  title={pendingAgentCentralizedValue ? t('securitySettings.enableCentralizedTitle') : t('securitySettings.disableCentralizedTitle')}
   message={pendingAgentCentralizedValue
-    ? 'Workspace admins will be able to bind coding-agent runs to centralized service users from the global allowlist. Existing bindings are unaffected.'
-    : 'Workspace admins will no longer be able to create new bindings against centralized service users. Existing bindings continue to fire until you delete them.'}
-  reasonLabel="Reason (audit-logged)"
-  reasonPlaceholder="e.g. enabling for the acme-agent pilot in WS-3"
-  confirmText={pendingAgentCentralizedValue ? 'Enable' : 'Disable'}
+    ? t('securitySettings.enableCentralizedMessage')
+    : t('securitySettings.disableCentralizedMessage')}
+  reasonLabel={t('securitySettings.reasonLabel')}
+  reasonPlaceholder={t('securitySettings.reasonPlaceholder')}
+  confirmText={pendingAgentCentralizedValue ? t('common.enable') : t('common.disable')}
   onconfirm={applyAgentCentralized}
   oncancel={cancelAgentCentralized}
 />

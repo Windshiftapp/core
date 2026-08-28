@@ -1,13 +1,14 @@
 <script>
   import { Loader2, AlertCircle } from '@lucide/svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     loading = false,
     error = null,
     isEmpty = false,
-    loadingText = 'Loading...',
+    loadingText = null,
     emptyIcon: EmptyIcon = null,
-    emptyTitle = 'No items',
+    emptyTitle = null,
     emptySubtitle = '',
     onRetry = null,
     children
@@ -18,7 +19,7 @@
   {#if loading}
     <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-600">
       <Loader2 class="w-5 h-5 animate-spin text-blue-500" />
-      <span>{loadingText}</span>
+      <span>{loadingText || t('common.loading')}</span>
     </div>
   {:else if error}
     <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-rose-200 px-4 py-4 text-sm text-rose-600">
@@ -30,7 +31,7 @@
             class="text-xs text-blue-600 hover:text-blue-800 underline"
             onclick={onRetry}
           >
-            Try again
+            {t('common.retry')}
           </button>
         {/if}
       </div>
@@ -40,7 +41,7 @@
       {#if EmptyIcon}
         <EmptyIcon class="h-10 w-10 mb-2 opacity-30" />
       {/if}
-      <p class="text-sm font-medium text-gray-700">{emptyTitle}</p>
+      <p class="text-sm font-medium text-gray-700">{emptyTitle || t('items.noItems')}</p>
       {#if emptySubtitle}
         <p class="text-xs text-gray-400">{emptySubtitle}</p>
       {/if}

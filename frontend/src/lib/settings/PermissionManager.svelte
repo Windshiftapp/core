@@ -18,6 +18,7 @@
     buildPermissionAssignmentMap,
     loadPermissionManagerData,
   } from './permissionManagerData.js';
+  import { systemPermissionDescription, systemPermissionName } from '../utils/systemLabels.js';
 
   let permissions = $state([]);
   let users = $state([]);
@@ -227,7 +228,7 @@
 
   const columns = [
     { key: 'permission_name', label: t('settings.permissions.permission'), slot: 'permission' },
-    { key: 'description', label: t('common.description') },
+    { key: 'description', label: t('common.description'), slot: 'description' },
     { key: 'users', label: t('settings.permissions.assignedUsers'), slot: 'users' },
     { key: 'groups', label: t('settings.permissions.assignedGroups'), slot: 'groups' },
     { key: 'actions', label: t('common.actions'), slot: 'actions', width: 'w-32' }
@@ -273,12 +274,16 @@
     >
       {#snippet permission(item)}
         <div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text);">
-          {item.permission_name}
+          {systemPermissionName(item)}
           {#if item.is_system}
             <Crown class="w-4 h-4" style="color: var(--ds-text-warning);" title={t('settings.permissions.systemPermission')} />
           {/if}
         </div>
         <div class="text-xs" style="color: var(--ds-text-subtle);">{item.permission_key}</div>
+      {/snippet}
+
+      {#snippet description(item)}
+        {systemPermissionDescription(item)}
       {/snippet}
 
       {#snippet users(item)}
@@ -337,7 +342,7 @@
 <Modal bind:isOpen={assignModalOpen} onclose={closeAssignModal} maxWidth="max-w-2xl">
   {#if assignTarget}
     <ModalHeader
-      title={t('settings.permissions.assignPermission', { permission: assignTarget.permission_name })}
+      title={t('settings.permissions.assignPermission', { permission: systemPermissionName(assignTarget) })}
       onClose={closeAssignModal}
     />
     <div class="px-6 py-4">

@@ -11,6 +11,7 @@
   import Button from '../components/Button.svelte';
   import ConfirmWithReasonDialog from '../dialogs/ConfirmWithReasonDialog.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 
   // flagEnabled is informational: when false, we hint that grants are
@@ -69,7 +70,7 @@
       workspacesById = wm;
     } catch (err) {
       console.error('Failed to load agent-security allowlist:', err);
-      errorToast(err?.message || 'Failed to load allowlist');
+      errorToast(err?.message || t('securitySettings.allowlist.loadFailed'));
     } finally {
       loading = false;
     }
@@ -77,16 +78,16 @@
 
   function displayUser(userId) {
     const u = usersById[userId];
-    if (!u) return `User #${userId}`;
+    if (!u) return t('securitySettings.allowlist.userNumber', { id: userId });
     const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
-    return full || u.username || u.email || `User #${userId}`;
+    return full || u.username || u.email || t('securitySettings.allowlist.userNumber', { id: userId });
   }
 
   function displayWorkspace(workspaceId) {
-    if (!workspaceId) return 'Any workspace';
+    if (!workspaceId) return t('securitySettings.allowlist.anyWorkspace');
     const w = workspacesById[workspaceId];
-    if (!w) return `Workspace #${workspaceId}`;
-    return w.name || w.key || `Workspace #${workspaceId}`;
+    if (!w) return t('securitySettings.allowlist.workspaceNumber', { id: workspaceId });
+    return w.name || w.key || t('securitySettings.allowlist.workspaceNumber', { id: workspaceId });
   }
 
   let canAdd = $derived(!!addUserId && addReason.trim().length > 0 && !adding);
@@ -106,7 +107,7 @@
       addReason = '';
       await load();
     } catch (err) {
-      errorToast(err?.message || 'Failed to add allowlist entry');
+      errorToast(err?.message || t('securitySettings.allowlist.addFailed'));
       console.error('Failed to add allowlist entry:', err);
     } finally {
       adding = false;
@@ -130,7 +131,7 @@
       pendingRemoveLabel = '';
       await load();
     } catch (err) {
-      errorToast(err?.message || 'Failed to remove allowlist entry');
+      errorToast(err?.message || t('securitySettings.allowlist.removeFailed'));
       console.error('Failed to remove allowlist entry:', err);
     }
   }
@@ -143,13 +144,13 @@
 
 <div>
   <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">
-    Allowed centralized service users
+    {t('securitySettings.allowlist.title')}
   </h4>
 
   {#if !flagEnabled}
     <div class="mb-3">
       <DescriptionText>
-        Grants here are persisted but inert until the toggle above is on — populate them ahead of enabling so workspace admins can start binding immediately.
+        {t('securitySettings.allowlist.disabledHint')}
       </DescriptionText>
     </div>
   {/if}
@@ -161,16 +162,16 @@
   {:else}
     {#if entries.length === 0}
       <p class="text-sm py-2" style="color: var(--ds-text-subtle);">
-        No grants yet. Add a user below to allow workspace admins to bind to them.
+        {t('securitySettings.allowlist.empty')}
       </p>
     {:else}
       <div class="border rounded-md overflow-hidden" style="border-color: var(--ds-border);">
         <table class="w-full text-sm">
           <thead>
             <tr style="background-color: var(--ds-background-neutral);">
-              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">User</th>
-              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">Scope</th>
-              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">Reason</th>
+              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">{t('securitySettings.allowlist.user')}</th>
+              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">{t('securitySettings.allowlist.scope')}</th>
+              <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text);">{t('securitySettings.allowlist.reason')}</th>
               <th class="px-3 py-2"></th>
             </tr>
           </thead>
@@ -186,8 +187,8 @@
                     onclick={() => openRemoveDialog(entry)}
                     class="inline-flex items-center justify-center p-1 rounded hover:opacity-80"
                     style="color: var(--ds-icon-danger);"
-                    title="Remove grant"
-                    aria-label="Remove grant for {displayUser(entry.user_id)}"
+                    title={t('securitySettings.allowlist.remove')}
+                    aria-label={t('securitySettings.allowlist.removeFor', { name: displayUser(entry.user_id) })}
                   >
                     <Trash2 class="w-4 h-4" />
                   </button>
@@ -204,27 +205,27 @@
       style="background-color: var(--ds-background-neutral);"
       data-testid="agent-security-add-grant"
     >
-      <p class="text-xs font-medium mb-2" style="color: var(--ds-text);">Add grant</p>
+      <p class="text-xs font-medium mb-2" style="color: var(--ds-text);">{t('securitySettings.allowlist.add')}</p>
       <div class="add-grant-fields grid gap-3 items-end">
         <div class="min-w-0">
-          <label for="add-user" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">User</label>
+          <label for="add-user" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">{t('securitySettings.allowlist.user')}</label>
           <div id="add-user">
-            <UserPicker bind:value={addUserId} users={serviceUsers} placeholder="Pick a service user" class="min-h-[38px]" />
+            <UserPicker bind:value={addUserId} users={serviceUsers} placeholder={t('securitySettings.allowlist.pickUser')} class="min-h-[38px]" />
           </div>
         </div>
         <div class="min-w-0">
-          <label for="add-workspace" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Workspace</label>
+          <label for="add-workspace" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">{t('securitySettings.allowlist.workspace')}</label>
           <div id="add-workspace">
             <WorkspacePicker
               bind:value={addWorkspaceIds}
               allowClear
-              placeholder="Any workspace"
+              placeholder={t('securitySettings.allowlist.anyWorkspace')}
             />
           </div>
         </div>
         <div class="min-w-0">
-          <label for="add-reason" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Reason (audit-logged)</label>
-          <Input id="add-reason" size="small" class="min-h-[38px]" bind:value={addReason} placeholder="e.g. pilot rollout for acme-agent" />
+          <label for="add-reason" class="block text-xs mb-1" style="color: var(--ds-text-subtle);">{t('securitySettings.allowlist.reasonLogged')}</label>
+          <Input id="add-reason" size="small" class="min-h-[38px]" bind:value={addReason} placeholder={t('securitySettings.allowlist.reasonExample')} />
         </div>
         <div class="min-w-0">
           <!-- shortcut-guard-exempt: admin settings tab action, not a primary global-create surface -->
@@ -237,7 +238,7 @@
             onclick={addEntry}
             class="min-h-[38px]"
           >
-            Add
+            {t('common.add')}
           </Button>
         </div>
       </div>
@@ -248,11 +249,11 @@
 <ConfirmWithReasonDialog
   bind:show={removeDialogOpen}
   variant="danger"
-  title="Remove allowlist grant?"
-  message={`This removes the grant for ${pendingRemoveLabel}. Workspace admins will no longer be able to bind to this acting identity in that scope.`}
-  reasonLabel="Reason (audit-logged)"
-  reasonPlaceholder="Why are you removing this grant?"
-  confirmText="Remove grant"
+  title={t('securitySettings.allowlist.removeTitle')}
+  message={t('securitySettings.allowlist.removeMessage', { name: pendingRemoveLabel })}
+  reasonLabel={t('securitySettings.allowlist.reasonLogged')}
+  reasonPlaceholder={t('securitySettings.allowlist.removeReason')}
+  confirmText={t('securitySettings.allowlist.remove')}
   onconfirm={confirmRemove}
   oncancel={cancelRemove}
 />

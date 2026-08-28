@@ -97,9 +97,10 @@
   }
 
   function getStatusLabel(iteration) {
-    if (isActiveIteration(iteration)) return 'Active';
-    if (iteration.status === 'planned' || iteration.status === 'pending') return 'Planned';
-    return iteration.status || 'Planned';
+    if (isActiveIteration(iteration)) return t('widgets.iterationTimeline.active');
+    if (iteration.status === 'planned' || iteration.status === 'pending') return t('widgets.iterationTimeline.planned');
+    if (iteration.status === 'completed' || iteration.status === 'done') return t('widgets.iterationTimeline.completed');
+    return iteration.status || t('widgets.iterationTimeline.planned');
   }
 
   function getPercentComplete(progress) {

@@ -39,7 +39,7 @@ export default {
       subtask: 'Подзадача', create: 'Создать', skip: 'Пропустить',
     },
     preview: {
-      workspaces: 'Рабочие пространства', workItems: 'Рабочие элементы', statuses: 'Статусы', itemTypes: 'Типы элементов', customFields: 'Настраиваемые поля', milestones: 'Этапы', users: 'Пользователи', usersNew: '({count} новых)', assets: 'Активы', projectsToImport: 'Импортируемые проекты',
+      workspaces: 'Рабочие пространства', workItems: 'Рабочие элементы', statuses: 'Статусы', itemTypes: 'Типы элементов', customFields: 'Настраиваемые поля', milestones: 'Этапы', users: 'Пользователи', usersNew: '({count} новых)', assets: 'Ресурсы', projectsToImport: 'Импортируемые проекты',
     },
     import: {
       importing: 'Импорт…', starting: 'Запуск импорта…', complete: 'Импорт завершён!', success: 'Успешно импортировано элементов: {count}.', failed: 'Не удалось импортировать элементов: {count}.', ready: 'Готово к импорту', readyDesc: 'Нажмите «Начать импорт», чтобы импортировать элементы ({count}).', progress: 'Ход выполнения',
@@ -62,9 +62,9 @@ export default {
     text: 'Текст', number: 'Число', date: 'Дата', datetime: 'Дата и время', select: 'Выбор', multiSelect: 'Множественный выбор', checkbox: 'Флажок', user: 'Пользователь', url: 'URL',
     milestoneHint: 'Поля этапов автоматически ссылаются на системные этапы. При заполнении поля пользователи смогут выбрать существующий этап.',
     dateHint: 'Поля дат позволяют выбрать дату в календаре. Значения хранятся в формате YYYY-MM-DD.',
-    assetHint: 'Поля активов позволяют выбрать актив из указанного набора. Доступные активы можно дополнительно отфильтровать запросом QL.',
-    portalCustomerHint: 'Поля заказчика портала ссылаются на заказчиков. Используйте currentCustomer() в отчётах по активам для фильтрации по вошедшему заказчику.',
-    customerOrganisationHint: 'Поля организации заказчика ссылаются на организации. Используйте currentOrganisation() в отчётах по активам для фильтрации по организации заказчика.',
+    assetHint: 'Поля ресурсов позволяют выбрать ресурс из указанного набора. Доступные ресурсы можно дополнительно отфильтровать запросом QL.',
+    portalCustomerHint: 'Поля заказчика портала ссылаются на заказчиков. Используйте currentCustomer() в отчётах по ресурсам для фильтрации по вошедшему заказчику.',
+    customerOrganisationHint: 'Поля организации заказчика ссылаются на организации. Используйте currentOrganisation() в отчётах по ресурсам для фильтрации по организации заказчика.',
     usedIn: 'Используется в', portalCustomers: 'Заказчики портала', customerOrganisations: 'Организации заказчиков',
   },
 
@@ -103,11 +103,11 @@ export default {
   },
 
   assets: {
-    title: 'Управление активами', subtitle: 'Управление наборами, типами, категориями и активами', selectAssetSet: 'Выберите набор активов', newSet: 'Новый набор', createAssetSet: 'Создать набор активов', editSet: 'Изменить набор', deleteSet: 'Удалить набор', noAssetSets: 'Нет наборов активов', noAssetSetsDesc: 'Создайте первый набор, чтобы начать управлять активами.', selectAnAssetSet: 'Выберите набор активов', selectAnAssetSetDesc: 'Выберите набор выше, чтобы просматривать активы и управлять ими.', default: 'По умолчанию', assetTag: 'Тег актива', preview: 'Предпросмотр', serialNumber: 'Серийный номер',
+    title: 'Управление ресурсами', subtitle: 'Управление наборами, типами, категориями и ресурсами', selectAssetSet: 'Выберите набор ресурсов', newSet: 'Новый набор', createAssetSet: 'Создать набор ресурсов', editSet: 'Изменить набор', deleteSet: 'Удалить набор', noAssetSets: 'Нет наборов ресурсов', noAssetSetsDesc: 'Создайте первый набор, чтобы начать управлять ресурсами.', selectAnAssetSet: 'Выберите набор ресурсов', selectAnAssetSetDesc: 'Выберите набор выше, чтобы просматривать ресурсы и управлять ими.', default: 'По умолчанию', assetTag: 'Тег ресурса', preview: 'Предпросмотр', serialNumber: 'Серийный номер',
     types: 'Типы', categories: 'Категории', permissions: 'Разрешения', automations: 'Автоматизации',
-    newType: 'Новый тип', createType: 'Создать тип', editType: 'Изменить тип', noAssetTypes: 'Нет типов активов', noAssetTypesDesc: 'Создайте типы, чтобы классифицировать активы.', assetType: 'Тип актива',
-    newCategory: 'Новая категория', createCategory: 'Создать категорию', editCategory: 'Изменить категорию', noCategories: 'Нет категорий', noCategoriesDesc: 'Создайте категории, чтобы упорядочить активы.', parentCategory: 'Родительская категория', noParent: 'Без родителя (верхний уровень)',
-    assignRole: 'Назначить роль', everyoneRole: 'Общая роль', everyoneRoleDesc: 'Стандартная роль для всех пользователей. Индивидуальные назначения имеют приоритет.', noRoleAssignments: 'Роли не назначены', noRoleAssignmentsDesc: 'Назначьте роли, чтобы управлять доступом к набору активов.', assignee: 'Получатель', role: 'Роль',
+    newType: 'Новый тип', createType: 'Создать тип', editType: 'Изменить тип', noAssetTypes: 'Нет типов ресурсов', noAssetTypesDesc: 'Создайте типы, чтобы классифицировать ресурсы.', assetType: 'Тип ресурса',
+    newCategory: 'Новая категория', createCategory: 'Создать категорию', editCategory: 'Изменить категорию', noCategories: 'Нет категорий', noCategoriesDesc: 'Создайте категории, чтобы упорядочить ресурсы.', parentCategory: 'Родительская категория', noParent: 'Без родителя (верхний уровень)',
+    assignRole: 'Назначить роль', everyoneRole: 'Общая роль', everyoneRoleDesc: 'Стандартная роль для всех пользователей. Индивидуальные назначения имеют приоритет.', noRoleAssignments: 'Роли не назначены', noRoleAssignmentsDesc: 'Назначьте роли, чтобы управлять доступом к набору ресурсов.', assignee: 'Получатель', role: 'Роль',
     failedToDownload: 'Не удалось скачать файл', editDiagram: 'Изменить диаграмму', untitledDiagram: 'Диаграмма без названия', diagram: 'диаграмма', uploadedBy: 'Загрузил {name}', zoomOut: 'Уменьшить (-)', zoomIn: 'Увеличить (+)', rotate: 'Повернуть (R)', fitToScreen: 'Вписать в экран (F)', shortcutScroll: 'Колесо: масштаб', shortcutDrag: 'Перетаскивание: перемещение', shortcutRotate: 'R: повернуть', shortcutFit: 'F: вписать', shortcutReset: '0: сбросить', shortcutClose: 'Esc: закрыть',
   },
 

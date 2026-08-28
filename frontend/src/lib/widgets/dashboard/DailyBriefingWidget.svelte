@@ -5,6 +5,7 @@
   import { ai } from '../../api/ai.js';
   import { navigate } from '../../router.js';
   import { formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let briefing = $state(null);
   let loading = $state(true);
@@ -57,8 +58,7 @@
   <div class="flex items-start gap-3 py-2">
     <Sparkles class="w-4 h-4 mt-0.5" style="color: var(--ds-icon-accent);" />
     <p class="text-sm" style="color: var(--ds-text-subtle);">
-      Your daily briefing isn't available right now. It relies on an AI integration — if you've just
-      set one up, check back in a bit.
+      {t('dashboard.widgetContent.briefingUnavailable')}
     </p>
   </div>
 {:else}
@@ -74,12 +74,12 @@
   </div>
   {#if briefing.generated_at}
     <p class="text-xs mt-3" style="color: var(--ds-text-subtlest);">
-      Updated {formatAuthenticatedInstant(briefing.generated_at, {
+      {t('dashboard.widgetContent.updated', { date: formatAuthenticatedInstant(briefing.generated_at, {
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
-      })}
+      }) })}
     </p>
   {/if}
 {/if}

@@ -1098,7 +1098,7 @@
       <div class="relative z-50 mb-6">
         <ViewHeader
           workspaceName={workspace?.name || ''}
-          collection={currentCollectionName}
+          collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('collections.roadmap')}
           itemCount={treeData.length}
         >
@@ -1294,7 +1294,7 @@
           data-testid="roadmap-unscheduled-hint"
         >
           <CalendarClock class="h-4 w-4 shrink-0" />
-          <span>{unscheduledItemCount} {unscheduledItemCount === 1 ? 'item needs dates' : 'items need dates'} — click a timeline row to schedule it.</span>
+          <span>{t('collections.roadmapUnscheduledHint', { count: unscheduledItemCount })}</span>
         </div>
       {/if}
 
@@ -1328,7 +1328,7 @@
               style="height: 29px; border-bottom: 1px solid var(--ds-border);"
             >
               <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">
-                Items ({treeData.length})
+                {t('collections.roadmapItems', { count: treeData.length })}
               </span>
             </div>
             <!-- Tree header row 2 (column labels height) -->
@@ -1481,7 +1481,7 @@
                               type="button"
                               data-testid="roadmap-schedule-row-{item.id}"
                               class="absolute inset-0 w-full roadmap-schedule-row"
-                              aria-label={`Schedule ${item.title}`}
+                              aria-label={t('collections.roadmapScheduleItem', { title: item.title })}
                               onpointermove={(e) => onSchedulePointerMove(e, item)}
                               onpointerleave={() => onSchedulePointerLeave(item.id)}
                               onclick={(e) => onScheduleClick(e, item)}

@@ -1,6 +1,7 @@
 <script>
   import { Target, CheckCircle, AlertCircle } from '@lucide/svelte';
   import { homepageStore } from '../../stores';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let milestones = $derived(homepageStore.upcomingMilestones);
   let loading = $derived(homepageStore.loading);
@@ -21,7 +22,7 @@
 {:else if milestones.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Target class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">No upcoming milestones</p>
+    <p class="text-sm">{t('dashboard.widgetContent.noUpcomingMilestones')}</p>
   </div>
 {:else}
   <ul class="flex flex-col gap-3">
@@ -48,15 +49,15 @@
               </span>
             </div>
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              {m.done_items} of {m.total_items} done
+              {t('dashboard.widgetContent.milestoneDone', { done: m.done_items, total: m.total_items })}
               {#if m.target_date}
                 ·
                 {#if overdue}
-                  <span style="color: var(--ds-text-danger);">{Math.abs(daysUntil)} days overdue</span>
+                  <span style="color: var(--ds-text-danger);">{t('dashboard.widgetContent.daysOverdue', { count: Math.abs(daysUntil) })}</span>
                 {:else if daysUntil === 0}
-                  Due today
+                  {t('dashboard.dueToday')}
                 {:else if daysUntil !== null}
-                  {daysUntil} days left
+                  {t('dashboard.widgetContent.daysLeft', { count: daysUntil })}
                 {/if}
               {/if}
             </p>

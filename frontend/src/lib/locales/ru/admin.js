@@ -41,7 +41,7 @@ export default {
       integrationLinks: 'Интеграции и связи',
       usersAccess: 'Пользователи и доступ',
       communication: 'Коммуникации',
-      assetManagement: 'Управление активами',
+      assetManagement: 'Управление ресурсами',
       system: 'Система',
     },
 
@@ -157,7 +157,7 @@ export default {
       },
       assets: {
         title: 'Активы',
-        description: 'Управление наборами, типами, категориями и экземплярами активов',
+        description: 'Управление наборами, типами, категориями и ресурсами',
       },
       aiFeatures: {
         title: 'Функции ИИ',
@@ -1038,6 +1038,7 @@ export default {
     },
 
     boardConfig: {
+      configureBoard: 'Настройка доски',
       columns: 'Столбцы',
       backlog: 'Бэклог',
       dragToReorder: 'Перетащите, чтобы изменить порядок',
@@ -1070,6 +1071,25 @@ export default {
       createCustomField: 'Создать настраиваемое поле',
       customFieldsGlobalNote:
         'Настраиваемыми полями для всей системы управляет системный администратор.',
+      latestFiftyRightmost: 'Показывать только 50 последних элементов в крайнем правом столбце',
+      latestFiftyRightmostHint: 'Подходит для больших столбцов «Готово» и не ограничивает остальную доску.',
+      hideCompletedByAge: 'Скрывать давно завершённые элементы',
+      hideCompletedByAgeHint: 'Незавершённые элементы видны всегда, завершённые — только при недавней активности.',
+      recentActivityWindow: 'Период недавней активности',
+      days: 'дней',
+      retentionWindowHint: 'Завершённые элементы без активности за этот период будут скрыты.',
+      retentionRangeError: 'Введите целое число от 1 до 3650.',
+      backlogSelected: 'Для бэклога выбрано статусов: {count}',
+      backlogSelected_one: 'Для бэклога выбран {count} статус',
+      backlogSelected_few: 'Для бэклога выбрано {count} статуса',
+      backlogSelected_many: 'Для бэклога выбрано {count} статусов',
+      backlogSelected_other: 'Для бэклога выбрано {count} статуса',
+      systemFieldNames: {
+        status: 'Статус', priority: 'Приоритет', milestone: 'Этап', iteration: 'Итерация',
+        due_date: 'Срок', start_date: 'Дата начала', end_date: 'Дата окончания', labels: 'Метки',
+        created_at: 'Дата создания', project: 'Проект', parent: 'Родитель', time_in_status: 'Время в статусе',
+        story_points: 'Сторипойнты', estimate: 'Оценка',
+      },
     },
   },
 

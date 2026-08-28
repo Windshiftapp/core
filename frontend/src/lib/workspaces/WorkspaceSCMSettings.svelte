@@ -58,11 +58,11 @@
         nextList[idx] = updated;
         linkedRepos = { ...linkedRepos, [connId]: nextList };
       }
-      successToast('Repository settings saved');
+      successToast(t('scmSettings.repoSettingsSaved'));
       closeRepoSettings();
     } catch (err) {
       console.error(err);
-      errorToast('Failed to save repository settings');
+      errorToast(t('scmSettings.repoSettingsSaveFailed'));
     }
   }
 
@@ -80,7 +80,7 @@
       authStatuses = overview.authStatuses;
     } catch (error) {
       console.error('Failed to load SCM data:', error);
-      showNotification('Failed to load SCM settings', 'error');
+      showNotification(t('scmSettings.loadFailed'), 'error');
     } finally {
       loading = false;
     }
@@ -95,7 +95,7 @@
       }
     } catch (error) {
       console.error('Failed to start OAuth:', error);
-      showNotification('Failed to start OAuth reconnection', 'error');
+      showNotification(t('scmSettings.oauthFailed'), 'error');
     }
   }
 
@@ -109,17 +109,17 @@
       availableProviders = availableProviders.map(p =>
         p.id === provider.id ? { ...p, is_connected: true } : p
       );
-      showNotification(`Connected to ${provider.name}`, 'success');
+      showNotification(t('scmSettings.connectedTo', { name: provider.name }), 'success');
     } catch (error) {
       console.error('Failed to connect provider:', error);
-      showNotification('Failed to connect provider', 'error');
+      showNotification(t('scmSettings.connectFailed'), 'error');
     }
   }
 
   async function disconnectProvider(conn) {
     const confirmed = await confirm({
       title: t('common.disconnect'),
-      message: `Are you sure you want to disconnect ${conn.provider_name}? This will also unlink all repositories.`,
+      message: t('scmSettings.disconnectMessage', { name: conn.provider_name }),
       confirmText: t('common.disconnect'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -137,10 +137,10 @@
       linkedRepos = Object.fromEntries(
         Object.entries(linkedRepos).filter(([id]) => id !== String(conn.id))
       );
-      showNotification(`Disconnected from ${conn.provider_name}`, 'success');
+      showNotification(t('scmSettings.disconnectedFrom', { name: conn.provider_name }), 'success');
     } catch (error) {
       console.error('Failed to disconnect provider:', error);
-      showNotification('Failed to disconnect provider', 'error');
+      showNotification(t('scmSettings.disconnectFailed'), 'error');
     }
   }
 
@@ -185,7 +185,7 @@
           ? { ...c, repository_count: (linkedRepos[selectedConnection.id] || []).length }
           : c
       );
-      showNotification(`Linked ${repos.length} repositor${repos.length === 1 ? 'y' : 'ies'}`, 'success');
+      showNotification(t('scmSettings.linkedRepositories', { count: repos.length }), 'success');
     }
     showRepoSelector = false;
     selectedConnection = null;
@@ -215,7 +215,7 @@
   async function unlinkRepo(connId, repo) {
     const confirmed = await confirm({
       title: t('common.remove'),
-      message: `Are you sure you want to unlink ${repo.repository_name}?`,
+      message: t('scmSettings.unlinkMessage', { name: repo.repository_name }),
       confirmText: t('common.remove'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -233,10 +233,10 @@
           ? { ...c, repository_count: c.repository_count - 1 }
           : c
       );
-      showNotification(`Unlinked ${repo.repository_name}`, 'success');
+      showNotification(t('scmSettings.unlinkedRepository', { name: repo.repository_name }), 'success');
     } catch (error) {
       console.error('Failed to unlink repository:', error);
-      showNotification('Failed to unlink repository', 'error');
+      showNotification(t('scmSettings.unlinkFailed'), 'error');
     }
   }
 
@@ -265,8 +265,8 @@
     <div class="flex items-center gap-3">
       <GitMerge class="w-5 h-5" style="color: var(--ds-text-subtle);" />
       <div>
-        <h3 class="text-lg font-medium" style="color: var(--ds-text);">Source Control</h3>
-        <p class="text-sm" style="color: var(--ds-text-subtle);">Connect SCM providers and link repositories to this workspace</p>
+        <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('scmSettings.title')}</h3>
+        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('scmSettings.subtitle')}</p>
       </div>
     </div>
   </div>
@@ -279,7 +279,7 @@
     <!-- Available Providers Section -->
     {#if availableProviders.length > 0}
       <div class="rounded-lg border p-4" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-        <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">Available Providers</h4>
+        <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('scmSettings.availableProviders')}</h4>
         <div class="flex flex-wrap gap-2">
           {#each availableProviders as provider}
             <div
@@ -294,12 +294,12 @@
               {#if provider.is_connected}
                 <span class="flex items-center gap-1 text-xs" style="color: var(--ds-text-success);">
                   <Check class="w-3 h-3" />
-                  Connected
+                  {t('scmSettings.connected')}
                 </span>
               {:else}
                 <Button dataTestid={`scm-connect-${provider.id}`} size="xs" variant="ghost" onclick={() => connectProvider(provider)}>
                   <Plus class="w-3 h-3 mr-1" />
-                  Connect
+                  {t('scmSettings.connect')}
                 </Button>
               {/if}
             </div>
@@ -309,9 +309,9 @@
     {:else}
       <div class="rounded-lg border p-6 text-center" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
         <GitMerge class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtlest);" />
-        <p class="text-sm" style="color: var(--ds-text-subtle);">No SCM providers configured</p>
+        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('scmSettings.noProviders')}</p>
         <DescriptionText variant="subtlest">
-          Ask a system administrator to configure SCM providers in the Admin panel
+          {t('scmSettings.noProvidersDescription')}
         </DescriptionText>
       </div>
     {/if}
@@ -319,7 +319,7 @@
     <!-- Connected Providers & Repositories -->
     {#if connections.length > 0}
       <div class="space-y-3">
-        <h4 class="text-sm font-medium" style="color: var(--ds-text);">Connected Providers</h4>
+        <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('scmSettings.connectedProviders')}</h4>
 
         {#each connections as conn}
           <div data-testid={`scm-connection-${conn.id}`} class="rounded-lg border overflow-hidden" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
@@ -340,7 +340,7 @@
                 {/if}
                 <span class="font-medium" style="color: var(--ds-text);">{conn.provider_name}</span>
                 <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                  {conn.repository_count} {conn.repository_count === 1 ? 'repository' : 'repositories'}
+                  {t('scmSettings.repositoryCount', { count: conn.repository_count })}
                 </span>
               </div>
               <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -349,14 +349,14 @@
                 {#if authStatuses[conn.id]?.auth_method === 'oauth' && !authStatuses[conn.id]?.has_workspace_token}
                   <Button size="sm" variant="ghost" onclick={() => reconnectOAuth(conn)}>
                     <KeyRound class="w-4 h-4 mr-1" />
-                    Reconnect
+                    {t('scmSettings.reconnect')}
                   </Button>
                 {/if}
                 <Button size="sm" variant="ghost" onclick={() => openRepoSelector(conn)}>
                   <Plus class="w-4 h-4 mr-1" />
-                  Link Repositories
+                  {t('scmSettings.linkRepositories')}
                 </Button>
-                <Button size="sm" variant="danger-ghost" icon={Trash2} title="Disconnect" onclick={() => disconnectProvider(conn)}></Button>
+                <Button size="sm" variant="danger-ghost" icon={Trash2} title={t('common.disconnect')} onclick={() => disconnectProvider(conn)}></Button>
               </div>
             </div>
 
@@ -390,10 +390,11 @@
                     <Loader2 class="w-5 h-5 animate-spin" style="color: var(--ds-text-subtle);" />
                   </div>
                 {:else if !linkedRepos[conn.id] || linkedRepos[conn.id].length === 0}
-                  <EmptyState title="No repositories linked yet">
+                  <EmptyState title={t('scmSettings.noRepositories')}>
                     {#snippet action()}
+                      <!-- shortcut-guard-exempt: contextual repository linking is not a global create action -->
                       <Button size="sm" variant="secondary" icon={Plus} onclick={() => openRepoSelector(conn)}>
-                        Link Repositories
+                        {t('scmSettings.linkRepositories')}
                       </Button>
                     {/snippet}
                   </EmptyState>
@@ -407,18 +408,18 @@
                             <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                               {repo.default_branch}
                             </span>
-                            <span class="text-xs px-1.5 py-0.5 rounded font-mono" title="Tag pattern" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                              tags: {repo.milestone_tag_pattern || 'v*'}
+                            <span class="text-xs px-1.5 py-0.5 rounded font-mono" title={t('scmSettings.tagPattern')} style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                              {t('scmSettings.tags')}: {repo.milestone_tag_pattern || 'v*'}
                             </span>
-                            <span class="text-xs px-1.5 py-0.5 rounded font-mono" title="Branch pattern" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                              branches: {repo.milestone_branch_pattern || 'release/*'}
+                            <span class="text-xs px-1.5 py-0.5 rounded font-mono" title={t('scmSettings.branchPattern')} style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                              {t('scmSettings.branches')}: {repo.milestone_branch_pattern || 'release/*'}
                             </span>
                           </div>
                           <div class="flex items-center gap-2">
                             <button
                               class="p-1 rounded hover:bg-opacity-50"
                               style="color: var(--ds-text-subtle);"
-                              title="Repository settings"
+                              title={t('scmSettings.repositorySettings')}
                               onclick={() => editingRepoSettings?.id === repo.id ? closeRepoSettings() : openRepoSettings(repo)}
                             >
                               <Settings class="w-4 h-4" />
@@ -444,11 +445,11 @@
                         {#if editingRepoSettings?.id === repo.id}
                           <div class="px-3 py-3 border-t" style="border-color: var(--ds-border);">
                             <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">
-                              Globs the milestone-from-tag automation uses for this repo. Tags matching the tag pattern trigger a milestone promote; branches matching the branch pattern create a planning milestone.
+                              {t('scmSettings.patternsHelp')}
                             </p>
                             <div class="grid grid-cols-2 gap-3">
                               <div>
-                                <label for="ws-scm-tag-pattern-{repo.id}" class="block text-xs font-medium mb-1">Tag pattern</label>
+                                <label for="ws-scm-tag-pattern-{repo.id}" class="block text-xs font-medium mb-1">{t('scmSettings.tagPattern')}</label>
                                 <Input
                                   id="ws-scm-tag-pattern-{repo.id}"
                                   type="text"
@@ -458,7 +459,7 @@
                                 />
                               </div>
                               <div>
-                                <label for="ws-scm-branch-pattern-{repo.id}" class="block text-xs font-medium mb-1">Branch pattern</label>
+                                <label for="ws-scm-branch-pattern-{repo.id}" class="block text-xs font-medium mb-1">{t('scmSettings.branchPattern')}</label>
                                 <Input
                                   id="ws-scm-branch-pattern-{repo.id}"
                                   type="text"
@@ -469,8 +470,8 @@
                               </div>
                             </div>
                             <div class="flex justify-end gap-2 mt-3">
-                              <Button size="sm" variant="ghost" onclick={closeRepoSettings}>Cancel</Button>
-                              <Button size="sm" variant="primary" onclick={() => saveRepoSettings(conn.id)}>Save</Button>
+                              <Button size="sm" variant="ghost" onclick={closeRepoSettings}>{t('common.cancel')}</Button>
+                              <Button size="sm" variant="primary" onclick={() => saveRepoSettings(conn.id)}>{t('common.save')}</Button>
                             </div>
                           </div>
                         {/if}

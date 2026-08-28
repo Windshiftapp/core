@@ -17,6 +17,12 @@
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import {
+    systemPermissionDescription,
+    systemPermissionName,
+    systemRoleDescription,
+    systemRoleName,
+  } from '../utils/systemLabels.js';
 
   let roles = $state([]);
   let loading = $state(true);
@@ -30,8 +36,8 @@
   let newDescription = $state('');
 
   const columns = $derived([
-    { key: 'name', label: t('roles.roleName'), sortable: true },
-    { key: 'description', label: t('common.description') },
+    { key: 'name', label: t('roles.roleName'), sortable: true, slot: 'name' },
+    { key: 'description', label: t('common.description'), slot: 'description' },
     {
       key: 'kind',
       label: t('common.type'),
@@ -190,8 +196,8 @@
     maxWidth="max-w-2xl"
   >
     <ModalHeader
-      title={selectedRole?.name}
-      subtitle={selectedRole?.description}
+      title={systemRoleName(selectedRole)}
+      subtitle={systemRoleDescription(selectedRole)}
       icon={BadgeCheck}
       onClose={closeDetails}
     />
@@ -203,8 +209,8 @@
             <div class="flex items-start space-x-2 p-3 rounded-md" style="background-color: var(--ds-interactive-subtle);">
               <CheckCircle class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--ds-text-success);" />
               <div>
-                <div class="font-medium text-sm" style="color: var(--ds-text);">{permission.permission_name}</div>
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{permission.description}</div>
+                <div class="font-medium text-sm" style="color: var(--ds-text);">{systemPermissionName(permission)}</div>
+                <div class="text-xs" style="color: var(--ds-text-subtle);">{systemPermissionDescription(permission)}</div>
                 <div class="text-xs mt-0.5" style="color: var(--ds-text-subtlest);">{permission.permission_key}</div>
               </div>
             </div>
@@ -278,7 +284,14 @@
     {loading}
     actionItems={buildRoleDropdownItems}
     emptyMessage={t('roles.noRoles')}
-  />
+  >
+    {#snippet name(item)}
+      {systemRoleName(item)}
+    {/snippet}
+    {#snippet description(item)}
+      {systemRoleDescription(item)}
+    {/snippet}
+  </DataTable>
 
   <AlertBox variant="info">
     <p class="text-sm">

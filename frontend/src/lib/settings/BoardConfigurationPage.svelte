@@ -6,7 +6,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { CARD_SELECTABLE_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
+  import { CARD_SELECTABLE_FIELDS } from '../stores/fieldConfig.js';
   import { confirm } from '../composables/useConfirm.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { collectionStore } from '../stores/collectionContext.svelte.js';
@@ -24,6 +24,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
+  import { systemStatusName } from '../utils/systemLabels.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -537,7 +538,7 @@
 
   function getStatusName(statusId) {
     const s = statuses.find(s => s.id === statusId);
-    return s ? s.name : statusId;
+    return s ? systemStatusName(s) : statusId;
   }
 
   function getStatusColor(statusId) {
@@ -588,7 +589,7 @@
       .filter(f => !isPublicCollection || PUBLIC_BOARD_CARD_FIELDS.has(f.identifier))
       .map(f => ({
         identifier: f.identifier,
-        label: f.name
+        label: t(`settings.boardConfig.systemFieldNames.${f.identifier}`)
       }))
   );
 
@@ -644,7 +645,7 @@
 
   function getCardFieldLabel(field) {
     if (field.field_type === 'system') {
-      return getSystemFieldName(field.field_identifier);
+      return t(`settings.boardConfig.systemFieldNames.${field.field_identifier}`);
     }
     // Custom field
     const cfId = field.field_identifier.replace('custom_field_', '');
@@ -660,7 +661,7 @@
       trimCompletedItemsByAge &&
       (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 3650)
     ) {
-      completedItemRetentionError = 'Enter a whole number from 1 to 3650.';
+      completedItemRetentionError = t('settings.boardConfig.retentionRangeError');
       return;
     }
 
@@ -781,8 +782,8 @@
         <!-- Header with view tabs -->
         <ViewHeader
           workspaceName={workspace?.name || ''}
-          collection={currentCollectionName}
-          viewName="Configure Board"
+          collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
+          viewName={t('settings.boardConfig.configureBoard')}
           itemCount={columns.length}
         >
           {#snippet actions()}
@@ -839,8 +840,8 @@
             onchange={setShowRightmostColumnLast50}
             disabled={!canConfigure}
             dataTestid="board-rightmost-limit-enabled"
-            label="Show only the latest 50 items in the rightmost column"
-            hint="Useful for high-volume Done columns while keeping the rest of the board complete."
+            label={t('settings.boardConfig.latestFiftyRightmost')}
+            hint={t('settings.boardConfig.latestFiftyRightmostHint')}
             size="small"
           />
           {#if !showRightmostColumnLast50}
@@ -850,8 +851,8 @@
                 onchange={setTrimCompletedItemsByAge}
                 disabled={!canConfigure}
                 dataTestid="board-completed-age-enabled"
-                label="Hide completed items by age"
-                hint="Show only completed work with recent activity. Unfinished work is always shown."
+                label={t('settings.boardConfig.hideCompletedByAge')}
+                hint={t('settings.boardConfig.hideCompletedByAgeHint')}
                 size="small"
               />
               {#if trimCompletedItemsByAge}
@@ -861,7 +862,7 @@
                     class="mb-1.5 block text-xs font-medium"
                     style="color: var(--ds-text-subtle);"
                   >
-                    Recent activity window
+                    {t('settings.boardConfig.recentActivityWindow')}
                   </label>
                   <div class="flex items-center gap-2">
                     <Input
@@ -877,14 +878,14 @@
                       ariaDescribedby="board-completed-retention-help"
                       class="w-24"
                     />
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">days</span>
+                    <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.boardConfig.days')}</span>
                   </div>
                   <p
                     id="board-completed-retention-help"
                     class="mt-1.5 text-xs"
                     style="color: {completedItemRetentionError ? 'var(--ds-text-danger)' : 'var(--ds-text-subtlest)'};"
                   >
-                    {completedItemRetentionError || 'Completed items with no activity inside this window are hidden.'}
+                    {completedItemRetentionError || t('settings.boardConfig.retentionWindowHint')}
                   </p>
                 </div>
               {/if}
@@ -933,7 +934,7 @@
                   <!-- Color dot -->
                   <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.category_color || '#6b7280'};"></span>
                   <!-- Status name -->
-                  <span class="text-sm truncate" style="color: var(--ds-text);">{status.name}</span>
+                  <span class="text-sm truncate" style="color: var(--ds-text);">{systemStatusName(status)}</span>
                 </div>
               {/each}
 
@@ -1131,7 +1132,7 @@
                       <span style="color: var(--ds-interactive);">✓</span>
                     {/if}
                   </span>
-                  <span class="flex-1">{status.name}</span>
+                  <span class="flex-1">{systemStatusName(status)}</span>
                 </button>
               {/each}
             </div>
@@ -1142,7 +1143,7 @@
               </p>
             {:else}
               <p class="text-sm mt-4" style="color: var(--ds-text-subtle);">
-                {backlogStatusIDs.length} {backlogStatusIDs.length === 1 ? 'status' : 'statuses'} selected for backlog
+                {t('settings.boardConfig.backlogSelected', { count: backlogStatusIDs.length })}
               </p>
             {/if}
           </div>

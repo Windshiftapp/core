@@ -45,6 +45,7 @@
     isGenericSubtaskType,
     sortItemTypesByHierarchy,
   } from '../../utils/hierarchy.js';
+  import { systemStatusName } from '../../utils/systemLabels.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -376,9 +377,14 @@
 
       if (!belongsToView) {
         const selectedWorkspace = availableWorkspaces.find(w => w.id === state.workspaceId);
-        const workspaceName = selectedWorkspace?.name || 'another workspace';
-        const reason = collectionId ? 'collection filters' : 'the current workspace filter';
-        infoToast(`Card created in ${workspaceName} but won't appear here due to ${reason}`, 'Card created successfully');
+        const workspaceName = selectedWorkspace?.name || t('collections.anotherWorkspace');
+        const reason = collectionId
+          ? t('collections.collectionFiltersReason')
+          : t('collections.workspaceFilterReason');
+        infoToast(
+          t('collections.cardCreatedOutsideView', { workspace: workspaceName, reason }),
+          t('collections.cardCreatedSuccess')
+        );
       }
 
       try {
@@ -394,7 +400,7 @@
         // Toast feedback
         showCreatedItemToast(newItem);
         if (collectionStore.itemsHasMore) {
-          warningToast('The board has more items than can be displayed. Use "Load More" to see all items.');
+          warningToast(t('collections.boardItemsTruncated'));
         }
       }
 
@@ -639,7 +645,7 @@
   }
 
   function warnUnsupportedCombinedBoardMove() {
-    warningToast('Moving between swimlanes and statuses at the same time is not supported yet. Move it in two steps.');
+    warningToast(t('collections.combinedBoardMoveUnsupported'));
   }
 
   async function updateItemParentForLane(item, targetParentId) {
@@ -658,7 +664,7 @@
       return { ...item, ...updatedItem, parent_id: targetParentId };
     } catch (error) {
       console.error('Failed to move item to swimlane:', error);
-      warningToast('Could not move item to that swimlane');
+      warningToast(t('collections.swimlaneMoveFailed'));
       if (error && typeof error === 'object') {
         error.swimlaneMoveFailed = true;
       }
@@ -893,31 +899,31 @@
     {
       id: 'sort-rank',
       testid: 'board-sort-rank',
-      title: 'Rank mode',
-      subtitle: 'Manual drag-and-drop order',
-      badge: sortMode === 'rank' ? 'Selected' : '',
+      title: t('boardControls.rankMode'),
+      subtitle: t('boardControls.rankModeDescription'),
+      badge: sortMode === 'rank' ? t('common.selected') : '',
       onClick: () => setSortMode('rank')
     },
     {
       id: 'sort-bubble',
       testid: 'board-sort-bubble',
-      title: 'Bubble Mode',
-      subtitle: 'Recently active cards rise to the top',
-      badge: sortMode === 'bubble' ? 'Selected' : '',
+      title: t('boardControls.bubbleMode'),
+      subtitle: t('boardControls.bubbleModeDescription'),
+      badge: sortMode === 'bubble' ? t('common.selected') : '',
       onClick: () => setSortMode('bubble')
     }
   ]);
 
   let groupByMenuItems = $derived.by(() => {
     const sortedTypes = sortItemTypesByHierarchy(itemTypes);
-    const rightmostColumnName = rightmostBoardColumn?.name || 'rightmost column';
+    const rightmostColumnName = systemStatusName(rightmostBoardColumn?.name) || t('boardControls.rightmostColumn');
     return [
       {
         id: 'group-none',
         testid: 'board-group-by-none',
-        title: 'No swimlanes',
-        subtitle: 'Show every item as a normal card',
-        badge: groupByItemTypeId ? '' : 'Selected',
+        title: t('boardControls.noSwimlanes'),
+        subtitle: t('boardControls.noSwimlanesDescription'),
+        badge: groupByItemTypeId ? '' : t('common.selected'),
         onClick: () => setGroupByItemType(null)
       },
       ...(groupByItemTypeId ? [
@@ -925,11 +931,11 @@
         {
           id: 'group-rightmost-toggle',
           type: 'checkbox',
-          title: `Hide ${rightmostColumnName} swimlanes`,
+          title: t('boardControls.hideColumnSwimlanes', { name: rightmostColumnName }),
           subtitle: selectedGroupByItemType
-            ? `Only group by ${selectedGroupByItemType.name} items outside ${rightmostColumnName}`
-            : `Only group by items outside ${rightmostColumnName}`,
-          badge: hiddenRightmostSwimlaneParentCount > 0 ? `${hiddenRightmostSwimlaneParentCount} hidden` : '',
+            ? t('boardControls.groupOutsideColumnWithType', { type: selectedGroupByItemType.name, column: rightmostColumnName })
+            : t('boardControls.groupOutsideColumn', { column: rightmostColumnName }),
+          badge: hiddenRightmostSwimlaneParentCount > 0 ? t('boardControls.hiddenCount', { count: hiddenRightmostSwimlaneParentCount }) : '',
           checked: excludeRightmostSwimlaneParents,
           closeOnSelect: false,
           onChange: setExcludeRightmostSwimlaneParents
@@ -940,9 +946,9 @@
         id: `group-type-${type.id}`,
         testid: `board-group-by-type-${type.id}`,
         title: type.name,
-        subtitle: 'Use these items as swimlanes',
+        subtitle: t('boardControls.useAsSwimlanes'),
         itemType: type,
-        badge: groupByItemTypeId === type.id ? 'Selected' : '',
+        badge: groupByItemTypeId === type.id ? t('common.selected') : '',
         onClick: () => setGroupByItemType(type.id)
       }))
     ];
@@ -952,7 +958,7 @@
     if (!groupByItemTypeId) {
       return [{
         id: 'all',
-        title: 'All items',
+        title: t('collections.allItems'),
         parent: null,
         items: filteredItems,
         isDefault: true,
@@ -992,7 +998,7 @@
       ...lanes,
       {
         id: 'unassigned',
-        title: 'Unassigned',
+        title: t('common.unassigned'),
         parent: null,
         items: unassignedItems,
         isDefault: false,
@@ -1547,8 +1553,8 @@
       <div class="mb-8">
         <ViewHeader
           workspaceName={workspace?.name || ''}
-          collection={currentCollectionName}
-          viewName="Board"
+          collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
+          viewName={t('workspaceSettings.views.board')}
           itemCount={collectionStore.itemsTotalCount}
         >
           {#snippet actions()}
@@ -1614,7 +1620,7 @@
                 <DropdownMenu
                   items={groupByMenuItems}
                   triggerIcon={Layers}
-                  triggerText={selectedGroupByItemType ? `Group by: ${selectedGroupByItemType.name}` : 'Group by'}
+                  triggerText={selectedGroupByItemType ? t('boardControls.groupByValue', { name: selectedGroupByItemType.name }) : t('boardControls.groupBy')}
                   placement="bottom-end"
                   maxWidth="max-w-xs"
                   triggerClass="px-3 py-1.5 rounded text-sm font-medium transition-colors {selectedGroupByItemType ? 'shadow-sm' : ''}"
@@ -1624,7 +1630,7 @@
                 <DropdownMenu
                   items={sortByMenuItems}
                   triggerIcon={ArrowDownUp}
-                  triggerText={sortMode === 'bubble' ? 'Sort: Bubble' : 'Sort by'}
+                  triggerText={sortMode === 'bubble' ? t('boardControls.sortBubble') : t('boardControls.sortBy')}
                   placement="bottom-end"
                   maxWidth="max-w-xs"
                   triggerClass="px-3 py-1.5 rounded text-sm font-medium transition-colors {sortMode === 'bubble' ? 'shadow-sm' : ''}"
@@ -1766,14 +1772,14 @@
                         data-status-column-key={`${lane.id}-${column.id}-${column.status_ids[0]}`}
                         data-swimlane-parent-id={selectedGroupByItemType && lane.parent ? lane.parent.id : ''}
                         data-status-id={column.status_ids[0]}
-                        aria-label={t('collections.expandColumn', { name: column.name })}
+                        aria-label={t('collections.expandColumn', { name: systemStatusName(column.name) })}
                         aria-expanded="false"
-                        title={t('collections.expandColumn', { name: column.name })}
+                        title={t('collections.expandColumn', { name: systemStatusName(column.name) })}
                         onclick={() => toggleColumnCollapse(column.id)}
                       >
                         <ChevronRight class="w-4 h-4 flex-shrink-0" style={styles.glassTextStyle} />
                         <span class="board-column-collapsed-name font-semibold text-sm break-words" style={styles.glassTextStyle}>
-                          {column.name}
+                          {systemStatusName(column.name)}
                         </span>
                         <span class="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                           {columnTotal}

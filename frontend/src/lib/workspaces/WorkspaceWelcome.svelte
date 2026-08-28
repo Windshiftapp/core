@@ -12,10 +12,10 @@
     workspaceBackgroundImageUrl
   } from '../stores/workspaceGradient.svelte.js';
 
-  const shortDateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   import { getCollection } from '../features/collections/collectionService.js';
   import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateOnly } from '../utils/dateFormatter.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -101,15 +101,17 @@
     return [
       {
         id: crypto.randomUUID(),
-        title: 'Overview',
-        subtitle: 'Key metrics and statistics',
+        title: t('workspaceDashboard.overview'),
+        subtitle: t('workspaceDashboard.overviewDescription'),
+        system_key: 'overview',
         display_order: 0,
         widget_ids: []
       },
       {
         id: crypto.randomUUID(),
-        title: 'Progress Tracking',
-        subtitle: 'Charts and timelines',
+        title: t('workspaceDashboard.progress'),
+        subtitle: t('workspaceDashboard.progressDescription'),
+        system_key: 'progress',
         display_order: 1,
         widget_ids: []
       }
@@ -307,7 +309,9 @@
         completedByWeekData.push({
           date: new Date(weekStart),
           count: completedCount,
-          label: `Week of ${shortDateFormat.format(weekStart)}`
+          label: t('workspaceDashboard.weekOf', {
+            date: formatDateOnly(weekStart, { month: 'short', day: 'numeric' })
+          })
         });
       }
 
@@ -433,7 +437,7 @@
   function addSection() {
     const newSection = {
       id: crypto.randomUUID(),
-      title: 'New Section',
+      title: t('dashboard.sections.new'),
       subtitle: '',
       display_order: sections.length,
       widget_ids: []
@@ -488,7 +492,7 @@
   async function deleteSection(sectionId) {
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: 'Delete this section? All widgets in this section will be removed.',
+      message: t('dashboard.sections.deleteMessage'),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -639,7 +643,20 @@
   });
 
   function getWidgetTitle(type) {
-    return getWidgetMetadata(type)?.name || type;
+    const widget = getWidgetMetadata(type);
+    return widget?.nameKey ? t(widget.nameKey) : widget?.name || type;
+  }
+
+  function getSectionTitle(section) {
+    if (section.system_key === 'overview' || section.title === 'Overview') return t('workspaceDashboard.overview');
+    if (section.system_key === 'progress' || section.title === 'Progress Tracking') return t('workspaceDashboard.progress');
+    return section.title;
+  }
+
+  function getSectionSubtitle(section) {
+    if (section.system_key === 'overview' || section.subtitle === 'Key metrics and statistics') return t('workspaceDashboard.overviewDescription');
+    if (section.system_key === 'progress' || section.subtitle === 'Charts and timelines') return t('workspaceDashboard.progressDescription');
+    return section.subtitle;
   }
 
   // Get widgets for a section
@@ -664,13 +681,13 @@
 >
     {#if loading}
       <div class="flex items-center justify-center h-64">
-        <p style={gradientStyles.emptyStateStyle}>Loading workspace data...</p>
+        <p style={gradientStyles.emptyStateStyle}>{t('workspaceDashboard.loading')}</p>
       </div>
     {:else}
     <!-- Header -->
     <ViewHeader
-      viewName={workspace?.name || 'Workspace'}
-      workspaceName="Homepage"
+      viewName={workspace?.name || t('common.workspace')}
+      workspaceName={t('workspaceDashboard.homepage')}
       collection={currentCollectionName !== 'Default' ? currentCollectionName : ''}
       hasGradient={gradientStyles.hasCustomBackground}
       textStyle={gradientStyles.textStyle}
@@ -684,7 +701,7 @@
             icon={isEditMode ? X : Edit3}
             onclick={toggleEditMode}
           >
-            {isEditMode ? 'Done Editing' : 'Edit'}
+            {isEditMode ? t('workspaceDashboard.doneEditing') : t('common.edit')}
           </Button>
 
           <!-- Customize button -->
@@ -693,7 +710,7 @@
             icon={isCustomizeMode ? X : LayoutGrid}
             onclick={toggleCustomizeMode}
           >
-            {isCustomizeMode ? 'Done' : 'Customize'}
+            {isCustomizeMode ? t('common.done') : t('workspaceDashboard.customize')}
           </Button>
         </div>
       {/snippet}
@@ -704,15 +721,16 @@
       <div class="mb-4 p-3 border rounded flex items-center justify-between" style="background-color: var(--ds-status-info-bg); border-color: var(--ds-status-info-border);">
         <div class="flex items-center gap-2 text-sm" style="color: var(--ds-status-info-text);">
           <Edit3 class="h-4 w-4" />
-          <span>Edit mode: Add, rename, or delete sections</span>
+          <span>{t('workspaceDashboard.editModeHint')}</span>
         </div>
+        <!-- shortcut-guard-exempt: section creation is available only inside dashboard edit mode -->
         <Button
           variant="primary"
           size="small"
           icon={Plus}
           onclick={addSection}
         >
-          Add Section
+          {t('layout.addSection')}
         </Button>
       </div>
     {/if}
@@ -731,13 +749,13 @@
                   type="text"
                   bind:value={editingSectionTitle}
                   class="text-lg font-semibold"
-                  placeholder="Section title"
+                  placeholder={t('dashboard.sections.titlePlaceholder')}
                   onkeydown={handleSectionEditKeydown}
                 />
                 <Input
                   type="text"
                   bind:value={editingSectionSubtitle}
-                  placeholder="Subtitle (optional)"
+                  placeholder={t('dashboard.sections.subtitlePlaceholder')}
                   onkeydown={handleSectionEditKeydown}
                   size="small"
                 />
@@ -746,22 +764,22 @@
                   size="small"
                   onclick={saveSection}
                 >
-                  Save <span class="ml-1 opacity-60">⏎</span>
+                  {t('common.save')} <span class="ml-1 opacity-60">⏎</span>
                 </Button>
                 <Button
                   variant="default"
                   size="small"
                   onclick={cancelEditingSection}
                 >
-                  Cancel <span class="ml-1 opacity-60">Esc</span>
+                  {t('common.cancel')} <span class="ml-1 opacity-60">Esc</span>
                 </Button>
               </div>
             {:else}
               <!-- Display mode -->
               <div>
-                <h2 class="text-xl font-semibold" style={gradientStyles.glassTextStyle}>{section.title}</h2>
+                <h2 class="text-xl font-semibold" style={gradientStyles.glassTextStyle}>{getSectionTitle(section)}</h2>
                 {#if section.subtitle}
-                  <p class="text-sm mt-1" style={gradientStyles.glassSubtleTextStyle}>{section.subtitle}</p>
+                  <p class="text-sm mt-1" style={gradientStyles.glassSubtleTextStyle}>{getSectionSubtitle(section)}</p>
                 {/if}
               </div>
 
@@ -773,14 +791,14 @@
                     onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-interactive)'}
                     onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
                     onclick={() => startEditingSection(section)}
-                    title="Rename section"
+                    title={t('dashboard.sections.rename')}
                   >
                     <Pencil class="h-4 w-4" />
                   </button>
                   <button
                     class="p-2 rounded hover-danger" style="color: var(--ds-text-subtle);"
                     onclick={() => deleteSection(section.id)}
-                    title="Delete section"
+                    title={t('layout.deleteSection')}
                   >
                     <Trash2 class="h-4 w-4" />
                   </button>
@@ -849,7 +867,7 @@
                       />
                     {:else}
                       <div class="text-center py-8 text-sm" style="color: var(--ds-text-subtle);">
-                        Unknown widget type: {widget.type}
+                        {t('dashboard.widgets.unknown', { type: widget.type })}
                       </div>
                     {/if}
                   </WidgetWrapper>
@@ -857,8 +875,8 @@
               </div>
             {:else}
               <div class="text-center py-12" style={gradientStyles.emptyStateStyle}>
-                <p class="text-sm">No widgets in this section yet</p>
-                <p class="text-xs mt-1">Click "Customize" to add widgets</p>
+                <p class="text-sm">{t('dashboard.sections.noWidgets')}</p>
+                <p class="text-xs mt-1">{t('dashboard.sections.addWidgetsHint')}</p>
               </div>
             {/if}
           </div>
@@ -869,8 +887,8 @@
     {#if sections.length === 0}
       <div class="flex flex-col items-center justify-center py-16" style={gradientStyles.emptyStateStyle}>
         <LayoutGrid class="h-16 w-16 mb-4 opacity-30" />
-        <p class="text-lg font-medium">No sections configured</p>
-        <p class="text-sm mt-2">Click "Edit" to add sections to your homepage</p>
+        <p class="text-lg font-medium">{t('dashboard.sections.none')}</p>
+        <p class="text-sm mt-2">{t('workspaceDashboard.noSectionsHint')}</p>
       </div>
     {/if}
     {/if}
