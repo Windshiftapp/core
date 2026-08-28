@@ -140,7 +140,7 @@ export default {
       },
       adminLinkTypes: { label: 'Типы связей', description: 'Управление типами связей между рабочими элементами' },
       adminScmProviders: {
-        label: 'Поставщики SCM',
+        label: 'SCM-провайдеры',
         description: 'Настройка интеграций с GitHub, GitLab, Gitea и Bitbucket',
       },
       adminAttachments: {
@@ -171,7 +171,7 @@ export default {
       },
       adminSso: {
         label: 'Единый вход',
-        description: 'Настройка поставщиков удостоверений OIDC для SSO',
+        description: 'Настройка OIDC-провайдеров для единого входа',
       },
       adminSecurity: {
         label: 'Настройки безопасности',

@@ -93,7 +93,7 @@ export default {
       integrationProviders: {
         title: 'Интеграции',
         description:
-          'Управление исходящими интеграциями Windshift и входящими приложениями с авторизацией через OAuth.',
+          'Подключение внешних сервисов и OAuth-приложений к Windshift',
       },
       systemImport: {
         title: 'Импорт из систем',
@@ -161,11 +161,11 @@ export default {
       },
       aiFeatures: {
         title: 'Функции ИИ',
-        description: 'Настройка доступных функций ИИ и подключений LLM для них',
+        description: 'Настройка функций ИИ и используемых ими моделей',
       },
       llmConnections: {
-        title: 'Подключения ИИ',
-        description: 'Настройка провайдеров моделей ИИ для интеллектуальных функций',
+        title: 'Модели ИИ',
+        description: 'Подключение моделей для функций на базе ИИ',
       },
       workItemStaleness: {
         title: 'Метрики качества',
@@ -174,11 +174,11 @@ export default {
       agentTemplates: {
         title: 'Шаблоны агентов',
         description:
-          'Переопределение каталога Agent Studio: названий шаблонов, типов профилей и инструкций',
+          'Настройка названий, типов профилей и инструкций в Agent Studio',
       },
       actionCapabilities: {
-        title: 'Возможности действий',
-        description: 'Управление средами Docker, HTTP-клиентами и подключениями LLM для действий',
+        title: 'Инструменты действий',
+        description: 'Среды Docker, HTTP-клиенты и модели ИИ для автоматизаций',
       },
       diagnostics: {
         title: 'Диагностика',
@@ -388,7 +388,7 @@ export default {
       preselectedItemType: 'Тип элемента, заранее выбранный при создании новых элементов',
       selectItemTypes:
         'Выберите типы элементов, доступные в рабочих пространствах с этим набором конфигураций.',
-      workflowScreenOverrides: 'Переопределение рабочих процессов и экранов',
+      workflowScreenOverrides: 'Настройки по типам элементов',
       overridesDesc:
         'Настройте рабочие процессы и экраны для каждого типа элемента. Выберите «По умолчанию», чтобы наследовать настройки вкладки «Общие».',
       itemType: 'Тип элемента',
@@ -506,11 +506,11 @@ export default {
       authMethod: 'Способ аутентификации',
       baseUrl: 'Базовый URL',
       baseUrlPlaceholder: 'Введите URL собственного сервера Gitea/Forgejo',
-      callbackUrl: 'URL обратного вызова',
+      callbackUrl: 'URL перенаправления OAuth',
       copy: 'Копировать',
       copied: 'Скопировано',
       enterSlugForCallback:
-        'Введите идентификатор выше, чтобы сформировать URL обратного вызова',
+        'Введите идентификатор выше, чтобы сформировать URL перенаправления',
       useThisUrl: 'Используйте этот URL при настройке приложения OAuth в',
       oauthClientId: 'ID клиента OAuth',
       oauthClientSecret: 'Секрет клиента OAuth',
@@ -592,9 +592,9 @@ export default {
       enterClientSecret: 'Введите секрет клиента',
       leaveEmptyToKeepCurrent: '(оставьте пустым, чтобы сохранить текущий)',
       notConfigured: 'Не настроено',
-      callbackUrl: 'URL обратного вызова',
+      callbackUrl: 'URL перенаправления OAuth',
       callbackUrlHelp:
-        'Укажите этот адрес как URL перенаправления или обратного вызова у провайдера идентификации',
+        'Укажите этот адрес как URL перенаправления у провайдера идентификации',
       scopes: 'Области доступа',
       scopesHelp: 'Список областей доступа OIDC через пробел',
       enabled: 'Включён',
@@ -887,17 +887,17 @@ export default {
 
     aiFeatures: {
       title: 'Функции ИИ',
-      subtitle: 'Настройте доступные функции ИИ и назначьте им подключения LLM',
+      subtitle: 'Выберите доступные функции ИИ и модели, которые они будут использовать',
       loading: 'Загрузка конфигурации функций ИИ…',
       saveSuccess: 'Конфигурация функций ИИ сохранена',
       saveFailed: 'Не удалось сохранить конфигурацию функций ИИ',
       loadFailed: 'Не удалось загрузить конфигурацию функций ИИ',
       noConnections:
-        'Подключения LLM не настроены. Сначала добавьте их в разделе «Подключения ИИ».',
+        'Сначала подключите модель в разделе «Модели ИИ».',
       modeDefault: 'Использовать по умолчанию',
-      modeSpecific: 'Использовать указанное подключение',
+      modeSpecific: 'Выбрать модель',
       modeDisabled: 'Отключено',
-      selectConnection: 'Выберите подключение…',
+      selectConnection: 'Выберите модель…',
       scheduleLabel: 'Частота создания',
       scheduleDaily: 'Раз в день',
       scheduleEvery6h: 'Каждые 6 часов',
@@ -960,29 +960,29 @@ export default {
     },
 
     actionCapabilities: {
-      title: 'Возможности действий',
-      subtitle: 'Управляйте подготовленными возможностями для узлов автоматических действий',
-      addCapability: 'Добавить возможность',
-      editCapability: 'Изменить возможность',
-      deleteCapability: 'Удалить возможность',
+      title: 'Инструменты действий',
+      subtitle: 'Настройте среды Docker, HTTP-клиенты и модели ИИ для автоматизаций',
+      addCapability: 'Добавить инструмент',
+      editCapability: 'Настроить инструмент',
+      deleteCapability: 'Удалить инструмент',
       name: 'Название',
       namePlaceholder: 'например, Изолированная среда Python',
-      capabilityType: 'Тип возможности',
+      capabilityType: 'Тип инструмента',
       selectType: 'Выберите тип…',
-      enabled: 'Включена',
-      noCapabilities: 'Возможности действий пока не настроены.',
-      addFirst: 'Добавить первую возможность',
-      createSuccess: 'Возможность действия создана',
-      updateSuccess: 'Возможность действия обновлена',
-      deleteSuccess: 'Возможность действия удалена',
-      createFailed: 'Не удалось создать возможность',
-      updateFailed: 'Не удалось обновить возможность',
-      deleteFailed: 'Не удалось удалить возможность',
-      loadFailed: 'Не удалось загрузить возможности действий',
+      enabled: 'Включён',
+      noCapabilities: 'Инструменты действий пока не настроены.',
+      addFirst: 'Добавить первый инструмент',
+      createSuccess: 'Инструмент создан',
+      updateSuccess: 'Инструмент обновлён',
+      deleteSuccess: 'Инструмент удалён',
+      createFailed: 'Не удалось создать инструмент',
+      updateFailed: 'Не удалось обновить инструмент',
+      deleteFailed: 'Не удалось удалить инструмент',
+      loadFailed: 'Не удалось загрузить инструменты действий',
       confirmDelete: 'Удалить',
       typeDocker: 'Среда Docker',
       typeHTTP: 'HTTP-клиент',
-      typeLLM: 'Подключение LLM',
+      typeLLM: 'Модель ИИ',
       docker: {
         image: 'Образ Docker',
         imagePlaceholder: 'например, python:3.12-slim',
@@ -996,7 +996,7 @@ export default {
         key: 'Ключ',
         value: 'Значение',
         healthCheck: 'Проверка состояния',
-        endpoint: 'Конечная точка',
+        endpoint: 'Путь проверки',
         endpointPlaceholder: 'например, /health',
         intervalSecs: 'Интервал (с)',
         timeoutSecs: 'Тайм-аут (с)',
@@ -1013,10 +1013,10 @@ export default {
         timeoutPlaceholder: 'например, 30',
       },
       llm: {
-        connection: 'Подключение LLM',
-        selectConnection: 'Выберите подключение…',
+        connection: 'Модель ИИ',
+        selectConnection: 'Выберите модель…',
         noConnections:
-          'Нет доступных подключений LLM. Сначала настройте подключение в разделе «Подключения ИИ».',
+          'Нет доступных моделей. Сначала подключите модель в разделе «Модели ИИ».',
       },
     },
 

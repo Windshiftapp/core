@@ -183,7 +183,7 @@ export default {
     usernameAndPassword: 'Имя пользователя и пароль',
     oauth: 'OAuth',
     microsoftOrGoogle: 'Microsoft 365 или Google',
-    provider: 'Поставщик',
+    provider: 'Почтовый сервис',
     microsoft365: 'Microsoft 365',
     google: 'Google',
     clientId: 'ID клиента',
