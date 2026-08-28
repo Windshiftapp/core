@@ -32,6 +32,7 @@ const guardedFiles = [
   'src/lib/settings/RunnerPoolManager.svelte',
   'src/lib/workspaces/WorkspaceConfigurationAssigner.svelte',
   'src/lib/workspaces/WorkspaceConfigurationPreview.svelte',
+  'src/lib/workspaces/WorkspaceNavigation.svelte',
   'src/lib/workspaces/Workspaces.svelte',
 ];
 

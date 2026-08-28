@@ -29,9 +29,9 @@ import {
 /**
  * @typedef {Object} WorkspaceView
  * @property {string} id
- * @property {string} label
+ * @property {string} labelKey
  * @property {any}    icon
- * @property {string} [tooltip]
+ * @property {string} [tooltipKey]
  * @property {string} [testId]
  * @property {string[]} [activeViews]  Route view names that highlight this item.
  */
@@ -41,22 +41,20 @@ import {
  * @type {WorkspaceView[]}
  */
 export const workspaceViewItems = [
-  { id: 'backlog', label: 'Backlog', icon: Rows_3, tooltip: 'Backlog view for unfinished items' },
+  { id: 'backlog', labelKey: 'workspaceSettings.views.backlog', icon: Rows_3 },
   {
     id: 'board',
-    label: 'Board',
+    labelKey: 'workspaceSettings.views.board',
     icon: SquareKanban,
-    tooltip: 'Kanban board view with columns',
     testId: 'workspace-nav-board',
   },
-  { id: 'list', label: 'List', icon: List, tooltip: 'Detailed list view with all fields' },
-  { id: 'tree', label: 'Tree', icon: ListTree, tooltip: 'Hierarchical tree view for nested items' },
-  { id: 'map', label: 'Map', icon: MapPin, tooltip: 'Visual map view for spatial organization' },
+  { id: 'list', labelKey: 'workspaceSettings.views.list', icon: List },
+  { id: 'tree', labelKey: 'workspaceSettings.views.tree', icon: ListTree },
+  { id: 'map', labelKey: 'workspaceSettings.views.map', icon: MapPin },
   {
     id: 'roadmap',
-    label: 'Roadmap',
+    labelKey: 'collections.roadmap',
     icon: GanttChart,
-    tooltip: 'Timeline view with date ranges and dependencies',
   },
 ];
 
@@ -67,36 +65,35 @@ export const workspaceViewItems = [
 export const workspaceOnlyViews = [
   {
     id: 'agents',
-    label: 'Agents',
+    labelKey: 'users.agents.title',
+    tooltipKey: 'users.agents.description',
     icon: AgentIcon,
-    tooltip: 'Meet and work with workspace agents',
     testId: 'workspace-nav-agents',
     activeViews: ['workspace-agents', 'workspace-agent-profile', 'workspace-agent-create'],
   },
   {
     id: 'iterations',
-    label: 'Iterations',
+    labelKey: 'commandPalette.commands.iterations.label',
+    tooltipKey: 'commandPalette.commands.iterations.description',
     icon: Calendar,
-    tooltip: 'Manage sprints, PIs, and other iteration cycles',
   },
   {
     id: 'milestones',
-    label: 'Milestones',
+    labelKey: 'commandPalette.commands.milestones.label',
+    tooltipKey: 'commandPalette.commands.milestones.description',
     icon: Milestone,
-    tooltip: 'Manage workspace milestones and releases',
   },
   {
     id: 'analytics',
-    label: 'Analytics',
+    labelKey: 'commandPalette.commands.analytics.label',
+    tooltipKey: 'commandPalette.commands.analytics.description',
     icon: TrendingUp,
-    tooltip: 'Velocity, cycle time, and forecasting',
   },
-  { id: 'actions', label: 'Actions', icon: Zap, tooltip: 'Automate workflows and triggers' },
+  { id: 'actions', labelKey: 'actions.title', icon: Zap },
   {
     id: 'pages',
-    label: 'Pages',
+    labelKey: 'pages.treeHeading',
     icon: Book,
-    tooltip: 'Workspace knowledge pages (wiki)',
     activeViews: ['workspace-pages'],
   },
 ];
@@ -109,37 +106,37 @@ export const workspaceOnlyViews = [
 export const testNavigationItems = [
   {
     id: 'test-cases',
-    label: 'Test Cases',
+    labelKey: 'commandPalette.commands.testCases.label',
+    tooltipKey: 'commandPalette.commands.testCases.description',
     icon: FileCheck,
-    tooltip: 'Manage test cases and steps',
     activeViews: ['test-cases', 'test-case-detail', 'test-steps'],
   },
   {
     id: 'test-sets',
-    label: 'Test Plans',
+    labelKey: 'commandPalette.commands.testPlans.label',
+    tooltipKey: 'commandPalette.commands.testPlans.description',
     icon: Package,
-    tooltip: 'Organize plans and suites',
     activeViews: ['test-sets', 'test-set-detail'],
   },
   {
     id: 'test-templates',
-    label: 'Templates',
+    labelKey: 'commandPalette.commands.testTemplates.label',
+    tooltipKey: 'commandPalette.commands.testTemplates.description',
     icon: FileStack,
-    tooltip: 'Template runs and shared steps',
     activeViews: ['test-templates', 'test-template-detail'],
   },
   {
     id: 'test-runs',
-    label: 'Test Runs',
+    labelKey: 'commandPalette.commands.testRuns.label',
+    tooltipKey: 'commandPalette.commands.testRuns.description',
     icon: Play,
-    tooltip: 'Schedule and execute runs',
     activeViews: ['test-runs', 'test-run-detail', 'test-execution'],
   },
   {
     id: 'test-reports',
-    label: 'Reports',
+    labelKey: 'commandPalette.commands.testReports.label',
+    tooltipKey: 'commandPalette.commands.testReports.description',
     icon: BarChart3,
-    tooltip: 'Review execution results',
     activeViews: ['test-reports'],
   },
 ];
