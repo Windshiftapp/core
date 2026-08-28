@@ -994,7 +994,7 @@
   }
 
   /* Preserve blank lines from remarkPreserveEmptyLinePlugin */
-  :global(.milkdown-editor .ProseMirror br) {
+  :global(.milkdown-editor .ProseMirror br:not(.ProseMirror-trailingBreak)) {
     display: block;
     content: "";
     margin-top: 0.5rem;
