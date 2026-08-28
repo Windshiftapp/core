@@ -961,77 +961,88 @@ func derefTimePtr(p *time.Time) any {
 }
 
 func (as *ActionService) currentItemFieldValue(ctx *models.ExecutionContext, fieldName string) any {
-	return currentItemFieldValue(as.itemRepo, ctx, fieldName)
+	value, _ := currentItemFieldValueResolved(as.itemRepo, ctx, fieldName)
+	return value
 }
 
 func currentItemFieldValue(itemRepo *repository.ItemRepository, ctx *models.ExecutionContext, fieldName string) any {
+	value, _ := currentItemFieldValueResolved(itemRepo, ctx, fieldName)
+	return value
+}
+
+func currentItemFieldValueResolved(itemRepo *repository.ItemRepository, ctx *models.ExecutionContext, fieldName string) (any, bool) {
 	if ctx == nil {
-		return nil
+		return nil, false
 	}
 	itemID := currentActionItemID(ctx)
 	if ctx.Item != nil {
 		switch fieldName {
 		case "id", "item_id":
-			return ctx.Item.ID
+			return ctx.Item.ID, true
 		case "workspace_id":
-			return ctx.Item.WorkspaceID
+			return ctx.Item.WorkspaceID, true
 		}
 		if strings.HasPrefix(fieldName, "custom_field_") {
 			customFieldID, err := strconv.Atoi(strings.TrimPrefix(fieldName, "custom_field_"))
-			if err == nil && customFieldID > 0 {
+			if itemRepo != nil && err == nil && customFieldID > 0 {
 				if val, readErr := itemRepo.GetItemCustomFieldValue(itemID, customFieldID); readErr == nil {
-					return val
+					return val, true
 				}
 			}
 			if ctx.Item.CustomFieldValues != nil {
-				return ctx.Item.CustomFieldValues[strings.TrimPrefix(fieldName, "custom_field_")]
+				val, ok := ctx.Item.CustomFieldValues[strings.TrimPrefix(fieldName, "custom_field_")]
+				return val, ok
 			}
 		}
 	}
-	if itemID != 0 && repository.IsAllowedItemColumn(fieldName) {
+	if itemRepo != nil && itemID != 0 && repository.IsAllowedItemColumn(fieldName) {
 		if val, err := itemRepo.GetAllowedColumnValue(itemID, fieldName); err == nil {
-			return val
+			return val, true
 		}
 	}
 	if ctx.Item != nil {
 		switch fieldName {
 		case "title":
-			return ctx.Item.Title
+			return ctx.Item.Title, true
 		case "description":
-			return ctx.Item.Description
+			return ctx.Item.Description, true
+		case "status":
+			return ctx.Item.StatusName, true
+		case "priority":
+			return ctx.Item.PriorityName, true
 		case "status_id":
-			return derefIntPtr(ctx.Item.StatusID)
+			return derefIntPtr(ctx.Item.StatusID), true
 		case "priority_id":
-			return derefIntPtr(ctx.Item.PriorityID)
+			return derefIntPtr(ctx.Item.PriorityID), true
 		case "assignee_id":
-			return derefIntPtr(ctx.Item.AssigneeID)
+			return derefIntPtr(ctx.Item.AssigneeID), true
 		case "creator_id":
-			return derefIntPtr(ctx.Item.CreatorID)
+			return derefIntPtr(ctx.Item.CreatorID), true
 		case "item_type_id":
-			return derefIntPtr(ctx.Item.ItemTypeID)
+			return derefIntPtr(ctx.Item.ItemTypeID), true
 		case "iteration_id":
-			return derefIntPtr(ctx.Item.IterationID)
+			return derefIntPtr(ctx.Item.IterationID), true
 		case "project_id":
-			return derefIntPtr(ctx.Item.ProjectID)
+			return derefIntPtr(ctx.Item.ProjectID), true
 		case "parent_id":
-			return derefIntPtr(ctx.Item.ParentID)
+			return derefIntPtr(ctx.Item.ParentID), true
 		case "story_points":
-			return derefFloatPtr(ctx.Item.StoryPoints)
+			return derefFloatPtr(ctx.Item.StoryPoints), true
 		case "due_date":
-			return derefTimePtr(ctx.Item.DueDate)
+			return derefTimePtr(ctx.Item.DueDate), true
 		case "start_date":
-			return derefTimePtr(ctx.Item.StartDate)
+			return derefTimePtr(ctx.Item.StartDate), true
 		case "end_date":
-			return derefTimePtr(ctx.Item.EndDate)
+			return derefTimePtr(ctx.Item.EndDate), true
 		}
 	}
 	if val, ok := ctx.Variables[fieldName]; ok {
-		return val
+		return val, true
 	}
 	if val, ok := ctx.Variables["new_"+fieldName]; ok {
-		return val
+		return val, true
 	}
-	return nil
+	return nil, false
 }
 
 // executeSetField executes a set_field node. It dispatches to either the
@@ -1908,60 +1919,139 @@ func compareNumericOrString(a, b string, numCmp func(float64, float64) bool, str
 	return false
 }
 
-// substituteVariables replaces {{variable}} placeholders with actual values
+// nestedExecutionValue walks JSON-like maps and slices using dotted path
+// segments. The boolean distinguishes a present null value from a missing path.
+func nestedExecutionValue(value any, path []string) (any, bool) {
+	for _, segment := range path {
+		switch current := value.(type) {
+		case map[string]any:
+			var ok bool
+			value, ok = current[segment]
+			if !ok {
+				return nil, false
+			}
+		case map[string]string:
+			var ok bool
+			value, ok = current[segment]
+			if !ok {
+				return nil, false
+			}
+		case []any:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(current) {
+				return nil, false
+			}
+			value = current[index]
+		case []string:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(current) {
+				return nil, false
+			}
+			value = current[index]
+		default:
+			return nil, false
+		}
+	}
+	return value, true
+}
+
+func stringifyExecutionValue(value any, nilValue string) (string, error) {
+	if value == nil {
+		return nilValue, nil
+	}
+	switch value.(type) {
+	case map[string]any, map[string]string, []any, []string:
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	case string:
+		return value.(string), nil
+	default:
+		return fmt.Sprintf("%v", value), nil
+	}
+}
+
+// resolveExecutionValue resolves all action context paths from one place.
+// Exact variable names take precedence over dotted traversal so existing output
+// fields remain backward compatible.
+func (as *ActionService) resolveExecutionValue(ctx *models.ExecutionContext, path string) (any, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, false
+	}
+	if value, ok := ctx.Variables[path]; ok {
+		return value, true
+	}
+
+	parts := strings.Split(path, ".")
+	if len(parts) < 2 {
+		return nil, false
+	}
+
+	switch parts[0] {
+	case "item":
+		value, ok := currentItemFieldValueResolved(as.itemRepo, ctx, parts[1])
+		if !ok {
+			return nil, false
+		}
+		return nestedExecutionValue(value, parts[2:])
+	case "trigger":
+		if value, ok := ctx.Variables[parts[1]]; ok {
+			return nestedExecutionValue(value, parts[2:])
+		}
+		return nil, false
+	case "old":
+		if value, ok := ctx.Variables["old_"+parts[1]]; ok {
+			return nestedExecutionValue(value, parts[2:])
+		}
+		return nil, false
+	case "user":
+		if ctx.Actor != nil && len(parts) == 2 {
+			switch parts[1] {
+			case "name":
+				return ctx.Actor.FirstName + " " + ctx.Actor.LastName, true
+			case "email":
+				return ctx.Actor.Email, true
+			case "id":
+				return ctx.Actor.ID, true
+			}
+		}
+		return nil, false
+	case "ref", "repo", "commits":
+		// SCM trigger payloads are stored with their dotted keys intact.
+		if value, ok := ctx.Variables["new_"+path]; ok {
+			return value, true
+		}
+		if value, ok := ctx.Variables["new_"+parts[0]]; ok {
+			return nestedExecutionValue(value, parts[1:])
+		}
+		return nil, false
+	}
+
+	if value, ok := ctx.Variables[parts[0]]; ok {
+		return nestedExecutionValue(value, parts[1:])
+	}
+	return nil, false
+}
+
+// substituteVariables replaces {{variable}} placeholders with actual values.
+// Missing values intentionally remain unchanged so templates stay tolerant.
 func (as *ActionService) substituteVariables(template string, ctx *models.ExecutionContext) string {
-	// Matches double-brace variable placeholders like {{variable_name}}
 	re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 	return re.ReplaceAllStringFunc(template, func(match string) string {
-		// Extract variable name (remove {{ and }})
-		varName := strings.TrimPrefix(strings.TrimSuffix(match, "}}"), "{{")
-		varName = strings.TrimSpace(varName)
-
-		// Check different variable sources
-		parts := strings.Split(varName, ".")
-		if len(parts) == 2 {
-			switch parts[0] {
-			case "item":
-				if val := as.currentItemFieldValue(ctx, parts[1]); val != nil {
-					return fmt.Sprintf("%v", val)
-				}
-			case "trigger":
-				if val, ok := ctx.Variables[parts[1]]; ok {
-					return fmt.Sprintf("%v", val)
-				}
-			case "old":
-				if val, ok := ctx.Variables["old_"+parts[1]]; ok {
-					return fmt.Sprintf("%v", val)
-				}
-			case "user":
-				if ctx.Actor != nil {
-					switch parts[1] {
-					case "name":
-						return ctx.Actor.FirstName + " " + ctx.Actor.LastName
-					case "email":
-						return ctx.Actor.Email
-					case "id":
-						return strconv.Itoa(ctx.Actor.ID)
-					}
-				}
-			case "ref", "repo", "commits":
-				// SCM trigger payload — emitted by SyncService into
-				// ActionEvent.NewValues with dotted keys like "ref.short".
-				// The event init code prefixes NewValues keys with "new_"
-				// when populating ctx.Variables, so look up there.
-				if val, ok := ctx.Variables["new_"+varName]; ok {
-					return fmt.Sprintf("%v", val)
-				}
+		varName := strings.TrimSpace(strings.TrimPrefix(strings.TrimSuffix(match, "}}"), "{{"))
+		if value, ok := as.resolveExecutionValue(ctx, varName); ok {
+			formatted, err := stringifyExecutionValue(value, "")
+			if err == nil {
+				return formatted
 			}
 		}
-
-		// Direct variable lookup
-		if val, ok := ctx.Variables[varName]; ok {
-			return fmt.Sprintf("%v", val)
-		}
-
-		// Return original if not found
 		return match
 	})
 }
@@ -2194,12 +2284,15 @@ func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.E
 		return fmt.Errorf("failed to parse ai_extract config: %w", err)
 	}
 
-	// Get the untrusted input from execution context
-	inputRaw, ok := ctx.Variables[config.InputField]
+	// Get the untrusted input from execution context.
+	inputRaw, ok := as.resolveExecutionValue(ctx, config.InputField)
 	if !ok {
 		return fmt.Errorf("input field %q not found in execution context", config.InputField)
 	}
-	input := fmt.Sprintf("%v", inputRaw)
+	input, err := stringifyExecutionValue(inputRaw, "null")
+	if err != nil {
+		return fmt.Errorf("failed to encode input field %q: %w", config.InputField, err)
+	}
 
 	// Resolve LLM client (gated by the action's workspace scope)
 	client, err := as.resolveLLMClient(ctx.Event.WorkspaceID, config.CapabilityID)
@@ -2254,6 +2347,22 @@ func wrapUntrustedAgentInput(field, payload string) string {
 	return fmt.Sprintf(`<input field=%q trust="untrusted">%s</input>`, field, payload)
 }
 
+func (as *ActionService) buildAIAgentUserMessage(ctx *models.ExecutionContext, fields []string) (string, error) {
+	inputParts := make([]string, 0, len(fields))
+	for _, field := range fields {
+		value, ok := as.resolveExecutionValue(ctx, field)
+		if !ok {
+			return "", fmt.Errorf("input field %q not found in execution context", field)
+		}
+		valueJSON, err := json.Marshal(value)
+		if err != nil {
+			return "", fmt.Errorf("failed to encode input field %q: %w", field, err)
+		}
+		inputParts = append(inputParts, wrapUntrustedAgentInput(field, string(valueJSON)))
+	}
+	return strings.Join(inputParts, "\n\n"), nil
+}
+
 // executeAIAgent executes an ai_agent node — agentic LLM loop with scoped tools.
 func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.AIAgentNodeConfig
@@ -2261,24 +2370,18 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 		return fmt.Errorf("failed to parse ai_agent config: %w", err)
 	}
 
+	// Build user message before resolving the client so invalid action input
+	// configuration fails clearly and does not start an empty agent run.
+	userMessage, err := as.buildAIAgentUserMessage(ctx, config.InputFields)
+	if err != nil {
+		return err
+	}
+
 	// Resolve LLM client (gated by the action's workspace scope)
 	client, err := as.resolveLLMClient(ctx.Event.WorkspaceID, config.CapabilityID)
 	if err != nil {
 		return err
 	}
-
-	// Build user message from input fields. Each value is wrapped in a
-	// trust-marked envelope so the agent can recognize it as untrusted data
-	// rather than instructions — item titles, comments, and HTTP responses
-	// have been a vector for indirect prompt injection.
-	var inputParts []string
-	for _, field := range config.InputFields {
-		if val, ok := ctx.Variables[field]; ok {
-			valJSON, _ := json.Marshal(val)
-			inputParts = append(inputParts, wrapUntrustedAgentInput(field, string(valJSON)))
-		}
-	}
-	userMessage := strings.Join(inputParts, "\n\n")
 
 	// Keep untrusted execution values in wrapped user input, never system prompts.
 	systemPrompt := aiAgentUntrustedInputGuardrail + "\n\n" + config.Prompt
