@@ -56,7 +56,7 @@ export default {
 
     statusSaving: 'Сохранение…',
     statusSaved: 'Сохранено',
-    statusUnsaved: 'Не сохранено',
+    statusUnsaved: 'Есть несохранённые изменения',
     statusError: 'Не удалось сохранить',
 
     modeEdit: 'Редактирование',
@@ -71,19 +71,19 @@ export default {
     errorCreate: 'Не удалось создать страницу',
     errorArchive: 'Не удалось переместить в архив',
 
-    discardTitle: 'Отменить несохранённые изменения?',
+    discardTitle: 'Перейти без сохранения?',
     discardMessage:
       'На текущей странице есть несохранённые изменения. При переходе они будут потеряны.',
-    discardConfirm: 'Отменить изменения',
+    discardConfirm: 'Не сохранять',
     discardCancel: 'Продолжить редактирование',
     archiveTitle: 'Переместить «{title}» в архив?',
     archiveMessage:
-      'Страница и все её дочерние страницы будут перемещены в архив. Это действие нельзя отменить.',
+      'Страница и все её дочерние страницы будут перемещены в архив. Позже их можно будет восстановить.',
     archiveConfirm: 'В архив',
 
     archivedOpenAria: 'Показать архивные страницы',
     archivedHeading: 'Архивные страницы',
-    archivedSubtitle: 'Просмотр и восстановление страниц, ранее перемещённых в архив.',
+    archivedSubtitle: 'Здесь можно просмотреть и восстановить страницы из архива',
     archivedBack: 'Вернуться к страницам',
     archivedEmpty: 'Архивных страниц нет',
     archivedColTitle: 'Название',
@@ -100,13 +100,13 @@ export default {
 
     moveTitle: 'Переместить «{title}»',
     moveSubtitle:
-      'Выберите нового родителя. Дочерние страницы текущей страницы скрыты, поскольку их выбор создал бы цикл.',
+      'Выберите раздел, в который нужно переместить страницу. Её дочерние страницы скрыты, чтобы избежать зацикливания.',
     moveWorkspaceLabel: 'Целевое рабочее пространство',
     moveWorkspacePlaceholder: 'Выберите рабочее пространство…',
-    moveParentLabel: 'Родительская страница',
+    moveParentLabel: 'Разместить внутри',
     moveSearchPlaceholder: 'Поиск страниц…',
-    moveRoot: 'Корень рабочего пространства',
-    moveCrossWorkspaceSummary: 'Страниц в этой ветви: {count}.',
+    moveRoot: 'В корне рабочего пространства',
+    moveCrossWorkspaceSummary: 'Будет перемещено страниц: {count}.',
     moveCrossWorkspacePolicy:
       'Совпадающие метки сохранятся. Явные разрешения, ссылки на рабочие элементы и ссылки на навыки агентов будут удалены.',
     moveButton: 'Переместить',
@@ -115,16 +115,16 @@ export default {
     errorMove: 'Не удалось переместить',
 
     permsTitle: 'Разрешения страницы',
-    permsEffectiveAccess: 'Ваш фактический уровень доступа: {level}',
+    permsEffectiveAccess: 'Ваш уровень доступа: {level}',
     permsEffectiveAccessNone: 'нет',
     permsLoading: 'Загрузка…',
     permsInheritLabel: 'Наследовать разрешения от родительских страниц',
     permsInheritHint:
       'Если наследование включено и явных разрешений нет, доступ определяется ролью в рабочем пространстве. Если отключить наследование и не выдать разрешения, страница будет доступна только администраторам.',
-    permsExplicitGrants: 'Явные разрешения',
-    permsEmptyGrantsTitle: 'На этой странице нет явных разрешений.',
-    permsEmptyGrantsDescription: 'По-прежнему действуют наследование и роли рабочего пространства.',
-    permsColumnPrincipal: 'Получатель',
+    permsExplicitGrants: 'Отдельные разрешения',
+    permsEmptyGrantsTitle: 'Для этой страницы не заданы отдельные разрешения.',
+    permsEmptyGrantsDescription: 'Доступ по-прежнему определяется наследованием и ролями рабочего пространства.',
+    permsColumnPrincipal: 'Пользователь, группа или роль',
     permsColumnLevel: 'Уровень',
     permsRemove: 'Удалить',
     permsRemoveTitle: 'Удалить разрешение?',
@@ -142,7 +142,7 @@ export default {
     permsPickUser: 'Выберите пользователя',
     permsPickGroup: 'Выберите группу',
     permsPickRole: 'Выберите роль',
-    permsErrorNoPrincipal: 'Перед добавлением разрешения выберите получателя',
+    permsErrorNoPrincipal: 'Выберите пользователя, группу или роль',
     permsErrorLoad: 'Не удалось загрузить разрешения',
     permsErrorInherit: 'Не удалось обновить наследование',
     permsErrorGrant: 'Не удалось добавить разрешение',

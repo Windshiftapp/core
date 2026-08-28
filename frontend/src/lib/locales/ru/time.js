@@ -5,7 +5,7 @@
 export default {
   time: {
     title: 'Учёт времени',
-    subtitle: 'Учёт времени, затраченного на рабочие элементы',
+    subtitle: 'Время, затраченное на рабочие элементы',
     logTime: 'Записать время',
     editTimeEntry: 'Изменить запись времени',
     updateEntry: 'Обновить запись',
@@ -49,7 +49,7 @@ export default {
       stepOf: 'Шаг {current} из {total}',
       createCustomerTitle: 'Создайте первую организацию заказчика',
       createCustomerDescription:
-        'Организация заказчика — компания или другое лицо, для которого вы выполняете работу. Это может быть клиент, работодатель или ваша собственная компания.',
+        'Организация заказчика — компания или подразделение, для которого вы выполняете работу. Это может быть клиент, работодатель или ваша собственная компания.',
       createProjectTitle: 'Создайте первый проект',
       createProjectDescription:
         'Проекты помогают упорядочивать работу для заказчика и учитывать затраченное на неё время.',
@@ -57,7 +57,7 @@ export default {
       projectNameRequired: 'Укажите название проекта',
       failedToCreateCustomer: 'Не удалось создать организацию заказчика. Повторите попытку.',
       failedToCreateProject: 'Не удалось создать проект. Повторите попытку.',
-      customerCreatedSuccess: 'Организация заказчика «{name}» создана!',
+      customerCreatedSuccess: 'Организация заказчика «{name}» создана',
       organizationNamePlaceholder: 'Например, Acme Corporation или внутренняя работа',
       emailPlaceholder: 'billing@customer.com',
       contactPersonPlaceholder: 'Иван Петров',
@@ -96,7 +96,7 @@ export default {
       totalHours: 'Всего часов',
       totalEntries: 'Всего записей',
       averagePerDay: 'В среднем за день',
-      topProject: 'Ведущий проект',
+      topProject: 'Проект с наибольшим временем',
       loadingReports: 'Загрузка отчётов…',
       noEntriesFound: 'По выбранным фильтрам записи времени не найдены.',
       totalTime: 'Общее время',
@@ -163,7 +163,7 @@ export default {
       workItemsWillAppear: 'Назначенные вам рабочие элементы появятся здесь',
       itemsCompleted: 'Завершено элементов: {completed} из {total}',
       previousWeek: 'Предыдущая неделя',
-      thisWeek: 'эта неделя',
+      thisWeek: 'Эта неделя',
       nextWeek: 'Следующая неделя',
       newTaskPlaceholder: 'Название новой задачи…',
       failedToCreateTask: 'Не удалось создать задачу',
@@ -235,7 +235,7 @@ export default {
     hourlyRate: 'Почасовая ставка ($)',
     maxHours: 'Максимум часов',
     maxHoursPlaceholder: 'Без ограничения',
-    maxHoursHint: 'Необязательный бюджет для отчётности',
+    maxHoursHint: 'Необязательный лимит времени для отчётов',
     projectColor: 'Цвет проекта',
     updateProject: 'Обновить проект',
     createProject: 'Создать проект',

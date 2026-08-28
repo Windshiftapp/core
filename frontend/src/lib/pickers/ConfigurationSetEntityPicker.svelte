@@ -37,10 +37,9 @@
   async function addEntity(entityId) {
     // Check for conflicts (workspaces assigned elsewhere)
     if (entityAssignments[entityId]) {
-      const assignment = entityAssignments[entityId];
       const confirmed = await confirm({
         title: t('common.confirm'),
-        message: t('pickers.entityAlreadyAssigned', { entity: getEntityLabel(), configSetName: assignment.configSetName }),
+        message: t('pickers.entityAlreadyAssigned', { label: getEntityLabel() }),
         confirmText: t('common.confirm'),
         cancelText: t('common.cancel'),
         variant: 'warning'
