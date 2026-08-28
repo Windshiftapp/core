@@ -28,6 +28,21 @@ export default withEnglishAdminOperations({
       installHelp: 'Ejecuta esto en el host. Instala e inicia el contenedor con la URL del servidor, la etiqueta de imagen adecuada y el token nuevo.', manualPrefix: '¿Configuración manual? Define el token como', setTokenPrefix: 'Define el token como', tokenOnce: 'en el host ejecutor. Solo se muestra una vez y no se puede recuperar.', loadFailed: 'No se pudieron cargar los grupos de ejecutores', tokensLoadFailed: 'No se pudieron cargar los tokens', runnersLoadFailed: 'No se pudieron cargar los ejecutores', created: 'Grupo de ejecutores creado', createFailed: 'No se pudo crear el grupo', mintFailed: 'No se pudo crear el token', revokeTokenTitle: 'Revocar token de registro', revokeTokenMessage: '¿Revocar el token {prefix}…? Los ejecutores ya no podrán registrarse con él.', revokeTokenFailed: 'No se pudo revocar el token', revokeRunnerMessage: '¿Expulsar al ejecutor {name}? Tendrá que registrarse de nuevo.', revokeRunnerFailed: 'No se pudo expulsar al ejecutor', copied: 'Copiado al portapapeles', copyFailed: 'No se pudo copiar; selecciona y copia manualmente',
     },
   } },
+  workspaceMembers: {
+    invalidWorkspace: 'Espacio de trabajo no válido.', loadFailed: 'No se pudieron cargar los miembros del espacio de trabajo.', addMemberFailed: 'No se pudo añadir el miembro: {error}', addGroupFailed: 'No se pudo añadir el grupo: {error}',
+    removeRoleTitle: '¿Quitar el rol {role} a {name}?', removeRoleMessage: 'Se eliminarán la asignación del rol y sus permisos.', removeRoleFailed: 'No se pudo quitar el rol: {error}',
+    summaryTitle: 'Resumen de acceso', summaryDescription: 'Muestra cómo se asignan los roles en este espacio. Un rol sin miembros ni grupos asignados está disponible para todos. Jerarquía de permisos: {viewer} → {editor} → {tester}.',
+    role: 'Rol', effectiveAccess: 'Acceso', assignments: 'Asignaciones', memberOrGroup: 'Miembro o grupo', rolesLabel: 'Roles', actions: 'Acciones',
+    roles: {
+      viewer: { name: 'Lector', description: 'Ver el contenido del espacio y participar en conversaciones' },
+      editor: { name: 'Editor', description: 'Crear y editar elementos de trabajo en este espacio' },
+      tester: { name: 'Tester', description: 'Ver elementos, ejecutar pruebas, gestionar casos de prueba y crear defectos' },
+      administrator: { name: 'Administrador', description: 'Gestionar todo el espacio, incluidos los permisos de acceso' },
+    },
+    memberCount: '{count} miembros', memberCount_one: '{count} miembro', memberCount_other: '{count} miembros', everyone: 'Todos', noDirectAssignments: 'Sin asignaciones directas',
+    addMember: 'Añadir miembro', addGroup: 'Añadir grupo', searchPlaceholder: 'Buscar miembros o grupos por nombre o correo…', loading: 'Cargando miembros…', empty: 'Aún no hay miembros ni grupos. Añádelos para configurar el acceso a este espacio.', noSearchResults: 'No se encontraron miembros ni grupos para «{query}».',
+    unknownUser: 'Usuario desconocido', group: 'Grupo', removeRoleAction: 'Quitar rol: {role}', addMemberTitle: 'Añadir miembro al espacio', user: 'Usuario', selectUser: 'Selecciona un usuario…', selectRole: 'Selecciona un rol…', addingMember: 'Añadiendo miembro…', cancel: 'Cancelar', addGroupTitle: 'Añadir grupo al espacio', selectGroup: 'Selecciona un grupo…', addingGroup: 'Añadiendo grupo…',
+  },
   integrations: {
     directions: { outbound: 'Salientes', inbound: 'Entrantes', outboundDescription: 'Aplicaciones a las que se conecta Windshift. Añade credenciales OAuth para leer datos de servicios externos como Notion o Confluence.', inboundDescription: 'Aplicaciones que se conectan a Windshift en nombre del usuario. Registra una aplicación una vez y los usuarios la autorizan con OAuth 2.0 y PKCE.' },
     providers: { loadFailed: 'No se pudieron cargar los proveedores de integraciones', saveFailed: 'No se pudo guardar el proveedor', deleteMessage: 'Se eliminará el proveedor de integración y se desconectará a todos los usuarios.', deleteFailed: 'No se pudo eliminar el proveedor', namePlaceholder: 'Mi integración con Notion' },

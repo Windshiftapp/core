@@ -50,6 +50,21 @@ export default withEnglishAdminOperations({
       revokeTokenTitle: 'Registrierungstoken widerrufen', revokeTokenMessage: 'Token {prefix}… widerrufen? Runner können sich damit nicht mehr registrieren.', revokeTokenFailed: 'Token konnte nicht widerrufen werden', revokeRunnerMessage: 'Runner {name} entfernen? Für einen erneuten Beitritt muss er neu registriert werden.', revokeRunnerFailed: 'Runner konnte nicht entfernt werden', copied: 'In die Zwischenablage kopiert', copyFailed: 'Kopieren fehlgeschlagen — bitte manuell auswählen und kopieren',
     },
   } },
+  workspaceMembers: {
+    invalidWorkspace: 'Ungültiger Arbeitsbereich.', loadFailed: 'Mitglieder des Arbeitsbereichs konnten nicht geladen werden.', addMemberFailed: 'Mitglied konnte nicht hinzugefügt werden: {error}', addGroupFailed: 'Gruppe konnte nicht hinzugefügt werden: {error}',
+    removeRoleTitle: 'Die Rolle {role} von {name} entfernen?', removeRoleMessage: 'Dadurch werden die Rollenzuweisung und die zugehörigen Berechtigungen entfernt.', removeRoleFailed: 'Rolle konnte nicht entfernt werden: {error}',
+    summaryTitle: 'Zugriffsübersicht', summaryDescription: 'Zeigt die Rollenverteilung in diesem Arbeitsbereich. Eine Rolle ohne zugewiesene Mitglieder oder Gruppen steht allen zur Verfügung. Berechtigungshierarchie: {viewer} → {editor} → {tester}.',
+    role: 'Rolle', effectiveAccess: 'Zugriff', assignments: 'Zuweisungen', memberOrGroup: 'Mitglied oder Gruppe', rolesLabel: 'Rollen', actions: 'Aktionen',
+    roles: {
+      viewer: { name: 'Betrachter', description: 'Inhalte des Arbeitsbereichs ansehen und an Diskussionen teilnehmen' },
+      editor: { name: 'Bearbeiter', description: 'Arbeitselemente in diesem Arbeitsbereich erstellen und bearbeiten' },
+      tester: { name: 'Tester', description: 'Elemente ansehen, Tests ausführen, Testfälle verwalten und Fehler erstellen' },
+      administrator: { name: 'Administrator', description: 'Den gesamten Arbeitsbereich einschließlich der Zugriffsrechte verwalten' },
+    },
+    memberCount: '{count} Mitglieder', memberCount_one: '{count} Mitglied', memberCount_other: '{count} Mitglieder', everyone: 'Alle', noDirectAssignments: 'Keine direkten Zuweisungen',
+    addMember: 'Mitglied hinzufügen', addGroup: 'Gruppe hinzufügen', searchPlaceholder: 'Mitglieder oder Gruppen nach Name oder E-Mail suchen…', loading: 'Mitglieder werden geladen…', empty: 'Noch keine Mitglieder oder Gruppen. Fügen Sie sie hinzu, um den Zugriff auf diesen Arbeitsbereich einzurichten.', noSearchResults: 'Keine Mitglieder oder Gruppen für „{query}“ gefunden.',
+    unknownUser: 'Unbekannter Benutzer', group: 'Gruppe', removeRoleAction: 'Rolle entfernen: {role}', addMemberTitle: 'Mitglied zum Arbeitsbereich hinzufügen', user: 'Benutzer', selectUser: 'Benutzer auswählen…', selectRole: 'Rolle auswählen…', addingMember: 'Mitglied wird hinzugefügt…', cancel: 'Abbrechen', addGroupTitle: 'Gruppe zum Arbeitsbereich hinzufügen', selectGroup: 'Gruppe auswählen…', addingGroup: 'Gruppe wird hinzugefügt…',
+  },
   integrations: {
     directions: { outbound: 'Ausgehend', inbound: 'Eingehend', outboundDescription: 'Apps, mit denen sich Windshift verbindet. Fügen Sie OAuth-Anmeldedaten zum Lesen externer Dienste wie Notion oder Confluence hinzu.', inboundDescription: 'Apps, die sich im Namen eines Benutzers mit Windshift verbinden. Registrieren Sie die App einmal; Benutzer autorisieren sie anschließend mit OAuth 2.0 und PKCE.' },
     providers: { loadFailed: 'Integrationsanbieter konnten nicht geladen werden', saveFailed: 'Anbieter konnte nicht gespeichert werden', deleteMessage: 'Der Integrationsanbieter wird entfernt und alle Benutzer werden getrennt.', deleteFailed: 'Anbieter konnte nicht gelöscht werden', namePlaceholder: 'Meine Notion-Integration' },

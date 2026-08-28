@@ -13,6 +13,21 @@ export default withEnglishAdminOperations({
     actionCredentials: { title: '操作凭据', subtitle: '供 HTTP 功能引用的加密 API 令牌。机密值只能写入，保存后无法读回。', add: '添加凭据', addFirst: '添加第一个凭据', empty: '尚无凭据。', basicAuth: '基本认证（用户名:密码）', customHeader: '自定义请求头值', loadFailed: '无法加载操作凭据', nameSecretRequired: '名称和机密值均为必填项', workspaceRequired: '请至少选择一个工作区，或允许所有工作区使用。', created: '凭据已创建（{prefix}）', createFailed: '无法创建凭据', updateFailed: '无法更新凭据', rotated: '机密值已替换（{prefix}）', rotateFailed: '无法替换机密值', deleteMessage: '删除 {name}？仍引用它的功能将在运行时失败。', deleteFailed: '无法删除凭据', storedSecret: '已存储，绝不会完整显示', availableAll: '所有工作区均可用', availableAllHelp: '任何工作区都可以使用此凭据。', restrict: '限制到指定工作区', restrictHelp: '只有下方选择的工作区可以使用此凭据。', noWorkspaces: '没有可用的工作区。', secretPlaceholder: '输入令牌、API 密钥或用户名:密码', secretHelp: '以加密方式存储，不会再次显示；需要时可替换。', metadata: '元数据（JSON，可选）', metadataHelp: '仅限非机密元数据。token、secret、password 等键会被拒绝。', storedRotate: '已存储（{prefix}）— 使用“替换”设置新值。', rotateTitle: '替换机密值 — {name}', rotateHelp: '输入新的机密值。旧值会立即被替换且无法恢复。' },
     runnerPools: { title: '运行器池', subtitle: '执行编码智能体任务的远程运行器池。创建注册令牌即可添加运行器主机。', empty: '没有运行器池', emptyDescription: '先创建池，再创建注册令牌以连接运行器主机。', registrationTokens: '注册令牌 — {name}', noTokens: '尚无令牌', runnersForPool: '运行器 — {name}', noRunners: '尚未注册运行器', newPoolTitle: '新建运行器池', maxConcurrentRuns: '最大并发运行数', zeroUnlimited: '0 = 无限制', availableAll: '所有工作区均可用', mintTitle: '创建注册令牌', expiresHours: '有效期（小时）', zeroNeverExpires: '0 = 永不过期（撤销后停用）', addHostTitle: '添加运行器主机', installHelp: '在运行器主机上执行此命令。它会使用服务器 URL、匹配的镜像标签和新令牌安装并启动运行器容器。', manualPrefix: '改为手动设置？将令牌设为', setTokenPrefix: '将令牌设为', tokenOnce: '并配置到运行器主机。令牌仅显示一次，之后无法再次获取。', loadFailed: '无法加载运行器池', tokensLoadFailed: '无法加载令牌', runnersLoadFailed: '无法加载运行器实例', created: '运行器池已创建', createFailed: '无法创建运行器池', mintFailed: '无法创建令牌', revokeTokenTitle: '撤销注册令牌', revokeTokenMessage: '撤销令牌 {prefix}…？运行器将无法再用它注册。', revokeTokenFailed: '无法撤销令牌', revokeRunnerMessage: '移除运行器 {name}？它必须重新注册才能再次加入。', revokeRunnerFailed: '无法移除运行器', copied: '已复制到剪贴板', copyFailed: '复制失败，请手动选择并复制' },
   } },
+  workspaceMembers: {
+    invalidWorkspace: '工作区无效。', loadFailed: '无法加载工作区成员。', addMemberFailed: '无法添加成员：{error}', addGroupFailed: '无法添加用户组：{error}',
+    removeRoleTitle: '从 {name} 移除“{role}”角色？', removeRoleMessage: '这将移除角色分配及其权限。', removeRoleFailed: '无法移除角色：{error}',
+    summaryTitle: '访问摘要', summaryDescription: '显示此工作区中的角色分配。没有分配成员或用户组的角色对所有人开放。权限层级：{viewer} → {editor} → {tester}。',
+    role: '角色', effectiveAccess: '访问权限', assignments: '分配对象', memberOrGroup: '成员或用户组', rolesLabel: '角色', actions: '操作',
+    roles: {
+      viewer: { name: '查看者', description: '查看工作区内容并参与讨论' },
+      editor: { name: '编辑者', description: '在此工作区创建和编辑工作项' },
+      tester: { name: '测试者', description: '查看工作项、执行测试、管理测试用例并创建缺陷' },
+      administrator: { name: '管理员', description: '管理整个工作区，包括访问权限' },
+    },
+    memberCount: '{count} 名成员', memberCount_one: '{count} 名成员', memberCount_other: '{count} 名成员', everyone: '所有人', noDirectAssignments: '无直接分配',
+    addMember: '添加成员', addGroup: '添加用户组', searchPlaceholder: '按姓名或邮箱搜索成员或用户组…', loading: '正在加载成员…', empty: '尚无成员或用户组。请添加成员或用户组以配置此工作区的访问权限。', noSearchResults: '未找到与“{query}”匹配的成员或用户组。',
+    unknownUser: '未知用户', group: '用户组', removeRoleAction: '移除角色：{role}', addMemberTitle: '添加工作区成员', user: '用户', selectUser: '选择用户…', selectRole: '选择角色…', addingMember: '正在添加成员…', cancel: '取消', addGroupTitle: '向工作区添加用户组', selectGroup: '选择用户组…', addingGroup: '正在添加用户组…',
+  },
   integrations: {
     directions: { outbound: '出站', inbound: '入站', outboundDescription: 'Windshift 主动连接的应用。添加 OAuth 凭据以读取 Notion 或 Confluence 等外部服务的数据。', inboundDescription: '代表用户连接 Windshift 的应用。只需注册一次第三方应用，用户随后通过 OAuth 2.0 和 PKCE 授权。' },
     providers: { loadFailed: '无法加载集成提供商', saveFailed: '无法保存提供商', deleteMessage: '这会删除集成提供商并断开所有用户的连接。', deleteFailed: '无法删除提供商', namePlaceholder: '我的 Notion 集成' },
