@@ -17,6 +17,7 @@
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import './settings-form.css';
 
   let entries = $state([]);
@@ -35,13 +36,13 @@
     enabled: true,
   });
 
-  const profileTypeOptions = [
-    { value: 'standard', label: 'Standard' },
-    { value: 'coding', label: 'Coding' },
-  ];
+  const profileTypeOptions = $derived([
+    { value: 'standard', label: t('settings.adminOperations.agentTemplates.standard') },
+    { value: 'coding', label: t('settings.adminOperations.agentTemplates.coding') },
+  ]);
 
   const defaultOptions = $derived([
-    { value: '', label: 'Start from… (new custom template)' },
+    { value: '', label: t('settings.adminOperations.agentTemplates.startFromNew') },
     ...defaults.map((d) => ({ value: d.key, label: d.name })),
   ]);
 
@@ -56,7 +57,7 @@
       error = null;
       entries = await api.agentTemplates.getAll();
     } catch (err) {
-      error = 'Failed to load agent templates: ' + err.message;
+      error = t('settings.adminOperations.agentTemplates.loadFailed', { error: err.message });
     } finally {
       isLoading = false;
     }
@@ -128,11 +129,11 @@
   async function saveEntry() {
     try {
       if (!formData.template_key.trim()) {
-        errorToast('Template key is required');
+        errorToast(t('settings.adminOperations.agentTemplates.templateKeyRequired'));
         return;
       }
       if (!formData.name.trim()) {
-        errorToast('Name is required');
+        errorToast(t('settings.adminOperations.agentTemplates.nameRequired'));
         return;
       }
 
@@ -157,16 +158,16 @@
       cancelEdit();
       error = null;
     } catch (err) {
-      errorToast('Failed to save: ' + err.message);
+      errorToast(t('settings.adminOperations.agentTemplates.saveFailed', { error: err.message }));
     }
   }
 
   async function deleteEntry(id, name) {
     const confirmed = await confirm({
-      title: 'Delete',
-      message: `Are you sure you want to delete the override for "${name}"? This restores the default template.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('common.delete'),
+      message: t('settings.adminOperations.agentTemplates.deleteMessage', { name }),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -180,13 +181,13 @@
     }
   }
 
-  const columns = [
-    { key: 'template_key', label: 'Key' },
-    { key: 'name', label: 'Name' },
-    { key: 'default_type', label: 'Profile Type', slot: 'default_type' },
-    { key: 'enabled', label: 'Enabled', slot: 'enabled' },
-    { key: 'actions', label: 'Actions' },
-  ];
+  const columns = $derived([
+    { key: 'template_key', label: t('settings.adminOperations.agentTemplates.key') },
+    { key: 'name', label: t('common.name') },
+    { key: 'default_type', label: t('settings.adminOperations.agentTemplates.profileType'), slot: 'default_type' },
+    { key: 'enabled', label: t('common.enabled'), slot: 'enabled' },
+    { key: 'actions', label: t('common.actions') },
+  ]);
 
   function buildDropdownItems(entry) {
     return [
@@ -194,7 +195,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(entry),
       },
@@ -202,7 +203,7 @@
         id: 'delete',
         type: 'regular',
         icon: Trash2,
-        title: 'Delete',
+        title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
         onClick: () => deleteEntry(entry.id, entry.name),
@@ -213,8 +214,8 @@
 
 <PageHeader
   icon={AgentIcon}
-  title="Agent Templates"
-  subtitle="Override the Agent Studio creation catalog: template names, profile types, and instructions"
+  title={t('settings.adminOperations.agentTemplates.title')}
+  subtitle={t('settings.adminOperations.agentTemplates.subtitle')}
 >
   {#snippet actions()}
     <Button
@@ -226,7 +227,7 @@
       keyboardHint="A"
       hotkeyConfig={{ key: toHotkeyString('agentTemplates', 'add'), guard: () => !showCreateForm }}
     >
-      Add Template
+      {t('settings.adminOperations.agentTemplates.addTemplate')}
     </Button>
   {/snippet}
 </PageHeader>
@@ -242,7 +243,7 @@
   data={entries}
   keyField="id"
   loading={isLoading}
-  emptyMessage="No overrides configured yet. The Agent Studio falls back to the embedded defaults."
+  emptyMessage={t('settings.adminOperations.agentTemplates.empty')}
   emptyIcon={AgentIcon}
   actionItems={buildDropdownItems}
   actionTriggerTestid={(entry) => `agent-template-actions-${entry.id}`}
@@ -253,21 +254,21 @@
   {#snippet default_type(entry)}
     <Lozenge
       color={entry.default_type === 'coding' ? 'purple' : 'blue'}
-      text={entry.default_type === 'coding' ? 'Coding' : 'Standard'}
+      text={entry.default_type === 'coding' ? t('settings.adminOperations.agentTemplates.coding') : t('settings.adminOperations.agentTemplates.standard')}
     />
   {/snippet}
 
   {#snippet enabled(entry)}
     <Lozenge
       color={entry.enabled ? 'green' : 'gray'}
-      text={entry.enabled ? 'Yes' : 'No'}
+      text={entry.enabled ? t('common.yes') : t('common.no')}
     />
   {/snippet}
 </DataTable>
 
 <Modal isOpen={showCreateForm} onclose={cancelEdit} onSubmit={saveEntry} maxWidth="max-w-2xl">
   <ModalHeader
-    title={editingId ? 'Edit Template Override' : 'Add Template Override'}
+    title={editingId ? t('settings.adminOperations.agentTemplates.editOverride') : t('settings.adminOperations.agentTemplates.addOverride')}
     showCloseButton={false}
   />
 
@@ -275,48 +276,48 @@
     <form onsubmit={(e) => { e.preventDefault(); saveEntry(); }}>
       {#if !editingId}
         <div class="form-group">
-          <label for="start_from_default">Start from default</label>
+          <label for="start_from_default">{t('settings.adminOperations.agentTemplates.startFromDefault')}</label>
           <Select
             id="start_from_default"
             bind:value={formData.template_key}
             onchange={onDefaultSelected}
             options={defaultOptions}
-            placeholder="Overwrite a built-in template or create a new one"
+            placeholder={t('settings.adminOperations.agentTemplates.startFromPlaceholder')}
           />
           <span class="text-xs" style="color: var(--ds-text-subtlest);">
-            Picking a default overwrites it with your edits; "Start from…" creates a brand-new template.
+            {t('settings.adminOperations.agentTemplates.startFromHelp')}
           </span>
         </div>
       {/if}
 
       <div class="form-group">
-        <label for="template_key">Template Key</label>
+        <label for="template_key">{t('settings.adminOperations.agentTemplates.templateKey')}</label>
         <Input
           id="template_key"
-          placeholder="e.g. software_engineer"
+          placeholder={t('settings.adminOperations.agentTemplates.templateKeyPlaceholder')}
           bind:value={formData.template_key}
           disabled={!!editingId || keyLocked}
           required
         />
         {#if keyLocked}
           <span class="text-xs" style="color: var(--ds-text-subtlest);">
-            This override replaces the built-in "{formData.name}" template.
+            {t('settings.adminOperations.agentTemplates.builtInOverride', { name: formData.name })}
           </span>
         {/if}
       </div>
 
       <div class="form-group">
-        <label for="name">Name</label>
+        <label for="name">{t('common.name')}</label>
         <Input
           id="name"
-          placeholder="e.g. Software Engineer"
+          placeholder={t('settings.adminOperations.agentTemplates.namePlaceholder')}
           bind:value={formData.name}
           required
         />
       </div>
 
       <div class="form-group">
-        <label for="default_type">Profile Type</label>
+        <label for="default_type">{t('settings.adminOperations.agentTemplates.profileType')}</label>
         <Select
           id="default_type"
           bind:value={formData.default_type}
@@ -326,10 +327,10 @@
       </div>
 
       <div class="form-group">
-        <label for="instructions">Instructions</label>
+        <label for="instructions">{t('settings.adminOperations.agentTemplates.instructions')}</label>
         <Textarea
           id="instructions"
-          placeholder="The system prompt / persona for this template"
+          placeholder={t('settings.adminOperations.agentTemplates.instructionsPlaceholder')}
           bind:value={formData.instructions}
           rows={4}
         />
@@ -338,7 +339,7 @@
       <div class="form-group">
         <Checkbox
           bind:checked={formData.enabled}
-          label="Enabled"
+          label={t('common.enabled')}
         />
       </div>
     </form>
@@ -347,7 +348,7 @@
   <DialogFooter
     onCancel={cancelEdit}
     onConfirm={saveEntry}
-    confirmLabel={editingId ? 'Update' : 'Create'}
+    confirmLabel={editingId ? t('common.update') : t('common.create')}
     showKeyboardHint
   />
 </Modal>

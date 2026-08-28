@@ -19,6 +19,8 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import { confirm } from '../composables/useConfirm.js';
   import { llmConnectionTestErrorMessage } from './llmConnectionErrors.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let connections = $state([]);
   let providers = $state([]);
@@ -108,7 +110,7 @@
     const p = model?.pricing;
     if (!p || (!p.prompt && !p.completion)) return '';
     const perM = (v) => `$${(Number(v) * 1_000_000).toFixed(2)}`;
-    return `${perM(p.prompt)}/${perM(p.completion)} per 1M tok`;
+    return t('settings.adminOperations.llmConnections.rateHint', { prompt: perM(p.prompt), completion: perM(p.completion) });
   }
 
   // connVision resolves a connection's effective vision capability client-side,
@@ -138,17 +140,17 @@
   const lastRefreshError = $derived(selectedProvider?.last_error || '');
 
   function formatLastRefreshed(iso) {
-    if (!iso) return 'Never refreshed';
+    if (!iso) return t('settings.adminOperations.llmConnections.neverRefreshed');
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 'Never refreshed';
+    if (Number.isNaN(d.getTime())) return t('settings.adminOperations.llmConnections.neverRefreshed');
     const diffMs = Date.now() - d.getTime();
     const mins = Math.round(diffMs / 60000);
-    if (mins < 1) return 'Refreshed just now';
-    if (mins < 60) return `Refreshed ${mins} min ago`;
+    if (mins < 1) return t('settings.adminOperations.llmConnections.refreshedNow');
+    if (mins < 60) return t('settings.adminOperations.llmConnections.refreshedMinutes', { count: mins });
     const hours = Math.round(mins / 60);
-    if (hours < 24) return `Refreshed ${hours}h ago`;
+    if (hours < 24) return t('settings.adminOperations.llmConnections.refreshedHours', { count: hours });
     const days = Math.round(hours / 24);
-    return `Refreshed ${days}d ago`;
+    return t('settings.adminOperations.llmConnections.refreshedDays', { count: days });
   }
 
   async function refreshModels() {
@@ -163,10 +165,10 @@
         ...(form.base_url ? { base_url: form.base_url } : {}),
         ...(form.api_key ? { api_key: form.api_key } : {}),
       });
-      successToast(`Fetched ${result.models?.length ?? 0} models from ${selectedProvider.name}`);
+      successToast(t('settings.adminOperations.llmConnections.modelsFetched', { count: result.models?.length ?? 0, provider: selectedProvider.name }));
       await loadProviders();
     } catch (err) {
-      const msg = err?.message || 'Failed to refresh models';
+      const msg = err?.message || t('settings.adminOperations.llmConnections.refreshFailed');
       errorToast(msg);
       // Backend already recorded the failure in the cache; reload so last_error surfaces.
       await loadProviders();
@@ -180,7 +182,7 @@
       connections = await api.llmConnections.getAll();
     } catch (err) {
       console.error('Failed to load connections:', err);
-      errorToast('Failed to load AI connections');
+      errorToast(t('settings.adminOperations.llmConnections.loadFailed'));
     }
   }
 
@@ -233,8 +235,8 @@
   }
 
   function capabilityUsageLabel(caps) {
-    if (caps.length === 1) return `1 enabled action capability: ${caps[0].name}`;
-    return `${caps.length} enabled action capabilities: ${caps.map((cap) => cap.name).join(', ')}`;
+    if (caps.length === 1) return t('settings.adminOperations.llmConnections.oneCapability', { name: caps[0].name });
+    return t('settings.adminOperations.llmConnections.manyCapabilities', { count: caps.length, names: caps.map((cap) => cap.name).join(', ') });
   }
 
   function openEdit(conn) {
@@ -258,18 +260,18 @@
   async function deleteConnection(conn) {
     const impacted = enabledLLMCapabilitiesForConnection(conn.id);
     const ok = await confirm({
-      title: 'Delete AI Connection',
-      message: 'Are you sure you want to delete ' + conn.name + '? This action cannot be undone.' + (impacted.length ? `\n\nThis connection is referenced by ${capabilityUsageLabel(impacted)}. Those capabilities will stop working.` : ''),
-      confirmText: 'Delete',
+      title: t('settings.adminOperations.llmConnections.deleteTitle'),
+      message: t('settings.adminOperations.llmConnections.deleteMessage', { name: conn.name }) + (impacted.length ? `\n\n${t('settings.adminOperations.llmConnections.deleteImpact', { capabilities: capabilityUsageLabel(impacted) })}` : ''),
+      confirmText: t('common.delete'),
       variant: 'danger',
     });
     if (!ok) return;
     try {
       await api.llmConnections.delete(conn.id);
-      successToast('AI connection deleted');
+      successToast(t('settings.adminOperations.llmConnections.deleted'));
       await reloadAfterConnectionChange();
     } catch (err) {
-      errorToast(err.message || 'Failed to delete connection');
+      errorToast(err.message || t('settings.adminOperations.llmConnections.deleteFailed'));
     }
   }
 
@@ -282,13 +284,13 @@
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-        errorToast('Provider config must be a JSON object');
+        errorToast(t('settings.adminOperations.llmConnections.configObject'));
         return false;
       }
       form.provider_config = raw;
       return true;
     } catch {
-      errorToast('Provider config must be valid JSON');
+      errorToast(t('settings.adminOperations.llmConnections.configJson'));
       return false;
     }
   }
@@ -298,11 +300,11 @@
     saving = true;
     try {
       await api.llmConnections.create({ ...form, provider_config: composeProviderConfig() });
-      successToast('AI connection created');
+      successToast(t('settings.adminOperations.llmConnections.created'));
       showCreateModal = false;
       await reloadAfterConnectionChange();
     } catch (err) {
-      errorToast(err.message || 'Failed to create connection');
+      errorToast(err.message || t('settings.adminOperations.llmConnections.createFailed'));
     } finally {
       saving = false;
     }
@@ -314,11 +316,11 @@
     saving = true;
     try {
       await api.llmConnections.update(editingConnection.id, { ...form, provider_config: composeProviderConfig() });
-      successToast('AI connection updated');
+      successToast(t('settings.adminOperations.llmConnections.updated'));
       showEditModal = false;
       await reloadAfterConnectionChange();
     } catch (err) {
-      errorToast(err.message || 'Failed to update connection');
+      errorToast(err.message || t('settings.adminOperations.llmConnections.updateFailed'));
     } finally {
       saving = false;
     }
@@ -330,29 +332,29 @@
     testResult = null;
     try {
       await api.llmConnections.test(id);
-      testResult = { success: true, message: 'Connection successful' };
-      successToast('Connection test passed');
+      testResult = { success: true, message: t('settings.adminOperations.llmConnections.connectionSuccessful') };
+      successToast(t('settings.adminOperations.llmConnections.testPassed'));
     } catch (err) {
-      errorToast(llmConnectionTestErrorMessage(err), 'Connection test failed');
+      errorToast(llmConnectionTestErrorMessage(err), t('settings.adminOperations.llmConnections.testFailed'));
     } finally {
       testingConnectionId = null;
     }
   }
 
-  const columns = [
-    { key: 'name', label: 'Name', slot: 'name' },
-    { key: 'provider_type', label: 'Provider', textColor: 'var(--ds-text-subtle)' },
-    { key: 'model', label: 'Model', slot: 'model' },
-    { key: 'is_enabled', label: 'Status', slot: 'status' },
-    { key: 'actions', label: 'Actions', slot: 'actions', align: 'text-right', width: 'w-32' },
-  ];
+  const columns = $derived([
+    { key: 'name', label: t('common.name'), slot: 'name' },
+    { key: 'provider_type', label: t('settings.adminOperations.llmConnections.provider'), textColor: 'var(--ds-text-subtle)' },
+    { key: 'model', label: t('settings.adminOperations.llmConnections.model'), slot: 'model' },
+    { key: 'is_enabled', label: t('common.status'), slot: 'status' },
+    { key: 'actions', label: t('common.actions'), slot: 'actions', align: 'text-right', width: 'w-32' },
+  ]);
 </script>
 
 <div class="space-y-4">
-  <PageHeader title="AI Connections" subtitle="Configure AI model providers for intelligent features">
+  <PageHeader title={t('settings.adminOperations.llmConnections.title')} subtitle={t('settings.adminOperations.llmConnections.subtitle')}>
     {#snippet actions()}
-      <Button id="llm-connection-add" variant="primary" onclick={openCreate} icon={Plus}>
-        Add Connection
+      <Button id="llm-connection-add" variant="primary" onclick={openCreate} icon={Plus} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('llmConnections', 'add') }}>
+        {t('settings.adminOperations.llmConnections.addConnection')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -363,9 +365,9 @@
     </div>
   {:else if connections.length === 0}
     <div class="flex flex-col items-center py-12 gap-3 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
-      <p class="text-sm" style="color: var(--ds-text-subtle);">No AI connections configured yet.</p>
-      <Button variant="secondary" onclick={openCreate} icon={Plus}>
-        Add your first connection
+      <p class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.empty')}</p>
+      <Button variant="secondary" onclick={openCreate} icon={Plus} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('llmConnections', 'add') }}>
+        {t('settings.adminOperations.llmConnections.addFirst')}
       </Button>
     </div>
   {:else}
@@ -374,10 +376,10 @@
         <div class="flex items-center gap-2">
           <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
           {#if conn.is_default}
-            <Lozenge appearance="info" size="sm">Default</Lozenge>
+            <Lozenge appearance="info" size="sm">{t('settings.adminOperations.llmConnections.default')}</Lozenge>
           {/if}
           {#if !conn.is_enabled && enabledLLMCapabilitiesForConnection(conn.id).length > 0}
-            <Lozenge appearance="warning" size="sm">Referenced by enabled capabilities</Lozenge>
+            <Lozenge appearance="warning" size="sm">{t('settings.adminOperations.llmConnections.referenced')}</Lozenge>
           {/if}
         </div>
       {/snippet}
@@ -385,12 +387,12 @@
         <div class="flex items-center gap-2">
           <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
           {#if connVision(conn)}
-            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title="This model can analyse images on work items">
-              <Eye size={12} /> Vision
+            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title={t('settings.adminOperations.llmConnections.visionTitle')}>
+              <Eye size={12} /> {t('settings.adminOperations.llmConnections.vision')}
             </span>
           {:else}
-            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title="This model is text-only and cannot see images">
-              <EyeOff size={12} /> No vision
+            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title={t('settings.adminOperations.llmConnections.noVisionTitle')}>
+              <EyeOff size={12} /> {t('settings.adminOperations.llmConnections.noVision')}
             </span>
           {/if}
         </div>
@@ -399,12 +401,12 @@
         {#if conn.is_enabled}
           <div class="flex items-center gap-1">
             <Power size={14} style="color: var(--ds-icon-success);" />
-            <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
+            <span class="text-xs" style="color: var(--ds-text-success);">{t('common.enabled')}</span>
           </div>
         {:else}
           <div class="flex items-center gap-1">
             <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.disabled')}</span>
           </div>
         {/if}
       {/snippet}
@@ -413,7 +415,7 @@
           <button
             class="p-1.5 rounded hover:opacity-80"
             style="color: var(--ds-text-subtle);"
-            title="Test connection"
+            title={t('settings.adminOperations.llmConnections.testConnection')}
             data-testid="llm-connection-test"
             disabled={testingConnectionId === conn.id}
             onclick={() => testConnection(conn.id)}
@@ -427,7 +429,7 @@
           <button
             class="p-1.5 rounded hover:opacity-80"
             style="color: var(--ds-text-subtle);"
-            title="Edit"
+            title={t('common.edit')}
             data-testid="llm-connection-edit"
             onclick={() => openEdit(conn)}
           >
@@ -436,7 +438,7 @@
           <button
             class="p-1.5 rounded hover:opacity-80"
             style="color: var(--ds-text-danger);"
-            title="Delete"
+            title={t('common.delete')}
             data-testid="llm-connection-delete"
             onclick={() => deleteConnection(conn)}
           >
@@ -457,13 +459,13 @@
     submitDisabled={!form.name || !form.provider_type || !form.model || saving}
   >
     {#snippet children(submitHint)}
-      <ModalHeader title="Add AI Connection" onclose={() => showCreateModal = false} />
+      <ModalHeader title={t('settings.adminOperations.llmConnections.addTitle')} onclose={() => showCreateModal = false} />
       <div class="p-4 space-y-4">
         {@render connectionForm()}
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
           <Button id="llm-connection-create-submit" variant="primary" onclick={handleCreate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
-            Create
+            {t('common.create')}
           </Button>
         </div>
       </div>
@@ -480,7 +482,7 @@
     submitDisabled={!form.name || !form.provider_type || !form.model || saving}
   >
     {#snippet children(submitHint)}
-      <ModalHeader title="Edit AI Connection" onclose={() => showEditModal = false} />
+      <ModalHeader title={t('settings.adminOperations.llmConnections.editTitle')} onclose={() => showEditModal = false} />
       <div class="p-4 space-y-4">
         {@render connectionForm()}
 
@@ -488,8 +490,8 @@
           <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
             <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
             <div>
-              <div class="font-medium">Disabling this connection will disable dependent LLM action capabilities at runtime.</div>
-              <div class="mt-1 text-xs">Referenced by {capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id))}. The capabilities themselves will still appear enabled, but actions using them will fail until the connection is re-enabled or the capability is repointed.</div>
+              <div class="font-medium">{t('settings.adminOperations.llmConnections.disableWarning')}</div>
+              <div class="mt-1 text-xs">{t('settings.adminOperations.llmConnections.disableWarningHelp', { capabilities: capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id)) })}</div>
             </div>
           </div>
         {/if}
@@ -497,7 +499,7 @@
         {#if editingConnection}
           <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
             <Button dataTestid="llm-connection-test-modal" variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
-              Test Connection
+              {t('settings.adminOperations.llmConnections.testConnection')}
             </Button>
             {#if testResult}
               <div class="flex items-center gap-1 text-xs">
@@ -509,9 +511,9 @@
         {/if}
 
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
           <Button id="llm-connection-save-submit" variant="primary" onclick={handleUpdate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </div>
@@ -523,23 +525,23 @@
 {#snippet connectionForm()}
   <!-- Name -->
   <div>
-    <label for="llm-connection-name" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Name</label>
+    <label for="llm-connection-name" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('common.name')}</label>
     <Input
       id="llm-connection-name"
       type="text"
       bind:value={form.name}
-      placeholder="e.g. OpenRouter Claude Sonnet"
+      placeholder={t('settings.adminOperations.llmConnections.namePlaceholder')}
       size="small"
     />
   </div>
 
   <!-- Provider Type -->
   <div>
-    <label for="llm-connection-provider" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Provider</label>
+    <label for="llm-connection-provider" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.provider')}</label>
     <Select
       id="llm-connection-provider"
       bind:value={form.provider_type}
-      placeholder="Select a provider..."
+      placeholder={t('settings.adminOperations.llmConnections.selectProvider')}
       options={providers.map(p => ({ value: p.type, label: p.name }))}
       onchange={() => { form.model = ''; form.base_url = ''; }}
     />
@@ -548,7 +550,7 @@
   <!-- Base URL (only for local/custom) -->
   {#if isLocalProvider}
     <div>
-      <label for="llm-connection-base-url" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Base URL</label>
+      <label for="llm-connection-base-url" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.baseUrl')}</label>
       <Input
         id="llm-connection-base-url"
         type="text"
@@ -561,19 +563,19 @@
 
   <!-- API Key -->
   <div>
-    <label for="llm-connection-api-key" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">API Key</label>
+    <label for="llm-connection-api-key" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.apiKey')}</label>
     <Input
       id="llm-connection-api-key"
       type="password"
       bind:value={form.api_key}
-      placeholder={editingConnection?.has_api_key ? 'Key configured (leave blank to keep)' : 'Enter API key'}
+      placeholder={editingConnection?.has_api_key ? t('settings.adminOperations.llmConnections.keyConfigured') : t('settings.adminOperations.llmConnections.enterApiKey')}
       size="small"
     />
   </div>
 
   <!-- Model -->
   <div>
-    <label for="llm-connection-model" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Model</label>
+    <label for="llm-connection-model" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.model')}</label>
     {#if isDynamicProvider}
       <div class="space-y-2">
         <BasePicker
@@ -581,7 +583,7 @@
           bind:value={form.model}
           items={cachedModels}
           loading={refreshingModels}
-          placeholder={cachedModels.length ? 'Search models or type an ID...' : 'Type a model ID (or click Refresh)'}
+          placeholder={cachedModels.length ? t('settings.adminOperations.llmConnections.searchModels') : t('settings.adminOperations.llmConnections.typeModelId')}
           searchFields={['id', 'name']}
           getValue={(m) => m.id}
           getLabel={(m) => m.name || m.id}
@@ -596,9 +598,9 @@
                   <span class="text-xs" style="color: var(--ds-text-subtle);">{rateHint(item)}</span>
                 {/if}
                 {#if item.supports_vision}
-                  <span class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title="Supports image input"><Eye size={12} /></span>
+                  <span class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title={t('settings.adminOperations.llmConnections.supportsImages')}><Eye size={12} /></span>
                 {:else}
-                  <span class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title="Text-only"><EyeOff size={12} /></span>
+                  <span class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title={t('settings.adminOperations.llmConnections.textOnly')}><EyeOff size={12} /></span>
                 {/if}
               </span>
             </div>
@@ -607,21 +609,21 @@
         <div class="flex items-center justify-between text-xs" style="color: var(--ds-text-subtle);">
           <span>
             {#if lastRefreshError}
-              <span style="color: var(--ds-text-danger);">Last attempt failed: {lastRefreshError}</span>
+              <span style="color: var(--ds-text-danger);">{t('settings.adminOperations.llmConnections.lastAttemptFailed', { error: lastRefreshError })}</span>
             {:else}
-              {formatLastRefreshed(lastRefreshedAt)}{cachedModels.length ? ` · ${cachedModels.length} cached` : ''}
+              {formatLastRefreshed(lastRefreshedAt)}{cachedModels.length ? ` · ${t('settings.adminOperations.llmConnections.cachedCount', { count: cachedModels.length })}` : ''}
             {/if}
           </span>
           <Button variant="ghost" size="small" onclick={refreshModels} disabled={refreshModelsDisabled}>
-            {refreshingModels ? 'Refreshing…' : 'Refresh'}
+            {refreshingModels ? t('settings.adminOperations.llmConnections.refreshing') : t('common.refresh')}
           </Button>
         </div>
         {#if !cachedModels.length && !lastRefreshError}
           <div class="text-xs" style="color: var(--ds-text-subtle);">
             {#if isLocalProvider && !form.base_url.trim()}
-              Enter a base URL to fetch models, or type a model ID above to use it without browsing.
+              {t('settings.adminOperations.llmConnections.enterBaseUrlHelp')}
             {:else}
-              No cached models. Click Refresh to fetch from {selectedProvider?.name}, or type a model ID above to use it without browsing.
+              {t('settings.adminOperations.llmConnections.noCachedModels', { provider: selectedProvider?.name })}
             {/if}
           </div>
         {/if}
@@ -630,15 +632,15 @@
       <Select
         id="llm-connection-model"
         bind:value={form.model}
-        placeholder="Select a model..."
-        options={availableModels.map(m => ({ value: m.id, label: m.name + (m.supports_vision ? ' · vision' : '') }))}
+        placeholder={t('settings.adminOperations.llmConnections.selectModel')}
+        options={availableModels.map(m => ({ value: m.id, label: m.name + (m.supports_vision ? ` · ${t('settings.adminOperations.llmConnections.vision')}` : '') }))}
       />
     {/if}
   </div>
 
   <!-- Provider Config -->
   <div>
-    <label for="llm-connection-provider-config" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Provider config JSON</label>
+    <label for="llm-connection-provider-config" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.providerConfig')}</label>
     <Textarea
       id="llm-connection-provider-config"
       bind:value={form.provider_config}
@@ -649,31 +651,31 @@
       size="small"
     />
     <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-      Optional top-level request fields merged into provider calls. Existing Windshift fields take precedence.
+      {t('settings.adminOperations.llmConnections.providerConfigHelp')}
     </div>
   </div>
 
   <!-- Vision capability override -->
   <div>
-    <label for="llm-connection-vision-mode" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Vision support</label>
+    <label for="llm-connection-vision-mode" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.visionSupport')}</label>
     <Select
       id="llm-connection-vision-mode"
       bind:value={form.vision_mode}
       options={[
-        { value: 'auto', label: 'Auto (detect from model)' },
-        { value: 'on', label: 'On (force vision)' },
-        { value: 'off', label: 'Off (force text-only)' },
+        { value: 'auto', label: t('settings.adminOperations.llmConnections.visionAuto') },
+        { value: 'on', label: t('settings.adminOperations.llmConnections.visionOn') },
+        { value: 'off', label: t('settings.adminOperations.llmConnections.visionOff') },
       ]}
     />
     <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-      Whether the coding agent may send images to this model. <strong>Auto</strong> uses the model's known capability; override to <strong>On</strong> for a vision-capable local/custom model the catalog can't identify, or <strong>Off</strong> to disable images.
+      {t('settings.adminOperations.llmConnections.visionHelp')}
     </div>
   </div>
 
   <!-- Toggles -->
   <div class="flex items-center gap-6">
-    <Checkbox bind:checked={form.is_default} label="Default connection" size="small" />
-    <Checkbox bind:checked={form.is_enabled} label="Enabled" size="small" />
+    <Checkbox bind:checked={form.is_default} label={t('settings.adminOperations.llmConnections.defaultConnection')} size="small" />
+    <Checkbox bind:checked={form.is_enabled} label={t('common.enabled')} size="small" />
   </div>
 
 {/snippet}

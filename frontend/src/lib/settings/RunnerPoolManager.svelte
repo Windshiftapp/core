@@ -17,6 +17,7 @@
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { formatAuthenticatedDateTime } from '../utils/authenticatedDateFormatter.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let pools = $state([]);
   let loadingPools = $state(true);
@@ -41,6 +42,7 @@
   let mintedToken = $state(null); // { token, installCommand }
 
   const canCreate = $derived(poolForm.name.trim().length > 0 && Number(poolForm.maxConcurrent) >= 0);
+  const REGISTRATION_TOKEN_ENV = 'WSRUNNER_REGISTRATION_TOKEN';
 
   onMount(loadPools);
 
@@ -54,7 +56,7 @@
         selectedPool = pools.find((p) => p.id === selectedPool.id) || null;
       }
     } catch (e) {
-      errorToast(e?.message || 'Failed to load runner pools');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.loadFailed'));
     } finally {
       loadingPools = false;
     }
@@ -70,7 +72,7 @@
     try {
       tokens = (await api.runnerPools.listTokens(poolId)) || [];
     } catch (e) {
-      errorToast(e?.message || 'Failed to load tokens');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.tokensLoadFailed'));
     } finally {
       loadingTokens = false;
     }
@@ -81,7 +83,7 @@
     try {
       instances = (await api.runnerPools.listInstances(poolId)) || [];
     } catch (e) {
-      errorToast(e?.message || 'Failed to load runner instances');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.runnersLoadFailed'));
     } finally {
       loadingInstances = false;
     }
@@ -104,11 +106,11 @@
         applies_to_all_workspaces: poolForm.appliesToAll,
         workspace_ids: [],
       });
-      successToast('Runner pool created');
+      successToast(t('settings.adminOperations.runnerPools.created'));
       showCreatePool = false;
       await loadPools();
     } catch (e) {
-      errorToast(e?.message || 'Failed to create runner pool');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.createFailed'));
     } finally {
       creating = false;
     }
@@ -132,7 +134,7 @@
       mintedToken = res?.token ? { token: res.token, installCommand: res.install_command || '' } : null;
       await loadTokens(selectedPool.id);
     } catch (e) {
-      errorToast(e?.message || 'Failed to mint token');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.mintFailed'));
     } finally {
       minting = false;
     }
@@ -140,44 +142,44 @@
 
   async function revokeToken(tok) {
     const ok = await confirm({
-      title: 'Revoke registration token',
-      message: `Revoke token ${tok.token_prefix}…? Runners can no longer register with it.`,
-      confirmText: 'Revoke',
+      title: t('settings.adminOperations.runnerPools.revokeTokenTitle'),
+      message: t('settings.adminOperations.runnerPools.revokeTokenMessage', { prefix: tok.token_prefix }),
+      confirmText: t('settings.adminOperations.runnerPools.revoke'),
       variant: 'danger',
     });
     if (!ok) return;
     try {
       await api.runnerPools.revokeToken(selectedPool.id, tok.id);
-      successToast('Token revoked');
+      successToast(t('settings.adminOperations.runnerPools.tokenRevoked'));
       await loadTokens(selectedPool.id);
     } catch (e) {
-      errorToast(e?.message || 'Failed to revoke token');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.revokeTokenFailed'));
     }
   }
 
   async function revokeInstance(inst) {
     const ok = await confirm({
-      title: 'Revoke runner',
-      message: `Evict runner ${inst.name || `#${inst.id}`}? It must re-register to rejoin.`,
-      confirmText: 'Revoke',
+      title: t('settings.adminOperations.runnerPools.revokeRunnerTitle'),
+      message: t('settings.adminOperations.runnerPools.revokeRunnerMessage', { name: inst.name || `#${inst.id}` }),
+      confirmText: t('settings.adminOperations.runnerPools.revoke'),
       variant: 'danger',
     });
     if (!ok) return;
     try {
       await api.runnerPools.revokeInstance(selectedPool.id, inst.id);
-      successToast('Runner revoked');
+      successToast(t('settings.adminOperations.runnerPools.runnerRevoked'));
       await loadInstances(selectedPool.id);
     } catch (e) {
-      errorToast(e?.message || 'Failed to revoke runner');
+      errorToast(e?.message || t('settings.adminOperations.runnerPools.revokeRunnerFailed'));
     }
   }
 
   async function copy(text) {
     try {
       await navigator.clipboard.writeText(text);
-      successToast('Copied to clipboard');
+      successToast(t('settings.adminOperations.runnerPools.copied'));
     } catch {
-      errorToast('Copy failed — select and copy manually');
+      errorToast(t('settings.adminOperations.runnerPools.copyFailed'));
     }
   }
 
@@ -186,11 +188,11 @@
   }
 
   function tokenStatus(tok) {
-    if (tok.revoked_at) return { label: 'Revoked', appearance: 'removed' };
+    if (tok.revoked_at) return { label: t('settings.adminOperations.runnerPools.revoked'), appearance: 'removed' };
     if (tok.expires_at && new Date(tok.expires_at) < new Date()) {
-      return { label: 'Expired', appearance: 'default' };
+      return { label: t('settings.adminOperations.runnerPools.expired'), appearance: 'default' };
     }
-    return { label: 'Active', appearance: 'success' };
+    return { label: t('settings.adminOperations.runnerPools.active'), appearance: 'success' };
   }
 
   // Mirrors the server's RunnerLivenessWindow (90s, ~3 missed heartbeats):
@@ -199,54 +201,54 @@
   const HEARTBEAT_FRESH_MS = 90_000;
 
   function instanceStatus(inst) {
-    if (inst.revoked_at) return { label: 'Revoked', appearance: 'removed' };
+    if (inst.revoked_at) return { label: t('settings.adminOperations.runnerPools.revoked'), appearance: 'removed' };
     if (inst.status === 'active') {
       const lastSeen = inst.last_heartbeat_at || inst.registered_at;
       if (lastSeen && Date.now() - new Date(lastSeen).getTime() <= HEARTBEAT_FRESH_MS) {
-        return { label: 'Online', appearance: 'success' };
+        return { label: t('settings.adminOperations.runnerPools.online'), appearance: 'success' };
       }
-      return { label: 'Stale', appearance: 'warning' };
+      return { label: t('settings.adminOperations.runnerPools.stale'), appearance: 'warning' };
     }
-    return { label: inst.status || 'Unknown', appearance: 'default' };
+    return { label: inst.status || t('settings.adminOperations.runnerPools.unknown'), appearance: 'default' };
   }
 
-  const poolColumns = [
-    { key: 'name', label: 'Pool', slot: 'name' },
-    { key: 'status', label: 'Status', slot: 'status' },
-    { key: 'concurrency', label: 'Max concurrent', slot: 'concurrency' },
-  ];
-  const tokenColumns = [
-    { key: 'token_prefix', label: 'Token', slot: 'prefix' },
-    { key: 'description', label: 'Description', slot: 'description' },
-    { key: 'created_at', label: 'Created', slot: 'created' },
-    { key: 'expires_at', label: 'Expires', slot: 'expires' },
-    { key: 'status', label: 'Status', slot: 'status' },
+  const poolColumns = $derived([
+    { key: 'name', label: t('settings.adminOperations.runnerPools.pool'), slot: 'name' },
+    { key: 'status', label: t('common.status'), slot: 'status' },
+    { key: 'concurrency', label: t('settings.adminOperations.runnerPools.maxConcurrent'), slot: 'concurrency' },
+  ]);
+  const tokenColumns = $derived([
+    { key: 'token_prefix', label: t('settings.adminOperations.runnerPools.token'), slot: 'prefix' },
+    { key: 'description', label: t('common.description'), slot: 'description' },
+    { key: 'created_at', label: t('common.created'), slot: 'created' },
+    { key: 'expires_at', label: t('settings.adminOperations.runnerPools.expires'), slot: 'expires' },
+    { key: 'status', label: t('common.status'), slot: 'status' },
     { key: 'actions', label: '', slot: 'actions', align: 'text-right', width: 'w-20' },
-  ];
-  const instanceColumns = [
-    { key: 'name', label: 'Runner', slot: 'name' },
-    { key: 'status', label: 'Status', slot: 'status' },
-    { key: 'registered_at', label: 'Registered', slot: 'registered' },
-    { key: 'last_heartbeat_at', label: 'Last heartbeat', slot: 'heartbeat' },
+  ]);
+  const instanceColumns = $derived([
+    { key: 'name', label: t('settings.adminOperations.runnerPools.runner'), slot: 'name' },
+    { key: 'status', label: t('common.status'), slot: 'status' },
+    { key: 'registered_at', label: t('settings.adminOperations.runnerPools.registered'), slot: 'registered' },
+    { key: 'last_heartbeat_at', label: t('settings.adminOperations.runnerPools.lastHeartbeat'), slot: 'heartbeat' },
     { key: 'actions', label: '', slot: 'actions', align: 'text-right', width: 'w-20' },
-  ];
+  ]);
 
   function maxConcurrentLabel(pool) {
     try {
       const n = JSON.parse(pool.config || '{}').max_concurrent_runs ?? 0;
-      return Number(n) === 0 ? 'Unlimited' : String(n);
+      return Number(n) === 0 ? t('settings.adminOperations.runnerPools.unlimited') : String(n);
     } catch {
-      return 'Unlimited';
+      return t('settings.adminOperations.runnerPools.unlimited');
     }
   }
 </script>
 
 <div class="space-y-6">
-  <PageHeader title="Runner pools" subtitle="Pools of remote runners that execute coding-agent jobs. Mint a registration token to add a runner host; see RUNNER setup docs.">
+  <PageHeader title={t('settings.adminOperations.runnerPools.title')} subtitle={t('settings.adminOperations.runnerPools.subtitle')}>
     {#snippet actions()}
       <!-- shortcut-guard-exempt: admin settings tab action, not a primary global-create surface -->
       <Button variant="primary" onclick={openCreate} icon={Plus}>
-        New pool
+        {t('settings.adminOperations.runnerPools.newPool')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -261,15 +263,15 @@
       onRowClick={selectPool}
       selectedItemId={selectedPool?.id ?? null}
       emptyIcon={Server}
-      emptyMessage="No runner pools"
-      emptyDescription="Create a pool, then mint a registration token to connect a runner host."
+      emptyMessage={t('settings.adminOperations.runnerPools.empty')}
+      emptyDescription={t('settings.adminOperations.runnerPools.emptyDescription')}
     >
       {#snippet name(pool)}
         <span class="font-medium" style="color: var(--ds-text);">{pool.name}</span>
       {/snippet}
       {#snippet status(pool)}
         <Lozenge appearance={pool.is_enabled ? 'success' : 'default'} size="sm">
-          {pool.is_enabled ? 'Enabled' : 'Disabled'}
+          {pool.is_enabled ? t('common.enabled') : t('common.disabled')}
         </Lozenge>
       {/snippet}
       {#snippet concurrency(pool)}
@@ -283,16 +285,16 @@
     <section class="space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-semibold flex items-center gap-2" style="color: var(--ds-text);">
-          <KeyRound size={16} /> Registration tokens — {selectedPool.name}
+          <KeyRound size={16} /> {t('settings.adminOperations.runnerPools.registrationTokens', { name: selectedPool.name })}
         </h3>
         <Button variant="secondary" size="sm" onclick={openMint}>
-          <Plus size={14} /> Mint token
+          <Plus size={14} /> {t('settings.adminOperations.runnerPools.mintToken')}
         </Button>
       </div>
       {#if loadingTokens}
         <div class="flex justify-center py-6"><Spinner /></div>
       {:else}
-        <DataTable columns={tokenColumns} data={tokens} keyField="id" emptyMessage="No tokens yet">
+        <DataTable columns={tokenColumns} data={tokens} keyField="id" emptyMessage={t('settings.adminOperations.runnerPools.noTokens')}>
           {#snippet prefix(tok)}
             <code class="text-xs" style="color: var(--ds-text);">{tok.token_prefix}…</code>
           {/snippet}
@@ -303,7 +305,7 @@
             <span class="text-xs" style="color: var(--ds-text-subtle);">{fmtDate(tok.created_at)}</span>
           {/snippet}
           {#snippet expires(tok)}
-            <span class="text-xs" style="color: var(--ds-text-subtle);">{tok.expires_at ? fmtDate(tok.expires_at) : 'Never'}</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{tok.expires_at ? fmtDate(tok.expires_at) : t('settings.adminOperations.runnerPools.never')}</span>
           {/snippet}
           {#snippet status(tok)}
             {@const s = tokenStatus(tok)}
@@ -311,7 +313,7 @@
           {/snippet}
           {#snippet actions(tok)}
             {#if !tok.revoked_at}
-              <Button variant="danger-ghost" size="small" icon={Trash2} title="Revoke token" onclick={() => revokeToken(tok)}></Button>
+              <Button variant="danger-ghost" size="small" icon={Trash2} title={t('settings.adminOperations.runnerPools.revokeToken')} onclick={() => revokeToken(tok)}></Button>
             {/if}
           {/snippet}
         </DataTable>
@@ -321,12 +323,12 @@
     <!-- Runner instances -->
     <section class="space-y-3">
       <h3 class="text-sm font-semibold flex items-center gap-2" style="color: var(--ds-text);">
-        <Server size={16} /> Runners — {selectedPool.name}
+        <Server size={16} /> {t('settings.adminOperations.runnerPools.runnersForPool', { name: selectedPool.name })}
       </h3>
       {#if loadingInstances}
         <div class="flex justify-center py-6"><Spinner /></div>
       {:else}
-        <DataTable columns={instanceColumns} data={instances} keyField="id" emptyMessage="No runners registered">
+        <DataTable columns={instanceColumns} data={instances} keyField="id" emptyMessage={t('settings.adminOperations.runnerPools.noRunners')}>
           {#snippet name(inst)}
             <span class="font-medium text-sm" style="color: var(--ds-text);">{inst.name || `#${inst.id}`}</span>
           {/snippet}
@@ -342,7 +344,7 @@
           {/snippet}
           {#snippet actions(inst)}
             {#if !inst.revoked_at}
-              <Button variant="danger-ghost" size="small" icon={Trash2} title="Revoke runner" onclick={() => revokeInstance(inst)}></Button>
+              <Button variant="danger-ghost" size="small" icon={Trash2} title={t('settings.adminOperations.runnerPools.revokeRunner')} onclick={() => revokeInstance(inst)}></Button>
             {/if}
           {/snippet}
         </DataTable>
@@ -354,10 +356,10 @@
 {#if showCreatePool}
   <Modal isOpen={true} onclose={() => (showCreatePool = false)} onSubmit={createPool} submitDisabled={!canCreate || creating}>
     {#snippet children(submitHint)}
-      <ModalHeader title="New runner pool" onclose={() => (showCreatePool = false)} />
+      <ModalHeader title={t('settings.adminOperations.runnerPools.newPoolTitle')} onclose={() => (showCreatePool = false)} />
       <div class="space-y-4 p-4">
         <label class="block">
-          <span class="text-sm font-medium" style="color: var(--ds-text);">Name</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{t('common.name')}</span>
           <Input
             class="mt-1"
             size="small"
@@ -366,7 +368,7 @@
           />
         </label>
         <label class="block">
-          <span class="text-sm font-medium" style="color: var(--ds-text);">Max concurrent runs</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.adminOperations.runnerPools.maxConcurrentRuns')}</span>
           <Input
             type="number"
             min="0"
@@ -374,13 +376,13 @@
             size="small"
             bind:value={poolForm.maxConcurrent}
           />
-          <span class="text-xs" style="color: var(--ds-text-subtle);">0 = unlimited</span>
+          <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.runnerPools.zeroUnlimited')}</span>
         </label>
-        <Checkbox bind:checked={poolForm.appliesToAll} label="Available to all workspaces" size="small" />
-        <Checkbox bind:checked={poolForm.enabled} label="Enabled" size="small" />
+        <Checkbox bind:checked={poolForm.appliesToAll} label={t('settings.adminOperations.runnerPools.availableAll')} size="small" />
+        <Checkbox bind:checked={poolForm.enabled} label={t('common.enabled')} size="small" />
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => (showCreatePool = false)} keyboardHint="Esc">Cancel</Button>
-          <Button variant="primary" onclick={createPool} loading={creating} disabled={!canCreate} keyboardHint={submitHint}>Create pool</Button>
+          <Button variant="secondary" onclick={() => (showCreatePool = false)} keyboardHint="Esc">{t('common.cancel')}</Button>
+          <Button variant="primary" onclick={createPool} loading={creating} disabled={!canCreate} keyboardHint={submitHint}>{t('settings.adminOperations.runnerPools.createPool')}</Button>
         </div>
       </div>
     {/snippet}
@@ -390,10 +392,10 @@
 {#if showMint}
   <Modal isOpen={true} onclose={() => (showMint = false)} onSubmit={mintToken} submitDisabled={minting}>
     {#snippet children(submitHint)}
-      <ModalHeader title="Mint registration token" onclose={() => (showMint = false)} />
+      <ModalHeader title={t('settings.adminOperations.runnerPools.mintTitle')} onclose={() => (showMint = false)} />
       <div class="space-y-4 p-4">
         <label class="block">
-          <span class="text-sm font-medium" style="color: var(--ds-text);">Description (optional)</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.adminOperations.runnerPools.descriptionOptional')}</span>
           <Input
             class="mt-1"
             size="small"
@@ -402,7 +404,7 @@
           />
         </label>
         <label class="block">
-          <span class="text-sm font-medium" style="color: var(--ds-text);">Expires in (hours)</span>
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.adminOperations.runnerPools.expiresHours')}</span>
           <Input
             type="number"
             min="0"
@@ -410,11 +412,11 @@
             size="small"
             bind:value={mintForm.ttlHours}
           />
-          <span class="text-xs" style="color: var(--ds-text-subtle);">0 = never expires (revoke to disable)</span>
+          <span class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.runnerPools.zeroNeverExpires')}</span>
         </label>
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => (showMint = false)} keyboardHint="Esc">Cancel</Button>
-          <Button variant="primary" onclick={mintToken} loading={minting} keyboardHint={submitHint}>Mint token</Button>
+          <Button variant="secondary" onclick={() => (showMint = false)} keyboardHint="Esc">{t('common.cancel')}</Button>
+          <Button variant="primary" onclick={mintToken} loading={minting} keyboardHint={submitHint}>{t('settings.adminOperations.runnerPools.mintToken')}</Button>
         </div>
       </div>
     {/snippet}
@@ -424,13 +426,12 @@
 {#if mintedToken}
   <Modal isOpen={true} onclose={() => (mintedToken = null)}>
     {#snippet children()}
-      <ModalHeader title="Add the runner host" onclose={() => (mintedToken = null)} />
+      <ModalHeader title={t('settings.adminOperations.runnerPools.addHostTitle')} onclose={() => (mintedToken = null)} />
       <div class="space-y-4 p-4">
         {#if mintedToken.installCommand}
           <div class="space-y-2">
             <p class="text-sm" style="color: var(--ds-text-subtle);">
-              Run this on the runner host. It installs and starts the runner container with
-              this server's URL, the matching image tag, and the fresh token already baked in:
+              {t('settings.adminOperations.runnerPools.installHelp')}
             </p>
             <div class="flex items-start gap-2">
               <code
@@ -439,16 +440,15 @@
                 style="background: var(--ds-surface-sunken); color: var(--ds-text); border-color: var(--ds-border);"
               >{mintedToken.installCommand}</code>
               <Button variant="primary" size="sm" dataTestid="copy-install-command" onclick={() => copy(mintedToken.installCommand)}>
-                <Copy size={14} /> Copy
+                <Copy size={14} /> {t('common.copy')}
               </Button>
             </div>
           </div>
         {/if}
         <div class="space-y-2">
           <p class="text-sm" style="color: var(--ds-text-subtle);">
-            {#if mintedToken.installCommand}Setting up manually instead? Set the token as{:else}Set the token as{/if}
-            <code>WSRUNNER_REGISTRATION_TOKEN</code> on the runner host. It is shown
-            <strong>once</strong> and cannot be retrieved again.
+            {#if mintedToken.installCommand}{t('settings.adminOperations.runnerPools.manualPrefix')}{:else}{t('settings.adminOperations.runnerPools.setTokenPrefix')}{/if}
+            <code>{REGISTRATION_TOKEN_ENV}</code> {t('settings.adminOperations.runnerPools.tokenOnce')}
           </p>
           <div class="flex items-center gap-2">
             <code
@@ -457,12 +457,12 @@
               style="background: var(--ds-surface-sunken); color: var(--ds-text); border-color: var(--ds-border);"
             >{mintedToken.token}</code>
             <Button variant="secondary" size="sm" dataTestid="copy-registration-token" onclick={() => copy(mintedToken.token)}>
-              <Copy size={14} /> Copy
+              <Copy size={14} /> {t('common.copy')}
             </Button>
           </div>
         </div>
         <div class="flex justify-end pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="primary" dataTestid="runner-token-done" onclick={() => (mintedToken = null)}>Done</Button>
+          <Button variant="primary" dataTestid="runner-token-done" onclick={() => (mintedToken = null)}>{t('common.done')}</Button>
         </div>
       </div>
     {/snippet}

@@ -19,6 +19,7 @@
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { successToast, errorToast } from '../stores/toasts.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
+	import { t } from '../stores/i18n.svelte.js';
 
 	// The scopes an admin may grant an OAuth client, fetched from the server
 	// catalog (auth.ScopeCatalog) minus admin scopes, which the OAuth surfaces
@@ -71,7 +72,7 @@
 			clients = (await api.oauthClients.getAll()) || [];
 		} catch (err) {
 			console.error('Failed to load OAuth clients:', err);
-			error = 'Failed to load OAuth clients';
+			error = t('integrations.oauthClients.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -157,7 +158,7 @@
 					allowed_scopes: formData.allowed_scopes,
 					enabled: formData.enabled,
 				});
-				successToast('OAuth client updated');
+				successToast(t('integrations.oauthClients.updated'));
 				showFormModal = false;
 				await loadClients();
 			} else {
@@ -177,12 +178,12 @@
 					secretModal = { client: created, secret: created.client_secret };
 				} else {
 					// Public client (no secret). Just confirm.
-					successToast('Public OAuth client created');
+					successToast(t('integrations.oauthClients.publicCreated'));
 				}
 			}
 		} catch (err) {
 			console.error('Failed to save OAuth client:', err);
-			errorToast(err.message || 'Failed to save OAuth client');
+			errorToast(err.message || t('integrations.oauthClients.saveFailed'));
 		} finally {
 			saving = false;
 		}
@@ -190,8 +191,8 @@
 
 	async function rotateSecret(client) {
 		const ok = await confirm(
-			`Rotate secret for "${client.display_name}"?`,
-			'The previous secret stops working immediately. Existing access and refresh tokens keep working until they expire — only future /token exchanges that present the old secret start failing.'
+			t('integrations.oauthClients.rotateTitle', { name: client.display_name }),
+			t('integrations.oauthClients.rotateMessage')
 		);
 		if (!ok) return;
 
@@ -203,30 +204,28 @@
 			await loadClients();
 		} catch (err) {
 			console.error('Failed to rotate secret:', err);
-			errorToast(err.message || 'Failed to rotate secret');
+			errorToast(err.message || t('integrations.oauthClients.rotateFailed'));
 		}
 	}
 
 	async function deleteClient(client) {
 		const ok = await confirm(
-			`Delete "${client.display_name}"?`,
-			'All access tokens and refresh tokens issued to this client will be revoked immediately. Users connected via this app will need to reconnect.'
+			t('integrations.oauthClients.deleteTitle', { name: client.display_name }),
+			t('integrations.oauthClients.deleteMessage')
 		);
 		if (!ok) return;
 
 		try {
 			await api.oauthClients.delete(client.id);
-			successToast('OAuth client deleted');
+			successToast(t('integrations.oauthClients.deleted'));
 			await loadClients();
 		} catch (err) {
 			console.error('Failed to delete OAuth client:', err);
-			errorToast(err.message || 'Failed to delete OAuth client');
+			errorToast(err.message || t('integrations.oauthClients.deleteFailed'));
 		}
 	}
 
-	const callbackHelp = $derived(
-		'After this client redeems an authorization code at /api/oauth/token, every issued access token will be a Windshift API token (crw_…) bound to a per-user agent. Tokens inherit the requesting user\'s permissions, intersected with the scopes selected here.'
-	);
+	const callbackHelp = $derived(t('integrations.oauthClients.scopeHelp'));
 
 	function displayClientId(clientId) {
 		if (!clientId || clientId.length <= 16) return clientId || '';
@@ -236,14 +235,14 @@
 
 <div>
 	<SectionHeader
-		title="OAuth Clients"
-		subtitle="Register third-party apps that can authorize Windshift users via OAuth 2.0 (authorization code + PKCE). Each registered client can drive /api/oauth/authorize and /api/oauth/token to mint per-user API tokens."
+		title={t('integrations.oauthClients.title')}
+		subtitle={t('integrations.oauthClients.subtitle')}
 		class="mb-6"
 	>
 		{#snippet actions()}
 			<div class="flex items-center gap-2">
 				<DropdownMenu
-					triggerText="Template"
+					triggerText={t('integrations.oauthClients.template')}
 					placement="bottom-end"
 					maxWidth="max-w-sm"
 					triggerClass="px-3.5 py-1.5 border"
@@ -252,7 +251,7 @@
 						{
 							id: 'docmost',
 							title: 'Docmost',
-							subtitle: `${DOCMOST_REQUIRED_SCOPES.join(' ')} · OAuth callback`,
+							subtitle: `${DOCMOST_REQUIRED_SCOPES.join(' ')} · ${t('integrations.oauthClients.oauthCallback')}`,
 							onClick: () => openCreateFromTemplate('docmost'),
 						},
 					]}
@@ -265,7 +264,7 @@
 					keyboardHint="A"
 					hotkeyConfig={{ key: toHotkeyString('oauthClients', 'addClient'), guard: () => !showFormModal && !secretModal }}
 				>
-					Register Client
+					{t('integrations.oauthClients.registerClient')}
 				</Button>
 			</div>
 		{/snippet}
@@ -283,8 +282,8 @@
 		</div>
 	{:else if clients.length === 0}
 		<EmptyState
-			title="No OAuth clients registered"
-			description="Click 'Register Client' to add a third-party app."
+			title={t('integrations.oauthClients.empty')}
+			description={t('integrations.oauthClients.emptyDescription')}
 		/>
 	{:else}
 		<div class="space-y-3">
@@ -299,22 +298,22 @@
 								{client.display_name}
 							</h3>
 							<Lozenge appearance={client.enabled ? 'success' : 'default'}>
-								{client.enabled ? 'Enabled' : 'Disabled'}
+								{client.enabled ? t('common.enabled') : t('common.disabled')}
 							</Lozenge>
 							<Lozenge appearance="info">{client.client_type}</Lozenge>
 							{#if (client.allowed_scopes || []).length > 0}
 								<Lozenge appearance="default">
-									{client.allowed_scopes.length} scope{client.allowed_scopes.length === 1 ? '' : 's'}
+									{t('integrations.oauthClients.scopeCount', { count: client.allowed_scopes.length })}
 								</Lozenge>
 							{/if}
 						</div>
 						<p class="text-xs mt-1 flex items-center gap-1 flex-wrap" style="color: var(--ds-text-subtle);">
 							<code title={client.client_id}>{displayClientId(client.client_id)}</code>
-							<CopyButton getText={() => client.client_id} title="Client ID" />
+							<CopyButton getText={() => client.client_id} title={t('integrations.oauthClients.clientId')} />
 							{#if client.client_type === 'confidential'}
-								<span>&middot; secret {client.has_secret ? 'set' : 'missing'}</span>
+								<span>&middot; {client.has_secret ? t('integrations.oauthClients.secretSet') : t('integrations.oauthClients.secretMissing')}</span>
 							{/if}
-							&middot; {(client.redirect_uris || []).length} redirect URI{(client.redirect_uris || []).length === 1 ? '' : 's'}
+							&middot; {t('integrations.oauthClients.redirectCount', { count: (client.redirect_uris || []).length })}
 						</p>
 					</div>
 					<div class="flex items-center gap-1">
@@ -322,7 +321,7 @@
 							<Button
 								variant="ghost"
 								size="small"
-								title="Rotate client secret"
+								title={t('integrations.oauthClients.rotateSecret')}
 								onclick={() => rotateSecret(client)}
 							>
 								<RefreshCw class="w-4 h-4" />
@@ -331,7 +330,7 @@
 						<Button variant="ghost" size="small" onclick={() => openEdit(client)}>
 							<Edit2 class="w-4 h-4" />
 						</Button>
-						<Button variant="danger-ghost" size="small" icon={Trash2} title="Delete client" onclick={() => deleteClient(client)}></Button>
+						<Button variant="danger-ghost" size="small" icon={Trash2} title={t('integrations.oauthClients.deleteClient')} onclick={() => deleteClient(client)}></Button>
 					</div>
 				</div>
 			{/each}
@@ -342,7 +341,7 @@
 <!-- Create / Edit form -->
 <Modal bind:isOpen={showFormModal}>
 	<ModalHeader
-		title={editingClient ? 'Edit OAuth Client' : 'Register OAuth Client'}
+		title={editingClient ? t('integrations.oauthClients.editTitle') : t('integrations.oauthClients.registerTitle')}
 		onclose={() => (showFormModal = false)}
 	/>
 
@@ -353,14 +352,14 @@
 		}}
 		class="p-4 space-y-4"
 	>
-		<FormField label="Display name" required>
+		<FormField label={t('integrations.oauthClients.displayName')} required>
 			<Input
 				bind:value={formData.display_name}
-				placeholder="e.g. Docmost"
+				placeholder={t('integrations.oauthClients.displayNamePlaceholder')}
 			/>
 		</FormField>
 
-		<FormField label="Slug" required>
+		<FormField label={t('integrations.oauthClients.slug')} required>
 			<Input
 				bind:value={formData.slug}
 				placeholder="omni"
@@ -368,22 +367,22 @@
 			/>
 		</FormField>
 
-		<FormField label="Client type" required>
+		<FormField label={t('integrations.oauthClients.clientType')} required>
 			<NativeSelect
 				bind:value={formData.client_type}
 				disabled={!!editingClient}
 				options={[
-					{ value: 'confidential', label: 'Confidential (server-to-server, has secret)' },
-					{ value: 'public', label: 'Public (PKCE only, no secret)' },
+					{ value: 'confidential', label: t('integrations.oauthClients.confidential') },
+					{ value: 'public', label: t('integrations.oauthClients.public') },
 				]}
 				size="small"
 			/>
 			<p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-				Confidential clients store a client_secret server-side. Public clients (browser SPAs, native apps) must use PKCE on every /token exchange.
+				{t('integrations.oauthClients.clientTypeHelp')}
 			</p>
 		</FormField>
 
-		<FormField label="Redirect URIs" required>
+		<FormField label={t('integrations.oauthClients.redirectUris')} required>
 			<Textarea
 				bind:value={formData.redirect_uris_text}
 				rows={3}
@@ -392,11 +391,11 @@
 				placeholder={`https://docmost.example.com/api/integrations/oauth/windshift/callback\n${DOCMOST_LOCAL_CALLBACK}`}
 			/>
 			<p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-				One URI per line. For Docmost, register {`{DOCMOST_APP_URL}/api/integrations/oauth/windshift/callback`}. The redirect_uri parameter on /authorize must exactly match one of these.
+				{t('integrations.oauthClients.redirectHelp')}
 			</p>
 		</FormField>
 
-		<FormField label="Allowed scopes" required>
+		<FormField label={t('integrations.oauthClients.allowedScopes')} required>
 			<div class="space-y-2">
 				{#each scopeOptions as scope (scope.scope)}
 					<Checkbox
@@ -413,10 +412,10 @@
 			</p>
 		</FormField>
 
-		<Checkbox id="oauth-client-enabled" bind:checked={formData.enabled} label="Enabled" size="small" />
+		<Checkbox id="oauth-client-enabled" bind:checked={formData.enabled} label={t('common.enabled')} size="small" />
 
 		<div class="flex justify-end gap-2 pt-2">
-			<Button variant="ghost" onclick={() => (showFormModal = false)}>Cancel</Button>
+			<Button variant="ghost" onclick={() => (showFormModal = false)}>{t('common.cancel')}</Button>
 			<Button
 				variant="primary"
 				type="submit"
@@ -429,7 +428,7 @@
 				{#if saving}
 					<Loader2 class="w-4 h-4 animate-spin mr-1" />
 				{/if}
-				{editingClient ? 'Update' : 'Register'}
+				{editingClient ? t('common.update') : t('integrations.oauthClients.register')}
 			</Button>
 		</div>
 	</form>
@@ -439,18 +438,18 @@
 {#if secretModal}
 	<Modal isOpen={true}>
 		<ModalHeader
-			title="Copy this secret now"
+			title={t('integrations.oauthClients.copySecretNow')}
 			onclose={() => (secretModal = null)}
 		/>
 
 		<div class="p-4 space-y-4">
 			<AlertBox
 				appearance="warning"
-				message="The client secret is shown exactly once. Windshift only stores its bcrypt hash — once you close this dialog there is no way to recover it. Copy it into Docmost Settings → Workspace integrations. If you lose it, use 'Rotate secret' to generate a new one."
+				message={t('integrations.oauthClients.secretWarning')}
 			/>
 
 			<div>
-				<div class="text-xs mb-1" style="color: var(--ds-text-subtle);">Client ID</div>
+				<div class="text-xs mb-1" style="color: var(--ds-text-subtle);">{t('integrations.oauthClients.clientId')}</div>
 				<div class="flex items-center gap-2">
 					<code
 						class="flex-1 text-xs px-3 py-2 rounded border break-all"
@@ -458,12 +457,12 @@
 					>
 						{secretModal.client.client_id}
 					</code>
-					<CopyButton getText={() => secretModal.client.client_id} title="Client ID" />
+					<CopyButton getText={() => secretModal.client.client_id} title={t('integrations.oauthClients.clientId')} />
 				</div>
 			</div>
 
 			<div>
-				<div class="text-xs mb-1" style="color: var(--ds-text-subtle);">Client Secret</div>
+				<div class="text-xs mb-1" style="color: var(--ds-text-subtle);">{t('integrations.oauthClients.clientSecret')}</div>
 				<div class="flex items-center gap-2">
 					<code
 						class="flex-1 text-xs px-3 py-2 rounded border break-all"
@@ -471,13 +470,13 @@
 					>
 						{secretModal.secret}
 					</code>
-					<CopyButton getText={() => secretModal.secret} title="Client Secret" />
+					<CopyButton getText={() => secretModal.secret} title={t('integrations.oauthClients.clientSecret')} />
 				</div>
 			</div>
 
 			<div class="flex justify-end pt-2">
 				<Button variant="primary" onclick={() => (secretModal = null)}>
-					<X class="w-4 h-4 mr-1" /> Done
+					<X class="w-4 h-4 mr-1" /> {t('common.done')}
 				</Button>
 			</div>
 		</div>

@@ -221,6 +221,9 @@ const shortcuts = {
   actionCredentials: {
     add: { key: 'a' },
   },
+  llmConnections: {
+    add: { key: 'a' },
+  },
   // Coding agents (workspace settings tab — bindings + skills are siblings,
   // so their add shortcuts must not collide)
   agentBindings: {

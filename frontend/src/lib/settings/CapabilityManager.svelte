@@ -385,8 +385,8 @@
   const columns = [
     { key: 'name', label: t('settings.actionCapabilities.name'), slot: 'name' },
     { key: 'capability_type', label: t('settings.actionCapabilities.capabilityType'), slot: 'type' },
-    { key: 'is_enabled', label: 'Status', slot: 'status' },
-    { key: 'actions', label: 'Actions', slot: 'actions', align: 'text-right', width: 'w-32' },
+    { key: 'is_enabled', label: t('common.status'), slot: 'status' },
+    { key: 'actions', label: t('common.actions'), slot: 'actions', align: 'text-right', width: 'w-32' },
   ];
 </script>
 
@@ -422,12 +422,12 @@
         {#if cap.is_enabled}
           <div class="flex items-center gap-1">
             <Power size={14} style="color: var(--ds-icon-success);" />
-            <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
+            <span class="text-xs" style="color: var(--ds-text-success);">{t('common.enabled')}</span>
           </div>
         {:else}
           <div class="flex items-center gap-1">
             <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.disabled')}</span>
           </div>
         {/if}
       {/snippet}
@@ -436,7 +436,7 @@
           <button
             class="p-1.5 rounded hover:opacity-80"
             style="color: var(--ds-text-subtle);"
-            title="Edit"
+            title={t('common.edit')}
             onclick={() => openEdit(cap)}
           >
             <Edit size={14} />
@@ -445,7 +445,7 @@
             variant="danger-ghost"
             size="small"
             icon={Trash2}
-            title="Delete"
+            title={t('common.delete')}
             onclick={() => deleteCapability(cap)}
           ></Button>
         </div>
@@ -467,9 +467,9 @@
       <div class="p-4 space-y-4">
         {@render capabilityForm(false)}
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
           <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
-            Create
+            {t('common.create')}
           </Button>
         </div>
       </div>
@@ -490,9 +490,9 @@
       <div class="p-4 space-y-4">
         {@render capabilityForm(true)}
         <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
           <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </div>
@@ -535,7 +535,7 @@
 
   <!-- Scope: applies to all workspaces vs. specific allowlist -->
   <div class="space-y-2 pt-2 border-t" style="border-color: var(--ds-border);">
-    <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Workspace scope</div>
+    <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.workspaceScope')}</div>
     <label class="flex items-start gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
       <Radio
         name="cap-scope"
@@ -544,8 +544,8 @@
         class="mt-0.5"
       />
       <div>
-        <div>Available in all workspaces</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Any workspace's actions can reference this capability.</div>
+        <div>{t('settings.adminOperations.actionCapabilities.availableAll')}</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.availableAllHelp')}</div>
       </div>
     </label>
     <label class="flex items-start gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
@@ -556,15 +556,15 @@
         class="mt-0.5"
       />
       <div>
-        <div>Restrict to specific workspaces</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Only the workspaces selected below can reference this capability.</div>
+        <div>{t('settings.adminOperations.actionCapabilities.restrict')}</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.restrictHelp')}</div>
       </div>
     </label>
 
     {#if !form.applies_to_all_workspaces}
       <div class="ml-6 mt-1 max-h-40 overflow-auto rounded-md border p-2" style="border-color: var(--ds-border); background: var(--ds-surface);">
         {#if workspaces.length === 0}
-          <p class="text-xs" style="color: var(--ds-text-subtle);">No workspaces available.</p>
+          <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.noWorkspaces')}</p>
         {:else}
           {#each workspaces as ws}
             <Checkbox
@@ -734,7 +734,7 @@
         <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addHeader}>+ {t('settings.actionCapabilities.http.addHeader')}</button>
       </div>
       <p class="text-xs mb-1" style="color: var(--ds-text-subtle);">
-        Non-sensitive headers only (Accept, User-Agent, …). Auth tokens go in the Authentication section below.
+        {t('settings.adminOperations.actionCapabilities.defaultHeadersHelp')}
       </p>
       {#each form.http_default_headers as header, i}
         <div class="flex gap-2 mb-1">
@@ -761,11 +761,11 @@
 
     <!-- Authentication (credential refs) -->
     <div class="rounded-md border p-3" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
-      <Checkbox bind:checked={form.http_auth_enabled} label="Use an auth credential" class="mb-2" />
+      <Checkbox bind:checked={form.http_auth_enabled} label={t('settings.adminOperations.actionCapabilities.useCredential')} class="mb-2" />
       {#if form.http_auth_enabled}
         <div class="space-y-2 mt-2">
           <div>
-            <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Credential</div>
+            <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.credential')}</div>
             <CredentialPicker
               workspaceId={form.applies_to_all_workspaces ? 0 : form.workspace_ids[0] || 0}
               bind:value={form.http_auth_credential_id}
@@ -773,29 +773,29 @@
             />
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
               {#if form.applies_to_all_workspaces}
-                Global capabilities can only reference global credentials.
+                {t('settings.adminOperations.actionCapabilities.globalCredentialHelp')}
               {:else}
-                Workspace-scoped capabilities can reference globals or credentials in their workspace allowlist.
+                {t('settings.adminOperations.actionCapabilities.workspaceCredentialHelp')}
               {/if}
             </p>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <label class="block">
-              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">Header name</span>
+              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.headerName')}</span>
               <Input
                 type="text"
                 bind:value={form.http_auth_header_name}
-                placeholder="Authorization"
+                placeholder={t('settings.adminOperations.actionCapabilities.authorizationPlaceholder')}
                 class="mt-1"
                 size="small"
               />
             </label>
             <label class="block">
-              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">Scheme (bearer tokens only)</span>
+              <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.scheme')}</span>
               <Input
                 type="text"
                 bind:value={form.http_auth_scheme}
-                placeholder="Bearer"
+                placeholder={t('settings.adminOperations.actionCapabilities.bearerPlaceholder')}
                 class="mt-1"
                 size="small"
               />
@@ -808,18 +808,18 @@
     <!-- Secret header refs (APIs that need multiple secret headers) -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Additional secret headers</div>
-        <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addSecretHeaderRef}>+ Add secret header</button>
+        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.additionalHeaders')}</div>
+        <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addSecretHeaderRef}>+ {t('settings.adminOperations.actionCapabilities.addSecretHeader')}</button>
       </div>
       <p class="text-xs mb-1" style="color: var(--ds-text-subtle);">
-        For APIs that need more than one secret header (e.g. X-API-Key + X-Signature). Each row resolves a credential at request time.
+        {t('settings.adminOperations.actionCapabilities.additionalHeadersHelp')}
       </p>
       {#each form.http_secret_header_refs as ref, i}
         <div class="flex gap-2 mb-1">
           <Input
             type="text"
             bind:value={ref.header}
-            placeholder="X-API-Key"
+            placeholder={t('settings.adminOperations.actionCapabilities.apiKeyHeaderPlaceholder')}
             class="flex-1"
             size="small"
           />

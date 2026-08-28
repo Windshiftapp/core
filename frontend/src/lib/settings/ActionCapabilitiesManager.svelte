@@ -6,16 +6,17 @@
   import { currentRoute, updateQueryParams } from '../router.js';
   import { Bolt, KeyRound, Server } from '@lucide/svelte';
   import { useEventListener } from 'runed';
+  import { t } from '../stores/i18n.svelte.js';
 
   const VALID_TABS = new Set(['capabilities', 'credentials', 'runners']);
 
   let activeTab = $state('capabilities');
 
-  const tabs = [
-    { id: 'capabilities', label: 'Capabilities', icon: Bolt },
-    { id: 'credentials', label: 'Credentials', icon: KeyRound },
-    { id: 'runners', label: 'Runner Pools', icon: Server },
-  ];
+  const tabs = $derived([
+    { id: 'capabilities', label: t('settings.adminOperations.tabs.capabilities'), icon: Bolt },
+    { id: 'credentials', label: t('settings.adminOperations.tabs.credentials'), icon: KeyRound },
+    { id: 'runners', label: t('settings.adminOperations.tabs.runnerPools'), icon: Server },
+  ]);
 
   function tabFromRoute(route) {
     const requestedTab = route.query?.tab;

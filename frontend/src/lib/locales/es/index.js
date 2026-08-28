@@ -22,6 +22,7 @@ import pages from './pages.js';
 import supplemental from './supplemental.js';
 import quality from './quality.js';
 import review from './review.js';
+import adminOperations from './adminOperations.js';
 
 export default createLocale({
   common,
@@ -43,4 +44,5 @@ export default createLocale({
   supplemental,
   quality,
   review,
+  adminOperations,
 });

@@ -20,6 +20,7 @@ import ui from './ui.js';
 import workflows from './workflows.js';
 import workspace from './workspace.js';
 import pages from './pages.js';
+import adminOperations from './adminOperations.js';
 
 export default createLocale({
   common,
@@ -38,4 +39,5 @@ export default createLocale({
   analytics,
   teams,
   pages,
+  adminOperations,
 });
