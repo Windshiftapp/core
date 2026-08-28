@@ -11,6 +11,8 @@ export default {
     organizations: '组织',
     create: '创建',
     search: '搜索',
+    aiChat: 'AI 聊天',
+    terminal: '终端',
     admin: '管理',
     notifications: '通知',
     profile: '个人资料',

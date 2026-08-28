@@ -128,7 +128,7 @@
   }
 </script>
 
-<nav class="main-sidebar {$uiStore.navExpanded ? 'w-[200px]' : 'w-16'} shadow-lg border-r flex flex-col py-4 fixed h-full z-40 themed-nav transition-all duration-200 overflow-x-hidden" style="border-color: var(--ds-border);" aria-label="Main navigation">
+<nav class="main-sidebar {$uiStore.navExpanded ? 'w-[200px]' : 'w-16'} shadow-lg border-r flex flex-col py-4 fixed h-full z-40 themed-nav transition-all duration-200 overflow-x-hidden" style="border-color: var(--ds-border);" aria-label={t('aria.mainNavigation')}>
   <!-- Logo -->
   <Tooltip content="Windshift" placement="right" disabled={$uiStore.navExpanded}>
     <a
@@ -200,7 +200,7 @@
         <NavLink
           id="chat-toggle-button"
           icon={IconMessage}
-          label="AI Chat"
+          label={t('nav.aiChat')}
           onclick={onShowChatPanel}
           expanded={$uiStore.navExpanded}
           tooltipSuffix=" ({getShortcutDisplay('global', 'aiChat')})"
@@ -209,7 +209,7 @@
       {#if isTauri}
       <NavLink
         icon={IconTerminal2}
-        label="Terminal"
+        label={t('nav.terminal')}
         onclick={onToggleTerminal}
         expanded={$uiStore.navExpanded}
         tooltipSuffix=" (Cmd+`)"

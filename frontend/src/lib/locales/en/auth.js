@@ -126,6 +126,7 @@ export default {
     saveSettings: 'Save Settings',
     settingsSaved: 'Settings saved successfully',
     connectedAccounts: 'Connected Accounts',
+    connectedAccountsTab: 'Accounts',
     connectedAccountsDesc:
       'Connect your source control accounts to create branches and pull requests',
     labels: {
@@ -145,6 +146,38 @@ export default {
       deleteTitle: 'Delete label?',
       deleteMessage:
         'Delete "{name}"? This will remove it from any items it is attached to.',
+    },
+    agents: {
+      title: 'Agents',
+      description:
+        'Agents are non-human users that inherit your permissions and authenticate only with API tokens. They cannot sign in interactively.',
+      createTitle: 'Create agent',
+      create: 'Create agent',
+      creating: 'Creating…',
+      creationUnavailable:
+        'Agent creation is not available for this account. Your administrator may need to enable user-managed agents, or your agent limit may have been reached.',
+      requiredFields: 'Username, first name, and last name are required.',
+      createFailed: 'Failed to create agent.',
+      yourAgents: 'Your agents',
+      empty: "You don't have any agents yet.",
+      actionsFor: 'Actions for {name}',
+      deleteTitle: 'Delete agent',
+      deleteMessage: 'Delete this agent? All of its API tokens will stop working.',
+      rename: 'Rename agent',
+      nameRequired: 'Agent name is required.',
+      renameFailed: 'Failed to rename agent.',
+      renameHint: 'The stable username @{username} will not change.',
+      manageTokens: 'Manage tokens',
+      hideTokens: 'Hide tokens',
+      tokenExpirationHint:
+        'The token remains valid through this date in your configured timezone. Leave empty for no expiration.',
+      existingTokens: 'Existing tokens',
+      tokenDates: 'Created {created} • Expires {expires}',
+      neverExpires: 'Never expires',
+      noTokens: 'No tokens yet.',
+      tokenCreateFailed: 'Failed to create token.',
+      confirmRevokeUnnamedToken:
+        'Revoke this token? Anything using it will stop working immediately.',
     },
     calendarIntegration: 'Calendar Integration',
     calendarIntegrationDesc: 'Subscribe to your scheduled items in external calendar apps',

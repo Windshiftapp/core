@@ -34,7 +34,7 @@
       aria-current={isActive ? 'page' : undefined}
     >
       <Icon class="w-5 h-5 flex-shrink-0" />
-      {#if expanded}<span class="ml-3 text-sm whitespace-nowrap">{label}</span>{/if}
+      {#if expanded}<span class="ml-3 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{label}</span>{/if}
     </a>
   {:else}
     <button
@@ -44,7 +44,7 @@
       aria-label={label}
     >
       <Icon class="w-5 h-5 flex-shrink-0" />
-      {#if expanded}<span class="ml-3 whitespace-nowrap">{label}</span>{/if}
+      {#if expanded}<span class="ml-3 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>{/if}
     </button>
   {/if}
 </Tooltip>

@@ -136,6 +136,8 @@ export default {
 
     // Status indicators
     loading: 'جاري التحميل...',
+    loadingSlow: 'قد يستغرق هذا بعض الوقت عند بطء الاتصال.',
+    skipToMainContent: 'الانتقال إلى المحتوى الرئيسي',
     saving: 'جاري الحفظ...',
     deleting: 'جاري الحذف...',
     processing: 'جاري المعالجة...',

@@ -182,9 +182,9 @@
   }
 
   function getScreenName(screenId, context) {
-    if (!screenId) return 'None';
+    if (!screenId) return t('settings.configSets.none');
     // The screen names are already loaded in the configuration set data
-    return 'Configured'; // We could enhance this to show actual screen names
+    return t('settings.configSets.configured'); // We could enhance this to show actual screen names
   }
 
   async function handleMigrationAssistantClose(data) {
@@ -227,22 +227,22 @@
 
 <div class="space-y-6">
   <div>
-    <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">Configuration Set</h3>
+    <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.configSets.title')}</h3>
     <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-      Select a configuration set to define the workflow and screens used for different contexts (create, edit, view) within this workspace. Only one configuration set can be assigned per workspace.
+      {t('settings.configSets.assignerDescription')}
     </p>
   </div>
 
   {#if loading}
     <Card rounded="xl" shadow padding="loose" class="text-center">
-      <div class="animate-pulse" style="color: var(--ds-text-subtle);">Loading configuration sets...</div>
+      <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
     </Card>
   {:else}
     <Card rounded="xl" shadow padding="spacious">
       <div class="space-y-6">
         <!-- Configuration Set Selection -->
         <div>
-          <Label color="default" class="mb-3">Select Configuration Set</Label>
+          <Label color="default" class="mb-3">{t('settings.configSets.select')}</Label>
           <ConfigurationSetPicker
             bind:value={selectedConfigurationSetId}
             items={configurationSets}
@@ -255,7 +255,7 @@
         <!-- Status indicator while saving -->
         {#if saving}
           <div class="text-center py-2">
-            <div class="text-sm" style="color: var(--ds-text-subtle);">Updating configuration...</div>
+            <div class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.configSets.updating')}</div>
           </div>
         {/if}
       </div>

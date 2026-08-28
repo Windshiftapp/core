@@ -15,6 +15,8 @@ export default {
     organizations: 'Organisationen',
     create: 'Erstellen',
     search: 'Suchen',
+    aiChat: 'KI-Chat',
+    terminal: 'Terminal',
     admin: 'Admin',
     notifications: 'Benachrichtigungen',
     profile: 'Profil',

@@ -17,6 +17,8 @@ export default {
     organizations: 'المؤسسات',
     create: 'إنشاء',
     search: 'بحث',
+    aiChat: 'محادثة الذكاء الاصطناعي',
+    terminal: 'الطرفية',
     admin: 'الإدارة',
     notifications: 'الإشعارات',
     profile: 'الملف الشخصي',

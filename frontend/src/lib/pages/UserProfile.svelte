@@ -83,13 +83,13 @@
 		},
 		{
 			id: 'agents',
-			label: 'Agents',
+			label: t('workspaceSettings.tabs.codingAgents'),
 			icon: Bot,
 			testid: 'profile-tab-agents'
 		},
 		{
 			id: 'connected-accounts',
-			label: t('users.connectedAccounts'),
+			label: t('users.connectedAccountsTab'),
 			icon: GitBranch
 		},
 		{
@@ -150,7 +150,7 @@
 		ensureAgentMintState(agentId);
 		const s = agentMintState[agentId];
 		if (!s.name.trim()) {
-			s.error = 'Token name is required';
+			s.error = t('security.enterTokenName');
 			return;
 		}
 		s.error = '';
@@ -167,7 +167,7 @@
 			s.expiresAt = '';
 			agentTokens[agentId] = await api.getApiTokens(agentId);
 		} catch (err) {
-			s.error = err?.message || 'Failed to mint token';
+			s.error = t('users.agents.tokenCreateFailed');
 		} finally {
 			s.minting = false;
 		}
@@ -178,7 +178,7 @@
 			title: t('security.revokeToken'),
 			message: tokenName
 				? t('security.confirmRevokeToken', { name: tokenName })
-				: 'Revoke this token? Anything using it will stop working immediately.',
+				: t('users.agents.confirmRevokeUnnamedToken'),
 			confirmText: t('security.revokeToken'),
 		});
 		if (!confirmed) return;
@@ -206,7 +206,7 @@
 		agentCreateError = '';
 		featureDisabledNotice = false;
 		if (!newAgent.username || !newAgent.first_name || !newAgent.last_name) {
-			agentCreateError = 'Username, first name and last name are required.';
+			agentCreateError = t('users.agents.requiredFields');
 			return;
 		}
 		creatingAgent = true;
@@ -224,7 +224,7 @@
 			if (err?.status === 403) {
 				featureDisabledNotice = true;
 			} else {
-				agentCreateError = err?.message || 'Failed to create agent.';
+				agentCreateError = t('users.agents.createFailed');
 			}
 		} finally {
 			creatingAgent = false;
@@ -233,8 +233,8 @@
 
 	async function handleDeleteAgent(agentId) {
 		const confirmed = await confirm({
-			title: 'Delete agent',
-			message: 'Delete this agent? Any API tokens they hold will stop working.',
+			title: t('users.agents.deleteTitle'),
+			message: t('users.agents.deleteMessage'),
 			confirmText: t('common.delete'),
 		});
 		if (!confirmed) return;
@@ -262,7 +262,7 @@
 	async function renameAgent() {
 		const name = editingAgentName.trim();
 		if (!editingAgent || !name) {
-			agentRenameError = 'Agent name is required.';
+			agentRenameError = t('users.agents.nameRequired');
 			return;
 		}
 		renamingAgent = true;
@@ -273,7 +273,7 @@
 			editingAgent = null;
 			editingAgentName = '';
 		} catch (err) {
-			agentRenameError = err?.message || 'Failed to rename agent.';
+			agentRenameError = t('users.agents.renameFailed');
 		} finally {
 			renamingAgent = false;
 		}
@@ -283,21 +283,21 @@
 		return [
 			{
 				id: 'rename',
-				title: 'Rename',
+				title: t('users.agents.rename'),
 				icon: Pencil,
 				onClick: () => openRenameAgent(agent),
 			},
 			{
 				id: 'tokens',
 				testid: `agent-manage-tokens-${agent.id}`,
-				title: expandedAgent === agent.id ? 'Hide tokens' : 'Manage tokens',
+				title: expandedAgent === agent.id ? t('users.agents.hideTokens') : t('users.agents.manageTokens'),
 				icon: Key,
 				onClick: () => toggleAgentTokens(agent.id),
 			},
 			{ type: 'divider' },
 			{
 				id: 'delete',
-				title: 'Delete',
+				title: t('common.delete'),
 				icon: Trash2,
 				color: 'var(--ds-text-danger)',
 				onClick: () => handleDeleteAgent(agent.id),
@@ -566,13 +566,20 @@
 
 		try {
 			// Use dedicated endpoint that only updates regional settings
-			await api.updateUserRegionalSettings(currentUserId, {
+			const updatedUser = await api.updateUserRegionalSettings(currentUserId, {
 				timezone: selectedTimezone,
 				language: selectedLanguage
 			});
 
-			// Switch UI locale to match saved preference
-			await i18n.setLocale(selectedLanguage);
+			// Keep the global authenticated user in sync before changing locale.
+			// Otherwise App.svelte observes the stale language and immediately
+			// switches the interface back to it.
+			const savedLanguage = updatedUser?.language || selectedLanguage;
+			authStore.patchCurrentUser({
+				language: savedLanguage,
+				timezone: updatedUser?.timezone || selectedTimezone
+			});
+			await i18n.setLocale(savedLanguage);
 
 			await loadUserProfile();
 
@@ -661,40 +668,54 @@
 		return url.substring(0, 40) + '...' + url.substring(url.length - 20);
 	}
 
-	// Common timezones (IANA format)
-	const commonTimezones = [
-		{ value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-		{ value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
-		{ value: 'America/Chicago', label: 'Central Time (US & Canada)' },
-		{ value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
-		{ value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
-		{ value: 'America/Anchorage', label: 'Alaska Time' },
-		{ value: 'Pacific/Honolulu', label: 'Hawaii Time' },
-		{ value: 'Europe/London', label: 'London (GMT/BST)' },
-		{ value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
-		{ value: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
-		{ value: 'Europe/Rome', label: 'Rome (CET/CEST)' },
-		{ value: 'Europe/Madrid', label: 'Madrid (CET/CEST)' },
-		{ value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
-		{ value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
-		{ value: 'Asia/Hong_Kong', label: 'Hong Kong (HKT)' },
-		{ value: 'Asia/Singapore', label: 'Singapore (SGT)' },
-		{ value: 'Asia/Dubai', label: 'Dubai (GST)' },
-		{ value: 'Asia/Kolkata', label: 'India (IST)' },
-		{ value: 'Australia/Sydney', label: 'Sydney (AEDT/AEST)' },
-		{ value: 'Australia/Melbourne', label: 'Melbourne (AEDT/AEST)' },
-		{ value: 'Pacific/Auckland', label: 'Auckland (NZDT/NZST)' }
+	// Common timezones (IANA format). Intl supplies locale-aware names while
+	// the IANA identifier keeps otherwise identical regional labels distinct.
+	const commonTimezoneIds = [
+		'UTC',
+		'America/New_York',
+		'America/Chicago',
+		'America/Denver',
+		'America/Los_Angeles',
+		'America/Anchorage',
+		'Pacific/Honolulu',
+		'Europe/London',
+		'Europe/Paris',
+		'Europe/Berlin',
+		'Europe/Rome',
+		'Europe/Madrid',
+		'Asia/Tokyo',
+		'Asia/Shanghai',
+		'Asia/Hong_Kong',
+		'Asia/Singapore',
+		'Asia/Dubai',
+		'Asia/Kolkata',
+		'Australia/Sydney',
+		'Australia/Melbourne',
+		'Pacific/Auckland'
 	];
+
+	function getLocalizedTimezoneLabel(timezone) {
+		try {
+			const formatter = new Intl.DateTimeFormat(i18n.locale, {
+				timeZone: timezone,
+				timeZoneName: timezone === 'UTC' ? 'long' : 'longGeneric'
+			});
+			const name = formatter.formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+			if (!name) return timezone;
+			return timezone === 'UTC' ? `UTC (${name})` : `${name} (${timezone})`;
+		} catch {
+			return timezone;
+		}
+	}
+
+	let commonTimezones = $derived(
+		commonTimezoneIds.map(value => ({ value, label: getLocalizedTimezoneLabel(value) }))
+	);
 
 	// Languages - only show those with UI translations
 	const commonLanguages = SUPPORTED_LOCALES.map(loc => ({
 		value: loc.code,
-		label: loc.code === 'en' ? 'English' :
-		       loc.code === 'de' ? 'Deutsch (German)' :
-		       loc.code === 'es' ? 'Español (Spanish)' :
-		       loc.code === 'ar' ? 'العربية (Arabic)' :
-		       loc.code === 'pt-BR' ? 'Português (Brasil)' :
-		       loc.code === 'zh-CN' ? '简体中文 (Chinese)' : loc.name
+		label: loc.name
 	}));
 </script>
 
@@ -786,7 +807,7 @@
 			<div class="flex items-center gap-6 mb-6">
 				<div class="relative">
 					{#if user?.avatar_url}
-						<img class="h-20 w-20 rounded-full border-2" style="border-color: var(--ds-border);" src={user.avatar_url} alt="Current avatar" />
+						<img class="h-20 w-20 rounded-full border-2" style="border-color: var(--ds-border);" src={user.avatar_url} alt={t('users.currentProfilePicture')} />
 					{:else}
 						<div class="h-20 w-20 rounded-full flex items-center justify-center border-2" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
 							<User class="h-10 w-10" style="color: var(--ds-icon);" />
@@ -903,27 +924,27 @@
 			<div class="mb-6">
 				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 					<Bot class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					Agents
+					{t('users.agents.title')}
 				</h2>
 				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					Agents are non-human users that inherit your permissions and authenticate via API tokens only. They cannot log in interactively.
+					{t('users.agents.description')}
 				</p>
 			</div>
 
 			<div class="border rounded-lg p-6 mb-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">Create agent</h3>
+				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">{t('users.agents.createTitle')}</h3>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-					<Input placeholder="Username" bind:value={newAgent.username} />
-					<Input type="email" placeholder="Email (optional)" bind:value={newAgent.email} />
-					<Input placeholder="First name" bind:value={newAgent.first_name} />
-					<Input placeholder="Last name" bind:value={newAgent.last_name} />
+					<Input placeholder={t('common.username')} bind:value={newAgent.username} />
+					<Input type="email" placeholder={t('common.email')} bind:value={newAgent.email} />
+					<Input placeholder={t('users.firstName')} bind:value={newAgent.first_name} />
+					<Input placeholder={t('users.lastName')} bind:value={newAgent.last_name} />
 				</div>
 				{#if agentCreateError}
 					<p class="text-sm mt-2" style="color: var(--ds-text-danger);">{agentCreateError}</p>
 				{/if}
 				{#if featureDisabledNotice}
 					<p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
-						Agent creation is not available on this account. Your administrator may need to enable user-managed agents or your agent limit may have been reached.
+						{t('users.agents.creationUnavailable')}
 					</p>
 				{/if}
 				<div class="mt-3">
@@ -933,17 +954,17 @@
 						disabled={creatingAgent}
 						loading={creatingAgent}
 					>
-						{creatingAgent ? 'Creating…' : 'Create agent'}
+						{creatingAgent ? t('users.agents.creating') : t('users.agents.create')}
 					</Button>
 				</div>
 			</div>
 
 			<div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">Your agents</h3>
+				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">{t('users.agents.yourAgents')}</h3>
 				{#if agentsLoading}
-					<p class="text-sm" style="color: var(--ds-text-subtle);">Loading…</p>
+					<p class="text-sm" style="color: var(--ds-text-subtle);">{t('common.loading')}</p>
 				{:else if agents.length === 0}
-					<p class="text-sm" style="color: var(--ds-text-subtle);">You don't have any agents yet.</p>
+					<p class="text-sm" style="color: var(--ds-text-subtle);">{t('users.agents.empty')}</p>
 				{:else}
 					<ul class="divide-y divide-[var(--ds-border)]">
 						{#each agents as agent (agent.id)}
@@ -952,7 +973,7 @@
 									<div>
 										<div class="font-medium" style="color: var(--ds-text);">{agent.full_name || `${agent.first_name} ${agent.last_name}`}</div>
 										<div class="text-sm" style="color: var(--ds-text-subtle);">
-											@{agent.username} · {agent.is_active ? 'active' : 'inactive'}
+											@{agent.username} · {agent.is_active ? t('users.active') : t('users.inactive')}
 										</div>
 									</div>
 									<DropdownMenu
@@ -965,7 +986,7 @@
 									>
 										{#snippet children()}
 											<MoreHorizontal class="w-5 h-5" aria-hidden="true" />
-											<span class="sr-only">Actions for {agent.full_name || agent.username}</span>
+											<span class="sr-only">{t('users.agents.actionsFor', { name: agent.full_name || agent.username })}</span>
 										{/snippet}
 									</DropdownMenu>
 								</div>
@@ -1012,7 +1033,7 @@
 												<Input placeholder={t('security.tokenName')} bind:value={agentMintState[agent.id].name} />
 												<Input type="date" bind:value={agentMintState[agent.id].expiresAt} />
 											</div>
-											<DescriptionText>The token remains valid through this date in your configured timezone. Leave empty for no expiration.</DescriptionText>
+											<DescriptionText>{t('users.agents.tokenExpirationHint')}</DescriptionText>
 											{#if agentMintState[agent.id].error}
 												<p class="text-sm mt-2" style="color: var(--ds-text-danger);">{agentMintState[agent.id].error}</p>
 											{/if}
@@ -1029,7 +1050,7 @@
 											</div>
 										</div>
 
-										<h5 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Existing tokens</h5>
+									<h5 class="text-sm font-medium mb-2" style="color: var(--ds-text);">{t('users.agents.existingTokens')}</h5>
 										<div class="space-y-2">
 											{#each agentTokens[agent.id] || [] as tok (tok.id)}
 												<div data-testid={`agent-token-row-${tok.id}`} class="flex items-center justify-between p-3 border rounded" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
@@ -1038,7 +1059,10 @@
 														<div>
 															<div class="font-medium text-sm" style="color: var(--ds-text);">{tok.name}</div>
 															<div class="text-xs" style="color: var(--ds-text-subtle);">
-														Created {formatAuthenticatedInstant(tok.created_at, { year: 'numeric', month: 'short', day: 'numeric' }) || '-'} • Expires {formatAuthenticatedInstant(tok.expires_at, { year: 'numeric', month: 'short', day: 'numeric' }) || 'Never expires'}
+													{t('users.agents.tokenDates', {
+														created: formatAuthenticatedInstant(tok.created_at, { year: 'numeric', month: 'short', day: 'numeric' }) || '-',
+														expires: formatAuthenticatedInstant(tok.expires_at, { year: 'numeric', month: 'short', day: 'numeric' }) || t('users.agents.neverExpires')
+													})}
 															</div>
 														</div>
 													</div>
@@ -1053,7 +1077,7 @@
 													</Button>
 												</div>
 											{:else}
-												<p class="text-sm" style="color: var(--ds-text-subtle);">No tokens yet.</p>
+										<p class="text-sm" style="color: var(--ds-text-subtle);">{t('users.agents.noTokens')}</p>
 											{/each}
 										</div>
 									</div>
@@ -1085,10 +1109,10 @@
 			<div class="mb-6">
 				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
 					<Tag class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					{t('users.labels.tabLabel') || 'Personal labels'}
+					{t('users.labels.tabLabel')}
 				</h2>
 				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					{t('users.labels.tabDescription') || 'Manage your personal labels.'}
+					{t('users.labels.tabDescription')}
 				</p>
 			</div>
 
@@ -1274,21 +1298,21 @@
 	submitDisabled={renamingAgent || !editingAgentName.trim()}
 	maxWidth="max-w-md"
 >
-	<ModalHeader title="Rename agent" onClose={closeRenameAgent} />
+	<ModalHeader title={t('users.agents.rename')} onClose={closeRenameAgent} />
 	<div class="px-6 py-4">
 		<label for="agent-display-name" class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
-			Name
+			{t('users.displayName')}
 		</label>
 		<Input id="agent-display-name" bind:value={editingAgentName} maxlength={100} />
 		<p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-			The agent's stable username @{editingAgent?.username ?? ''} will not change.
+			{t('users.agents.renameHint', { username: editingAgent?.username ?? '' })}
 		</p>
 		{#if agentRenameError}
 			<p class="text-sm mt-2" style="color: var(--ds-text-danger);">{agentRenameError}</p>
 		{/if}
 	</div>
 	<DialogFooter
-		confirmLabel="Rename"
+		confirmLabel={t('users.agents.rename')}
 		onCancel={closeRenameAgent}
 		onConfirm={renameAgent}
 		disabled={!editingAgentName.trim()}

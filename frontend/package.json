@@ -20,7 +20,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "check": "biome check . && node scripts/check-shortcuts.js && node scripts/check-i18n.js",
+    "check": "biome check . && node scripts/check-shortcuts.js && node scripts/check-i18n.js && node scripts/check-hardcoded-i18n.js",
     "check:entry-assets": "node scripts/check-entry-assets.js",
     "check:fix": "biome check --write .",
     "test": "bun --bun vitest",

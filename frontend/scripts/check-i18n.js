@@ -4,7 +4,8 @@
  * i18n Validation Script
  *
  * Validates locale files against English (reference locale) and detects:
- * - Missing or extra keys in non-English locales
+ * - Missing or extra keys in non-English locales (while allowing valid
+ *   locale-specific CLDR plural variants)
  * - Source keys referenced in code but missing from English catalog
  * - Placeholder mismatches between English and other locales
  * - Untranslated English carryovers in non-English locales
@@ -21,6 +22,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = join(__dirname, '..', 'src', 'lib', 'locales');
 const SRC_DIR = join(__dirname, '..', 'src');
 const REFERENCE_LOCALE = 'en';
+const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
 
 // These values intentionally retain product names, code syntax, URLs, or sample identifiers.
 const INTENTIONAL_CARRYOVERS = new Set([
@@ -87,6 +89,65 @@ function extractPlaceholders(str) {
   return matches ? matches.map((m) => m.slice(1, -1)).sort() : [];
 }
 
+function splitPluralKey(key) {
+  const match = key.match(PLURAL_SUFFIX_PATTERN);
+  if (!match) return null;
+
+  return {
+    baseKey: key.slice(0, -match[0].length),
+    category: match[1],
+  };
+}
+
+function getPluralCategories(localeCode) {
+  return new Set(new Intl.PluralRules(localeCode).resolvedOptions().pluralCategories);
+}
+
+function collectPluralBases(keys) {
+  const categoriesByBase = new Map();
+
+  for (const key of keys) {
+    const plural = splitPluralKey(key);
+    if (!plural) continue;
+
+    const categories = categoriesByBase.get(plural.baseKey) ?? new Set();
+    categories.add(plural.category);
+    categoriesByBase.set(plural.baseKey, categories);
+  }
+
+  return new Set(
+    [...categoriesByBase]
+      .filter(([, categories]) => categories.has('other') && categories.size > 1)
+      .map(([baseKey]) => baseKey)
+  );
+}
+
+function isLocaleSpecificPluralKey(key, pluralBases, localePluralCategories) {
+  const plural = splitPluralKey(key);
+  return (
+    plural !== null &&
+    pluralBases.has(plural.baseKey) &&
+    localePluralCategories.has(plural.category)
+  );
+}
+
+function findReferenceEntry(key, refEntries, pluralBases, localePluralCategories) {
+  if (Object.hasOwn(refEntries, key)) {
+    return { key, value: refEntries[key] };
+  }
+
+  if (!isLocaleSpecificPluralKey(key, pluralBases, localePluralCategories)) {
+    return null;
+  }
+
+  const { baseKey } = splitPluralKey(key);
+  const fallbackKey = [`${baseKey}_other`, `${baseKey}_one`].find((candidate) =>
+    Object.hasOwn(refEntries, candidate)
+  );
+
+  return fallbackKey ? { key: fallbackKey, value: refEntries[fallbackKey] } : null;
+}
+
 function findSourceFile(key, fileMap) {
   for (const [filename, keys] of Object.entries(fileMap)) {
     if (keys.has(key)) return filename;
@@ -136,17 +197,21 @@ async function extractSourceKeys() {
   return keys;
 }
 
-function detectCarryovers(english, other, _localeCode) {
+function detectCarryovers(english, other, localeCode) {
   const carryovers = [];
   const enEntries = Object.fromEntries(
     flattenAll(english).filter(([, v]) => typeof v === 'string')
   );
+  const pluralBases = collectPluralBases(Object.keys(enEntries));
+  const localePluralCategories = getPluralCategories(localeCode);
 
   for (const [key, value] of flattenAll(other)) {
     if (INTENTIONAL_CARRYOVERS.has(key)) continue;
     if (typeof value !== 'string') continue;
-    const enValue = enEntries[key];
-    if (!enValue) continue;
+    const reference = findReferenceEntry(key, enEntries, pluralBases, localePluralCategories);
+    if (!reference) continue;
+
+    const enValue = reference.value;
 
     const words = value.split(/\s+/);
     const wordCount = words.length;
@@ -195,6 +260,7 @@ async function main() {
   const refEntries = Object.fromEntries(
     flattenAll(ref.merged).filter(([, v]) => typeof v === 'string')
   );
+  const refPluralBases = collectPluralBases(refLeafKeys);
 
   console.log(`\n  Reference: ${REFERENCE_LOCALE} (${refLeafKeys.size} leaf keys)\n`);
 
@@ -226,9 +292,23 @@ async function main() {
   for (const locale of otherLocales) {
     const loc = await loadLocaleFiles(locale);
     const locKeys = new Set(flattenKeys(loc.merged));
+    const localePluralCategories = getPluralCategories(locale);
 
     const missing = [...refLeafKeys].filter((k) => !locKeys.has(k)).sort();
-    const extra = [...locKeys].filter((k) => !refLeafKeys.has(k)).sort();
+    const localePluralVariants = [...locKeys]
+      .filter(
+        (k) =>
+          !refLeafKeys.has(k) &&
+          isLocaleSpecificPluralKey(k, refPluralBases, localePluralCategories)
+      )
+      .sort();
+    const extra = [...locKeys]
+      .filter(
+        (k) =>
+          !refLeafKeys.has(k) &&
+          !isLocaleSpecificPluralKey(k, refPluralBases, localePluralCategories)
+      )
+      .sort();
 
     totalMissing += missing.length;
     totalExtra += extra.length;
@@ -236,7 +316,11 @@ async function main() {
     const coverage = (((refLeafKeys.size - missing.length) / refLeafKeys.size) * 100).toFixed(1);
 
     if (missing.length === 0 && extra.length === 0) {
-      console.log(`  ✓ ${locale}  ${coverage}% coverage  (${locKeys.size} keys)`);
+      const pluralSuffix =
+        localePluralVariants.length > 0
+          ? `, ${localePluralVariants.length} locale plural variant(s)`
+          : '';
+      console.log(`  ✓ ${locale}  ${coverage}% coverage  (${locKeys.size} keys${pluralSuffix})`);
     } else {
       console.log(
         `  ✗ ${locale}  ${coverage}% coverage  (${locKeys.size} keys, ${missing.length} missing, ${extra.length} extra)`
@@ -268,11 +352,14 @@ async function main() {
     const locEntries = Object.fromEntries(
       flattenAll(loc.merged).filter(([, v]) => typeof v === 'string')
     );
+    const localePluralCategories = getPluralCategories(locale);
 
     const mismatches = [];
-    for (const [key, enValue] of Object.entries(refEntries)) {
-      const locValue = locEntries[key];
-      if (!locValue) continue;
+    for (const [key, locValue] of Object.entries(locEntries)) {
+      const reference = findReferenceEntry(key, refEntries, refPluralBases, localePluralCategories);
+      if (!reference || !locValue) continue;
+
+      const enValue = reference.value;
 
       const enPlaceholders = extractPlaceholders(enValue);
       const locPlaceholders = extractPlaceholders(locValue);
@@ -286,7 +373,14 @@ async function main() {
       const extra = locPlaceholders.filter((p) => p !== 'plural' && !enSet.has(p));
 
       if (missing.length > 0 || extra.length > 0) {
-        mismatches.push({ key, enValue, locValue, missing, extra });
+        mismatches.push({
+          key,
+          referenceKey: reference.key,
+          enValue,
+          locValue,
+          missing,
+          extra,
+        });
       }
     }
 
@@ -298,7 +392,8 @@ async function main() {
         if (m.extra.length > 0) details.push(`extra: {${m.extra.join('}, {')}}`);
         console.log(`      ${m.key} — ${details.join(', ')}`);
         if (verbose) {
-          console.log(`        EN: ${m.enValue}`);
+          const referenceLabel = m.referenceKey === m.key ? 'EN' : `EN (${m.referenceKey})`;
+          console.log(`        ${referenceLabel}: ${m.enValue}`);
           console.log(`        ${locale}: ${m.locValue}`);
         }
       }

@@ -2,6 +2,7 @@
   import Button from './Button.svelte';
   import ModalBackdrop from './ModalBackdrop.svelte';
   import Spinner from './Spinner.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     loader,
@@ -31,10 +32,11 @@
       style="background-color: var(--ds-surface-raised); color: var(--ds-text); box-shadow: var(--ds-shadow-raised);"
       role="status"
       data-testid="root-dialog-loading"
+      data-root-label={label}
     >
       <Spinner class="mx-auto mb-3" />
       <p id="root-dialog-loading-label" class="text-sm" style="color: var(--ds-text-subtle);">
-        Loading {label}…
+        {t('common.loading')}
       </p>
     </div>
   </ModalBackdrop>
@@ -55,12 +57,13 @@
       style="background-color: var(--ds-surface-raised); color: var(--ds-text); box-shadow: var(--ds-shadow-raised);"
       role="alert"
       data-testid="root-dialog-error"
+      data-root-label={label}
     >
       <h1 id="root-dialog-error-title" class="mb-2 text-lg font-semibold">
-        Unable to load {label}
+        {t('errors.failedToLoad')}
       </h1>
       <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
-        Check your connection, then try again.
+        {t('errors.NETWORK_ERROR')}
       </p>
       <!-- shortcut-guard-exempt: retrying a failed lazy import is a recovery action, not a form submission. -->
       <Button
@@ -68,7 +71,7 @@
         size="large"
         dataTestid="root-dialog-retry"
         onclick={() => retryVersion++}
-      >Try again</Button>
+      >{t('common.retry')}</Button>
     </div>
   </ModalBackdrop>
 {/await}

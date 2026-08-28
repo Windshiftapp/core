@@ -1,6 +1,7 @@
 <script>
   import Button from './Button.svelte';
   import Spinner from './Spinner.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let { loader, componentProps = {}, label = 'view' } = $props();
   let retryVersion = $state(0);
@@ -17,10 +18,11 @@
     style="color: var(--ds-text);"
     role="status"
     data-testid="root-view-loading"
+    data-root-label={label}
   >
     <div class="text-center">
       <Spinner class="mx-auto mb-3" />
-      <p class="text-sm" style="color: var(--ds-text-subtle);">Loading {label}…</p>
+      <p class="text-sm" style="color: var(--ds-text-subtle);">{t('common.loading')}</p>
     </div>
   </div>
 {:then loadedModule}
@@ -32,11 +34,12 @@
     style="color: var(--ds-text);"
     role="alert"
     data-testid="root-view-error"
+    data-root-label={label}
   >
     <div class="text-center max-w-sm">
-      <h1 class="text-lg font-semibold mb-2">Unable to load {label}</h1>
+      <h1 class="text-lg font-semibold mb-2">{t('errors.failedToLoad')}</h1>
       <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
-        Check your connection, then try again.
+        {t('errors.NETWORK_ERROR')}
       </p>
       <!-- shortcut-guard-exempt: retrying a failed lazy import is a recovery action, not a form submission. -->
       <Button
@@ -44,7 +47,7 @@
         size="large"
         dataTestid="root-view-retry"
         onclick={() => retryVersion++}
-      >Try again</Button>
+      >{t('common.retry')}</Button>
     </div>
   </div>
 {/await}

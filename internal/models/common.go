@@ -68,6 +68,7 @@ type SetupUser struct {
 	Username  string `json:"username"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	Language  string `json:"language"`
 	Password  string `json:"password"` // Plaintext; hashed server-side
 }
 

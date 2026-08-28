@@ -128,6 +128,8 @@ export default {
     custom: '自定义',
 
     loading: '加载中...',
+    loadingSlow: '网络连接较慢时，这可能需要一些时间。',
+    skipToMainContent: '跳转到主要内容',
     saving: '保存中...',
     deleting: '删除中...',
     processing: '处理中...',

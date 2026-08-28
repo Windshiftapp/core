@@ -2,12 +2,38 @@
   import { api } from '../api.js';
   import { Settings, Workflow, Monitor, Bell } from '@lucide/svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let { workspaceId } = $props();
 
   let configurationSet = $state(null);
   let isUsingDefault = $state(false);
   let loading = $state(true);
+
+  const defaultConfiguration = {
+    name: 'Default Configuration',
+    description: 'Default configuration set with basic workflow and screen'
+  };
+
+  function isSystemDefaultConfiguration(configSet) {
+    return configSet?.is_default === true && configSet.name === defaultConfiguration.name &&
+      configSet.description === defaultConfiguration.description;
+  }
+
+  function getConfigurationDisplayValue(field) {
+    return isSystemDefaultConfiguration(configurationSet)
+      ? t(`settings.configSets.defaults.configuration.${field}`)
+      : (configurationSet?.[field] || '');
+  }
+
+  function getSystemReferenceName(value, type) {
+    if (!value) return t('settings.configSets.noneAssigned');
+    if (!isSystemDefaultConfiguration(configurationSet)) return value;
+    if (type === 'workflow' && value === 'Default Workflow') return t('workflows.defaults.default.name');
+    if (type === 'screen' && value === 'Default Screen') return t('screensPage.defaults.default.name');
+    if (type === 'notifications' && value === 'Default Notifications') return t('settings.configSets.defaults.notifications.name');
+    return value;
+  }
 
   async function loadConfigurationSet() {
     try {
@@ -54,8 +80,8 @@
   <div class="flex items-center gap-3" style="color: var(--ds-text-subtle);">
     <Settings class="w-5 h-5" />
     <div>
-      <div class="font-medium" style="color: var(--ds-text);">No Configuration Set Available</div>
-      <div class="text-sm">Create a default configuration set to configure this workspace</div>
+      <div class="font-medium" style="color: var(--ds-text);">{t('settings.configSets.previewUnavailable')}</div>
+      <div class="text-sm">{t('settings.configSets.previewUnavailableDescription')}</div>
     </div>
   </div>
 {:else}
@@ -65,13 +91,13 @@
       <Settings class="w-5 h-5" style="color: var(--ds-icon-accent);" />
       <div>
         <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
-          {configurationSet.name}
+          {getConfigurationDisplayValue('name')}
           {#if isUsingDefault}
-            <Lozenge color="blue" text="Default" />
+            <Lozenge color="blue" text={t('common.default')} />
           {/if}
         </div>
-        {#if configurationSet.description}
-          <div class="text-sm" style="color: var(--ds-text-subtle);">{configurationSet.description}</div>
+        {#if getConfigurationDisplayValue('description')}
+          <div class="text-sm" style="color: var(--ds-text-subtle);">{getConfigurationDisplayValue('description')}</div>
         {/if}
       </div>
     </div>
@@ -82,9 +108,9 @@
       <div class="flex items-center gap-2">
         <Workflow class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
         <div class="text-sm">
-          <div style="color: var(--ds-text-subtle);">Workflow</div>
+          <div style="color: var(--ds-text-subtle);">{t('settings.configSets.workflow')}</div>
           <div class="font-medium" style="color: var(--ds-text);">
-            {configurationSet.workflow_name || 'Not assigned'}
+            {getSystemReferenceName(configurationSet.workflow_name, 'workflow')}
           </div>
         </div>
       </div>
@@ -93,19 +119,19 @@
       <div class="flex items-start gap-2">
         <Monitor class="w-4 h-4 mt-0.5" style="color: var(--ds-icon-subtle);" />
         <div class="text-sm">
-          <div class="mb-1" style="color: var(--ds-text-subtle);">Screens</div>
+          <div class="mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.screens')}</div>
           <div class="space-y-1">
             <div class="flex justify-between">
-              <span style="color: var(--ds-text-subtle);">Create:</span>
-              <span class="font-medium" style="color: var(--ds-text);">{configurationSet.create_screen_name || 'Not assigned'}</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.configSets.createScreen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.create_screen_name, 'screen')}</span>
             </div>
             <div class="flex justify-between">
-              <span style="color: var(--ds-text-subtle);">Edit:</span>
-              <span class="font-medium" style="color: var(--ds-text);">{configurationSet.edit_screen_name || 'Not assigned'}</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.configSets.editScreen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.edit_screen_name, 'screen')}</span>
             </div>
             <div class="flex justify-between">
-              <span style="color: var(--ds-text-subtle);">View:</span>
-              <span class="font-medium" style="color: var(--ds-text);">{configurationSet.view_screen_name || 'Not assigned'}</span>
+              <span style="color: var(--ds-text-subtle);">{t('settings.configSets.viewScreen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.view_screen_name, 'screen')}</span>
             </div>
           </div>
         </div>
@@ -115,9 +141,9 @@
       <div class="flex items-center gap-2">
         <Bell class="w-4 h-4" style="color: var(--ds-icon-subtle);" />
         <div class="text-sm">
-          <div style="color: var(--ds-text-subtle);">Notifications</div>
+          <div style="color: var(--ds-text-subtle);">{t('settings.configSets.notifications')}</div>
           <div class="font-medium" style="color: var(--ds-text);">
-            {configurationSet.notification_setting_name || 'Not assigned'}
+            {getSystemReferenceName(configurationSet.notification_setting_name, 'notifications')}
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
 <script>
   import { APP_NAME } from '../constants.js';
+  import { t } from '../stores/i18n.svelte.js';
 
-  let { label = `Loading ${APP_NAME}…`, detail = '', fullViewport = true } = $props();
+  let { label = '', detail = '', fullViewport = true } = $props();
+  let displayLabel = $derived(label || t('common.loading'));
 </script>
 
 <div
@@ -20,7 +22,7 @@
       decoding="async"
       data-testid="branded-loader-logo"
     />
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{label}</p>
+    <p class="text-sm" style="color: var(--ds-text-subtle);">{displayLabel}</p>
     {#if detail}
       <p class="mt-1 text-sm" style="color: var(--ds-text-subtlest);">{detail}</p>
     {/if}

@@ -129,6 +129,8 @@ export default {
     default: 'Standard',
     custom: 'Benutzerdefiniert',
     loading: 'Wird geladen...',
+    loadingSlow: 'Bei einer langsamen Verbindung kann dies einen Moment dauern.',
+    skipToMainContent: 'Zum Hauptinhalt springen',
     saving: 'Wird gespeichert...',
     deleting: 'Wird gelöscht...',
     processing: 'Wird verarbeitet...',

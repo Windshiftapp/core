@@ -34,6 +34,86 @@
   let showCreateForm = $state(false);
   let editingId = $state(null);
 
+  const systemStatuses = {
+    Open: {
+      key: 'open',
+      description: 'New work item, not yet started',
+      isDefault: true
+    },
+    'In Progress': {
+      key: 'inProgress',
+      description: 'Currently being worked on',
+      isDefault: false
+    },
+    Done: {
+      key: 'done',
+      description: 'Work has been completed',
+      isDefault: false
+    }
+  };
+
+  const systemStatusCategories = {
+    'To Do': {
+      key: 'todo',
+      color: '#d1d5db',
+      description: "Work that hasn't been started",
+      isDefault: false,
+      isCompleted: false
+    },
+    'In Progress': {
+      key: 'inProgress',
+      color: '#3b82f6',
+      description: 'Work that is actively being done',
+      isDefault: true,
+      isCompleted: false
+    },
+    Done: {
+      key: 'done',
+      color: '#22c55e',
+      description: 'Work that has been completed',
+      isDefault: false,
+      isCompleted: true
+    }
+  };
+
+  function getSystemStatusDefinition(status) {
+    const definition = systemStatuses[status.name];
+    if (
+      !definition ||
+      status.description !== definition.description ||
+      Boolean(status.is_default) !== definition.isDefault
+    ) {
+      return null;
+    }
+    return definition;
+  }
+
+  function getStatusDisplayValue(status, field) {
+    const definition = getSystemStatusDefinition(status);
+    return definition ? t(`statuses.defaults.${definition.key}.${field}`) : status[field];
+  }
+
+  function getSystemCategoryDefinition(category) {
+    const definition = systemStatusCategories[category.name];
+    if (
+      !definition ||
+      category.color?.toLowerCase() !== definition.color ||
+      category.description !== definition.description ||
+      Boolean(category.is_default) !== definition.isDefault ||
+      Boolean(category.is_completed) !== definition.isCompleted
+    ) {
+      return null;
+    }
+    return definition;
+  }
+
+  function getStatusCategoryDisplayName(category) {
+    const definition = getSystemCategoryDefinition(category);
+    return definition
+      ? t(`settings.statusCategories.defaults.${definition.key}.name`)
+      : category.name;
+  }
+
   // Form state
   let formData = $state({
     name: '',
@@ -131,7 +211,7 @@
 
     if (status.transitionCount > 0) {
       errorToast(t('dialogs.alerts.statusInUseByTransitions', {
-        name: status.name,
+        name: getStatusDisplayValue(status, 'name'),
         count: status.transitionCount
       }));
       return;
@@ -139,7 +219,9 @@
 
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: t('dialogs.confirmations.deleteItem', { name: status.name }),
+      message: t('dialogs.confirmations.deleteItem', {
+        name: getStatusDisplayValue(status, 'name')
+      }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -166,7 +248,7 @@
 
   function getCategoryName(categoryId) {
     const category = statusCategories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Unknown';
+    return category ? getStatusCategoryDisplayName(category) : t('common.unknown');
   }
 
   function buildStatusDropdownItems(status) {
@@ -216,13 +298,15 @@
     {
       key: 'description',
       label: t('common.description'),
-      render: (status) => status.description || '—',
+      render: (status) => getStatusDisplayValue(status, 'description') || '—',
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'transitions',
       label: t('workflows.transitions'),
-      render: (status) => `${status.transitionCount || 0} transition${status.transitionCount === 1 ? '' : 's'}`,
+      render: (status) => t('statuses.transitionCount', {
+        count: status.transitionCount || 0
+      }),
       textColor: 'var(--ds-text-subtle)'
     },
     {
@@ -273,7 +357,7 @@
     >
       {#snippet status(status)}
         <div class="flex items-center gap-3">
-          <h3 class="font-medium" style="color: var(--ds-text);">{status.name}</h3>
+          <h3 class="font-medium" style="color: var(--ds-text);">{getStatusDisplayValue(status, 'name')}</h3>
           {#if status.is_default}
             <Lozenge color="green" text={t('common.default')} />
           {/if}
@@ -302,7 +386,7 @@
           <Input
             type="text"
             id="name"
-            placeholder="e.g. Open, In Progress, Resolved"
+            placeholder={t('statuses.namePlaceholder')}
             bind:value={formData.name}
             required
             size="small"
@@ -316,7 +400,7 @@
             items={statusCategories}
             placeholder={t('categories.selectCategory')}
             getValue={(item) => item.id}
-            getLabel={(item) => item.name}
+            getLabel={getStatusCategoryDisplayName}
           />
         </div>
 

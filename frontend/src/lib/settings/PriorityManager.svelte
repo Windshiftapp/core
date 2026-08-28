@@ -25,6 +25,67 @@
   let editingId = $state(null);
   let showCreateForm = $state(false);
 
+  const systemPriorities = [
+    {
+      key: 'critical',
+      name: 'Critical',
+      description: 'Urgent items requiring immediate attention',
+      icon: 'AlertCircle',
+      color: '#dc2626',
+      sortOrder: 1,
+      isDefault: false
+    },
+    {
+      key: 'high',
+      name: 'High',
+      description: 'High priority items',
+      icon: 'ArrowUp',
+      color: '#ea580c',
+      sortOrder: 2,
+      isDefault: false
+    },
+    {
+      key: 'medium',
+      name: 'Medium',
+      description: 'Normal priority items',
+      icon: 'Minus',
+      color: '#ca8a04',
+      sortOrder: 3,
+      isDefault: true
+    },
+    {
+      key: 'low',
+      name: 'Low',
+      description: 'Low priority items',
+      icon: 'ArrowDown',
+      color: '#16a34a',
+      sortOrder: 4,
+      isDefault: false
+    }
+  ];
+
+  function getSystemPriorityDefinition(priority) {
+    return systemPriorities.find(definition => (
+      priority.name === definition.name &&
+      priority.description === definition.description &&
+      priority.icon === definition.icon &&
+      priority.color?.toLowerCase() === definition.color &&
+      Number(priority.sort_order) === definition.sortOrder &&
+      Boolean(priority.is_default) === definition.isDefault
+    )) ?? null;
+  }
+
+  function getPriorityDisplayName(priority) {
+    const definition = getSystemPriorityDefinition(priority);
+    return definition ? t(`priorities.${definition.key}`) : priority.name;
+  }
+
+  function getConfigurationSetDisplayName(name) {
+    return name === 'Default Configuration'
+      ? t('pickers.defaultConfiguration')
+      : name;
+  }
+
   // Form data
   let formData = $state({
     name: '',
@@ -47,7 +108,7 @@
       // Sort by sort_order
       priorities = priorities.sort((a, b) => a.sort_order - b.sort_order);
     } catch (err) {
-      error = 'Failed to load priorities: ' + err.message;
+      error = t('priorities.failedToLoad');
     } finally {
       isLoading = false;
     }
@@ -99,7 +160,7 @@
   async function savePriority() {
     try {
       if (!formData.name.trim()) {
-        error = 'Priority name is required';
+        error = t('priorities.nameRequired');
         return;
       }
 
@@ -114,14 +175,14 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      error = err.message;
+      error = t('priorities.failedToSave');
     }
   }
 
   async function deletePriority(id, name) {
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      message: t('priorities.confirmDelete', { name }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -134,7 +195,7 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      error = err.message;
+      error = t('priorities.deleteFailed');
     }
   }
 
@@ -148,7 +209,8 @@
     },
     {
       key: 'name',
-      label: t('common.name')
+      label: t('common.name'),
+      render: priority => getPriorityDisplayName(priority)
     },
     {
       key: 'is_default',
@@ -188,7 +250,7 @@
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
-        onClick: () => deletePriority(priority.id, priority.name)
+        onClick: () => deletePriority(priority.id, getPriorityDisplayName(priority))
       }
     ];
   }
@@ -248,10 +310,10 @@
       <div class="flex flex-wrap gap-1">
         {#if priority.configuration_set_names && priority.configuration_set_names.length > 0}
           {#each priority.configuration_set_names as configSetName}
-            <Lozenge color="gray" text={configSetName} />
+            <Lozenge color="gray" text={getConfigurationSetDisplayName(configSetName)} />
           {/each}
         {:else}
-          <span class="text-xs text-gray-500">{t('common.noData')}</span>
+          <span class="text-xs text-gray-500">{t('pickers.noConfigurationSetsFound')}</span>
         {/if}
       </div>
     {/snippet}
@@ -270,7 +332,7 @@
           <Input
             type="text"
             id="name"
-            placeholder="e.g. Critical, High, Medium, Low"
+            placeholder={t('priorities.namePlaceholder')}
             bind:value={formData.name}
             required
           />

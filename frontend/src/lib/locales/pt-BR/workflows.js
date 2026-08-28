@@ -18,6 +18,13 @@ export default {
     statusName: 'Nome do Status',
     statusCategory: 'Categoria',
     noStatuses: 'Nenhum status encontrado',
+    namePlaceholder: 'ex.: Aberto, Em andamento, Resolvido',
+    transitionCount: 'Transições: {count}',
+    defaults: {
+      open: { name: 'Aberto', description: 'Novo item de trabalho, ainda não iniciado' },
+      inProgress: { name: 'Em andamento', description: 'Em execução no momento' },
+      done: { name: 'Concluído', description: 'O trabalho foi concluído' },
+    },
     statusCreated: 'Status criado com sucesso',
     statusUpdated: 'Status atualizado com sucesso',
     statusDeleted: 'Status excluído com sucesso',
@@ -34,6 +41,12 @@ export default {
     deletePriority: 'Excluir Prioridade',
     priorityName: 'Nome da Prioridade',
     noPriorities: 'Nenhuma prioridade encontrada',
+    namePlaceholder: 'ex.: Crítica, Alta, Média, Baixa',
+    nameRequired: 'O nome da prioridade é obrigatório.',
+    failedToLoad: 'Não foi possível carregar as prioridades.',
+    failedToSave: 'Não foi possível salvar a prioridade.',
+    deleteFailed: 'Não foi possível excluir a prioridade.',
+    confirmDelete: 'Excluir “{name}”? Esta ação não pode ser desfeita.',
     priorityCreated: 'Prioridade criada com sucesso',
     priorityUpdated: 'Prioridade atualizada com sucesso',
     priorityDeleted: 'Prioridade excluída com sucesso',
@@ -75,6 +88,7 @@ export default {
     workflowNamePlaceholder: 'ex.: Workflow Padrão',
     descriptionPlaceholder: 'Descrição opcional para este workflow',
     setAsDefault: 'Definir como workflow padrão',
+    defaults: { default: { name: 'Workflow padrão', description: 'Workflow básico para concluir tarefas' } },
     backToWorkflows: 'Voltar para Workflows',
     workflowDesigner: 'Designer de Workflow',
     designerHint:
@@ -159,6 +173,7 @@ export default {
       'Não é possível excluir a tela padrão. Esta tela é necessária para espaços de trabalho sem um conjunto de configurações.',
     confirmDeleteScreen:
       'Tem certeza de que deseja excluir a tela "{name}"? Isso afetará todos os espaços de trabalho que utilizam esta tela.',
+    defaults: { default: { name: 'Tela padrão', description: 'Tela padrão com os campos essenciais do item de trabalho' } },
     fieldWidths: {
       full: 'Largura Total',
       half: 'Meia Largura',

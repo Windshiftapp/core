@@ -129,6 +129,8 @@ export default {
     default: 'Padrão',
     custom: 'Personalizado',
     loading: 'Carregando...',
+    loadingSlow: 'Isso pode levar alguns instantes em uma conexão lenta.',
+    skipToMainContent: 'Ir para o conteúdo principal',
     saving: 'Salvando...',
     deleting: 'Excluindo...',
     processing: 'Processando...',

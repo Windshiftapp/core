@@ -136,6 +136,8 @@ export default {
 
     // Status indicators
     loading: 'Loading...',
+    loadingSlow: 'This can take a moment on a slow connection.',
+    skipToMainContent: 'Skip to main content',
     saving: 'Saving...',
     deleting: 'Deleting...',
     submitting: 'Submitting...',

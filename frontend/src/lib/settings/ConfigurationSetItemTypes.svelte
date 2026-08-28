@@ -124,6 +124,23 @@
   // for any row that already carries a screen override so the user lands on
   // the configured value without an extra click.
   let expandedScreenRows = $state(new Set());
+
+  const systemItemTypes = [
+    { key: 'initiative', name: 'Initiative', icon: 'Target', color: '#7c3aed', hierarchy_level: 0 },
+    { key: 'epic', name: 'Epic', icon: 'Zap', color: '#2563eb', hierarchy_level: 1 },
+    { key: 'story', name: 'Story', icon: 'BookOpen', color: '#059669', hierarchy_level: 2 },
+    { key: 'task', name: 'Task', icon: 'CheckSquare', color: '#dc2626', hierarchy_level: 3 },
+    { key: 'bug', name: 'Bug', icon: 'Bug', color: '#ea580c', hierarchy_level: 3 },
+    { key: 'subtask', name: 'Sub-task', icon: 'Minus', color: '#6b7280', hierarchy_level: -1 }
+  ];
+
+  function getItemTypeDisplayName(itemType) {
+    const definition = systemItemTypes.find(candidate =>
+      candidate.name === itemType?.name && candidate.icon === itemType?.icon &&
+      candidate.color === itemType?.color && candidate.hierarchy_level === itemType?.hierarchy_level
+    );
+    return definition ? t(`settings.itemTypes.defaults.${definition.key}`) : itemType?.name;
+  }
   $effect(() => {
     const next = new Set(expandedScreenRows);
     for (const c of itemTypeConfigs) {
@@ -145,8 +162,8 @@
     const n = (config.create_screen_id ? 1 : 0)
             + (config.edit_screen_id ? 1 : 0)
             + (config.view_screen_id ? 1 : 0);
-    if (n === 0) return 'default';
-    return `${n} custom`;
+    if (n === 0) return t('settings.configSets.default');
+    return t('settings.configSets.customScreenOverrides', { count: n });
   }
 </script>
 
@@ -183,7 +200,7 @@
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.workflow')}</th>
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('conditionSets.title')}</th>
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('approvalSets.title')}</th>
-              <th class="text-left px-4 py-3 font-medium rounded-tr-lg" style="color: var(--ds-text);">Screens</th>
+              <th class="text-left px-4 py-3 font-medium rounded-tr-lg" style="color: var(--ds-text);">{t('settings.configSets.screens')}</th>
             </tr>
           </thead>
           <tbody>
@@ -193,7 +210,7 @@
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <ItemTypeIcon itemType={itemType} />
-                    <span class="font-medium" style="color: var(--ds-text);">{itemType.name}</span>
+                    <span class="font-medium" style="color: var(--ds-text);">{getItemTypeDisplayName(itemType)}</span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -201,7 +218,6 @@
                     value={config.workflow_id}
                     items={workflows}
                     {defaultWorkflowId}
-                    placeholder="Select workflow..."
                     onSelect={(workflow) => updateConfig(itemType.id, 'workflow_id', workflow?.id || null)}
                   />
                 </td>
@@ -247,7 +263,7 @@
                       style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
                     >
                       <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--ds-text-subtle);">
-                        Screens
+                        {t('settings.configSets.screens')}
                       </div>
                       <div class="grid grid-cols-3 gap-3">
                         <div>
@@ -256,7 +272,6 @@
                             value={config.create_screen_id}
                             items={screens}
                             defaultScreenId={defaultCreateScreenId}
-                            placeholder="Select screen..."
                             onSelect={(screen) => updateConfig(itemType.id, 'create_screen_id', screen?.id || null)}
                           />
                         </div>
@@ -266,7 +281,6 @@
                             value={config.edit_screen_id}
                             items={screens}
                             defaultScreenId={defaultEditScreenId}
-                            placeholder="Select screen..."
                             onSelect={(screen) => updateConfig(itemType.id, 'edit_screen_id', screen?.id || null)}
                           />
                         </div>
@@ -276,7 +290,6 @@
                             value={config.view_screen_id}
                             items={screens}
                             defaultScreenId={defaultViewScreenId}
-                            placeholder="Select screen..."
                             onSelect={(screen) => updateConfig(itemType.id, 'view_screen_id', screen?.id || null)}
                           />
                         </div>

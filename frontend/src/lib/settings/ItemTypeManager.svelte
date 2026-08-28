@@ -35,6 +35,128 @@
   let originalHierarchyLevel = $state(null);
   let showCreateForm = $state(false);
 
+  const systemItemTypes = [
+    {
+      key: 'initiative',
+      name: 'Initiative',
+      description: 'Strategic initiative spanning multiple teams',
+      icon: 'Target',
+      color: '#7c3aed',
+      hierarchyLevel: 0,
+      sortOrder: 1
+    },
+    {
+      key: 'epic',
+      name: 'Epic',
+      description: 'Large feature or capability',
+      icon: 'Zap',
+      color: '#2563eb',
+      hierarchyLevel: 1,
+      sortOrder: 1
+    },
+    {
+      key: 'story',
+      name: 'Story',
+      description: 'User story delivering value to end users',
+      icon: 'BookOpen',
+      color: '#059669',
+      hierarchyLevel: 2,
+      sortOrder: 1
+    },
+    {
+      key: 'task',
+      name: 'Task',
+      description: 'Development or operational task',
+      icon: 'CheckSquare',
+      color: '#dc2626',
+      hierarchyLevel: 3,
+      sortOrder: 1
+    },
+    {
+      key: 'bug',
+      name: 'Bug',
+      description: 'Software defect that needs fixing',
+      icon: 'Bug',
+      color: '#ea580c',
+      hierarchyLevel: 3,
+      sortOrder: 2
+    },
+    {
+      key: 'subtask',
+      name: 'Sub-task',
+      description: 'Small work item below any regular hierarchy level',
+      icon: 'Minus',
+      color: '#6b7280',
+      hierarchyLevel: GENERIC_SUBTASK_HIERARCHY_LEVEL,
+      sortOrder: 1
+    }
+  ];
+
+  const systemHierarchyLevels = {
+    0: {
+      key: 'initiative',
+      name: 'Initiative',
+      description: 'High-level strategic work spanning multiple epics'
+    },
+    1: {
+      key: 'epic',
+      name: 'Epic',
+      description: 'Large work item that can be broken down into stories'
+    },
+    2: {
+      key: 'story',
+      name: 'Story',
+      description: 'User story or feature that delivers value'
+    },
+    3: {
+      key: 'task',
+      name: 'Task',
+      description: 'Individual work item or technical task'
+    },
+    4: {
+      key: 'activity',
+      name: 'Activity',
+      description: 'Discrete activity within a task'
+    }
+  };
+
+  function getSystemItemTypeDefinition(itemType) {
+    if (!itemType.is_default) return null;
+
+    return systemItemTypes.find(definition => (
+      itemType.name === definition.name &&
+      itemType.description === definition.description &&
+      itemType.icon === definition.icon &&
+      itemType.color?.toLowerCase() === definition.color &&
+      Number(itemType.hierarchy_level) === definition.hierarchyLevel &&
+      Number(itemType.sort_order) === definition.sortOrder
+    )) ?? null;
+  }
+
+  function getItemTypeDisplayName(itemType) {
+    const definition = getSystemItemTypeDefinition(itemType);
+    return definition
+      ? t(`settings.itemTypes.defaults.${definition.key}`)
+      : itemType.name;
+  }
+
+  function getHierarchyLevelDisplayName(hierarchyLevel) {
+    const definition = systemHierarchyLevels[hierarchyLevel.level];
+    const isUnchangedSystemLevel = definition &&
+      hierarchyLevel.name === definition.name &&
+      hierarchyLevel.description === definition.description;
+
+    return isUnchangedSystemLevel
+      ? t(`settings.hierarchyLevels.defaults.${definition.key}.name`)
+      : hierarchyLevel.name;
+  }
+
+  function getConfigurationSetDisplayName(name) {
+    return name === 'Default Configuration'
+      ? t('settings.itemTypes.defaultConfiguration')
+      : name;
+  }
+
   // Form data
   let formData = $state({
     name: '',
@@ -61,7 +183,7 @@
       // Group by hierarchy level for better display
       itemTypes = sortItemTypesByHierarchy(itemTypes);
     } catch (err) {
-      error = 'Failed to load item types: ' + err.message;
+      error = t('settings.itemTypes.failedToLoad');
     } finally {
       isLoading = false;
     }
@@ -155,14 +277,14 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      errorToast(t('settings.itemTypes.failedToSave') + ' ' + err.message);
+      errorToast(t('settings.itemTypes.failedToSave'));
     }
   }
 
   async function deleteItemType(id, name) {
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      message: t('settings.itemTypes.confirmDelete', { name }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -175,7 +297,7 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      error = err.message;
+      error = t('settings.itemTypes.deleteFailed');
     }
   }
 
@@ -184,13 +306,21 @@
       return t('settings.itemTypes.genericSubtaskLevel');
     }
     const hierarchyLevel = hierarchyLevels.find(hl => hl.level === level);
-    return hierarchyLevel ? `Level ${level} - ${hierarchyLevel.name}` : `Level ${level}`;
+    return hierarchyLevel
+      ? t('settings.itemTypes.levelLabel', {
+          level,
+          name: getHierarchyLevelDisplayName(hierarchyLevel)
+        })
+      : t('settings.itemTypes.levelOnly', { level });
   }
 
   let hierarchyLevelOptions = $derived([
     ...hierarchyLevels.map(level => ({
       value: level.level,
-      label: `${level.name} (Level ${level.level})`
+      label: t('settings.itemTypes.levelOption', {
+        name: getHierarchyLevelDisplayName(level),
+        level: level.level
+      })
     })),
     {
       value: GENERIC_SUBTASK_HIERARCHY_LEVEL,
@@ -208,7 +338,8 @@
     },
     {
       key: 'name',
-      label: t('settings.itemTypes.name')
+      label: t('settings.itemTypes.name'),
+      render: itemType => getItemTypeDisplayName(itemType)
     },
     {
       key: 'hierarchy_level',
@@ -248,7 +379,7 @@
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
-        onClick: () => deleteItemType(itemType.id, itemType.name)
+        onClick: () => deleteItemType(itemType.id, getItemTypeDisplayName(itemType))
       }
     ];
   }
@@ -285,7 +416,7 @@
     data={itemTypes}
     keyField="id"
     loading={isLoading}
-    emptyMessage={t('settings.itemTypes.noItemTypes') || 'No work item types configured yet.'}
+    emptyMessage={t('settings.itemTypes.noItemTypes')}
     emptyIcon={FileText}
     actionItems={buildItemTypeDropdownItems}
     actionTriggerTestid={(itemType) => `item-type-actions-${itemType.id}`}
@@ -296,7 +427,7 @@
   >
     {#snippet icon(itemType)}
       <div class="flex items-center justify-center">
-        <ItemTypeIcon itemType={itemType} />
+        <ItemTypeIcon itemType={itemType} title={getItemTypeDisplayName(itemType)} />
       </div>
     {/snippet}
 
@@ -311,10 +442,10 @@
       <div class="flex flex-wrap gap-1">
         {#if itemType.configuration_set_names && itemType.configuration_set_names.length > 0}
           {#each itemType.configuration_set_names as configSetName}
-            <Lozenge color="gray" text={configSetName} />
+            <Lozenge color="gray" text={getConfigurationSetDisplayName(configSetName)} />
           {/each}
         {:else}
-          <span class="text-xs text-gray-500">No configuration sets</span>
+          <span class="text-xs text-gray-500">{t('settings.itemTypes.noConfigurationSets')}</span>
         {/if}
       </div>
     {/snippet}
@@ -332,7 +463,7 @@
           <Input
             type="text"
             id="name"
-            placeholder="e.g. Epic, Story, Task, Bug"
+            placeholder={t('settings.itemTypes.namePlaceholder')}
             bind:value={formData.name}
             required
           />
@@ -342,7 +473,7 @@
           <label for="description">{t('settings.itemTypes.description')}</label>
           <Textarea
             id="description"
-            placeholder="Brief description of this item type"
+            placeholder={t('settings.itemTypes.descriptionPlaceholder')}
             bind:value={formData.description}
             rows={2}
           />

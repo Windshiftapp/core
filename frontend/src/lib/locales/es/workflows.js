@@ -18,6 +18,13 @@ export default {
     statusName: 'Nombre del estado',
     statusCategory: 'Categoría',
     noStatuses: 'No se encontraron estados',
+    namePlaceholder: 'p. ej., Abierto, En curso, Resuelto',
+    transitionCount: 'Transiciones: {count}',
+    defaults: {
+      open: { name: 'Abierto', description: 'Elemento de trabajo nuevo, aún no iniciado' },
+      inProgress: { name: 'En curso', description: 'Se está trabajando actualmente' },
+      done: { name: 'Finalizado', description: 'El trabajo se ha completado' },
+    },
     statusCreated: 'Estado creado correctamente',
     statusUpdated: 'Estado actualizado correctamente',
     statusDeleted: 'Estado eliminado correctamente',
@@ -34,6 +41,12 @@ export default {
     deletePriority: 'Eliminar prioridad',
     priorityName: 'Nombre de la prioridad',
     noPriorities: 'No se encontraron prioridades',
+    namePlaceholder: 'p. ej., Crítica, Alta, Media, Baja',
+    nameRequired: 'El nombre de la prioridad es obligatorio.',
+    failedToLoad: 'No se pudieron cargar las prioridades.',
+    failedToSave: 'No se pudo guardar la prioridad.',
+    deleteFailed: 'No se pudo eliminar la prioridad.',
+    confirmDelete: '¿Eliminar «{name}»? Esta acción no se puede deshacer.',
     priorityCreated: 'Prioridad creada correctamente',
     priorityUpdated: 'Prioridad actualizada correctamente',
     priorityDeleted: 'Prioridad eliminada correctamente',
@@ -76,6 +89,7 @@ export default {
     workflowNamePlaceholder: 'ej., Flujo de trabajo predeterminado',
     descriptionPlaceholder: 'Descripción opcional para este flujo de trabajo',
     setAsDefault: 'Establecer como flujo de trabajo predeterminado',
+    defaults: { default: { name: 'Flujo de trabajo predeterminado', description: 'Flujo de trabajo básico para completar tareas' } },
     backToWorkflows: 'Volver a flujos de trabajo',
     workflowDesigner: 'Diseñador de flujo de trabajo',
     designerHint:
@@ -161,6 +175,7 @@ export default {
       'No se puede eliminar la pantalla predeterminada. Esta pantalla es necesaria para espacios de trabajo sin un conjunto de configuración.',
     confirmDeleteScreen:
       '¿Estás seguro de que deseas eliminar la pantalla "{name}"? Esto afectará a todos los espacios de trabajo que usen esta pantalla.',
+    defaults: { default: { name: 'Pantalla predeterminada', description: 'Pantalla predeterminada con los campos esenciales del elemento de trabajo' } },
     fieldWidths: {
       full: 'Ancho completo',
       half: 'Medio ancho',

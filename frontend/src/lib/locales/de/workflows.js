@@ -17,6 +17,13 @@ export default {
     statusName: 'Statusname',
     statusCategory: 'Kategorie',
     noStatuses: 'Keine Status gefunden',
+    namePlaceholder: 'z. B. Offen, In Bearbeitung, Erledigt',
+    transitionCount: 'Übergänge: {count}',
+    defaults: {
+      open: { name: 'Offen', description: 'Neuer Arbeitsvorgang, noch nicht begonnen' },
+      inProgress: { name: 'In Bearbeitung', description: 'Wird derzeit bearbeitet' },
+      done: { name: 'Erledigt', description: 'Die Arbeit wurde abgeschlossen' },
+    },
     statusCreated: 'Status erfolgreich erstellt',
     statusUpdated: 'Status erfolgreich aktualisiert',
     statusDeleted: 'Status erfolgreich gelöscht',
@@ -33,6 +40,12 @@ export default {
     deletePriority: 'Priorität löschen',
     priorityName: 'Prioritätsname',
     noPriorities: 'Keine Prioritäten gefunden',
+    namePlaceholder: 'z. B. Kritisch, Hoch, Mittel, Niedrig',
+    nameRequired: 'Der Prioritätsname ist erforderlich.',
+    failedToLoad: 'Prioritäten konnten nicht geladen werden.',
+    failedToSave: 'Priorität konnte nicht gespeichert werden.',
+    deleteFailed: 'Priorität konnte nicht gelöscht werden.',
+    confirmDelete: '„{name}“ löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
     priorityCreated: 'Priorität erfolgreich erstellt',
     priorityUpdated: 'Priorität erfolgreich aktualisiert',
     priorityDeleted: 'Priorität erfolgreich gelöscht',
@@ -73,6 +86,7 @@ export default {
     workflowNamePlaceholder: 'z.B. Standard-Workflow',
     descriptionPlaceholder: 'Optionale Beschreibung für diesen Workflow',
     setAsDefault: 'Als Standard-Workflow festlegen',
+    defaults: { default: { name: 'Standard-Workflow', description: 'Grundlegender Workflow für die Bearbeitung von Aufgaben' } },
     backToWorkflows: 'Zurück zu Workflows',
     workflowDesigner: 'Workflow-Designer',
     designerHint:
@@ -158,6 +172,7 @@ export default {
       'Die Standardmaske kann nicht gelöscht werden. Diese Maske wird für Arbeitsbereiche ohne Konfigurationsset benötigt.',
     confirmDeleteScreen:
       'Möchten Sie die Maske "{name}" wirklich löschen? Dies betrifft alle Arbeitsbereiche, die diese Maske verwenden.',
+    defaults: { default: { name: 'Standardmaske', description: 'Standardmaske mit den wichtigsten Aufgabenfeldern' } },
     fieldWidths: {
       full: 'Volle Breite',
       half: 'Halbe Breite',

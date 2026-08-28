@@ -10,7 +10,7 @@
   import WaveBackground from '../components/WaveBackground.svelte';
   import { APP_NAME } from '../constants.js';
   import Toggle from '../components/Toggle.svelte';
-  import { t } from '../stores/i18n.svelte.js';
+  import { i18n, t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = $bindable(true),
@@ -114,6 +114,7 @@
           username: adminUser.username,
           first_name: adminUser.first_name,
           last_name: adminUser.last_name,
+          language: i18n.locale,
           password: adminUser.password
         },
         module_settings: moduleSettings
@@ -206,7 +207,7 @@
                 id="first_name"
                 type="text"
                 bind:value={adminUser.first_name}
-                placeholder="John"
+                placeholder={t('setup.firstName')}
                 required
                 size="small"
               />
@@ -218,7 +219,7 @@
                 id="last_name"
                 type="text"
                 bind:value={adminUser.last_name}
-                placeholder="Doe"
+                placeholder={t('setup.lastName')}
                 required
                 size="small"
               />
@@ -231,7 +232,7 @@
               id="email"
               type="email"
               bind:value={adminUser.email}
-              placeholder="admin@example.com"
+              placeholder={t('setup.emailAddress')}
               required
               size="small"
             />
@@ -243,7 +244,7 @@
               id="username"
               type="text"
               bind:value={adminUser.username}
-              placeholder="admin"
+              placeholder={t('setup.username')}
               size="small"
             />
           </div>

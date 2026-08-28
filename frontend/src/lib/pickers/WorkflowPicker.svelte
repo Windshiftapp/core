@@ -18,11 +18,22 @@
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkflow'));
 
+  function isDefaultSystemWorkflow(workflow) {
+    return workflow?.is_default === true && workflow.name === 'Default Workflow' &&
+      workflow.description === 'Basic workflow for getting work done';
+  }
+
+  function getWorkflowDisplayValue(workflow, field) {
+    return isDefaultSystemWorkflow(workflow)
+      ? t(`workflows.defaults.default.${field}`)
+      : (workflow?.[field] || '');
+  }
+
   // Get the default workflow name for the "Default" option label
   const defaultWorkflowName = $derived(() => {
     if (!defaultWorkflowId) return '';
     const workflow = items.find(w => w.id === defaultWorkflowId);
-    return workflow ? workflow.name : '';
+    return workflow ? getWorkflowDisplayValue(workflow, 'name') : '';
   });
 
   // Dynamic label for the unassigned/default option (custom label takes precedence)
@@ -45,7 +56,7 @@
   {unassignedLabel}
   searchFields={['name', 'description']}
   getValue={(workflow) => workflow?.id}
-  getLabel={(workflow) => workflow?.name ?? ''}
+  getLabel={(workflow) => getWorkflowDisplayValue(workflow, 'name')}
   {onSelect}
   {onCancel}
 >
@@ -60,9 +71,9 @@
 
       <!-- Workflow Info -->
       <div class="flex flex-col min-w-0">
-        <span class="font-medium truncate">{workflow.name}</span>
-        {#if workflow.description}
-          <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{workflow.description}</span>
+        <span class="font-medium truncate">{getWorkflowDisplayValue(workflow, 'name')}</span>
+        {#if getWorkflowDisplayValue(workflow, 'description')}
+          <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{getWorkflowDisplayValue(workflow, 'description')}</span>
         {/if}
       </div>
     </div>

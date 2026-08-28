@@ -14,14 +14,25 @@
   } = $props();
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.defaultConfiguration'));
+
+  function isDefaultSystemConfiguration(item) {
+    return item?.is_default === true && item.name === 'Default Configuration' &&
+      item.description === 'Default configuration set with basic workflow and screen';
+  }
+
+  function getConfigurationDisplayValue(item, field) {
+    return isDefaultSystemConfiguration(item)
+      ? t(`settings.configSets.defaults.configuration.${field}`)
+      : (item?.[field] || '');
+  }
 </script>
 
 {#snippet configSetRow({ item })}
   <Settings class="w-4 h-4 flex-shrink-0" />
   <div class="flex flex-col min-w-0">
-    <span class="font-medium truncate">{item?.name || ''}</span>
-    {#if item?.description}
-      <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{item.description}</span>
+    <span class="font-medium truncate">{getConfigurationDisplayValue(item, 'name')}</span>
+    {#if getConfigurationDisplayValue(item, 'description')}
+      <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{getConfigurationDisplayValue(item, 'description')}</span>
     {/if}
   </div>
 {/snippet}
@@ -38,7 +49,7 @@
   itemSnippet={configSetRow}
   searchFields={['name', 'description']}
   getValue={(item) => item?.id}
-  getLabel={(item) => item?.name || ''}
+  getLabel={(item) => getConfigurationDisplayValue(item, 'name')}
   onSelect={(item) => onSelect(item)}
   onCancel={() => onCancel()}
 />

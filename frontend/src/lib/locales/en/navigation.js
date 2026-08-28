@@ -17,6 +17,8 @@ export default {
     teams: 'Teams',
     create: 'Create',
     search: 'Search',
+    aiChat: 'AI Chat',
+    terminal: 'Terminal',
     admin: 'Admin',
     notifications: 'Notifications',
     profile: 'Profile',

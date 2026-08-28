@@ -13,6 +13,7 @@ export const SUPPORTED_LOCALES = [
   { code: 'es', name: 'Español', direction: 'ltr' },
   { code: 'ar', name: 'العربية', direction: 'rtl' },
   { code: 'pt-BR', name: 'Português (Brasil)', direction: 'ltr' },
+  { code: 'ru', name: 'Русский', direction: 'ltr' },
   { code: 'zh-CN', name: '简体中文', direction: 'ltr' },
 ];
 

@@ -18,6 +18,13 @@ export default {
     statusName: 'Status Name',
     statusCategory: 'Category',
     noStatuses: 'No statuses found',
+    namePlaceholder: 'e.g. Open, In Progress, Resolved',
+    transitionCount: 'Transitions: {count}',
+    defaults: {
+      open: { name: 'Open', description: 'New work item, not yet started' },
+      inProgress: { name: 'In Progress', description: 'Currently being worked on' },
+      done: { name: 'Done', description: 'Work has been completed' },
+    },
     statusCreated: 'Status created successfully',
     statusUpdated: 'Status updated successfully',
     statusDeleted: 'Status deleted successfully',
@@ -34,6 +41,12 @@ export default {
     deletePriority: 'Delete Priority',
     priorityName: 'Priority Name',
     noPriorities: 'No priorities found',
+    namePlaceholder: 'e.g. Critical, High, Medium, Low',
+    nameRequired: 'Priority name is required.',
+    failedToLoad: 'Failed to load priorities.',
+    failedToSave: 'Failed to save priority.',
+    deleteFailed: 'Failed to delete priority.',
+    confirmDelete: 'Delete “{name}”? This action cannot be undone.',
     priorityCreated: 'Priority created successfully',
     priorityUpdated: 'Priority updated successfully',
     priorityDeleted: 'Priority deleted successfully',
@@ -75,6 +88,7 @@ export default {
     workflowNamePlaceholder: 'e.g., Default Workflow',
     descriptionPlaceholder: 'Optional description for this workflow',
     setAsDefault: 'Set as default workflow',
+    defaults: { default: { name: 'Default Workflow', description: 'Basic workflow for getting work done' } },
     backToWorkflows: 'Back to Workflows',
     workflowDesigner: 'Workflow Designer',
     designerHint:
@@ -160,6 +174,7 @@ export default {
       'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
     confirmDeleteScreen:
       'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.',
+    defaults: { default: { name: 'Default Screen', description: 'Default screen with essential work item fields' } },
     fieldWidths: {
       full: 'Full Width',
       half: 'Half Width',

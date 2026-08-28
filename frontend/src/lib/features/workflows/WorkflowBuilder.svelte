@@ -43,6 +43,24 @@
     is_default: false
   });
 
+  const defaultWorkflow = {
+    name: 'Default Workflow',
+    description: 'Basic workflow for getting work done'
+  };
+
+  function isDefaultSystemWorkflow(workflow) {
+    return workflow?.is_default === true &&
+      workflow.name === defaultWorkflow.name &&
+      workflow.description === defaultWorkflow.description;
+  }
+
+  function getWorkflowDisplayValue(workflow, field) {
+    if (isDefaultSystemWorkflow(workflow)) {
+      return t(`workflows.defaults.default.${field}`);
+    }
+    return workflow?.[field] || '';
+  }
+
   onMount(async () => {
     await loadStatuses();
     await loadWorkflows();
@@ -139,7 +157,7 @@
   async function deleteWorkflow(workflow) {
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: t('workflows.confirmDeleteWorkflow', { name: workflow.name }),
+      message: t('workflows.confirmDeleteWorkflow', { name: getWorkflowDisplayValue(workflow, 'name') }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -193,7 +211,9 @@
     const query = searchQuery.toLowerCase();
     return (
       wf.name?.toLowerCase().includes(query) ||
-      wf.description?.toLowerCase().includes(query)
+      wf.description?.toLowerCase().includes(query) ||
+      getWorkflowDisplayValue(wf, 'name').toLowerCase().includes(query) ||
+      getWorkflowDisplayValue(wf, 'description').toLowerCase().includes(query)
     );
   }));
 
@@ -203,12 +223,12 @@
       key: 'workflow',
       label: t('workflows.workflow'),
       slot: 'workflow',
-      render: (workflow) => workflow.name // Fallback if slot doesn't work
+      render: (workflow) => getWorkflowDisplayValue(workflow, 'name') // Fallback if slot doesn't work
     },
     {
       key: 'description',
       label: t('common.description'),
-      render: (workflow) => workflow.description || '—',
+      render: (workflow) => getWorkflowDisplayValue(workflow, 'description') || '—',
       textColor: 'var(--ds-text-subtle)'
     },
     {
@@ -274,7 +294,7 @@
     >
       {#snippet workflow(item)}
         <div class="flex items-center gap-3">
-          <h3 class="font-medium" style="color: var(--ds-text);">{item.name}</h3>
+          <h3 class="font-medium" style="color: var(--ds-text);">{getWorkflowDisplayValue(item, 'name')}</h3>
           {#if item.is_default}
             <Lozenge color="green" text={t('common.default')} />
           {/if}

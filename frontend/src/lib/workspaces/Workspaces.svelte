@@ -35,7 +35,7 @@
   async function deleteWorkspace(workspace) {
     const confirmed = await confirm({
       title: t('common.delete'),
-      message: `Are you sure you want to delete workspace "${workspace.name}"? This will affect all associated projects.`,
+      message: t('workspaces.confirmDelete', { name: workspace.name }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
       variant: 'danger'
@@ -68,7 +68,7 @@
         id: 'edit',
         type: 'regular',
         icon: Edit,
-        title: 'Edit',
+        title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => navigate(`/workspaces/${workspace.id}`)
       }
@@ -77,28 +77,28 @@
   }
 
   // Table column definitions
-  const workspaceColumns = [
+  const workspaceColumns = $derived([
     {
       key: 'name',
-      label: 'Workspace',
+      label: t('workspaces.workspace'),
       slot: 'name'
     },
     {
       key: 'active',
-      label: 'Status',
+      label: t('common.status'),
       slot: 'status'
     },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('common.created'),
       render: (workspace) => formatDateSimple(workspace.created_at),
       textColor: 'var(--ds-text-subtle)'
     },
     {
       key: 'actions',
-      label: 'Actions'
+      label: t('common.actions')
     }
-  ];
+  ]);
 
 
 </script>
@@ -107,8 +107,8 @@
     <div class="{noPadding ? '' : 'px-6 pt-6'}">
       <PageHeader
         icon={Grip}
-        title="Workspaces"
-        subtitle="Organize and manage your projects within workspaces"
+        title={t('workspaces.title')}
+        subtitle={t('workspaces.listSubtitle')}
       >
         {#snippet actions()}
           {#if canCreate}
@@ -120,7 +120,7 @@
               keyboardHint={getShortcutDisplay('workspaces', 'addWorkspace')}
               hotkeyConfig={{ key: toHotkeyString('workspaces', 'addWorkspace'), guard: () => true }}
             >
-              Add Workspace
+              {t('workspaces.createWorkspace')}
             </Button>
           {/if}
         {/snippet}
@@ -133,7 +133,7 @@
         columns={workspaceColumns}
         data={$workspacesStore.regularWorkspaces}
         keyField="id"
-        emptyMessage="No workspaces found. Create your first workspace to get started."
+        emptyMessage={t('workspaces.empty')}
         emptyIcon={Circle}
         actionItems={buildWorkspaceDropdownItems}
         onRowClick={(workspace) => navigate(`/workspaces/${workspace.id}`)}
@@ -160,7 +160,7 @@
             <div style="color: var(--ds-text);">{workspace.name}</div>
             {#if workspace.is_personal}
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                Personal
+                {t('workspaces.personal')}
               </span>
             {/if}
             {#if workspace.is_template}

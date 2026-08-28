@@ -17,6 +17,8 @@ export default {
     organizations: 'Organizaciones',
     create: 'Crear',
     search: 'Buscar',
+    aiChat: 'Chat con IA',
+    terminal: 'Terminal',
     admin: 'Administración',
     notifications: 'Notificaciones',
     profile: 'Perfil',

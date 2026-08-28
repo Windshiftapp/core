@@ -164,6 +164,7 @@
     disabled={isDisabled}
     data-testid={triggerTestid || undefined}
     aria-label={triggerLabel || triggerText || undefined}
+    title={triggerText || undefined}
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}
     class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
@@ -177,7 +178,7 @@
     {:else if triggerAvatar}
       <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
       {#if triggerText}
-        <span class="text-sm whitespace-nowrap">{triggerText}</span>
+        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{triggerText}</span>
       {/if}
       {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3" />
@@ -202,7 +203,9 @@
         {/if}
       {/if}
       {#if triggerText}
-        <span class="{triggerAlignment === 'between' ? 'flex-1 text-left' : ''}">{triggerText}</span>
+        <span
+          class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap {triggerAlignment === 'between' || triggerAlignment === 'start' ? 'flex-1 text-left' : ''}"
+        >{triggerText}</span>
       {/if}
       {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3 flex-shrink-0" />

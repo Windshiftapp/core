@@ -67,6 +67,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		sanitize.Pair{Target: &req.AdminUser.LastName, Policy: sanitize.PlainTextField},
 		sanitize.Pair{Target: &req.AdminUser.Username, Policy: sanitize.ShortIdentifier},
 		sanitize.Pair{Target: &req.AdminUser.Email, Policy: sanitize.ShortIdentifier},
+		sanitize.Pair{Target: &req.AdminUser.Language, Policy: sanitize.ShortIdentifier},
 	)
 
 	// Validate the setup request
@@ -96,6 +97,10 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 
 	// Create admin user
 	adminUser := req.AdminUser
+	language := adminUser.Language
+	if language == "" {
+		language = "en"
+	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminUser.Password), bcrypt.DefaultCost)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -105,10 +110,10 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 	// Insert user and get ID using RETURNING clause (supported by both SQLite 3.35+ and PostgreSQL)
 	var userID int64
 	err = tx.QueryRow(`
-		INSERT INTO users (email, username, first_name, last_name, password_hash, is_active)
-		VALUES (?, ?, ?, ?, ?, true)
+		INSERT INTO users (email, username, first_name, last_name, language, password_hash, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, true)
 		RETURNING id
-	`, adminUser.Email, adminUser.Username, adminUser.FirstName, adminUser.LastName, string(hashedPassword)).Scan(&userID)
+	`, adminUser.Email, adminUser.Username, adminUser.FirstName, adminUser.LastName, language, string(hashedPassword)).Scan(&userID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
