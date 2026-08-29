@@ -20,14 +20,14 @@
 {#if workspaces.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Grip class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">{t('dashboard.widgetContent.noWorkspaces')}</p>
+    <p class="text-sm">{t('dashboard.states.noWorkspaces')}</p>
     {#if canCreate}
       <button
         class="mt-3 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded"
         style="color: var(--ds-link);"
         onclick={() => navigate('/workspaces/new')}
       >
-        <Plus class="w-3.5 h-3.5" /> {t('dashboard.widgetContent.createWorkspace')}
+        <Plus class="w-3.5 h-3.5" /> {t('dashboard.states.createWorkspace')}
       </button>
     {/if}
   </div>
@@ -45,7 +45,9 @@
         {#if workspace.avatar_url}
           <img
             src={workspace.avatar_url}
-            alt={t('dashboard.widgetContent.workspaceAvatar', { name: workspace.name || workspace.workspace_name || t('common.workspace') })}
+            alt={t('dashboard.states.workspaceAvatarAlt', {
+              name: workspace.name || workspace.workspace_name || t('common.workspace'),
+            })}
             class="w-7 h-7 rounded object-cover flex-shrink-0"
           />
         {:else}

@@ -35,7 +35,7 @@
         workspaceId: parseInt(m[1], 10),
         timestamp: n.timestamp,
         source: 'notification',
-        title: n.message || n.title || t('nav.notifications'),
+        title: n.message || n.title || t('notifications.notification'),
         subtitle: null,
         link: actionUrl,
         read: n.read,

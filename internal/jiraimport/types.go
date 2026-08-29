@@ -23,6 +23,23 @@ func (e *WorkspaceCountMismatchError) Error() string {
 	return fmt.Sprintf("workspace confirmation count mismatch: confirmed %d, current %d", e.Confirmed, e.Current)
 }
 
+// CleanupFailure identifies one imported entity that could not be removed.
+type CleanupFailure struct {
+	EntityType  string `json:"entity_type"`
+	WindshiftID int    `json:"windshift_id"`
+	Error       string `json:"error"`
+}
+
+// CleanupError reports a partial cleanup. The job mappings remain available so
+// the cleanup can be retried after the underlying problem is corrected.
+type CleanupError struct {
+	Failures []CleanupFailure
+}
+
+func (e *CleanupError) Error() string {
+	return fmt.Sprintf("jira import cleanup failed for %d entity mapping(s)", len(e.Failures))
+}
+
 type JobStatus struct {
 	JobID        string         `json:"job_id"`
 	Status       string         `json:"status"`
@@ -39,12 +56,14 @@ type Progress struct {
 	CurrentProject      string `json:"current_project,omitempty"`
 	TotalProjects       int    `json:"total_projects"`
 	CompletedProjects   int    `json:"completed_projects"`
+	FailedProjects      int    `json:"failed_projects"`
 	TotalIssues         int    `json:"total_issues"`
 	ImportedIssues      int    `json:"imported_issues"`
 	FailedIssues        int    `json:"failed_issues"`
 	TotalTests          int    `json:"total_tests"`
 	ImportedTests       int    `json:"imported_tests"`
 	FailedTests         int    `json:"failed_tests"`
+	FailedLinks         int    `json:"failed_links"`
 	TotalAttachments    int    `json:"total_attachments"`
 	ImportedAttachments int    `json:"imported_attachments"`
 	TotalComments       int    `json:"total_comments"`

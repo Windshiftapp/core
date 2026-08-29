@@ -106,6 +106,7 @@ export default {
       importing: 'جاري الاستيراد...',
       starting: 'جاري بدء الاستيراد...',
       complete: 'اكتمل الاستيراد!',
+      completeWithErrors: 'اكتمل الاستيراد مع وجود أخطاء',
       success: 'تم استيراد {count} عنصر بنجاح.',
       failed: 'فشل استيراد {count} عنصر.',
       ready: 'جاهز للاستيراد',

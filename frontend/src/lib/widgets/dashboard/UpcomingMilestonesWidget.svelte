@@ -22,7 +22,7 @@
 {:else if milestones.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Target class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">{t('dashboard.widgetContent.noUpcomingMilestones')}</p>
+    <p class="text-sm">{t('dashboard.states.noUpcomingMilestones')}</p>
   </div>
 {:else}
   <ul class="flex flex-col gap-3">
@@ -49,15 +49,15 @@
               </span>
             </div>
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              {t('dashboard.widgetContent.milestoneDone', { done: m.done_items, total: m.total_items })}
+              {t('dashboard.states.milestoneProgress', { done: m.done_items, total: m.total_items })}
               {#if m.target_date}
                 ·
                 {#if overdue}
-                  <span style="color: var(--ds-text-danger);">{t('dashboard.widgetContent.daysOverdue', { count: Math.abs(daysUntil) })}</span>
+                  <span style="color: var(--ds-text-danger);">{t('dashboard.states.daysOverdue', { days: Math.abs(daysUntil) })}</span>
                 {:else if daysUntil === 0}
                   {t('dashboard.dueToday')}
                 {:else if daysUntil !== null}
-                  {t('dashboard.widgetContent.daysLeft', { count: daysUntil })}
+                  {t('dashboard.states.daysLeft', { days: daysUntil })}
                 {/if}
               {/if}
             </p>

@@ -36,6 +36,14 @@
 
   // Derived: determine which step is active (first incomplete step, admin path only)
   let activeStep = $derived(workspaceCount === 0 ? 1 : (itemCount === 0 ? 2 : 0));
+  let welcomeText = $derived(
+    userName
+      ? t('dashboard.salutation.withName', {
+          salutation: t('onboarding.welcomeTo'),
+          name: userName,
+        })
+      : t('dashboard.salutation.withoutName', { salutation: t('onboarding.welcomeTo') })
+  );
 
   onMount(() => {
     // Check if user has dismissed the onboarding
@@ -121,7 +129,7 @@
         </div>
         <div class="flex-1">
           <h1 class="text-2xl font-semibold mb-1" style="color: var(--ds-text);">
-            {t('onboarding.welcomeTo')}, {userName}!
+            {welcomeText}
           </h1>
           <p class="text-sm" style="color: var(--ds-text-subtle);">
             {#if canCreateWorkspaces}

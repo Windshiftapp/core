@@ -100,6 +100,7 @@ export default {
       importing: 'Importiere...',
       starting: 'Import wird gestartet...',
       complete: 'Import abgeschlossen!',
+      completeWithErrors: 'Import mit Fehlern abgeschlossen',
       success: '{count} Vorgänge erfolgreich importiert.',
       failed: '{count} Vorgänge konnten nicht importiert werden.',
       ready: 'Bereit zum Import',

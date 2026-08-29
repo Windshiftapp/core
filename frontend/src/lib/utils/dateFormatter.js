@@ -261,27 +261,21 @@ export function formatRelativeTime(dateString) {
   if (!dateString) return '';
   try {
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
     const now = serverNow();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    const diffMs = date.getTime() - now.getTime();
+    const absoluteMs = Math.abs(diffMs);
+    const formatter = new Intl.RelativeTimeFormat(getAppLocale(), { numeric: 'always' });
+    const immediateFormatter = new Intl.RelativeTimeFormat(getAppLocale(), { numeric: 'auto' });
+    const valueFor = (unitMs) => Math.sign(diffMs) * Math.floor(absoluteMs / unitMs);
 
-    if (diffSecs < 60) return 'just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    if (diffDays < 30) {
-      const weeks = Math.floor(diffDays / 7);
-      return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
-    }
-    if (diffDays < 365) {
-      const months = Math.floor(diffDays / 30);
-      return `${months} month${months !== 1 ? 's' : ''} ago`;
-    }
-    const years = Math.floor(diffDays / 365);
-    return `${years} year${years !== 1 ? 's' : ''} ago`;
+    if (absoluteMs < 60_000) return immediateFormatter.format(0, 'second');
+    if (absoluteMs < 3_600_000) return formatter.format(valueFor(60_000), 'minute');
+    if (absoluteMs < 86_400_000) return formatter.format(valueFor(3_600_000), 'hour');
+    if (absoluteMs < 604_800_000) return formatter.format(valueFor(86_400_000), 'day');
+    if (absoluteMs < 2_592_000_000) return formatter.format(valueFor(604_800_000), 'week');
+    if (absoluteMs < 31_536_000_000) return formatter.format(valueFor(2_592_000_000), 'month');
+    return formatter.format(valueFor(31_536_000_000), 'year');
   } catch (error) {
     console.error('Error formatting relative time:', error);
     return '';

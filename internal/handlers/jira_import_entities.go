@@ -368,6 +368,10 @@ func isJiraStoryPointsField(mapping CustomFieldMapping) bool {
 	return mapping.JiraType == "com.pyxis.greenhopper.jira:jsw-story-points" || strings.EqualFold(strings.TrimSpace(mapping.JiraName), "Story Points")
 }
 
+func shouldImportJiraStoryPoints(mapping CustomFieldMapping) bool {
+	return mapping.Action != "skip" && isJiraStoryPointsField(mapping)
+}
+
 // isJiraSprintField identifies Jira Software's sprint field. Windshift has a
 // first-class iteration_id on items, so sprint data should resolve there rather
 // than into a generic custom field bag.
@@ -499,16 +503,15 @@ func extractCustomFieldValueWithOptions(
 		}
 	case "date":
 		if s := customFieldDisplayValue(value); s != "" {
-			if t := jira.ParseJiraTimestamp(s); t != nil {
-				return t.UTC().Format(time.RFC3339), true
+			if _, err := time.Parse(time.DateOnly, s); err == nil {
+				return s, true
 			}
-			return s, true
+			if t := jira.ParseJiraTimestamp(s); t != nil {
+				return t.Format(time.DateOnly), true
+			}
 		}
 	case "select":
 		if s := customFieldDisplayValue(value); s != "" {
-			if choiceOptionIDs == nil {
-				return s, true
-			}
 			optionID := choiceOptionIDs[strings.ToLower(strings.TrimSpace(s))]
 			if optionID > 0 {
 				return optionID, true
@@ -517,9 +520,6 @@ func extractCustomFieldValueWithOptions(
 	case "multiselect":
 		values := customFieldDisplayValues(value)
 		if len(values) > 0 {
-			if choiceOptionIDs == nil {
-				return values, true
-			}
 			optionIDs := make([]int, 0, len(values))
 			seen := make(map[int]bool)
 			for _, label := range values {
@@ -540,9 +540,6 @@ func extractCustomFieldValueWithOptions(
 				return mid, true
 			}
 		}
-		if s := customFieldDisplayValue(value); s != "" {
-			return s, true
-		}
 	case "asset":
 		values := customFieldDisplayValues(value)
 		if len(values) > 0 {
@@ -558,6 +555,55 @@ func extractCustomFieldValueWithOptions(
 		}
 	}
 	return nil, false
+}
+
+func unresolvedJiraCustomFieldRawValue(
+	mapping CustomFieldMapping,
+	fields *jira.JiraIssueFields,
+	typedValueResolved bool,
+	choiceOptionIDs map[string]int,
+) (any, bool) {
+	if typedValueResolved && mapping.WindshiftType != "multiselect" {
+		return nil, false
+	}
+	if mapping.Action == "skip" || mapping.PreserveRaw || isJiraStoryPointsField(mapping) || isJiraSprintField(mapping) {
+		return nil, false
+	}
+	switch mapping.WindshiftType {
+	case "date", "select", "multiselect", "milestone":
+	default:
+		return nil, false
+	}
+	if fields == nil || fields.CustomFields == nil {
+		return nil, false
+	}
+	raw, exists := fields.CustomFields[mapping.JiraID]
+	if !exists || raw == nil {
+		return nil, false
+	}
+	if !typedValueResolved {
+		return raw, true
+	}
+
+	for _, label := range customFieldDisplayValues(raw) {
+		if choiceOptionIDs[strings.ToLower(strings.TrimSpace(label))] <= 0 {
+			return raw, true
+		}
+	}
+	return nil, false
+}
+
+func preserveUnresolvedJiraCustomField(
+	values map[string]any,
+	mapping CustomFieldMapping,
+	raw any,
+) {
+	values["_jira_custom_field_"+mapping.JiraID] = map[string]any{
+		"jira_field_id":   mapping.JiraID,
+		"jira_field_name": mapping.JiraName,
+		"jira_field_type": mapping.JiraType,
+		"value":           raw,
+	}
 }
 
 func userIdentifierFromObject(userObj map[string]any) string {
@@ -1081,9 +1127,11 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 			continue
 		}
 		if isJiraStoryPointsField(mapping) {
-			if raw, ok := issue.Fields.CustomFields[mapping.JiraID]; ok {
-				if sp, ok := numericCustomFieldValue(raw); ok {
-					storyPoints = &sp
+			if shouldImportJiraStoryPoints(mapping) {
+				if raw, ok := issue.Fields.CustomFields[mapping.JiraID]; ok {
+					if sp, ok := numericCustomFieldValue(raw); ok {
+						storyPoints = &sp
+					}
 				}
 			}
 			continue
@@ -1112,14 +1160,23 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 			}
 			continue
 		}
-		if v, ok := extractCustomFieldValueWithOptions(
+		v, resolved := extractCustomFieldValueWithOptions(
 			mapping,
 			&issue.Fields,
 			userMap,
 			versionMap,
 			choiceOptionIDs[mapping.JiraID],
-		); ok {
+		)
+		if resolved {
 			customFieldValues[strconv.Itoa(fieldID)] = v
+		}
+		if raw, preserve := unresolvedJiraCustomFieldRawValue(
+			mapping,
+			&issue.Fields,
+			resolved,
+			choiceOptionIDs[mapping.JiraID],
+		); preserve {
+			preserveUnresolvedJiraCustomField(customFieldValues, mapping, raw)
 		}
 	}
 
@@ -1144,8 +1201,8 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		}
 		customFieldValues[key] = sanitizeJiraImportStrings(v)
 	}
-	if err := validation.SanitizeCustomFieldTextValues(h.db, customFieldValues); err != nil {
-		return fmt.Errorf("failed to sanitize custom field values: %w", err)
+	if err := validation.ValidateAndNormalizeCustomFieldValues(h.db, customFieldValues); err != nil {
+		return fmt.Errorf("failed to validate custom field values: %w", err)
 	}
 
 	customFieldValuesJSON := ""

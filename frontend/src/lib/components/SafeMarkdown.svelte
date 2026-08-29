@@ -60,6 +60,24 @@
     padding-inline-start: 1.5rem;
   }
 
+  .safe-markdown :global(ul) {
+    list-style-type: disc;
+  }
+
+  .safe-markdown :global(ol) {
+    list-style-type: decimal;
+  }
+
+  .safe-markdown :global(li) {
+    display: list-item;
+    margin-block: 0.25em;
+  }
+
+  .safe-markdown :global(li:has(> input[type='checkbox']:first-child)),
+  .safe-markdown :global(li:has(> p:first-child > input[type='checkbox']:first-child)) {
+    list-style-type: none;
+  }
+
   .safe-markdown :global(a) {
     color: var(--ds-text-link);
     text-decoration: underline;

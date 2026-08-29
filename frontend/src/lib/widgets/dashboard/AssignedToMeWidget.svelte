@@ -1,9 +1,9 @@
 <script>
   import { CheckSquare } from '@lucide/svelte';
   import { authStore } from '../../stores';
+  import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
-  import { t } from '../../stores/i18n.svelte.js';
   import {
     assignedToMeQuery,
     normalizeTaskResponse,
@@ -65,8 +65,8 @@
   {errored}
   {tasks}
   icon={CheckSquare}
-  errorMessage={t('dashboard.widgetContent.assignedLoadError')}
-  emptyMessage={t('dashboard.widgetContent.assignedEmpty')}
+  errorMessage={t('dashboard.states.assignedLoadError')}
+  emptyMessage={t('dashboard.states.assignedEmpty')}
   {density}
   {openTask}
 />

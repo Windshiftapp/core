@@ -105,6 +105,7 @@ export default {
       importing: 'Importing...',
       starting: 'Starting import...',
       complete: 'Import Complete!',
+      completeWithErrors: 'Import completed with errors',
       success: 'Successfully imported {count} items.',
       failed: '{count} items failed to import.',
       ready: 'Ready to Import',

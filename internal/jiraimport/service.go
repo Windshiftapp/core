@@ -265,7 +265,7 @@ func (s *Service) PreviousImports(projectKeys []string) ([]PreviousImport, error
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'workspace'),
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'item')
 		FROM jira_import_jobs j
-		WHERE j.status = 'completed'
+		WHERE j.status IN ('completed', 'completed_with_errors')
 		ORDER BY j.completed_at DESC
 		LIMIT 10
 	`)
@@ -328,7 +328,7 @@ func (s *Service) UpdateStatus(jobID, status, phase string, progress *Progress, 
 	case "running":
 		query = `UPDATE jira_import_jobs SET status = ?, phase = ?, progress_json = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []any{status, phase, progressJSON, jobID}
-	case "completed", "failed":
+	case "completed", "completed_with_errors", "failed":
 		query = `UPDATE jira_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []any{status, phase, progressJSON, errorMessage, jobID}
 	default:

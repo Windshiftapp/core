@@ -13,11 +13,11 @@
     return homepageStore.recentlyViewed;
   });
 
-  let tabs = $derived([
-    { id: 'viewed', label: t('dashboard.viewed'), icon: Eye },
-    { id: 'edited', label: t('dashboard.edited'), icon: Edit },
-    { id: 'commented', label: t('dashboard.commented'), icon: MessageSquare },
-  ]);
+  const tabs = [
+    { id: 'viewed', labelKey: 'dashboard.viewed', icon: Eye },
+    { id: 'edited', labelKey: 'dashboard.edited', icon: Edit },
+    { id: 'commented', labelKey: 'dashboard.commented', icon: MessageSquare },
+  ];
 
   function open(item) {
     navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}`);
@@ -37,7 +37,7 @@
         onclick={() => homepageStore.setActiveTab(tab.id)}
       >
         <TabIcon class="w-3.5 h-3.5" />
-        {tab.label}
+        {t(tab.labelKey)}
       </button>
     {/each}
   </div>

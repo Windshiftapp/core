@@ -42,7 +42,7 @@ export default {
       workspaces: 'Рабочие пространства', workItems: 'Рабочие элементы', statuses: 'Статусы', itemTypes: 'Типы элементов', customFields: 'Настраиваемые поля', milestones: 'Этапы', users: 'Пользователи', usersNew: '({count} новых)', assets: 'Ресурсы', projectsToImport: 'Импортируемые проекты',
     },
     import: {
-      importing: 'Импорт…', starting: 'Запуск импорта…', complete: 'Импорт завершён!', success: 'Успешно импортировано элементов: {count}.', failed: 'Не удалось импортировать элементов: {count}.', ready: 'Готово к импорту', readyDesc: 'Нажмите «Начать импорт», чтобы импортировать элементы ({count}).', progress: 'Ход выполнения',
+      importing: 'Импорт…', starting: 'Запуск импорта…', complete: 'Импорт завершён!', completeWithErrors: 'Импорт завершён с ошибками', success: 'Успешно импортировано элементов: {count}.', failed: 'Не удалось импортировать элементов: {count}.', ready: 'Готово к импорту', readyDesc: 'Нажмите «Начать импорт», чтобы импортировать элементы ({count}).', progress: 'Ход выполнения',
     },
     errors: {
       connectionFailed: 'Не удалось подключиться к Jira', loadProjectsFailed: 'Не удалось загрузить проекты', analyzeFailed: 'Не удалось проанализировать проекты', importFailed: 'Не удалось запустить импорт', loadConnectionsFailed: 'Не удалось загрузить подключения', deleteConnectionFailed: 'Не удалось удалить подключение',

@@ -22,6 +22,7 @@ import workspace from './workspace.js';
 import pages from './pages.js';
 import adminOperations from './adminOperations.js';
 import agents from './agents.js';
+import dashboard from './dashboard.js';
 
 export default createLocale({
   common,
@@ -42,4 +43,5 @@ export default createLocale({
   pages,
   adminOperations,
   agents,
+  dashboard,
 });

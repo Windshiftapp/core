@@ -166,7 +166,15 @@ async function loadLocaleFiles(localeCode) {
     .filter((f) => f.endsWith('.js') && f !== 'index.js')
     .sort((a, b) => {
       const rank = (file) =>
-        file === 'review.js' ? 3 : file === 'quality.js' ? 2 : file === 'supplemental.js' ? 1 : 0;
+        file === 'review.js'
+          ? 3
+          : file === 'quality.js'
+            ? 2
+            : file === 'supplemental.js'
+              ? 1
+              : file === 'dashboard.js'
+                ? 0.5
+                : 0;
       return rank(a) - rank(b) || a.localeCompare(b);
     });
 
@@ -204,6 +212,12 @@ async function extractSourceKeys() {
     const content = await readFile(file, 'utf-8');
     const matches = content.matchAll(/\bt\(['"]([a-zA-Z][a-zA-Z0-9_.]+)['"]/g);
     for (const match of matches) {
+      keys.add(match[1]);
+    }
+    const metadataMatches = content.matchAll(
+      /\b(?:name|description|label|title|subtitle)Key:\s*['"]([a-zA-Z][a-zA-Z0-9_.]+)['"]/g
+    );
+    for (const match of metadataMatches) {
       keys.add(match[1]);
     }
   }

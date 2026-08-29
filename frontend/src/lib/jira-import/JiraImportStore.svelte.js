@@ -685,7 +685,7 @@ export const jiraImport = {
         importState.phase = status.phase || 'running';
         importState.progress = status.progress;
 
-        if (status.status === 'completed') {
+        if (status.status === 'completed' || status.status === 'completed_with_errors') {
           importState.result = status;
           markWizardStepComplete('import');
           return; // Stop polling

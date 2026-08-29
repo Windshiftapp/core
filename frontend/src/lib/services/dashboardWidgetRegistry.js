@@ -14,10 +14,8 @@ export const dashboardWidgetRegistry = [
   // Activity & news
   {
     type: 'daily-briefing',
-    name: 'Daily Briefing',
-    description: 'AI-generated summary of what matters to you today',
-    nameKey: 'dashboard.widgets.dailyBriefing.name',
-    descriptionKey: 'dashboard.widgets.dailyBriefing.description',
+    nameKey: 'dashboard.widgetCatalog.dailyBriefing.name',
+    descriptionKey: 'dashboard.widgetCatalog.dailyBriefing.description',
     category: dashboardWidgetCategories.ACTIVITY,
     icon: 'Sparkles',
     defaultWidth: 12,
@@ -25,10 +23,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'your-activity',
-    name: 'Your Activity',
-    description: 'Items you recently viewed, edited, or commented on',
-    nameKey: 'dashboard.widgets.yourActivity.name',
-    descriptionKey: 'dashboard.widgets.yourActivity.description',
+    nameKey: 'dashboard.widgetCatalog.yourActivity.name',
+    descriptionKey: 'dashboard.widgetCatalog.yourActivity.description',
     category: dashboardWidgetCategories.ACTIVITY,
     icon: 'Clock',
     defaultWidth: 8,
@@ -36,10 +32,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'whats-new',
-    name: "What's New",
-    description: 'Latest notifications and unread updates',
-    nameKey: 'dashboard.widgets.whatsNew.name',
-    descriptionKey: 'dashboard.widgets.whatsNew.description',
+    nameKey: 'dashboard.widgetCatalog.whatsNew.name',
+    descriptionKey: 'dashboard.widgetCatalog.whatsNew.description',
     category: dashboardWidgetCategories.ACTIVITY,
     icon: 'Bell',
     defaultWidth: 4,
@@ -49,10 +43,8 @@ export const dashboardWidgetRegistry = [
   // Work items
   {
     type: 'personal-tasks',
-    name: 'Personal Tasks',
-    description: 'Items from your personal todo list',
-    nameKey: 'dashboard.widgets.personalTasks.name',
-    descriptionKey: 'dashboard.widgets.personalTasks.description',
+    nameKey: 'dashboard.widgetCatalog.personalTasks.name',
+    descriptionKey: 'dashboard.widgetCatalog.personalTasks.description',
     category: dashboardWidgetCategories.WORK,
     icon: 'ListChecks',
     defaultWidth: 6,
@@ -60,10 +52,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'saved-search',
-    name: 'Saved Search',
-    description: 'Display work items from a saved collection',
-    nameKey: 'dashboard.widgets.savedSearch.name',
-    descriptionKey: 'dashboard.widgets.savedSearch.description',
+    nameKey: 'dashboard.widgetCatalog.savedSearch.name',
+    descriptionKey: 'dashboard.widgetCatalog.savedSearch.description',
     category: dashboardWidgetCategories.WORK,
     icon: 'Search',
     defaultWidth: 6,
@@ -71,10 +61,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'assigned-to-me',
-    name: 'Assigned to Me',
-    description: 'Open items assigned to you across all workspaces',
-    nameKey: 'dashboard.widgets.assignedToMe.name',
-    descriptionKey: 'dashboard.widgets.assignedToMe.description',
+    nameKey: 'dashboard.widgetCatalog.assignedToMe.name',
+    descriptionKey: 'dashboard.widgetCatalog.assignedToMe.description',
     category: dashboardWidgetCategories.WORK,
     icon: 'CheckSquare',
     defaultWidth: 6,
@@ -82,10 +70,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'watched-items',
-    name: 'Watched Items',
-    description: 'Items you are following',
-    nameKey: 'dashboard.widgets.watchedItems.name',
-    descriptionKey: 'dashboard.widgets.watchedItems.description',
+    nameKey: 'dashboard.widgetCatalog.watchedItems.name',
+    descriptionKey: 'dashboard.widgetCatalog.watchedItems.description',
     category: dashboardWidgetCategories.WORK,
     icon: 'Eye',
     defaultWidth: 4,
@@ -93,10 +79,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'upcoming-milestones',
-    name: 'Upcoming Milestones',
-    description: 'Milestones with approaching target dates',
-    nameKey: 'dashboard.widgets.upcomingMilestones.name',
-    descriptionKey: 'dashboard.widgets.upcomingMilestones.description',
+    nameKey: 'dashboard.widgetCatalog.upcomingMilestones.name',
+    descriptionKey: 'dashboard.widgetCatalog.upcomingMilestones.description',
     category: dashboardWidgetCategories.WORK,
     icon: 'Target',
     defaultWidth: 12,
@@ -106,10 +90,8 @@ export const dashboardWidgetRegistry = [
   // Navigation
   {
     type: 'recent-workspaces',
-    name: 'Recent Workspaces',
-    description: 'Workspaces you recently visited',
-    nameKey: 'dashboard.widgets.recentWorkspaces.name',
-    descriptionKey: 'dashboard.widgets.recentWorkspaces.description',
+    nameKey: 'dashboard.widgetCatalog.recentWorkspaces.name',
+    descriptionKey: 'dashboard.widgetCatalog.recentWorkspaces.description',
     category: dashboardWidgetCategories.NAVIGATION,
     icon: 'Briefcase',
     defaultWidth: 8,
@@ -117,10 +99,8 @@ export const dashboardWidgetRegistry = [
   },
   {
     type: 'quick-access',
-    name: 'Quick Access',
-    description: 'Quick links to workspaces you can reach',
-    nameKey: 'dashboard.widgets.quickAccess.name',
-    descriptionKey: 'dashboard.widgets.quickAccess.description',
+    nameKey: 'dashboard.widgetCatalog.quickAccess.name',
+    descriptionKey: 'dashboard.widgetCatalog.quickAccess.description',
     category: dashboardWidgetCategories.NAVIGATION,
     icon: 'Grip',
     defaultWidth: 4,
@@ -146,33 +126,73 @@ export function getDashboardWidgetMinWidth(type) {
   return widget?.minWidth ?? 3;
 }
 
+export const defaultDashboardSections = {
+  'default-your-day': {
+    title: 'Your Day',
+    subtitle: 'A quick read on what needs your attention',
+    titleKey: 'dashboard.sections.yourDay.title',
+    subtitleKey: 'dashboard.sections.yourDay.subtitle',
+  },
+  'default-work': {
+    title: 'Work',
+    subtitle: 'Your personal list and items assigned to you',
+    titleKey: 'dashboard.sections.work.title',
+    subtitleKey: 'dashboard.sections.work.subtitle',
+  },
+  'default-workspaces': {
+    title: 'Workspaces',
+    subtitle: 'Jump back in',
+    titleKey: 'dashboard.sections.workspaces.title',
+    subtitleKey: 'dashboard.sections.workspaces.subtitle',
+  },
+};
+
+/**
+ * Translate untouched built-in section headings while preserving user edits.
+ */
+export function getDashboardSectionDisplay(section, translate) {
+  const defaults = defaultDashboardSections[section.id];
+  if (!defaults) return { title: section.title, subtitle: section.subtitle };
+  return {
+    title: section.title === defaults.title ? translate(defaults.titleKey) : section.title,
+    subtitle:
+      section.subtitle === defaults.subtitle ? translate(defaults.subtitleKey) : section.subtitle,
+  };
+}
+
+/**
+ * Preserve canonical default values when a localized section editor is saved
+ * without changing its translated display text.
+ */
+export function getDashboardSectionSaveValues(section, draft, translate) {
+  const display = getDashboardSectionDisplay(section, translate);
+  return {
+    title: draft.title === display.title ? section.title : draft.title,
+    subtitle: draft.subtitle === (display.subtitle || '') ? section.subtitle : draft.subtitle,
+  };
+}
+
 /**
  * Build the default three-section layout shown to users who have never
  * customized their dashboard (or whose saved layout is empty).
  */
 export function buildDefaultDashboardLayout() {
+  const section = (id, displayOrder, widgetIds) => ({
+    id,
+    title: defaultDashboardSections[id].title,
+    subtitle: defaultDashboardSections[id].subtitle,
+    display_order: displayOrder,
+    widget_ids: widgetIds,
+  });
+
   const sections = [
-    {
-      id: 'default-your-day',
-      title: 'Your Day',
-      subtitle: 'A quick read on what needs your attention',
-      display_order: 0,
-      widget_ids: ['default-daily-briefing', 'default-your-activity', 'default-whats-new'],
-    },
-    {
-      id: 'default-work',
-      title: 'Work',
-      subtitle: 'Your personal list and items assigned to you',
-      display_order: 1,
-      widget_ids: ['default-personal-tasks', 'default-assigned-to-me'],
-    },
-    {
-      id: 'default-workspaces',
-      title: 'Workspaces',
-      subtitle: 'Jump back in',
-      display_order: 2,
-      widget_ids: ['default-recent-workspaces', 'default-quick-access'],
-    },
+    section('default-your-day', 0, [
+      'default-daily-briefing',
+      'default-your-activity',
+      'default-whats-new',
+    ]),
+    section('default-work', 1, ['default-personal-tasks', 'default-assigned-to-me']),
+    section('default-workspaces', 2, ['default-recent-workspaces', 'default-quick-access']),
   ];
 
   const widget = (id, type, sectionId, position, width) => ({

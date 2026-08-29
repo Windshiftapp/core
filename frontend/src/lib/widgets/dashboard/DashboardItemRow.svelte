@@ -41,7 +41,7 @@
         class="inline-block w-2 h-2 rounded-full flex-shrink-0"
         style={`background-color: ${priorityColor};`}
         title={localizedPriorityName}
-        aria-label={t('dashboard.widgetContent.priorityAria', { name: localizedPriorityName })}
+        aria-label={t('dashboard.states.priorityLabel', { priority: localizedPriorityName })}
       ></span>
     {/if}
     <span class="text-sm truncate" style="color: var(--ds-text);">{title}</span>

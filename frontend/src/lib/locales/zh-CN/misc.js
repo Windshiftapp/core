@@ -94,6 +94,7 @@ export default {
       importing: '导入中...',
       starting: '开始导入...',
       complete: '导入完成！',
+      completeWithErrors: '导入已完成，但有错误',
       success: '成功导入 {count} 项。',
       failed: '{count} 项导入失败。',
       ready: '准备导入',

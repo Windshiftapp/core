@@ -28,7 +28,7 @@ make help
 ```bash
 # Build frontend
 cd frontend
-npm install
+npm ci
 npm run build
 cd ..
 
@@ -127,12 +127,12 @@ make build-windows-arm64
 ## Build Requirements
 
 ### For Server + Frontend
-- **Go 1.25+** - Backend compilation
-- **Node.js 18+** - Frontend build
-- **npm** - Package management
+- **Go 1.27.0** - Exact version declared in `go.mod`
+- **Node.js 24.18.0** - Exact version pinned in `.nvmrc` and `frontend/package.json`
+- **npm 11.16.0** - Exact version pinned in `frontend/package.json`
 
 ### For WS Client Only
-- **Go 1.25+** - Client compilation only
+- **Go 1.27.0** - Exact version declared in `go.mod`
 
 ### For Cross-Compilation (release.sh)
 - **Docker + Buildx** - Multi-arch Docker images
@@ -171,10 +171,11 @@ Production builds use these Go build flags:
 
 ### Frontend Build Issues
 ```bash
-# Clear npm cache and reinstall
+# Reinstall exactly from the lockfile
 cd frontend
-rm -rf node_modules package-lock.json
-npm install
+rm -rf node_modules
+npm cache verify
+npm ci
 npm run build
 ```
 

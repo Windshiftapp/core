@@ -58,7 +58,7 @@
   <div class="flex items-start gap-3 py-2">
     <Sparkles class="w-4 h-4 mt-0.5" style="color: var(--ds-icon-accent);" />
     <p class="text-sm" style="color: var(--ds-text-subtle);">
-      {t('dashboard.widgetContent.briefingUnavailable')}
+      {t('dashboard.states.dailyBriefingUnavailable')}
     </p>
   </div>
 {:else}
@@ -74,12 +74,14 @@
   </div>
   {#if briefing.generated_at}
     <p class="text-xs mt-3" style="color: var(--ds-text-subtlest);">
-      {t('dashboard.widgetContent.updated', { date: formatAuthenticatedInstant(briefing.generated_at, {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      }) })}
+      {t('dashboard.states.updatedAt', {
+        time: formatAuthenticatedInstant(briefing.generated_at, {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+      })}
     </p>
   {/if}
 {/if}

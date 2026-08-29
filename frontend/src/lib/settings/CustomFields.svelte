@@ -28,7 +28,7 @@
   import { parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
   import { X as XIcon } from '@lucide/svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
-  import { loadCustomFieldsOverview } from './customFieldsData.js';
+  import { customFieldFormData, loadCustomFieldsOverview } from './customFieldsData.js';
   import { BOOLEAN_CUSTOM_FIELD_TYPE, canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 
@@ -50,13 +50,7 @@
   // configuration, in which case cancel/success should return automatically.
   let boardCreateFlow = $state(false);
   /** @type {{ field_name: string, field_type: string, field_config: Record<string, any>, applies_to_portal_customers: boolean, applies_to_customer_organisations: boolean, description?: string, required?: boolean }} */
-  let formData = $state({
-    field_name: '',
-    field_type: 'text',
-    field_config: { max_length: '' },
-    applies_to_portal_customers: false,
-    applies_to_customer_organisations: false
-  });
+  let formData = $state(customFieldFormData());
 
   // Settings modal state
   let showSettingsModal = $state(false);
@@ -202,13 +196,7 @@
 
   function startEdit(field) {
     editingField = field;
-    formData = {
-      field_name: field.name,
-      field_type: canonicalCustomFieldType(field.field_type),
-      field_config: { max_length: '' },
-      applies_to_portal_customers: field.applies_to_portal_customers || false,
-      applies_to_customer_organisations: field.applies_to_customer_organisations || false
-    };
+    formData = customFieldFormData(field);
 
     // Parse options using the unified parser (handles both legacy and new format)
     if ((field.field_type === 'select' || field.field_type === 'multiselect') && field.options) {
@@ -271,13 +259,7 @@
   }
 
   function resetForm() {
-    formData = {
-      field_name: '',
-      field_type: 'text',
-      field_config: { max_length: '' },
-      applies_to_portal_customers: false,
-      applies_to_customer_organisations: false
-    };
+    formData = customFieldFormData();
     optionItems = [];
     nextOptionId = 1;
     assetSetId = null;

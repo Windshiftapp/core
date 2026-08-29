@@ -43,7 +43,7 @@
           {#if ws.avatar_url}
             <img
               src={ws.avatar_url}
-              alt={t('dashboard.widgetContent.workspaceAvatar', { name: ws.workspace_name })}
+              alt={t('dashboard.states.workspaceAvatarAlt', { name: ws.workspace_name })}
               class="w-8 h-8 rounded object-cover flex-shrink-0"
             />
           {:else}
@@ -61,7 +61,7 @@
             <p class="text-xs" style="color: var(--ds-text-subtle);">
               {ws.workspace_key}
               {#if ws.last_visited}
-                · {t('dashboard.widgetContent.visited', { date: homepageStore.formatRelativeTime(ws.last_visited) })}
+                · {t('dashboard.states.visited', { time: homepageStore.formatRelativeTime(ws.last_visited) })}
               {/if}
             </p>
           </div>

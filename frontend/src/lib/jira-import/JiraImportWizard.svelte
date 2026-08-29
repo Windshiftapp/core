@@ -1334,7 +1334,7 @@
                         >
                           <div class="flex items-center justify-between gap-3">
                             <span class="font-mono text-xs" style="color: var(--ds-text);">{conflict.job_id}</span>
-                            <span class="text-xs capitalize" style="color: var(--ds-text-subtle);">{conflict.status?.replace('_', ' ')}</span>
+                            <span class="text-xs capitalize" style="color: var(--ds-text-subtle);">{conflict.status?.replaceAll('_', ' ')}</span>
                           </div>
                           {#if conflict.project_keys?.length}
                             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Projects: {conflict.project_keys.join(', ')}</p>
@@ -1382,9 +1382,15 @@
               data-total-attachments={importData.progress?.total_attachments || 0}
               data-imported-attachments={importData.progress?.imported_attachments || 0}
             >
-              <Check class="w-16 h-16 mx-auto" style="color: var(--ds-text-success);" />
+              {#if importData.result.status === 'completed_with_errors'}
+                <AlertCircle class="w-16 h-16 mx-auto" style="color: var(--ds-text-warning);" />
+              {:else}
+                <Check class="w-16 h-16 mx-auto" style="color: var(--ds-text-success);" />
+              {/if}
               <p class="text-lg font-medium mt-4" style="color: var(--ds-text);">
-                {t('jiraImport.import.complete')}
+                {importData.result.status === 'completed_with_errors'
+                  ? t('jiraImport.import.completeWithErrors')
+                  : t('jiraImport.import.complete')}
               </p>
               <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                 {t('jiraImport.import.success', { count: importData.progress?.imported_issues || 0 })}
@@ -1408,6 +1414,17 @@
                 <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-xray-failed-count">
                   {importData.progress.failed_tests} Xray test
                   {importData.progress.failed_tests === 1 ? ' case failed' : ' cases failed'} to import.
+                </p>
+              {/if}
+              {#if importData.progress?.failed_projects > 0}
+                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-failed-project-count">
+                  {importData.progress.failed_projects} Jira
+                  {importData.progress.failed_projects === 1 ? ' project failed' : ' projects failed'} to import.
+                </p>
+              {/if}
+              {#if importData.progress?.failed_links > 0}
+                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-failed-link-count">
+                  Jira issue links could not be imported.
                 </p>
               {/if}
             </div>

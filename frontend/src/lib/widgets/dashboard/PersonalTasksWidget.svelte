@@ -1,9 +1,9 @@
 <script>
   import { ListChecks } from '@lucide/svelte';
   import { authStore, workspacesStore } from '../../stores';
+  import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
-  import { t } from '../../stores/i18n.svelte.js';
   import {
     completedSinceCutoff,
     normalizeTaskResponse,
@@ -76,8 +76,8 @@
   {errored}
   {tasks}
   icon={ListChecks}
-  errorMessage={t('dashboard.widgetContent.personalLoadError')}
-  emptyMessage={t('dashboard.widgetContent.personalEmpty')}
+  errorMessage={t('dashboard.states.personalTasksLoadError')}
+  emptyMessage={t('dashboard.states.personalTasksEmpty')}
   {density}
   {openTask}
 />

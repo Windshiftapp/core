@@ -22,7 +22,7 @@
 {:else if items.length === 0}
   <div class="flex flex-col items-center text-center py-6" style="color: var(--ds-text-subtle);">
     <Eye class="w-6 h-6 mb-2 opacity-60" />
-    <p class="text-sm">{t('dashboard.widgetContent.watchedEmpty')}</p>
+    <p class="text-sm">{t('dashboard.states.watchedItemsEmpty')}</p>
   </div>
 {:else}
   <ul class="flex flex-col gap-1.5">

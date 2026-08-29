@@ -22,6 +22,7 @@ import pages from './pages.js';
 import teams from './teams.js';
 import supplemental from './supplemental.js';
 import adminOperations from './adminOperations.js';
+import dashboard from './dashboard.js';
 
 export default createLocale({
   common,
@@ -42,4 +43,5 @@ export default createLocale({
   teams,
   supplemental,
   adminOperations,
+  dashboard,
 });

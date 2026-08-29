@@ -101,6 +101,7 @@ export default {
       importing: 'Importando...',
       starting: 'Iniciando importação...',
       complete: 'Importação Concluída!',
+      completeWithErrors: 'Importação concluída com erros',
       success: '{count} itens importados com sucesso.',
       failed: '{count} itens falharam na importação.',
       ready: 'Pronto para Importar',

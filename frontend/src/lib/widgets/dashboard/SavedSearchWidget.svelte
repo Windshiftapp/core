@@ -64,7 +64,10 @@
   function formatCollectionLabel(collection) {
     if (workspaceId || !collection.workspace_id) return collection.name;
     const workspace = workspaceMap.get(Number(collection.workspace_id));
-    const workspaceLabel = workspace?.name || workspace?.key || `Workspace ${collection.workspace_id}`;
+    const workspaceLabel =
+      workspace?.name ||
+      workspace?.key ||
+      t('dashboard.states.workspaceWithId', { id: collection.workspace_id });
     return `${collection.name} · ${workspaceLabel}`;
   }
 

@@ -1,6 +1,6 @@
 /**
- * Parse custom field options from the ID-based JSON format.
- * Format: {"next_id": 5, "items": [{"id": 1, "label": "Critical"}, ...]}
+ * Parse custom field options from the canonical ID-based format or a legacy label array.
+ * Canonical format: {"next_id": 5, "items": [{"id": 1, "label": "Critical"}, ...]}
  * @param {string|null|undefined} optionsStr - JSON string of options
  * @returns {{ nextId: number, items: Array<{id: number, label: string}> }}
  */
@@ -9,6 +9,13 @@ export function parseFieldOptions(optionsStr) {
 
   try {
     const parsed = JSON.parse(optionsStr);
+
+    if (Array.isArray(parsed) && parsed.every((label) => typeof label === 'string')) {
+      return {
+        nextId: parsed.length + 1,
+        items: parsed.map((label, index) => ({ id: index + 1, label })),
+      };
+    }
 
     if (parsed && typeof parsed === 'object' && parsed.next_id && Array.isArray(parsed.items)) {
       return {

@@ -163,6 +163,42 @@ func sortJiraIssuesByRequestedKeyOrder(issues []jira.JiraIssue, orderedKeys []st
 	})
 }
 
+func recordJiraBulkFetchErrors(
+	projectKey string,
+	bulkErrors []jira.BulkFetchError,
+	xrayPlan *xrayImportPlan,
+	progress *ImportProgress,
+) {
+	for _, fetchError := range bulkErrors {
+		slog.Error("Failed to fetch Jira issue",
+			slog.String("component", "jira"),
+			slog.String("issue", fetchError.IssueIDOrKey),
+			slog.String("error", fetchError.ErrorMessage))
+		if xrayPlan.isTest(projectKey, fetchError.IssueIDOrKey) {
+			progress.FailedTests++
+		} else {
+			progress.FailedIssues++
+		}
+	}
+}
+
+func jiraImportTerminalOutcome(progress *ImportProgress) (status, phase, errorMessage string) {
+	failures := progress.FailedProjects + progress.FailedIssues + progress.FailedTests + progress.FailedLinks
+	if failures == 0 {
+		return "completed", "completed", ""
+	}
+	if progress.ImportedIssues+progress.ImportedTests > 0 {
+		return "completed_with_errors", "completed_with_errors", ""
+	}
+	return "failed", "failed", fmt.Sprintf(
+		"No Jira issues or Xray tests were imported (%d project, %d issue, %d test, and %d issue-link failures).",
+		progress.FailedProjects,
+		progress.FailedIssues,
+		progress.FailedTests,
+		progress.FailedLinks,
+	)
+}
+
 func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, jobID string, req StartImportRequest, client jira.Client, createdByUserID int) {
 	h.clearMappingFailure(jobID)
 	defer h.clearMappingFailure(jobID)
@@ -242,6 +278,8 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 		return
 	}
 
+	var issueLinkImportErr error
+
 	// Process each project
 	for i, projectKey := range req.ProjectKeys {
 		progress.CurrentProject = projectKey
@@ -258,6 +296,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 		}
 		if wsMapping == nil {
 			slog.Warn("No workspace mapping found for project", slog.String("component", "jira"), slog.String("project", projectKey))
+			progress.FailedProjects++
 			continue
 		}
 
@@ -265,6 +304,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 		workspaceID, err := h.ensureWorkspace(ctx, jobID, wsMapping, createdByUserID)
 		if err != nil {
 			slog.Error("Failed to ensure workspace", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+			progress.FailedProjects++
 			continue
 		}
 		if h.failOnMappingFailure(jobID, progress) {
@@ -280,6 +320,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 				slog.String("component", "jira"),
 				slog.String("project", projectKey),
 				slog.Any("error", err))
+			progress.FailedProjects++
 			continue
 		}
 		if h.failOnMappingFailure(jobID, progress) {
@@ -346,6 +387,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 			issueKeys, err = getJiraIssueKeysInImportOrder(ctx, client, projectKey, req.OpenIssuesOnly)
 			if err != nil {
 				slog.Error("Failed to get issue keys", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+				progress.FailedProjects++
 				continue
 			}
 		}
@@ -395,6 +437,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 				}
 				continue
 			}
+			recordJiraBulkFetchErrors(projectKey, fetchResult.Errors, xrayPlan, progress)
 			// Bulk fetch is a set-oriented API and does not guarantee request
 			// ordering. Restore the Rank-ordered key sequence so CreateItem's
 			// append-only fractional index generation preserves Jira order.
@@ -580,7 +623,9 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 				return
 			}
 			slog.Error("Failed to import Jira issue links", slog.String("component", "jira"), slog.Any("error", err))
-			return
+			issueLinkImportErr = err
+		} else {
+			issueLinkImportErr = nil
 		}
 		if h.failOnMappingFailure(jobID, progress) {
 			return
@@ -592,10 +637,13 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 	if h.failOnMappingFailure(jobID, progress) {
 		return
 	}
-	// Mark job as completed
-	progress.Phase = "completed"
+	if issueLinkImportErr != nil {
+		progress.FailedLinks = 1
+	}
+	status, phase, errorMessage := jiraImportTerminalOutcome(progress)
+	progress.Phase = phase
 	h.persistJiraImportResult(jobID, progress)
-	h.updateJobStatus(jobID, "completed", "completed", progress, "")
+	h.updateJobStatus(jobID, status, phase, progress, errorMessage)
 }
 
 type jiraImportFidelityFinding struct {

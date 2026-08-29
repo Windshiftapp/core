@@ -23,6 +23,7 @@ import supplemental from './supplemental.js';
 import quality from './quality.js';
 import review from './review.js';
 import adminOperations from './adminOperations.js';
+import dashboard from './dashboard.js';
 
 export default createLocale({
   common,
@@ -45,4 +46,5 @@ export default createLocale({
   quality,
   review,
   adminOperations,
+  dashboard,
 });

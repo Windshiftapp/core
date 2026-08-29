@@ -29,25 +29,26 @@
   let categories = $derived([
     {
       id: dashboardWidgetCategories.ACTIVITY,
-      name: t('dashboard.customization.activity'),
+      nameKey: 'dashboard.customization.activity.name',
       icon: Clock,
-      description: t('dashboard.customization.activityDescription'),
+      descriptionKey: 'dashboard.customization.activity.description',
     },
     {
       id: dashboardWidgetCategories.WORK,
-      name: t('dashboard.customization.work'),
+      nameKey: 'dashboard.customization.work.name',
       icon: CheckSquare,
-      description: t('dashboard.customization.workDescription'),
+      descriptionKey: 'dashboard.customization.work.description',
     },
     {
       id: dashboardWidgetCategories.NAVIGATION,
-      name: t('dashboard.customization.navigation'),
+      nameKey: 'dashboard.customization.navigation.name',
       icon: Compass,
-      description: t('dashboard.customization.navigationDescription'),
+      descriptionKey: 'dashboard.customization.navigation.description',
     },
   ]);
 
   let currentWidgets = $derived(getDashboardWidgetsByCategory(activeCategory));
+  let currentCategory = $derived(categories.find((category) => category.id === activeCategory));
 
   function handleKeydown(event) {
     if (event.key === 'Escape' && isOpen) {
@@ -90,7 +91,8 @@
           if (!isActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);';
         }}
         onclick={() => (activeCategory = category.id)}
-        title={category.name}
+        title={t(category.nameKey)}
+        aria-label={t(category.nameKey)}
       >
         <CategoryIcon class="w-5 h-5" />
       </button>
@@ -100,8 +102,8 @@
   <!-- Right content panel -->
   <div class="w-96 flex flex-col" style="background-color: var(--ds-surface-raised);">
     <ModalHeader
-      title={categories.find((c) => c.id === activeCategory)?.name || t('dashboard.customization.widgets')}
-      subtitle={categories.find((c) => c.id === activeCategory)?.description || ''}
+      title={currentCategory ? t(currentCategory.nameKey) : t('dashboard.customization.widgets')}
+      subtitle={currentCategory ? t(currentCategory.descriptionKey) : ''}
       onClose={() => (isOpen = false)}
     />
 
@@ -137,7 +139,7 @@
                     class="text-xs px-2 py-0.5 rounded"
                     style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
                   >
-                    {categories.find((category) => category.id === widget.category)?.name || widget.category}
+                    {t(`dashboard.customization.${widget.category}.name`)}
                   </span>
                   <span class="text-xs" style="color: var(--ds-text-subtlest);">
                     {t('widgets.defaultWidth', {
@@ -163,7 +165,8 @@
         style="background-color: var(--ds-background-neutral); border: 1px solid var(--ds-border);"
       >
         <p class="text-xs" style="color: var(--ds-text);">
-          <strong>{t('dashboard.customization.tipTitle')}:</strong> {t('dashboard.customization.tip')}
+          <strong>{t('dashboard.customization.tipLabel')}:</strong>
+          {t('dashboard.customization.tip')}
         </p>
       </div>
     </div>
