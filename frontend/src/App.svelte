@@ -8,6 +8,7 @@
   import { themeStore } from './lib/stores/theme.svelte.js';
   import { i18n, SUPPORTED_LOCALES, t } from './lib/stores/i18n.svelte.js';
   import { safeLoginReturnPath } from './lib/utils/loginReturnPath.js';
+  import { getStartupCopy } from './lib/utils/startupCopy.js';
   import BrandedLoader from './lib/components/BrandedLoader.svelte';
   import LazyRootDialog from './lib/components/LazyRootDialog.svelte';
   import LazyRootView from './lib/components/LazyRootView.svelte';
@@ -115,9 +116,7 @@
       setupLoading = false;
       appInitialized = false;
       startupError =
-        error?.code === 'REQUEST_TIMEOUT'
-          ? t('errors.TIMEOUT')
-          : t('errors.NETWORK_ERROR');
+        error?.code === 'REQUEST_TIMEOUT' ? 'errors.TIMEOUT' : 'errors.NETWORK_ERROR';
     } finally {
       window.clearTimeout(slowTimer);
     }
@@ -282,7 +281,9 @@
   }
 </script>
 
-<a class="skip-link" href="#app-main">{t('common.skipToMainContent')}</a>
+<a class="skip-link" href="#app-main">
+  {getStartupCopy('common.skipToMainContent', i18nReady, t)}
+</a>
 <div
   id="app-main"
   tabindex="-1"
@@ -293,22 +294,23 @@
     <div class="min-h-screen flex items-center justify-center w-full px-6" data-testid="startup-error">
       <div class="text-center max-w-sm">
         <img src="windshift-3.svg" alt={APP_NAME} width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-75" />
-        <h1 class="text-xl font-semibold mb-2">{t('errors.failedToLoad')} Windshift</h1>
-        <p class="text-gray-600 mb-1">{startupError}</p>
-        <p class="text-sm text-gray-500 mb-5">{t('errors.NETWORK_ERROR')}</p>
+        <h1 class="text-xl font-semibold mb-2">
+          {getStartupCopy('errors.failedToLoad', i18nReady, t)} Windshift
+        </h1>
+        <p class="text-gray-600 mb-5">{getStartupCopy(startupError, i18nReady, t)}</p>
         <button
           type="button"
           class="min-h-11 px-5 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
           onclick={() => initializeApp()}
           data-testid="startup-retry"
-        >{t('common.retry')}</button>
+        >{getStartupCopy('common.retry', i18nReady, t)}</button>
       </div>
     </div>
   <!-- Show loading screen during initial setup/session checks -->
   {:else if setupLoading}
     <BrandedLoader
-      label={i18nReady ? t('common.loading') : 'Loading…'}
-      detail={startupSlow && i18nReady ? t('common.loadingSlow') : ''}
+      label={getStartupCopy('common.loading', i18nReady, t)}
+      detail={startupSlow ? getStartupCopy('common.loadingSlow', i18nReady, t) : ''}
     />
   <!-- Public board route - no authentication required -->
   {:else if $currentRoute.view === 'public-board'}
@@ -360,7 +362,10 @@
     <!-- Show loading or login screen while waiting for auth -->
     <div class="flex-1 flex items-center justify-center">
       {#if $authStore.loading}
-        <BrandedLoader label={i18nReady ? t('common.loading') : 'Loading…'} fullViewport={false} />
+        <BrandedLoader
+          label={getStartupCopy('common.loading', i18nReady, t)}
+          fullViewport={false}
+        />
       {:else if showLoginDialog}
         <!-- Login dialog will show, but we can show a minimal background -->
         <div class="text-center">

@@ -5,6 +5,7 @@ import {
   getDashboardSectionSaveValues,
 } from '../services/dashboardWidgetRegistry.js';
 import { formatRelativeTime } from '../utils/dateFormatter.js';
+import { EAGER_STARTUP_COPY, getStartupCopy } from '../utils/startupCopy.js';
 import { i18n } from './i18n.svelte.js';
 import { getPluralCategory, negotiateLocale } from './i18n-utils.js';
 
@@ -63,6 +64,24 @@ describe('getPluralCategory', () => {
   it('uses the single Simplified Chinese category', () => {
     expect(getPluralCategory('zh-CN', 0)).toBe('other');
     expect(getPluralCategory('zh-CN', 2)).toBe('other');
+  });
+});
+
+describe('startup copy', () => {
+  it('does not touch the translator before i18n is ready', () => {
+    const translate = vi.fn((key) => `translated:${key}`);
+
+    for (const [key, value] of Object.entries(EAGER_STARTUP_COPY)) {
+      expect(getStartupCopy(key, false, translate)).toBe(value);
+    }
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('uses the active locale after i18n is ready', () => {
+    const translate = vi.fn((key) => `translated:${key}`);
+
+    expect(getStartupCopy('common.retry', true, translate)).toBe('translated:common.retry');
+    expect(translate).toHaveBeenCalledWith('common.retry');
   });
 });
 

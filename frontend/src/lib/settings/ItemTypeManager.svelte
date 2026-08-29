@@ -82,7 +82,7 @@
       // Group by hierarchy level for better display
       itemTypes = sortItemTypesByHierarchy(itemTypes);
     } catch (err) {
-      error = t('settings.itemTypes.failedToLoad');
+      error = err?.message || t('settings.itemTypes.failedToLoad');
     } finally {
       isLoading = false;
     }
@@ -176,7 +176,7 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      errorToast(t('settings.itemTypes.failedToSave'));
+      errorToast(err?.message || t('settings.itemTypes.failedToSave'));
     }
   }
 
@@ -196,7 +196,7 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      error = t('settings.itemTypes.deleteFailed');
+      error = err?.message || t('settings.itemTypes.deleteFailed');
     }
   }
 
