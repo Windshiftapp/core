@@ -7,6 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // This list is an incremental ratchet: once a user-facing screen has been
 // migrated, literal English UI copy must not return to it.
 const guardedFiles = [
+  'src/lib/dialogs/PomodoroSettingsModal.svelte',
   'src/lib/layout/DashboardCustomizationSidebar.svelte',
   'src/lib/pages/Homepage.svelte',
   'src/lib/features/workflows/WorkflowBuilder.svelte',
