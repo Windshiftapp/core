@@ -2,6 +2,7 @@
   import { IconChevronDown, IconChevronRight } from '@tabler/icons-svelte-runes';
   import EmptyState from './EmptyState.svelte';
   import { itemUrl } from '../utils/urls.js';
+  import { systemPriorityName, systemStatusCategoryName } from '../utils/systemLabels.js';
 
   let {
     statusBreakdown = [],
@@ -37,7 +38,12 @@
               class="w-3 h-3 rounded-full"
               style="background-color: {category.category_color || '#9ca3af'};"
             ></div>
-            <span class="font-medium" style="color: var(--ds-text);">{category.category_name}</span>
+            <span class="font-medium" style="color: var(--ds-text);">
+              {systemStatusCategoryName({
+                name: category.category_name,
+                builtin_key: category.category_builtin_key,
+              })}
+            </span>
             <span class="text-sm" style="color: var(--ds-text-subtle);">({category.item_count} item{category.item_count !== 1 ? 's' : ''})</span>
           </div>
         </button>
@@ -62,7 +68,10 @@
                       class="text-xs px-2 py-0.5 rounded"
                       style="background-color: {item.priority_color ? item.priority_color + '20' : 'var(--ds-background-neutral)'}; color: {item.priority_color || 'var(--ds-text-subtle)'};"
                     >
-                      {item.priority_name}
+                      {systemPriorityName({
+                        name: item.priority_name,
+                        builtin_key: item.priority_builtin_key,
+                      })}
                     </span>
                   {/if}
                   {#if item.assignee_name}

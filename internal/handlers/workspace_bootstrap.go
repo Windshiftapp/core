@@ -275,7 +275,7 @@ func prioritiesToModels(results []services.PriorityResult) []models.Priority {
 	priorities := make([]models.Priority, 0, len(results))
 	for _, priority := range results {
 		priorities = append(priorities, models.Priority{
-			ID: priority.ID, Name: priority.Name, Description: priority.Description,
+			ID: priority.ID, BuiltinKey: priority.BuiltinKey, Name: priority.Name, Description: priority.Description,
 			Icon: priority.Icon, Color: priority.Color, SortOrder: priority.SortOrder,
 			IsDefault: priority.IsDefault,
 		})

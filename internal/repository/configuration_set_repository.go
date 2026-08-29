@@ -118,7 +118,15 @@ const notificationSettingSubquery = `
 		WHERE csns2.configuration_set_id = cs.id
 		ORDER BY csns2.created_at DESC
 		LIMIT 1
-	) AS notification_setting_name`
+	) AS notification_setting_name,
+	(
+		SELECT COALESCE(ns.builtin_key, '')
+		FROM configuration_set_notification_settings csns3
+		JOIN notification_settings ns ON ns.id = csns3.notification_setting_id
+		WHERE csns3.configuration_set_id = cs.id
+		ORDER BY csns3.created_at DESC
+		LIMIT 1
+	) AS notification_setting_builtin_key`
 
 // FindByID loads a configuration set by ID with all related data
 func (r *ConfigurationSetRepository) FindByID(id int) (*models.ConfigurationSet, error) {
@@ -147,19 +155,21 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 	var defaultItemTypeID sql.NullInt64
 	var notificationSettingID sql.NullInt64
 	var notificationSettingName sql.NullString
+	var notificationSettingBuiltinKey sql.NullString
 	var defaultItemTypeName sql.NullString
+	var defaultItemTypeBuiltinKey sql.NullString
 	var conditionSetID sql.NullInt64
 	var conditionSetName sql.NullString
 	var approvalSetID sql.NullInt64
 	var approvalSetName sql.NullString
 
 	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
+		SELECT cs.id, COALESCE(cs.builtin_key, ''), cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
 		       cs.default_item_type_id, cs.condition_set_id, cs.approval_set_id,
 		       %s,
 		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name,
-		       dit.name as default_item_type_name,
+		       wf.name as workflow_name, COALESCE(wf.builtin_key, '') as workflow_builtin_key,
+		       dit.name as default_item_type_name, COALESCE(dit.builtin_key, '') as default_item_type_builtin_key,
 		       cset.name as condition_set_name,
 		       aset.name as approval_set_name
 		FROM configuration_sets cs
@@ -171,11 +181,11 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 	`, notificationSettingSubquery)
 
 	err := r.db.QueryRow(query, id).Scan(
-		&cs.ID, &cs.Name, &cs.Description,
+		&cs.ID, &cs.BuiltinKey, &cs.Name, &cs.Description,
 		&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID,
 		&conditionSetID, &approvalSetID,
-		&notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt,
-		&workflowName, &defaultItemTypeName, &conditionSetName, &approvalSetName,
+		&notificationSettingID, &notificationSettingName, &notificationSettingBuiltinKey, &cs.CreatedAt, &cs.UpdatedAt,
+		&workflowName, &cs.WorkflowBuiltinKey, &defaultItemTypeName, &defaultItemTypeBuiltinKey, &conditionSetName, &approvalSetName,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -187,7 +197,9 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 
 	cs.WorkflowName = workflowName.String
 	cs.NotificationSettingName = notificationSettingName.String
+	cs.NotificationSettingBuiltinKey = notificationSettingBuiltinKey.String
 	cs.DefaultItemTypeName = defaultItemTypeName.String
+	cs.DefaultItemTypeBuiltinKey = defaultItemTypeBuiltinKey.String
 	cs.ConditionSetName = conditionSetName.String
 	cs.ApprovalSetName = approvalSetName.String
 	cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
@@ -223,12 +235,12 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 	// Build data query with pagination
 	offset := (page - 1) * limit
 	query := fmt.Sprintf(`
-		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
+		SELECT cs.id, COALESCE(cs.builtin_key, ''), cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
 		       cs.default_item_type_id, cs.condition_set_id, cs.approval_set_id,
 		       %s,
 		       cs.created_at, cs.updated_at,
-		       wf.name as workflow_name,
-		       dit.name as default_item_type_name,
+		       wf.name as workflow_name, COALESCE(wf.builtin_key, '') as workflow_builtin_key,
+		       dit.name as default_item_type_name, COALESCE(dit.builtin_key, '') as default_item_type_builtin_key,
 		       cset.name as condition_set_name,
 		       aset.name as approval_set_name
 		FROM configuration_sets cs
@@ -255,18 +267,20 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 		var defaultItemTypeID sql.NullInt64
 		var notificationSettingID sql.NullInt64
 		var notificationSettingName sql.NullString
+		var notificationSettingBuiltinKey sql.NullString
 		var defaultItemTypeName sql.NullString
+		var defaultItemTypeBuiltinKey sql.NullString
 		var conditionSetID sql.NullInt64
 		var conditionSetName sql.NullString
 		var approvalSetID sql.NullInt64
 		var approvalSetName sql.NullString
 
 		err := rows.Scan(
-			&cs.ID, &cs.Name, &cs.Description,
+			&cs.ID, &cs.BuiltinKey, &cs.Name, &cs.Description,
 			&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID,
 			&conditionSetID, &approvalSetID,
-			&notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt,
-			&workflowName, &defaultItemTypeName, &conditionSetName, &approvalSetName,
+			&notificationSettingID, &notificationSettingName, &notificationSettingBuiltinKey, &cs.CreatedAt, &cs.UpdatedAt,
+			&workflowName, &cs.WorkflowBuiltinKey, &defaultItemTypeName, &defaultItemTypeBuiltinKey, &conditionSetName, &approvalSetName,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan configuration set: %w", err)
@@ -274,7 +288,9 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 
 		cs.WorkflowName = workflowName.String
 		cs.NotificationSettingName = notificationSettingName.String
+		cs.NotificationSettingBuiltinKey = notificationSettingBuiltinKey.String
 		cs.DefaultItemTypeName = defaultItemTypeName.String
+		cs.DefaultItemTypeBuiltinKey = defaultItemTypeBuiltinKey.String
 		cs.ConditionSetName = conditionSetName.String
 		cs.ApprovalSetName = approvalSetName.String
 		cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
@@ -368,6 +384,7 @@ func (r *ConfigurationSetRepository) loadRelations(cs *models.ConfigurationSet) 
 	for _, config := range itemTypeConfigs {
 		itemTypeNames = append(itemTypeNames, config.ItemTypeName)
 		itemTypesDetailed = append(itemTypesDetailed, models.ItemTypeDisplay{
+			BuiltinKey:     config.ItemTypeBuiltinKey,
 			Name:           config.ItemTypeName,
 			Icon:           config.ItemTypeIcon,
 			Color:          config.ItemTypeColor,
@@ -424,7 +441,7 @@ func (r *ConfigurationSetRepository) loadWorkspaces(configSetID int) (ids []int,
 // loadScreens loads screen assignments for a configuration set
 func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) error {
 	query := `
-		SELECT css.context, css.screen_id, s.name
+		SELECT css.context, css.screen_id, s.name, COALESCE(s.builtin_key, '')
 		FROM configuration_set_screens css
 		JOIN screens s ON css.screen_id = s.id
 		WHERE css.configuration_set_id = ?`
@@ -439,7 +456,8 @@ func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) er
 		var screenContext string
 		var screenID int
 		var screenName string
-		if err := rows.Scan(&screenContext, &screenID, &screenName); err != nil {
+		var screenBuiltinKey string
+		if err := rows.Scan(&screenContext, &screenID, &screenName, &screenBuiltinKey); err != nil {
 			return fmt.Errorf("failed to scan screen: %w", err)
 		}
 
@@ -447,12 +465,15 @@ func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) er
 		case "create":
 			cs.CreateScreenID = &screenID
 			cs.CreateScreenName = screenName
+			cs.CreateScreenBuiltinKey = screenBuiltinKey
 		case "edit":
 			cs.EditScreenID = &screenID
 			cs.EditScreenName = screenName
+			cs.EditScreenBuiltinKey = screenBuiltinKey
 		case "view":
 			cs.ViewScreenID = &screenID
 			cs.ViewScreenName = screenName
+			cs.ViewScreenBuiltinKey = screenBuiltinKey
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -466,11 +487,11 @@ func (r *ConfigurationSetRepository) loadScreens(cs *models.ConfigurationSet) er
 func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]models.ItemTypeConfig, error) {
 	query := `
 		SELECT
-			it.id, it.name, it.icon, it.color, it.hierarchy_level,
-			csit.workflow_id, wf.name as workflow_name,
-			csit.create_screen_id, cs_create.name as create_screen_name,
-			csit.edit_screen_id, cs_edit.name as edit_screen_name,
-			csit.view_screen_id, cs_view.name as view_screen_name,
+			it.id, COALESCE(it.builtin_key, ''), it.name, it.icon, it.color, it.hierarchy_level,
+			csit.workflow_id, wf.name as workflow_name, COALESCE(wf.builtin_key, ''),
+			csit.create_screen_id, cs_create.name as create_screen_name, COALESCE(cs_create.builtin_key, ''),
+			csit.edit_screen_id, cs_edit.name as edit_screen_name, COALESCE(cs_edit.builtin_key, ''),
+			csit.view_screen_id, cs_view.name as view_screen_name, COALESCE(cs_view.builtin_key, ''),
 			csit.condition_set_id, cset.name as condition_set_name,
 			csit.approval_set_id, aset.name as approval_set_name
 		FROM configuration_set_item_types csit
@@ -507,11 +528,11 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 		var approvalSetName sql.NullString
 
 		if err := rows.Scan(
-			&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
-			&workflowID, &workflowName,
-			&createScreenID, &createScreenName,
-			&editScreenID, &editScreenName,
-			&viewScreenID, &viewScreenName,
+			&config.ItemTypeID, &config.ItemTypeBuiltinKey, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
+			&workflowID, &workflowName, &config.WorkflowBuiltinKey,
+			&createScreenID, &createScreenName, &config.CreateScreenBuiltinKey,
+			&editScreenID, &editScreenName, &config.EditScreenBuiltinKey,
+			&viewScreenID, &viewScreenName, &config.ViewScreenBuiltinKey,
 			&conditionSetID, &conditionSetName,
 			&approvalSetID, &approvalSetName,
 		); err != nil {
@@ -559,7 +580,7 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 // loadPriorities loads priority assignments for a configuration set
 func (r *ConfigurationSetRepository) loadPriorities(configSetID int) ([]int, []models.PriorityDisplay, error) {
 	query := `
-		SELECT p.id, p.name, p.icon, p.color, p.sort_order
+		SELECT p.id, COALESCE(p.builtin_key, ''), p.name, p.icon, p.color, p.sort_order
 		FROM configuration_set_priorities csp
 		JOIN priorities p ON csp.priority_id = p.id
 		WHERE csp.configuration_set_id = ?
@@ -575,7 +596,7 @@ func (r *ConfigurationSetRepository) loadPriorities(configSetID int) ([]int, []m
 	var priorities []models.PriorityDisplay
 	for rows.Next() {
 		var priority models.PriorityDisplay
-		if err := rows.Scan(&priority.ID, &priority.Name, &priority.Icon, &priority.Color, &priority.SortOrder); err != nil {
+		if err := rows.Scan(&priority.ID, &priority.BuiltinKey, &priority.Name, &priority.Icon, &priority.Color, &priority.SortOrder); err != nil {
 			return nil, nil, fmt.Errorf("failed to scan priority: %w", err)
 		}
 		priorityIDs = append(priorityIDs, priority.ID)
@@ -1163,7 +1184,7 @@ func (r *ConfigurationSetRepository) UnassignNotification(configSetID, assignmen
 func (r *ConfigurationSetRepository) ListAvailableNotificationSettings(configSetID int) ([]models.NotificationSetting, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
+			ns.id, COALESCE(ns.builtin_key, ''), ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
 			u.first_name || ' ' || u.last_name as created_by_name
 		FROM notification_settings ns
 		LEFT JOIN users u ON ns.created_by = u.id
@@ -1186,7 +1207,7 @@ func (r *ConfigurationSetRepository) ListAvailableNotificationSettings(configSet
 		var createdBy *int
 		var createdByName *string
 		if err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
+			&s.ID, &s.BuiltinKey, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
 			&createdByName,
 		); err != nil {
 			return nil, err

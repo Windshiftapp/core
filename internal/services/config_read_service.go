@@ -26,6 +26,7 @@ func NewConfigReadService(db database.Database) *ConfigReadService {
 // ItemTypeResult represents an item type for API responses.
 type ItemTypeResult struct {
 	ID             int    `json:"id"`
+	BuiltinKey     string `json:"builtin_key,omitempty"`
 	Name           string `json:"name"`
 	Description    string `json:"description"`
 	Icon           string `json:"icon"`
@@ -36,7 +37,7 @@ type ItemTypeResult struct {
 }
 
 // ScanItemTypes scans rows from an item_types query into a slice of ItemTypeResult.
-// The rows must select: id, name, description, icon, color, hierarchy_level, sort_order, is_default.
+// The rows must select: id, builtin_key, name, description, icon, color, hierarchy_level, sort_order, is_default.
 func ScanItemTypes(rows *sql.Rows) ([]ItemTypeResult, error) {
 	defer rows.Close()
 
@@ -44,7 +45,7 @@ func ScanItemTypes(rows *sql.Rows) ([]ItemTypeResult, error) {
 	for rows.Next() {
 		var t ItemTypeResult
 		var description, icon, color sql.NullString
-		err := rows.Scan(&t.ID, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
+		err := rows.Scan(&t.ID, &t.BuiltinKey, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
 		if err != nil {
 			continue
 		}
@@ -64,7 +65,7 @@ func ScanItemTypes(rows *sql.Rows) ([]ItemTypeResult, error) {
 // ListItemTypes retrieves all item types ordered by hierarchy and sort order.
 func (s *ConfigReadService) ListItemTypes() ([]ItemTypeResult, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
+		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, hierarchy_level, sort_order, is_default
 		FROM item_types
 		ORDER BY CASE WHEN hierarchy_level = -1 THEN 1 ELSE 0 END, hierarchy_level, sort_order, name
 	`)
@@ -80,9 +81,9 @@ func (s *ConfigReadService) GetItemType(id int) (*ItemTypeResult, error) {
 	var t ItemTypeResult
 	var description, icon, color sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
+		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, hierarchy_level, sort_order, is_default
 		FROM item_types WHERE id = ?
-	`, id).Scan(&t.ID, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
+	`, id).Scan(&t.ID, &t.BuiltinKey, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("item type not found: %d", id)
@@ -104,6 +105,7 @@ func (s *ConfigReadService) GetItemType(id int) (*ItemTypeResult, error) {
 // PriorityResult represents a priority for API responses.
 type PriorityResult struct {
 	ID          int
+	BuiltinKey  string
 	Name        string
 	Description string
 	Icon        string
@@ -113,7 +115,7 @@ type PriorityResult struct {
 }
 
 // ScanPriorities scans rows from a priorities query into a slice of PriorityResult.
-// The rows must select: id, name, description, icon, color, sort_order, is_default.
+// The rows must select: id, builtin_key, name, description, icon, color, sort_order, is_default.
 func ScanPriorities(rows *sql.Rows) ([]PriorityResult, error) {
 	defer rows.Close()
 
@@ -121,7 +123,7 @@ func ScanPriorities(rows *sql.Rows) ([]PriorityResult, error) {
 	for rows.Next() {
 		var p PriorityResult
 		var description, icon, color sql.NullString
-		err := rows.Scan(&p.ID, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
+		err := rows.Scan(&p.ID, &p.BuiltinKey, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
 		if err != nil {
 			continue
 		}
@@ -144,7 +146,7 @@ func ScanPriorities(rows *sql.Rows) ([]PriorityResult, error) {
 // ListPriorities retrieves all priorities ordered by sort order and name.
 func (s *ConfigReadService) ListPriorities() ([]PriorityResult, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, description, icon, color, sort_order, is_default
+		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, sort_order, is_default
 		FROM priorities
 		ORDER BY sort_order, name
 	`)
@@ -160,9 +162,9 @@ func (s *ConfigReadService) GetPriority(id int) (*PriorityResult, error) {
 	var p PriorityResult
 	var description, icon, color sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, name, description, icon, color, sort_order, is_default
+		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, sort_order, is_default
 		FROM priorities WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
+	`, id).Scan(&p.ID, &p.BuiltinKey, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("priority not found: %d", id)

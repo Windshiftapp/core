@@ -260,11 +260,12 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
 		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
-		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
+		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key,
 		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
 		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-		st.name as status_name, sc.color as status_color, pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
+		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
+		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
 		COALESCE(%s, i.created_at) as status_since
 	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
 
@@ -855,9 +856,9 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		var itemTypeID, parentID, parentWorkspaceItemNumber, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
 		var dueDate, startDate, endDate sql.NullTime
 		var statusSince sql.NullString
-		var itemTypeName, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
+		var itemTypeName, itemTypeBuiltinKey, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName, statusColor sql.NullString
-		var priorityName, priorityIcon, priorityColor sql.NullString
+		var statusBuiltinKey, priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
 		var fracIndex sql.NullString
 		var storyPoints sql.NullFloat64
 		var estimateMinutes sql.NullInt64
@@ -869,8 +870,8 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
-			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusColor, &priorityName, &priorityIcon, &priorityColor,
+			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
+			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
 			&statusSince,
 		)
 		if err != nil {
@@ -915,14 +916,17 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 
 		item.InheritProject = inheritProject
 		assignNullableString(&item.ItemTypeName, itemTypeName)
+		assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
 		assignNullableString(&item.ParentTitle, parentTitle)
 		assignNullableString(&item.IterationName, iterationName)
 		assignNullableString(&item.IterationEndDate, iterationEndDate)
 		assignNullableString(&item.StatusName, statusName)
+		assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
 		assignNullableString(&item.StatusColor, statusColor)
 		assignNullableString(&item.ProjectName, projectName)
 		assignNullableString(&item.TimeProjectName, timeProjectName)
 		assignNullableString(&item.PriorityName, priorityName)
+		assignNullableString(&item.PriorityBuiltinKey, priorityBuiltinKey)
 		assignNullableString(&item.PriorityIcon, priorityIcon)
 		assignNullableString(&item.PriorityColor, priorityColor)
 		assignNullableString(&item.AssigneeName, assigneeName)

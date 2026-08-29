@@ -19,8 +19,7 @@
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkflow'));
 
   function isDefaultSystemWorkflow(workflow) {
-    return workflow?.is_default === true && workflow.name === 'Default Workflow' &&
-      workflow.description === 'Basic workflow for getting work done';
+    return Boolean(workflow?.builtin_key);
   }
 
   function getWorkflowDisplayValue(workflow, field) {

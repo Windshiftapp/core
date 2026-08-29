@@ -285,8 +285,10 @@
             title={item.title}
             itemKey={getItemKey(item)}
             statusName={item.status_name}
+            statusBuiltinKey={item.status_builtin_key}
             statusColor={item.status_color}
             priorityName={item.priority_name}
+            priorityBuiltinKey={item.priority_builtin_key}
             priorityColor={item.priority_color}
             dueDate={item.due_date}
             {density}

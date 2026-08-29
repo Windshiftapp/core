@@ -15,6 +15,7 @@
   import Textarea from '../components/Textarea.svelte';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let hierarchyLevels = $state([]);
   let isLoading = $state(true);
@@ -29,50 +30,10 @@
     description: ''
   });
 
-  const systemHierarchyLevels = {
-    0: {
-      key: 'initiative',
-      name: 'Initiative',
-      description: 'High-level strategic work spanning multiple epics'
-    },
-    1: {
-      key: 'epic',
-      name: 'Epic',
-      description: 'Large work item that can be broken down into stories'
-    },
-    2: {
-      key: 'story',
-      name: 'Story',
-      description: 'User story or feature that delivers value'
-    },
-    3: {
-      key: 'task',
-      name: 'Task',
-      description: 'Individual work item or technical task'
-    },
-    4: {
-      key: 'activity',
-      name: 'Activity',
-      description: 'Discrete activity within a task'
-    }
-  };
-
-  function getSystemLevelDefinition(hierarchyLevel) {
-    const definition = systemHierarchyLevels[hierarchyLevel.level];
-    if (
-      !definition ||
-      hierarchyLevel.name !== definition.name ||
-      hierarchyLevel.description !== definition.description
-    ) {
-      return null;
-    }
-    return definition;
-  }
-
   function getDisplayValue(hierarchyLevel, field) {
-    const definition = getSystemLevelDefinition(hierarchyLevel);
-    return definition
-      ? t(`settings.hierarchyLevels.defaults.${definition.key}.${field}`)
+    const key = builtinLocaleKey(hierarchyLevel);
+    return key
+      ? t(`settings.hierarchyLevels.defaults.${key}.${field}`)
       : hierarchyLevel[field];
   }
 

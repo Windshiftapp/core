@@ -13,26 +13,29 @@ import (
 // StatusBreakdown represents item counts per status category in a progress report.
 // Used by both milestones and iterations.
 type StatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
+	CategoryName       string `json:"category_name"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	ItemCount          int    `json:"item_count"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 // ProgressItem represents a work item in a progress report.
 // Used by both milestones and iterations.
 type ProgressItem struct {
-	ID             int    `json:"id"`
-	Title          string `json:"title"`
-	WorkspaceID    int    `json:"workspace_id"`
-	WorkspaceKey   string `json:"workspace_key"`
-	ItemNumber     int    `json:"item_number"`
-	StatusName     string `json:"status_name,omitempty"`
-	StatusColor    string `json:"status_color,omitempty"`
-	PriorityName   string `json:"priority_name,omitempty"`
-	PriorityColor  string `json:"priority_color,omitempty"`
-	AssigneeName   string `json:"assignee_name,omitempty"`
-	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
+	ID                 int    `json:"id"`
+	Title              string `json:"title"`
+	WorkspaceID        int    `json:"workspace_id"`
+	WorkspaceKey       string `json:"workspace_key"`
+	ItemNumber         int    `json:"item_number"`
+	StatusName         string `json:"status_name,omitempty"`
+	StatusBuiltinKey   string `json:"status_builtin_key,omitempty"`
+	StatusColor        string `json:"status_color,omitempty"`
+	PriorityName       string `json:"priority_name,omitempty"`
+	PriorityBuiltinKey string `json:"priority_builtin_key,omitempty"`
+	PriorityColor      string `json:"priority_color,omitempty"`
+	AssigneeName       string `json:"assignee_name,omitempty"`
+	AssigneeAvatar     string `json:"assignee_avatar,omitempty"`
 }
 
 // progressAccumulator collects items and computes progress stats.
@@ -100,12 +103,14 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 
 		for _, item := range items {
 			categoryName := "No Status"
+			categoryBuiltinKey := ""
 			categoryColor := "#9ca3af"
 			statusColor := ""
 			isCompleted := false
 			if item.StatusID != nil {
 				if st, ok := statusByID[*item.StatusID]; ok {
 					categoryName = st.CategoryName
+					categoryBuiltinKey = st.CategoryBuiltinKey
 					categoryColor = st.CategoryColor
 					statusColor = st.CategoryColor
 					isCompleted = st.IsCompleted
@@ -114,25 +119,28 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 
 			if _, exists := breakdownMap[categoryName]; !exists {
 				breakdownMap[categoryName] = &StatusBreakdown{
-					CategoryName:  categoryName,
-					CategoryColor: categoryColor,
-					IsCompleted:   isCompleted,
+					CategoryName:       categoryName,
+					CategoryBuiltinKey: categoryBuiltinKey,
+					CategoryColor:      categoryColor,
+					IsCompleted:        isCompleted,
 				}
 			}
 			breakdownMap[categoryName].ItemCount++
 
 			acc.ItemsByCategory[categoryName] = append(acc.ItemsByCategory[categoryName], ProgressItem{
-				ID:             item.ID,
-				Title:          item.Title,
-				WorkspaceID:    item.WorkspaceID,
-				WorkspaceKey:   item.WorkspaceKey,
-				ItemNumber:     item.WorkspaceItemNumber,
-				StatusName:     item.StatusName,
-				StatusColor:    statusColor,
-				PriorityName:   item.PriorityName,
-				PriorityColor:  item.PriorityColor,
-				AssigneeName:   item.AssigneeName,
-				AssigneeAvatar: item.AssigneeAvatar,
+				ID:                 item.ID,
+				Title:              item.Title,
+				WorkspaceID:        item.WorkspaceID,
+				WorkspaceKey:       item.WorkspaceKey,
+				ItemNumber:         item.WorkspaceItemNumber,
+				StatusName:         item.StatusName,
+				StatusBuiltinKey:   item.StatusBuiltinKey,
+				StatusColor:        statusColor,
+				PriorityName:       item.PriorityName,
+				PriorityBuiltinKey: item.PriorityBuiltinKey,
+				PriorityColor:      item.PriorityColor,
+				AssigneeName:       item.AssigneeName,
+				AssigneeAvatar:     item.AssigneeAvatar,
 			})
 			acc.TotalItems++
 			if isCompleted {

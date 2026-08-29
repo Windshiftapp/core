@@ -314,6 +314,170 @@ var Catalog = []Migration{
 				ON scm_connection_health(consecutive_failures, last_failure_at);
 		`,
 	},
+	{
+		Version: "20260829_builtin_translation_keys",
+		Name:    "Add immutable keys for localized built-in records",
+		CheckSQLite: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM pragma_table_info('configuration_sets') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('workflows') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('screens') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('notification_settings') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('item_types') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('hierarchy_levels') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('priorities') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('status_categories') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('statuses') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('workspace_roles') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('link_types') WHERE name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM pragma_table_info('themes') WHERE name='builtin_key') = 1
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='configuration_sets' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='workflows' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='screens' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='notification_settings' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='item_types' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='hierarchy_levels' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='priorities' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='status_categories' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='statuses' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='workspace_roles' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='link_types' AND column_name='builtin_key') = 1 AND
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='themes' AND column_name='builtin_key') = 1
+		THEN 1 ELSE 0 END`,
+		SQLite: `
+			ALTER TABLE configuration_sets ADD COLUMN builtin_key TEXT;
+			ALTER TABLE workflows ADD COLUMN builtin_key TEXT;
+			ALTER TABLE screens ADD COLUMN builtin_key TEXT;
+			ALTER TABLE notification_settings ADD COLUMN builtin_key TEXT;
+			ALTER TABLE item_types ADD COLUMN builtin_key TEXT;
+			ALTER TABLE hierarchy_levels ADD COLUMN builtin_key TEXT;
+			ALTER TABLE priorities ADD COLUMN builtin_key TEXT;
+			ALTER TABLE status_categories ADD COLUMN builtin_key TEXT;
+			ALTER TABLE statuses ADD COLUMN builtin_key TEXT;
+			ALTER TABLE workspace_roles ADD COLUMN builtin_key TEXT;
+			ALTER TABLE link_types ADD COLUMN builtin_key TEXT;
+			ALTER TABLE themes ADD COLUMN builtin_key TEXT;
+
+			UPDATE configuration_sets SET builtin_key='default' WHERE name='Default Configuration' AND is_default=true;
+			UPDATE workflows SET builtin_key='default' WHERE name='Default Workflow' AND is_default=true;
+			UPDATE screens SET builtin_key='default' WHERE name='Default Screen';
+			UPDATE notification_settings SET builtin_key='default' WHERE name='Default Notifications';
+			UPDATE item_types SET builtin_key=CASE name
+				WHEN 'Initiative' THEN 'initiative' WHEN 'Epic' THEN 'epic' WHEN 'Story' THEN 'story'
+				WHEN 'Task' THEN 'task' WHEN 'Bug' THEN 'bug' WHEN 'Sub-task' THEN 'subtask' END
+			WHERE is_default=true AND name IN ('Initiative','Epic','Story','Task','Bug','Sub-task');
+			UPDATE hierarchy_levels SET builtin_key=CASE level
+				WHEN 0 THEN 'initiative' WHEN 1 THEN 'epic' WHEN 2 THEN 'story'
+				WHEN 3 THEN 'task' WHEN 4 THEN 'activity' END WHERE level BETWEEN 0 AND 4;
+			UPDATE priorities SET builtin_key=LOWER(name) WHERE name IN ('Critical','High','Medium','Low');
+			UPDATE status_categories SET builtin_key=CASE name
+				WHEN 'To Do' THEN 'to_do' WHEN 'In Progress' THEN 'in_progress' WHEN 'Done' THEN 'done' END
+			WHERE name IN ('To Do','In Progress','Done');
+			UPDATE statuses SET builtin_key=CASE name
+				WHEN 'Open' THEN 'open' WHEN 'In Progress' THEN 'in_progress' WHEN 'Done' THEN 'done' END
+			WHERE name IN ('Open','In Progress','Done');
+			UPDATE workspace_roles SET builtin_key=LOWER(name)
+			WHERE is_system=true AND name IN ('Viewer','Editor','Administrator','Tester');
+			UPDATE link_types SET builtin_key=CASE name
+				WHEN 'Tests' THEN 'tests' WHEN 'Implements' THEN 'implements'
+				WHEN 'Depends On' THEN 'depends_on' WHEN 'Relates To' THEN 'relates_to'
+				WHEN 'Links To' THEN 'links_to' WHEN 'Duplicates' THEN 'duplicates'
+				WHEN 'Child Of' THEN 'child_of' WHEN 'Page' THEN 'page' END
+			WHERE is_system=true AND name IN ('Tests','Implements','Depends On','Relates To','Links To','Duplicates','Child Of','Page');
+			UPDATE themes SET builtin_key='default'
+			WHERE name='Default' AND description='Clean theme with standard navigation colors'
+				AND nav_background_color_light='#ffffff' AND nav_text_color_light='#374151'
+				AND nav_background_color_dark='#1f2937' AND nav_text_color_dark='#f3f4f6';
+			UPDATE themes SET builtin_key='ocean'
+			WHERE name='Ocean' AND description='Professional blue-tinted navigation theme'
+				AND nav_background_color_light='#f0f9ff' AND nav_text_color_light='#0c4a6e'
+				AND nav_background_color_dark='#0c4a6e' AND nav_text_color_dark='#e0f2fe';
+			UPDATE themes SET builtin_key='forest'
+			WHERE name='Forest' AND description='Nature-inspired green navigation theme'
+				AND nav_background_color_light='#f0fdf4' AND nav_text_color_light='#14532d'
+				AND nav_background_color_dark='#14532d' AND nav_text_color_dark='#dcfce7';
+
+			CREATE UNIQUE INDEX uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_workflows_builtin_key ON workflows(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_notification_settings_builtin_key ON notification_settings(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_statuses_builtin_key ON statuses(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_workspace_roles_builtin_key ON workspace_roles(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_link_types_builtin_key ON link_types(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
+		`,
+		Postgres: `
+			ALTER TABLE configuration_sets ADD COLUMN builtin_key TEXT;
+			ALTER TABLE workflows ADD COLUMN builtin_key TEXT;
+			ALTER TABLE screens ADD COLUMN builtin_key TEXT;
+			ALTER TABLE notification_settings ADD COLUMN builtin_key TEXT;
+			ALTER TABLE item_types ADD COLUMN builtin_key TEXT;
+			ALTER TABLE hierarchy_levels ADD COLUMN builtin_key TEXT;
+			ALTER TABLE priorities ADD COLUMN builtin_key TEXT;
+			ALTER TABLE status_categories ADD COLUMN builtin_key TEXT;
+			ALTER TABLE statuses ADD COLUMN builtin_key TEXT;
+			ALTER TABLE workspace_roles ADD COLUMN builtin_key TEXT;
+			ALTER TABLE link_types ADD COLUMN builtin_key TEXT;
+			ALTER TABLE themes ADD COLUMN builtin_key TEXT;
+
+			UPDATE configuration_sets SET builtin_key='default' WHERE name='Default Configuration' AND is_default=true;
+			UPDATE workflows SET builtin_key='default' WHERE name='Default Workflow' AND is_default=true;
+			UPDATE screens SET builtin_key='default' WHERE name='Default Screen';
+			UPDATE notification_settings SET builtin_key='default' WHERE name='Default Notifications';
+			UPDATE item_types SET builtin_key=CASE name
+				WHEN 'Initiative' THEN 'initiative' WHEN 'Epic' THEN 'epic' WHEN 'Story' THEN 'story'
+				WHEN 'Task' THEN 'task' WHEN 'Bug' THEN 'bug' WHEN 'Sub-task' THEN 'subtask' END
+			WHERE is_default=true AND name IN ('Initiative','Epic','Story','Task','Bug','Sub-task');
+			UPDATE hierarchy_levels SET builtin_key=CASE level
+				WHEN 0 THEN 'initiative' WHEN 1 THEN 'epic' WHEN 2 THEN 'story'
+				WHEN 3 THEN 'task' WHEN 4 THEN 'activity' END WHERE level BETWEEN 0 AND 4;
+			UPDATE priorities SET builtin_key=LOWER(name) WHERE name IN ('Critical','High','Medium','Low');
+			UPDATE status_categories SET builtin_key=CASE name
+				WHEN 'To Do' THEN 'to_do' WHEN 'In Progress' THEN 'in_progress' WHEN 'Done' THEN 'done' END
+			WHERE name IN ('To Do','In Progress','Done');
+			UPDATE statuses SET builtin_key=CASE name
+				WHEN 'Open' THEN 'open' WHEN 'In Progress' THEN 'in_progress' WHEN 'Done' THEN 'done' END
+			WHERE name IN ('Open','In Progress','Done');
+			UPDATE workspace_roles SET builtin_key=LOWER(name)
+			WHERE is_system=true AND name IN ('Viewer','Editor','Administrator','Tester');
+			UPDATE link_types SET builtin_key=CASE name
+				WHEN 'Tests' THEN 'tests' WHEN 'Implements' THEN 'implements'
+				WHEN 'Depends On' THEN 'depends_on' WHEN 'Relates To' THEN 'relates_to'
+				WHEN 'Links To' THEN 'links_to' WHEN 'Duplicates' THEN 'duplicates'
+				WHEN 'Child Of' THEN 'child_of' WHEN 'Page' THEN 'page' END
+			WHERE is_system=true AND name IN ('Tests','Implements','Depends On','Relates To','Links To','Duplicates','Child Of','Page');
+			UPDATE themes SET builtin_key='default'
+			WHERE name='Default' AND description='Clean theme with standard navigation colors'
+				AND nav_background_color_light='#ffffff' AND nav_text_color_light='#374151'
+				AND nav_background_color_dark='#1f2937' AND nav_text_color_dark='#f3f4f6';
+			UPDATE themes SET builtin_key='ocean'
+			WHERE name='Ocean' AND description='Professional blue-tinted navigation theme'
+				AND nav_background_color_light='#f0f9ff' AND nav_text_color_light='#0c4a6e'
+				AND nav_background_color_dark='#0c4a6e' AND nav_text_color_dark='#e0f2fe';
+			UPDATE themes SET builtin_key='forest'
+			WHERE name='Forest' AND description='Nature-inspired green navigation theme'
+				AND nav_background_color_light='#f0fdf4' AND nav_text_color_light='#14532d'
+				AND nav_background_color_dark='#14532d' AND nav_text_color_dark='#dcfce7';
+
+			CREATE UNIQUE INDEX uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_workflows_builtin_key ON workflows(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_notification_settings_builtin_key ON notification_settings(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_statuses_builtin_key ON statuses(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_workspace_roles_builtin_key ON workspace_roles(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_link_types_builtin_key ON link_types(builtin_key) WHERE builtin_key IS NOT NULL;
+			CREATE UNIQUE INDEX uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
+		`,
+	},
 }
 
 func (m Migration) checksum(driver string) string {

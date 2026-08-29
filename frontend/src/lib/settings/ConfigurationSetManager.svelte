@@ -29,6 +29,7 @@
   import FileInput from '../components/FileInput.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let configurationSets = $state([]);
   let workspaces = $state([]);
@@ -69,59 +70,23 @@
   let pendingWorkflowChangePayload = $state(null);
   let pendingWorkflowChangeId = $state(null);
 
-  const defaultConfigurationSet = {
-    name: 'Default Configuration',
-    description: 'Default configuration set with basic workflow and screen'
-  };
-
-  const defaultWorkflow = {
-    name: 'Default Workflow',
-    description: 'Basic workflow for getting work done'
-  };
-
-  const defaultScreen = {
-    name: 'Default Screen',
-    description: 'Default screen with essential work item fields'
-  };
-
-  const defaultNotificationSetting = {
-    name: 'Default Notifications',
-    description: 'Standard notification rules for work item updates'
-  };
-
-  const systemItemTypes = [
-    { key: 'initiative', name: 'Initiative', icon: 'Target', color: '#7c3aed', hierarchy_level: 0 },
-    { key: 'epic', name: 'Epic', icon: 'Zap', color: '#2563eb', hierarchy_level: 1 },
-    { key: 'story', name: 'Story', icon: 'BookOpen', color: '#059669', hierarchy_level: 2 },
-    { key: 'task', name: 'Task', icon: 'CheckSquare', color: '#dc2626', hierarchy_level: 3 },
-    { key: 'bug', name: 'Bug', icon: 'Bug', color: '#ea580c', hierarchy_level: 3 },
-    { key: 'subtask', name: 'Sub-task', icon: 'Minus', color: '#6b7280', hierarchy_level: -1 }
-  ];
-
   function getConfigurationSetDisplayValue(configSet, field) {
-    const isSystemDefault = configSet?.is_default === true &&
-      configSet.name === defaultConfigurationSet.name &&
-      configSet.description === defaultConfigurationSet.description;
-    return isSystemDefault ? t(`settings.configSets.defaults.configuration.${field}`) : (configSet?.[field] || '');
+    return configSet?.builtin_key
+      ? t(`settings.configSets.defaults.configuration.${field}`)
+      : (configSet?.[field] || '');
   }
 
   function getItemTypeDisplayName(itemType) {
-    const definition = systemItemTypes.find(candidate =>
-      candidate.name === itemType?.name &&
-      candidate.icon === itemType?.icon &&
-      candidate.color === itemType?.color &&
-      candidate.hierarchy_level === itemType?.hierarchy_level
-    );
-    return definition ? t(`settings.itemTypes.defaults.${definition.key}`) : itemType?.name;
+    const key = builtinLocaleKey(itemType);
+    return key ? t(`settings.itemTypes.defaults.${key}`) : itemType?.name;
   }
 
   function getScreenDisplayName(screenId, fallbackName) {
     const screen = screens.find(candidate => candidate.id === screenId) ||
       screens.find(candidate => candidate.name === fallbackName);
-    const isSystemDefault = screen?.id === 1 &&
-      screen.name === defaultScreen.name &&
-      screen.description === defaultScreen.description;
-    return isSystemDefault ? t('screensPage.defaults.default.name') : (fallbackName || screen?.name || t('settings.configSets.none'));
+    return screen?.builtin_key
+      ? t('screensPage.defaults.default.name')
+      : (fallbackName || screen?.name || t('settings.configSets.none'));
   }
 
   // Form state
@@ -407,19 +372,14 @@
     if (!workflowId) return t('settings.configSets.none');
     const workflow = workflows.find(w => w.id === workflowId);
     if (!workflow) return t('common.unknown');
-    const isSystemDefault = workflow.is_default === true &&
-      workflow.name === defaultWorkflow.name &&
-      workflow.description === defaultWorkflow.description;
-    return isSystemDefault ? t('workflows.defaults.default.name') : workflow.name;
+    return workflow.builtin_key ? t('workflows.defaults.default.name') : workflow.name;
   }
 
   function getNotificationSettingName(notificationSettingId) {
     if (!notificationSettingId) return t('settings.configSets.none');
     const setting = notificationSettings.find(s => s.id === notificationSettingId);
     if (!setting) return t('common.unknown');
-    const isSystemDefault = setting.name === defaultNotificationSetting.name &&
-      setting.description === defaultNotificationSetting.description;
-    return isSystemDefault ? t('settings.configSets.defaults.notifications.name') : setting.name;
+    return setting.builtin_key ? t('settings.configSets.defaults.notifications.name') : setting.name;
   }
 
   // Helper functions for workspace selection
@@ -494,8 +454,8 @@
       if (created && created.id) {
         successToast(t('settings.configSets.importSuccess', { name: created.name }));
       }
-      if (warnings.length > 0) {
-        errorToast(t('settings.configSets.importWarning'));
+      for (const warning of warnings) {
+        errorToast(warning);
       }
       await loadData(currentPage, itemsPerPage, searchQuery);
     } catch (err) {

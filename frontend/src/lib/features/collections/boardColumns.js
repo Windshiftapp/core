@@ -13,9 +13,9 @@ export const PERSONAL_TASK_OPEN_STATUS_ID = 1;
 export const PERSONAL_TASK_DONE_STATUS_ID = 3;
 
 const CATEGORY_ORDER = {
-  'To Do': 1,
-  'In Progress': 2,
-  Done: 3,
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
 };
 
 /**
@@ -24,8 +24,8 @@ const CATEGORY_ORDER = {
  */
 export function sortStatusesForBoard(statuses = []) {
   return statuses.slice().sort((a, b) => {
-    const aOrder = CATEGORY_ORDER[a.category_name] || 999;
-    const bOrder = CATEGORY_ORDER[b.category_name] || 999;
+    const aOrder = CATEGORY_ORDER[a.category_builtin_key] || 999;
+    const bOrder = CATEGORY_ORDER[b.category_builtin_key] || 999;
     if (aOrder !== bOrder) return aOrder - bOrder;
     return a.name.localeCompare(b.name);
   });
@@ -37,11 +37,20 @@ export function sortStatusesForBoard(statuses = []) {
  */
 export function buildDisplayColumns(boardConfig, statuses = []) {
   if (boardConfig?.columns?.length > 0) {
-    return boardConfig.columns.slice().sort((a, b) => a.display_order - b.display_order);
+    return boardConfig.columns
+      .map((column) => {
+        if (column.status_ids?.length !== 1) return column;
+        const status = statuses.find((candidate) => candidate.id === column.status_ids[0]);
+        return status?.builtin_key && status.name === column.name
+          ? { ...column, builtin_key: status.builtin_key }
+          : column;
+      })
+      .sort((a, b) => a.display_order - b.display_order);
   }
   return sortStatusesForBoard(statuses).map((status) => ({
     id: status.id,
     name: status.name,
+    builtin_key: status.builtin_key,
     status_ids: [status.id],
     color: status.category_color,
     wip_limit: null,

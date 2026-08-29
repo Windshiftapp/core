@@ -7,6 +7,7 @@
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
   import ConditionSetPicker from '../pickers/ConditionSetPicker.svelte';
   import ApprovalSetPicker from '../pickers/ApprovalSetPicker.svelte';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let {
     itemTypes = [],
@@ -125,21 +126,9 @@
   // the configured value without an extra click.
   let expandedScreenRows = $state(new Set());
 
-  const systemItemTypes = [
-    { key: 'initiative', name: 'Initiative', icon: 'Target', color: '#7c3aed', hierarchy_level: 0 },
-    { key: 'epic', name: 'Epic', icon: 'Zap', color: '#2563eb', hierarchy_level: 1 },
-    { key: 'story', name: 'Story', icon: 'BookOpen', color: '#059669', hierarchy_level: 2 },
-    { key: 'task', name: 'Task', icon: 'CheckSquare', color: '#dc2626', hierarchy_level: 3 },
-    { key: 'bug', name: 'Bug', icon: 'Bug', color: '#ea580c', hierarchy_level: 3 },
-    { key: 'subtask', name: 'Sub-task', icon: 'Minus', color: '#6b7280', hierarchy_level: -1 }
-  ];
-
   function getItemTypeDisplayName(itemType) {
-    const definition = systemItemTypes.find(candidate =>
-      candidate.name === itemType?.name && candidate.icon === itemType?.icon &&
-      candidate.color === itemType?.color && candidate.hierarchy_level === itemType?.hierarchy_level
-    );
-    return definition ? t(`settings.itemTypes.defaults.${definition.key}`) : itemType?.name;
+    const key = builtinLocaleKey(itemType);
+    return key ? t(`settings.itemTypes.defaults.${key}`) : itemType?.name;
   }
   $effect(() => {
     const next = new Set(expandedScreenRows);

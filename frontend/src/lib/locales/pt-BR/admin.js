@@ -701,7 +701,7 @@ export default {
       empty: 'Nenhuma categoria de status encontrada. Crie a primeira para começar.',
       inUseByStatuses: 'Não é possível excluir "{name}" porque está sendo usada por um ou mais status. Remova ou reatribua esses status no Gerenciamento de Status primeiro.',
       defaults: {
-        todo: { name: 'A fazer', description: 'Trabalho que ainda não foi iniciado' },
+        toDo: { name: 'A fazer', description: 'Trabalho que ainda não foi iniciado' },
         inProgress: { name: 'Em andamento', description: 'Trabalho que está sendo executado' },
         done: { name: 'Concluído', description: 'Trabalho que foi concluído' },
       },

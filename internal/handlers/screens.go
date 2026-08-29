@@ -35,7 +35,7 @@ func NewScreenHandler(db database.Database) *ScreenHandler {
 }
 
 func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT id, name, description, created_at, updated_at FROM screens ORDER BY name`
+	query := `SELECT id, COALESCE(builtin_key, ''), name, description, created_at, updated_at FROM screens ORDER BY name`
 
 	rows, err := h.db.Query(query)
 	if err != nil {
@@ -46,7 +46,7 @@ func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var screens []models.Screen
 	for rows.Next() {
 		var screen models.Screen
-		err := rows.Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
+		err := rows.Scan(&screen.ID, &screen.BuiltinKey, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 		if err != nil {
 			_ = rows.Close()
 			respondInternalError(w, r, err)
@@ -102,9 +102,9 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ScreenHandler) loadScreen(id int) (*models.Screen, error) {
 	var screen models.Screen
 	err := h.db.QueryRow(`
-		SELECT id, name, description, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, created_at, updated_at
 		FROM screens WHERE id = ?
-	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
+	`, id).Scan(&screen.ID, &screen.BuiltinKey, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
@@ -174,9 +174,9 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created screen
 	err = h.db.QueryRow(`
-		SELECT id, name, description, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, created_at, updated_at
 		FROM screens WHERE id = ?
-	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
+	`, id).Scan(&screen.ID, &screen.BuiltinKey, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -224,9 +224,9 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Return the updated screen
 	err = h.db.QueryRow(`
-		SELECT id, name, description, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, created_at, updated_at
 		FROM screens WHERE id = ?
-	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
+	`, id).Scan(&screen.ID, &screen.BuiltinKey, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 
 	if err != nil {
 		respondInternalError(w, r, err)

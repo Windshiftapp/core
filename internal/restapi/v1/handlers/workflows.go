@@ -26,6 +26,7 @@ func NewWorkflowHandler(db database.Database, permissionService *services.Permis
 // WorkflowResponse is the public API representation of a Workflow
 type WorkflowResponse struct {
 	ID          int                      `json:"id"`
+	BuiltinKey  string                   `json:"builtin_key,omitempty"`
 	Name        string                   `json:"name"`
 	Description string                   `json:"description,omitempty"`
 	IsDefault   bool                     `json:"is_default"`
@@ -61,6 +62,7 @@ func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, wf := range results {
 		workflows = append(workflows, WorkflowResponse{
 			ID:          wf.ID,
+			BuiltinKey:  wf.BuiltinKey,
 			Name:        wf.Name,
 			Description: wf.Description,
 			IsDefault:   wf.IsDefault,
@@ -111,6 +113,7 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	wf := WorkflowResponse{
 		ID:          wfResult.ID,
+		BuiltinKey:  wfResult.BuiltinKey,
 		Name:        wfResult.Name,
 		Description: wfResult.Description,
 		IsDefault:   wfResult.IsDefault,
@@ -183,20 +186,24 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]dto.Transiti
 			FromAllStatuses: t.FromAllStatuses,
 			ToStatusID:      t.ToStatusID,
 			ToStatus: &dto.StatusSummary{
-				ID:            t.ToStatusID,
-				Name:          t.ToStatusName,
-				CategoryName:  t.ToCategoryName,
-				CategoryColor: t.ToCategoryColor,
+				ID:                 t.ToStatusID,
+				BuiltinKey:         t.ToStatusBuiltinKey,
+				Name:               t.ToStatusName,
+				CategoryBuiltinKey: t.ToCategoryBuiltinKey,
+				CategoryName:       t.ToCategoryName,
+				CategoryColor:      t.ToCategoryColor,
 			},
 		}
 
 		if t.FromStatusID != nil {
 			tr.FromStatusID = t.FromStatusID
 			tr.FromStatus = &dto.StatusSummary{
-				ID:            *t.FromStatusID,
-				Name:          t.FromStatusName,
-				CategoryName:  t.FromCategoryName,
-				CategoryColor: t.FromCategoryColor,
+				ID:                 *t.FromStatusID,
+				BuiltinKey:         t.FromStatusBuiltinKey,
+				Name:               t.FromStatusName,
+				CategoryBuiltinKey: t.FromCategoryBuiltinKey,
+				CategoryName:       t.FromCategoryName,
+				CategoryColor:      t.FromCategoryColor,
 			}
 		}
 

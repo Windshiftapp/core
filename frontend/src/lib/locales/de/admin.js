@@ -705,7 +705,7 @@ export default {
       empty: 'Keine Statuskategorien gefunden. Erstellen Sie Ihre erste Statuskategorie.',
       inUseByStatuses: '„{name}“ kann nicht gelöscht werden, da sie von einem oder mehreren Status verwendet wird. Entfernen Sie diese Status zuerst in der Statusverwaltung oder weisen Sie sie neu zu.',
       defaults: {
-        todo: { name: 'Zu erledigen', description: 'Arbeit, die noch nicht begonnen wurde' },
+        toDo: { name: 'Zu erledigen', description: 'Arbeit, die noch nicht begonnen wurde' },
         inProgress: { name: 'In Bearbeitung', description: 'Arbeit, die aktiv ausgeführt wird' },
         done: { name: 'Erledigt', description: 'Arbeit, die abgeschlossen wurde' },
       },

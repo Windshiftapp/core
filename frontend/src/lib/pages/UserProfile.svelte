@@ -167,7 +167,7 @@
 			s.expiresAt = '';
 			agentTokens[agentId] = await api.getApiTokens(agentId);
 		} catch (err) {
-			s.error = t('users.agents.tokenCreateFailed');
+			s.error = err?.message || t('users.agents.tokenCreateFailed');
 		} finally {
 			s.minting = false;
 		}
@@ -220,10 +220,12 @@
 			agents = [created, ...agents];
 			newAgent = { username: '', first_name: '', last_name: '', email: '' };
 		} catch (err) {
-			// 403 from backend when flag is off or cap reached.
-			if (err?.status === 403) {
-				featureDisabledNotice = true;
-			} else {
+			// Preserve the backend's specific reason (for example, a configured
+			// agent limit). Only use the generic feature notice when no message
+			// was returned at all.
+			agentCreateError = err?.message || '';
+			featureDisabledNotice = err?.status === 403 && !agentCreateError;
+			if (!agentCreateError && !featureDisabledNotice) {
 				agentCreateError = t('users.agents.createFailed');
 			}
 		} finally {
@@ -273,7 +275,7 @@
 			editingAgent = null;
 			editingAgentName = '';
 		} catch (err) {
-			agentRenameError = t('users.agents.renameFailed');
+			agentRenameError = err?.message || t('users.agents.renameFailed');
 		} finally {
 			renamingAgent = false;
 		}

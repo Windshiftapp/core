@@ -27,7 +27,7 @@ func NewPriorityHandler(db database.Database) *PriorityHandler {
 func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Base query for priorities
 	query := `
-		SELECT p.id, p.name, p.description, p.is_default,
+		SELECT p.id, COALESCE(p.builtin_key, ''), p.name, p.description, p.is_default,
 		       p.icon, p.color, p.sort_order, p.created_at, p.updated_at
 		FROM priorities p`
 
@@ -54,7 +54,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var priorities []models.Priority
 	for rows.Next() {
 		var p models.Priority
-		err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
+		err := rows.Scan(&p.ID, &p.BuiltinKey, &p.Name, &p.Description, &p.IsDefault,
 			&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
@@ -63,7 +63,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		// Load configuration set associations from junction table
 		configSetQuery := `
-			SELECT cs.id, cs.name
+			SELECT cs.id, cs.name, COALESCE(cs.builtin_key, '')
 			FROM configuration_set_priorities csp
 			JOIN configuration_sets cs ON csp.configuration_set_id = cs.id
 			WHERE csp.priority_id = ?
@@ -77,16 +77,18 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		var configSetIDs []int
 		var configSetNames []string
+		var configSetBuiltinKeys []string
 		for configSetRows.Next() {
 			var configSetID int
-			var configSetName string
-			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
+			var configSetName, configSetBuiltinKey string
+			if err := configSetRows.Scan(&configSetID, &configSetName, &configSetBuiltinKey); err != nil {
 				_ = configSetRows.Close()
 				respondInternalError(w, r, err)
 				return
 			}
 			configSetIDs = append(configSetIDs, configSetID)
 			configSetNames = append(configSetNames, configSetName)
+			configSetBuiltinKeys = append(configSetBuiltinKeys, configSetBuiltinKey)
 		}
 		if err := configSetRows.Err(); err != nil {
 			_ = configSetRows.Close()
@@ -97,6 +99,7 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 		p.ConfigurationSetIDs = configSetIDs
 		p.ConfigurationSetNames = configSetNames
+		p.ConfigurationSetBuiltinKeys = configSetBuiltinKeys
 
 		priorities = append(priorities, p)
 	}
@@ -120,11 +123,11 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var p models.Priority
 	err := h.db.QueryRow(`
-		SELECT id, name, description, is_default,
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default,
 		       icon, color, sort_order, created_at, updated_at
 		FROM priorities
 		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
+	`, id).Scan(&p.ID, &p.BuiltinKey, &p.Name, &p.Description, &p.IsDefault,
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -138,7 +141,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Load configuration set associations from junction table
 	configSetQuery := `
-		SELECT cs.id, cs.name
+		SELECT cs.id, cs.name, COALESCE(cs.builtin_key, '')
 		FROM configuration_set_priorities csp
 		JOIN configuration_sets cs ON csp.configuration_set_id = cs.id
 		WHERE csp.priority_id = ?
@@ -153,15 +156,17 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var configSetIDs []int
 	var configSetNames []string
+	var configSetBuiltinKeys []string
 	for configSetRows.Next() {
 		var configSetID int
-		var configSetName string
-		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
+		var configSetName, configSetBuiltinKey string
+		if err := configSetRows.Scan(&configSetID, &configSetName, &configSetBuiltinKey); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 		configSetIDs = append(configSetIDs, configSetID)
 		configSetNames = append(configSetNames, configSetName)
+		configSetBuiltinKeys = append(configSetBuiltinKeys, configSetBuiltinKey)
 	}
 	if err := configSetRows.Err(); err != nil {
 		respondInternalError(w, r, err)
@@ -170,6 +175,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	p.ConfigurationSetIDs = configSetIDs
 	p.ConfigurationSetNames = configSetNames
+	p.ConfigurationSetBuiltinKeys = configSetBuiltinKeys
 
 	respondJSONOK(w, p)
 }
@@ -234,11 +240,11 @@ func (h *PriorityHandler) validateConfigurationSets(w http.ResponseWriter, r *ht
 // loadPriorityWithConfigSets loads a priority by ID and attaches configuration set info.
 func (h *PriorityHandler) loadPriorityWithConfigSets(p *models.Priority, id int, configSetIDs []int) error {
 	err := h.db.QueryRow(`
-		SELECT id, name, description, is_default,
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default,
 		       icon, color, sort_order, created_at, updated_at
 		FROM priorities
 		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
+	`, id).Scan(&p.ID, &p.BuiltinKey, &p.Name, &p.Description, &p.IsDefault,
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return err
@@ -247,13 +253,19 @@ func (h *PriorityHandler) loadPriorityWithConfigSets(p *models.Priority, id int,
 	p.ConfigurationSetIDs = configSetIDs
 
 	var configSetNames []string
+	var configSetBuiltinKeys []string
 	for _, csID := range configSetIDs {
-		var csName string
-		if err := h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", csID).Scan(&csName); err == nil {
+		var csName, csBuiltinKey string
+		if err := h.db.QueryRow(
+			"SELECT name, COALESCE(builtin_key, '') FROM configuration_sets WHERE id = ?",
+			csID,
+		).Scan(&csName, &csBuiltinKey); err == nil {
 			configSetNames = append(configSetNames, csName)
+			configSetBuiltinKeys = append(configSetBuiltinKeys, csBuiltinKey)
 		}
 	}
 	p.ConfigurationSetNames = configSetNames
+	p.ConfigurationSetBuiltinKeys = configSetBuiltinKeys
 
 	return nil
 }

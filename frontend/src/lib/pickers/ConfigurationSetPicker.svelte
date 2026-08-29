@@ -16,8 +16,7 @@
   const resolvedPlaceholder = $derived(placeholder || t('pickers.defaultConfiguration'));
 
   function isDefaultSystemConfiguration(item) {
-    return item?.is_default === true && item.name === 'Default Configuration' &&
-      item.description === 'Default configuration set with basic workflow and screen';
+    return Boolean(item?.builtin_key);
   }
 
   function getConfigurationDisplayValue(item, field) {

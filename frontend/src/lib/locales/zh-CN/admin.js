@@ -602,7 +602,7 @@ export default {
       empty: '未找到状态分类。创建第一个状态分类以开始使用。',
       inUseByStatuses: '无法删除"{name}"，因为它正被一个或多个状态使用。请先在状态管理中删除或重新分配这些状态。',
       defaults: {
-        todo: { name: '待办', description: '尚未开始的工作' },
+        toDo: { name: '待办', description: '尚未开始的工作' },
         inProgress: { name: '进行中', description: '正在执行的工作' },
         done: { name: '已完成', description: '已经完成的工作' },
       },

@@ -302,8 +302,8 @@ func (db *DB) initializeDefaultData() error {
 	for _, cat := range defaultStatusCategories {
 		var result sql.Result
 		result, err = tx.Exec(
-			"INSERT INTO status_categories (name, color, description, is_default, is_completed) VALUES (?, ?, ?, ?, ?)",
-			cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
+			"INSERT INTO status_categories (builtin_key, name, color, description, is_default, is_completed) VALUES (?, ?, ?, ?, ?, ?)",
+			cat.builtinKey, cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create status category %s: %w", cat.name, err)
@@ -318,8 +318,8 @@ func (db *DB) initializeDefaultData() error {
 		categoryID := categoryIDs[status.category]
 		var result sql.Result
 		result, err = tx.Exec(
-			"INSERT INTO statuses (name, description, category_id, is_default) VALUES (?, ?, ?, ?)",
-			status.name, status.description, categoryID, status.isDefault,
+			"INSERT INTO statuses (builtin_key, name, description, category_id, is_default) VALUES (?, ?, ?, ?, ?)",
+			status.builtinKey, status.name, status.description, categoryID, status.isDefault,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create status %s: %w", status.name, err)
@@ -330,8 +330,8 @@ func (db *DB) initializeDefaultData() error {
 
 	// 3. Create default workflow
 	result, err := tx.Exec(
-		"INSERT INTO workflows (name, description, is_default) VALUES (?, ?, ?)",
-		"Default Workflow", "Basic workflow for getting work done", true,
+		"INSERT INTO workflows (builtin_key, name, description, is_default) VALUES (?, ?, ?, ?)",
+		"default", "Default Workflow", "Basic workflow for getting work done", true,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create default workflow: %w", err)
@@ -358,8 +358,8 @@ func (db *DB) initializeDefaultData() error {
 
 	// 5. Create default screen with basic fields
 	result, err = tx.Exec(
-		"INSERT INTO screens (name, description) VALUES (?, ?)",
-		"Default Screen", "Default screen with essential work item fields",
+		"INSERT INTO screens (builtin_key, name, description) VALUES (?, ?, ?)",
+		"default", "Default Screen", "Default screen with essential work item fields",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create default screen: %w", err)
@@ -379,8 +379,8 @@ func (db *DB) initializeDefaultData() error {
 
 	// 7. Create default configuration set
 	configResult, err := tx.Exec(
-		"INSERT INTO configuration_sets (name, description, workflow_id, is_default) VALUES (?, ?, ?, ?)",
-		"Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
+		"INSERT INTO configuration_sets (builtin_key, name, description, workflow_id, is_default) VALUES (?, ?, ?, ?, ?)",
+		"default", "Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create default configuration set: %w", err)
@@ -401,8 +401,8 @@ func (db *DB) initializeDefaultData() error {
 	// 9. Create default link types
 	for _, linkType := range defaultLinkTypes {
 		_, err = tx.Exec(
-			"INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system, allowed_entity_types) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem, linkType.allowedEntityTypes,
+			"INSERT INTO link_types (builtin_key, name, description, forward_label, reverse_label, color, is_system, allowed_entity_types) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+			linkType.builtinKey, linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem, linkType.allowedEntityTypes,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create link type %s: %w", linkType.name, err)
@@ -423,8 +423,8 @@ func (db *DB) initializeDefaultData() error {
 	// 9. Create default hierarchy levels
 	for _, hl := range defaultHierarchyLevels {
 		_, err = tx.Exec(
-			"INSERT INTO hierarchy_levels (level, name, description) VALUES (?, ?, ?)",
-			hl.level, hl.name, hl.description,
+			"INSERT INTO hierarchy_levels (builtin_key, level, name, description) VALUES (?, ?, ?, ?)",
+			hl.builtinKey, hl.level, hl.name, hl.description,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create hierarchy level %s: %w", hl.name, err)
@@ -434,8 +434,8 @@ func (db *DB) initializeDefaultData() error {
 	// 10. Create default item types with icons and colors
 	for _, itemType := range defaultItemTypes {
 		_, err = tx.Exec(
-			"INSERT INTO item_types (configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
+			"INSERT INTO item_types (builtin_key, configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			itemType.builtinKey, configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create default item type %s: %w", itemType.name, err)
@@ -470,8 +470,8 @@ func (db *DB) initializeDefaultData() error {
 	// 12. Create default themes with dual light/dark nav colors
 	for _, theme := range defaultThemes {
 		_, err = tx.Exec(
-			"INSERT INTO themes (name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
+			"INSERT INTO themes (builtin_key, name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			theme.builtinKey, theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create theme %s: %w", theme.name, err)
@@ -521,8 +521,8 @@ func (db *DB) initializeDefaultData() error {
 	// the server bootstrap after Initialize completes — keeps the database
 	// layer free of email-domain imports.)
 	notificationSettingResult, err := tx.Exec(
-		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES (?, ?, ?, ?)",
-		"Default Notifications", "Standard notification rules for work item updates", true, nil,
+		"INSERT INTO notification_settings (builtin_key, name, description, is_active, created_by) VALUES (?, ?, ?, ?, ?)",
+		"default", "Default Notifications", "Standard notification rules for work item updates", true, nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create default notification setting: %w", err)

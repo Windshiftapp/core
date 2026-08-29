@@ -179,7 +179,7 @@ func (s *TransitionMatrixService) loadItemTypeWorkflows(ctx context.Context, wor
 func (s *TransitionMatrixService) loadStatuses(ctx context.Context, workflowIDs []int) ([]StatusTransitionOption, error) {
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(workflowIDs)), ",")
 	query := fmt.Sprintf(`
-		SELECT s.id, s.name, sc.color
+		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, sc.color
 		FROM statuses s
 		LEFT JOIN status_categories sc ON sc.id = s.category_id
 		WHERE NOT EXISTS (
@@ -209,7 +209,7 @@ func (s *TransitionMatrixService) loadStatuses(ctx context.Context, workflowIDs 
 	for rows.Next() {
 		var status StatusTransitionOption
 		var categoryColor sql.NullString
-		if err := rows.Scan(&status.StatusID, &status.StatusName, &categoryColor); err != nil {
+		if err := rows.Scan(&status.StatusID, &status.BuiltinKey, &status.StatusName, &categoryColor); err != nil {
 			return nil, fmt.Errorf("scan transition-matrix status: %w", err)
 		}
 		if categoryColor.Valid {
@@ -226,7 +226,7 @@ func (s *TransitionMatrixService) loadStatuses(ctx context.Context, workflowIDs 
 func (s *TransitionMatrixService) loadEdges(ctx context.Context, workflowIDs []int) (edgesByStatus map[int]map[int][]StatusTransitionOption, anyEdgesByWorkflow map[int][]StatusTransitionOption, err error) {
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(workflowIDs)), ",")
 	query := fmt.Sprintf(`
-		SELECT wt.workflow_id, wt.from_status_id, wt.from_all_statuses, wt.id, s.id, s.name, sc.color
+		SELECT wt.workflow_id, wt.from_status_id, wt.from_all_statuses, wt.id, s.id, COALESCE(s.builtin_key, ''), s.name, sc.color
 		FROM workflow_transitions wt
 		JOIN statuses s ON s.id = wt.to_status_id
 		LEFT JOIN status_categories sc ON sc.id = s.category_id
@@ -257,6 +257,7 @@ func (s *TransitionMatrixService) loadEdges(ctx context.Context, workflowIDs []i
 			&fromAll,
 			&option.TransitionID,
 			&option.StatusID,
+			&option.BuiltinKey,
 			&option.StatusName,
 			&categoryColor,
 		); err != nil {

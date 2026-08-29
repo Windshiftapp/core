@@ -26,6 +26,7 @@
     isGenericSubtaskType,
     sortItemTypesByHierarchy,
   } from '../utils/hierarchy.js';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let itemTypes = $state([]);
   let hierarchyLevels = $state([]);
@@ -35,124 +36,22 @@
   let originalHierarchyLevel = $state(null);
   let showCreateForm = $state(false);
 
-  const systemItemTypes = [
-    {
-      key: 'initiative',
-      name: 'Initiative',
-      description: 'Strategic initiative spanning multiple teams',
-      icon: 'Target',
-      color: '#7c3aed',
-      hierarchyLevel: 0,
-      sortOrder: 1
-    },
-    {
-      key: 'epic',
-      name: 'Epic',
-      description: 'Large feature or capability',
-      icon: 'Zap',
-      color: '#2563eb',
-      hierarchyLevel: 1,
-      sortOrder: 1
-    },
-    {
-      key: 'story',
-      name: 'Story',
-      description: 'User story delivering value to end users',
-      icon: 'BookOpen',
-      color: '#059669',
-      hierarchyLevel: 2,
-      sortOrder: 1
-    },
-    {
-      key: 'task',
-      name: 'Task',
-      description: 'Development or operational task',
-      icon: 'CheckSquare',
-      color: '#dc2626',
-      hierarchyLevel: 3,
-      sortOrder: 1
-    },
-    {
-      key: 'bug',
-      name: 'Bug',
-      description: 'Software defect that needs fixing',
-      icon: 'Bug',
-      color: '#ea580c',
-      hierarchyLevel: 3,
-      sortOrder: 2
-    },
-    {
-      key: 'subtask',
-      name: 'Sub-task',
-      description: 'Small work item below any regular hierarchy level',
-      icon: 'Minus',
-      color: '#6b7280',
-      hierarchyLevel: GENERIC_SUBTASK_HIERARCHY_LEVEL,
-      sortOrder: 1
-    }
-  ];
-
-  const systemHierarchyLevels = {
-    0: {
-      key: 'initiative',
-      name: 'Initiative',
-      description: 'High-level strategic work spanning multiple epics'
-    },
-    1: {
-      key: 'epic',
-      name: 'Epic',
-      description: 'Large work item that can be broken down into stories'
-    },
-    2: {
-      key: 'story',
-      name: 'Story',
-      description: 'User story or feature that delivers value'
-    },
-    3: {
-      key: 'task',
-      name: 'Task',
-      description: 'Individual work item or technical task'
-    },
-    4: {
-      key: 'activity',
-      name: 'Activity',
-      description: 'Discrete activity within a task'
-    }
-  };
-
-  function getSystemItemTypeDefinition(itemType) {
-    if (!itemType.is_default) return null;
-
-    return systemItemTypes.find(definition => (
-      itemType.name === definition.name &&
-      itemType.description === definition.description &&
-      itemType.icon === definition.icon &&
-      itemType.color?.toLowerCase() === definition.color &&
-      Number(itemType.hierarchy_level) === definition.hierarchyLevel &&
-      Number(itemType.sort_order) === definition.sortOrder
-    )) ?? null;
-  }
-
   function getItemTypeDisplayName(itemType) {
-    const definition = getSystemItemTypeDefinition(itemType);
-    return definition
-      ? t(`settings.itemTypes.defaults.${definition.key}`)
+    const key = builtinLocaleKey(itemType);
+    return key
+      ? t(`settings.itemTypes.defaults.${key}`)
       : itemType.name;
   }
 
   function getHierarchyLevelDisplayName(hierarchyLevel) {
-    const definition = systemHierarchyLevels[hierarchyLevel.level];
-    const isUnchangedSystemLevel = definition &&
-      hierarchyLevel.name === definition.name &&
-      hierarchyLevel.description === definition.description;
-
-    return isUnchangedSystemLevel
-      ? t(`settings.hierarchyLevels.defaults.${definition.key}.name`)
+    const key = builtinLocaleKey(hierarchyLevel);
+    return key
+      ? t(`settings.hierarchyLevels.defaults.${key}.name`)
       : hierarchyLevel.name;
   }
 
-  function getConfigurationSetDisplayName(name) {
-    return name === 'Default Configuration'
+  function getConfigurationSetDisplayName(name, builtinKey = '') {
+    return builtinKey === 'default'
       ? t('settings.itemTypes.defaultConfiguration')
       : name;
   }
@@ -441,8 +340,14 @@
     {#snippet configuration_set_names(itemType)}
       <div class="flex flex-wrap gap-1">
         {#if itemType.configuration_set_names && itemType.configuration_set_names.length > 0}
-          {#each itemType.configuration_set_names as configSetName}
-            <Lozenge color="gray" text={getConfigurationSetDisplayName(configSetName)} />
+          {#each itemType.configuration_set_names as configSetName, index}
+            <Lozenge
+              color="gray"
+              text={getConfigurationSetDisplayName(
+                configSetName,
+                itemType.configuration_set_builtin_keys?.[index]
+              )}
+            />
           {/each}
         {:else}
           <span class="text-xs text-gray-500">{t('settings.itemTypes.noConfigurationSets')}</span>

@@ -26,6 +26,7 @@ func NewItemTypeHandler(db database.Database, permissionService *services.Permis
 
 type ItemTypeResponse struct {
 	ID             int    `json:"id"`
+	BuiltinKey     string `json:"builtin_key,omitempty"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
 	Icon           string `json:"icon,omitempty"`
@@ -62,6 +63,7 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, t := range results {
 		types = append(types, ItemTypeResponse{
 			ID:             t.ID,
+			BuiltinKey:     t.BuiltinKey,
 			Name:           t.Name,
 			Description:    t.Description,
 			Icon:           t.Icon,
@@ -112,6 +114,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	h.RespondOK(w, ItemTypeResponse{
 		ID:             t.ID,
+		BuiltinKey:     t.BuiltinKey,
 		Name:           t.Name,
 		Description:    t.Description,
 		Icon:           t.Icon,
@@ -140,6 +143,7 @@ func NewPriorityHandler(db database.Database, permissionService *services.Permis
 
 type PriorityResponse struct {
 	ID          int    `json:"id"`
+	BuiltinKey  string `json:"builtin_key,omitempty"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Icon        string `json:"icon,omitempty"`
@@ -175,6 +179,7 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, p := range results {
 		priorities = append(priorities, PriorityResponse{
 			ID:          p.ID,
+			BuiltinKey:  p.BuiltinKey,
 			Name:        p.Name,
 			Description: p.Description,
 			Icon:        p.Icon,
@@ -224,6 +229,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	h.RespondOK(w, PriorityResponse{
 		ID:          p.ID,
+		BuiltinKey:  p.BuiltinKey,
 		Name:        p.Name,
 		Description: p.Description,
 		Icon:        p.Icon,

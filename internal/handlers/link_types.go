@@ -83,6 +83,7 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lt.ID = id
+	lt.BuiltinKey = ""
 	lt.IsSystem = false
 	lt.Active = true
 	lt.CreatedAt = now
@@ -124,15 +125,19 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lt.ID = id
-	lt.UpdatedAt = now
+	updated, err := h.repo.GetByID(id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	updated.UpdatedAt = now
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		h.auditor.Log(r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, lt.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, updated.Name)
 	}
 
-	respondJSONOK(w, lt)
+	respondJSONOK(w, updated)
 }
 
 func (h *LinkTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {

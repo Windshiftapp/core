@@ -24,13 +24,13 @@ func NewItemTypeRepository(db database.Database) *ItemTypeRepository {
 }
 
 const (
-	itemTypeColumns   = "id, name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at"
-	itemTypeColumnsIT = "it.id, it.name, it.description, it.is_default, it.icon, it.color, it.hierarchy_level, it.sort_order, it.created_at, it.updated_at"
+	itemTypeColumns   = "id, COALESCE(builtin_key, ''), name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at"
+	itemTypeColumnsIT = "it.id, COALESCE(it.builtin_key, ''), it.name, it.description, it.is_default, it.icon, it.color, it.hierarchy_level, it.sort_order, it.created_at, it.updated_at"
 )
 
 // scanItemType reads a full item_types row (in itemTypeColumns order) into it.
 func scanItemType(row interface{ Scan(...any) error }, it *models.ItemType) error {
-	return row.Scan(&it.ID, &it.Name, &it.Description, &it.IsDefault,
+	return row.Scan(&it.ID, &it.BuiltinKey, &it.Name, &it.Description, &it.IsDefault,
 		&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 }
 
@@ -73,7 +73,7 @@ func (r *ItemTypeRepository) List(configurationSetID *int) ([]models.ItemType, e
 // ListForWorkspace returns the workspace-applicable item type catalog.
 func (r *ItemTypeRepository) ListForWorkspace(workspaceID int) ([]models.ItemType, error) {
 	rows, err := r.db.Query(`
-		SELECT it.id, it.name, COALESCE(it.description, ''), COALESCE(it.icon, ''), COALESCE(it.color, ''),
+		SELECT it.id, COALESCE(it.builtin_key, ''), it.name, COALESCE(it.description, ''), COALESCE(it.icon, ''), COALESCE(it.color, ''),
 		       it.hierarchy_level, it.sort_order, it.is_default
 		FROM item_types it
 		WHERE NOT EXISTS (
@@ -96,7 +96,7 @@ func (r *ItemTypeRepository) ListForWorkspace(workspaceID int) ([]models.ItemTyp
 	out := make([]models.ItemType, 0)
 	for rows.Next() {
 		var itemType models.ItemType
-		if err := rows.Scan(&itemType.ID, &itemType.Name, &itemType.Description,
+		if err := rows.Scan(&itemType.ID, &itemType.BuiltinKey, &itemType.Name, &itemType.Description,
 			&itemType.Icon, &itemType.Color, &itemType.HierarchyLevel, &itemType.SortOrder,
 			&itemType.IsDefault); err != nil {
 			return nil, fmt.Errorf("scan workspace item type: %w", err)
@@ -288,45 +288,47 @@ func (r *ItemTypeRepository) insertConfigurationSets(itemTypeID int, ids []int, 
 	return nil
 }
 
-// loadConfigurationSets returns the configuration-set ids and names linked to
-// the item type, ordered by name.
-func (r *ItemTypeRepository) loadConfigurationSets(itemTypeID int) (ids []int, names []string, err error) {
+// loadConfigurationSets returns the configuration-set ids, names, and stable
+// built-in keys linked to the item type, ordered by name.
+func (r *ItemTypeRepository) loadConfigurationSets(itemTypeID int) (ids []int, names, builtinKeys []string, err error) {
 	rows, err := r.db.Query(`
-		SELECT cs.id, cs.name
+		SELECT cs.id, cs.name, COALESCE(cs.builtin_key, '')
 		FROM configuration_set_item_types csit
 		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
 		WHERE csit.item_type_id = ?
 		ORDER BY cs.name
 	`, itemTypeID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load configuration sets for item type %d: %w", itemTypeID, err)
+		return nil, nil, nil, fmt.Errorf("load configuration sets for item type %d: %w", itemTypeID, err)
 	}
 	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id int
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return nil, nil, fmt.Errorf("scan configuration set: %w", err)
+		var name, builtinKey string
+		if err := rows.Scan(&id, &name, &builtinKey); err != nil {
+			return nil, nil, nil, fmt.Errorf("scan configuration set: %w", err)
 		}
 		ids = append(ids, id)
 		names = append(names, name)
+		builtinKeys = append(builtinKeys, builtinKey)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("load configuration sets for item type %d: %w", itemTypeID, err)
+		return nil, nil, nil, fmt.Errorf("load configuration sets for item type %d: %w", itemTypeID, err)
 	}
-	return ids, names, nil
+	return ids, names, builtinKeys, nil
 }
 
 // populateConfigurationSets fills it.ConfigurationSet* from the junction table,
 // keeping the deprecated single-set fields in sync for backward compatibility.
 func (r *ItemTypeRepository) populateConfigurationSets(it *models.ItemType) error {
-	ids, names, err := r.loadConfigurationSets(it.ID)
+	ids, names, builtinKeys, err := r.loadConfigurationSets(it.ID)
 	if err != nil {
 		return err
 	}
 	it.ConfigurationSetIDs = ids
 	it.ConfigurationSetNames = names
+	it.ConfigurationSetBuiltinKeys = builtinKeys
 	if len(ids) > 0 {
 		it.ConfigurationSetID = ids[0]
 		it.ConfigurationSetName = names[0]

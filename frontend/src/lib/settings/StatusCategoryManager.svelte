@@ -12,54 +12,17 @@
   import StatusCategoryModal from '../dialogs/StatusCategoryModal.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let statusCategories = $state([]);
   let loading = $state(true);
   let showModal = $state(false);
   let editingId = $state(null);
 
-  const systemStatusCategories = {
-    'To Do': {
-      key: 'todo',
-      color: '#d1d5db',
-      description: "Work that hasn't been started",
-      isDefault: false,
-      isCompleted: false
-    },
-    'In Progress': {
-      key: 'inProgress',
-      color: '#3b82f6',
-      description: 'Work that is actively being done',
-      isDefault: true,
-      isCompleted: false
-    },
-    Done: {
-      key: 'done',
-      color: '#22c55e',
-      description: 'Work that has been completed',
-      isDefault: false,
-      isCompleted: true
-    }
-  };
-
-  function getSystemCategoryDefinition(category) {
-    const definition = systemStatusCategories[category.name];
-    if (
-      !definition ||
-      category.color?.toLowerCase() !== definition.color ||
-      category.description !== definition.description ||
-      Boolean(category.is_default) !== definition.isDefault ||
-      Boolean(category.is_completed) !== definition.isCompleted
-    ) {
-      return null;
-    }
-    return definition;
-  }
-
   function getCategoryDisplayValue(category, field) {
-    const definition = getSystemCategoryDefinition(category);
-    return definition
-      ? t(`settings.statusCategories.defaults.${definition.key}.${field}`)
+    const key = builtinLocaleKey(category);
+    return key
+      ? t(`settings.statusCategories.defaults.${key}.${field}`)
       : category[field];
   }
 

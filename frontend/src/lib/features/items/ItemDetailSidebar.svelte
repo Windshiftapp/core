@@ -84,11 +84,11 @@
       size: 'w-2 h-2'
     },
     primary: {
-      text: (item) => systemStatusName(item.label)
+      text: (item) => systemStatusName({ name: item.label, builtin_key: item.builtin_key })
     },
     searchFields: ['label', 'value'],
     getValue: (item) => item.id,
-    getLabel: (item) => systemStatusName(item.label)
+    getLabel: (item) => systemStatusName({ name: item.label, builtin_key: item.builtin_key })
   };
 
   // Project picker configuration
@@ -699,7 +699,12 @@
               </kbd>
             </div>
             {#if selectedStatus}
-              <StatusBadge status={{ ...selectedStatus, label: systemStatusName(selectedStatus.label) }} />
+              <StatusBadge
+                status={{
+                  ...selectedStatus,
+                  label: systemStatusName({ name: selectedStatus.label, builtin_key: selectedStatus.builtin_key }),
+                }}
+              />
             {:else}
               <Text variant="subtle" size="sm">{t('items.setStatus')}</Text>
             {/if}

@@ -409,7 +409,7 @@ func (s *WorkspaceService) GetItemTypes(workspaceID int) ([]ItemTypeResult, erro
 	}
 	out := make([]ItemTypeResult, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, ItemTypeResult{ID: row.ID, Name: row.Name, Description: row.Description,
+		out = append(out, ItemTypeResult{ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
 			Icon: row.Icon, Color: row.Color, HierarchyLevel: row.HierarchyLevel,
 			SortOrder: row.SortOrder, IsDefault: row.IsDefault})
 	}
@@ -426,7 +426,7 @@ func (s *WorkspaceService) GetPriorities(workspaceID int) ([]PriorityResult, err
 	}
 	out := make([]PriorityResult, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, PriorityResult{ID: row.ID, Name: row.Name, Description: row.Description,
+		out = append(out, PriorityResult{ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
 			Icon: row.Icon, Color: row.Color, SortOrder: row.SortOrder, IsDefault: row.IsDefault})
 	}
 	return out, nil

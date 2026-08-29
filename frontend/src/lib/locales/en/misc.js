@@ -400,6 +400,17 @@ export default {
     hideCompletedHelp: 'Hide completed milestones from the list',
     noVisibleMilestones: 'No visible milestones',
     dragToReorder: 'Drag to reorder',
+    columnStatus: 'Status',
+    columnMilestone: 'Milestone',
+    columnTargetDate: 'Target Date',
+    columnTimeline: 'Timeline',
+    columnTests: 'Tests',
+    visibleCount: '{count} milestones',
+    visibleCount_one: '{count} milestone',
+    visibleCount_other: '{count} milestones',
+    visibleInCategory: '{count} milestones in this category',
+    visibleInCategory_one: '{count} milestone in this category',
+    visibleInCategory_other: '{count} milestones in this category',
   },
 
   assets: {
@@ -693,6 +704,9 @@ export default {
   },
 
   setup: {
+    chooseLanguage: 'Choose your language',
+    chooseLanguageDesc: 'Select the language to use during setup and in the application.',
+    language: 'Language',
     welcomeTo: 'Welcome to {appName}',
     setupMessage: "Let's get your work management system set up",
     setupProgress: 'Setup Progress',

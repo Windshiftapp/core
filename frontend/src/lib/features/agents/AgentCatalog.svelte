@@ -10,6 +10,7 @@
   } from '@tabler/icons-svelte-runes';
   import { agentBindings, agentRuns } from '../../api.js';
   import { workspacePermissions } from '../../stores';
+  import { t } from '../../stores/i18n.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import Badge from '../../components/Badge.svelte';
@@ -56,7 +57,7 @@
       }
       recentRunByAgent = nextRecent;
     } catch (err) {
-      error = err.message || 'Agents could not be loaded.';
+      error = err.message || t('workspaceAgents.catalog.loadErrorMessage');
     } finally {
       loading = false;
     }
@@ -71,35 +72,46 @@
 
   function availabilityLabel(value) {
     return {
-      ready: 'Ready',
-      offline: 'Offline · queues work',
-      needs_setup: 'Needs setup',
-      draft: 'Draft',
-      paused: 'Paused',
-      invalid: 'Invalid',
-      archived: 'Archived',
-    }[value] || 'Unavailable';
+      ready: t('workspaceAgents.availability.ready'),
+      offline: t('workspaceAgents.availability.offline'),
+      needs_setup: t('workspaceAgents.availability.needsSetup'),
+      draft: t('workspaceAgents.availability.draft'),
+      paused: t('workspaceAgents.availability.paused'),
+      invalid: t('workspaceAgents.availability.invalid'),
+      archived: t('workspaceAgents.availability.archived'),
+    }[value] || t('workspaceAgents.availability.unavailable');
   }
 
   function typeLabel(value) {
-    if (value === 'standard') return 'Standard';
-    if (value === 'coding') return 'Coding';
-    return 'Legacy';
+    if (value === 'standard') return t('workspaceAgents.types.standard');
+    if (value === 'coding') return t('workspaceAgents.types.coding');
+    return t('workspaceAgents.types.legacy');
   }
 
   function runtimeLabel(value) {
     return {
-      windshift: 'Built-in Windshift runtime',
-      authorized_runner: 'Authorized coding runner',
-      legacy_local: 'Legacy local runtime',
+      windshift: t('workspaceAgents.runtimes.windshift'),
+      authorized_runner: t('workspaceAgents.runtimes.authorizedRunner'),
+      legacy_local: t('workspaceAgents.runtimes.legacyLocal'),
     }[value] || value;
   }
 
   function identityLabel(value) {
     return {
-      workspace_managed: 'Workspace managed',
-      centralized_service: 'Central service identity',
-      user_owned: 'User-owned identity',
+      workspace_managed: t('workspaceAgents.identities.workspaceManaged'),
+      centralized_service: t('workspaceAgents.identities.centralizedService'),
+      user_owned: t('workspaceAgents.identities.userOwned'),
+    }[value] || value;
+  }
+
+  function runStatusLabel(value) {
+    return {
+      queued: t('workspaceAgents.runStatuses.queued'),
+      running: t('workspaceAgents.runStatuses.running'),
+      succeeded: t('workspaceAgents.runStatuses.succeeded'),
+      completed: t('workspaceAgents.runStatuses.completed'),
+      failed: t('workspaceAgents.runStatuses.failed'),
+      cancelled: t('workspaceAgents.runStatuses.cancelled'),
     }[value] || value;
   }
 </script>
@@ -112,8 +124,8 @@
   <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader
       icon={AgentIcon}
-      title="Agents"
-      subtitle="Specialists available in this workspace"
+      title={t('workspaceAgents.catalog.title')}
+      subtitle={t('workspaceAgents.catalog.subtitle')}
     >
       {#snippet actions()}
         {#if canAdmin}
@@ -126,7 +138,7 @@
             hotkeyConfig={{ key: toHotkeyString('agents', 'add') }}
             dataTestid="agent-catalog-manage"
           >
-            Create agent
+            {t('workspaceAgents.catalog.createAgent')}
           </Button>
         {/if}
       {/snippet}
@@ -135,17 +147,17 @@
     <div class="max-w-md">
       <SearchInput
         bind:value={query}
-        placeholder="Search agents"
+        placeholder={t('workspaceAgents.catalog.searchPlaceholder')}
         dataTestid="agent-catalog-search"
       />
     </div>
 
     {#if loading}
-      <StateDisplay type="loading" message="Loading workspace agents…" class="py-20" />
+      <StateDisplay type="loading" message={t('workspaceAgents.catalog.loading')} class="py-20" />
     {:else if error}
       <StateDisplay
         type="error"
-        title="Agents could not be loaded"
+        title={t('workspaceAgents.catalog.loadErrorTitle')}
         message={error}
         onRetry={loadAgents}
         class="py-20"
@@ -155,10 +167,10 @@
         <StateDisplay
           type="empty"
           icon={AgentIcon}
-          title="No agents yet"
+          title={t('workspaceAgents.catalog.emptyTitle')}
           description={canAdmin
-            ? 'Create a Standard or Coding specialist for this workspace.'
-            : 'A workspace administrator can add specialists here.'}
+            ? t('workspaceAgents.catalog.emptyAdminDescription')
+            : t('workspaceAgents.catalog.emptyMemberDescription')}
         />
         {#if canAdmin}
           <div class="mt-4 flex justify-center">
@@ -168,7 +180,7 @@
               icon={Plus}
               dataTestid="agent-catalog-empty-manage"
             >
-              Create agent
+              {t('workspaceAgents.catalog.createAgent')}
             </Button>
           </div>
         {/if}
@@ -177,8 +189,8 @@
       <Card variant="outlined" padding="spacious">
         <StateDisplay
           type="empty"
-          title="No matching agents"
-          description="Try another name, handle, purpose, or profile type."
+          title={t('workspaceAgents.catalog.noMatchesTitle')}
+          description={t('workspaceAgents.catalog.noMatchesDescription')}
         />
       </Card>
     {:else}
@@ -218,7 +230,7 @@
             </div>
 
             <p class="mt-4 line-clamp-3 min-h-15 text-sm" style="color: var(--ds-text-subtle);">
-              {agent.purpose || 'A workspace specialist configured by your administrators.'}
+              {agent.purpose || t('workspaceAgents.catalog.defaultPurpose')}
             </p>
 
             <div class="mt-4 space-y-2 text-sm">
@@ -234,19 +246,21 @@
                 <AgentIcon class="h-4 w-4" />
                 <span>
                   {identityLabel(agent.identity_class)}
-                  {agent.owner_name ? ` · Owned by ${agent.owner_name}` : ''}
+                  {agent.owner_name
+                    ? ` · ${t('workspaceAgents.catalog.ownedBy', { name: agent.owner_name })}`
+                    : ''}
                 </span>
               </div>
               <div class="flex items-center gap-2" style="color: var(--ds-text-subtle);">
                 <Activity class="h-4 w-4" />
-                <span>{agent.model_summary || 'Model unavailable'}</span>
+                <span>{agent.model_summary || t('workspaceAgents.catalog.modelUnavailable')}</span>
               </div>
               <div class="flex items-center gap-2" style="color: var(--ds-text-subtle);">
                 <Message class="h-4 w-4" />
                 <span>
                   {agent.profile_type === 'standard'
-                    ? 'Assignment, mentions, and workspace chat'
-                    : 'Direct assignment and mentions'}
+                    ? t('workspaceAgents.catalog.standardInteraction')
+                    : t('workspaceAgents.catalog.codingInteraction')}
                 </span>
               </div>
               {#if recentRunByAgent[String(agent.id)]}
@@ -254,7 +268,9 @@
                 <div class="flex items-center gap-2" style="color: var(--ds-text-subtle);">
                   <Activity class="h-4 w-4" />
                   <span>
-                    Last run {latestRun.status} ·
+                    {t('workspaceAgents.catalog.lastRun', {
+                      status: runStatusLabel(latestRun.status),
+                    })} ·
                     {new Date(latestRun.updated_at || latestRun.created_at).toLocaleDateString()}
                   </span>
                 </div>
@@ -263,7 +279,9 @@
 
             <div class="mt-auto pt-4">
               <span class="text-xs" style="color: var(--ds-text-subtlest);">
-                View profile · Version {agent.profile_version}
+                {t('workspaceAgents.catalog.viewProfileVersion', {
+                  version: agent.profile_version,
+                })}
               </span>
             </div>
           </Card>

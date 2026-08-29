@@ -37,7 +37,7 @@ func NewWorkflowRepository(db database.Database) *WorkflowRepository {
 // The result is never nil.
 func (r *WorkflowRepository) List() ([]models.Workflow, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, description, is_default, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
 		FROM workflows
 		ORDER BY is_default DESC, name ASC`)
 	if err != nil {
@@ -48,7 +48,7 @@ func (r *WorkflowRepository) List() ([]models.Workflow, error) {
 	var workflows []models.Workflow
 	for rows.Next() {
 		var workflow models.Workflow
-		if err := rows.Scan(&workflow.ID, &workflow.Name, &workflow.Description,
+		if err := rows.Scan(&workflow.ID, &workflow.BuiltinKey, &workflow.Name, &workflow.Description,
 			&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -72,7 +72,7 @@ func (r *WorkflowRepository) ListByIDs(ids []int) ([]models.Workflow, error) {
 	}
 	placeholders, args := inPlaceholders(ids)
 	rows, err := r.db.Query(`
-		SELECT id, name, description, is_default, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
 		FROM workflows
 		WHERE id IN (`+placeholders+`)
 		ORDER BY name
@@ -84,7 +84,7 @@ func (r *WorkflowRepository) ListByIDs(ids []int) ([]models.Workflow, error) {
 	out := []models.Workflow{}
 	for rows.Next() {
 		var workflow models.Workflow
-		if err := rows.Scan(&workflow.ID, &workflow.Name, &workflow.Description,
+		if err := rows.Scan(&workflow.ID, &workflow.BuiltinKey, &workflow.Name, &workflow.Description,
 			&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan workflow by id: %w", err)
 		}
@@ -101,10 +101,10 @@ func (r *WorkflowRepository) ListByIDs(ids []int) ([]models.Workflow, error) {
 func (r *WorkflowRepository) Get(id int) (*models.Workflow, error) {
 	var workflow models.Workflow
 	err := r.db.QueryRow(`
-		SELECT id, name, description, is_default, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
 		FROM workflows
 		WHERE id = ?
-	`, id).Scan(&workflow.ID, &workflow.Name, &workflow.Description,
+	`, id).Scan(&workflow.ID, &workflow.BuiltinKey, &workflow.Name, &workflow.Description,
 		&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound

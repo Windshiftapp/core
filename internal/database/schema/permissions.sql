@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_user_global_permissions_permission_id ON user_glo
 -- Workspace roles tables
 CREATE TABLE IF NOT EXISTS workspace_roles (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	is_system BOOLEAN DEFAULT FALSE,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS workspace_roles (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_roles_builtin_key ON workspace_roles(builtin_key) WHERE builtin_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS user_workspace_roles (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,12 +215,12 @@ INSERT OR IGNORE INTO permissions (permission_key, permission_name, description,
 	('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', 0);
 
 -- Default workspace roles
-INSERT OR IGNORE INTO workspace_roles (name, description, is_system, display_order)
+INSERT OR IGNORE INTO workspace_roles (builtin_key, name, description, is_system, display_order)
 VALUES
-	('Viewer', 'Can view workspace content and participate in discussions', 1, 1),
-	('Editor', 'Can create and edit work items within the workspace', 1, 2),
-	('Administrator', 'Full workspace administration including permissions', 1, 3),
-	('Tester', 'Can view items, execute tests, manage test cases, and create defects', 1, 4);
+	('viewer', 'Viewer', 'Can view workspace content and participate in discussions', 1, 1),
+	('editor', 'Editor', 'Can create and edit work items within the workspace', 1, 2),
+	('administrator', 'Administrator', 'Full workspace administration including permissions', 1, 3),
+	('tester', 'Tester', 'Can view items, execute tests, manage test cases, and create defects', 1, 4);
 
 -- Default role permission mappings
 INSERT OR IGNORE INTO role_permissions (role_id, permission_id)

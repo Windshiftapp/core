@@ -190,6 +190,7 @@ type PermissionSetPermission struct {
 // future toggle can flip it; v1 forces it false at create time.
 type WorkspaceRole struct {
 	ID                 int       `json:"id" db:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty" db:"builtin_key"`
 	Name               string    `json:"name" db:"name"`
 	Description        string    `json:"description" db:"description"`
 	IsSystem           bool      `json:"is_system" db:"is_system"`

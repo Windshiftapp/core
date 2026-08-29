@@ -1,0 +1,60 @@
+/** Workspace agents and Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Ready',
+      offline: 'Offline · queues work',
+      needsSetup: 'Needs setup',
+      draft: 'Draft',
+      paused: 'Paused',
+      invalid: 'Invalid',
+      archived: 'Archived',
+      unavailable: 'Unavailable',
+    },
+    types: {
+      standard: 'Standard',
+      coding: 'Coding',
+      legacy: 'Legacy',
+    },
+    runtimes: {
+      windshift: 'Built-in Windshift runtime',
+      authorizedRunner: 'Authorized coding runner',
+      legacyLocal: 'Legacy local runtime',
+    },
+    identities: {
+      workspaceManaged: 'Workspace managed',
+      centralizedService: 'Central service identity',
+      userOwned: 'User-owned identity',
+    },
+    runStatuses: {
+      queued: 'queued',
+      running: 'running',
+      succeeded: 'completed',
+      completed: 'completed',
+      failed: 'failed',
+      cancelled: 'cancelled',
+    },
+    catalog: {
+      title: 'Agents',
+      subtitle: 'Specialists available in this workspace',
+      createAgent: 'Create agent',
+      searchPlaceholder: 'Search agents',
+      loading: 'Loading workspace agents…',
+      loadErrorTitle: 'Agents could not be loaded',
+      loadErrorMessage: 'Agents could not be loaded.',
+      emptyTitle: 'No agents yet',
+      emptyAdminDescription: 'Create a Standard or Coding specialist for this workspace.',
+      emptyMemberDescription: 'A workspace administrator can add specialists here.',
+      noMatchesTitle: 'No matching agents',
+      noMatchesDescription: 'Try another name, handle, purpose, or profile type.',
+      defaultPurpose: 'A workspace specialist configured by your administrators.',
+      ownedBy: 'Owned by {name}',
+      modelUnavailable: 'Model unavailable',
+      standardInteraction: 'Assignment, mentions, and workspace chat',
+      codingInteraction: 'Direct assignment and mentions',
+      lastRun: 'Last run: {status}',
+      viewProfileVersion: 'View profile · Version {version}',
+    },
+  },
+};

@@ -29,6 +29,7 @@
   import { aiStore } from '../../stores/aiStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { systemStatusCategoryName } from '../../utils/systemLabels.js';
 
   let { iterationId, workspaceId = null } = $props();
 
@@ -419,7 +420,12 @@
                       class="w-3 h-3 rounded-full"
                       style="background-color: {breakdown.category_color || '#9ca3af'};"
                     ></div>
-                    <span class="text-sm" style="color: var(--ds-text);">{breakdown.category_name}</span>
+                    <span class="text-sm" style="color: var(--ds-text);">
+                      {systemStatusCategoryName({
+                        name: breakdown.category_name,
+                        builtin_key: breakdown.category_builtin_key,
+                      })}
+                    </span>
                   </div>
                   <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{breakdown.item_count}</span>
                 </div>

@@ -45,6 +45,7 @@ func mapItemToResponse(item *models.Item, baseURL string) *ItemResponse {
 	if item.StatusID != nil {
 		resp.Status = &StatusSummary{
 			ID:            *item.StatusID,
+			BuiltinKey:    item.StatusBuiltinKey,
 			Name:          item.StatusName,
 			CategoryColor: "", // Would need to be populated from expanded data
 		}
@@ -53,18 +54,20 @@ func mapItemToResponse(item *models.Item, baseURL string) *ItemResponse {
 	// Map priority
 	if item.PriorityID != nil {
 		resp.Priority = &PrioritySummary{
-			ID:    *item.PriorityID,
-			Name:  item.PriorityName,
-			Icon:  item.PriorityIcon,
-			Color: item.PriorityColor,
+			ID:         *item.PriorityID,
+			BuiltinKey: item.PriorityBuiltinKey,
+			Name:       item.PriorityName,
+			Icon:       item.PriorityIcon,
+			Color:      item.PriorityColor,
 		}
 	}
 
 	// Map item type
 	if item.ItemTypeID != nil {
 		resp.ItemType = &ItemTypeSummary{
-			ID:   *item.ItemTypeID,
-			Name: item.ItemTypeName,
+			ID:         *item.ItemTypeID,
+			BuiltinKey: item.ItemTypeBuiltinKey,
+			Name:       item.ItemTypeName,
 		}
 	}
 
@@ -284,14 +287,18 @@ func MapServiceTransitionsToResponse(transitions []services.WorkflowTransitionRe
 
 		if t.FromStatusID != nil {
 			resp.FromStatus = &StatusSummary{
-				ID:   *t.FromStatusID,
-				Name: t.FromStatusName,
+				ID:                 *t.FromStatusID,
+				BuiltinKey:         t.FromStatusBuiltinKey,
+				Name:               t.FromStatusName,
+				CategoryBuiltinKey: t.FromCategoryBuiltinKey,
 			}
 		}
 
 		resp.ToStatus = &StatusSummary{
-			ID:   t.ToStatusID,
-			Name: t.ToStatusName,
+			ID:                 t.ToStatusID,
+			BuiltinKey:         t.ToStatusBuiltinKey,
+			Name:               t.ToStatusName,
+			CategoryBuiltinKey: t.ToCategoryBuiltinKey,
 		}
 
 		result[i] = resp

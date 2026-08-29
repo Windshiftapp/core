@@ -20,7 +20,7 @@ func NewThemeRepository(db database.Database) *ThemeRepository {
 	return &ThemeRepository{db: db}
 }
 
-const themeColumns = `id, name, description, is_default, is_active,
+const themeColumns = `id, COALESCE(builtin_key, ''), name, description, is_default, is_active,
 	nav_background_color_light, nav_text_color_light,
 	nav_background_color_dark, nav_text_color_dark,
 	created_at, updated_at`
@@ -31,7 +31,7 @@ type themeScanner interface {
 
 func scanTheme(s themeScanner, t *models.Theme) error {
 	return s.Scan(
-		&t.ID, &t.Name, &t.Description,
+		&t.ID, &t.BuiltinKey, &t.Name, &t.Description,
 		&t.IsDefault, &t.IsActive,
 		&t.NavBackgroundColorLight, &t.NavTextColorLight,
 		&t.NavBackgroundColorDark, &t.NavTextColorDark,

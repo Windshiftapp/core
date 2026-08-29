@@ -46,10 +46,11 @@ type ProjectStats struct {
 
 // MilestoneStatusBreakdown represents the distribution of items per status category within a milestone
 type MilestoneStatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
+	CategoryName       string `json:"category_name"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	ItemCount          int    `json:"item_count"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 // MilestoneStatusProgress aggregates milestone progress for a workspace
@@ -221,10 +222,11 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			breakdowns := make([]MilestoneStatusBreakdown, len(rp.StatusBreakdown))
 			for j, rb := range rp.StatusBreakdown {
 				breakdowns[j] = MilestoneStatusBreakdown{
-					CategoryName:  rb.CategoryName,
-					CategoryColor: rb.CategoryColor,
-					ItemCount:     rb.ItemCount,
-					IsCompleted:   rb.IsCompleted,
+					CategoryName:       rb.CategoryName,
+					CategoryBuiltinKey: rb.CategoryBuiltinKey,
+					CategoryColor:      rb.CategoryColor,
+					ItemCount:          rb.ItemCount,
+					IsCompleted:        rb.IsCompleted,
 				}
 			}
 			milestoneProgress[i] = MilestoneStatusProgress{

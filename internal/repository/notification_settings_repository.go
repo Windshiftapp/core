@@ -23,7 +23,7 @@ func NewNotificationSettingsRepository(db database.Database) *NotificationSettin
 func (r *NotificationSettingsRepository) ListAll() ([]models.NotificationSetting, error) {
 	rows, err := r.db.Query(`
 		SELECT
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
+			ns.id, COALESCE(ns.builtin_key, ''), ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
 			u.first_name || ' ' || u.last_name as created_by_name
 		FROM notification_settings ns
 		LEFT JOIN users u ON ns.created_by = u.id
@@ -56,7 +56,7 @@ func (r *NotificationSettingsRepository) ListAll() ([]models.NotificationSetting
 func (r *NotificationSettingsRepository) FindByID(id int) (*models.NotificationSetting, error) {
 	row := r.db.QueryRow(`
 		SELECT
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
+			ns.id, COALESCE(ns.builtin_key, ''), ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
 			u.first_name || ' ' || u.last_name as created_by_name
 		FROM notification_settings ns
 		LEFT JOIN users u ON ns.created_by = u.id
@@ -160,9 +160,9 @@ func (r *NotificationSettingsRepository) EnsureDefault() error {
 	return database.WithTx(r.db, func(tx database.Tx) error {
 		var notificationSettingID int64
 		if err := tx.QueryRow(
-			`INSERT INTO notification_settings (name, description, is_active, created_by)
-			 VALUES (?, ?, ?, ?) RETURNING id`,
-			"Default Notifications", "Standard notification rules for work item updates", true, nil,
+			`INSERT INTO notification_settings (builtin_key, name, description, is_active, created_by)
+			 VALUES (?, ?, ?, ?, ?) RETURNING id`,
+			"default", "Default Notifications", "Standard notification rules for work item updates", true, nil,
 		).Scan(&notificationSettingID); err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func scanNotificationSettingRow(s rowScanner) (models.NotificationSetting, error
 	var createdBy sql.NullInt64
 	var createdByName sql.NullString
 	if err := s.Scan(
-		&setting.ID, &setting.Name, &setting.Description, &setting.IsActive,
+		&setting.ID, &setting.BuiltinKey, &setting.Name, &setting.Description, &setting.IsActive,
 		&createdBy, &setting.CreatedAt, &setting.UpdatedAt, &createdByName,
 	); err != nil {
 		return models.NotificationSetting{}, err

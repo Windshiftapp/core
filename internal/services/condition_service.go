@@ -155,6 +155,7 @@ func (s *ConditionService) FilterTransitionsByConditions(ctx context.Context, co
 type TransitionWithID struct {
 	TransitionID  int
 	StatusID      int
+	BuiltinKey    string
 	StatusName    string
 	CategoryColor string
 }

@@ -651,6 +651,7 @@ func (h *WorkspaceHandler) GetWorkflows(w http.ResponseWriter, r *http.Request) 
 	for _, wf := range results {
 		workflows = append(workflows, WorkflowResponse{
 			ID:          wf.ID,
+			BuiltinKey:  wf.BuiltinKey,
 			Name:        wf.Name,
 			Description: wf.Description,
 			IsDefault:   wf.IsDefault,

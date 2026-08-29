@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS configuration_sets (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS configuration_sets (
 
 CREATE TABLE IF NOT EXISTS item_types (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	configuration_set_id INTEGER, -- Made nullable for many-to-many relationship
 	name TEXT NOT NULL UNIQUE, -- Changed to global unique (not per config set)
 	description TEXT,
@@ -59,6 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_config_set_item_types_view_screen_id ON configura
 
 CREATE TABLE IF NOT EXISTS priorities (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -85,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_config_set_priorities_priority_id ON configuratio
 
 CREATE TABLE IF NOT EXISTS hierarchy_levels (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	level INTEGER NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	description TEXT DEFAULT '',
@@ -94,6 +98,7 @@ CREATE TABLE IF NOT EXISTS hierarchy_levels (
 
 CREATE TABLE IF NOT EXISTS screens (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -131,6 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_screen_system_fields_screen_id ON screen_system_f
 -- Workflow System Tables
 CREATE TABLE IF NOT EXISTS status_categories (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
 	description TEXT,
@@ -142,6 +148,7 @@ CREATE TABLE IF NOT EXISTS status_categories (
 
 CREATE TABLE IF NOT EXISTS statuses (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	category_id INTEGER NOT NULL,
@@ -153,6 +160,7 @@ CREATE TABLE IF NOT EXISTS statuses (
 
 CREATE TABLE IF NOT EXISTS workflows (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -181,6 +189,14 @@ CREATE INDEX IF NOT EXISTS idx_statuses_category_id ON statuses(category_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_workflow_id ON workflow_transitions(workflow_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_from_status ON workflow_transitions(from_status_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_to_status ON workflow_transitions(to_status_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_statuses_builtin_key ON statuses(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workflows_builtin_key ON workflows(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Configuration Set Screen Assignments
 CREATE TABLE IF NOT EXISTS configuration_set_screens (

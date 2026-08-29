@@ -716,7 +716,7 @@ export default {
       empty: 'No status categories found. Create your first status category to get started.',
       inUseByStatuses: 'Cannot delete "{name}" because it\'s being used by one or more statuses. Remove or reassign those statuses in Status Management first.',
       defaults: {
-        todo: { name: 'To Do', description: "Work that hasn't been started" },
+        toDo: { name: 'To Do', description: "Work that hasn't been started" },
         inProgress: { name: 'In Progress', description: 'Work that is actively being done' },
         done: { name: 'Done', description: 'Work that has been completed' },
       },

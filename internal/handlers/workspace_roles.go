@@ -269,6 +269,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 
 	type Role struct {
 		RoleID          int    `json:"role_id"`
+		RoleBuiltinKey  string `json:"role_builtin_key,omitempty"`
 		RoleName        string `json:"role_name"`
 		RoleDescription string `json:"role_description"`
 		AssignmentID    int    `json:"assignment_id"`
@@ -306,6 +307,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 		// Add role to user
 		user.Roles = append(user.Roles, Role{
 			RoleID:          a.RoleID,
+			RoleBuiltinKey:  a.RoleBuiltinKey,
 			RoleName:        a.RoleName,
 			RoleDescription: a.RoleDescription,
 			AssignmentID:    a.AssignmentID,
@@ -495,6 +497,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceGroupRoleAssignments(w http.ResponseW
 
 	type Role struct {
 		RoleID          int    `json:"role_id"`
+		RoleBuiltinKey  string `json:"role_builtin_key,omitempty"`
 		RoleName        string `json:"role_name"`
 		RoleDescription string `json:"role_description"`
 		AssignmentID    int    `json:"assignment_id"`
@@ -527,6 +530,7 @@ func (h *WorkspaceRoleHandler) GetWorkspaceGroupRoleAssignments(w http.ResponseW
 
 		group.Roles = append(group.Roles, Role{
 			RoleID:          a.RoleID,
+			RoleBuiltinKey:  a.RoleBuiltinKey,
 			RoleName:        a.RoleName,
 			RoleDescription: a.RoleDescription,
 			AssignmentID:    a.AssignmentID,

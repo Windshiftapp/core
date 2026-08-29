@@ -36,6 +36,7 @@
   let showWelcomeAssistant = $state(false);
   let startupError = $state('');
   let startupSlow = $state(false);
+  let i18nReady = $state(false);
   let startupAttempt = 0;
   let themeAudience = null;
   let themeLoadGeneration = 0;
@@ -82,6 +83,7 @@
     try {
       // Initialize i18n (loads user's preferred locale)
       await withBootstrapDeadline(i18n.init());
+      i18nReady = true;
 
       // Check setup status first
       await checkSetupStatus();
@@ -305,8 +307,8 @@
   <!-- Show loading screen during initial setup/session checks -->
   {:else if setupLoading}
     <BrandedLoader
-      label={t('common.loading')}
-      detail={startupSlow ? t('common.loadingSlow') : ''}
+      label={i18nReady ? t('common.loading') : 'Loading…'}
+      detail={startupSlow && i18nReady ? t('common.loadingSlow') : ''}
     />
   <!-- Public board route - no authentication required -->
   {:else if $currentRoute.view === 'public-board'}
@@ -358,7 +360,7 @@
     <!-- Show loading or login screen while waiting for auth -->
     <div class="flex-1 flex items-center justify-center">
       {#if $authStore.loading}
-        <BrandedLoader fullViewport={false} />
+        <BrandedLoader label={i18nReady ? t('common.loading') : 'Loading…'} fullViewport={false} />
       {:else if showLoginDialog}
         <!-- Login dialog will show, but we can show a minimal background -->
         <div class="text-center">

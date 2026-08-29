@@ -481,18 +481,18 @@
       : [],
     {
       key: 'status',
-      label: 'Status',
+      label: t('milestones.columnStatus'),
       width: 'w-40',
       slot: 'status'
     },
     { 
       key: 'name', 
-      label: 'Milestone', 
+      label: t('milestones.columnMilestone'),
       slot: 'name'
     },
     { 
       key: 'target_date', 
-      label: 'Target Date', 
+      label: t('milestones.columnTargetDate'),
       width: 'w-40',
       render: (milestone) => {
         return formatDateShort(milestone.target_date) || '-';
@@ -500,13 +500,13 @@
     },
     { 
       key: 'days_remaining', 
-      label: 'Timeline', 
+      label: t('milestones.columnTimeline'),
       width: 'w-48',
       slot: 'days_remaining'
     },
     ...$moduleSettings.test_management_enabled ? [{
       key: 'tests',
-      label: 'Tests',
+      label: t('milestones.columnTests'),
       width: 'w-24',
       slot: 'tests'
     }] : [],
@@ -537,7 +537,9 @@
           : t('milestones.workspaceMilestones')}
         subtitle={!isGlobalView
           ? `${localMilestones.length} ${t('milestones.local').toLowerCase()}, ${globalMilestones.length} ${t('milestones.global').toLowerCase()}`
-          : `${visibleMilestones.length} milestone${visibleMilestones.length !== 1 ? 's' : ''}${activeCategoryId ? ' in this category' : ''}`}
+          : activeCategoryId
+            ? t('milestones.visibleInCategory', { count: visibleMilestones.length })
+            : t('milestones.visibleCount', { count: visibleMilestones.length })}
       >
         {#snippet actions()}
           <div class="flex items-center gap-2">

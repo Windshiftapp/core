@@ -40,15 +40,8 @@
   let setupCleanups = [];
   let setupTimeout;
 
-  const defaultScreen = {
-    name: 'Default Screen',
-    description: 'Default screen with essential work item fields'
-  };
-
   function isDefaultSystemScreen(screen) {
-    return screen?.id === 1 &&
-      screen.name === defaultScreen.name &&
-      screen.description === defaultScreen.description;
+    return Boolean(screen?.builtin_key);
   }
 
   function getScreenDisplayValue(screen, field) {

@@ -237,6 +237,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_active_timers_user_id ON active_timers(use
 -- Themes table
 CREATE TABLE IF NOT EXISTS themes (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -248,6 +249,8 @@ CREATE TABLE IF NOT EXISTS themes (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Board configuration tables
 CREATE TABLE IF NOT EXISTS board_configurations (

@@ -441,6 +441,9 @@ export default {
     pleaseSelectTargetPriorities: 'Bitte wählen Sie Zielprioritäten für alle Einträge aus, die eine Migration erfordern.',
   },
   setup: {
+    chooseLanguage: 'Sprache auswählen',
+    chooseLanguageDesc: 'Wählen Sie die Sprache für die Einrichtung und die Anwendung aus.',
+    language: 'Sprache',
     welcomeTo: 'Willkommen bei {appName}',
     setupMessage: 'Lassen Sie uns Ihr Arbeitsmanagementsystem einrichten',
     setupProgress: 'Einrichtungsfortschritt',

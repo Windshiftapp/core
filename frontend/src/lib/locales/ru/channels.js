@@ -384,7 +384,7 @@ export default {
     submitButtonLabel: 'Текст кнопки отправки (необязательно)',
     submitButtonPlaceholder: 'Создать отчёт',
     successMessage: 'Сообщение об успехе (необязательно)',
-    successMessagePlaceholder: 'Активы, соответствующие вашим условиям.',
+    successMessagePlaceholder: 'Ресурсы, соответствующие вашим условиям.',
     assetReportConfigureFieldsHint: 'Используйте действие «Настроить поля» на карточке отчёта, чтобы выбрать поля формы.',
     assetReportFieldsAfterCreate: 'После создания используйте «Настроить поля» на карточке отчёта, чтобы выбрать поля формы.',
     runReport: 'Создать отчёт',

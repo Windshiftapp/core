@@ -684,6 +684,9 @@ export default {
   },
 
   setup: {
+    chooseLanguage: 'اختر لغتك',
+    chooseLanguageDesc: 'اختر اللغة التي ستُستخدم أثناء الإعداد وفي التطبيق.',
+    language: 'اللغة',
     welcomeTo: 'مرحباً بك في {appName}',
     setupMessage: 'لنقم بإعداد نظام إدارة العمل الخاص بك',
     setupProgress: 'تقدم الإعداد',

@@ -45,8 +45,8 @@ func (r *StatusRepository) ListForWorkspaces(workspaceIDs []int) ([]models.Statu
 			SELECT wt.to_status_id AS status_id FROM effective_workflows ew
 			JOIN workflow_transitions wt ON wt.workflow_id = ew.workflow_id
 		)
-		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default,
-		       sc.name, sc.color, sc.is_completed
+		SELECT DISTINCT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
+		       sc.name, COALESCE(sc.builtin_key, ''), sc.color, sc.is_completed
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
 		WHERE s.id IN (SELECT status_id FROM available_statuses)
@@ -61,8 +61,8 @@ func (r *StatusRepository) ListForWorkspaces(workspaceIDs []int) ([]models.Statu
 	for rows.Next() {
 		var status models.Status
 		var description sql.NullString
-		if err := rows.Scan(&status.ID, &status.Name, &description, &status.CategoryID,
-			&status.IsDefault, &status.CategoryName, &status.CategoryColor, &status.IsCompleted); err != nil {
+		if err := rows.Scan(&status.ID, &status.BuiltinKey, &status.Name, &description, &status.CategoryID,
+			&status.IsDefault, &status.CategoryName, &status.CategoryBuiltinKey, &status.CategoryColor, &status.IsCompleted); err != nil {
 			return nil, fmt.Errorf("scan workspace status: %w", err)
 		}
 		status.Description = description.String
@@ -78,6 +78,7 @@ func (r *StatusRepository) ListForWorkspaces(workspaceIDs []int) ([]models.Statu
 type StatusTransitionOption struct {
 	TransitionID  int
 	StatusID      int
+	BuiltinKey    string
 	StatusName    string
 	CategoryColor *string
 }
@@ -88,8 +89,8 @@ func NewStatusRepository(db database.Database) *StatusRepository {
 }
 
 const statusJoinedSelect = `
-	SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-	       sc.name as category_name, sc.color as category_color, sc.is_completed
+	SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+	       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed
 	FROM statuses s
 	JOIN status_categories sc ON s.category_id = sc.id`
 
@@ -205,11 +206,11 @@ func (r *StatusRepository) GetTransitionOption(statusID int64) (*StatusTransitio
 	var option StatusTransitionOption
 	var categoryColor sql.NullString
 	err := r.db.QueryRow(`
-		SELECT s.id, s.name, sc.color
+		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, sc.color
 		FROM statuses s
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		WHERE s.id = ?
-	`, statusID).Scan(&option.StatusID, &option.StatusName, &categoryColor)
+	`, statusID).Scan(&option.StatusID, &option.BuiltinKey, &option.StatusName, &categoryColor)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -227,7 +228,7 @@ func (r *StatusRepository) GetTransitionOption(statusID int64) (*StatusTransitio
 // direct edge from this status.
 func (r *StatusRepository) ListAvailableTransitionOptions(workflowID int, fromStatusID int64) ([]StatusTransitionOption, error) {
 	rows, err := r.db.Query(`
-		SELECT wt.id, s.id, s.name, sc.color
+		SELECT wt.id, s.id, COALESCE(s.builtin_key, ''), s.name, sc.color
 		FROM workflow_transitions wt
 		JOIN statuses s ON wt.to_status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
@@ -252,7 +253,7 @@ func (r *StatusRepository) ListAvailableTransitionOptions(workflowID int, fromSt
 	for rows.Next() {
 		var option StatusTransitionOption
 		var categoryColor sql.NullString
-		if err := rows.Scan(&option.TransitionID, &option.StatusID, &option.StatusName, &categoryColor); err != nil {
+		if err := rows.Scan(&option.TransitionID, &option.StatusID, &option.BuiltinKey, &option.StatusName, &categoryColor); err != nil {
 			continue
 		}
 		if categoryColor.Valid {
@@ -303,9 +304,9 @@ func scanStatusJoined(scanner interface {
 }) (models.Status, error) {
 	var s models.Status
 	if err := scanner.Scan(
-		&s.ID, &s.Name, &s.Description, &s.CategoryID, &s.IsDefault,
+		&s.ID, &s.BuiltinKey, &s.Name, &s.Description, &s.CategoryID, &s.IsDefault,
 		&s.CreatedAt, &s.UpdatedAt,
-		&s.CategoryName, &s.CategoryColor, &s.IsCompleted,
+		&s.CategoryName, &s.CategoryBuiltinKey, &s.CategoryColor, &s.IsCompleted,
 	); err != nil {
 		return s, err
 	}

@@ -74,6 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_item_diagrams_created_by ON item_diagrams(created
 -- Link management tables
 CREATE TABLE IF NOT EXISTS link_types (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	forward_label TEXT NOT NULL,
@@ -85,6 +86,8 @@ CREATE TABLE IF NOT EXISTS link_types (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_link_types_builtin_key ON link_types(builtin_key) WHERE builtin_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS item_links (
 	id SERIAL PRIMARY KEY,

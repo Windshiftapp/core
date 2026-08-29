@@ -628,6 +628,9 @@ export default {
     pleaseSelectTargetPriorities: 'Selecione as prioridades de destino para todos os itens que requerem migração.',
   },
   setup: {
+    chooseLanguage: 'Escolha seu idioma',
+    chooseLanguageDesc: 'Selecione o idioma usado durante a configuração e no aplicativo.',
+    language: 'Idioma',
     welcomeTo: 'Bem-vindo ao {appName}',
     setupMessage: 'Vamos configurar seu sistema de gerenciamento de trabalho',
     setupProgress: 'Progresso da Configuração',

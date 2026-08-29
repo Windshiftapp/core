@@ -23,7 +23,7 @@ func NewWorkspaceRoleRepository(db database.Database) *WorkspaceRoleRepository {
 	return &WorkspaceRoleRepository{db: db}
 }
 
-const workspaceRoleSelectColumns = "id, name, description, is_system, permissions_enabled, display_order, created_at, updated_at"
+const workspaceRoleSelectColumns = "id, COALESCE(builtin_key, ''), name, description, is_system, permissions_enabled, display_order, created_at, updated_at"
 
 // List returns all workspace roles ordered by display_order then name.
 func (r *WorkspaceRoleRepository) List() ([]models.WorkspaceRole, error) {
@@ -38,7 +38,7 @@ func (r *WorkspaceRoleRepository) List() ([]models.WorkspaceRole, error) {
 	var roles []models.WorkspaceRole
 	for rows.Next() {
 		var role models.WorkspaceRole
-		if err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
+		if err := rows.Scan(&role.ID, &role.BuiltinKey, &role.Name, &role.Description, &role.IsSystem,
 			&role.PermissionsEnabled, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan workspace_role: %w", err)
 		}
@@ -59,7 +59,7 @@ func (r *WorkspaceRoleRepository) GetByID(id int) (*models.WorkspaceRole, error)
 	var role models.WorkspaceRole
 	err := r.db.QueryRow(
 		"SELECT "+workspaceRoleSelectColumns+" FROM workspace_roles WHERE id = ?", id,
-	).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
+	).Scan(&role.ID, &role.BuiltinKey, &role.Name, &role.Description, &role.IsSystem,
 		&role.PermissionsEnabled, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -236,7 +236,7 @@ func (r *WorkspaceRoleRepository) RevokeFromGroup(groupID, workspaceID, roleID i
 // The returned slice is always non-nil.
 func (r *WorkspaceRoleRepository) ListUserRoles(userID, workspaceID int) ([]models.WorkspaceRole, error) {
 	rows, err := r.db.Query(`
-		SELECT wr.id, wr.name, wr.description, wr.is_system, wr.display_order, wr.created_at, wr.updated_at
+		SELECT wr.id, COALESCE(wr.builtin_key, ''), wr.name, wr.description, wr.is_system, wr.display_order, wr.created_at, wr.updated_at
 		FROM workspace_roles wr
 		JOIN user_workspace_roles uwr ON wr.id = uwr.role_id
 		WHERE uwr.user_id = ? AND uwr.workspace_id = ?
@@ -250,7 +250,7 @@ func (r *WorkspaceRoleRepository) ListUserRoles(userID, workspaceID int) ([]mode
 	var roles []models.WorkspaceRole
 	for rows.Next() {
 		var role models.WorkspaceRole
-		err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
+		err := rows.Scan(&role.ID, &role.BuiltinKey, &role.Name, &role.Description, &role.IsSystem,
 			&role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 		if err == nil {
 			roles = append(roles, role)
@@ -275,6 +275,7 @@ type WorkspaceRoleUserAssignment struct {
 	LastName        *string
 	AvatarURL       *string
 	RoleID          int
+	RoleBuiltinKey  string
 	RoleName        string
 	RoleDescription string
 	AssignmentID    int
@@ -288,7 +289,7 @@ func (r *WorkspaceRoleRepository) ListUserAssignments(workspaceID int) ([]Worksp
 	rows, err := r.db.Query(`
 		SELECT
 			u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url,
-			wr.id, wr.name, wr.description,
+			wr.id, COALESCE(wr.builtin_key, ''), wr.name, wr.description,
 			uwr.id, uwr.granted_at
 		FROM user_workspace_roles uwr
 		JOIN users u ON uwr.user_id = u.id
@@ -306,7 +307,7 @@ func (r *WorkspaceRoleRepository) ListUserAssignments(workspaceID int) ([]Worksp
 		var a WorkspaceRoleUserAssignment
 		err := rows.Scan(
 			&a.UserID, &a.Username, &a.Email, &a.FirstName, &a.LastName, &a.AvatarURL,
-			&a.RoleID, &a.RoleName, &a.RoleDescription,
+			&a.RoleID, &a.RoleBuiltinKey, &a.RoleName, &a.RoleDescription,
 			&a.AssignmentID, &a.GrantedAt,
 		)
 		if err != nil {
@@ -327,6 +328,7 @@ type WorkspaceRoleGroupAssignment struct {
 	GroupName        string
 	GroupDescription *string
 	RoleID           int
+	RoleBuiltinKey   string
 	RoleName         string
 	RoleDescription  string
 	AssignmentID     int
@@ -340,7 +342,7 @@ func (r *WorkspaceRoleRepository) ListGroupAssignments(workspaceID int) ([]Works
 	rows, err := r.db.Query(`
 		SELECT
 			g.id, g.name, g.description,
-			wr.id, wr.name, wr.description,
+			wr.id, COALESCE(wr.builtin_key, ''), wr.name, wr.description,
 			gwr.id, gwr.granted_at
 		FROM group_workspace_roles gwr
 		JOIN groups g ON gwr.group_id = g.id
@@ -358,7 +360,7 @@ func (r *WorkspaceRoleRepository) ListGroupAssignments(workspaceID int) ([]Works
 		var a WorkspaceRoleGroupAssignment
 		err := rows.Scan(
 			&a.GroupID, &a.GroupName, &a.GroupDescription,
-			&a.RoleID, &a.RoleName, &a.RoleDescription,
+			&a.RoleID, &a.RoleBuiltinKey, &a.RoleName, &a.RoleDescription,
 			&a.AssignmentID, &a.GrantedAt,
 		)
 		if err != nil {

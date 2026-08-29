@@ -693,6 +693,9 @@ export default {
   },
 
   setup: {
+    chooseLanguage: 'Elige tu idioma',
+    chooseLanguageDesc: 'Selecciona el idioma que se usará durante la configuración y en la aplicación.',
+    language: 'Idioma',
     welcomeTo: 'Bienvenido a {appName}',
     setupMessage: 'Vamos a configurar tu sistema de gestión de trabajo',
     setupProgress: 'Progreso de configuración',

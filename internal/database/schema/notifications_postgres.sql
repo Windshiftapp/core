@@ -45,6 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_workspace_id ON notifications(works
 -- Notification settings system for configuration sets
 CREATE TABLE IF NOT EXISTS notification_settings (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_active BOOLEAN DEFAULT true,
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS notification_settings (
 
 CREATE INDEX IF NOT EXISTS idx_notification_settings_active ON notification_settings(is_active);
 CREATE INDEX IF NOT EXISTS idx_notification_settings_created_by ON notification_settings(created_by);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_settings_builtin_key ON notification_settings(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Notification event rules for each setting
 CREATE TABLE IF NOT EXISTS notification_event_rules (

@@ -550,24 +550,27 @@ type MilestoneProgressResponse struct {
 }
 
 type MilestoneStatusBreakdownResponse struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
+	CategoryName       string `json:"category_name"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	ItemCount          int    `json:"item_count"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 type MilestoneProgressItemResponse struct {
-	ID             int    `json:"id"`
-	Title          string `json:"title"`
-	WorkspaceID    int    `json:"workspace_id"`
-	WorkspaceKey   string `json:"workspace_key"`
-	ItemNumber     int    `json:"item_number"`
-	StatusName     string `json:"status_name,omitempty"`
-	StatusColor    string `json:"status_color,omitempty"`
-	PriorityName   string `json:"priority_name,omitempty"`
-	PriorityColor  string `json:"priority_color,omitempty"`
-	AssigneeName   string `json:"assignee_name,omitempty"`
-	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
+	ID                 int    `json:"id"`
+	Title              string `json:"title"`
+	WorkspaceID        int    `json:"workspace_id"`
+	WorkspaceKey       string `json:"workspace_key"`
+	ItemNumber         int    `json:"item_number"`
+	StatusName         string `json:"status_name,omitempty"`
+	StatusBuiltinKey   string `json:"status_builtin_key,omitempty"`
+	StatusColor        string `json:"status_color,omitempty"`
+	PriorityName       string `json:"priority_name,omitempty"`
+	PriorityBuiltinKey string `json:"priority_builtin_key,omitempty"`
+	PriorityColor      string `json:"priority_color,omitempty"`
+	AssigneeName       string `json:"assignee_name,omitempty"`
+	AssigneeAvatar     string `json:"assignee_avatar,omitempty"`
 }
 
 func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneProgressResponse {
@@ -585,10 +588,11 @@ func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneP
 	resp.StatusBreakdown = make([]MilestoneStatusBreakdownResponse, 0, len(r.StatusBreakdown))
 	for _, sb := range r.StatusBreakdown {
 		resp.StatusBreakdown = append(resp.StatusBreakdown, MilestoneStatusBreakdownResponse{
-			CategoryName:  sb.CategoryName,
-			CategoryColor: sb.CategoryColor,
-			ItemCount:     sb.ItemCount,
-			IsCompleted:   sb.IsCompleted,
+			CategoryName:       sb.CategoryName,
+			CategoryBuiltinKey: sb.CategoryBuiltinKey,
+			CategoryColor:      sb.CategoryColor,
+			ItemCount:          sb.ItemCount,
+			IsCompleted:        sb.IsCompleted,
 		})
 	}
 	if len(r.ItemsByCategory) > 0 {
@@ -597,17 +601,19 @@ func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneP
 			converted := make([]MilestoneProgressItemResponse, 0, len(items))
 			for _, it := range items {
 				converted = append(converted, MilestoneProgressItemResponse{
-					ID:             it.ID,
-					Title:          it.Title,
-					WorkspaceID:    it.WorkspaceID,
-					WorkspaceKey:   it.WorkspaceKey,
-					ItemNumber:     it.ItemNumber,
-					StatusName:     it.StatusName,
-					StatusColor:    it.StatusColor,
-					PriorityName:   it.PriorityName,
-					PriorityColor:  it.PriorityColor,
-					AssigneeName:   it.AssigneeName,
-					AssigneeAvatar: it.AssigneeAvatar,
+					ID:                 it.ID,
+					Title:              it.Title,
+					WorkspaceID:        it.WorkspaceID,
+					WorkspaceKey:       it.WorkspaceKey,
+					ItemNumber:         it.ItemNumber,
+					StatusName:         it.StatusName,
+					StatusBuiltinKey:   it.StatusBuiltinKey,
+					StatusColor:        it.StatusColor,
+					PriorityName:       it.PriorityName,
+					PriorityBuiltinKey: it.PriorityBuiltinKey,
+					PriorityColor:      it.PriorityColor,
+					AssigneeName:       it.AssigneeName,
+					AssigneeAvatar:     it.AssigneeAvatar,
 				})
 			}
 			resp.ItemsByCategory[category] = converted

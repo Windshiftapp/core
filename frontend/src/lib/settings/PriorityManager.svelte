@@ -18,6 +18,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import './settings-form.css';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let priorities = $state([]);
   let isLoading = $state(true);
@@ -25,64 +26,14 @@
   let editingId = $state(null);
   let showCreateForm = $state(false);
 
-  const systemPriorities = [
-    {
-      key: 'critical',
-      name: 'Critical',
-      description: 'Urgent items requiring immediate attention',
-      icon: 'AlertCircle',
-      color: '#dc2626',
-      sortOrder: 1,
-      isDefault: false
-    },
-    {
-      key: 'high',
-      name: 'High',
-      description: 'High priority items',
-      icon: 'ArrowUp',
-      color: '#ea580c',
-      sortOrder: 2,
-      isDefault: false
-    },
-    {
-      key: 'medium',
-      name: 'Medium',
-      description: 'Normal priority items',
-      icon: 'Minus',
-      color: '#ca8a04',
-      sortOrder: 3,
-      isDefault: true
-    },
-    {
-      key: 'low',
-      name: 'Low',
-      description: 'Low priority items',
-      icon: 'ArrowDown',
-      color: '#16a34a',
-      sortOrder: 4,
-      isDefault: false
-    }
-  ];
-
-  function getSystemPriorityDefinition(priority) {
-    return systemPriorities.find(definition => (
-      priority.name === definition.name &&
-      priority.description === definition.description &&
-      priority.icon === definition.icon &&
-      priority.color?.toLowerCase() === definition.color &&
-      Number(priority.sort_order) === definition.sortOrder &&
-      Boolean(priority.is_default) === definition.isDefault
-    )) ?? null;
-  }
-
   function getPriorityDisplayName(priority) {
-    const definition = getSystemPriorityDefinition(priority);
-    return definition ? t(`priorities.${definition.key}`) : priority.name;
+    const key = builtinLocaleKey(priority);
+    return key ? t(`priorities.${key}`) : priority.name;
   }
 
-  function getConfigurationSetDisplayName(name) {
-    return name === 'Default Configuration'
-      ? t('pickers.defaultConfiguration')
+  function getConfigurationSetDisplayName(name, builtinKey = '') {
+    return builtinKey === 'default'
+      ? t('settings.itemTypes.defaultConfiguration')
       : name;
   }
 
@@ -309,8 +260,14 @@
     {#snippet configuration_set_names(priority)}
       <div class="flex flex-wrap gap-1">
         {#if priority.configuration_set_names && priority.configuration_set_names.length > 0}
-          {#each priority.configuration_set_names as configSetName}
-            <Lozenge color="gray" text={getConfigurationSetDisplayName(configSetName)} />
+          {#each priority.configuration_set_names as configSetName, index}
+            <Lozenge
+              color="gray"
+              text={getConfigurationSetDisplayName(
+                configSetName,
+                priority.configuration_set_builtin_keys?.[index]
+              )}
+            />
           {/each}
         {:else}
           <span class="text-xs text-gray-500">{t('pickers.noConfigurationSetsFound')}</span>

@@ -7,8 +7,10 @@
     title,
     itemKey,
     statusName = null,
+    statusBuiltinKey = null,
     statusColor = null,
     priorityName = null,
+    priorityBuiltinKey = null,
     priorityColor = null,
     dueDate = null,
     timestamp = null,
@@ -18,6 +20,8 @@
 
   const hasPriority = $derived(!!(priorityName && priorityColor));
   const hasStatus = $derived(!!statusName);
+  const localizedPriorityName = $derived(systemPriorityName({ name: priorityName, builtin_key: priorityBuiltinKey }));
+  const localizedStatusName = $derived(systemStatusName({ name: statusName, builtin_key: statusBuiltinKey }));
   const rowPadding = $derived(density === 'compact' ? 'p-1.5' : 'p-2');
 </script>
 
@@ -36,8 +40,8 @@
       <span
         class="inline-block w-2 h-2 rounded-full flex-shrink-0"
         style={`background-color: ${priorityColor};`}
-        title={systemPriorityName(priorityName)}
-        aria-label={t('dashboard.widgetContent.priorityAria', { name: systemPriorityName(priorityName) })}
+        title={localizedPriorityName}
+        aria-label={t('dashboard.widgetContent.priorityAria', { name: localizedPriorityName })}
       ></span>
     {/if}
     <span class="text-sm truncate" style="color: var(--ds-text);">{title}</span>
@@ -52,7 +56,7 @@
           ? `background-color: ${statusColor}1f; color: ${statusColor};`
           : 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);'}
       >
-        {systemStatusName(statusName)}
+        {localizedStatusName}
       </span>
     {/if}
     {#if timestamp}

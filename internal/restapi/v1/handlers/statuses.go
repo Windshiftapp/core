@@ -23,19 +23,22 @@ func NewStatusHandler(db database.Database, permissionService *services.Permissi
 
 // StatusResponse is the public API representation of a Status
 type StatusResponse struct {
-	ID            int    `json:"id"`
-	Name          string `json:"name"`
-	Description   string `json:"description,omitempty"`
-	CategoryID    int    `json:"category_id"`
-	CategoryName  string `json:"category_name,omitempty"`
-	CategoryColor string `json:"category_color,omitempty"`
-	IsDefault     bool   `json:"is_default"`
-	IsCompleted   bool   `json:"is_completed"`
+	ID                 int    `json:"id"`
+	BuiltinKey         string `json:"builtin_key,omitempty"`
+	Name               string `json:"name"`
+	Description        string `json:"description,omitempty"`
+	CategoryID         int    `json:"category_id"`
+	CategoryName       string `json:"category_name,omitempty"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	IsDefault          bool   `json:"is_default"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 // StatusCategoryResponse is the public API representation of a StatusCategory
 type StatusCategoryResponse struct {
 	ID          int    `json:"id"`
+	BuiltinKey  string `json:"builtin_key,omitempty"`
 	Name        string `json:"name"`
 	Color       string `json:"color"`
 	Description string `json:"description,omitempty"`
@@ -70,14 +73,16 @@ func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 	var statuses []StatusResponse
 	for _, s := range results {
 		statuses = append(statuses, StatusResponse{
-			ID:            s.ID,
-			Name:          s.Name,
-			Description:   s.Description,
-			CategoryID:    s.CategoryID,
-			CategoryName:  s.CategoryName,
-			CategoryColor: s.CategoryColor,
-			IsDefault:     s.IsDefault,
-			IsCompleted:   s.IsCompleted,
+			ID:                 s.ID,
+			BuiltinKey:         s.BuiltinKey,
+			Name:               s.Name,
+			Description:        s.Description,
+			CategoryID:         s.CategoryID,
+			CategoryName:       s.CategoryName,
+			CategoryBuiltinKey: s.CategoryBuiltinKey,
+			CategoryColor:      s.CategoryColor,
+			IsDefault:          s.IsDefault,
+			IsCompleted:        s.IsCompleted,
 		})
 	}
 
@@ -120,14 +125,16 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.RespondOK(w, StatusResponse{
-		ID:            s.ID,
-		Name:          s.Name,
-		Description:   s.Description,
-		CategoryID:    s.CategoryID,
-		CategoryName:  s.CategoryName,
-		CategoryColor: s.CategoryColor,
-		IsDefault:     s.IsDefault,
-		IsCompleted:   s.IsCompleted,
+		ID:                 s.ID,
+		BuiltinKey:         s.BuiltinKey,
+		Name:               s.Name,
+		Description:        s.Description,
+		CategoryID:         s.CategoryID,
+		CategoryName:       s.CategoryName,
+		CategoryBuiltinKey: s.CategoryBuiltinKey,
+		CategoryColor:      s.CategoryColor,
+		IsDefault:          s.IsDefault,
+		IsCompleted:        s.IsCompleted,
 	})
 }
 
@@ -159,6 +166,7 @@ func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	for _, c := range results {
 		categories = append(categories, StatusCategoryResponse{
 			ID:          c.ID,
+			BuiltinKey:  c.BuiltinKey,
 			Name:        c.Name,
 			Color:       c.Color,
 			Description: c.Description,
@@ -207,6 +215,7 @@ func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 
 	h.RespondOK(w, StatusCategoryResponse{
 		ID:          c.ID,
+		BuiltinKey:  c.BuiltinKey,
 		Name:        c.Name,
 		Color:       c.Color,
 		Description: c.Description,

@@ -236,6 +236,7 @@ type TeamGroupMembershipResponse struct {
 // Theme represents the application's visual theme settings
 type Theme struct {
 	ID          int    `json:"id"`
+	BuiltinKey  string `json:"builtin_key,omitempty"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	IsDefault   bool   `json:"is_default"`

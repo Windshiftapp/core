@@ -701,7 +701,7 @@ export default {
       empty: 'No se encontraron categorías de estados. Crea la primera para comenzar.',
       inUseByStatuses: 'No se puede eliminar «{name}» porque está en uso por uno o más estados. Elimina o reasigna esos estados en Gestión de estados primero.',
       defaults: {
-        todo: { name: 'Por hacer', description: 'Trabajo que aún no se ha iniciado' },
+        toDo: { name: 'Por hacer', description: 'Trabajo que aún no se ha iniciado' },
         inProgress: { name: 'En curso', description: 'Trabajo que se está realizando activamente' },
         done: { name: 'Finalizado', description: 'Trabajo que se ha completado' },
       },

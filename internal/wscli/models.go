@@ -343,10 +343,11 @@ type MilestoneProgress struct {
 }
 
 type MilestoneStatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
+	CategoryName       string `json:"category_name"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	ItemCount          int    `json:"item_count"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 type MilestoneProgressItem struct {
@@ -823,6 +824,7 @@ type PageLabelAddRequest struct {
 // are valid.
 type LinkType struct {
 	ID                 int      `json:"id"`
+	BuiltinKey         string   `json:"builtin_key,omitempty"`
 	Name               string   `json:"name"`
 	Description        string   `json:"description,omitempty"`
 	ForwardLabel       string   `json:"forward_label"`

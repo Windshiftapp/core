@@ -15,6 +15,7 @@ const HierarchyLevelGenericSubtask = -1
 // ConfigurationSet represents a configuration set for workspaces
 type ConfigurationSet struct {
 	ID                      int       `json:"id"`
+	BuiltinKey              string    `json:"builtin_key,omitempty"`
 	WorkspaceID             int       `json:"workspace_id"` // Keep for backward compatibility
 	Name                    string    `json:"name"`
 	Description             string    `json:"description"`
@@ -27,11 +28,13 @@ type ConfigurationSet struct {
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	WorkspaceName           string `json:"workspace_name,omitempty"`
-	WorkflowName            string `json:"workflow_name,omitempty"`
-	NotificationSettingName string `json:"notification_setting_name,omitempty"`
-	ConditionSetName        string `json:"condition_set_name,omitempty"`
-	ApprovalSetName         string `json:"approval_set_name,omitempty"`
+	WorkspaceName                 string `json:"workspace_name,omitempty"`
+	WorkflowName                  string `json:"workflow_name,omitempty"`
+	WorkflowBuiltinKey            string `json:"workflow_builtin_key,omitempty"`
+	NotificationSettingName       string `json:"notification_setting_name,omitempty"`
+	NotificationSettingBuiltinKey string `json:"notification_setting_builtin_key,omitempty"`
+	ConditionSetName              string `json:"condition_set_name,omitempty"`
+	ApprovalSetName               string `json:"approval_set_name,omitempty"`
 	// Many-to-many workspace relationships
 	WorkspaceIDs []int    `json:"workspace_ids,omitempty"`
 	Workspaces   []string `json:"workspaces,omitempty"` // Workspace names for display
@@ -43,15 +46,19 @@ type ConfigurationSet struct {
 	PriorityIDs        []int             `json:"priority_ids,omitempty"`        // IDs of associated priorities
 	PrioritiesDetailed []PriorityDisplay `json:"priorities_detailed,omitempty"` // Full priority data with icons and colors
 	// Screen assignments for different contexts
-	CreateScreenID   *int   `json:"create_screen_id,omitempty"`
-	EditScreenID     *int   `json:"edit_screen_id,omitempty"`
-	ViewScreenID     *int   `json:"view_screen_id,omitempty"`
-	CreateScreenName string `json:"create_screen_name,omitempty"`
-	EditScreenName   string `json:"edit_screen_name,omitempty"`
-	ViewScreenName   string `json:"view_screen_name,omitempty"`
+	CreateScreenID         *int   `json:"create_screen_id,omitempty"`
+	EditScreenID           *int   `json:"edit_screen_id,omitempty"`
+	ViewScreenID           *int   `json:"view_screen_id,omitempty"`
+	CreateScreenName       string `json:"create_screen_name,omitempty"`
+	CreateScreenBuiltinKey string `json:"create_screen_builtin_key,omitempty"`
+	EditScreenName         string `json:"edit_screen_name,omitempty"`
+	EditScreenBuiltinKey   string `json:"edit_screen_builtin_key,omitempty"`
+	ViewScreenName         string `json:"view_screen_name,omitempty"`
+	ViewScreenBuiltinKey   string `json:"view_screen_builtin_key,omitempty"`
 	// Default item type for new items (when user has no localStorage preference)
-	DefaultItemTypeID   *int   `json:"default_item_type_id,omitempty"`
-	DefaultItemTypeName string `json:"default_item_type_name,omitempty"`
+	DefaultItemTypeID         *int   `json:"default_item_type_id,omitempty"`
+	DefaultItemTypeName       string `json:"default_item_type_name,omitempty"`
+	DefaultItemTypeBuiltinKey string `json:"default_item_type_builtin_key,omitempty"`
 }
 
 // ConfigurationSetScreen represents a screen assignment for a configuration set
@@ -69,6 +76,7 @@ type ConfigurationSetScreen struct {
 // Screen represents a field layout screen
 type Screen struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -96,6 +104,7 @@ type ScreenField struct {
 // ItemType represents a type of work item
 type ItemType struct {
 	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
 	ConfigurationSetID int       `json:"configuration_set_id,omitempty"` // Deprecated: kept for backward compatibility
 	Name               string    `json:"name"`
 	Description        string    `json:"description"`
@@ -107,8 +116,9 @@ type ItemType struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	// Many-to-many configuration set relationships
-	ConfigurationSetIDs   []int    `json:"configuration_set_ids,omitempty"`   // IDs of associated configuration sets
-	ConfigurationSetNames []string `json:"configuration_set_names,omitempty"` // Names for display
+	ConfigurationSetIDs         []int    `json:"configuration_set_ids,omitempty"`          // IDs of associated configuration sets
+	ConfigurationSetNames       []string `json:"configuration_set_names,omitempty"`        // Names for display
+	ConfigurationSetBuiltinKeys []string `json:"configuration_set_builtin_keys,omitempty"` // Stable keys for built-in configuration sets
 	// Deprecated joined fields (kept for backward compatibility)
 	ConfigurationSetName string `json:"configuration_set_name,omitempty"`
 	WorkspaceName        string `json:"workspace_name,omitempty"`
@@ -116,6 +126,7 @@ type ItemType struct {
 
 // ItemTypeDisplay holds minimal item type data for displaying in configuration sets
 type ItemTypeDisplay struct {
+	BuiltinKey     string `json:"builtin_key,omitempty"`
 	Name           string `json:"name"`
 	Icon           string `json:"icon"`
 	Color          string `json:"color"`
@@ -124,14 +135,16 @@ type ItemTypeDisplay struct {
 
 // ItemTypeConfig represents item type configuration with optional workflow and screen overrides
 type ItemTypeConfig struct {
-	ItemTypeID     int    `json:"item_type_id"`
-	ItemTypeName   string `json:"item_type_name"`
-	ItemTypeIcon   string `json:"item_type_icon"`
-	ItemTypeColor  string `json:"item_type_color"`
-	HierarchyLevel int    `json:"hierarchy_level"`
+	ItemTypeID         int    `json:"item_type_id"`
+	ItemTypeBuiltinKey string `json:"item_type_builtin_key,omitempty"`
+	ItemTypeName       string `json:"item_type_name"`
+	ItemTypeIcon       string `json:"item_type_icon"`
+	ItemTypeColor      string `json:"item_type_color"`
+	HierarchyLevel     int    `json:"hierarchy_level"`
 	// Override workflow (NULL = use configuration set default)
-	WorkflowID   *int   `json:"workflow_id,omitempty"`
-	WorkflowName string `json:"workflow_name,omitempty"` // "Default" or workflow name
+	WorkflowID         *int   `json:"workflow_id,omitempty"`
+	WorkflowName       string `json:"workflow_name,omitempty"` // "Default" or workflow name
+	WorkflowBuiltinKey string `json:"workflow_builtin_key,omitempty"`
 	// Override condition set (NULL = use configuration set default)
 	ConditionSetID   *int   `json:"condition_set_id,omitempty"`
 	ConditionSetName string `json:"condition_set_name,omitempty"`
@@ -139,17 +152,21 @@ type ItemTypeConfig struct {
 	ApprovalSetID   *int   `json:"approval_set_id,omitempty"`
 	ApprovalSetName string `json:"approval_set_name,omitempty"`
 	// Override screens (NULL = use configuration set defaults)
-	CreateScreenID   *int   `json:"create_screen_id,omitempty"`
-	CreateScreenName string `json:"create_screen_name,omitempty"`
-	EditScreenID     *int   `json:"edit_screen_id,omitempty"`
-	EditScreenName   string `json:"edit_screen_name,omitempty"`
-	ViewScreenID     *int   `json:"view_screen_id,omitempty"`
-	ViewScreenName   string `json:"view_screen_name,omitempty"`
+	CreateScreenID         *int   `json:"create_screen_id,omitempty"`
+	CreateScreenName       string `json:"create_screen_name,omitempty"`
+	CreateScreenBuiltinKey string `json:"create_screen_builtin_key,omitempty"`
+	EditScreenID           *int   `json:"edit_screen_id,omitempty"`
+	EditScreenName         string `json:"edit_screen_name,omitempty"`
+	EditScreenBuiltinKey   string `json:"edit_screen_builtin_key,omitempty"`
+	ViewScreenID           *int   `json:"view_screen_id,omitempty"`
+	ViewScreenName         string `json:"view_screen_name,omitempty"`
+	ViewScreenBuiltinKey   string `json:"view_screen_builtin_key,omitempty"`
 }
 
 // Priority represents a priority level
 type Priority struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	IsDefault   bool      `json:"is_default"`
@@ -159,22 +176,25 @@ type Priority struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// Many-to-many configuration set relationships
-	ConfigurationSetIDs   []int    `json:"configuration_set_ids,omitempty"`   // IDs of associated configuration sets
-	ConfigurationSetNames []string `json:"configuration_set_names,omitempty"` // Names for display
+	ConfigurationSetIDs         []int    `json:"configuration_set_ids,omitempty"`          // IDs of associated configuration sets
+	ConfigurationSetNames       []string `json:"configuration_set_names,omitempty"`        // Names for display
+	ConfigurationSetBuiltinKeys []string `json:"configuration_set_builtin_keys,omitempty"` // Stable keys for built-in configuration sets
 }
 
 // PriorityDisplay holds minimal priority data for displaying in configuration sets
 type PriorityDisplay struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Icon      string `json:"icon"`
-	Color     string `json:"color"`
-	SortOrder int    `json:"sort_order"`
+	ID         int    `json:"id"`
+	BuiltinKey string `json:"builtin_key,omitempty"`
+	Name       string `json:"name"`
+	Icon       string `json:"icon"`
+	Color      string `json:"color"`
+	SortOrder  int    `json:"sort_order"`
 }
 
 // HierarchyLevel represents a hierarchy level definition
 type HierarchyLevel struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Level       int       `json:"level"` // 0, 1, 2, 3...
 	Name        string    `json:"name"`  // e.g., "Initiative", "Epic", "Task", "Sub-task"
 	Description string    `json:"description"`
@@ -185,6 +205,7 @@ type HierarchyLevel struct {
 // StatusCategory represents a category for statuses
 type StatusCategory struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`
 	Color       string    `json:"color"` // Hex color code (e.g., "#3b82f6")
 	Description string    `json:"description"`
@@ -197,6 +218,7 @@ type StatusCategory struct {
 // Status represents a workflow status
 type Status struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	CategoryID  int       `json:"category_id"`
@@ -204,14 +226,16 @@ type Status struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	CategoryName  string `json:"category_name,omitempty"`
-	CategoryColor string `json:"category_color,omitempty"`
-	IsCompleted   bool   `json:"is_completed,omitempty"`
+	CategoryName       string `json:"category_name,omitempty"`
+	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
+	CategoryColor      string `json:"category_color,omitempty"`
+	IsCompleted        bool   `json:"is_completed,omitempty"`
 }
 
 // Workflow represents a workflow definition
 type Workflow struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	IsDefault   bool      `json:"is_default"`

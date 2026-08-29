@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS custom_field_indexes (
 -- From config_workflows_postgres.sql
 CREATE TABLE IF NOT EXISTS workflows (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -197,6 +198,7 @@ CREATE TABLE IF NOT EXISTS workflows (
 
 CREATE TABLE IF NOT EXISTS screens (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -206,6 +208,7 @@ CREATE TABLE IF NOT EXISTS screens (
 
 CREATE TABLE IF NOT EXISTS priorities (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -218,6 +221,7 @@ CREATE TABLE IF NOT EXISTS priorities (
 
 CREATE TABLE IF NOT EXISTS item_types (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	configuration_set_id INTEGER, -- Made nullable for many-to-many relationship
 	name TEXT NOT NULL UNIQUE, -- Changed to global unique (not per config set)
 	description TEXT,
@@ -232,6 +236,7 @@ CREATE TABLE IF NOT EXISTS item_types (
 
 CREATE TABLE IF NOT EXISTS hierarchy_levels (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	level INTEGER NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	description TEXT DEFAULT '',
@@ -241,6 +246,7 @@ CREATE TABLE IF NOT EXISTS hierarchy_levels (
 
 CREATE TABLE IF NOT EXISTS status_categories (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
 	description TEXT,
@@ -294,6 +300,7 @@ CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(categ
 
 CREATE TABLE IF NOT EXISTS themes (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -305,6 +312,8 @@ CREATE TABLE IF NOT EXISTS themes (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS board_configurations (
 	id SERIAL PRIMARY KEY,
@@ -333,6 +342,7 @@ CREATE TABLE IF NOT EXISTS attachment_settings (
 
 CREATE TABLE IF NOT EXISTS link_types (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	forward_label TEXT NOT NULL,
@@ -344,6 +354,8 @@ CREATE TABLE IF NOT EXISTS link_types (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_link_types_builtin_key ON link_types(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Email templates: per-sender HTML/text/subject Go templates editable from the
 -- admin UI. `name` is the lookup key consumed by senders (e.g. "magic_link",

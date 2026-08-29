@@ -21,23 +21,25 @@ func NewStatusService(db database.Database) *StatusService {
 
 // StatusResult represents a status with category details.
 type StatusResult struct {
-	ID            int
-	Name          string
-	Description   string
-	CategoryID    int
-	CategoryName  string
-	CategoryColor string
-	IsDefault     bool
-	IsCompleted   bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                 int
+	BuiltinKey         string
+	Name               string
+	Description        string
+	CategoryID         int
+	CategoryName       string
+	CategoryBuiltinKey string
+	CategoryColor      string
+	IsDefault          bool
+	IsCompleted        bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // ListStatuses retrieves all statuses with their category details.
 func (s *StatusService) ListStatuses() ([]StatusResult, error) {
 	rows, err := s.db.Query(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed,
+		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
 		       s.created_at, s.updated_at
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
@@ -52,8 +54,8 @@ func (s *StatusService) ListStatuses() ([]StatusResult, error) {
 	for rows.Next() {
 		var s StatusResult
 		var description sql.NullString
-		err := rows.Scan(&s.ID, &s.Name, &description, &s.CategoryID, &s.IsDefault,
-			&s.CategoryName, &s.CategoryColor, &s.IsCompleted,
+		err := rows.Scan(&s.ID, &s.BuiltinKey, &s.Name, &description, &s.CategoryID, &s.IsDefault,
+			&s.CategoryName, &s.CategoryBuiltinKey, &s.CategoryColor, &s.IsCompleted,
 			&s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
 			continue
@@ -77,14 +79,14 @@ func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
 	var status StatusResult
 	var description sql.NullString
 	err := s.db.QueryRow(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed,
+		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
 		       s.created_at, s.updated_at
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
 		WHERE s.id = ?
-	`, id).Scan(&status.ID, &status.Name, &description, &status.CategoryID, &status.IsDefault,
-		&status.CategoryName, &status.CategoryColor, &status.IsCompleted,
+	`, id).Scan(&status.ID, &status.BuiltinKey, &status.Name, &description, &status.CategoryID, &status.IsDefault,
+		&status.CategoryName, &status.CategoryBuiltinKey, &status.CategoryColor, &status.IsCompleted,
 		&status.CreatedAt, &status.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -107,8 +109,8 @@ func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
 // terminal" as a fallback get a deterministic choice.
 func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, error) {
 	rows, err := s.db.Query(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed,
+		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
 		       s.created_at, s.updated_at
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
@@ -130,8 +132,8 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 	for rows.Next() {
 		var st StatusResult
 		var description sql.NullString
-		if err := rows.Scan(&st.ID, &st.Name, &description, &st.CategoryID, &st.IsDefault,
-			&st.CategoryName, &st.CategoryColor, &st.IsCompleted,
+		if err := rows.Scan(&st.ID, &st.BuiltinKey, &st.Name, &description, &st.CategoryID, &st.IsDefault,
+			&st.CategoryName, &st.CategoryBuiltinKey, &st.CategoryColor, &st.IsCompleted,
 			&st.CreatedAt, &st.UpdatedAt); err != nil {
 			continue
 		}
@@ -150,8 +152,8 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 // ListWorkflowStatuses returns statuses that participate in a workflow.
 func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, error) {
 	rows, err := s.db.Query(`
-		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed
+		SELECT DISTINCT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed
 		FROM workflow_transitions wt
 		JOIN statuses s ON s.id = wt.to_status_id OR (wt.from_status_id IS NOT NULL AND s.id = wt.from_status_id)
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
@@ -169,9 +171,9 @@ func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, er
 		var categoryName, categoryColor sql.NullString
 		var isCompleted sql.NullBool
 		if err := rows.Scan(
-			&st.ID, &st.Name, &st.Description, &st.CategoryID,
+			&st.ID, &st.BuiltinKey, &st.Name, &st.Description, &st.CategoryID,
 			&st.IsDefault, &st.CreatedAt, &st.UpdatedAt,
-			&categoryName, &categoryColor, &isCompleted,
+			&categoryName, &st.CategoryBuiltinKey, &categoryColor, &isCompleted,
 		); err != nil {
 			return nil, fmt.Errorf("scan workflow status: %w", err)
 		}
@@ -192,6 +194,7 @@ func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, er
 // StatusCategoryResult represents a status category.
 type StatusCategoryResult struct {
 	ID          int
+	BuiltinKey  string
 	Name        string
 	Color       string
 	Description string
@@ -202,7 +205,7 @@ type StatusCategoryResult struct {
 // ListCategories retrieves all status categories.
 func (s *StatusService) ListCategories() ([]StatusCategoryResult, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, color, description, is_default, is_completed
+		SELECT id, COALESCE(builtin_key, ''), name, color, description, is_default, is_completed
 		FROM status_categories
 		ORDER BY id
 	`)
@@ -215,7 +218,7 @@ func (s *StatusService) ListCategories() ([]StatusCategoryResult, error) {
 	for rows.Next() {
 		var c StatusCategoryResult
 		var description sql.NullString
-		err := rows.Scan(&c.ID, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
+		err := rows.Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
 		if err != nil {
 			continue
 		}
@@ -238,9 +241,9 @@ func (s *StatusService) GetCategory(id int) (*StatusCategoryResult, error) {
 	var c StatusCategoryResult
 	var description sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, name, color, description, is_default, is_completed
+		SELECT id, COALESCE(builtin_key, ''), name, color, description, is_default, is_completed
 		FROM status_categories WHERE id = ?
-	`, id).Scan(&c.ID, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
+	`, id).Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("category not found: %d", id)

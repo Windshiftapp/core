@@ -812,6 +812,7 @@ func (s *WorkflowService) GetInitialStatusID(workflowID int) (*int, error) {
 // WorkflowResult represents a workflow for listing/reading.
 type WorkflowResult struct {
 	ID          int
+	BuiltinKey  string
 	Name        string
 	Description string
 	IsDefault   bool
@@ -821,22 +822,26 @@ type WorkflowResult struct {
 
 // WorkflowTransitionResult represents a workflow transition.
 type WorkflowTransitionResult struct {
-	ID                int
-	FromStatusID      *int
-	FromAllStatuses   bool
-	FromStatusName    string
-	FromCategoryName  string
-	FromCategoryColor string
-	ToStatusID        int
-	ToStatusName      string
-	ToCategoryName    string
-	ToCategoryColor   string
+	ID                     int
+	FromStatusID           *int
+	FromAllStatuses        bool
+	FromStatusBuiltinKey   string
+	FromStatusName         string
+	FromCategoryBuiltinKey string
+	FromCategoryName       string
+	FromCategoryColor      string
+	ToStatusID             int
+	ToStatusBuiltinKey     string
+	ToStatusName           string
+	ToCategoryBuiltinKey   string
+	ToCategoryName         string
+	ToCategoryColor        string
 }
 
 // List retrieves all workflows.
 func (s *WorkflowService) List() ([]WorkflowResult, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, description, is_default, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
 		FROM workflows
 		ORDER BY name
 	`)
@@ -849,7 +854,7 @@ func (s *WorkflowService) List() ([]WorkflowResult, error) {
 	for rows.Next() {
 		var wf WorkflowResult
 		var description sql.NullString
-		err := rows.Scan(&wf.ID, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
+		err := rows.Scan(&wf.ID, &wf.BuiltinKey, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
 		if err != nil {
 			continue
 		}
@@ -883,7 +888,7 @@ func (s *WorkflowService) ListForWorkspace(workspaceID int) ([]WorkflowResult, e
 	workflows := make([]WorkflowResult, 0, len(workflowModels))
 	for _, workflow := range workflowModels {
 		workflows = append(workflows, WorkflowResult{
-			ID: workflow.ID, Name: workflow.Name, Description: workflow.Description,
+			ID: workflow.ID, BuiltinKey: workflow.BuiltinKey, Name: workflow.Name, Description: workflow.Description,
 			IsDefault: workflow.IsDefault, CreatedAt: workflow.CreatedAt, UpdatedAt: workflow.UpdatedAt,
 		})
 	}
@@ -895,9 +900,9 @@ func (s *WorkflowService) GetByID(id int) (*WorkflowResult, error) {
 	var wf WorkflowResult
 	var description sql.NullString
 	err := s.db.QueryRow(`
-		SELECT id, name, description, is_default, created_at, updated_at
+		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
 		FROM workflows WHERE id = ?
-	`, id).Scan(&wf.ID, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
+	`, id).Scan(&wf.ID, &wf.BuiltinKey, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workflow not found: %d", id)
@@ -929,12 +934,13 @@ func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionR
 	for rows.Next() {
 		var t WorkflowTransitionResult
 		var fromStatusID sql.NullInt64
-		var fromStatusName, fromCategoryName, fromCategoryColor sql.NullString
+		var fromStatusBuiltinKey, fromStatusName sql.NullString
+		var fromCategoryBuiltinKey, fromCategoryName, fromCategoryColor sql.NullString
 
 		err := rows.Scan(&t.ID, &fromStatusID, &t.ToStatusID, &t.FromAllStatuses,
-			&fromStatusName, &t.ToStatusName,
-			&fromCategoryName, &fromCategoryColor,
-			&t.ToCategoryName, &t.ToCategoryColor)
+			&fromStatusBuiltinKey, &fromStatusName, &t.ToStatusBuiltinKey, &t.ToStatusName,
+			&fromCategoryBuiltinKey, &fromCategoryName, &fromCategoryColor,
+			&t.ToCategoryBuiltinKey, &t.ToCategoryName, &t.ToCategoryColor)
 		if err != nil {
 			continue
 		}
@@ -942,7 +948,9 @@ func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionR
 		if fromStatusID.Valid {
 			id := int(fromStatusID.Int64)
 			t.FromStatusID = &id
+			t.FromStatusBuiltinKey = fromStatusBuiltinKey.String
 			t.FromStatusName = fromStatusName.String
+			t.FromCategoryBuiltinKey = fromCategoryBuiltinKey.String
 			t.FromCategoryName = fromCategoryName.String
 			t.FromCategoryColor = fromCategoryColor.String
 		}
@@ -961,9 +969,10 @@ func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionR
 func (s *WorkflowService) GetTransitions(workflowID int) ([]WorkflowTransitionResult, error) {
 	rows, err := s.db.Query(`
 		SELECT wt.id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses,
-		       fs.name as from_status_name, ts.name as to_status_name,
-		       fsc.name as from_category_name, fsc.color as from_category_color,
-		       tsc.name as to_category_name, tsc.color as to_category_color
+		       fs.builtin_key as from_status_builtin_key, fs.name as from_status_name,
+		       COALESCE(ts.builtin_key, ''), ts.name as to_status_name,
+		       fsc.builtin_key as from_category_builtin_key, fsc.name as from_category_name, fsc.color as from_category_color,
+		       COALESCE(tsc.builtin_key, ''), tsc.name as to_category_name, tsc.color as to_category_color
 		FROM workflow_transitions wt
 		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
 		JOIN statuses ts ON wt.to_status_id = ts.id
@@ -986,9 +995,10 @@ func (s *WorkflowService) GetTransitions(workflowID int) ([]WorkflowTransitionRe
 func (s *WorkflowService) GetTransitionsFromStatus(statusID int) ([]WorkflowTransitionResult, error) {
 	rows, err := s.db.Query(`
 		SELECT wt.id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses,
-		       fs.name as from_status_name, ts.name as to_status_name,
-		       fsc.name as from_category_name, fsc.color as from_category_color,
-		       tsc.name as to_category_name, tsc.color as to_category_color
+		       fs.builtin_key as from_status_builtin_key, fs.name as from_status_name,
+		       COALESCE(ts.builtin_key, ''), ts.name as to_status_name,
+		       fsc.builtin_key as from_category_builtin_key, fsc.name as from_category_name, fsc.color as from_category_color,
+		       COALESCE(tsc.builtin_key, ''), tsc.name as to_category_name, tsc.color as to_category_color
 		FROM workflow_transitions wt
 		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
 		JOIN statuses ts ON wt.to_status_id = ts.id
@@ -1022,9 +1032,10 @@ func (s *WorkflowService) GetTransitionsForItem(
 
 	rows, err := s.db.Query(`
 		SELECT wt.id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses,
-		       fs.name as from_status_name, ts.name as to_status_name,
-		       fsc.name as from_category_name, fsc.color as from_category_color,
-		       tsc.name as to_category_name, tsc.color as to_category_color
+		       fs.builtin_key as from_status_builtin_key, fs.name as from_status_name,
+		       COALESCE(ts.builtin_key, ''), ts.name as to_status_name,
+		       fsc.builtin_key as from_category_builtin_key, fsc.name as from_category_name, fsc.color as from_category_color,
+		       COALESCE(tsc.builtin_key, ''), tsc.name as to_category_name, tsc.color as to_category_color
 		FROM workflow_transitions wt
 		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
 		JOIN statuses ts ON wt.to_status_id = ts.id

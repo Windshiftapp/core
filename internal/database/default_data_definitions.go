@@ -1,6 +1,7 @@
 package database
 
 type defaultStatusCategory struct {
+	builtinKey  string
 	name        string
 	color       string
 	description string
@@ -9,12 +10,13 @@ type defaultStatusCategory struct {
 }
 
 var defaultStatusCategories = []defaultStatusCategory{
-	{"To Do", "#d1d5db", "Work that hasn't been started", false, false},
-	{"In Progress", "#3b82f6", "Work that is actively being done", true, false},
-	{"Done", "#22c55e", "Work that has been completed", false, true},
+	{"to_do", "To Do", "#d1d5db", "Work that hasn't been started", false, false},
+	{"in_progress", "In Progress", "#3b82f6", "Work that is actively being done", true, false},
+	{"done", "Done", "#22c55e", "Work that has been completed", false, true},
 }
 
 type defaultStatus struct {
+	builtinKey  string
 	name        string
 	description string
 	category    string
@@ -22,9 +24,9 @@ type defaultStatus struct {
 }
 
 var defaultStatuses = []defaultStatus{
-	{"Open", "New work item, not yet started", "To Do", true},
-	{"In Progress", "Currently being worked on", "In Progress", false},
-	{"Done", "Work has been completed", "Done", false},
+	{"open", "Open", "New work item, not yet started", "To Do", true},
+	{"in_progress", "In Progress", "Currently being worked on", "In Progress", false},
+	{"done", "Done", "Work has been completed", "Done", false},
 }
 
 type defaultTransition struct {
@@ -64,6 +66,7 @@ var defaultScreenFields = []defaultScreenField{
 var defaultScreenContexts = []string{"create", "edit", "view"}
 
 type defaultLinkType struct {
+	builtinKey         string
 	name               string
 	description        string
 	forwardLabel       string
@@ -74,14 +77,14 @@ type defaultLinkType struct {
 }
 
 var defaultLinkTypes = []defaultLinkType{
-	{"Tests", "Test case tests work item", "tests", "tested by", "#10b981", true, strPtr(`["item","test_case"]`)},
-	{"Implements", "Work item implements another work item", "implements", "implemented by", "#3b82f6", true, nil},
-	{"Depends On", "Work item depends on another work item", "depends on", "blocks", "#f59e0b", true, nil},
-	{"Relates To", "General bidirectional relationship", "relates to", "relates to", "#6b7280", true, nil},
-	{"Links To", "General directional link", "links to", "linked from", "#64748b", true, nil},
-	{"Duplicates", "Work item is a duplicate of another", "duplicates", "duplicated by", "#ef4444", true, nil},
-	{"Child Of", "Alternative hierarchy relationship", "child of", "parent of", "#8b5cf6", true, nil},
-	{"Page", "Work item references a knowledge page", "references page", "referenced by", "#0ea5e9", true, strPtr(`["item","page"]`)},
+	{"tests", "Tests", "Test case tests work item", "tests", "tested by", "#10b981", true, strPtr(`["item","test_case"]`)},
+	{"implements", "Implements", "Work item implements another work item", "implements", "implemented by", "#3b82f6", true, nil},
+	{"depends_on", "Depends On", "Work item depends on another work item", "depends on", "blocks", "#f59e0b", true, nil},
+	{"relates_to", "Relates To", "General bidirectional relationship", "relates to", "relates to", "#6b7280", true, nil},
+	{"links_to", "Links To", "General directional link", "links to", "linked from", "#64748b", true, nil},
+	{"duplicates", "Duplicates", "Work item is a duplicate of another", "duplicates", "duplicated by", "#ef4444", true, nil},
+	{"child_of", "Child Of", "Alternative hierarchy relationship", "child of", "parent of", "#8b5cf6", true, nil},
+	{"page", "Page", "Work item references a knowledge page", "references page", "referenced by", "#0ea5e9", true, strPtr(`["item","page"]`)},
 }
 
 type defaultSystemSetting struct {
@@ -107,20 +110,22 @@ var defaultSystemSettings = []defaultSystemSetting{
 }
 
 type defaultHierarchyLevel struct {
+	builtinKey  string
 	level       int
 	name        string
 	description string
 }
 
 var defaultHierarchyLevels = []defaultHierarchyLevel{
-	{0, "Initiative", "High-level strategic work spanning multiple epics"},
-	{1, "Epic", "Large work item that can be broken down into stories"},
-	{2, "Story", "User story or feature that delivers value"},
-	{3, "Task", "Individual work item or technical task"},
-	{4, "Activity", "Discrete activity within a task"},
+	{"initiative", 0, "Initiative", "High-level strategic work spanning multiple epics"},
+	{"epic", 1, "Epic", "Large work item that can be broken down into stories"},
+	{"story", 2, "Story", "User story or feature that delivers value"},
+	{"task", 3, "Task", "Individual work item or technical task"},
+	{"activity", 4, "Activity", "Discrete activity within a task"},
 }
 
 type defaultItemType struct {
+	builtinKey     string
 	name           string
 	description    string
 	icon           string
@@ -130,12 +135,12 @@ type defaultItemType struct {
 }
 
 var defaultItemTypes = []defaultItemType{
-	{"Initiative", "Strategic initiative spanning multiple teams", "Target", "#7c3aed", 0, 1},
-	{"Epic", "Large feature or capability", "Zap", "#2563eb", 1, 1},
-	{"Story", "User story delivering value to end users", "BookOpen", "#059669", 2, 1},
-	{"Task", "Development or operational task", "CheckSquare", "#dc2626", 3, 1},
-	{"Bug", "Software defect that needs fixing", "Bug", "#ea580c", 3, 2},
-	{"Sub-task", "Small work item below any regular hierarchy level", "Minus", "#6b7280", -1, 1},
+	{"initiative", "Initiative", "Strategic initiative spanning multiple teams", "Target", "#7c3aed", 0, 1},
+	{"epic", "Epic", "Large feature or capability", "Zap", "#2563eb", 1, 1},
+	{"story", "Story", "User story delivering value to end users", "BookOpen", "#059669", 2, 1},
+	{"task", "Task", "Development or operational task", "CheckSquare", "#dc2626", 3, 1},
+	{"bug", "Bug", "Software defect that needs fixing", "Bug", "#ea580c", 3, 2},
+	{"subtask", "Sub-task", "Small work item below any regular hierarchy level", "Minus", "#6b7280", -1, 1},
 }
 
 var defaultItemTypeBindings = []string{"Epic", "Story", "Task", "Bug", "Sub-task"}
@@ -151,6 +156,7 @@ const defaultNotificationChannelConfig = `{
 }`
 
 type defaultTheme struct {
+	builtinKey              string
 	name                    string
 	description             string
 	isDefault               bool
@@ -162,9 +168,9 @@ type defaultTheme struct {
 }
 
 var defaultThemes = []defaultTheme{
-	{"Default", "Clean theme with standard navigation colors", true, true, "#ffffff", "#374151", "#1f2937", "#f3f4f6"},
-	{"Ocean", "Professional blue-tinted navigation theme", false, false, "#f0f9ff", "#0c4a6e", "#0c4a6e", "#e0f2fe"},
-	{"Forest", "Nature-inspired green navigation theme", false, false, "#f0fdf4", "#14532d", "#14532d", "#dcfce7"},
+	{"default", "Default", "Clean theme with standard navigation colors", true, true, "#ffffff", "#374151", "#1f2937", "#f3f4f6"},
+	{"ocean", "Ocean", "Professional blue-tinted navigation theme", false, false, "#f0f9ff", "#0c4a6e", "#0c4a6e", "#e0f2fe"},
+	{"forest", "Forest", "Nature-inspired green navigation theme", false, false, "#f0fdf4", "#14532d", "#14532d", "#dcfce7"},
 }
 
 type defaultNotificationEventRule struct {

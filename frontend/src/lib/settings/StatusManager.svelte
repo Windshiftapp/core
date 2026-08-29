@@ -22,9 +22,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { loadStatusManagerData } from './statusManagerData.js';
   import './settings-form.css';
-
-  // System-protected status IDs (cannot be deleted)
-  const PROTECTED_STATUS_IDS = [1, 6]; // Open and Closed
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   let statuses = $state([]);
   let statusCategories = $state([]);
@@ -34,84 +32,20 @@
   let showCreateForm = $state(false);
   let editingId = $state(null);
 
-  const systemStatuses = {
-    Open: {
-      key: 'open',
-      description: 'New work item, not yet started',
-      isDefault: true
-    },
-    'In Progress': {
-      key: 'inProgress',
-      description: 'Currently being worked on',
-      isDefault: false
-    },
-    Done: {
-      key: 'done',
-      description: 'Work has been completed',
-      isDefault: false
-    }
-  };
-
-  const systemStatusCategories = {
-    'To Do': {
-      key: 'todo',
-      color: '#d1d5db',
-      description: "Work that hasn't been started",
-      isDefault: false,
-      isCompleted: false
-    },
-    'In Progress': {
-      key: 'inProgress',
-      color: '#3b82f6',
-      description: 'Work that is actively being done',
-      isDefault: true,
-      isCompleted: false
-    },
-    Done: {
-      key: 'done',
-      color: '#22c55e',
-      description: 'Work that has been completed',
-      isDefault: false,
-      isCompleted: true
-    }
-  };
-
-  function getSystemStatusDefinition(status) {
-    const definition = systemStatuses[status.name];
-    if (
-      !definition ||
-      status.description !== definition.description ||
-      Boolean(status.is_default) !== definition.isDefault
-    ) {
-      return null;
-    }
-    return definition;
-  }
-
   function getStatusDisplayValue(status, field) {
-    const definition = getSystemStatusDefinition(status);
-    return definition ? t(`statuses.defaults.${definition.key}.${field}`) : status[field];
-  }
-
-  function getSystemCategoryDefinition(category) {
-    const definition = systemStatusCategories[category.name];
-    if (
-      !definition ||
-      category.color?.toLowerCase() !== definition.color ||
-      category.description !== definition.description ||
-      Boolean(category.is_default) !== definition.isDefault ||
-      Boolean(category.is_completed) !== definition.isCompleted
-    ) {
-      return null;
-    }
-    return definition;
+    const key = builtinLocaleKey(status);
+    return key ? t(`statuses.defaults.${key}.${field}`) : status[field];
   }
 
   function getStatusCategoryDisplayName(category) {
-    const definition = getSystemCategoryDefinition(category);
-    return definition
-      ? t(`settings.statusCategories.defaults.${definition.key}.name`)
+    const key = builtinLocaleKey(category);
+    return key
+      ? t(`settings.statusCategories.defaults.${key}.name`)
       : category.name;
+  }
+
+  function isProtectedStatus(status) {
+    return status?.builtin_key === 'open' || status?.builtin_key === 'done';
   }
 
   // Form state
@@ -205,7 +139,7 @@
 
   async function deleteStatus(status) {
     // Protect system-critical statuses
-    if (PROTECTED_STATUS_IDS.includes(status.id)) {
+    if (isProtectedStatus(status)) {
       return; // Silently ignore - button should already be disabled
     }
 
@@ -252,7 +186,7 @@
   }
 
   function buildStatusDropdownItems(status) {
-    const isProtected = PROTECTED_STATUS_IDS.includes(status.id);
+    const isProtected = isProtectedStatus(status);
     const inUse = status.transitionCount > 0;
 
     const items = [

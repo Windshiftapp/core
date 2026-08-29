@@ -637,6 +637,9 @@ export default {
   },
 
   setup: {
+    chooseLanguage: '选择语言',
+    chooseLanguageDesc: '选择设置过程和应用界面所使用的语言。',
+    language: '语言',
     welcomeTo: '欢迎使用 {appName}',
     setupMessage: '让我们设置您的工作管理系统',
     setupProgress: '设置进度',

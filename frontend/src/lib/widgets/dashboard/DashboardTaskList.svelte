@@ -39,8 +39,10 @@
           title={task.title}
           itemKey={`${task.workspace_key}-${task.workspace_item_number}`}
           statusName={task.status_name}
+          statusBuiltinKey={task.status_builtin_key}
           statusColor={task.status_color}
           priorityName={task.priority_name}
+          priorityBuiltinKey={task.priority_builtin_key}
           priorityColor={task.priority_color}
           dueDate={task.dueDate}
           {density}

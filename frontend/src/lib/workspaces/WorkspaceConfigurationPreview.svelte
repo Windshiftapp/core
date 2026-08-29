@@ -10,14 +10,8 @@
   let isUsingDefault = $state(false);
   let loading = $state(true);
 
-  const defaultConfiguration = {
-    name: 'Default Configuration',
-    description: 'Default configuration set with basic workflow and screen'
-  };
-
   function isSystemDefaultConfiguration(configSet) {
-    return configSet?.is_default === true && configSet.name === defaultConfiguration.name &&
-      configSet.description === defaultConfiguration.description;
+    return Boolean(configSet?.builtin_key);
   }
 
   function getConfigurationDisplayValue(field) {
@@ -26,12 +20,12 @@
       : (configurationSet?.[field] || '');
   }
 
-  function getSystemReferenceName(value, type) {
+  function getSystemReferenceName(value, builtinKey, type) {
     if (!value) return t('settings.configSets.noneAssigned');
-    if (!isSystemDefaultConfiguration(configurationSet)) return value;
-    if (type === 'workflow' && value === 'Default Workflow') return t('workflows.defaults.default.name');
-    if (type === 'screen' && value === 'Default Screen') return t('screensPage.defaults.default.name');
-    if (type === 'notifications' && value === 'Default Notifications') return t('settings.configSets.defaults.notifications.name');
+    if (!builtinKey) return value;
+    if (type === 'workflow') return t('workflows.defaults.default.name');
+    if (type === 'screen') return t('screensPage.defaults.default.name');
+    if (type === 'notifications') return t('settings.configSets.defaults.notifications.name');
     return value;
   }
 
@@ -110,7 +104,7 @@
         <div class="text-sm">
           <div style="color: var(--ds-text-subtle);">{t('settings.configSets.workflow')}</div>
           <div class="font-medium" style="color: var(--ds-text);">
-            {getSystemReferenceName(configurationSet.workflow_name, 'workflow')}
+            {getSystemReferenceName(configurationSet.workflow_name, configurationSet.workflow_builtin_key, 'workflow')}
           </div>
         </div>
       </div>
@@ -123,15 +117,15 @@
           <div class="space-y-1">
             <div class="flex justify-between">
               <span style="color: var(--ds-text-subtle);">{t('settings.configSets.createScreen')}</span>
-              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.create_screen_name, 'screen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.create_screen_name, configurationSet.create_screen_builtin_key, 'screen')}</span>
             </div>
             <div class="flex justify-between">
               <span style="color: var(--ds-text-subtle);">{t('settings.configSets.editScreen')}</span>
-              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.edit_screen_name, 'screen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.edit_screen_name, configurationSet.edit_screen_builtin_key, 'screen')}</span>
             </div>
             <div class="flex justify-between">
               <span style="color: var(--ds-text-subtle);">{t('settings.configSets.viewScreen')}</span>
-              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.view_screen_name, 'screen')}</span>
+              <span class="font-medium" style="color: var(--ds-text);">{getSystemReferenceName(configurationSet.view_screen_name, configurationSet.view_screen_builtin_key, 'screen')}</span>
             </div>
           </div>
         </div>
@@ -143,7 +137,7 @@
         <div class="text-sm">
           <div style="color: var(--ds-text-subtle);">{t('settings.configSets.notifications')}</div>
           <div class="font-medium" style="color: var(--ds-text);">
-            {getSystemReferenceName(configurationSet.notification_setting_name, 'notifications')}
+            {getSystemReferenceName(configurationSet.notification_setting_name, configurationSet.notification_setting_builtin_key, 'notifications')}
           </div>
         </div>
       </div>

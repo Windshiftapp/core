@@ -16,6 +16,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   // State management
   let themes = $state([]);
@@ -25,38 +26,9 @@
   let showCreateForm = $state(false);
   let editingTheme = $state(null);
 
-  const systemThemes = [
-    {
-      key: 'default', name: 'Default', description: 'Clean theme with standard navigation colors',
-      nav_background_color_light: '#ffffff', nav_text_color_light: '#374151',
-      nav_background_color_dark: '#1f2937', nav_text_color_dark: '#f3f4f6'
-    },
-    {
-      key: 'ocean', name: 'Ocean', description: 'Professional blue-tinted navigation theme',
-      nav_background_color_light: '#f0f9ff', nav_text_color_light: '#0c4a6e',
-      nav_background_color_dark: '#0c4a6e', nav_text_color_dark: '#e0f2fe'
-    },
-    {
-      key: 'forest', name: 'Forest', description: 'Nature-inspired green navigation theme',
-      nav_background_color_light: '#f0fdf4', nav_text_color_light: '#14532d',
-      nav_background_color_dark: '#14532d', nav_text_color_dark: '#dcfce7'
-    }
-  ];
-
-  function getSystemTheme(theme) {
-    return systemThemes.find(definition =>
-      definition.name === theme?.name &&
-      definition.description === theme?.description &&
-      definition.nav_background_color_light === theme?.nav_background_color_light &&
-      definition.nav_text_color_light === theme?.nav_text_color_light &&
-      definition.nav_background_color_dark === theme?.nav_background_color_dark &&
-      definition.nav_text_color_dark === theme?.nav_text_color_dark
-    );
-  }
-
   function getThemeDisplayValue(theme, field) {
-    const systemTheme = getSystemTheme(theme);
-    return systemTheme ? t(`settings.themeManager.defaults.${systemTheme.key}.${field}`) : (theme?.[field] || '');
+    const key = builtinLocaleKey(theme);
+    return key ? t(`settings.themeManager.defaults.${key}.${field}`) : (theme?.[field] || '');
   }
 
   // Form data

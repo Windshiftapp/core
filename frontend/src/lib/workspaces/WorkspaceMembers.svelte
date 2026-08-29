@@ -19,6 +19,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { systemRoleDescription, systemRoleName } from '../utils/systemLabels.js';
 
   let { workspaceId } = $props();
 
@@ -27,7 +28,6 @@
   let roles = $state([]);
   let loading = $state(true);
   let error = $state(null);
-  const defaultRoleOrder = ['Viewer', 'Editor', 'Tester', 'Administrator'];
 
   // Add member modal state
   let showModal = $state(false);
@@ -46,21 +46,28 @@
   let currentPage = $state(1);
   let itemsPerPage = $state(20);
 
-  const builtInRoleKeys = {
-    Viewer: 'viewer',
-    Editor: 'editor',
-    Tester: 'tester',
-    Administrator: 'administrator'
-  };
+  function assignmentRole(role) {
+    return roles.find(candidate => candidate.id === role?.role_id) || {
+      name: role?.role_name,
+      description: role?.role_description,
+      builtin_key: role?.role_builtin_key,
+      is_system: Boolean(role?.role_builtin_key)
+    };
+  }
 
-  function getRoleName(roleName) {
-    const key = builtInRoleKeys[roleName];
-    return key ? t(`workspaceMembers.roles.${key}.name`) : roleName;
+  function getRoleName(role) {
+    return systemRoleName(role);
   }
 
   function getRoleDescription(role) {
-    const key = builtInRoleKeys[role.name];
-    return key ? t(`workspaceMembers.roles.${key}.description`) : role.description;
+    return systemRoleDescription(role);
+  }
+
+  function builtInRole(key) {
+    return roles.find(role => role.builtin_key === key) || {
+      builtin_key: key,
+      is_system: true
+    };
   }
 
   onMount(async () => {
@@ -127,7 +134,7 @@
     const userName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.username;
     const confirmed = await confirm({
       title: t('workspaceMembers.removeRoleTitle', {
-        role: getRoleName(role.role_name),
+        role: getRoleName(assignmentRole(role)),
         name: userName
       }),
       message: t('workspaceMembers.removeRoleMessage')
@@ -179,7 +186,7 @@
   async function handleRemoveGroupRole(group, role) {
     const confirmed = await confirm({
       title: t('workspaceMembers.removeRoleTitle', {
-        role: getRoleName(role.role_name),
+        role: getRoleName(assignmentRole(role)),
         name: group.group_name
       }),
       message: t('workspaceMembers.removeRoleMessage')
@@ -216,13 +223,13 @@
     if (!role) return 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);';
 
     // Role-specific styling using design system variables
-    if (role.name === 'Administrator') {
+    if (role.builtin_key === 'administrator') {
       return 'background-color: var(--ds-background-accent-purple-subtler); color: var(--ds-accent-purple);';
-    } else if (role.name === 'Editor') {
+    } else if (role.builtin_key === 'editor') {
       return 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);';
-    } else if (role.name === 'Viewer') {
+    } else if (role.builtin_key === 'viewer') {
       return 'background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);';
-    } else if (role.name === 'Tester') {
+    } else if (role.builtin_key === 'tester') {
       return 'background-color: var(--ds-accent-teal-subtler); color: var(--ds-accent-teal);';
     }
     return 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);';
@@ -238,31 +245,31 @@
   // Viewer -> Editor -> Tester. Admin always requires explicit assignment.
   // A role with no explicit members means "Everyone" has that access,
   // but only if the parent role in the hierarchy is also open.
-  function getEffectiveAccess(roleName, roleMembers) {
+  function getEffectiveAccess(roleKey, roleMembers) {
     // A role is "open to everyone" only when it has NO explicit assignment —
     // neither a user member nor a group. This mirrors the backend, which counts
     // user_workspace_roles + group_workspace_roles when deciding everyone-access.
-    const assignedCount = (name) =>
-      members.filter(m => m.roles.some(r => r.role_name === name)).length +
-      groupAssignments.filter(g => g.roles.some(r => r.role_name === name)).length;
+    const assignedCount = (key) =>
+      members.filter(m => m.roles.some(r => r.role_builtin_key === key)).length +
+      groupAssignments.filter(g => g.roles.some(r => r.role_builtin_key === key)).length;
 
-    const viewerOpen = assignedCount('Viewer') === 0;
-    const editorOpen = assignedCount('Editor') === 0;
-    const testerOpen = assignedCount('Tester') === 0;
+    const viewerOpen = assignedCount('viewer') === 0;
+    const editorOpen = assignedCount('editor') === 0;
+    const testerOpen = assignedCount('tester') === 0;
 
-    const roleGroups = groupAssignments.filter(g => g.roles.some(r => r.role_name === roleName));
+    const roleGroups = groupAssignments.filter(g => g.roles.some(r => r.role_builtin_key === roleKey));
     const explicitCount = roleMembers.length + roleGroups.length;
     if (explicitCount > 0) {
       return { type: 'members', count: explicitCount };
     }
 
-    if (roleName === 'Viewer') {
+    if (roleKey === 'viewer') {
       return viewerOpen ? { type: 'everyone' } : { type: 'none' };
     }
-    if (roleName === 'Editor') {
+    if (roleKey === 'editor') {
       return viewerOpen && editorOpen ? { type: 'everyone' } : { type: 'none' };
     }
-    if (roleName === 'Tester') {
+    if (roleKey === 'tester') {
       return viewerOpen && editorOpen && testerOpen ? { type: 'everyone' } : { type: 'none' };
     }
     // Administrator: never implicit
@@ -290,7 +297,7 @@
 
   function getAssignmentActionItems(assignment) {
     return assignment.roles.map(role => ({
-      title: t('workspaceMembers.removeRoleAction', { role: getRoleName(role.role_name) }),
+      title: t('workspaceMembers.removeRoleAction', { role: getRoleName(assignmentRole(role)) }),
       icon: Trash2,
       onClick: () => assignment.type === 'group'
         ? handleRemoveGroupRole(assignment, role)
@@ -347,15 +354,15 @@
   let prevSearchQuery = $state('');
 
   const roleSummaryRows = $derived(
-    defaultRoleOrder
-      .map((roleName) => {
-        const role = roles.find((r) => r.name === roleName);
-        if (!role) return null;
-        const roleMembers = members.filter((m) => m.roles.some((r) => r.role_name === roleName));
-        const roleGroups = groupAssignments.filter((g) => g.roles.some((r) => r.role_name === roleName));
-        return { name: roleName, role, members: roleMembers, groups: roleGroups, access: getEffectiveAccess(roleName, roleMembers) };
+    roles
+      .filter((role) => role.builtin_key)
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((role) => {
+        const roleKey = role.builtin_key;
+        const roleMembers = members.filter((m) => m.roles.some((r) => r.role_builtin_key === roleKey));
+        const roleGroups = groupAssignments.filter((g) => g.roles.some((r) => r.role_builtin_key === roleKey));
+        return { name: roleKey, role, members: roleMembers, groups: roleGroups, access: getEffectiveAccess(roleKey, roleMembers) };
       })
-      .filter(Boolean)
   );
 
   const roleSummaryColumns = $derived([
@@ -393,9 +400,9 @@
         <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('workspaceMembers.summaryTitle')}</h3>
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
           {t('workspaceMembers.summaryDescription', {
-            viewer: getRoleName('Viewer'),
-            editor: getRoleName('Editor'),
-            tester: getRoleName('Tester')
+            viewer: getRoleName(builtInRole('viewer')),
+            editor: getRoleName(builtInRole('editor')),
+            tester: getRoleName(builtInRole('tester'))
           })}
         </p>
       </div>
@@ -403,7 +410,7 @@
 
     <DataTable columns={roleSummaryColumns} data={roleSummaryRows} keyField="name">
       {#snippet role(row)}
-        <div class="font-medium" style="color: var(--ds-text);">{getRoleName(row.name)}</div>
+        <div class="font-medium" style="color: var(--ds-text);">{getRoleName(row.role)}</div>
         <DescriptionText as="div">{getRoleDescription(row.role)}</DescriptionText>
       {/snippet}
       {#snippet access(row)}
@@ -508,7 +515,7 @@
           {#each item.roles as role}
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" style={getRoleBadgeStyle(role.role_id)}>
               <Shield class="w-3 h-3" />
-              {getRoleName(role.role_name)}
+              {getRoleName(assignmentRole(role))}
             </span>
           {/each}
         </div>
@@ -558,7 +565,7 @@
         <Select
           bind:value={selectedRoleId}
           onchange={(value) => selectedRoleId = value ? Number(value) : null}
-          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role.name)} — ${getRoleDescription(role)}` }))]}
+          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role)} — ${getRoleDescription(role)}` }))]}
         />
       </div>
     </div>
@@ -612,7 +619,7 @@
         <Select
           bind:value={selectedGroupRoleId}
           onchange={(value) => selectedGroupRoleId = value ? Number(value) : null}
-          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role.name)} — ${getRoleDescription(role)}` }))]}
+          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role)} — ${getRoleDescription(role)}` }))]}
         />
       </div>
     </div>

@@ -256,9 +256,9 @@ const itemDetailsSelectBody = `
 	       p.workspace_item_number as parent_workspace_item_number,
 	       assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 	       creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-	       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
-	       s.name as status_name,
-	       it.name as item_type_name,
+	       pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
+	       s.name as status_name, COALESCE(s.builtin_key, '') as status_builtin_key,
+	       it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key,
 	       i.related_work_item_id,
 	       rw.title as related_work_item_title,
 	       rw_ws.key as related_work_item_workspace_key,
@@ -292,9 +292,9 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	var projectName, iterationName, timeProjectName, parentTitle sql.NullString
 	var parentWorkspaceItemNumber sql.NullInt64
 	var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail sql.NullString
-	var priorityName, priorityIcon, priorityColor sql.NullString
-	var statusName sql.NullString
-	var itemTypeName sql.NullString
+	var priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
+	var statusName, statusBuiltinKey sql.NullString
+	var itemTypeName, itemTypeBuiltinKey sql.NullString
 	var relatedWorkItemID sql.NullInt64
 	var relatedWorkItemTitle, relatedWorkItemWorkspaceKey sql.NullString
 	var relatedWorkItemWorkspaceID, relatedWorkItemNumber sql.NullInt64
@@ -313,9 +313,9 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 		&item.WorkspaceName, &item.WorkspaceKey, &workspaceActive,
 		&iterationName, &projectName, &timeProjectName, &parentTitle, &parentWorkspaceItemNumber,
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
-		&priorityName, &priorityIcon, &priorityColor,
-		&statusName,
-		&itemTypeName,
+		&priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
+		&statusName, &statusBuiltinKey,
+		&itemTypeName, &itemTypeBuiltinKey,
 		&relatedWorkItemID,
 		&relatedWorkItemTitle,
 		&relatedWorkItemWorkspaceKey,
@@ -357,10 +357,13 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	assignNullableString(&item.CreatorName, creatorName)
 	assignNullableString(&item.CreatorEmail, creatorEmail)
 	assignNullableString(&item.PriorityName, priorityName)
+	assignNullableString(&item.PriorityBuiltinKey, priorityBuiltinKey)
 	assignNullableString(&item.PriorityIcon, priorityIcon)
 	assignNullableString(&item.PriorityColor, priorityColor)
 	assignNullableString(&item.StatusName, statusName)
+	assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
+	assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
 
 	assignNullableInt(&item.RelatedWorkItemID, relatedWorkItemID)
 	assignNullableString(&item.RelatedWorkItemTitle, relatedWorkItemTitle)

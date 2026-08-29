@@ -916,7 +916,7 @@
 
   let groupByMenuItems = $derived.by(() => {
     const sortedTypes = sortItemTypesByHierarchy(itemTypes);
-    const rightmostColumnName = systemStatusName(rightmostBoardColumn?.name) || t('boardControls.rightmostColumn');
+    const rightmostColumnName = systemStatusName(rightmostBoardColumn) || t('boardControls.rightmostColumn');
     return [
       {
         id: 'group-none',
@@ -1772,14 +1772,14 @@
                         data-status-column-key={`${lane.id}-${column.id}-${column.status_ids[0]}`}
                         data-swimlane-parent-id={selectedGroupByItemType && lane.parent ? lane.parent.id : ''}
                         data-status-id={column.status_ids[0]}
-                        aria-label={t('collections.expandColumn', { name: systemStatusName(column.name) })}
+                        aria-label={t('collections.expandColumn', { name: systemStatusName(column) })}
                         aria-expanded="false"
-                        title={t('collections.expandColumn', { name: systemStatusName(column.name) })}
+                        title={t('collections.expandColumn', { name: systemStatusName(column) })}
                         onclick={() => toggleColumnCollapse(column.id)}
                       >
                         <ChevronRight class="w-4 h-4 flex-shrink-0" style={styles.glassTextStyle} />
                         <span class="board-column-collapsed-name font-semibold text-sm break-words" style={styles.glassTextStyle}>
-                          {systemStatusName(column.name)}
+                          {systemStatusName(column)}
                         </span>
                         <span class="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0" style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                           {columnTotal}

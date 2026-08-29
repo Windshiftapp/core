@@ -1,0 +1,60 @@
+/** Агенты рабочего пространства и Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Готов',
+      offline: 'Не в сети · задачи ставятся в очередь',
+      needsSetup: 'Нужна настройка',
+      draft: 'Черновик',
+      paused: 'Приостановлен',
+      invalid: 'Настроен неверно',
+      archived: 'В архиве',
+      unavailable: 'Недоступен',
+    },
+    types: {
+      standard: 'Стандартный',
+      coding: 'Для разработки',
+      legacy: 'Устаревший',
+    },
+    runtimes: {
+      windshift: 'Встроенная среда Windshift',
+      authorizedRunner: 'Авторизованный runner для разработки',
+      legacyLocal: 'Устаревшая локальная среда',
+    },
+    identities: {
+      workspaceManaged: 'Под управлением рабочего пространства',
+      centralizedService: 'Централизованная служебная учётная запись',
+      userOwned: 'Учётная запись пользователя',
+    },
+    runStatuses: {
+      queued: 'в очереди',
+      running: 'выполняется',
+      succeeded: 'завершён',
+      completed: 'завершён',
+      failed: 'завершился с ошибкой',
+      cancelled: 'отменён',
+    },
+    catalog: {
+      title: 'Агенты',
+      subtitle: 'Специалисты этого рабочего пространства',
+      createAgent: 'Создать агента',
+      searchPlaceholder: 'Поиск агентов',
+      loading: 'Загрузка агентов…',
+      loadErrorTitle: 'Не удалось загрузить агентов',
+      loadErrorMessage: 'Не удалось загрузить агентов.',
+      emptyTitle: 'Агентов пока нет',
+      emptyAdminDescription: 'Создайте стандартного агента или агента для разработки.',
+      emptyMemberDescription: 'Агента может добавить администратор рабочего пространства.',
+      noMatchesTitle: 'Агенты не найдены',
+      noMatchesDescription: 'Измените имя, идентификатор, назначение или тип профиля.',
+      defaultPurpose: 'Специалист, настроенный администраторами рабочего пространства.',
+      ownedBy: 'Владелец: {name}',
+      modelUnavailable: 'Модель недоступна',
+      standardInteraction: 'Назначение задач, упоминания и чат рабочего пространства',
+      codingInteraction: 'Прямое назначение задач и упоминания',
+      lastRun: 'Последний запуск: {status}',
+      viewProfileVersion: 'Открыть профиль · Версия {version}',
+    },
+  },
+};

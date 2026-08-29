@@ -30,7 +30,10 @@
     if (!Array.isArray(breakdown)) return [];
     return breakdown.map((segment, index) => {
       const label = typeof segment?.category_name === 'string' && segment.category_name.trim().length > 0
-        ? systemStatusCategoryName(segment.category_name.trim())
+        ? systemStatusCategoryName({
+            name: segment.category_name.trim(),
+            builtin_key: segment.category_builtin_key,
+          })
         : t('widgets.milestoneProgress.noStatus');
       const color = segment?.category_color || fallbackColors[index % fallbackColors.length];
       const count = typeof segment?.item_count === 'number' && Number.isFinite(segment.item_count)

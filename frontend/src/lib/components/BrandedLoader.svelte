@@ -1,9 +1,9 @@
 <script>
   import { APP_NAME } from '../constants.js';
-  import { t } from '../stores/i18n.svelte.js';
-
   let { label = '', detail = '', fullViewport = true } = $props();
-  let displayLabel = $derived(label || t('common.loading'));
+  // This component is also rendered while locale bundles are still loading.
+  // Keep its fallback independent from i18n so a translation key never flashes.
+  let displayLabel = $derived(label || 'Loading…');
 </script>
 
 <div

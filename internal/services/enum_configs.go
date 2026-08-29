@@ -18,19 +18,19 @@ func NewStatusCategoryConfig() EnumConfig {
 	return EnumConfig{
 		TableName:      "status_categories",
 		EntityName:     "Status category",
-		SelectColumns:  "id, name, color, description, is_default, is_completed, created_at, updated_at",
+		SelectColumns:  "id, COALESCE(builtin_key, ''), name, color, description, is_default, is_completed, created_at, updated_at",
 		DefaultOrderBy: "is_default DESC, name ASC",
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var c models.StatusCategory
-			err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Description,
+			err := rows.Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &c.Description,
 				&c.IsDefault, &c.IsCompleted, &c.CreatedAt, &c.UpdatedAt)
 			return &c, err
 		},
 
 		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
 			var c models.StatusCategory
-			err := row.Scan(&c.ID, &c.Name, &c.Color, &c.Description,
+			err := row.Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &c.Description,
 				&c.IsDefault, &c.IsCompleted, &c.CreatedAt, &c.UpdatedAt)
 			return &c, err
 		},
@@ -458,18 +458,18 @@ func NewHierarchyLevelConfig() EnumConfig {
 	return EnumConfig{
 		TableName:      "hierarchy_levels",
 		EntityName:     "Hierarchy level",
-		SelectColumns:  "id, level, name, description, created_at, updated_at",
+		SelectColumns:  "id, COALESCE(builtin_key, ''), level, name, description, created_at, updated_at",
 		DefaultOrderBy: "level ASC",
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var h models.HierarchyLevel
-			err := rows.Scan(&h.ID, &h.Level, &h.Name, &h.Description, &h.CreatedAt, &h.UpdatedAt)
+			err := rows.Scan(&h.ID, &h.BuiltinKey, &h.Level, &h.Name, &h.Description, &h.CreatedAt, &h.UpdatedAt)
 			return &h, err
 		},
 
 		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
 			var h models.HierarchyLevel
-			err := row.Scan(&h.ID, &h.Level, &h.Name, &h.Description, &h.CreatedAt, &h.UpdatedAt)
+			err := row.Scan(&h.ID, &h.BuiltinKey, &h.Level, &h.Name, &h.Description, &h.CreatedAt, &h.UpdatedAt)
 			return &h, err
 		},
 
@@ -608,17 +608,17 @@ func NewStatusConfig() EnumConfig {
 	return EnumConfig{
 		TableName:  "statuses",
 		EntityName: "Status",
-		SelectColumns: `s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color`,
+		SelectColumns: `s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color`,
 		SelectQuery: `
-			SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-			       sc.name as category_name, sc.color as category_color
+			SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+			       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color
 			FROM statuses s
 			JOIN status_categories sc ON s.category_id = sc.id
 			ORDER BY s.is_default DESC, sc.name ASC, s.name ASC`,
 		GetByIDQuery: `
-			SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-			       sc.name as category_name, sc.color as category_color
+			SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+			       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color
 			FROM statuses s
 			JOIN status_categories sc ON s.category_id = sc.id
 			WHERE s.id = ?`,
@@ -626,17 +626,17 @@ func NewStatusConfig() EnumConfig {
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var s models.Status
-			err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.CategoryID,
+			err := rows.Scan(&s.ID, &s.BuiltinKey, &s.Name, &s.Description, &s.CategoryID,
 				&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
-				&s.CategoryName, &s.CategoryColor)
+				&s.CategoryName, &s.CategoryBuiltinKey, &s.CategoryColor)
 			return &s, err
 		},
 
 		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
 			var s models.Status
-			err := row.Scan(&s.ID, &s.Name, &s.Description, &s.CategoryID,
+			err := row.Scan(&s.ID, &s.BuiltinKey, &s.Name, &s.Description, &s.CategoryID,
 				&s.IsDefault, &s.CreatedAt, &s.UpdatedAt,
-				&s.CategoryName, &s.CategoryColor)
+				&s.CategoryName, &s.CategoryBuiltinKey, &s.CategoryColor)
 			return &s, err
 		},
 
@@ -727,19 +727,19 @@ func NewLinkTypeConfig() EnumConfig {
 	return EnumConfig{
 		TableName:      "link_types",
 		EntityName:     "Link type",
-		SelectColumns:  "id, name, description, forward_label, reverse_label, color, is_system, active, created_at, updated_at",
+		SelectColumns:  "id, COALESCE(builtin_key, ''), name, description, forward_label, reverse_label, color, is_system, active, created_at, updated_at",
 		DefaultOrderBy: "is_system DESC, name ASC",
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var l models.LinkType
-			err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.ForwardLabel, &l.ReverseLabel,
+			err := rows.Scan(&l.ID, &l.BuiltinKey, &l.Name, &l.Description, &l.ForwardLabel, &l.ReverseLabel,
 				&l.Color, &l.IsSystem, &l.Active, &l.CreatedAt, &l.UpdatedAt)
 			return &l, err
 		},
 
 		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
 			var l models.LinkType
-			err := row.Scan(&l.ID, &l.Name, &l.Description, &l.ForwardLabel, &l.ReverseLabel,
+			err := row.Scan(&l.ID, &l.BuiltinKey, &l.Name, &l.Description, &l.ForwardLabel, &l.ReverseLabel,
 				&l.Color, &l.IsSystem, &l.Active, &l.CreatedAt, &l.UpdatedAt)
 			return &l, err
 		},
@@ -830,13 +830,13 @@ func NewItemTypeConfig() EnumConfig {
 	return EnumConfig{
 		TableName:      "item_types",
 		EntityName:     "Item type",
-		SelectColumns:  "id, name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at",
+		SelectColumns:  "id, COALESCE(builtin_key, ''), name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at",
 		DefaultOrderBy: "hierarchy_level ASC, sort_order ASC, name ASC",
 
 		ScanRow: func(rows *sql.Rows) (EnumEntity, error) {
 			var it models.ItemType
 			var description sql.NullString
-			err := rows.Scan(&it.ID, &it.Name, &description, &it.IsDefault,
+			err := rows.Scan(&it.ID, &it.BuiltinKey, &it.Name, &description, &it.IsDefault,
 				&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder,
 				&it.CreatedAt, &it.UpdatedAt)
 			if description.Valid {
@@ -848,7 +848,7 @@ func NewItemTypeConfig() EnumConfig {
 		ScanSingleRow: func(row *sql.Row) (EnumEntity, error) {
 			var it models.ItemType
 			var description sql.NullString
-			err := row.Scan(&it.ID, &it.Name, &description, &it.IsDefault,
+			err := row.Scan(&it.ID, &it.BuiltinKey, &it.Name, &description, &it.IsDefault,
 				&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder,
 				&it.CreatedAt, &it.UpdatedAt)
 			if description.Valid {

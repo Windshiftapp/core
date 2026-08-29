@@ -575,8 +575,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	for _, cat := range defaultStatusCategories {
 		var id int64
 		err = tx.QueryRow(
-			"INSERT INTO status_categories (name, color, description, is_default, is_completed) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-			cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
+			"INSERT INTO status_categories (builtin_key, name, color, description, is_default, is_completed) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+			cat.builtinKey, cat.name, cat.color, cat.description, cat.isDefault, cat.isCompleted,
 		).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("failed to create status category %s: %w", cat.name, err)
@@ -590,8 +590,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		categoryID := categoryIDs[status.category]
 		var id int64
 		err = tx.QueryRow(
-			"INSERT INTO statuses (name, description, category_id, is_default) VALUES ($1, $2, $3, $4) RETURNING id",
-			status.name, status.description, categoryID, status.isDefault,
+			"INSERT INTO statuses (builtin_key, name, description, category_id, is_default) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+			status.builtinKey, status.name, status.description, categoryID, status.isDefault,
 		).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("failed to create status %s: %w", status.name, err)
@@ -602,8 +602,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 3. Create default workflow
 	var workflowID int64
 	err = tx.QueryRow(
-		"INSERT INTO workflows (name, description, is_default) VALUES ($1, $2, $3) RETURNING id",
-		"Default Workflow", "Basic workflow for getting work done", true,
+		"INSERT INTO workflows (builtin_key, name, description, is_default) VALUES ($1, $2, $3, $4) RETURNING id",
+		"default", "Default Workflow", "Basic workflow for getting work done", true,
 	).Scan(&workflowID)
 	if err != nil {
 		return fmt.Errorf("failed to create default workflow: %w", err)
@@ -630,8 +630,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 5. Create default screen with basic fields
 	var screenID int64
 	err = tx.QueryRow(
-		"INSERT INTO screens (name, description) VALUES ($1, $2) RETURNING id",
-		"Default Screen", "Default screen with essential work item fields",
+		"INSERT INTO screens (builtin_key, name, description) VALUES ($1, $2, $3) RETURNING id",
+		"default", "Default Screen", "Default screen with essential work item fields",
 	).Scan(&screenID)
 	if err != nil {
 		return fmt.Errorf("failed to create default screen: %w", err)
@@ -651,8 +651,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 7. Create default configuration set
 	var configSetID int64
 	err = tx.QueryRow(
-		"INSERT INTO configuration_sets (name, description, workflow_id, is_default) VALUES ($1, $2, $3, $4) RETURNING id",
-		"Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
+		"INSERT INTO configuration_sets (builtin_key, name, description, workflow_id, is_default) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+		"default", "Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
 	).Scan(&configSetID)
 	if err != nil {
 		return fmt.Errorf("failed to create default configuration set: %w", err)
@@ -672,8 +672,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 9. Create default link types
 	for _, linkType := range defaultLinkTypes {
 		_, err = tx.Exec(
-			"INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system, allowed_entity_types) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-			linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem, linkType.allowedEntityTypes,
+			"INSERT INTO link_types (builtin_key, name, description, forward_label, reverse_label, color, is_system, allowed_entity_types) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+			linkType.builtinKey, linkType.name, linkType.description, linkType.forwardLabel, linkType.reverseLabel, linkType.color, linkType.isSystem, linkType.allowedEntityTypes,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create link type %s: %w", linkType.name, err)
@@ -694,8 +694,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 12. Create default hierarchy levels
 	for _, hl := range defaultHierarchyLevels {
 		_, err = tx.Exec(
-			"INSERT INTO hierarchy_levels (level, name, description) VALUES ($1, $2, $3)",
-			hl.level, hl.name, hl.description,
+			"INSERT INTO hierarchy_levels (builtin_key, level, name, description) VALUES ($1, $2, $3, $4)",
+			hl.builtinKey, hl.level, hl.name, hl.description,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create hierarchy level %s: %w", hl.name, err)
@@ -705,8 +705,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 13. Create default item types with icons and colors
 	for _, itemType := range defaultItemTypes {
 		_, err = tx.Exec(
-			"INSERT INTO item_types (configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-			configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
+			"INSERT INTO item_types (builtin_key, configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			itemType.builtinKey, configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create default item type %s: %w", itemType.name, err)
@@ -741,8 +741,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// 14. Create default themes with dual light/dark nav colors
 	for _, theme := range defaultThemes {
 		_, err = tx.Exec(
-			"INSERT INTO themes (name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-			theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
+			"INSERT INTO themes (builtin_key, name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			theme.builtinKey, theme.name, theme.description, theme.isDefault, theme.isActive, theme.navBackgroundColorLight, theme.navTextColorLight, theme.navBackgroundColorDark, theme.navTextColorDark,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create theme %s: %w", theme.name, err)
@@ -769,8 +769,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	// layer free of email-domain imports.)
 	var notificationSettingID int64
 	err = tx.QueryRow(
-		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
-		"Default Notifications", "Standard notification rules for work item updates", true, nil,
+		"INSERT INTO notification_settings (builtin_key, name, description, is_active, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+		"default", "Default Notifications", "Standard notification rules for work item updates", true, nil,
 	).Scan(&notificationSettingID)
 	if err != nil {
 		return fmt.Errorf("failed to create default notification setting: %w", err)

@@ -1,16 +1,17 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { api } from '../api.js';
-  import { User, Blocks, ClipboardList, AlertCircle } from '@lucide/svelte';
+  import { User, Blocks, ClipboardList, AlertCircle, Languages } from '@lucide/svelte';
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
   import Input from '../components/Input.svelte';
+  import Select from '../components/Select.svelte';
   import Seagulls from '../components/Seagulls.svelte';
   import WaveBackground from '../components/WaveBackground.svelte';
   import { APP_NAME } from '../constants.js';
   import Toggle from '../components/Toggle.svelte';
-  import { i18n, t } from '../stores/i18n.svelte.js';
+  import { i18n, SUPPORTED_LOCALES, t } from '../stores/i18n.svelte.js';
 
   let {
     isOpen = $bindable(true),
@@ -18,9 +19,14 @@
   } = $props();
 
   let currentStep = $state(1);
-  let totalSteps = 2;
+  const totalSteps = 3;
   let submitting = $state(false);
   let error = $state('');
+  let selectedLanguage = $state(i18n.locale);
+  const languageOptions = SUPPORTED_LOCALES.map(locale => ({
+    value: locale.code,
+    label: locale.name
+  }));
 
   // Form data
   let adminUser = $state({
@@ -45,9 +51,9 @@
   function handleKeyDown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      if (currentStep < 2) {
+      if (currentStep < totalSteps) {
         handleNext();
-      } else if (currentStep === 2 && !submitting) {
+      } else if (currentStep === totalSteps && !submitting) {
         completeSetup();
       }
     } else if (event.key === 'Escape') {
@@ -74,7 +80,7 @@
   function validateCurrentStep() {
     error = '';
 
-    if (currentStep === 1) {
+    if (currentStep === 2) {
       // Validate admin user form
       if (!adminUser.email || !adminUser.first_name || !adminUser.last_name || !adminUser.password) {
         error = t('setup.fillAllRequired');
@@ -99,6 +105,11 @@
     }
   }
 
+  async function handleLanguageChange(localeCode) {
+    selectedLanguage = localeCode;
+    await i18n.setLocale(localeCode);
+  }
+
   async function completeSetup() {
     if (!validateCurrentStep()) {
       return;
@@ -114,7 +125,7 @@
           username: adminUser.username,
           first_name: adminUser.first_name,
           last_name: adminUser.last_name,
-          language: i18n.locale,
+          language: selectedLanguage,
           password: adminUser.password
         },
         module_settings: moduleSettings
@@ -189,8 +200,32 @@
         </div>
       {/if}
 
-      <!-- Step 1: Create Admin Account -->
+      <!-- Step 1: Choose interface language -->
       {#if currentStep === 1}
+        <div class="space-y-6">
+          <div class="text-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
+              <Languages class="w-6 h-6" style="color: var(--ds-icon-info);" />
+            </div>
+            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.chooseLanguage')}</h2>
+            <p style="color: var(--ds-text-subtle);">{t('setup.chooseLanguageDesc')}</p>
+          </div>
+
+          <div class="max-w-sm mx-auto">
+            <Label for="setup-language" color="default" class="mb-2">{t('setup.language')}</Label>
+            <Select
+              id="setup-language"
+              bind:value={selectedLanguage}
+              options={languageOptions}
+              onchange={handleLanguageChange}
+              ariaLabel={t('setup.language')}
+            />
+          </div>
+        </div>
+      {/if}
+
+      <!-- Step 2: Create Admin Account -->
+      {#if currentStep === 2}
         <div class="space-y-6">
           <div class="text-center">
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
@@ -277,8 +312,8 @@
         </div>
       {/if}
 
-      <!-- Step 2: Configure Modules -->
-      {#if currentStep === 2}
+      <!-- Step 3: Configure Modules -->
+      {#if currentStep === 3}
         <div class="space-y-6">
           <div class="text-center">
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
@@ -325,7 +360,7 @@
         </div>
 
         <div class="flex gap-3">
-          {#if currentStep < 2}
+          {#if currentStep < totalSteps}
             <Button
               variant="primary"
               onclick={handleNext}
@@ -334,7 +369,7 @@
             >
               {t('setup.next')}
             </Button>
-          {:else if currentStep === 2}
+          {:else if currentStep === totalSteps}
             <Button
               variant="primary"
               onclick={completeSetup}

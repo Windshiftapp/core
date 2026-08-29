@@ -18,8 +18,7 @@
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectScreen'));
 
   function isDefaultSystemScreen(screen) {
-    return screen?.name === 'Default Screen' &&
-      screen.description === 'Default screen with essential work item fields';
+    return Boolean(screen?.builtin_key);
   }
 
   function getScreenDisplayValue(screen, field) {

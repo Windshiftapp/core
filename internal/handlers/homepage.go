@@ -71,9 +71,11 @@ type ItemActivity struct {
 	WorkspaceItemNumber int     `json:"workspace_item_number"`
 	Title               string  `json:"title"`
 	Status              string  `json:"status"`
+	StatusBuiltinKey    string  `json:"status_builtin_key,omitempty"`
 	StatusColor         *string `json:"status_color,omitempty"`
 	PriorityID          *int    `json:"priority_id,omitempty"`
 	PriorityName        *string `json:"priority_name,omitempty"`
+	PriorityBuiltinKey  string  `json:"priority_builtin_key,omitempty"`
 	PriorityColor       *string `json:"priority_color,omitempty"`
 	LastActivity        string  `json:"last_activity"`
 	ActivityCount       int     `json:"activity_count"`
@@ -349,7 +351,9 @@ func (h *HomepageHandler) getItemActivitiesBatch(ctx context.Context, activities
 			WorkspaceItemNumber: item.WorkspaceItemNumber,
 			Title:               item.Title,
 			Status:              item.StatusName,
+			StatusBuiltinKey:    item.StatusBuiltinKey,
 			PriorityID:          item.PriorityID,
+			PriorityBuiltinKey:  item.PriorityBuiltinKey,
 			WorkspaceKey:        item.WorkspaceKey,
 		}
 		if itemActivity.Status == "" {

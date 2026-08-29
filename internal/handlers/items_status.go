@@ -150,6 +150,7 @@ func (h *ItemHandler) loadAvailableStatusTransitions(ctx context.Context, userID
 					twids = append(twids, services.TransitionWithID{
 						TransitionID:  rt.TransitionID,
 						StatusID:      rt.StatusID,
+						BuiltinKey:    rt.BuiltinKey,
 						StatusName:    rt.StatusName,
 						CategoryColor: color,
 					})
@@ -175,6 +176,7 @@ func (h *ItemHandler) loadAvailableStatusTransitions(ctx context.Context, userID
 						rawTransitions = append(rawTransitions, services.StatusTransitionOption{
 							TransitionID:  f.TransitionID,
 							StatusID:      f.StatusID,
+							BuiltinKey:    f.BuiltinKey,
 							StatusName:    f.StatusName,
 							CategoryColor: categoryColor,
 						})
@@ -273,9 +275,10 @@ func (h *ItemHandler) GetWorkspaceTransitionMatrix(w http.ResponseWriter, r *htt
 
 func transitionOptionResponse(option services.StatusTransitionOption) map[string]any {
 	transition := map[string]any{
-		"id":    option.StatusID,
-		"name":  option.StatusName,
-		"value": strings.ToLower(strings.ReplaceAll(option.StatusName, " ", "_")),
+		"id":          option.StatusID,
+		"builtin_key": option.BuiltinKey,
+		"name":        option.StatusName,
+		"value":       strings.ToLower(strings.ReplaceAll(option.StatusName, " ", "_")),
 	}
 	if option.CategoryColor != nil {
 		transition["category_color"] = *option.CategoryColor

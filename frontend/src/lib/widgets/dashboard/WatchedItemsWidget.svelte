@@ -32,8 +32,10 @@
           title={item.title}
           itemKey={`${item.workspace_key}-${item.workspace_item_number}`}
           statusName={item.status}
+          statusBuiltinKey={item.status_builtin_key}
           statusColor={item.status_color}
           priorityName={item.priority_name}
+          priorityBuiltinKey={item.priority_builtin_key}
           priorityColor={item.priority_color}
           timestamp={item.last_activity ? homepageStore.formatRelativeTime(item.last_activity) : null}
           onclick={() => open(item)}

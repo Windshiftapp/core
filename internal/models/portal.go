@@ -538,6 +538,7 @@ type EmailTemplate struct {
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets
 type NotificationSetting struct {
 	ID          int       `json:"id"`
+	BuiltinKey  string    `json:"builtin_key,omitempty"`
 	Name        string    `json:"name"`        // e.g., "Development Team Notifications"
 	Description string    `json:"description"` // e.g., "Standard notifications for development workspaces"
 	IsActive    bool      `json:"is_active"`

@@ -203,6 +203,7 @@ class ItemDetailStore {
         id: transition.id,
         value: transition.value,
         label: transition.name,
+        builtin_key: transition.builtin_key,
         categoryColor: transition.category_color || null,
       }));
     }

@@ -43,15 +43,8 @@
     is_default: false
   });
 
-  const defaultWorkflow = {
-    name: 'Default Workflow',
-    description: 'Basic workflow for getting work done'
-  };
-
   function isDefaultSystemWorkflow(workflow) {
-    return workflow?.is_default === true &&
-      workflow.name === defaultWorkflow.name &&
-      workflow.description === defaultWorkflow.description;
+    return Boolean(workflow?.builtin_key);
   }
 
   function getWorkflowDisplayValue(workflow, field) {

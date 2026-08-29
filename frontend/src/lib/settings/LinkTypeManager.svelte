@@ -20,89 +20,17 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import { builtinLocaleKey } from '../utils/systemLabels.js';
 
   const linkTypes = writable([]);
 
   let showForm = $state(false);
   let editingLinkType = $state(null);
-  const systemLinkTypes = {
-    Tests: {
-      key: 'tests',
-      description: 'Test case tests work item',
-      forwardLabel: 'tests',
-      reverseLabel: 'tested by',
-      color: '#10b981'
-    },
-    Implements: {
-      key: 'implements',
-      description: 'Work item implements another work item',
-      forwardLabel: 'implements',
-      reverseLabel: 'implemented by',
-      color: '#3b82f6'
-    },
-    'Depends On': {
-      key: 'dependsOn',
-      description: 'Work item depends on another work item',
-      forwardLabel: 'depends on',
-      reverseLabel: 'blocks',
-      color: '#f59e0b'
-    },
-    'Relates To': {
-      key: 'relatesTo',
-      description: 'General bidirectional relationship',
-      forwardLabel: 'relates to',
-      reverseLabel: 'relates to',
-      color: '#6b7280'
-    },
-    'Links To': {
-      key: 'linksTo',
-      description: 'General directional link',
-      forwardLabel: 'links to',
-      reverseLabel: 'linked from',
-      color: '#64748b'
-    },
-    Duplicates: {
-      key: 'duplicates',
-      description: 'Work item is a duplicate of another',
-      forwardLabel: 'duplicates',
-      reverseLabel: 'duplicated by',
-      color: '#ef4444'
-    },
-    'Child Of': {
-      key: 'childOf',
-      description: 'Alternative hierarchy relationship',
-      forwardLabel: 'child of',
-      reverseLabel: 'parent of',
-      color: '#8b5cf6'
-    },
-    Page: {
-      key: 'page',
-      description: 'Work item references a knowledge page',
-      forwardLabel: 'references page',
-      reverseLabel: 'referenced by',
-      color: '#0ea5e9'
-    }
-  };
-
-  function getSystemLinkTypeDefinition(linkType) {
-    const definition = systemLinkTypes[linkType.name];
-    if (
-      !definition ||
-      !linkType.is_system ||
-      linkType.description !== definition.description ||
-      linkType.forward_label !== definition.forwardLabel ||
-      linkType.reverse_label !== definition.reverseLabel ||
-      linkType.color?.toLowerCase() !== definition.color
-    ) {
-      return null;
-    }
-    return definition;
-  }
 
   function getLinkTypeDisplayValue(linkType, field) {
-    const definition = getSystemLinkTypeDefinition(linkType);
-    return definition
-      ? t(`settings.linkTypes.defaults.${definition.key}.${field}`)
+    const key = linkType?.is_system ? builtinLocaleKey(linkType) : '';
+    return key
+      ? t(`settings.linkTypes.defaults.${key}.${field}`)
       : linkType[field];
   }
 

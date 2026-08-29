@@ -10,6 +10,7 @@
 
 CREATE TABLE IF NOT EXISTS statuses (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
 	category_id INTEGER NOT NULL,
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS statuses (
 
 CREATE TABLE IF NOT EXISTS configuration_sets (
 	id SERIAL PRIMARY KEY,
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
@@ -135,6 +137,14 @@ CREATE TABLE IF NOT EXISTS workflow_transitions (
 
 -- Configuration set indexes
 CREATE INDEX IF NOT EXISTS idx_configuration_sets_workflow_id ON configuration_sets(workflow_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_statuses_builtin_key ON statuses(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_workflows_builtin_key ON workflows(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Item type indexes (moved to base_tables_postgres.sql)
 CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(configuration_set_id);

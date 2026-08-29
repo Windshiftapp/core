@@ -47,10 +47,11 @@ func (r *PlanningRepository) ListMilestoneNamesForItem(itemID int) ([]string, er
 }
 
 type WorkspaceMilestoneStatusBreakdown struct {
-	CategoryName  string
-	CategoryColor string
-	ItemCount     int
-	IsCompleted   bool
+	CategoryName       string
+	CategoryBuiltinKey string
+	CategoryColor      string
+	ItemCount          int
+	IsCompleted        bool
 }
 
 type WorkspaceMilestoneProgress struct {
@@ -70,7 +71,7 @@ type WorkspaceMilestoneProgress struct {
 func (r *PlanningRepository) GetWorkspaceMilestoneProgress(workspaceID int, filterSQL string, filterArgs []any) ([]WorkspaceMilestoneProgress, error) {
 	query := `
 		SELECT m.id, m.name, m.target_date, m.status, mc.color,
-		       sc.name, sc.color, sc.is_completed, COUNT(i.id)
+		       sc.name, COALESCE(sc.builtin_key, ''), sc.color, sc.is_completed, COUNT(i.id)
 		` + ItemListFilterFromClause() + `
 		JOIN item_milestones im ON im.item_id = i.id
 		JOIN milestones m ON m.id = im.milestone_id
@@ -84,7 +85,7 @@ func (r *PlanningRepository) GetWorkspaceMilestoneProgress(workspaceID int, filt
 	}
 	query += `
 		GROUP BY m.id, m.name, m.target_date, m.status, mc.color,
-		         sc.name, sc.color, sc.is_completed
+		         sc.name, sc.builtin_key, sc.color, sc.is_completed
 		ORDER BY m.target_date IS NULL, m.target_date, m.name`
 
 	rows, err := r.db.Query(query, args...)
@@ -98,10 +99,10 @@ func (r *PlanningRepository) GetWorkspaceMilestoneProgress(workspaceID int, filt
 		var milestoneID, itemCount int
 		var milestoneName string
 		var targetDate, milestoneStatus, milestoneColor sql.NullString
-		var categoryName, categoryColor sql.NullString
+		var categoryName, categoryBuiltinKey, categoryColor sql.NullString
 		var categoryCompleted sql.NullBool
 		if err := rows.Scan(&milestoneID, &milestoneName, &targetDate, &milestoneStatus,
-			&milestoneColor, &categoryName, &categoryColor, &categoryCompleted, &itemCount); err != nil {
+			&milestoneColor, &categoryName, &categoryBuiltinKey, &categoryColor, &categoryCompleted, &itemCount); err != nil {
 			return nil, fmt.Errorf("scan workspace milestone progress: %w", err)
 		}
 		if itemCount == 0 {
@@ -126,10 +127,11 @@ func (r *PlanningRepository) GetWorkspaceMilestoneProgress(workspaceID int, filt
 			label = "No Status"
 		}
 		breakdown := WorkspaceMilestoneStatusBreakdown{
-			CategoryName:  label,
-			CategoryColor: categoryColor.String,
-			ItemCount:     itemCount,
-			IsCompleted:   categoryCompleted.Valid && categoryCompleted.Bool,
+			CategoryName:       label,
+			CategoryBuiltinKey: categoryBuiltinKey.String,
+			CategoryColor:      categoryColor.String,
+			ItemCount:          itemCount,
+			IsCompleted:        categoryCompleted.Valid && categoryCompleted.Bool,
 		}
 		progress.StatusBreakdown = append(progress.StatusBreakdown, breakdown)
 		progress.TotalItems += itemCount

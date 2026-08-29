@@ -62,12 +62,15 @@ type Item struct {
 	WorkspaceName             string `json:"workspace_name,omitempty"`
 	WorkspaceKey              string `json:"workspace_key,omitempty"`
 	ItemTypeName              string `json:"item_type_name,omitempty"`
+	ItemTypeBuiltinKey        string `json:"item_type_builtin_key,omitempty"`
 	PriorityName              string `json:"priority_name,omitempty"`
+	PriorityBuiltinKey        string `json:"priority_builtin_key,omitempty"`
 	PriorityIcon              string `json:"priority_icon,omitempty"`
 	PriorityColor             string `json:"priority_color,omitempty"`
 	ParentTitle               string `json:"parent_title,omitempty"`
 	ParentWorkspaceItemNumber *int   `json:"parent_workspace_item_number,omitempty"` // Parent's workspace-scoped number, for rendering the parent key
 	StatusName                string `json:"status_name,omitempty"`                  // Name from statuses table (joined field)
+	StatusBuiltinKey          string `json:"status_builtin_key,omitempty"`           // Stable key for translating built-in statuses
 	StatusColor               string `json:"status_color,omitempty"`                 // Color from the status category (joined field)
 	// StatusSince is when the item last entered its current status, derived from
 	// item_history (falls back to created_at when there is no recorded change).
@@ -264,6 +267,7 @@ type AttachmentSettingsRequest struct {
 // LinkType represents a type of link between items
 type LinkType struct {
 	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
 	Name               string    `json:"name"`
 	Description        string    `json:"description"`
 	ForwardLabel       string    `json:"forward_label"`
