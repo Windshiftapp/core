@@ -36,6 +36,7 @@ import (
 	appmetrics "windshift/internal/metrics"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/plugins"
 	"windshift/internal/portalwebauthn"
 	"windshift/internal/repository"
@@ -224,6 +225,10 @@ func (s *Server) initialize() error {
 	}
 	if err = database.ValidateCanonicalSchemaCheckpoint(s.db); err != nil {
 		return fmt.Errorf("database startup refused: %w", err)
+	}
+	objectTranslationService := objecttranslation.NewService(s.db)
+	if err := objectTranslationService.SyncSystem(context.Background(), objecttranslation.ShippedSystemTranslations()); err != nil {
+		return fmt.Errorf("sync shipped object translations: %w", err)
 	}
 	s.eventEngine = events.NewEngine(s.db, events.DefaultConfig())
 
@@ -484,10 +489,10 @@ func (s *Server) initialize() error {
 	itemHandler.SetDBRequestTimeout(s.config.DB.RequestTimeout)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache)
-	screenHandler := handlers.NewScreenHandler(s.db)
-	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService)
-	itemTypeHandler := handlers.NewItemTypeHandler(s.db)
-	priorityHandler := handlers.NewPriorityHandler(s.db)
+	screenHandler := handlers.NewScreenHandler(s.db).WithObjectTranslations(objectTranslationService)
+	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService).WithObjectTranslations(objectTranslationService)
+	itemTypeHandler := handlers.NewItemTypeHandler(s.db).WithObjectTranslations(objectTranslationService)
+	priorityHandler := handlers.NewPriorityHandler(s.db).WithObjectTranslations(objectTranslationService)
 
 	// Shared audit emitter for enum services
 	enumAuditEmit := services.AuditEmitFunc(func(db database.Database, r *http.Request, actionType, resourceType string, entityID int, entityName string) {
@@ -512,7 +517,7 @@ func (s *Server) initialize() error {
 	hierarchyLevelConfig.AuditEmit = enumAuditEmit
 	hierarchyLevelHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, hierarchyLevelConfig),
-		func() any { return &models.HierarchyLevel{} })
+		func() any { return &models.HierarchyLevel{} }).WithObjectTranslations(objectTranslationService, "hierarchy_level")
 	requestTypeHandler := handlers.NewRequestTypeHandler(
 		repository.NewRequestTypeRepository(s.db),
 		repository.NewChannelRepository(s.db),
@@ -525,13 +530,13 @@ func (s *Server) initialize() error {
 	statusCategoryConfig.AuditEmit = enumAuditEmit
 	statusCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, statusCategoryConfig),
-		func() any { return &models.StatusCategory{} })
+		func() any { return &models.StatusCategory{} }).WithObjectTranslations(objectTranslationService, "status_category")
 	statusHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewStatusConfig()),
-		func() any { return &models.Status{} })
+		func() any { return &models.Status{} }).WithObjectTranslations(objectTranslationService, "status")
 	statusQueryHandler := handlers.NewStatusQueryHandler(repository.NewStatusRepository(s.db))
 	workflowService := s.workflowService
-	workflowHandler := handlers.NewWorkflowHandler(repository.NewWorkflowRepository(s.db), logger.NewAuditor(s.db))
+	workflowHandler := handlers.NewWorkflowHandler(repository.NewWorkflowRepository(s.db), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
 	workflowHandler.SetWorkflowService(workflowService)
 	userHandler := handlers.NewUserHandler(
 		repository.NewUserRepository(s.db),
@@ -593,7 +598,7 @@ func (s *Server) initialize() error {
 	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager, logger.NewAuditor(s.db))
 
 	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(repository.NewPermissionSetRepository(s.db), permService, logger.NewAuditor(s.db))
-	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(repository.NewWorkspaceRoleRepository(s.db), permService, logger.NewAuditor(s.db))
+	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(repository.NewWorkspaceRoleRepository(s.db), permService, logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
 
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
 	customerOrgPermissionService := services.NewCustomerOrganisationPermissionService(s.db, permService, timePermissionService)
@@ -614,7 +619,7 @@ func (s *Server) initialize() error {
 	testRunHandler := handlers.NewTestRunHandlerWithPool(services.NewTestRunService(s.db), logger.NewAuditor(s.db))
 	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(repository.NewTestSummaryRepository(s.db))
 
-	linkTypeHandler := handlers.NewLinkTypeHandler(repository.NewLinkTypeRepository(s.db), logger.NewAuditor(s.db))
+	linkTypeHandler := handlers.NewLinkTypeHandler(repository.NewLinkTypeRepository(s.db), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
 	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService, permService)
 
 	labelHandler := handlers.NewLabelHandler(repository.NewLabelRepository(s.db), repository.NewItemRepository(s.db), permService, logger.NewAuditor(s.db))
@@ -736,7 +741,8 @@ func (s *Server) initialize() error {
 
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
-	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db))
+	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
+	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService)
 	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db))
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
 	homepageHandler := handlers.NewHomepageHandler(
@@ -1148,7 +1154,7 @@ func (s *Server) initialize() error {
 	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor, channelService)
 	formHandler.SetEventCoordinator(eventCoordinator)
 
-	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db), s.notificationService)
+	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db), s.notificationService).WithObjectTranslations(objectTranslationService)
 	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db), s.notificationService, logger.NewAuditor(s.db))
 
 	var attachmentHandler *handlers.AttachmentHandler
@@ -1222,6 +1228,7 @@ func (s *Server) initialize() error {
 	} else {
 		slog.Info("plugin system disabled")
 	}
+	ssoHandler.SetPluginManager(s.pluginManager)
 
 	pluginHandler := handlers.NewPluginHandler(s.pluginManager, repository.NewPluginRegistryRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
 
@@ -1529,6 +1536,7 @@ func (s *Server) initialize() error {
 				logger.NewAuditor(s.db),
 			),
 			AgentTemplateCatalog: agentTemplateCatalogHandler,
+			ObjectTranslation:    objectTranslationHandler,
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,
@@ -1650,6 +1658,7 @@ func (s *Server) initialize() error {
 		ItemDeletionApplicationService: itemHandler.ItemDeletionApplicationService(),
 		PageApplicationService:         pageHandler.PageApplicationService(),
 		PageDiagramService:             pageDiagramService,
+		ObjectTranslationService:       objectTranslationService,
 	}, v1.RegisterRoutes)
 
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true

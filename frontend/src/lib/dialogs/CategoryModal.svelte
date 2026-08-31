@@ -86,7 +86,7 @@
     <!-- Add New Category Form -->
     <div class="mb-6 p-4 rounded border" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
       <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('categories.addNewCategory')}</h4>
-      <div class="flex gap-3 items-center">
+      <div class="flex gap-3 items-center" data-testid="category-create-form">
         <div class="flex-1">
           <Input
             type="text"
@@ -95,15 +95,22 @@
             onkeydown={(e) => e.key === 'Enter' && addCategory()}
             disabled={loading}
             size="small"
+            dataTestid="category-create-name"
           />
         </div>
         {#if showColorPicker}
-          <IconSelector bind:selectedColor={newCategoryColor} colorOnly compact />
+          <IconSelector
+            bind:selectedColor={newCategoryColor}
+            colorOnly
+            compact
+            dataTestid="category-create-color"
+          />
         {/if}
         <Button
           variant="primary"
           onclick={addCategory}
           disabled={!newCategoryName.trim() || loading}
+          dataTestid="category-create-submit"
         >
           {t('categories.addCategory')}
         </Button>

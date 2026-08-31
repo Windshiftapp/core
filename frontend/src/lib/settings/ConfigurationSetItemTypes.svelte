@@ -7,7 +7,7 @@
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
   import ConditionSetPicker from '../pickers/ConditionSetPicker.svelte';
   import ApprovalSetPicker from '../pickers/ApprovalSetPicker.svelte';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let {
     itemTypes = [],
@@ -127,8 +127,7 @@
   let expandedScreenRows = $state(new Set());
 
   function getItemTypeDisplayName(itemType) {
-    const key = builtinLocaleKey(itemType);
-    return key ? t(`settings.itemTypes.defaults.${key}`) : itemType?.name;
+    return objectDisplayName(itemType);
   }
   $effect(() => {
     const next = new Set(expandedScreenRows);

@@ -177,7 +177,10 @@
       await loadProviders();
     } catch (err) {
       console.error('Failed to create SSO provider:', err);
-      error = err.message || t('settings.sso.failedToCreate');
+      formErrors = {
+        ...formErrors,
+        submit: err.message || t('settings.sso.failedToCreate')
+      };
     } finally {
       saving = false;
     }
@@ -194,7 +197,10 @@
       await loadProviders();
     } catch (err) {
       console.error('Failed to update SSO provider:', err);
-      error = err.message || t('settings.sso.failedToUpdate');
+      formErrors = {
+        ...formErrors,
+        submit: err.message || t('settings.sso.failedToUpdate')
+      };
     } finally {
       saving = false;
     }
@@ -391,6 +397,10 @@
       onClose={closeModals}
     />
     <form onsubmit={(e) => { e.preventDefault(); showCreateModal ? handleCreate() : handleUpdate(); }} class="p-6 space-y-4">
+      {#if formErrors.submit}
+        <AlertBox type="error">{formErrors.submit}</AlertBox>
+      {/if}
+
       <div class="grid grid-cols-2 gap-4">
         <!-- Name -->
         <div>
@@ -529,7 +539,7 @@
           size="small"
         />
 
-        {#if formData.auto_provision_users && !formData.require_verified_email}
+        {#if formData.require_verified_email}
           <AlertBox type="warning">
             <strong>{t('settings.sso.unsafeProvisioningWarningTitle')}</strong>
             <div class="mt-1">{t('settings.sso.unsafeProvisioningWarningBody')}</div>

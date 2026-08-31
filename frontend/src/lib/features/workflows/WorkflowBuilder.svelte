@@ -20,6 +20,8 @@
   import Checkbox from '../../components/Checkbox.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
+  import { objectDisplayValue } from '../../utils/systemLabels.js';
+  import LocalizedObjectFields from '../../settings/LocalizedObjectFields.svelte';
 
   let workflows = $state([]);
   let searchQuery = $state('');
@@ -29,6 +31,8 @@
   let creating = $state(false);
   let editingId = $state(null);
   let nameInput = $state(null);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   // Form state
   let newWorkflow = $state({
@@ -43,15 +47,8 @@
     is_default: false
   });
 
-  function isDefaultSystemWorkflow(workflow) {
-    return Boolean(workflow?.builtin_key);
-  }
-
   function getWorkflowDisplayValue(workflow, field) {
-    if (isDefaultSystemWorkflow(workflow)) {
-      return t(`workflows.defaults.default.${field}`);
-    }
-    return workflow?.[field] || '';
+    return objectDisplayValue(workflow, field, 'workflow');
   }
 
   onMount(async () => {
@@ -118,6 +115,7 @@
   }
 
   function startEdit(workflow) {
+    editingObject = workflow;
     editingId = workflow.id;
     editWorkflow = {
       name: workflow.name,
@@ -128,6 +126,7 @@
 
   function cancelEdit() {
     editingId = null;
+    editingObject = null;
   }
 
   async function updateWorkflow() {
@@ -137,8 +136,10 @@
     }
 
     try {
-      const updated = await api.put(`/workflows/${editingId}`, editWorkflow);
-      workflows = workflows.map(w => w.id === editingId ? updated : w);
+      translationEditor?.validate();
+      await api.put(`/workflows/${editingId}`, editWorkflow);
+      await translationEditor?.save();
+      await loadWorkflows();
       editingId = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
@@ -353,23 +354,17 @@
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); updateWorkflow(); }}>
       <div class="space-y-4">
-        <div>
-          <Label color="default" required class="mb-2">{t('common.name')}</Label>
-          <Input
-            type="text"
-            bind:value={editWorkflow.name}
-            size="small"
-            required
+        {#key editingId}
+          <LocalizedObjectFields
+            bind:this={translationEditor}
+            objectType="workflow"
+            objectId={editingId}
+            bind:canonicalName={editWorkflow.name}
+            bind:canonicalDescription={editWorkflow.description}
+            displayName={editingObject?.display_name || editingObject?.name}
+            displayDescription={editingObject?.display_description || editingObject?.description}
           />
-        </div>
-
-        <div>
-          <Label color="default" class="mb-2">{t('common.description')}</Label>
-          <Textarea
-            bind:value={editWorkflow.description}
-            rows={2}
-          />
-        </div>
+        {/key}
 
         <Checkbox
           bind:checked={editWorkflow.is_default}

@@ -114,13 +114,15 @@ const (
 	ScopeItemTemplatesWrite = "item-templates:write"
 
 	// Admin scopes (require system admin role AND scope on token)
-	ScopeAdminUsersRead      = "admin:users:read"
-	ScopeAdminUsersWrite     = "admin:users:write"
-	ScopeAdminGroupsRead     = "admin:groups:read"
-	ScopeAdminGroupsWrite    = "admin:groups:write"
-	ScopeAdminAuditLogsRead  = "admin:audit-logs:read"
-	ScopeAdminAPITokensRead  = "admin:api-tokens:read"
-	ScopeAdminAPITokensWrite = "admin:api-tokens:write"
+	ScopeAdminUsersRead         = "admin:users:read"
+	ScopeAdminUsersWrite        = "admin:users:write"
+	ScopeAdminGroupsRead        = "admin:groups:read"
+	ScopeAdminGroupsWrite       = "admin:groups:write"
+	ScopeAdminAuditLogsRead     = "admin:audit-logs:read"
+	ScopeAdminAPITokensRead     = "admin:api-tokens:read"
+	ScopeAdminAPITokensWrite    = "admin:api-tokens:write"
+	ScopeAdminTranslationsRead  = "admin:object-translations:read"
+	ScopeAdminTranslationsWrite = "admin:object-translations:write"
 )
 
 // ScopeInfo describes one entry in the token scope catalog. Every surface that
@@ -214,6 +216,8 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeAdminAuditLogsRead, Resource: "admin:audit-logs", ResourceLabel: "Audit logs (admin)", Action: "read", Label: "Read audit logs", Description: "Read the central audit log.", Admin: true},
 	{Scope: ScopeAdminAPITokensRead, Resource: "admin:api-tokens", ResourceLabel: "API tokens (admin)", Action: "read", Label: "Read all API tokens", Description: "List API tokens belonging to any user.", Admin: true},
 	{Scope: ScopeAdminAPITokensWrite, Resource: "admin:api-tokens", ResourceLabel: "API tokens (admin)", Action: "write", Label: "Revoke all API tokens", Description: "Revoke API tokens belonging to any user.", Admin: true},
+	{Scope: ScopeAdminTranslationsRead, Resource: "admin:object-translations", ResourceLabel: "Object translations (admin)", Action: "read", Label: "Read object translations", Description: "Read instance-wide labels for configurable objects.", Admin: true},
+	{Scope: ScopeAdminTranslationsWrite, Resource: "admin:object-translations", ResourceLabel: "Object translations (admin)", Action: "write", Label: "Manage object translations", Description: "Create, update, and delete instance-wide labels for configurable objects.", Admin: true},
 }
 
 // ScopeCatalog returns a copy of the scope catalog in presentation order.

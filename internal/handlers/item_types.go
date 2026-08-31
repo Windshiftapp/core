@@ -10,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
@@ -29,8 +30,14 @@ func sanitizeItemTypeRequest(it *models.ItemType) {
 }
 
 type ItemTypeHandler struct {
-	db   database.Database
-	repo *repository.ItemTypeRepository
+	db           database.Database
+	repo         *repository.ItemTypeRepository
+	translations *objecttranslation.Service
+}
+
+func (h *ItemTypeHandler) WithObjectTranslations(service *objecttranslation.Service) *ItemTypeHandler {
+	h.translations = service
+	return h
 }
 
 func NewItemTypeHandler(db database.Database) *ItemTypeHandler {
@@ -53,6 +60,9 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	if !localizeObjectResponse(w, r, h.translations, "item_type", itemTypes) {
+		return
+	}
 	respondJSONOK(w, itemTypes)
 }
 
@@ -69,6 +79,9 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "item_type", it) {
 		return
 	}
 	respondJSONOK(w, it)
@@ -143,6 +156,9 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "item_type", created) {
+		return
+	}
 	respondJSONCreated(w, created)
 }
 
@@ -243,6 +259,9 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "item_type", updated) {
+		return
+	}
 	respondJSONOK(w, updated)
 }
 

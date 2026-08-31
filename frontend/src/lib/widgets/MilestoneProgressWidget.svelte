@@ -5,7 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import { buildPieSegments } from '../utils/pieChart.js';
-  import { systemStatusCategoryName } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let { milestones = [] } = $props();
 
@@ -30,10 +30,10 @@
     if (!Array.isArray(breakdown)) return [];
     return breakdown.map((segment, index) => {
       const label = typeof segment?.category_name === 'string' && segment.category_name.trim().length > 0
-        ? systemStatusCategoryName({
+        ? objectDisplayName({
             name: segment.category_name.trim(),
             builtin_key: segment.category_builtin_key,
-          })
+          }, 'status_category')
         : t('widgets.milestoneProgress.noStatus');
       const color = segment?.category_color || fallbackColors[index % fallbackColors.length];
       const count = typeof segment?.item_count === 'number' && Number.isFinite(segment.item_count)

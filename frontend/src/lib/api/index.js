@@ -90,6 +90,7 @@ import {
   notifications,
 } from './notifications.js';
 import { oauth } from './oauth.js';
+import { objectTranslations } from './objectTranslations.js';
 import { onCallSchedules } from './oncall.js';
 import { pageLabels, pages } from './pages.js';
 import { groups, permissions } from './permissions.js';
@@ -337,6 +338,9 @@ export const api = {
 
   // Notification Settings API
   notificationSettings,
+
+  // Instance-wide configurable-object translations
+  objectTranslations,
 
   // Email Templates API (admin-edited transactional emails)
   emailTemplates,

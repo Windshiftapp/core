@@ -59,6 +59,7 @@ We are especially interested in early bug reports and real-world feedback about 
 - [Build instructions](BUILD.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Logging configuration](LOGGING.md)
+- [Docker backup and restore](deploy/backup-restore.md)
 - [Product documentation](https://windshift.sh/docs)
 
 ## License

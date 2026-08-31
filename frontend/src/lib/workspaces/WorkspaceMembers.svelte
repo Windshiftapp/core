@@ -19,7 +19,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import { systemRoleDescription, systemRoleName } from '../utils/systemLabels.js';
+  import { objectDisplayDescription, objectDisplayName } from '../utils/systemLabels.js';
 
   let { workspaceId } = $props();
 
@@ -56,11 +56,11 @@
   }
 
   function getRoleName(role) {
-    return systemRoleName(role);
+    return objectDisplayName(role, 'workspace_role');
   }
 
   function getRoleDescription(role) {
-    return systemRoleDescription(role);
+    return objectDisplayDescription(role, 'workspace_role');
   }
 
   function builtInRole(key) {

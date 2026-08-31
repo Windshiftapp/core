@@ -22,7 +22,8 @@
   import { confirm } from '../composables/useConfirm.js';
   import { loadStatusManagerData } from './statusManagerData.js';
   import './settings-form.css';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayName, objectDisplayValue } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   let statuses = $state([]);
   let statusCategories = $state([]);
@@ -31,17 +32,15 @@
   let loadingCategories = $state(true);
   let showCreateForm = $state(false);
   let editingId = $state(null);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   function getStatusDisplayValue(status, field) {
-    const key = builtinLocaleKey(status);
-    return key ? t(`statuses.defaults.${key}.${field}`) : status[field];
+    return objectDisplayValue(status, field);
   }
 
   function getStatusCategoryDisplayName(category) {
-    const key = builtinLocaleKey(category);
-    return key
-      ? t(`settings.statusCategories.defaults.${key}.name`)
-      : category.name;
+    return objectDisplayName(category);
   }
 
   function isProtectedStatus(status) {
@@ -87,10 +86,12 @@
       is_default: false
     };
     editingId = null;
+    editingObject = null;
     showCreateForm = true;
   }
 
   function startEdit(status) {
+    editingObject = status;
     formData = {
       name: status.name || '',
       description: status.description || '',
@@ -104,6 +105,7 @@
   function cancelForm() {
     showCreateForm = false;
     editingId = null;
+    editingObject = null;
     formData = {
       name: '',
       description: '',
@@ -120,10 +122,13 @@
       }
 
       if (editingId) {
-        const updated = await api.put(`/statuses/${editingId}`, formData);
-        statuses = statuses.map(status => 
-          status.id === editingId ? { ...updated, transitionCount: status.transitionCount } : status
-        );
+        translationEditor?.validate();
+        await api.put(`/statuses/${editingId}`, formData);
+        await translationEditor?.save();
+        const reloaded = await loadStatusManagerData(api);
+        statuses = reloaded.statuses;
+        statusCategories = reloaded.statusCategories;
+        workflowTransitions = reloaded.workflowTransitions;
       } else {
         const created = await api.post('/statuses', formData);
         statuses = [...statuses, { ...created, transitionCount: 0 }];
@@ -315,17 +320,31 @@
     <!-- Modal content -->
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); saveStatus(); }}>
-        <div class="form-group">
-          <label for="name">{t('common.name')} *</label>
-          <Input
-            type="text"
-            id="name"
-            placeholder={t('statuses.namePlaceholder')}
-            bind:value={formData.name}
-            required
-            size="small"
-          />
-        </div>
+        {#if editingId}
+          {#key editingId}
+            <LocalizedObjectFields
+              bind:this={translationEditor}
+              objectType="status"
+              objectId={editingId}
+              bind:canonicalName={formData.name}
+              bind:canonicalDescription={formData.description}
+              displayName={editingObject?.display_name || editingObject?.name}
+              displayDescription={editingObject?.display_description || editingObject?.description}
+            />
+          {/key}
+        {:else}
+          <div class="form-group">
+            <label for="name">{t('common.name')} *</label>
+            <Input
+              type="text"
+              id="name"
+              placeholder={t('statuses.namePlaceholder')}
+              bind:value={formData.name}
+              required
+              size="small"
+            />
+          </div>
+        {/if}
 
         <div class="form-group">
           <label for="category">{t('common.category')} *</label>
@@ -338,15 +357,17 @@
           />
         </div>
 
-        <div class="form-group">
-          <label for="description">{t('common.description')}</label>
-          <Textarea
-            id="description"
-            placeholder={t('placeholders.optionalDescription')}
-            bind:value={formData.description}
-            rows={2}
-          />
-        </div>
+        {#if !editingId}
+          <div class="form-group">
+            <label for="description">{t('common.description')}</label>
+            <Textarea
+              id="description"
+              placeholder={t('placeholders.optionalDescription')}
+              bind:value={formData.description}
+              rows={2}
+            />
+          </div>
+        {/if}
 
         <div class="mb-6">
           <Toggle

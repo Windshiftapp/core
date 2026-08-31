@@ -18,6 +18,7 @@
   import Input from '../components/Input.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import './settings-form.css';
@@ -26,7 +27,7 @@
     isGenericSubtaskType,
     sortItemTypesByHierarchy,
   } from '../utils/hierarchy.js';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let itemTypes = $state([]);
   let hierarchyLevels = $state([]);
@@ -35,19 +36,15 @@
   let editingId = $state(null);
   let originalHierarchyLevel = $state(null);
   let showCreateForm = $state(false);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   function getItemTypeDisplayName(itemType) {
-    const key = builtinLocaleKey(itemType);
-    return key
-      ? t(`settings.itemTypes.defaults.${key}`)
-      : itemType.name;
+    return objectDisplayName(itemType);
   }
 
   function getHierarchyLevelDisplayName(hierarchyLevel) {
-    const key = builtinLocaleKey(hierarchyLevel);
-    return key
-      ? t(`settings.hierarchyLevels.defaults.${key}.name`)
-      : hierarchyLevel.name;
+    return objectDisplayName(hierarchyLevel);
   }
 
   function getConfigurationSetDisplayName(name, builtinKey = '') {
@@ -108,11 +105,13 @@
       is_default: false
     };
     editingId = null;
+    editingObject = null;
     originalHierarchyLevel = null;
     showCreateForm = true;
   }
 
   function startEdit(itemType) {
+    editingObject = itemType;
     formData = {
       name: itemType.name,
       description: itemType.description,
@@ -130,6 +129,7 @@
   function cancelEdit() {
     showCreateForm = false;
     editingId = null;
+    editingObject = null;
     originalHierarchyLevel = null;
     formData = {
       name: '',
@@ -166,7 +166,9 @@
       }
 
       if (editingId) {
+        translationEditor?.validate();
         await api.itemTypes.update(editingId, formData);
+        await translationEditor?.save();
       } else {
         await api.itemTypes.create(formData);
       }
@@ -176,7 +178,7 @@
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (err) {
-      errorToast(err?.message || t('settings.itemTypes.failedToSave'));
+      errorToast(`${t('settings.itemTypes.failedToSave')} ${err?.message || err}`);
     }
   }
 
@@ -363,26 +365,40 @@
     <!-- Modal content -->
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); saveItemType(); }}>
-        <div class="form-group">
-          <label for="name">{t('settings.itemTypes.name')}</label>
-          <Input
-            type="text"
-            id="name"
-            placeholder={t('settings.itemTypes.namePlaceholder')}
-            bind:value={formData.name}
-            required
-          />
-        </div>
+        {#if editingId}
+          {#key editingId}
+            <LocalizedObjectFields
+              bind:this={translationEditor}
+              objectType="item_type"
+              objectId={editingId}
+              bind:canonicalName={formData.name}
+              bind:canonicalDescription={formData.description}
+              displayName={editingObject?.display_name || editingObject?.name}
+              displayDescription={editingObject?.display_description || editingObject?.description}
+            />
+          {/key}
+        {:else}
+          <div class="form-group">
+            <label for="name">{t('settings.itemTypes.name')}</label>
+            <Input
+              type="text"
+              id="name"
+              placeholder={t('settings.itemTypes.namePlaceholder')}
+              bind:value={formData.name}
+              required
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="description">{t('settings.itemTypes.description')}</label>
-          <Textarea
-            id="description"
-            placeholder={t('settings.itemTypes.descriptionPlaceholder')}
-            bind:value={formData.description}
-            rows={2}
-          />
-        </div>
+          <div class="form-group">
+            <label for="description">{t('settings.itemTypes.description')}</label>
+            <Textarea
+              id="description"
+              placeholder={t('settings.itemTypes.descriptionPlaceholder')}
+              bind:value={formData.description}
+              rows={2}
+            />
+          </div>
+        {/if}
 
         <div class="form-row">
           <div class="form-group">

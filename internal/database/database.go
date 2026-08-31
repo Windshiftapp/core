@@ -32,6 +32,9 @@ var workspaceSchema string
 //go:embed schema/config_workflows.sql
 var configWorkflowsSchema string
 
+//go:embed schema/object_translations.sql
+var objectTranslationsSchema string
+
 //go:embed schema/time_tracking.sql
 var timeTrackingSchema string
 

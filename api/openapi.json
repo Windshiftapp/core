@@ -1539,6 +1539,12 @@
           "description": {
             "type": "string"
           },
+          "display_description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
           "hierarchy_level": {
             "type": "integer"
           },
@@ -1894,6 +1900,12 @@
           "description": {
             "type": "string"
           },
+          "display_description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
           "icon": {
             "type": "string"
           },
@@ -1921,6 +1933,12 @@
             "type": "string"
           },
           "description": {
+            "type": "string"
+          },
+          "display_description": {
+            "type": "string"
+          },
+          "display_name": {
             "type": "string"
           },
           "id": {
@@ -1958,6 +1976,12 @@
           "description": {
             "type": "string"
           },
+          "display_description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
           "id": {
             "type": "integer"
           },
@@ -1982,6 +2006,28 @@
             "type": "number"
           },
           "theme": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.TranslationResolveRequest": {
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/objecttranslation.Target"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.TranslationUpsertRequest": {
+        "properties": {
+          "value": {
             "type": "string"
           }
         },
@@ -3934,6 +3980,12 @@
           "description": {
             "type": "string"
           },
+          "display_description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
           "forward_label": {
             "type": "string"
           },
@@ -4708,6 +4760,112 @@
           },
           "workspace_id": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "objecttranslation.CanonicalDifference": {
+        "properties": {
+          "builtin_key": {
+            "type": "string"
+          },
+          "canonical": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "integer"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "objecttranslation.ObjectDefinition": {
+        "properties": {
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "object_type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "objecttranslation.ResolvedValue": {
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "integer"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "objecttranslation.Target": {
+        "properties": {
+          "fallback": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "integer"
+          },
+          "object_type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "objecttranslation.Translation": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "integer"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -5755,6 +5913,531 @@
         "summary": "Update a group (admin)",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/admin/object-translations/canonical-differences": {
+      "get": {
+        "description": "System-admin only. Compares canonical values with shipped base-locale copy without changing either.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/objecttranslation.CanonicalDifference"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List built-in object values needing translation review",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      }
+    },
+    "/admin/object-translations/definitions": {
+      "get": {
+        "description": "System-admin only. Returns the allowlisted object types and translatable fields.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/objecttranslation.ObjectDefinition"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List configurable object translation definitions",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      }
+    },
+    "/admin/object-translations/orphans": {
+      "get": {
+        "description": "System-admin only. Reports corruption without mutating it.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/objecttranslation.Translation"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Detect orphaned configurable object translations",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      }
+    },
+    "/admin/object-translations/resolve": {
+      "post": {
+        "description": "System-admin only. Query count is bounded by object type and field, not target count.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/handlers.TranslationResolveRequest"
+              }
+            }
+          },
+          "description": "Locale and canonical targets",
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/objecttranslation.ResolvedValue"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Resolve configurable object display values in bulk",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      }
+    },
+    "/admin/object-translations/{objectType}/{objectId}": {
+      "get": {
+        "description": "System-admin only. Returns all locale and source rows for one object.",
+        "parameters": [
+          {
+            "description": "Allowlisted object type",
+            "in": "path",
+            "name": "objectType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object ID",
+            "in": "path",
+            "name": "objectId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/objecttranslation.Translation"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List translations for a configurable object",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      }
+    },
+    "/admin/object-translations/{objectType}/{objectId}/{field}/{locale}": {
+      "delete": {
+        "description": "System-admin only. Shipped system translations are unaffected.",
+        "parameters": [
+          {
+            "description": "Allowlisted object type",
+            "in": "path",
+            "name": "objectType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object ID",
+            "in": "path",
+            "name": "objectId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Translatable field",
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "BCP 47 locale",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete an instance object translation",
+        "tags": [
+          "admin",
+          "object-translations"
+        ]
+      },
+      "put": {
+        "description": "System-admin only. Writes the instance source and never overwrites shipped system rows.",
+        "parameters": [
+          {
+            "description": "Allowlisted object type",
+            "in": "path",
+            "name": "objectType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object ID",
+            "in": "path",
+            "name": "objectId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Translatable field",
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "BCP 47 locale",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/handlers.TranslationUpsertRequest"
+              }
+            }
+          },
+          "description": "Translation value",
+          "required": true,
+          "x-originalParamName": "body"
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/objecttranslation.Translation"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create or replace an instance object translation",
+        "tags": [
+          "admin",
+          "object-translations"
         ]
       }
     },

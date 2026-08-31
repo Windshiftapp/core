@@ -29,7 +29,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
-  import { systemStatusCategoryName } from '../../utils/systemLabels.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   let { milestoneId, workspaceId = null } = $props();
 
@@ -406,10 +406,10 @@
                       style="background-color: {breakdown.category_color || '#9ca3af'};"
                     ></div>
                     <span class="text-sm" style="color: var(--ds-text);">
-                      {systemStatusCategoryName({
+                      {objectDisplayName({
                         name: breakdown.category_name,
                         builtin_key: breakdown.category_builtin_key,
-                      })}
+                      }, 'status_category')}
                     </span>
                   </div>
                   <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{breakdown.item_count}</span>

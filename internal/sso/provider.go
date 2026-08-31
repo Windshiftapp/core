@@ -36,7 +36,7 @@ type SSOProvider struct {
 	ClientSecret          string `json:"client_secret,omitempty"` // Only used for input, never stored
 	Scopes                string `json:"scopes"`
 	AutoProvisionUsers    bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
+	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Trust provider-managed email when verification status is absent.
 	AttributeMapping      string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
@@ -127,22 +127,24 @@ func scanProviderNoSecret(row interface {
 
 // AttributeMap represents the claim/attribute mapping configuration
 type AttributeMap struct {
-	Email      string `json:"email"`
-	Name       string `json:"name"`
-	GivenName  string `json:"given_name"`
-	FamilyName string `json:"family_name"`
-	Username   string `json:"username"`
+	Email         string `json:"email"`
+	EmailVerified string `json:"email_verified"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Username      string `json:"username"`
 }
 
 // GetAttributeMap parses the attribute mapping JSON
 func (p *SSOProvider) GetAttributeMap() (*AttributeMap, error) {
 	if p.AttributeMapping == "" {
 		return &AttributeMap{
-			Email:      "email",
-			Name:       "name",
-			GivenName:  "given_name",
-			FamilyName: "family_name",
-			Username:   "preferred_username",
+			Email:         "email",
+			EmailVerified: "email_verified",
+			Name:          "name",
+			GivenName:     "given_name",
+			FamilyName:    "family_name",
+			Username:      "preferred_username",
 		}, nil
 	}
 

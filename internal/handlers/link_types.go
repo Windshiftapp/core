@@ -6,14 +6,21 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
 )
 
 type LinkTypeHandler struct {
-	repo    *repository.LinkTypeRepository
-	auditor *logger.Auditor
+	repo         *repository.LinkTypeRepository
+	auditor      *logger.Auditor
+	translations *objecttranslation.Service
+}
+
+func (h *LinkTypeHandler) WithObjectTranslations(service *objecttranslation.Service) *LinkTypeHandler {
+	h.translations = service
+	return h
 }
 
 func NewLinkTypeHandler(repo *repository.LinkTypeRepository, auditor *logger.Auditor) *LinkTypeHandler {
@@ -32,6 +39,9 @@ func (h *LinkTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	if !localizeObjectResponse(w, r, h.translations, "link_type", linkTypes) {
+		return
+	}
 	respondJSONOK(w, linkTypes)
 }
 
@@ -48,6 +58,9 @@ func (h *LinkTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "link_type", lt) {
 		return
 	}
 	respondJSONOK(w, lt)
@@ -94,6 +107,9 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.auditor.Log(r, currentUser, logger.ActionLinkTypeCreate, logger.ResourceLinkType, &id, lt.Name)
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "link_type", &lt) {
+		return
+	}
 	respondJSONCreated(w, lt)
 }
 
@@ -137,6 +153,9 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.auditor.Log(r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, updated.Name)
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "link_type", updated) {
+		return
+	}
 	respondJSONOK(w, updated)
 }
 

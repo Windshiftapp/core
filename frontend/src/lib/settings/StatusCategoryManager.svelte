@@ -12,18 +12,17 @@
   import StatusCategoryModal from '../dialogs/StatusCategoryModal.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayValue } from '../utils/systemLabels.js';
 
   let statusCategories = $state([]);
   let loading = $state(true);
   let showModal = $state(false);
   let editingId = $state(null);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   function getCategoryDisplayValue(category, field) {
-    const key = builtinLocaleKey(category);
-    return key
-      ? t(`settings.statusCategories.defaults.${key}.${field}`)
-      : category[field];
+    return objectDisplayValue(category, field);
   }
 
   // Form state
@@ -69,10 +68,12 @@
       is_completed: false
     };
     editingId = null;
+    editingObject = null;
     showModal = true;
   }
 
   function startEdit(category) {
+    editingObject = category;
     formData = {
       name: category.name || '',
       color: category.color || '#3b82f6',
@@ -87,6 +88,7 @@
   function cancelForm() {
     showModal = false;
     editingId = null;
+    editingObject = null;
     formData = {
       name: '',
       color: '#3b82f6',
@@ -104,10 +106,10 @@
       }
 
       if (editingId) {
-        const updated = await api.put(`/status-categories/${editingId}`, formData);
-        statusCategories = statusCategories.map(cat => 
-          cat.id === editingId ? { ...updated, statusCount: cat.statusCount } : cat
-        );
+        translationEditor?.validate();
+        await api.put(`/status-categories/${editingId}`, formData);
+        await translationEditor?.save();
+        await loadStatusCategories();
       } else {
         const created = await api.post('/status-categories', formData);
         statusCategories = [...statusCategories, { ...created, statusCount: 0 }];
@@ -249,7 +251,11 @@
   <StatusCategoryModal
     isOpen={showModal}
     bind:formData
+    bind:translationEditor
     isEditing={!!editingId}
+    objectId={editingId}
+    displayName={editingObject?.display_name || editingObject?.name}
+    displayDescription={editingObject?.display_description || editingObject?.description}
     onsave={saveCategory}
     oncancel={cancelForm}
   />

@@ -325,8 +325,9 @@ const (
 	ActionRoleAssign = "role.assign"
 	ActionRoleRevoke = "role.revoke"
 
-	// Workspace role CRUD (custom/label-only roles created via admin UI).
+	// Workspace role management.
 	ActionWorkspaceRoleCreate = "workspace_role.create"
+	ActionWorkspaceRoleUpdate = "workspace_role.update"
 	ActionWorkspaceRoleDelete = "workspace_role.delete"
 
 	// Workspace management

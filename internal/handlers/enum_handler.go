@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
@@ -50,6 +51,14 @@ type EnumHandler struct {
 	newEntity          func() any // Factory function to create new entity
 	permissionService  *services.PermissionService
 	mutationPermission string
+	translations       *objecttranslation.Service
+	translationType    string
+}
+
+func (h *EnumHandler) WithObjectTranslations(service *objecttranslation.Service, objectType string) *EnumHandler {
+	h.translations = service
+	h.translationType = objectType
+	return h
 }
 
 // WithGlobalMutationPermission adds a handler-level authorization boundary for
@@ -100,6 +109,9 @@ func (h *EnumHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		handleServiceError(w, r, err)
 		return
 	}
+	if h.translationType != "" && !localizeObjectResponse(w, r, h.translations, h.translationType, entities) {
+		return
+	}
 	respondJSONOK(w, entities)
 }
 
@@ -113,6 +125,9 @@ func (h *EnumHandler) Get(w http.ResponseWriter, r *http.Request) {
 	entity, err := h.service.GetByID(id)
 	if err != nil {
 		handleServiceError(w, r, err)
+		return
+	}
+	if h.translationType != "" && !localizeObjectResponse(w, r, h.translations, h.translationType, entity) {
 		return
 	}
 	respondJSONOK(w, entity)
@@ -133,6 +148,9 @@ func (h *EnumHandler) Create(w http.ResponseWriter, r *http.Request) {
 	created, err := h.service.Create(entity, r)
 	if err != nil {
 		handleServiceError(w, r, err)
+		return
+	}
+	if h.translationType != "" && !localizeObjectResponse(w, r, h.translations, h.translationType, created) {
 		return
 	}
 	respondJSONCreated(w, created)
@@ -158,6 +176,9 @@ func (h *EnumHandler) Update(w http.ResponseWriter, r *http.Request) {
 	updated, err := h.service.Update(id, entity, r)
 	if err != nil {
 		handleServiceError(w, r, err)
+		return
+	}
+	if h.translationType != "" && !localizeObjectResponse(w, r, h.translations, h.translationType, updated) {
 		return
 	}
 	respondJSONOK(w, updated)

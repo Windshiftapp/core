@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -568,6 +569,138 @@ var Catalog = []Migration{
 			CREATE INDEX idx_scm_webhook_deliveries_status ON scm_webhook_deliveries(status, created_at);
 		`,
 	},
+	{
+		Version:       "20260831_object_translations",
+		Name:          "Add instance-wide configurable object translations",
+		CheckSQLite:   "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='object_translations'",
+		CheckPostgres: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='object_translations'",
+		SQLite:        objectTranslationsSchema,
+		Postgres:      objectTranslationsSchemaPostgres,
+	},
+	{
+		Version: "20260831_sso_email_verified_attribute_mapping",
+		Name:    "Add the verified-email claim to the default SSO attribute mapping",
+		CheckSQLite: `SELECT COUNT(*) FROM pragma_table_info('sso_providers')
+			WHERE name='attribute_mapping' AND dflt_value LIKE '%"email_verified":"email_verified"%'`,
+		CheckPostgres: `SELECT COUNT(*) FROM information_schema.columns
+			WHERE table_schema=current_schema() AND table_name='sso_providers'
+				AND column_name='attribute_mapping' AND column_default LIKE '%"email_verified":"email_verified"%'`,
+		SQLite:      "applySQLiteSSOAttributeMappingDefault:v1",
+		Postgres:    `ALTER TABLE sso_providers ALTER COLUMN attribute_mapping SET DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username","email_verified":"email_verified"}'`,
+		ApplySQLite: applySQLiteSSOAttributeMappingDefault,
+	},
+}
+
+func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin SSO provider rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE sso_providers_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			slug TEXT UNIQUE NOT NULL,
+			name TEXT NOT NULL,
+			provider_type TEXT NOT NULL DEFAULT 'oidc',
+			enabled BOOLEAN DEFAULT FALSE,
+			is_default BOOLEAN DEFAULT FALSE,
+			issuer_url TEXT,
+			client_id TEXT,
+			client_secret_encrypted TEXT,
+			scopes TEXT DEFAULT 'openid email profile',
+			auto_provision_users BOOLEAN DEFAULT FALSE,
+			require_verified_email BOOLEAN DEFAULT TRUE,
+			attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username","email_verified":"email_verified"}',
+			saml_idp_metadata_url TEXT,
+			saml_idp_sso_url TEXT,
+			saml_idp_certificate TEXT,
+			saml_sp_entity_id TEXT,
+			saml_sign_requests BOOLEAN DEFAULT FALSE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`INSERT INTO sso_providers_migration (
+			id, slug, name, provider_type, enabled, is_default,
+			issuer_url, client_id, client_secret_encrypted, scopes,
+			auto_provision_users, require_verified_email, attribute_mapping,
+			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate,
+			saml_sp_entity_id, saml_sign_requests, created_at, updated_at
+		) SELECT
+			id, slug, name, provider_type, enabled, is_default,
+			issuer_url, client_id, client_secret_encrypted, scopes,
+			auto_provision_users, require_verified_email, attribute_mapping,
+			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate,
+			saml_sp_entity_id, saml_sign_requests, created_at, updated_at
+		FROM sso_providers`,
+		`DROP TABLE sso_providers`,
+		`ALTER TABLE sso_providers_migration RENAME TO sso_providers`,
+		`CREATE INDEX idx_sso_providers_slug ON sso_providers(slug)`,
+		`CREATE INDEX idx_sso_providers_enabled ON sso_providers(enabled)`,
+		`CREATE INDEX idx_sso_providers_default ON sso_providers(is_default)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild sso_providers: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return fmt.Errorf("check foreign keys after SSO provider rebuild: %w", err)
+	}
+	if rows.Next() {
+		var table, parent string
+		var rowID any
+		var foreignKeyID int
+		if err := rows.Scan(&table, &rowID, &parent, &foreignKeyID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("read foreign key violation after SSO provider rebuild: %w", err)
+		}
+		_ = rows.Close()
+		return fmt.Errorf("foreign key violation after SSO provider rebuild: table %s row %v references %s constraint %d", table, rowID, parent, foreignKeyID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("check foreign keys after SSO provider rebuild: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close foreign key check after SSO provider rebuild: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit SSO provider rebuild: %w", err)
+	}
+
+	return nil
 }
 
 func (m Migration) checksum(driver string) string {

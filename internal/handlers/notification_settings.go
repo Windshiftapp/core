@@ -9,15 +9,22 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
 )
 
 type NotificationSettingsHandler struct {
-	repo    *repository.NotificationSettingsRepository
-	auditor *logger.Auditor
-	service NotificationService
+	repo         *repository.NotificationSettingsRepository
+	auditor      *logger.Auditor
+	service      NotificationService
+	translations *objecttranslation.Service
+}
+
+func (h *NotificationSettingsHandler) WithObjectTranslations(service *objecttranslation.Service) *NotificationSettingsHandler {
+	h.translations = service
+	return h
 }
 
 func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor, service NotificationService) *NotificationSettingsHandler {
@@ -90,6 +97,9 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		respondInternalError(w, r, err)
 		return
 	}
+	if !localizeObjectResponse(w, r, h.translations, "notification_setting", settings) {
+		return
+	}
 	respondJSONOK(w, settings)
 }
 
@@ -107,6 +117,9 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "notification_setting", setting) {
 		return
 	}
 	respondJSONOK(w, setting)
@@ -146,6 +159,9 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 	}
 
 	h.refreshRuleCache("create")
+	if !localizeObjectResponse(w, r, h.translations, "notification_setting", &req) {
+		return
+	}
 	respondJSONCreated(w, req)
 }
 
@@ -187,6 +203,9 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 
 	h.refreshRuleCache("update")
 	req.ID = id
+	if !localizeObjectResponse(w, r, h.translations, "notification_setting", &req) {
+		return
+	}
 	respondJSONOK(w, req)
 }
 

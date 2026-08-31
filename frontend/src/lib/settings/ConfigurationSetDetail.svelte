@@ -22,6 +22,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   // Tab configuration
   let activeTab = $state('general');
@@ -36,6 +37,7 @@
   let migrationApplyWorkflowId = $state(null);
   let migrationApplyItemTypeConfigs = $state(null);
   let pendingSavePayload = $state(null);
+  let translationEditor = $state(null);
 
   // Reference data
   let workflows = $state([]);
@@ -210,6 +212,7 @@
 
     try {
       saving = true;
+      if (!isNewMode) translationEditor?.validate();
 
       const payload = {
         name: formData.name,
@@ -239,6 +242,8 @@
         try {
           const updated = await api.configurationSets.update(configSetId, payload);
           configSet = updated;
+          await translationEditor?.save();
+          await loadData();
         } catch (error) {
           if (isMigrationRequired(error)) {
             openMigrationAssistant(error.body.analysis, payload);
@@ -292,6 +297,8 @@
       saving = true;
       const updated = await api.configurationSets.update(configSetId, payload);
       configSet = updated;
+      await translationEditor?.save();
+      await loadData();
       originalFormData = JSON.parse(JSON.stringify(formData));
     } catch (error) {
       if (isMigrationRequired(error)) {
@@ -379,24 +386,38 @@
                 <div>
                   <h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">{t('settings.configSets.basicInfo')}</h3>
                   <div class="space-y-4">
-                    <div>
-                      <Label color="default" required class="mb-1">{t('settings.configSets.name')}</Label>
-                      <Input
-                        type="text"
-                        bind:value={formData.name}
-                        placeholder={t('settings.configSets.namePlaceholder')}
-                        size="small"
-                      />
-                    </div>
+                    {#if isNewMode}
+                      <div>
+                        <Label color="default" required class="mb-1">{t('settings.configSets.name')}</Label>
+                        <Input
+                          type="text"
+                          bind:value={formData.name}
+                          placeholder={t('settings.configSets.namePlaceholder')}
+                          size="small"
+                        />
+                      </div>
 
-                    <div>
-                      <Label color="default" class="mb-1">{t('settings.configSets.description')}</Label>
-                      <Textarea
-                        bind:value={formData.description}
-                        rows={3}
-                        placeholder={t('settings.configSets.description')}
-                      />
-                    </div>
+                      <div>
+                        <Label color="default" class="mb-1">{t('settings.configSets.description')}</Label>
+                        <Textarea
+                          bind:value={formData.description}
+                          rows={3}
+                          placeholder={t('settings.configSets.description')}
+                        />
+                      </div>
+                    {:else if configSet}
+                      {#key configSetId}
+                        <LocalizedObjectFields
+                          bind:this={translationEditor}
+                          objectType="configuration_set"
+                          objectId={configSetId}
+                          bind:canonicalName={formData.name}
+                          bind:canonicalDescription={formData.description}
+                          displayName={configSet.display_name || configSet.name}
+                          displayDescription={configSet.display_description || configSet.description}
+                        />
+                      {/key}
+                    {/if}
 
                     <Checkbox
                       bind:checked={formData.is_default}

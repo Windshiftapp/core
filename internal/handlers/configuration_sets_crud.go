@@ -9,6 +9,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -22,6 +23,12 @@ type ConfigurationSetHandler struct {
 		ForceRefreshCache() error
 	} // Notification service for cache refresh (optional, can be nil)
 	permissionService *services.PermissionService
+	translations      *objecttranslation.Service
+}
+
+func (h *ConfigurationSetHandler) WithObjectTranslations(service *objecttranslation.Service) *ConfigurationSetHandler {
+	h.translations = service
+	return h
 }
 
 func NewConfigurationSetHandler(db database.Database, notificationService interface{ ForceRefreshCache() error }, permissionService *services.PermissionService) *ConfigurationSetHandler {
@@ -70,6 +77,9 @@ func (h *ConfigurationSetHandler) GetAll(w http.ResponseWriter, r *http.Request)
 			TotalPages: (totalCount + limit - 1) / limit,
 		},
 	}
+	if !localizeObjectResponse(w, r, h.translations, "configuration_set", response.ConfigurationSets) {
+		return
+	}
 
 	respondJSONOK(w, response)
 }
@@ -88,6 +98,9 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "configuration_set", cs) {
 		return
 	}
 
@@ -171,6 +184,9 @@ func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request)
 			},
 			Success: true,
 		})
+	}
+	if !localizeObjectResponse(w, r, h.translations, "configuration_set", createdCS) {
+		return
 	}
 
 	respondJSONCreatedWithWarnings(w, createdCS, warnings)

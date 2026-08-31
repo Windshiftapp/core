@@ -177,6 +177,7 @@ type AdminHandlers struct {
 	Diagnostics          *handlers.DiagnosticsHandler
 	AgentSecurity        *handlers.AgentSecurityHandler
 	AgentTemplateCatalog *handlers.AdminAgentTemplateCatalogHandler
+	ObjectTranslation    *handlers.ObjectTranslationHandler
 }
 
 // PlanningHandlers groups planning-related handlers.

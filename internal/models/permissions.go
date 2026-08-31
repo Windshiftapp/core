@@ -192,7 +192,9 @@ type WorkspaceRole struct {
 	ID                 int       `json:"id" db:"id"`
 	BuiltinKey         string    `json:"builtin_key,omitempty" db:"builtin_key"`
 	Name               string    `json:"name" db:"name"`
+	DisplayName        string    `json:"display_name"`
 	Description        string    `json:"description" db:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
 	IsSystem           bool      `json:"is_system" db:"is_system"`
 	PermissionsEnabled bool      `json:"permissions_enabled" db:"permissions_enabled"`
 	DisplayOrder       int       `json:"display_order" db:"display_order"`

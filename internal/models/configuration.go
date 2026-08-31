@@ -18,7 +18,9 @@ type ConfigurationSet struct {
 	BuiltinKey              string    `json:"builtin_key,omitempty"`
 	WorkspaceID             int       `json:"workspace_id"` // Keep for backward compatibility
 	Name                    string    `json:"name"`
+	DisplayName             string    `json:"display_name"`
 	Description             string    `json:"description"`
+	DisplayDescription      string    `json:"display_description,omitempty"`
 	IsDefault               bool      `json:"is_default"`
 	DifferentiateByItemType bool      `json:"differentiate_by_item_type"`
 	WorkflowID              *int      `json:"workflow_id,omitempty"`
@@ -75,12 +77,14 @@ type ConfigurationSetScreen struct {
 
 // Screen represents a field layout screen
 type Screen struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	Fields       []ScreenField `json:"fields,omitempty"`
 	SystemFields []string      `json:"system_fields,omitempty"` // List of system field names to show
@@ -107,7 +111,9 @@ type ItemType struct {
 	BuiltinKey         string    `json:"builtin_key,omitempty"`
 	ConfigurationSetID int       `json:"configuration_set_id,omitempty"` // Deprecated: kept for backward compatibility
 	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
 	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
 	IsDefault          bool      `json:"is_default"`
 	Icon               string    `json:"icon"`            // Lucide icon name
 	Color              string    `json:"color"`           // Hex color for background
@@ -165,16 +171,18 @@ type ItemTypeConfig struct {
 
 // Priority represents a priority level
 type Priority struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	IsDefault   bool      `json:"is_default"`
-	Icon        string    `json:"icon"`       // Lucide icon name
-	Color       string    `json:"color"`      // Hex color for background
-	SortOrder   int       `json:"sort_order"` // For ordering priorities
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	IsDefault          bool      `json:"is_default"`
+	Icon               string    `json:"icon"`       // Lucide icon name
+	Color              string    `json:"color"`      // Hex color for background
+	SortOrder          int       `json:"sort_order"` // For ordering priorities
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Many-to-many configuration set relationships
 	ConfigurationSetIDs         []int    `json:"configuration_set_ids,omitempty"`          // IDs of associated configuration sets
 	ConfigurationSetNames       []string `json:"configuration_set_names,omitempty"`        // Names for display
@@ -193,38 +201,44 @@ type PriorityDisplay struct {
 
 // HierarchyLevel represents a hierarchy level definition
 type HierarchyLevel struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Level       int       `json:"level"` // 0, 1, 2, 3...
-	Name        string    `json:"name"`  // e.g., "Initiative", "Epic", "Task", "Sub-task"
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Level              int       `json:"level"` // 0, 1, 2, 3...
+	Name               string    `json:"name"`  // e.g., "Initiative", "Epic", "Task", "Sub-task"
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // StatusCategory represents a category for statuses
 type StatusCategory struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`
-	Color       string    `json:"color"` // Hex color code (e.g., "#3b82f6")
-	Description string    `json:"description"`
-	IsDefault   bool      `json:"is_default"`
-	IsCompleted bool      `json:"is_completed"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
+	Color              string    `json:"color"` // Hex color code (e.g., "#3b82f6")
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	IsDefault          bool      `json:"is_default"`
+	IsCompleted        bool      `json:"is_completed"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // Status represents a workflow status
 type Status struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CategoryID  int       `json:"category_id"`
-	IsDefault   bool      `json:"is_default"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	CategoryID         int       `json:"category_id"`
+	IsDefault          bool      `json:"is_default"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	CategoryName       string `json:"category_name,omitempty"`
 	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
@@ -234,13 +248,15 @@ type Status struct {
 
 // Workflow represents a workflow definition
 type Workflow struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	IsDefault   bool      `json:"is_default"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
+	IsDefault          bool      `json:"is_default"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	Transitions []WorkflowTransition `json:"transitions,omitempty"`
 }

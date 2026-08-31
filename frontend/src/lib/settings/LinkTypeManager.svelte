@@ -20,18 +20,17 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayValue } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   const linkTypes = writable([]);
 
   let showForm = $state(false);
   let editingLinkType = $state(null);
+  let translationEditor = $state(null);
 
   function getLinkTypeDisplayValue(linkType, field) {
-    const key = linkType?.is_system ? builtinLocaleKey(linkType) : '';
-    return key
-      ? t(`settings.linkTypes.defaults.${key}.${field}`)
-      : linkType[field];
+    return objectDisplayValue(linkType, field);
   }
 
   let formData = $state({
@@ -89,7 +88,9 @@
 
     try {
       if (editingLinkType) {
+        translationEditor?.validate();
         await api.linkTypes.update(editingLinkType.id, formData);
+        await translationEditor?.save();
       } else {
         await api.linkTypes.create(formData);
       }
@@ -244,21 +245,40 @@
   <!-- Modal content -->
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <Label color="default" class="mb-2">{t('settings.linkTypes.name')}</Label>
-          <Input
-            type="text"
-            bind:value={formData.name}
-            required
-            placeholder={t('settings.linkTypes.namePlaceholder')}
-            size="small"
+      {#if editingLinkType}
+        {#key editingLinkType.id}
+          <LocalizedObjectFields
+            bind:this={translationEditor}
+            objectType="link_type"
+            objectId={editingLinkType.id}
+            bind:canonicalName={formData.name}
+            bind:canonicalDescription={formData.description}
+            displayName={editingLinkType.display_name || editingLinkType.name}
+            displayDescription={editingLinkType.display_description || editingLinkType.description}
           />
+        {/key}
+      {:else}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label color="default" class="mb-2">{t('settings.linkTypes.name')}</Label>
+            <Input
+              type="text"
+              bind:value={formData.name}
+              required
+              placeholder={t('settings.linkTypes.namePlaceholder')}
+              size="small"
+            />
+          </div>
+          <div>
+            <IconSelector bind:selectedColor={formData.color} colorOnly compact />
+          </div>
         </div>
+      {/if}
+      {#if editingLinkType}
         <div>
           <IconSelector bind:selectedColor={formData.color} colorOnly compact />
         </div>
-      </div>
+      {/if}
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
@@ -285,14 +305,16 @@
         </div>
       </div>
 
-      <div class="mb-4">
-        <Label color="default" class="mb-2">{t('settings.linkTypes.description')}</Label>
-        <Textarea
-          bind:value={formData.description}
-          rows={3}
-          placeholder={t('settings.linkTypes.descriptionPlaceholder')}
-        />
-      </div>
+      {#if !editingLinkType}
+        <div class="mb-4">
+          <Label color="default" class="mb-2">{t('settings.linkTypes.description')}</Label>
+          <Textarea
+            bind:value={formData.description}
+            rows={3}
+            placeholder={t('settings.linkTypes.descriptionPlaceholder')}
+          />
+        </div>
+      {/if}
 
       <div class="mb-4">
         <Checkbox

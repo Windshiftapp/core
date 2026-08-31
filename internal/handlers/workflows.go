@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -18,6 +19,12 @@ type WorkflowHandler struct {
 	repo            *repository.WorkflowRepository
 	auditor         *logger.Auditor
 	workflowService *services.WorkflowService
+	translations    *objecttranslation.Service
+}
+
+func (h *WorkflowHandler) WithObjectTranslations(service *objecttranslation.Service) *WorkflowHandler {
+	h.translations = service
+	return h
 }
 
 // SetWorkflowService sets the workflow service for cache invalidation
@@ -54,6 +61,9 @@ func (h *WorkflowHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("workflows listed", "count", len(workflows))
+	if !localizeObjectResponse(w, r, h.translations, "workflow", workflows) {
+		return
+	}
 	respondJSONOK(w, workflows)
 }
 
@@ -80,6 +90,9 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	workflow.Transitions = transitions
+	if !localizeObjectResponse(w, r, h.translations, "workflow", workflow) {
+		return
+	}
 
 	respondJSONOK(w, workflow)
 }
@@ -139,6 +152,9 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionWorkflowCreate, logger.ResourceWorkflow, &id, workflow.Name)
+	}
+	if !localizeObjectResponse(w, r, h.translations, "workflow", createdWorkflow) {
+		return
 	}
 
 	respondJSONCreated(w, struct {
@@ -207,6 +223,9 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Invalidate initial status cache so new items get the correct initial status
 	if h.workflowService != nil {
 		h.workflowService.InvalidateInitialStatusCache()
+	}
+	if !localizeObjectResponse(w, r, h.translations, "workflow", updatedWorkflow) {
+		return
 	}
 
 	respondJSONOK(w, struct {

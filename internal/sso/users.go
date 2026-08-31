@@ -16,7 +16,6 @@ import (
 var (
 	ErrExternalAccountNotFound            = errors.New("external account not found")
 	ErrUserNotFound                       = errors.New("user not found")
-	ErrEmailNotVerified                   = errors.New("email not verified by SSO provider")
 	ErrAutoProvisionDisabled              = errors.New("automatic user provisioning is disabled")
 	ErrAccountLinkingFailed               = errors.New("failed to link external account")
 	ErrAccountLinkingRequiresVerification = errors.New("account linking requires verified email from identity provider")
@@ -25,7 +24,7 @@ var (
 // FindOrCreateResult contains the result of FindOrCreateUser with verification status
 type FindOrCreateResult struct {
 	User                   *models.User
-	NeedsEmailVerification bool // True if we need to verify email ourselves (IdP didn't provide claim)
+	NeedsEmailVerification bool // True when Windshift must verify the email.
 	IsNewUser              bool // True if user was just created
 }
 
@@ -95,7 +94,7 @@ func (s *UserStore) FindExternalAccount(providerID int, externalID string) (*Ext
 // scanning the result into a models.User. The query must select columns in the
 // standard order: id, email, username, first_name, last_name, is_active,
 // avatar_url, password_hash, requires_password_reset, timezone, language,
-// created_at, updated_at.
+// email_verified, created_at, updated_at.
 func (s *UserStore) getUserByQuery(query string, arg any) (*models.User, error) {
 	var user models.User
 	var avatarURL, timezone, language sql.NullString
@@ -112,6 +111,7 @@ func (s *UserStore) getUserByQuery(query string, arg any) (*models.User, error) 
 		&user.RequiresPasswordReset,
 		&timezone,
 		&language,
+		&user.EmailVerified,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -134,7 +134,7 @@ func (s *UserStore) getUserByQuery(query string, arg any) (*models.User, error) 
 func (s *UserStore) FindUserByEmail(email string) (*models.User, error) {
 	query := `
 		SELECT id, email, username, first_name, last_name, is_active, avatar_url,
-		       password_hash, requires_password_reset, timezone, language, created_at, updated_at
+		       password_hash, requires_password_reset, timezone, language, email_verified, created_at, updated_at
 		FROM users
 		WHERE LOWER(email) = LOWER(?)
 	`
@@ -145,7 +145,7 @@ func (s *UserStore) FindUserByEmail(email string) (*models.User, error) {
 func (s *UserStore) GetUserByID(userID int) (*models.User, error) {
 	query := `
 		SELECT id, email, username, first_name, last_name, is_active, avatar_url,
-		       password_hash, requires_password_reset, timezone, language, created_at, updated_at
+		       password_hash, requires_password_reset, timezone, language, email_verified, created_at, updated_at
 		FROM users
 		WHERE id = ?
 	`
@@ -236,38 +236,17 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 // 4. If auto-provision disabled -> return error
 //
 // Email verification logic:
-// - If IdP says email_verified: true -> user is verified
-// - If IdP says email_verified: false AND RequireVerifiedEmail is true -> block login
-// - If IdP doesn't provide email_verified claim -> we need to verify ourselves
+// - A verified claim is always accepted.
+// - An explicitly unverified claim uses Windshift verification.
+// - A missing claim is accepted only when the provider is trusted to manage email.
 func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) (*FindOrCreateResult, error) {
 	result := &FindOrCreateResult{}
 
-	// Determine email verification status from IdP
-	// Three cases:
-	// 1. IdP provided email_verified: true -> trust it, user is verified
-	// 2. IdP provided email_verified: false -> if RequireVerifiedEmail, block; otherwise continue
-	// 3. IdP didn't provide email_verified -> we need to verify ourselves
-	needsOurVerification := false
-	emailIsVerified := false
-
-	if claims.EmailVerifiedProvided {
-		// IdP provided the claim
-		if claims.EmailVerified {
-			// Case 1: IdP confirms email is verified
-			emailIsVerified = true
-		} else {
-			// Case 2: IdP explicitly says email is NOT verified
-			if provider.RequireVerifiedEmail {
-				return nil, fmt.Errorf("%w: the identity provider reports your email address is not verified", ErrEmailNotVerified)
-			}
-			// If provider doesn't require verification, allow login but mark as unverified
-			emailIsVerified = false
-		}
-	} else {
-		// Case 3: IdP didn't provide the claim - we need to verify ourselves
-		needsOurVerification = true
-		emailIsVerified = false
+	emailIsVerified := claims.Email != "" && claims.EmailVerifiedProvided && claims.EmailVerified
+	if claims.Email != "" && !claims.EmailVerifiedProvided && provider.RequireVerifiedEmail {
+		emailIsVerified = true
 	}
+	needsOurVerification := !emailIsVerified
 
 	// 1. Check if external account already linked
 	extAccount, err := s.FindExternalAccount(provider.ID, claims.Subject)
@@ -280,23 +259,20 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 			return nil, err
 		}
 		result.User = user
-		// For existing users, only need verification if they're not already verified
-		// AND the IdP doesn't provide verification status
-		result.NeedsEmailVerification = needsOurVerification && !user.EmailVerified
+		// Verify locally only when the stored email is still unverified and the
+		// current provider evidence does not verify that same address.
+		emailMatchesUser := strings.EqualFold(strings.TrimSpace(claims.Email), strings.TrimSpace(user.Email))
+		result.NeedsEmailVerification = (!emailIsVerified || !emailMatchesUser) && !user.EmailVerified
 		return result, nil
 	}
 
-	// 2. Try to link by email - ONLY if IdP has verified the email
-	// Security: This prevents account takeover via malicious IdP that claims
-	// unverified emails matching existing users
+	// 2. Link by email only when the provider claim or provider trust verifies it.
 	if claims.Email != "" {
 		var existingUser *models.User
 		existingUser, err = s.FindUserByEmail(claims.Email)
 		if err == nil {
-			// Security check: Only auto-link if IdP has explicitly verified the email
-			// This prevents account takeover where an attacker controls an IdP and
-			// creates a user with a victim's email address
-			if !claims.EmailVerified || !claims.EmailVerifiedProvided {
+			// Never grant an unverified SSO identity access to an existing account.
+			if !emailIsVerified {
 				return nil, fmt.Errorf("%w: cannot automatically link to existing account '%s' without verified email from identity provider", ErrAccountLinkingRequiresVerification, claims.Email)
 			}
 			// Link the external account to existing user
@@ -304,8 +280,8 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 				return nil, fmt.Errorf("%w: %w", ErrAccountLinkingFailed, err)
 			}
 			result.User = existingUser
-			// For existing users, only need verification if they're not already verified
-			// AND the IdP doesn't provide verification status
+			// The callback promotes an unverified local row when this login supplies
+			// trusted verification evidence.
 			result.NeedsEmailVerification = needsOurVerification && !existingUser.EmailVerified
 			return result, nil
 		}
@@ -321,10 +297,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 		return nil, fmt.Errorf("%w: email is required for user provisioning", ErrOIDCMissingClaims)
 	}
 
-	// Surface the dangerous case in logs: IdP explicitly says email is not verified,
-	// provider has RequireVerifiedEmail=false, and we're about to create a brand-new
-	// user from that unverified claim. This row could later be cross-linked to a
-	// stricter provider, which is the account-takeover/squatting path.
+	// Record explicit negative verification before creating an unverified user.
 	if claims.EmailVerifiedProvided && !claims.EmailVerified {
 		slog.Warn("SSO auto-provisioning a new user from an IdP-unverified email claim",
 			slog.String("component", "sso"),

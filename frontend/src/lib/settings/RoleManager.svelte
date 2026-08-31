@@ -20,14 +20,17 @@
   import {
     systemPermissionDescription,
     systemPermissionName,
-    systemRoleDescription,
-    systemRoleName,
+    objectDisplayDescription,
+    objectDisplayName,
   } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   let roles = $state([]);
   let loading = $state(true);
   let selectedRole = $state(null);
   let rolePermissions = $state([]);
+  let translationEditor = $state(null);
+  let savingTranslations = $state(false);
 
   // Add-custom-role modal state
   let creating = $state(false);
@@ -89,6 +92,25 @@
   function closeDetails() {
     selectedRole = null;
     rolePermissions = [];
+  }
+
+  async function saveRoleTranslations() {
+    try {
+      savingTranslations = true;
+      translationEditor?.validate();
+      await api.workspaceRoles.update(selectedRole.id, {
+        name: selectedRole.name,
+        description: selectedRole.description,
+      });
+      await translationEditor?.save();
+      selectedRole = await api.workspaceRoles.get(selectedRole.id);
+      await loadRoles();
+      successToast(t('common.saved'));
+    } catch (error) {
+      errorToast(error?.message || t('dialogs.alerts.failedToSave'));
+    } finally {
+      savingTranslations = false;
+    }
   }
 
   function startCreating() {
@@ -196,12 +218,30 @@
     maxWidth="max-w-2xl"
   >
     <ModalHeader
-      title={systemRoleName(selectedRole)}
-      subtitle={systemRoleDescription(selectedRole)}
+      title={objectDisplayName(selectedRole, 'workspace_role')}
+      subtitle={objectDisplayDescription(selectedRole, 'workspace_role')}
       icon={BadgeCheck}
       onClose={closeDetails}
     />
     <div class="px-6 py-4">
+      {#if selectedRole}
+        {#key selectedRole.id}
+          <LocalizedObjectFields
+            bind:this={translationEditor}
+            objectType="workspace_role"
+            objectId={selectedRole.id}
+            bind:canonicalName={selectedRole.name}
+            bind:canonicalDescription={selectedRole.description}
+            displayName={selectedRole.display_name || selectedRole.name}
+            displayDescription={selectedRole.display_description || selectedRole.description}
+          />
+        {/key}
+        <div class="mt-4 flex justify-end">
+          <Button variant="primary" onclick={saveRoleTranslations} loading={savingTranslations}>
+            {t('common.save')}
+          </Button>
+        </div>
+      {/if}
       {#if selectedRole?.permissions_enabled}
         <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('roles.permissions')}</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
@@ -286,10 +326,10 @@
     emptyMessage={t('roles.noRoles')}
   >
     {#snippet name(item)}
-      {systemRoleName(item)}
+      {objectDisplayName(item, 'workspace_role')}
     {/snippet}
     {#snippet description(item)}
-      {systemRoleDescription(item)}
+      {objectDisplayDescription(item, 'workspace_role')}
     {/snippet}
   </DataTable>
 

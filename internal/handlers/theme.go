@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -14,8 +15,14 @@ import (
 )
 
 type ThemeHandler struct {
-	service *services.ThemeService
-	auditor *logger.Auditor
+	service      *services.ThemeService
+	auditor      *logger.Auditor
+	translations *objecttranslation.Service
+}
+
+func (h *ThemeHandler) WithObjectTranslations(service *objecttranslation.Service) *ThemeHandler {
+	h.translations = service
+	return h
 }
 
 func NewThemeHandler(service *services.ThemeService, auditor *logger.Auditor) *ThemeHandler {
@@ -27,6 +34,9 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 	themes, err := h.service.List()
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query themes: %w", err))
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "theme", themes) {
 		return
 	}
 	respondJSONOK(w, themes)
@@ -43,6 +53,9 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to get active theme: %w", err))
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "theme", theme) {
 		return
 	}
 	respondJSONOK(w, theme)
@@ -109,6 +122,9 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &theme.ID, theme.Name)
 	}
+	if !localizeObjectResponse(w, r, h.translations, "theme", &theme) {
+		return
+	}
 	respondJSONCreated(w, struct {
 		models.Theme
 		Warnings []string `json:"warnings,omitempty"`
@@ -146,6 +162,9 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.Log(r, currentUser, logger.ActionThemeUpdate, logger.ResourceTheme, &themeID, theme.Name)
+	}
+	if !localizeObjectResponse(w, r, h.translations, "theme", &theme) {
+		return
 	}
 	respondJSONOK(w, struct {
 		models.Theme

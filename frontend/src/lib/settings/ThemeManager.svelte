@@ -16,7 +16,8 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayValue } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   // State management
   let themes = $state([]);
@@ -25,10 +26,10 @@
   let error = $state(null);
   let showCreateForm = $state(false);
   let editingTheme = $state(null);
+  let translationEditor = $state(null);
 
   function getThemeDisplayValue(theme, field) {
-    const key = builtinLocaleKey(theme);
-    return key ? t(`settings.themeManager.defaults.${key}.${field}`) : (theme?.[field] || '');
+    return objectDisplayValue(theme, field);
   }
 
   // Form data
@@ -95,8 +96,6 @@
       error = null;
       const updated = await api.themes.update(id, data);
       themes = themes.map(t => t.id === id ? updated : t);
-      editingTheme = null;
-      
       // If this theme is active, update active theme
       if (updated.is_active) {
         activeTheme = updated;
@@ -104,6 +103,7 @@
     } catch (err) {
       error = t('settings.themeManager.failedToUpdate');
       console.error('Error updating theme:', err);
+      throw err;
     }
   }
 
@@ -173,9 +173,10 @@
     createTheme();
   }
 
-  function handleEditSubmit(e) {
+  async function handleEditSubmit(e) {
     e.preventDefault();
-    updateTheme(editingTheme.id, {
+    translationEditor?.validate();
+    await updateTheme(editingTheme.id, {
       name: editingTheme.name,
       description: editingTheme.description,
       nav_background_color_light: editingTheme.nav_background_color_light,
@@ -184,6 +185,9 @@
       nav_text_color_dark: editingTheme.nav_text_color_dark,
       is_active: editingTheme.is_active
     });
+    await translationEditor?.save();
+    await Promise.all([loadThemes(), loadActiveTheme()]);
+    editingTheme = null;
   }
 </script>
 
@@ -335,26 +339,17 @@
             {#if editingTheme && editingTheme.id === theme.id}
               <!-- Edit Form -->
               <form onsubmit={handleEditSubmit} class="space-y-4">
-                <div>
-                  <Label for="edit-theme-name" color="default" class="mb-1">{t('common.name')}</Label>
-                  <Input
-                    type="text"
-                    id="edit-theme-name"
-                    bind:value={editingTheme.name}
-                    required
-                    size="small"
+                {#key editingTheme.id}
+                  <LocalizedObjectFields
+                    bind:this={translationEditor}
+                    objectType="theme"
+                    objectId={editingTheme.id}
+                    bind:canonicalName={editingTheme.name}
+                    bind:canonicalDescription={editingTheme.description}
+                    displayName={editingTheme.display_name || editingTheme.name}
+                    displayDescription={editingTheme.display_description || editingTheme.description}
                   />
-                </div>
-
-                <div>
-                  <Label for="edit-theme-description" color="default" class="mb-1">{t('common.description')}</Label>
-                  <Input
-                    type="text"
-                    id="edit-theme-description"
-                    bind:value={editingTheme.description}
-                    size="small"
-                  />
-                </div>
+                {/key}
 
                 <!-- Light Mode Colors -->
                 <div class="mb-3">

@@ -116,6 +116,17 @@ func (r *WorkspaceRoleRepository) NameExists(name string) (bool, error) {
 	return exists, err
 }
 
+// NameExistsExcept reports whether another workspace role uses the name.
+func (r *WorkspaceRoleRepository) NameExistsExcept(name string, id int) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM workspace_roles WHERE name = ? AND id <> ?)",
+		name,
+		id,
+	).Scan(&exists)
+	return exists, err
+}
+
 // CountManualActionRestrictions returns how many action allowlists reference
 // the role. Deleting such a role would otherwise turn a restricted manual
 // action into an unrestricted one.
@@ -415,6 +426,18 @@ func (r *WorkspaceRoleRepository) CreateCustomRole(name, description string, now
 		return 0, fmt.Errorf("create workspace_role %q: %w", name, err)
 	}
 	return int(id64), nil
+}
+
+// UpdateMetadata changes only the canonical label fields.
+func (r *WorkspaceRoleRepository) UpdateMetadata(id int, name, description string, now time.Time) error {
+	if _, err := r.db.ExecWrite(`
+		UPDATE workspace_roles
+		SET name = ?, description = ?, updated_at = ?
+		WHERE id = ?
+	`, name, description, now, id); err != nil {
+		return fmt.Errorf("update workspace_role %d: %w", id, err)
+	}
+	return nil
 }
 
 // AffectedUserIDs returns the set of user ids whose permission cache is

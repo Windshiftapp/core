@@ -25,6 +25,7 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   let notificationSettings = $state([]);
   let availableEvents = $state([]);
@@ -33,6 +34,7 @@
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
   let editingSetting = $state(null);
+  let translationEditor = $state(null);
 
   // Form state
   let formData = $state({
@@ -145,7 +147,9 @@
 
     try {
       if (editingSetting) {
+        translationEditor?.validate();
         await api.notificationSettings.update(editingSetting.id, formData);
+        await translationEditor?.save();
       } else {
         // Add created_by from current user
         formData.created_by = /** @type {any} */ (authStore.currentUser)?.id;
@@ -319,6 +323,19 @@
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <div class="space-y-6">
         <!-- Basic Information -->
+        {#if editingSetting}
+          {#key editingSetting.id}
+            <LocalizedObjectFields
+              bind:this={translationEditor}
+              objectType="notification_setting"
+              objectId={editingSetting.id}
+              bind:canonicalName={formData.name}
+              bind:canonicalDescription={formData.description}
+              displayName={editingSetting.display_name || editingSetting.name}
+              displayDescription={editingSetting.display_description || editingSetting.description}
+            />
+          {/key}
+        {:else}
         <div class="grid grid-cols-1 gap-4">
           <div>
             <Label for="name" color="default" required class="mb-1">{t('settings.notifications.name')}</Label>
@@ -343,6 +360,7 @@
           </div>
 
         </div>
+        {/if}
 
         <!-- Event Rules -->
         <div>

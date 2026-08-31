@@ -22,6 +22,8 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { isAlwaysVisibleSystemField } from '../utils/screenFields.js';
   import Checkbox from '../components/Checkbox.svelte';
+  import LocalizedObjectFields from '../settings/LocalizedObjectFields.svelte';
+  import { objectDisplayValue } from '../utils/systemLabels.js';
 
   // Bind to store values
   let screens = $derived(screenEditorStore.screens);
@@ -36,19 +38,15 @@
   let draggedField = $derived(screenEditorStore.draggedField);
   let fieldDragState = $derived(screenEditorStore.fieldDragState);
   let fieldWidths = $derived(screenEditorStore.fieldWidths);
+  let screenCanonicalName = $state('');
+  let screenCanonicalDescription = $state('');
+  let translationEditor = $state(null);
 
   let setupCleanups = [];
   let setupTimeout;
 
-  function isDefaultSystemScreen(screen) {
-    return Boolean(screen?.builtin_key);
-  }
-
   function getScreenDisplayValue(screen, field) {
-    if (isDefaultSystemScreen(screen)) {
-      return t(`screensPage.defaults.default.${field}`);
-    }
-    return screen?.[field] || '';
+    return objectDisplayValue(screen, field, 'screen');
   }
 
   onMount(async () => {
@@ -175,6 +173,8 @@
   }
 
   function startEdit(screen) {
+    screenCanonicalName = screen.name || '';
+    screenCanonicalDescription = screen.description || '';
     screenEditorStore.startEdit(screen);
   }
 
@@ -193,7 +193,15 @@
 
   async function saveScreen() {
     try {
+      if (editingScreen) {
+        translationEditor?.validate();
+        setFormData('name', screenCanonicalName);
+        setFormData('description', screenCanonicalDescription);
+      }
+      const editor = translationEditor;
       await screenEditorStore.saveScreen();
+      await editor?.save();
+      await screenEditorStore.loadScreens();
     } catch (error) {
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
@@ -332,6 +340,19 @@
       <!-- Modal content -->
       <div class="px-6 py-4">
         <form onsubmit={(e) => { e.preventDefault(); saveScreen(); }}>
+          {#if editingScreen}
+            {#key editingScreen.id}
+              <LocalizedObjectFields
+                bind:this={translationEditor}
+                objectType="screen"
+                objectId={editingScreen.id}
+                bind:canonicalName={screenCanonicalName}
+                bind:canonicalDescription={screenCanonicalDescription}
+                displayName={editingScreen.display_name || editingScreen.name}
+                displayDescription={editingScreen.display_description || editingScreen.description}
+              />
+            {/key}
+          {:else}
           <div class="grid grid-cols-1 gap-6">
             <div>
               <Label for="screen-name" required class="mb-2">{t('screensPage.screenName')}</Label>
@@ -355,6 +376,7 @@
               />
             </div>
           </div>
+          {/if}
         </form>
       </div>
 

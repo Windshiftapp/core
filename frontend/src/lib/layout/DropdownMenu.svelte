@@ -189,7 +189,7 @@
         <ChevronDown class="w-3 h-3" />
       {/if}
     {:else if triggerAvatar}
-      <img src={triggerAvatar} alt={t('common.profile')} class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+      <img src={triggerAvatar} alt={t('common.profile')} class="w-8 min-w-8 h-8 rounded-full object-cover flex-none" />
       {#if triggerText}
         <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{triggerText}</span>
       {/if}

@@ -1,7 +1,7 @@
 <script>
   import DueMark from './DueMark.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { systemPriorityName, systemStatusName } from '../../utils/systemLabels.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   let {
     title,
@@ -20,8 +20,8 @@
 
   const hasPriority = $derived(!!(priorityName && priorityColor));
   const hasStatus = $derived(!!statusName);
-  const localizedPriorityName = $derived(systemPriorityName({ name: priorityName, builtin_key: priorityBuiltinKey }));
-  const localizedStatusName = $derived(systemStatusName({ name: statusName, builtin_key: statusBuiltinKey }));
+  const localizedPriorityName = $derived(objectDisplayName({ name: priorityName, builtin_key: priorityBuiltinKey }, 'priority'));
+  const localizedStatusName = $derived(objectDisplayName({ name: statusName, builtin_key: statusBuiltinKey }, 'status'));
   const rowPadding = $derived(density === 'compact' ? 'p-1.5' : 'p-2');
 </script>
 

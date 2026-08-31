@@ -29,7 +29,7 @@
   import FileInput from '../components/FileInput.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayName, objectDisplayValue } from '../utils/systemLabels.js';
 
   let configurationSets = $state([]);
   let workspaces = $state([]);
@@ -71,22 +71,19 @@
   let pendingWorkflowChangeId = $state(null);
 
   function getConfigurationSetDisplayValue(configSet, field) {
-    return configSet?.builtin_key
-      ? t(`settings.configSets.defaults.configuration.${field}`)
-      : (configSet?.[field] || '');
+    return objectDisplayValue(configSet, field);
   }
 
   function getItemTypeDisplayName(itemType) {
-    const key = builtinLocaleKey(itemType);
-    return key ? t(`settings.itemTypes.defaults.${key}`) : itemType?.name;
+    return objectDisplayName(itemType);
   }
 
   function getScreenDisplayName(screenId, fallbackName) {
     const screen = screens.find(candidate => candidate.id === screenId) ||
       screens.find(candidate => candidate.name === fallbackName);
-    return screen?.builtin_key
-      ? t('screensPage.defaults.default.name')
-      : (fallbackName || screen?.name || t('settings.configSets.none'));
+    return screen
+      ? objectDisplayName(screen)
+      : (fallbackName || t('settings.configSets.none'));
   }
 
   // Form state

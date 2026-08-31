@@ -27,6 +27,17 @@ if (typeof window !== 'undefined') {
   });
 }
 
+function requestLocale() {
+  if (typeof document !== 'undefined' && document.documentElement.lang) {
+    return document.documentElement.lang;
+  }
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('windshift-locale');
+    if (saved) return saved;
+  }
+  return typeof navigator !== 'undefined' ? navigator.language : 'en';
+}
+
 // In-flight GET ownership is scoped to the authenticated browser session.
 // Settled responses are never retained here: this removes duplicate concurrent
 // network work without turning live endpoints into a cache.
@@ -53,7 +64,7 @@ function inFlightGETKey(endpoint, options) {
   const optionKeys = Object.keys(options || {});
   if (optionKeys.some((key) => key !== 'method')) return null;
 
-  return `${apiRequestSessionKey}|${normalizeGETEndpoint(endpoint)}`;
+  return `${apiRequestSessionKey}|${requestLocale()}|${normalizeGETEndpoint(endpoint)}`;
 }
 
 function isAdminUIPath() {
@@ -131,8 +142,12 @@ async function performFetchAPI(endpoint, options = {}) {
   const { timeout: requestedTimeout = 0, signal: callerSignal, ...fetchOptions } = options;
   const isFormData = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
   const headers = isFormData
-    ? { ...fetchOptions.headers }
-    : { 'Content-Type': 'application/json', ...fetchOptions.headers };
+    ? { 'Accept-Language': requestLocale(), ...fetchOptions.headers }
+    : {
+        'Content-Type': 'application/json',
+        'Accept-Language': requestLocale(),
+        ...fetchOptions.headers,
+      };
 
   const timeoutMs = Number(requestedTimeout);
   const hasTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;

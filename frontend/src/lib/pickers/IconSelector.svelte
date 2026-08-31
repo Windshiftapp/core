@@ -26,6 +26,7 @@
     triggerVariant = 'default',
     triggerText = '',
     triggerTitle = '',
+    dataTestid = undefined,
     onchange = null,
     iconMap = null,
     iconOptions = null
@@ -88,7 +89,11 @@
 {#if compact}
   <!-- Compact Mode -->
   {@const SelectedIcon = resolvedIconMap[selectedIcon] || Package}
-  <div class="icon-selector icon-selector-compact">
+  <div
+    class="icon-selector icon-selector-compact"
+    class:icon-selector-color-only={colorOnly}
+    data-testid={dataTestid}
+  >
     {#if resolvedLabel}
       <Label class="mb-2">{resolvedLabel}</Label>
     {/if}
@@ -455,6 +460,11 @@
   /* Compact mode styles */
   .icon-selector-compact {
     width: 100%;
+  }
+
+  .icon-selector-compact.icon-selector-color-only {
+    width: fit-content;
+    flex-shrink: 0;
   }
 
   .compact-trigger {

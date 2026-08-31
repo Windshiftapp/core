@@ -15,13 +15,16 @@
   import Textarea from '../components/Textarea.svelte';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayValue } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   let hierarchyLevels = $state([]);
   let isLoading = $state(true);
   let error = $state(null);
   let editingId = $state(null);
   let showCreateForm = $state(false);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   // Form data
   let formData = $state({
@@ -31,10 +34,7 @@
   });
 
   function getDisplayValue(hierarchyLevel, field) {
-    const key = builtinLocaleKey(hierarchyLevel);
-    return key
-      ? t(`settings.hierarchyLevels.defaults.${key}.${field}`)
-      : hierarchyLevel[field];
+    return objectDisplayValue(hierarchyLevel, field);
   }
 
 
@@ -62,10 +62,12 @@
       description: ''
     };
     editingId = null;
+    editingObject = null;
     showCreateForm = true;
   }
 
   function startEdit(hierarchyLevel) {
+    editingObject = hierarchyLevel;
     formData = {
       level: hierarchyLevel.level,
       name: hierarchyLevel.name,
@@ -78,6 +80,7 @@
   function cancelEdit() {
     showCreateForm = false;
     editingId = null;
+    editingObject = null;
     formData = { level: 0, name: '', description: '' };
   }
 
@@ -90,7 +93,9 @@
       }
 
       if (editingId) {
+        translationEditor?.validate();
         await api.hierarchyLevels.update(editingId, formData);
+        await translationEditor?.save();
       } else {
         await api.hierarchyLevels.create(formData);
       }
@@ -281,26 +286,40 @@
         <small>{t('settings.hierarchyLevels.numericHint')}</small>
       </div>
 
-      <div class="form-group">
-        <label for="name">{t('settings.hierarchyLevels.name')}</label>
-        <Input
-          type="text"
-          id="name"
-          placeholder={t('settings.hierarchyLevels.namePlaceholder')}
-          bind:value={formData.name}
-          required
-        />
-      </div>
+      {#if editingId}
+        {#key editingId}
+          <LocalizedObjectFields
+            bind:this={translationEditor}
+            objectType="hierarchy_level"
+            objectId={editingId}
+            bind:canonicalName={formData.name}
+            bind:canonicalDescription={formData.description}
+            displayName={editingObject?.display_name || editingObject?.name}
+            displayDescription={editingObject?.display_description || editingObject?.description}
+          />
+        {/key}
+      {:else}
+        <div class="form-group">
+          <label for="name">{t('settings.hierarchyLevels.name')}</label>
+          <Input
+            type="text"
+            id="name"
+            placeholder={t('settings.hierarchyLevels.namePlaceholder')}
+            bind:value={formData.name}
+            required
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="description">{t('settings.hierarchyLevels.description')}</label>
-        <Textarea
-          id="description"
-          placeholder={t('settings.hierarchyLevels.descriptionPlaceholder')}
-          bind:value={formData.description}
-          rows={3}
-        />
-      </div>
+        <div class="form-group">
+          <label for="description">{t('settings.hierarchyLevels.description')}</label>
+          <Textarea
+            id="description"
+            placeholder={t('settings.hierarchyLevels.descriptionPlaceholder')}
+            bind:value={formData.description}
+            rows={3}
+          />
+        </div>
+      {/if}
 
     </form>
   </div>

@@ -8,6 +8,17 @@ func RegisterAdminRoutes(deps *Deps) {
 	auth := deps.AuthMiddleware.RequireAuth
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
+	if deps.Admin.ObjectTranslation != nil {
+		translations := deps.Admin.ObjectTranslation
+		api.HandleH("GET /admin/object-translations/definitions", admin(http.HandlerFunc(translations.ListDefinitions)))
+		api.HandleH("POST /admin/object-translations/resolve", admin(http.HandlerFunc(translations.Resolve)))
+		api.HandleH("GET /admin/object-translations/orphans", admin(http.HandlerFunc(translations.FindOrphans)))
+		api.HandleH("GET /admin/object-translations/canonical-differences", admin(http.HandlerFunc(translations.FindCanonicalDifferences)))
+		api.HandleH("GET /admin/object-translations/{object_type}/{object_id}", admin(http.HandlerFunc(translations.List)))
+		api.HandleH("PUT /admin/object-translations/{object_type}/{object_id}/{field}/{locale}", admin(http.HandlerFunc(translations.Upsert)))
+		api.HandleH("DELETE /admin/object-translations/{object_type}/{object_id}/{field}/{locale}", admin(http.HandlerFunc(translations.Delete)))
+	}
+
 	// Admin security settings
 	api.HandleH("GET /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.GetSecuritySettings)))
 	api.HandleH("PUT /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.UpdateSecuritySettings)))

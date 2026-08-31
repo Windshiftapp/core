@@ -24,7 +24,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
-  import { systemStatusName } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -538,7 +538,7 @@
 
   function getStatusName(statusId) {
     const s = statuses.find(s => s.id === statusId);
-    return s ? systemStatusName(s) : statusId;
+    return s ? objectDisplayName(s, 'status') : statusId;
   }
 
   function getStatusColor(statusId) {
@@ -934,7 +934,7 @@
                   <!-- Color dot -->
                   <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.category_color || '#6b7280'};"></span>
                   <!-- Status name -->
-                  <span class="text-sm truncate" style="color: var(--ds-text);">{systemStatusName(status)}</span>
+                  <span class="text-sm truncate" style="color: var(--ds-text);">{objectDisplayName(status, 'status')}</span>
                 </div>
               {/each}
 
@@ -1132,7 +1132,7 @@
                       <span style="color: var(--ds-interactive);">✓</span>
                     {/if}
                   </span>
-                  <span class="flex-1">{systemStatusName(status)}</span>
+                  <span class="flex-1">{objectDisplayName(status, 'status')}</span>
                 </button>
               {/each}
             </div>

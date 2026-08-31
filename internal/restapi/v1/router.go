@@ -7,6 +7,7 @@ package v1
 
 import (
 	coremiddleware "windshift/internal/middleware"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/handlers"
@@ -21,6 +22,10 @@ func RegisterRoutes(deps restapi.Deps) {
 	db := deps.DB
 	tokenManager := deps.TokenManager
 	permissionService := deps.PermissionService
+	objectTranslationService := deps.ObjectTranslationService
+	if objectTranslationService == nil {
+		objectTranslationService = objecttranslation.NewService(db)
+	}
 
 	bearerAuth := v1middleware.NewBearerAuthWithPermissions(tokenManager, permissionService)
 
@@ -32,10 +37,10 @@ func RegisterRoutes(deps restapi.Deps) {
 	itemHandler.SetItemUpdateApplicationService(deps.ItemUpdateApplicationService)
 	itemHandler.SetItemDeletionApplicationService(deps.ItemDeletionApplicationService)
 	workspaceHandler := handlers.NewWorkspaceHandler(db, permissionService)
-	statusHandler := handlers.NewStatusHandler(db, permissionService)
+	statusHandler := handlers.NewStatusHandler(db, permissionService, objectTranslationService)
 	workflowHandler := handlers.NewWorkflowHandler(db, permissionService)
-	itemTypeHandler := handlers.NewItemTypeHandler(db, permissionService)
-	priorityHandler := handlers.NewPriorityHandler(db, permissionService)
+	itemTypeHandler := handlers.NewItemTypeHandler(db, permissionService, objectTranslationService)
+	priorityHandler := handlers.NewPriorityHandler(db, permissionService, objectTranslationService)
 	customFieldHandler := handlers.NewCustomFieldHandler(db, permissionService)
 	userHandler := handlers.NewUserHandler(db, permissionService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(db, permissionService)
@@ -505,6 +510,9 @@ func RegisterRoutes(deps restapi.Deps) {
 	adminGroupHandler := handlers.NewAdminGroupHandler(db, permissionService)
 	adminAuditLogHandler := handlers.NewAdminAuditLogHandler(db, permissionService)
 	adminAPITokenHandler := handlers.NewAdminAPITokenHandler(db, tokenManager, permissionService)
+	objectTranslationHandler := handlers.NewObjectTranslationHandler(
+		handlers.NewBaseHandler(db, permissionService), objectTranslationService,
+	)
 
 	adminV1 := v1.Group("", bearerAuth.RequireSystemAdmin)
 
@@ -521,4 +529,12 @@ func RegisterRoutes(deps restapi.Deps) {
 
 	adminV1.HandleWithMiddleware("GET /admin/api-tokens", adminAPITokenHandler.ListAll, bearerAuth.RequirePermission("admin:api-tokens:read"))
 	adminV1.HandleWithMiddleware("DELETE /admin/api-tokens/{id}", adminAPITokenHandler.Revoke, bearerAuth.RequirePermission("admin:api-tokens:write"), router.RequireNumericID)
+
+	adminV1.HandleWithMiddleware("GET /admin/object-translations/definitions", objectTranslationHandler.ListDefinitions, bearerAuth.RequirePermission("admin:object-translations:read"))
+	adminV1.HandleWithMiddleware("POST /admin/object-translations/resolve", objectTranslationHandler.Resolve, bearerAuth.RequirePermission("admin:object-translations:read"))
+	adminV1.HandleWithMiddleware("GET /admin/object-translations/orphans", objectTranslationHandler.FindOrphans, bearerAuth.RequirePermission("admin:object-translations:read"))
+	adminV1.HandleWithMiddleware("GET /admin/object-translations/canonical-differences", objectTranslationHandler.FindCanonicalDifferences, bearerAuth.RequirePermission("admin:object-translations:read"))
+	adminV1.HandleWithMiddleware("GET /admin/object-translations/{objectType}/{objectId}", objectTranslationHandler.List, bearerAuth.RequirePermission("admin:object-translations:read"))
+	adminV1.HandleWithMiddleware("PUT /admin/object-translations/{objectType}/{objectId}/{field}/{locale}", objectTranslationHandler.Upsert, bearerAuth.RequirePermission("admin:object-translations:write"))
+	adminV1.HandleWithMiddleware("DELETE /admin/object-translations/{objectType}/{objectId}/{field}/{locale}", objectTranslationHandler.Delete, bearerAuth.RequirePermission("admin:object-translations:write"))
 }

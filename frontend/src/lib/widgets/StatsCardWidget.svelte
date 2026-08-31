@@ -2,7 +2,7 @@
   import { FolderOpen, CheckCircle, Clock, AlertCircle } from '@lucide/svelte';
   import StatCard from './StatCard.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { systemStatusCategoryName } from '../utils/systemLabels.js';
+import { objectDisplayName } from '../utils/systemLabels.js';
 
   let { stats = {
     totalCollections: 0,
@@ -43,7 +43,7 @@
       icon={getCategoryIcon(category.name)}
       bgColor="{color}20"
       iconColor={color}
-      label={systemStatusCategoryName(category)}
+label={objectDisplayName(category, 'status_category')}
       value={stats.itemsByStatusCategory[category.name] || 0}
     />
   {/each}

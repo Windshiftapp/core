@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -202,8 +203,6 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		switch {
 		case err == sso.ErrAutoProvisionDisabled:
 			h.redirectWithError(w, r, "User account not found. Contact your administrator.")
-		case errors.Is(err, sso.ErrEmailNotVerified):
-			h.redirectWithError(w, r, "Your email address has not been verified by the identity provider")
 		case errors.Is(err, sso.ErrAccountLinkingRequiresVerification):
 			h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
 		default:
@@ -307,11 +306,12 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 	attrMap, _ := provider.GetAttributeMap()
 	if attrMap == nil {
 		attrMap = &sso.AttributeMap{
-			Email:      "email",
-			Name:       "name",
-			GivenName:  "given_name",
-			FamilyName: "family_name",
-			Username:   "preferred_username",
+			Email:         "email",
+			EmailVerified: "email_verified",
+			Name:          "name",
+			GivenName:     "given_name",
+			FamilyName:    "family_name",
+			Username:      "preferred_username",
 		}
 	}
 
@@ -369,10 +369,19 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 		claims.Username = strings.Split(claims.Email, "@")[0]
 	}
 
-	// SAML lacks a standard verified-email claim. Provider configuration decides
-	// whether email can auto-link an existing account, preventing an untrusted IdP
-	// assertion from taking one over.
+	// SAML lacks a standard verified-email claim. If the IdP asserts the mapped
+	// attribute, honor it; otherwise provider trust decides whether the
+	// asserted email can auto-link an existing account.
 	claims.EmailVerifiedProvided = true
+	if attrMap.EmailVerified != "" {
+		if v := info.GetAttribute(attrMap.EmailVerified); v != "" {
+			// Any value that isn't a recognizable "true" means not verified.
+			if verified, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+				claims.EmailVerified = verified
+			}
+			return claims
+		}
+	}
 	claims.EmailVerified = provider.RequireVerifiedEmail
 
 	return claims

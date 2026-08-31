@@ -435,12 +435,12 @@ export default {
     // SCM Providers
     scmProviders: {
       title: 'SCM Providers',
-      subtitle: 'Configure GitHub and Gitea integrations for repository linking.',
+      subtitle: 'Configure GitHub, GitLab, and Gitea integrations for repository linking.',
       addProvider: 'Add Provider',
       connectionSuccessful: 'Connection successful',
       connectionFailed: 'Connection failed',
       noProviders: 'No SCM providers',
-      getStarted: 'Get started by adding a GitHub or Gitea provider.',
+      getStarted: 'Get started by adding a GitHub, GitLab, or Gitea provider.',
       enabled: 'Enabled',
       disabled: 'Disabled',
       default: 'Default',
@@ -459,7 +459,7 @@ export default {
       providerType: 'Provider Type',
       authMethod: 'Authentication Method',
       baseUrl: 'Base URL',
-      baseUrlPlaceholder: 'Enter your self-hosted Gitea/Forgejo instance URL',
+      baseUrlPlaceholder: 'Enter your self-hosted GitLab or Gitea/Forgejo instance URL',
       callbackUrl: 'Callback URL',
       copy: 'Copy',
       copied: 'Copied!',
@@ -557,13 +557,13 @@ export default {
       autoProvisionUsers: 'Auto-provision users',
       autoProvisionUsersDesc: 'Automatically create user accounts on first SSO login',
       manualUserCreationOnly: 'Manual user creation only',
-      trustIdpEmailVerification: 'Trust IdP email verification',
+      trustIdpEmailVerification: 'Trust provider-managed email addresses',
       trustIdpEmailVerificationDesc:
-        "When enabled, blocks login if the IdP explicitly reports the email as unverified. When the IdP doesn't report verification status, we'll send a verification email.",
-      idpVerificationNotEnforced: 'IdP verification not enforced',
-      unsafeProvisioningWarningTitle: 'Risky configuration',
+        'Skip Windshift email verification when this provider omits verification status. Explicitly unverified addresses still require verification.',
+      idpVerificationNotEnforced: 'Windshift verifies unconfirmed email',
+      unsafeProvisioningWarningTitle: 'Provider email trust enabled',
       unsafeProvisioningWarningBody:
-        'Auto-provisioning is enabled while the IdP email verification trust check is off. An identity provider that lets users self-assert email addresses can pre-empt or squat legitimate accounts, and may later be linked to access from stricter providers. Only use this combination with a fully trusted IdP.',
+        "Users whose provider omits email verification can be linked to existing accounts by email. Enable this only when the provider controls its users' email addresses.",
       testConnection: 'Test Connection',
       testing: 'Testing...',
       connectionSuccessful: 'Connection successful',
@@ -973,6 +973,27 @@ export default {
         selectConnection: 'Select a connection...',
         noConnections: 'No LLM connections available. Configure one in AI Connections first.',
       },
+    },
+
+    localizedObjects: {
+      displayLabelFor: 'Display label for {locale}',
+      primaryHelp: 'This is the label administrators and users see in the active locale.',
+      localeOverrides: 'Locale overrides',
+      canonicalFallback: 'Advanced: canonical fallback',
+      canonicalHelp:
+        'The canonical value is used only when no matching instance or shipped translation applies. IDs, built-in keys, and automation behavior are unchanged.',
+      baseName: 'Canonical fallback name',
+      baseDescription: 'Canonical fallback description',
+      chooseCanonicalEffect: 'Choose what happens to locale overrides…',
+      keepOverrides: 'Change only the fallback and keep locale overrides',
+      removeInstanceOverrides: 'Change the fallback and remove instance overrides',
+      canonicalWarning:
+        'These locale translations will continue to take precedence over the canonical fallback. Choose explicitly how to handle administrator-managed overrides.',
+      canonicalChoiceRequired: 'Choose how the canonical change should affect locale overrides.',
+      localizedNameRequired: 'The active-locale display label is required.',
+      shippedFallback: 'Shipped fallback: {value}',
+      permissionRequired: 'Only an instance administrator can manage localized labels.',
+      loadFailed: 'Failed to load locale overrides.',
     },
 
     // Workspace Roles

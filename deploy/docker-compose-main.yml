@@ -25,6 +25,7 @@ services:
       - SSO_SECRET=${SSO_SECRET}
       - SESSION_IP_BINDING=${SESSION_IP_BINDING:-log}
       - ATTACHMENT_PATH=/data/attachments
+      - PLUGIN_DIR=/data/plugins
       - DB_TYPE=postgres
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432

@@ -102,7 +102,7 @@
 {:else if view === 'collections-edit'}
   <Collections collectionId={route.params.id} />
 {:else if view === 'channels'}
-  <div class="h-full min-h-0 overflow-hidden" style="background-color: var(--ds-surface);">
+  <div class="h-full min-h-0 overflow-y-auto" style="background-color: var(--ds-surface);">
     <Channels />
   </div>
 {:else if view === 'hub' || view === 'hub-inbox'}
@@ -164,7 +164,7 @@
   </div>
 {:else if routeEntry.config}
   {#if wrapper === 'surface-full'}
-    <div class="h-full min-h-0 overflow-hidden" style="background-color: var(--ds-surface);">
+    <div class="h-full min-h-0 overflow-y-auto" style="background-color: var(--ds-surface);">
       {@render lazyLoadedComponent(view, routeProps)}
     </div>
   {:else if wrapper === 'surface-padded'}

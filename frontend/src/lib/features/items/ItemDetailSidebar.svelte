@@ -33,7 +33,7 @@
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { isSystemFieldConfigured, systemFieldIdentifiers } from '../../utils/screenFields.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
-  import { systemPriorityName, systemStatusName } from '../../utils/systemLabels.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import Badge from '../../components/Badge.svelte';
   import ApprovalsTimeline from './ApprovalsTimeline.svelte';
 
@@ -69,11 +69,11 @@
       source: (item) => priorityIconMap[item.icon] || AlertCircle
     },
     primary: {
-      text: (item) => systemPriorityName(item)
+      text: (item) => objectDisplayName(item, 'priority')
     },
     searchFields: ['name'],
     getValue: (item) => item.id,
-    getLabel: (item) => systemPriorityName(item)
+    getLabel: (item) => objectDisplayName(item, 'priority')
   };
 
   // Status picker configuration
@@ -84,11 +84,11 @@
       size: 'w-2 h-2'
     },
     primary: {
-      text: (item) => systemStatusName({ name: item.label, builtin_key: item.builtin_key })
+      text: (item) => objectDisplayName({ name: item.label, builtin_key: item.builtin_key }, 'status')
     },
     searchFields: ['label', 'value'],
     getValue: (item) => item.id,
-    getLabel: (item) => systemStatusName({ name: item.label, builtin_key: item.builtin_key })
+    getLabel: (item) => objectDisplayName({ name: item.label, builtin_key: item.builtin_key }, 'status')
   };
 
   // Project picker configuration
@@ -702,7 +702,7 @@
               <StatusBadge
                 status={{
                   ...selectedStatus,
-                  label: systemStatusName({ name: selectedStatus.label, builtin_key: selectedStatus.builtin_key }),
+                  label: objectDisplayName({ name: selectedStatus.label, builtin_key: selectedStatus.builtin_key }, 'status'),
                 }}
               />
             {:else}
@@ -761,7 +761,7 @@
                 {#if selectedPriority}
                   {@const PriorityIcon = priorityIconMap[selectedPriority.icon] || AlertCircle}
                   <PriorityIcon size={14} class="flex-shrink-0" style="color: {selectedPriority.color};" />
-                  <span style="color: var(--ds-text);">{systemPriorityName(selectedPriority)}</span>
+                  <span style="color: var(--ds-text);">{objectDisplayName(selectedPriority, 'priority')}</span>
                 {:else}
                   <Text variant="subtle" size="sm">{t('common.none')}</Text>
                 {/if}

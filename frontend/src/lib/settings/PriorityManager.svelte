@@ -18,17 +18,19 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import './settings-form.css';
-  import { builtinLocaleKey } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
+  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
 
   let priorities = $state([]);
   let isLoading = $state(true);
   let error = $state(null);
   let editingId = $state(null);
   let showCreateForm = $state(false);
+  let editingObject = $state(null);
+  let translationEditor = $state(null);
 
   function getPriorityDisplayName(priority) {
-    const key = builtinLocaleKey(priority);
-    return key ? t(`priorities.${key}`) : priority.name;
+    return objectDisplayName(priority);
   }
 
   function getConfigurationSetDisplayName(name, builtinKey = '') {
@@ -75,10 +77,12 @@
       is_default: false
     };
     editingId = null;
+    editingObject = null;
     showCreateForm = true;
   }
 
   function startEdit(priority) {
+    editingObject = priority;
     formData = {
       name: priority.name,
       description: priority.description,
@@ -94,6 +98,7 @@
   function cancelEdit() {
     showCreateForm = false;
     editingId = null;
+    editingObject = null;
     formData = {
       name: '',
       description: '',
@@ -116,7 +121,9 @@
       }
 
       if (editingId) {
+        translationEditor?.validate();
         await api.priorities.update(editingId, formData);
+        await translationEditor?.save();
       } else {
         await api.priorities.create(formData);
       }
@@ -188,6 +195,7 @@
     return [
       {
         id: 'edit',
+        testid: `priority-edit-${priority.id}`,
         type: 'regular',
         icon: Edit,
         title: t('common.edit'),
@@ -196,6 +204,7 @@
       },
       {
         id: 'delete',
+        testid: `priority-delete-${priority.id}`,
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
@@ -218,6 +227,7 @@
       icon={Plus}
       onclick={startCreate}
       disabled={isLoading}
+      dataTestid="priority-add"
       keyboardHint="A"
       hotkeyConfig={{ key: toHotkeyString('priorities', 'add'), guard: () => !showCreateForm }}
     >
@@ -239,6 +249,8 @@
     emptyMessage={t('priorities.noPriorities')}
     emptyIcon={AlertCircle}
     actionItems={buildPriorityDropdownItems}
+    actionTriggerTestid={(priority) => `priority-actions-${priority.id}`}
+    rowAttrs={(priority) => ({ 'data-testid': `priority-row-${priority.id}` })}
   >
     {#snippet icon(priority)}
       {@const PriorityIcon = priorityIconMap[priority.icon] || AlertCircle}
@@ -276,7 +288,13 @@
     {/snippet}
   </DataTable>
 
-  <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl" onSubmit={savePriority}>
+  <Modal
+    isOpen={showCreateForm}
+    onclose={cancelEdit}
+    maxWidth="max-w-2xl"
+    onSubmit={savePriority}
+    dataTestid="priority-form-dialog"
+  >
     {#snippet children(submitHint)}
     <!-- Modal header -->
     <ModalHeader title={editingId ? t('priorities.editPriority') : t('priorities.createPriority')} showCloseButton={false} />
@@ -284,26 +302,40 @@
     <!-- Modal content -->
     <div class="px-6 py-4">
       <form onsubmit={(e) => { e.preventDefault(); savePriority(); }}>
-        <div class="form-group">
-          <label for="name">{t('common.name')}</label>
-          <Input
-            type="text"
-            id="name"
-            placeholder={t('priorities.namePlaceholder')}
-            bind:value={formData.name}
-            required
-          />
-        </div>
+        {#if editingId}
+          {#key editingId}
+            <LocalizedObjectFields
+              bind:this={translationEditor}
+              objectType="priority"
+              objectId={editingId}
+              bind:canonicalName={formData.name}
+              bind:canonicalDescription={formData.description}
+              displayName={editingObject?.display_name || editingObject?.name}
+              displayDescription={editingObject?.display_description || editingObject?.description}
+            />
+          {/key}
+        {:else}
+          <div class="form-group">
+            <label for="name">{t('common.name')}</label>
+            <Input
+              type="text"
+              id="name"
+              placeholder={t('priorities.namePlaceholder')}
+              bind:value={formData.name}
+              required
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="description">{t('common.description')}</label>
-          <Textarea
-            id="description"
-            placeholder={t('placeholders.optionalDescription')}
-            bind:value={formData.description}
-            rows={2}
-          />
-        </div>
+          <div class="form-group">
+            <label for="description">{t('common.description')}</label>
+            <Textarea
+              id="description"
+              placeholder={t('placeholders.optionalDescription')}
+              bind:value={formData.description}
+              rows={2}
+            />
+          </div>
+        {/if}
 
         <div class="form-group">
           <label for="sort_order">{t('common.order')}</label>

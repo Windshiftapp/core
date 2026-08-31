@@ -235,12 +235,14 @@ type TeamGroupMembershipResponse struct {
 
 // Theme represents the application's visual theme settings
 type Theme struct {
-	ID          int    `json:"id"`
-	BuiltinKey  string `json:"builtin_key,omitempty"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	IsDefault   bool   `json:"is_default"`
-	IsActive    bool   `json:"is_active"`
+	ID                 int    `json:"id"`
+	BuiltinKey         string `json:"builtin_key,omitempty"`
+	Name               string `json:"name"`
+	DisplayName        string `json:"display_name"`
+	Description        string `json:"description"`
+	DisplayDescription string `json:"display_description,omitempty"`
+	IsDefault          bool   `json:"is_default"`
+	IsActive           bool   `json:"is_active"`
 	// Navigation bar theme properties for light mode
 	NavBackgroundColorLight string `json:"nav_background_color_light"` // CSS color value (hex, rgb, etc.)
 	NavTextColorLight       string `json:"nav_text_color_light"`       // CSS color value (hex, rgb, etc.)

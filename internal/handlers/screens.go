@@ -11,13 +11,20 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
 )
 
 type ScreenHandler struct {
-	db database.Database
+	db           database.Database
+	translations *objecttranslation.Service
+}
+
+func (h *ScreenHandler) WithObjectTranslations(service *objecttranslation.Service) *ScreenHandler {
+	h.translations = service
+	return h
 }
 
 var alwaysVisibleScreenFields = []struct {
@@ -77,6 +84,9 @@ func (h *ScreenHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			screens[i].Fields = ensureAlwaysVisibleScreenFields(screens[i].ID, fieldsByScreen[screens[i].ID])
 		}
 	}
+	if !localizeObjectResponse(w, r, h.translations, "screen", screens) {
+		return
+	}
 
 	respondJSONOK(w, screens)
 }
@@ -94,6 +104,9 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "screen", screen) {
 		return
 	}
 	respondJSONOK(w, screen)
@@ -188,6 +201,9 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 		intID := int(id)
 		logAudit(h.db, r, currentUser, logger.ActionScreenCreate, logger.ResourceScreen, &intID, screen.Name)
 	}
+	if !localizeObjectResponse(w, r, h.translations, "screen", &screen) {
+		return
+	}
 
 	respondJSONCreated(w, struct {
 		models.Screen
@@ -238,6 +254,9 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 		logAudit(h.db, r, currentUser, logger.ActionScreenUpdate, logger.ResourceScreen, &id, screen.Name)
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "screen", &screen) {
+		return
+	}
 	respondJSONOK(w, struct {
 		models.Screen
 		Warnings []string `json:"warnings,omitempty"`

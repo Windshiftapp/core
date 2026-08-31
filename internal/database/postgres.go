@@ -22,6 +22,9 @@ var itemsSchemaPostgres string
 //go:embed schema/config_workflows_postgres.sql
 var configWorkflowsSchemaPostgres string
 
+//go:embed schema/object_translations_postgres.sql
+var objectTranslationsSchemaPostgres string
+
 //go:embed schema/time_tracking_postgres.sql
 var timeTrackingSchemaPostgres string
 
@@ -523,6 +526,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"notifications_postgres.sql", notificationsSchemaPostgres},
 		{"permissions_postgres.sql", permissionsSchemaPostgres},
 		{"system_postgres.sql", systemSchemaPostgres},
+		{"object_translations_postgres.sql", objectTranslationsSchemaPostgres},
 		{"user_preferences_postgres.sql", userPreferencesSchemaPostgres},
 		{"tests_postgres.sql", testsSchemaPostgres},
 		{"scm_postgres.sql", scmSchemaPostgres},

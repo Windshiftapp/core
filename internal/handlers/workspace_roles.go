@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -21,6 +22,12 @@ type WorkspaceRoleHandler struct {
 	permissionService *services.PermissionService
 	approvalService   *services.ApprovalService
 	auditor           *logger.Auditor
+	translations      *objecttranslation.Service
+}
+
+func (h *WorkspaceRoleHandler) WithObjectTranslations(service *objecttranslation.Service) *WorkspaceRoleHandler {
+	h.translations = service
+	return h
 }
 
 func NewWorkspaceRoleHandlerWithPool(repo *repository.WorkspaceRoleRepository, permissionService *services.PermissionService, auditor *logger.Auditor) *WorkspaceRoleHandler {
@@ -43,6 +50,9 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	roles, err := h.repo.List()
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "workspace_role", roles) {
 		return
 	}
 
@@ -73,6 +83,9 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role.Permissions = permissions
+	if !localizeObjectResponse(w, r, h.translations, "workspace_role", role) {
+		return
+	}
 
 	respondJSONOK(w, role)
 }
@@ -247,6 +260,9 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 	roles, err := h.repo.ListUserRoles(userID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "workspace_role", roles) {
 		return
 	}
 
@@ -620,10 +636,78 @@ func (h *WorkspaceRoleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:          now,
 		Permissions:        []models.Permission{},
 	}
+	if !localizeObjectResponse(w, r, h.translations, "workspace_role", &out) {
+		return
+	}
 	respondJSONCreated(w, struct {
 		models.WorkspaceRole
 		Warnings []string `json:"warnings,omitempty"`
 	}{out, warnings})
+}
+
+// Update changes a workspace role's canonical fallback label without changing
+// its identity, built-in key, permission behavior, or assignments.
+func (h *WorkspaceRoleHandler) Update(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	role, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "workspace_role")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	body, ok := decodeJSON[createCustomRoleRequest](w, r)
+	if !ok {
+		return
+	}
+	warnings := sanitize.ApplyAllWithWarnings(
+		sanitize.Pair{Target: &body.Name, Policy: sanitize.PlainTextField, Label: "Name"},
+		sanitize.Pair{Target: &body.Description, Policy: sanitize.RichText, Label: "Description"},
+	)
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		respondValidationError(w, r, "name is required")
+		return
+	}
+	if nameTaken, err := h.repo.NameExistsExcept(name, id); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if nameTaken {
+		respondConflict(w, r, fmt.Sprintf("A role named %q already exists", name))
+		return
+	}
+
+	now := time.Now()
+	if err := h.repo.UpdateMetadata(id, name, body.Description, now); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	h.auditor.Log(r, user, logger.ActionWorkspaceRoleUpdate, logger.ResourceRole, &id, name)
+
+	role.Name = name
+	role.Description = body.Description
+	role.UpdatedAt = now
+	role.Permissions, err = h.repo.GetPermissions(id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !localizeObjectResponse(w, r, h.translations, "workspace_role", role) {
+		return
+	}
+	respondJSONOK(w, struct {
+		*models.WorkspaceRole
+		Warnings []string `json:"warnings,omitempty"`
+	}{role, warnings})
 }
 
 // Delete removes a custom workspace role. System roles (is_system=true) cannot

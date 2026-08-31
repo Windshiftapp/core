@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/services"
 )
 
@@ -14,26 +15,30 @@ import (
 
 type ItemTypeHandler struct {
 	BaseHandler
-	configSvc *services.ConfigReadService
+	configSvc    *services.ConfigReadService
+	translations *objecttranslation.Service
 }
 
-func NewItemTypeHandler(db database.Database, permissionService *services.PermissionService) *ItemTypeHandler {
+func NewItemTypeHandler(db database.Database, permissionService *services.PermissionService, translations *objecttranslation.Service) *ItemTypeHandler {
 	return &ItemTypeHandler{
-		BaseHandler: NewBaseHandler(db, permissionService),
-		configSvc:   services.NewConfigReadService(db),
+		BaseHandler:  NewBaseHandler(db, permissionService),
+		configSvc:    services.NewConfigReadService(db),
+		translations: translations,
 	}
 }
 
 type ItemTypeResponse struct {
-	ID             int    `json:"id"`
-	BuiltinKey     string `json:"builtin_key,omitempty"`
-	Name           string `json:"name"`
-	Description    string `json:"description,omitempty"`
-	Icon           string `json:"icon,omitempty"`
-	Color          string `json:"color,omitempty"`
-	HierarchyLevel int    `json:"hierarchy_level"`
-	SortOrder      int    `json:"sort_order"`
-	IsDefault      bool   `json:"is_default"`
+	ID                 int    `json:"id"`
+	BuiltinKey         string `json:"builtin_key,omitempty"`
+	Name               string `json:"name"`
+	DisplayName        string `json:"display_name"`
+	Description        string `json:"description,omitempty"`
+	DisplayDescription string `json:"display_description,omitempty"`
+	Icon               string `json:"icon,omitempty"`
+	Color              string `json:"color,omitempty"`
+	HierarchyLevel     int    `json:"hierarchy_level"`
+	SortOrder          int    `json:"sort_order"`
+	IsDefault          bool   `json:"is_default"`
 }
 
 // List handles GET /rest/api/v1/item-types
@@ -77,6 +82,12 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 	if types == nil {
 		types = []ItemTypeResponse{}
 	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "item_type", types); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
 
 	h.RespondOK(w, types)
 }
@@ -112,7 +123,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.RespondOK(w, ItemTypeResponse{
+	response := ItemTypeResponse{
 		ID:             t.ID,
 		BuiltinKey:     t.BuiltinKey,
 		Name:           t.Name,
@@ -122,7 +133,14 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		HierarchyLevel: t.HierarchyLevel,
 		SortOrder:      t.SortOrder,
 		IsDefault:      t.IsDefault,
-	})
+	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "item_type", &response); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
+	h.RespondOK(w, response)
 }
 
 // ========================================
@@ -131,25 +149,29 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 type PriorityHandler struct {
 	BaseHandler
-	configSvc *services.ConfigReadService
+	configSvc    *services.ConfigReadService
+	translations *objecttranslation.Service
 }
 
-func NewPriorityHandler(db database.Database, permissionService *services.PermissionService) *PriorityHandler {
+func NewPriorityHandler(db database.Database, permissionService *services.PermissionService, translations *objecttranslation.Service) *PriorityHandler {
 	return &PriorityHandler{
-		BaseHandler: NewBaseHandler(db, permissionService),
-		configSvc:   services.NewConfigReadService(db),
+		BaseHandler:  NewBaseHandler(db, permissionService),
+		configSvc:    services.NewConfigReadService(db),
+		translations: translations,
 	}
 }
 
 type PriorityResponse struct {
-	ID          int    `json:"id"`
-	BuiltinKey  string `json:"builtin_key,omitempty"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
-	SortOrder   int    `json:"sort_order"`
-	IsDefault   bool   `json:"is_default"`
+	ID                 int    `json:"id"`
+	BuiltinKey         string `json:"builtin_key,omitempty"`
+	Name               string `json:"name"`
+	DisplayName        string `json:"display_name"`
+	Description        string `json:"description,omitempty"`
+	DisplayDescription string `json:"display_description,omitempty"`
+	Icon               string `json:"icon,omitempty"`
+	Color              string `json:"color,omitempty"`
+	SortOrder          int    `json:"sort_order"`
+	IsDefault          bool   `json:"is_default"`
 }
 
 // List handles GET /rest/api/v1/priorities
@@ -192,6 +214,12 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 	if priorities == nil {
 		priorities = []PriorityResponse{}
 	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "priority", priorities); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
 
 	h.RespondOK(w, priorities)
 }
@@ -227,7 +255,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.RespondOK(w, PriorityResponse{
+	response := PriorityResponse{
 		ID:          p.ID,
 		BuiltinKey:  p.BuiltinKey,
 		Name:        p.Name,
@@ -236,7 +264,14 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Color:       p.Color,
 		SortOrder:   p.SortOrder,
 		IsDefault:   p.IsDefault,
-	})
+	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "priority", &response); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
+	h.RespondOK(w, response)
 }
 
 // ========================================

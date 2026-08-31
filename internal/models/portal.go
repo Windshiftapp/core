@@ -537,14 +537,16 @@ type EmailTemplate struct {
 
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets
 type NotificationSetting struct {
-	ID          int       `json:"id"`
-	BuiltinKey  string    `json:"builtin_key,omitempty"`
-	Name        string    `json:"name"`        // e.g., "Development Team Notifications"
-	Description string    `json:"description"` // e.g., "Standard notifications for development workspaces"
-	IsActive    bool      `json:"is_active"`
-	CreatedBy   int       `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int       `json:"id"`
+	BuiltinKey         string    `json:"builtin_key,omitempty"`
+	Name               string    `json:"name"` // e.g., "Development Team Notifications"
+	DisplayName        string    `json:"display_name"`
+	Description        string    `json:"description"` // e.g., "Standard notifications for development workspaces"
+	DisplayDescription string    `json:"display_description,omitempty"`
+	IsActive           bool      `json:"is_active"`
+	CreatedBy          int       `json:"created_by"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	CreatedByName string `json:"created_by_name,omitempty"`
 	// Event rules

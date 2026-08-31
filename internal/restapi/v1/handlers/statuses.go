@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/services"
 )
 
@@ -11,13 +12,15 @@ import (
 type StatusHandler struct {
 	BaseHandler
 	statusService *services.StatusService
+	translations  *objecttranslation.Service
 }
 
 // NewStatusHandler creates a new status handler
-func NewStatusHandler(db database.Database, permissionService *services.PermissionService) *StatusHandler {
+func NewStatusHandler(db database.Database, permissionService *services.PermissionService, translations *objecttranslation.Service) *StatusHandler {
 	return &StatusHandler{
 		BaseHandler:   NewBaseHandler(db, permissionService),
 		statusService: services.NewStatusService(db),
+		translations:  translations,
 	}
 }
 
@@ -26,7 +29,9 @@ type StatusResponse struct {
 	ID                 int    `json:"id"`
 	BuiltinKey         string `json:"builtin_key,omitempty"`
 	Name               string `json:"name"`
+	DisplayName        string `json:"display_name"`
 	Description        string `json:"description,omitempty"`
+	DisplayDescription string `json:"display_description,omitempty"`
 	CategoryID         int    `json:"category_id"`
 	CategoryName       string `json:"category_name,omitempty"`
 	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
@@ -37,13 +42,15 @@ type StatusResponse struct {
 
 // StatusCategoryResponse is the public API representation of a StatusCategory
 type StatusCategoryResponse struct {
-	ID          int    `json:"id"`
-	BuiltinKey  string `json:"builtin_key,omitempty"`
-	Name        string `json:"name"`
-	Color       string `json:"color"`
-	Description string `json:"description,omitempty"`
-	IsDefault   bool   `json:"is_default"`
-	IsCompleted bool   `json:"is_completed"`
+	ID                 int    `json:"id"`
+	BuiltinKey         string `json:"builtin_key,omitempty"`
+	Name               string `json:"name"`
+	DisplayName        string `json:"display_name"`
+	Color              string `json:"color"`
+	Description        string `json:"description,omitempty"`
+	DisplayDescription string `json:"display_description,omitempty"`
+	IsDefault          bool   `json:"is_default"`
+	IsCompleted        bool   `json:"is_completed"`
 }
 
 // List handles GET /rest/api/v1/statuses
@@ -89,6 +96,12 @@ func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 	if statuses == nil {
 		statuses = []StatusResponse{}
 	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "status", statuses); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
 
 	h.RespondOK(w, statuses)
 }
@@ -124,7 +137,7 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.RespondOK(w, StatusResponse{
+	response := StatusResponse{
 		ID:                 s.ID,
 		BuiltinKey:         s.BuiltinKey,
 		Name:               s.Name,
@@ -135,7 +148,14 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		CategoryColor:      s.CategoryColor,
 		IsDefault:          s.IsDefault,
 		IsCompleted:        s.IsCompleted,
-	})
+	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "status", &response); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
+	h.RespondOK(w, response)
 }
 
 // ListCategories handles GET /rest/api/v1/status-categories
@@ -178,6 +198,12 @@ func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	if categories == nil {
 		categories = []StatusCategoryResponse{}
 	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "status_category", categories); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
 
 	h.RespondOK(w, categories)
 }
@@ -213,7 +239,7 @@ func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.RespondOK(w, StatusCategoryResponse{
+	response := StatusCategoryResponse{
 		ID:          c.ID,
 		BuiltinKey:  c.BuiltinKey,
 		Name:        c.Name,
@@ -221,5 +247,12 @@ func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 		Description: c.Description,
 		IsDefault:   c.IsDefault,
 		IsCompleted: c.IsCompleted,
-	})
+	}
+	if h.translations != nil {
+		if err := h.translations.LocalizeResponse(r.Context(), objecttranslation.RequestLocale(r), "status_category", &response); err != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+	}
+	h.RespondOK(w, response)
 }

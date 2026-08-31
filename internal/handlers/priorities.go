@@ -11,13 +11,20 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
 )
 
 type PriorityHandler struct {
-	db database.Database
+	db           database.Database
+	translations *objecttranslation.Service
+}
+
+func (h *PriorityHandler) WithObjectTranslations(service *objecttranslation.Service) *PriorityHandler {
+	h.translations = service
+	return h
 }
 
 func NewPriorityHandler(db database.Database) *PriorityHandler {
@@ -111,6 +118,9 @@ func (h *PriorityHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if priorities == nil {
 		priorities = []models.Priority{}
 	}
+	if !localizeObjectResponse(w, r, h.translations, "priority", priorities) {
+		return
+	}
 
 	respondJSONOK(w, priorities)
 }
@@ -176,6 +186,9 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	p.ConfigurationSetIDs = configSetIDs
 	p.ConfigurationSetNames = configSetNames
 	p.ConfigurationSetBuiltinKeys = configSetBuiltinKeys
+	if !localizeObjectResponse(w, r, h.translations, "priority", &p) {
+		return
+	}
 
 	respondJSONOK(w, p)
 }
@@ -341,6 +354,9 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "priority", &p) {
+		return
+	}
 	respondJSONCreated(w, p)
 }
 
@@ -436,6 +452,9 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if !localizeObjectResponse(w, r, h.translations, "priority", &p) {
+		return
+	}
 	respondJSONOK(w, p)
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/services"
 )
 
@@ -72,6 +73,9 @@ type Deps struct {
 	// path produces orphaned audit rows (no automation hook); production
 	// should always pass the cookie-auth handler's shared instance.
 	AssetService *services.AssetService
+	// ObjectTranslationService is shared with the cookie-auth admin surface so
+	// writes invalidate the same translation cache for every transport.
+	ObjectTranslationService *objecttranslation.Service
 }
 
 // SetupRoutesFunc is a function type for setting up v1 routes

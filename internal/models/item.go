@@ -269,7 +269,9 @@ type LinkType struct {
 	ID                 int       `json:"id"`
 	BuiltinKey         string    `json:"builtin_key,omitempty"`
 	Name               string    `json:"name"`
+	DisplayName        string    `json:"display_name"`
 	Description        string    `json:"description"`
+	DisplayDescription string    `json:"display_description,omitempty"`
 	ForwardLabel       string    `json:"forward_label"`
 	ReverseLabel       string    `json:"reverse_label"`
 	Color              string    `json:"color"`

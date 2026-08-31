@@ -1,45 +1,39 @@
 import { t } from '../stores/i18n.svelte.js';
 
-export function builtinLocaleKey(recordOrKey) {
+function builtinLocaleKey(recordOrKey) {
   const key = typeof recordOrKey === 'string' ? recordOrKey : recordOrKey?.builtin_key;
   return key?.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()) || '';
 }
 
+function objectLocalePath(objectType, key, field) {
+  if (!key) return '';
+  if (objectType === 'workspace_role') return `workspaceMembers.roles.${key}.${field}`;
+  if (field !== 'name') return '';
+  if (objectType === 'status') return `systemCatalog.statuses.${key}`;
+  if (objectType === 'status_category') return `systemCatalog.statusCategories.${key}`;
+  if (objectType === 'priority') return `priorities.${key}`;
+  return '';
+}
+
+export function objectDisplayValue(record, field = 'name', objectType = '') {
+  if (typeof record === 'string') return field === 'name' ? record : '';
+  if (!record || typeof record !== 'object') return '';
+  const displayField = field === 'name' ? 'display_name' : `display_${field}`;
+  if (record[displayField]) return record[displayField];
+  const localePath = objectLocalePath(objectType, builtinLocaleKey(record), field);
+  return localePath ? t(localePath) : record[field] || '';
+}
+
+export function objectDisplayName(record, objectType = '') {
+  return objectDisplayValue(record, 'name', objectType);
+}
+
+export function objectDisplayDescription(record, objectType = '') {
+  return objectDisplayValue(record, 'description', objectType);
+}
+
 function permissionLocaleKey(permissionKey) {
   return permissionKey.replaceAll('.', '_');
-}
-
-export function systemRoleName(role) {
-  const key = role?.is_system ? builtinLocaleKey(role) : '';
-  return key ? t(`workspaceMembers.roles.${key}.name`) : role?.name;
-}
-
-export function systemRoleDescription(role) {
-  const key = role?.is_system ? builtinLocaleKey(role) : '';
-  return key ? t(`workspaceMembers.roles.${key}.description`) : role?.description;
-}
-
-export function systemStatusName(status) {
-  const key = typeof status === 'object' ? builtinLocaleKey(status) : '';
-  return key
-    ? t(`systemCatalog.statuses.${key}`)
-    : typeof status === 'string'
-      ? status
-      : status?.name;
-}
-
-export function systemStatusCategoryName(category) {
-  const key = typeof category === 'object' ? builtinLocaleKey(category) : '';
-  return key
-    ? t(`systemCatalog.statusCategories.${key}`)
-    : typeof category === 'string'
-      ? category
-      : category?.name;
-}
-
-export function systemPriorityName(priority) {
-  const key = typeof priority === 'object' ? builtinLocaleKey(priority) : '';
-  return key ? t(`priorities.${key}`) : typeof priority === 'string' ? priority : priority?.name;
 }
 
 export function systemPermissionName(permission) {

@@ -99,7 +99,7 @@ type SSOProviderResponse struct {
 	HasClientSecret      bool   `json:"has_client_secret"`
 	Scopes               string `json:"scopes"`
 	AutoProvisionUsers   bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail bool   `json:"require_verified_email"`
+	RequireVerifiedEmail bool   `json:"require_verified_email"` // Trust provider email when verification status is absent.
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"`
@@ -123,7 +123,7 @@ type SSOProviderRequest struct {
 	ClientSecret         string `json:"client_secret,omitempty"`
 	Scopes               string `json:"scopes"`
 	AutoProvisionUsers   bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer to distinguish between false and not set
+	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer distinguishes false from an omitted trust setting.
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
@@ -231,6 +231,11 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		useProxy:                 useProxy,
 		additionalProxies:        additionalProxies,
 	}
+}
+
+// SetPluginManager supplies the plugin manager after its dependencies are initialized.
+func (h *SSOHandler) SetPluginManager(pluginManager *plugins.Manager) {
+	h.pluginManager = pluginManager
 }
 
 // GetStatus returns the public SSO status (no auth required)
@@ -467,8 +472,6 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case err == sso.ErrAutoProvisionDisabled:
 				h.redirectWithError(w, r, "User account not found. Contact your administrator.")
-			case errors.Is(err, sso.ErrEmailNotVerified):
-				h.redirectWithError(w, r, "Your email address has not been verified by the identity provider")
 			case errors.Is(err, sso.ErrAccountLinkingRequiresVerification):
 				h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
 			default:
@@ -777,10 +780,11 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		req.Scopes = "openid email profile"
 	}
 
-	// Default RequireVerifiedEmail to true for security
-	requireVerifiedEmail := true
+	// Preserve the existing default: trust provider-managed email when the
+	// provider omits verification status.
+	trustProviderEmail := true
 	if req.RequireVerifiedEmail != nil {
-		requireVerifiedEmail = *req.RequireVerifiedEmail
+		trustProviderEmail = *req.RequireVerifiedEmail
 	}
 
 	provider := &sso.SSOProvider{
@@ -794,7 +798,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		ClientSecretEncrypted: encryptedSecret,
 		Scopes:                req.Scopes,
 		AutoProvisionUsers:    req.AutoProvisionUsers,
-		RequireVerifiedEmail:  requireVerifiedEmail,
+		RequireVerifiedEmail:  trustProviderEmail,
 		AttributeMapping:      req.AttributeMapping,
 		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
 		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,
@@ -812,8 +816,8 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if provider.AutoProvisionUsers && !provider.RequireVerifiedEmail {
-		slog.Warn("SSO provider saved with auto-provisioning enabled and IdP email verification trust disabled — an IdP that lets users self-assert email addresses can pre-empt accounts and may later be linked to access from stricter providers",
+	if provider.RequireVerifiedEmail {
+		slog.Warn("SSO provider saved with provider-managed email trust enabled — a provider that lets users self-assert email addresses can link identities to existing accounts",
 			slog.String("component", "sso"),
 			slog.String("provider", provider.Slug),
 			slog.Int("provider_id", provider.ID))
@@ -914,8 +918,8 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if existing.AutoProvisionUsers && !existing.RequireVerifiedEmail {
-		slog.Warn("SSO provider saved with auto-provisioning enabled and IdP email verification trust disabled — an IdP that lets users self-assert email addresses can pre-empt accounts and may later be linked to access from stricter providers",
+	if existing.RequireVerifiedEmail {
+		slog.Warn("SSO provider saved with provider-managed email trust enabled — a provider that lets users self-assert email addresses can link identities to existing accounts",
 			slog.String("component", "sso"),
 			slog.String("provider", existing.Slug),
 			slog.Int("provider_id", existing.ID))
