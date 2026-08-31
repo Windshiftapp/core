@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -305,11 +306,12 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 	attrMap, _ := provider.GetAttributeMap()
 	if attrMap == nil {
 		attrMap = &sso.AttributeMap{
-			Email:      "email",
-			Name:       "name",
-			GivenName:  "given_name",
-			FamilyName: "family_name",
-			Username:   "preferred_username",
+			Email:         "email",
+			EmailVerified: "email_verified",
+			Name:          "name",
+			GivenName:     "given_name",
+			FamilyName:    "family_name",
+			Username:      "preferred_username",
 		}
 	}
 
@@ -367,9 +369,19 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 		claims.Username = strings.Split(claims.Email, "@")[0]
 	}
 
-	// SAML lacks a standard verified-email claim. Provider trust decides whether
-	// the asserted email can auto-link an existing account.
+	// SAML lacks a standard verified-email claim. If the IdP asserts the mapped
+	// attribute, honour it; otherwise provider trust decides whether the
+	// asserted email can auto-link an existing account.
 	claims.EmailVerifiedProvided = true
+	if attrMap.EmailVerified != "" {
+		if v := info.GetAttribute(attrMap.EmailVerified); v != "" {
+			// Any value that isn't a recognisable "true" means not verified.
+			if verified, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+				claims.EmailVerified = verified
+			}
+			return claims
+		}
+	}
 	claims.EmailVerified = provider.RequireVerifiedEmail
 
 	return claims

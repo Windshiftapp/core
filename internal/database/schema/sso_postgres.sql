@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	auto_provision_users BOOLEAN DEFAULT FALSE, -- Create users on first SSO login
 	require_verified_email BOOLEAN DEFAULT TRUE, -- Require email_verified=true from IdP (security)
 	-- Claim/attribute mappings (JSON for flexibility)
-	attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username"}',
+	attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username","email_verified":"email_verified"}',
 	-- SAML-specific fields
 	saml_idp_metadata_url TEXT,  -- IdP metadata URL for auto-configuration
 	saml_idp_sso_url TEXT,       -- IdP Single Sign-On URL

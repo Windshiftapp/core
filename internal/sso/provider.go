@@ -127,22 +127,24 @@ func scanProviderNoSecret(row interface {
 
 // AttributeMap represents the claim/attribute mapping configuration
 type AttributeMap struct {
-	Email      string `json:"email"`
-	Name       string `json:"name"`
-	GivenName  string `json:"given_name"`
-	FamilyName string `json:"family_name"`
-	Username   string `json:"username"`
+	Email         string `json:"email"`
+	EmailVerified string `json:"email_verified"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Username      string `json:"username"`
 }
 
 // GetAttributeMap parses the attribute mapping JSON
 func (p *SSOProvider) GetAttributeMap() (*AttributeMap, error) {
 	if p.AttributeMapping == "" {
 		return &AttributeMap{
-			Email:      "email",
-			Name:       "name",
-			GivenName:  "given_name",
-			FamilyName: "family_name",
-			Username:   "preferred_username",
+			Email:         "email",
+			EmailVerified: "email_verified",
+			Name:          "name",
+			GivenName:     "given_name",
+			FamilyName:    "family_name",
+			Username:      "preferred_username",
 		}, nil
 	}
 

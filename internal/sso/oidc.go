@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,15 +182,21 @@ func (s *OIDCService) ExtractClaims(tokens *oidc.Tokens[*oidc.IDTokenClaims], at
 		claims.Email = idTokenClaims.Email
 	}
 
-	// Check if email_verified was explicitly provided by the IdP
-	// The zitadel/oidc library returns a special type that defaults to false
-	// We need to check the raw claims to know if it was actually provided
-	if allClaims != nil {
-		if _, exists := allClaims["email_verified"]; exists {
-			claims.EmailVerifiedProvided = true
-		}
+	// Check if email_verified was explicitly provided by the IdP.
+	// The claim name is configurable via the attribute mapping; it falls back
+	// to the standard OIDC "email_verified" claim. The zitadel/oidc library
+	// returns a special type that defaults to false, so we inspect the raw
+	// claims to know whether the IdP actually sent a value.
+	emailVerifiedClaim := "email_verified"
+	if attributeMap != nil && attributeMap.EmailVerified != "" {
+		emailVerifiedClaim = attributeMap.EmailVerified
 	}
-	claims.EmailVerified = bool(idTokenClaims.EmailVerified)
+	if emailVerifiedValue, exists := allClaims[emailVerifiedClaim]; exists {
+		claims.EmailVerifiedProvided = true
+		claims.EmailVerified = claimToBool(emailVerifiedValue)
+	} else if emailVerifiedClaim == "email_verified" {
+		claims.EmailVerified = bool(idTokenClaims.EmailVerified)
+	}
 
 	// Extract name fields using attribute mapping or standard claims
 	if attributeMap != nil {
@@ -273,4 +280,18 @@ func getClaimString(claims map[string]any, key string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// claimToBool coerces a raw claim value to a bool. IdPs normally send a JSON
+// boolean for email_verified, but some send the string "true"/"false".
+func claimToBool(v any) bool {
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		b, err := strconv.ParseBool(strings.TrimSpace(val))
+		return err == nil && b
+	default:
+		return false
+	}
 }
