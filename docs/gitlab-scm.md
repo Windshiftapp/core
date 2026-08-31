@@ -13,11 +13,16 @@ Create an SCM provider in **Admin → Source Control** and choose **GitLab**.
   `https://gitlab.example.com`. A trailing `/api/v4` is accepted and normalized.
 - OAuth applications should grant the `api` scope. Register the callback URL
   shown by Windshift in the GitLab application.
-- PAT providers require a token with API access and sufficient project role for
-  the operations users will perform.
+- Access Token providers accept GitLab Personal, Project, and Group Access
+  Tokens through the same API authentication mechanism. The token needs API
+  access and a sufficient project role for the operations Windshift performs.
+  Prefer a Project or Group Access Token for bot and server-to-server
+  integrations because it limits access to a project or group hierarchy and
+  uses a dedicated GitLab bot identity.
 
 After an administrator creates the provider, a workspace administrator can
-connect it, authorize with OAuth or PAT, and link one or more projects.
+connect it, authorize with OAuth or an access token, and link one or more
+projects.
 
 ## Supported project data
 

@@ -59,7 +59,7 @@
   // Auth methods
   const authMethods = [
     { value: 'oauth', label: 'OAuth App', description: 'Users authorize via OAuth flow' },
-    { value: 'pat', label: 'Personal Access Token', description: 'Use a PAT for all operations' },
+    { value: 'pat', label: 'Access Token', description: 'Use an access token for all operations' },
     { value: 'github_app', label: 'GitHub App', description: 'Fine-grained permissions (GitHub only)' },
   ];
 
@@ -220,7 +220,7 @@
       }
     } else if (formData.auth_method === 'pat') {
       if (!editingProvider && !formData.personal_access_token) {
-        formErrors.personal_access_token = 'Personal Access Token is required';
+        formErrors.personal_access_token = 'Access Token is required';
       }
     } else if (formData.auth_method === 'github_app') {
       if (!formData.github_app_id) {
@@ -373,6 +373,14 @@
   function getProviderLabel(type) {
     const providerType = providerTypes.find(p => p.value === type);
     return providerType?.label || type;
+  }
+
+  function getAccessTokenHelp() {
+    const helpKey = formData.provider_type === 'gitlab'
+      ? 'settings.scmProviders.gitlabAccessTokenHelp'
+      : 'settings.scmProviders.accessTokenHelp';
+    const help = t(helpKey);
+    return editingProvider ? `${help} ${t('settings.scmProviders.leaveEmptyToKeep')}` : help;
   }
 
   // Compute OAuth callback URL based on slug
@@ -592,9 +600,9 @@
         </div>
       {/if}
 
-      <!-- PAT Settings -->
+      <!-- Access Token Settings (stored internally as PAT for API compatibility) -->
       {#if formData.auth_method === 'pat'}
-        <FormField label={t('settings.scmProviders.personalAccessToken')} error={formErrors.personal_access_token} helper={editingProvider ? t('settings.scmProviders.leaveEmptyToKeep') : ''}>
+        <FormField label={t('settings.scmProviders.accessToken')} error={formErrors.personal_access_token} helper={getAccessTokenHelp()}>
           <Input type="password" bind:value={formData.personal_access_token} />
         </FormField>
       {/if}

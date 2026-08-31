@@ -482,7 +482,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		} else {
 			respondJSONOK(w, map[string]any{
 				"success": false,
-				"error":   "Personal Access Token not configured",
+				"error":   "Access token not configured",
 			})
 			return
 		}
