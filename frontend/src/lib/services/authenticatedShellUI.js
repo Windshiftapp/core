@@ -12,6 +12,15 @@ import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 import { currentWorkspace, workspacesStore } from '../stores/workspaces.svelte.js';
 
 let refreshGeneration = 0;
+let shellUILoadGeneration = 0;
+let shellUILoadAudience = null;
+let shellUILoadPromise = null;
+let shellUISettledAudience = null;
+let shellUISettledResult = false;
+
+function shellUIAudience(userId) {
+  return `user:${userId ?? 'authenticated'}`;
+}
 
 export function hydrateAuthenticatedShellUI(bootstrap) {
   if (!bootstrap) return false;
@@ -27,6 +36,61 @@ export function hydrateAuthenticatedShellUI(bootstrap) {
   permissionStore.setHasActivePortals(bootstrap.has_active_portals === true);
   permissionStore.setManagesChannels(bootstrap.manages_channels === true);
   return true;
+}
+
+/**
+ * Hydrate the navigation-facing shell state once per authenticated audience.
+ * App.svelte waits for this promise before mounting the desktop shell so
+ * capability-gated navigation entries cannot appear after the sidebar and
+ * shift the action group below them.
+ */
+export function loadAuthenticatedShellUI(userId, { force = false } = {}) {
+  const audience = shellUIAudience(userId);
+
+  if (!force && shellUISettledAudience === audience) {
+    return Promise.resolve(shellUISettledResult);
+  }
+  if (!force && shellUILoadAudience === audience && shellUILoadPromise) {
+    return shellUILoadPromise;
+  }
+
+  const generation = ++shellUILoadGeneration;
+  shellUILoadAudience = audience;
+
+  const request = api.shellBootstrap
+    .get()
+    .then((bootstrap) => {
+      if (generation !== shellUILoadGeneration) return false;
+      const hydrated = hydrateAuthenticatedShellUI(bootstrap);
+      shellUISettledAudience = audience;
+      shellUISettledResult = hydrated;
+      return hydrated;
+    })
+    .catch((error) => {
+      if (generation !== shellUILoadGeneration) return false;
+      shellUISettledAudience = audience;
+      shellUISettledResult = false;
+      capabilitiesStore.failHydration();
+      console.warn('Failed to load shell capabilities:', error);
+      return false;
+    })
+    .finally(() => {
+      if (generation !== shellUILoadGeneration) return;
+      shellUILoadAudience = null;
+      shellUILoadPromise = null;
+    });
+
+  shellUILoadPromise = request;
+  return request;
+}
+
+/** Clear request identity when the authenticated audience changes. */
+export function resetAuthenticatedShellUILoad() {
+  shellUILoadGeneration += 1;
+  shellUILoadAudience = null;
+  shellUILoadPromise = null;
+  shellUISettledAudience = null;
+  shellUISettledResult = false;
 }
 
 /**

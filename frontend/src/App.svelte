@@ -9,6 +9,10 @@
   import { i18n, SUPPORTED_LOCALES, t } from './lib/stores/i18n.svelte.js';
   import { safeLoginReturnPath } from './lib/utils/loginReturnPath.js';
   import { getStartupCopy } from './lib/utils/startupCopy.js';
+  import {
+    loadAuthenticatedShellUI,
+    resetAuthenticatedShellUILoad,
+  } from './lib/services/authenticatedShellUI.js';
   import BrandedLoader from './lib/components/BrandedLoader.svelte';
   import LazyRootDialog from './lib/components/LazyRootDialog.svelte';
   import LazyRootView from './lib/components/LazyRootView.svelte';
@@ -38,6 +42,10 @@
   let startupError = $state('');
   let startupSlow = $state(false);
   let i18nReady = $state(false);
+  let authenticatedShellUIReady = $state(false);
+  let authenticatedShellUILoading = $state(false);
+  let authenticatedShellUIAudience = $state(null);
+  let authenticatedShellUILoadGeneration = 0;
   let startupAttempt = 0;
   let themeAudience = null;
   let themeLoadGeneration = 0;
@@ -122,6 +130,28 @@
     }
   }
 
+  async function prepareAuthenticatedShellUI(userId) {
+    const audience = `user:${userId ?? 'authenticated'}`;
+    if (
+      authenticatedShellUIAudience === audience &&
+      (authenticatedShellUIReady || authenticatedShellUILoading)
+    ) {
+      return;
+    }
+
+    const generation = ++authenticatedShellUILoadGeneration;
+    authenticatedShellUIAudience = audience;
+    authenticatedShellUIReady = false;
+    authenticatedShellUILoading = true;
+    await loadAuthenticatedShellUI(userId);
+
+    if (generation !== authenticatedShellUILoadGeneration) return;
+    if (!$authStore.isAuthenticated || authStore.currentUser?.id !== userId) return;
+
+    authenticatedShellUILoading = false;
+    authenticatedShellUIReady = true;
+  }
+
   // Show login dialog when setup is completed but user is not authenticated and app is initialized
   // But NOT for portal routes (they are public)
   const shouldShowLoginDialog = $derived(
@@ -146,6 +176,17 @@
     if ($authStore.isAuthenticated && setupCompleted) {
       showLoginDialog = false;
       appInitialized = true;
+      void prepareAuthenticatedShellUI(authStore.currentUser?.id);
+    } else if (
+      authenticatedShellUIAudience !== null ||
+      authenticatedShellUIReady ||
+      authenticatedShellUILoading
+    ) {
+      authenticatedShellUILoadGeneration += 1;
+      authenticatedShellUIAudience = null;
+      authenticatedShellUIReady = false;
+      authenticatedShellUILoading = false;
+      resetAuthenticatedShellUILoad();
     }
   });
 
@@ -355,6 +396,12 @@
   <!-- Mobile PWA surface (phone-focused shell, bypasses desktop MainApp chrome) -->
   {:else if $authStore.isAuthenticated && appInitialized && isMobileRoute($currentRoute.view)}
     <LazyRootView loader={ROOT_VIEW_LOADERS.mobile} label="mobile workspace" />
+  <!-- Mount desktop navigation only after its permission/capability snapshot is stable. -->
+  {:else if $authStore.isAuthenticated && appInitialized && !authenticatedShellUIReady}
+    <BrandedLoader
+      label={getStartupCopy('common.loading', i18nReady, t)}
+      fullViewport={false}
+    />
   <!-- Show main app when user is authenticated -->
   {:else if $authStore.isAuthenticated && appInitialized}
     <LazyRootView loader={ROOT_VIEW_LOADERS.desktop} label="workspace" />

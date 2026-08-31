@@ -99,7 +99,7 @@
   }
 </script>
 
-<div class="min-h-screen license-page">
+<div class="min-h-full license-page">
   <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <header class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>

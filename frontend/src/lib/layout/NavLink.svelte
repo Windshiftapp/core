@@ -16,7 +16,7 @@
   } = $props();
 
   const baseClasses = $derived(
-    'w-full px-3 h-10 rounded flex items-center justify-start cursor-pointer'
+    'w-full px-3 h-10 rounded flex items-center justify-start text-left cursor-pointer'
   );
 
   const variantClasses = $derived(

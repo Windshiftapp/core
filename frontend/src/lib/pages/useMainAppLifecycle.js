@@ -1,14 +1,13 @@
 import { useEventListener } from 'runed';
 import { onMount } from 'svelte';
 import { ADMIN_UI_MUTATION_EVENT } from '../api/core.js';
-import { api } from '../api.js';
 import { desktopBridge } from '../desktop/bridge.svelte.js';
 import {
   resetAuthenticatedShellState,
   runAuthenticatedShellBootstrap,
 } from '../services/authenticatedShellBootstrap.js';
 import {
-  hydrateAuthenticatedShellUI,
+  loadAuthenticatedShellUI,
   refreshAuthenticatedShellUI,
 } from '../services/authenticatedShellUI.js';
 import {
@@ -90,15 +89,7 @@ export function useMainAppLifecycle({
 
     const deferredTasks = [
       () => workspacesStore.loadPersonalWorkspace(),
-      async () => {
-        try {
-          const bootstrap = await api.shellBootstrap.get();
-          hydrateAuthenticatedShellUI(bootstrap);
-        } catch (error) {
-          capabilitiesStore.failHydration();
-          console.warn('Failed to load shell capabilities:', error);
-        }
-      },
+      () => loadAuthenticatedShellUI(userId),
       async () => {
         if (ssoStore.checkForEmailVerificationPending()) {
           onEmailVerificationChange(true);

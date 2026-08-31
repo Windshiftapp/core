@@ -264,7 +264,7 @@ export const MAIN_APP_ROUTE_CONFIG = {
     wrapper: 'surface-full',
   }),
   licenses: route('Loading Licenses...', 'Failed to load Licenses', {
-    wrapper: 'surface-full',
+    wrapper: 'none',
   }),
   'item-detail': route('Loading Item Details...', 'Failed to load Item Details', {
     getProps: (currentRoute, context) => {
