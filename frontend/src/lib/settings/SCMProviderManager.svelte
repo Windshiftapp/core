@@ -49,9 +49,10 @@
   // Workspace restriction state
   let allowedWorkspaceIds = $state([]);
 
-  // Provider types (only GitHub and Gitea supported)
+  // Provider types
   const providerTypes = [
     { value: 'github', label: 'GitHub', icon: Github },
+    { value: 'gitlab', label: 'GitLab', icon: GitBranch },
     { value: 'gitea', label: 'Gitea / Forgejo', icon: GitBranch },
   ];
 
@@ -67,16 +68,10 @@
     m.value !== 'github_app' || formData.provider_type === 'github'
   ));
 
-  // Reset auth method if it becomes invalid for the selected provider
-  $effect(() => {
-    if (formData.auth_method === 'github_app' && formData.provider_type !== 'github') {
-      formData.auth_method = 'oauth';
-    }
-  });
-
   // Default OAuth scopes per provider type
   const defaultScopes = {
     github: 'repo read:user user:email',
+    gitlab: 'api',
     gitea: 'read:user read:repository write:repository',
   };
 
@@ -108,15 +103,14 @@
   let discoveringInstallations = $state(false);
   let discoveryError = $state(null);
 
-  // Update scopes when provider type changes (only if scopes is a default value)
-  $effect(() => {
-    if (formData.provider_type) {
-      const currentIsDefault = Object.values(defaultScopes).includes(formData.scopes);
-      if (currentIsDefault) {
-        formData.scopes = defaultScopes[formData.provider_type] || defaultScopes.github;
-      }
+  function handleProviderTypeChange(providerType) {
+    if (formData.auth_method === 'github_app' && providerType !== 'github') {
+      formData.auth_method = 'oauth';
     }
-  });
+    if (Object.values(defaultScopes).includes(formData.scopes)) {
+      formData.scopes = defaultScopes[providerType] || defaultScopes.github;
+    }
+  }
 
   onMount(async () => {
     await loadProviders();
@@ -182,7 +176,7 @@
       github_app_private_key: '',
       github_app_installation_id: provider.github_app_installation_id || '',
       github_org_id: provider.github_org_id || null,
-      scopes: provider.scopes || 'repo',
+      scopes: provider.scopes || defaultScopes[provider.provider_type] || defaultScopes.github,
       workspace_restriction_mode: provider.workspace_restriction_mode || 'unrestricted',
     };
     formErrors = {};
@@ -430,7 +424,7 @@
   {:else}
     <!-- Providers List -->
     <Card shadow padding="none" class="divide-y">
-      {#each providers as provider}
+      {#each providers as provider (provider.id)}
         {@const ProviderIcon = getProviderIcon(provider.provider_type)}
         <div class="p-4 flex items-center justify-between" style="border-color: var(--ds-border);">
           <div class="flex items-center space-x-4">
@@ -532,6 +526,7 @@
             placeholder="Select provider type"
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
+            onSelect={(item) => handleProviderTypeChange(item.value)}
           />
         </div>
         <div>
@@ -546,12 +541,12 @@
         </div>
       </div>
 
-      <!-- Base URL (for self-hosted Gitea/Forgejo) -->
-      {#if formData.provider_type === 'gitea'}
+      <!-- Base URL (optional for GitLab.com, required for self-hosted Gitea/Forgejo) -->
+      {#if formData.provider_type === 'gitea' || formData.provider_type === 'gitlab'}
         <FormField label={t('settings.scmProviders.baseUrl')} error={formErrors.base_url} helper={t('settings.scmProviders.baseUrlPlaceholder')}>
           <Input
             bind:value={formData.base_url}
-            placeholder="https://gitea.example.com"
+            placeholder={formData.provider_type === 'gitlab' ? 'https://gitlab.com' : 'https://gitea.example.com'}
           />
         </FormField>
       {/if}
@@ -578,7 +573,7 @@
             <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.scmProviders.enterSlugForCallback')}</p>
           {/if}
           <DescriptionText variant="subtlest">
-            {t('settings.scmProviders.useThisUrl')} {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
+            {t('settings.scmProviders.useThisUrl')} {getProviderLabel(formData.provider_type)}
           </DescriptionText>
         </div>
       {/snippet}
@@ -655,7 +650,7 @@
             <div class="space-y-2">
               <p class="text-xs" style="color: var(--ds-text-subtle);">Select an organization:</p>
               <div class="grid gap-2">
-                {#each discoveredInstallations as installation}
+                {#each discoveredInstallations as installation (installation.id)}
                   <button
                     type="button"
                     class="flex items-center p-2 rounded border hover:border-blue-500 transition-colors text-left w-full"

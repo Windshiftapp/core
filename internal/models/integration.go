@@ -11,6 +11,7 @@ type SCMProviderType string
 
 const (
 	SCMProviderTypeGitHub SCMProviderType = "github"
+	SCMProviderTypeGitLab SCMProviderType = "gitlab"
 	SCMProviderTypeGitea  SCMProviderType = "gitea"
 )
 
@@ -201,6 +202,7 @@ type ItemSCMLinkRequest struct {
 type SCMWebhook struct {
 	ID                     int        `json:"id"`
 	WorkspaceRepositoryID  int        `json:"workspace_repository_id"`
+	WebhookKey             string     `json:"webhook_key,omitempty"`
 	WebhookExternalID      string     `json:"webhook_external_id,omitempty"`
 	WebhookSecretEncrypted string     `json:"-"`      // Never expose
 	Events                 string     `json:"events"` // JSON array
@@ -221,6 +223,17 @@ type SCMWebhookDelivery struct {
 	ErrorMessage     string    `json:"error_message,omitempty"`
 	ProcessingTimeMs int       `json:"processing_time_ms,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
+}
+
+// SCMReleaseAsset is a downloadable source archive or an explicit external
+// link associated with an SCM release.
+type SCMReleaseAsset struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	DirectURL string `json:"direct_url,omitempty"`
+	Format    string `json:"format,omitempty"`
+	LinkType  string `json:"link_type,omitempty"`
 }
 
 // IssueSyncLabelMode represents the label sync mode

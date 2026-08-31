@@ -25,6 +25,7 @@
 
   // Segmented buckets for the dev panel
   const pullRequests = $derived(links.filter(l => l.link_type === 'pull_request'));
+  const hasGitLabPullRequests = $derived(pullRequests.some(link => link.provider_type === 'gitlab'));
   const branchLinks = $derived(links.filter(l => l.link_type === 'branch'));
   const commitLinks = $derived(links.filter(l => l.link_type === 'commit'));
   // PR rollup follows Jira semantics: OPEN > MERGED > DECLINED
@@ -293,7 +294,7 @@
         {#if pullRequests.length > 0}
           <section class="space-y-1.5">
             <div class="flex items-center gap-2 px-1">
-              <Text variant="subtle" size="xs" weight="medium">{t('scm.pullRequests')}</Text>
+              <Text variant="subtle" size="xs" weight="medium">{t(hasGitLabPullRequests ? 'scm.mergeRequests' : 'scm.pullRequests')}</Text>
               <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                 {pullRequests.length}
               </span>
@@ -413,7 +414,7 @@
           class="p-1 rounded hover:bg-opacity-50"
           style="color: var(--ds-text-subtle);"
           onclick={() => openCreatePRModal(link)}
-          title={t('scm.createPullRequest')}
+          title={t(link.provider_type === 'gitlab' ? 'scm.createMergeRequest' : 'scm.createPullRequest')}
         >
           <GitMerge class="w-3 h-3" />
         </button>

@@ -478,6 +478,96 @@ var Catalog = []Migration{
 			CREATE UNIQUE INDEX uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
 		`,
 	},
+	{
+		Version:       "20260831_gitlab_release_metadata",
+		Name:          "Add repository-scoped SCM release metadata",
+		CheckSQLite:   sqliteColumnCheck("milestone_releases", "release_status"),
+		CheckPostgres: pgColumnCheck("milestone_releases", "release_status"),
+		SQLite: `
+			ALTER TABLE milestone_releases ADD COLUMN workspace_repository_id INTEGER;
+			ALTER TABLE milestone_releases ADD COLUMN tag_url TEXT;
+			ALTER TABLE milestone_releases ADD COLUMN release_status TEXT NOT NULL DEFAULT 'tag_only';
+			ALTER TABLE milestone_releases ADD COLUMN released_at DATETIME;
+			ALTER TABLE milestone_releases ADD COLUMN assets_json TEXT NOT NULL DEFAULT '[]';
+			ALTER TABLE milestone_releases ADD COLUMN last_synced_at DATETIME;
+			CREATE UNIQUE INDEX uq_milestone_releases_repository_tag
+				ON milestone_releases(workspace_repository_id, tag_name)
+				WHERE workspace_repository_id IS NOT NULL;
+		`,
+		Postgres: `
+			ALTER TABLE milestone_releases ADD COLUMN workspace_repository_id INTEGER;
+			ALTER TABLE milestone_releases ADD COLUMN tag_url TEXT;
+			ALTER TABLE milestone_releases ADD COLUMN release_status TEXT NOT NULL DEFAULT 'tag_only';
+			ALTER TABLE milestone_releases ADD COLUMN released_at TIMESTAMPTZ;
+			ALTER TABLE milestone_releases ADD COLUMN assets_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+			ALTER TABLE milestone_releases ADD COLUMN last_synced_at TIMESTAMPTZ;
+			CREATE UNIQUE INDEX uq_milestone_releases_repository_tag
+				ON milestone_releases(workspace_repository_id, tag_name)
+				WHERE workspace_repository_id IS NOT NULL;
+		`,
+	},
+	{
+		Version:       "20260831_scm_webhook_ingress",
+		Name:          "Add manual SCM webhook ingress",
+		CheckSQLite:   "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='scm_webhooks'",
+		CheckPostgres: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='scm_webhooks'",
+		SQLite: `
+			CREATE TABLE scm_webhooks (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				workspace_repository_id INTEGER NOT NULL UNIQUE REFERENCES workspace_repositories(id) ON DELETE CASCADE,
+				webhook_key TEXT NOT NULL UNIQUE,
+				webhook_external_id TEXT,
+				webhook_secret_encrypted TEXT NOT NULL,
+				events TEXT NOT NULL DEFAULT '["push","tag_push","merge_request","note","release"]',
+				is_active BOOLEAN NOT NULL DEFAULT true,
+				last_delivery_at DATETIME,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE TABLE scm_webhook_deliveries (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				scm_webhook_id INTEGER NOT NULL REFERENCES scm_webhooks(id) ON DELETE CASCADE,
+				delivery_id TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				payload_summary TEXT,
+				status TEXT NOT NULL DEFAULT 'pending',
+				error_message TEXT,
+				processing_time_ms INTEGER,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(scm_webhook_id, delivery_id)
+			);
+			CREATE INDEX idx_scm_webhook_deliveries_status ON scm_webhook_deliveries(status, created_at);
+		`,
+		Postgres: `
+			CREATE TABLE scm_webhooks (
+				id SERIAL PRIMARY KEY,
+				workspace_repository_id INTEGER NOT NULL UNIQUE REFERENCES workspace_repositories(id) ON DELETE CASCADE,
+				webhook_key TEXT NOT NULL UNIQUE,
+				webhook_external_id TEXT,
+				webhook_secret_encrypted TEXT NOT NULL,
+				events JSONB NOT NULL DEFAULT '["push","tag_push","merge_request","note","release"]'::jsonb,
+				is_active BOOLEAN NOT NULL DEFAULT true,
+				last_delivery_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE TABLE scm_webhook_deliveries (
+				id SERIAL PRIMARY KEY,
+				scm_webhook_id INTEGER NOT NULL REFERENCES scm_webhooks(id) ON DELETE CASCADE,
+				delivery_id TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				payload_summary JSONB,
+				status TEXT NOT NULL DEFAULT 'pending',
+				error_message TEXT,
+				processing_time_ms INTEGER,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(scm_webhook_id, delivery_id)
+			);
+			CREATE INDEX idx_scm_webhook_deliveries_status ON scm_webhook_deliveries(status, created_at);
+		`,
+	},
 }
 
 func (m Migration) checksum(driver string) string {

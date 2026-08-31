@@ -313,6 +313,12 @@ func (e *CreateMilestoneExecutor) attachRelease(ctx *models.ExecutionContext, mi
 	}
 	sha, _ := ctx.Variables["new_ref.sha"].(string)
 	repoFullName, _ := ctx.Variables["new_repo.full_name"].(string)
+	var workspaceRepositoryID *int
+	if rawID, exists := ctx.Variables["new_repo.workspace_repository_id"]; exists {
+		if id, ok := coerceInt(rawID); ok && id > 0 {
+			workspaceRepositoryID = &id
+		}
+	}
 
 	var repoPtr *string
 	if repoFullName != "" {
@@ -321,9 +327,10 @@ func (e *CreateMilestoneExecutor) attachRelease(ctx *models.ExecutionContext, mi
 	}
 
 	return e.planning.AttachRelease(ReleaseMilestoneParams{
-		ID:              milestoneID,
-		TagName:         tagName,
-		TargetCommitish: sha,
-		SCMRepository:   repoPtr,
+		ID:                    milestoneID,
+		WorkspaceRepositoryID: workspaceRepositoryID,
+		TagName:               tagName,
+		TargetCommitish:       sha,
+		SCMRepository:         repoPtr,
 	})
 }

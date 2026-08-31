@@ -531,17 +531,18 @@ func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID, comm
 // PushCommentUpdateToGitHub pushes a Windshift comment edit to the linked GitHub comment.
 func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commentID, authorID int, newBody string) {
 	var ghCommentID int64
+	var issueNumber int
 	var repoName string
 	var connectionID int
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT isc2.github_comment_id, wr.repository_name, wr.workspace_scm_connection_id
+		SELECT isc2.github_comment_id, isi.github_issue_number, wr.repository_name, wr.workspace_scm_connection_id
 		FROM issue_sync_comments isc2
 		JOIN issue_sync_items isi ON isi.id = isc2.issue_sync_item_id
 		JOIN issue_sync_configs isc ON isc.id = isi.issue_sync_config_id
 		JOIN workspace_repositories wr ON wr.id = isc.workspace_repository_id
 		WHERE isc2.comment_id = ? AND isc.sync_enabled = ? AND isc.sync_comments = ?
-	`, commentID, true, true).Scan(&ghCommentID, &repoName, &connectionID)
+	`, commentID, true, true).Scan(&ghCommentID, &issueNumber, &repoName, &connectionID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Error("lookup sync comment for update pushback", "comment_id", commentID, "error", err)
@@ -578,7 +579,7 @@ func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commen
 		return
 	}
 
-	if err := issueProvider.UpdateIssueComment(ctx, parts[0], parts[1], ghCommentID, newBody); err != nil {
+	if err := issueProvider.UpdateIssueComment(ctx, parts[0], parts[1], issueNumber, ghCommentID, newBody); err != nil {
 		slog.Error("push comment update to GitHub", "github_comment_id", ghCommentID, "error", err)
 	}
 }

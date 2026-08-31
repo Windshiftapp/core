@@ -34,13 +34,31 @@ var ErrBindingRepoNeedsSCMConnection = errors.New("binding service: repo_slug re
 // ErrBindingInvalidRepoSlug is returned when a binding's RepoSlug is
 // not of the canonical owner/repo shape (no path traversal, no
 // schemes, no leading slashes).
-var ErrBindingInvalidRepoSlug = errors.New("binding service: repo_slug must be owner/repo, alphanumerics + . _ - only")
+var ErrBindingInvalidRepoSlug = errors.New("binding service: repo_slug must be namespace/project, alphanumerics + . _ - only")
 
-// validRepoSlug is the canonical owner/repo shape. Two segments
-// separated by a single /. No "..", no leading slashes, no schemes —
-// the regex on its own rejects all of those because none of the
-// allowed characters can produce them.
-var validRepoSlug = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`)
+// validRepoSlug accepts a namespace with one or more segments followed by a
+// project. No traversal segments, leading slashes, or schemes are allowed.
+var validRepoSlug = regexp.MustCompile(`^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+$`)
+
+func isValidRepoSlug(slug string) bool {
+	if !validRepoSlug.MatchString(slug) {
+		return false
+	}
+	for _, segment := range strings.Split(slug, "/") {
+		if segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+func splitRepositoryPath(slug string) (namespace, project string, ok bool) {
+	if !isValidRepoSlug(slug) {
+		return "", "", false
+	}
+	separator := strings.LastIndex(slug, "/")
+	return slug[:separator], slug[separator+1:], true
+}
 
 const codingAgentVisionPromptSuffix = `
 
@@ -517,7 +535,7 @@ func normalizeRepoInputs(inputs []RepoInput) ([]models.BindingRepo, error) {
 	seen := make(map[string]bool, len(inputs))
 	primaries := 0
 	for i, in := range inputs {
-		if !validRepoSlug.MatchString(in.RepoSlug) {
+		if !isValidRepoSlug(in.RepoSlug) {
 			return nil, ErrBindingInvalidRepoSlug
 		}
 		if in.SCMConnectionID == nil {
@@ -1797,7 +1815,7 @@ func applyLLMModelEnv(env map[string]string, cfg *llm.ConnectionRuntimeConfig) {
 
 // deriveCloneURL builds a credential-free HTTPS remote from trusted SCM data.
 func deriveCloneURL(providerType, baseURL, slug string) (string, error) {
-	if !validRepoSlug.MatchString(slug) {
+	if !isValidRepoSlug(slug) {
 		return "", ErrBindingInvalidRepoSlug
 	}
 	host := ""
@@ -1820,6 +1838,18 @@ func deriveCloneURL(providerType, baseURL, slug string) (string, error) {
 			return "", fmt.Errorf("gitea base url: %w", err)
 		}
 		host = h
+	case "gitlab":
+		if baseURL == "" {
+			baseURL = "https://gitlab.com"
+		}
+		u, err := url.Parse(strings.TrimSuffix(strings.TrimSuffix(baseURL, "/"), "/api/v4"))
+		if err != nil {
+			return "", fmt.Errorf("gitlab base url: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("gitlab base url %q has no host", baseURL)
+		}
+		return strings.TrimSuffix(u.String(), "/") + "/" + slug + ".git", nil
 	default:
 		return "", fmt.Errorf("unsupported scm provider type %q", providerType)
 	}

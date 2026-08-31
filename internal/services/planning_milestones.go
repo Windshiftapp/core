@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -100,9 +101,10 @@ func scanMilestoneRow(sc milestoneScanner) (MilestoneResult, error) {
 	var description, targetDate, categoryName, categoryColor, workspaceName, externalKey sql.NullString
 	var categoryID, workspaceID sql.NullInt64
 	// Release columns
-	var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
-	var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
+	var mrID, mrCreatedBy, mrSCMConnectionID, mrWorkspaceRepositoryID sql.NullInt64
+	var mrTagName, mrName, mrBody, mrTargetCommitish, mrTagURL sql.NullString
 	var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
+	var mrReleaseStatus, mrReleasedAt, mrAssetsJSON, mrLastSyncedAt sql.NullString
 	var mrIsDraft, mrIsPrerelease sql.NullBool
 	var mrCreatedAt sql.NullString
 
@@ -110,7 +112,8 @@ func scanMilestoneRow(sc milestoneScanner) (MilestoneResult, error) {
 		&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
 		&externalKey, &m.Position,
 		&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
-		&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
+		&mrTargetCommitish, &mrWorkspaceRepositoryID, &mrTagURL, &mrReleaseStatus,
+		&mrReleasedAt, &mrAssetsJSON, &mrLastSyncedAt, &mrSCMConnectionID, &mrSCMRepository,
 		&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
 		&m.CreatedAt, &m.UpdatedAt)
 	if err != nil {
@@ -135,8 +138,9 @@ func scanMilestoneRow(sc milestoneScanner) (MilestoneResult, error) {
 		m.WorkspaceID = &id
 	}
 	m.LatestRelease = hydrateMilestoneRelease(m.ID,
-		mrID, mrCreatedBy, mrSCMConnectionID,
+		mrID, mrCreatedBy, mrSCMConnectionID, mrWorkspaceRepositoryID,
 		mrTagName, mrName, mrBody, mrTargetCommitish,
+		mrTagURL, mrReleaseStatus, mrReleasedAt, mrAssetsJSON, mrLastSyncedAt,
 		mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL,
 		mrIsDraft, mrIsPrerelease, mrCreatedAt,
 	)
@@ -162,20 +166,26 @@ func scanMilestones(rows *sql.Rows) ([]MilestoneResult, error) { //nolint:unpara
 
 // MilestoneReleaseResult represents a release record for a milestone.
 type MilestoneReleaseResult struct {
-	ID              int
-	MilestoneID     int
-	TagName         string
-	Name            string
-	Body            string
-	IsDraft         bool
-	IsPrerelease    bool
-	TargetCommitish string
-	SCMConnectionID *int
-	SCMRepository   *string
-	SCMReleaseID    *string
-	SCMReleaseURL   *string
-	CreatedBy       *int
-	CreatedAt       string
+	ID                    int
+	MilestoneID           int
+	WorkspaceRepositoryID *int
+	TagName               string
+	TagURL                *string
+	ReleaseStatus         string
+	ReleasedAt            *string
+	Assets                []models.SCMReleaseAsset
+	LastSyncedAt          *string
+	Name                  string
+	Body                  string
+	IsDraft               bool
+	IsPrerelease          bool
+	TargetCommitish       string
+	SCMConnectionID       *int
+	SCMRepository         *string
+	SCMReleaseID          *string
+	SCMReleaseURL         *string
+	CreatedBy             *int
+	CreatedAt             string
 }
 
 var ErrSCMRepositoryNotLinked = errors.New("SCM repository is not linked to the selected connection")
@@ -261,7 +271,9 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 		       m.is_global, m.workspace_id, w.name as workspace_name,
 		       m.external_key, m.position,
 		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
-		       mr.target_commitish, mr.scm_connection_id, mr.scm_repository,
+		       mr.target_commitish, mr.workspace_repository_id, mr.tag_url, mr.release_status,
+		       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
+		       mr.scm_connection_id, mr.scm_repository,
 		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
 		       m.created_at, m.updated_at
 		FROM milestones m
@@ -370,7 +382,9 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 		       m.is_global, m.workspace_id, w.name as workspace_name,
 		       m.external_key, m.position,
 		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
-		       mr.target_commitish, mr.scm_connection_id, mr.scm_repository,
+		       mr.target_commitish, mr.workspace_repository_id, mr.tag_url, mr.release_status,
+		       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
+		       mr.scm_connection_id, mr.scm_repository,
 		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
 		       m.created_at, m.updated_at
 		FROM milestones m
@@ -400,8 +414,9 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 // Returns nil if mrID is not valid (no release row).
 func hydrateMilestoneRelease(
 	milestoneID int,
-	mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64,
+	mrID, mrCreatedBy, mrSCMConnectionID, mrWorkspaceRepositoryID sql.NullInt64,
 	mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString,
+	mrTagURL, mrReleaseStatus, mrReleasedAt, mrAssetsJSON, mrLastSyncedAt sql.NullString,
 	mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString,
 	mrIsDraft, mrIsPrerelease sql.NullBool,
 	mrCreatedAt sql.NullString,
@@ -417,6 +432,23 @@ func hydrateMilestoneRelease(
 		Body:            mrBody.String,
 		CreatedAt:       mrCreatedAt.String,
 		TargetCommitish: mrTargetCommitish.String,
+	}
+	if mrWorkspaceRepositoryID.Valid {
+		id := int(mrWorkspaceRepositoryID.Int64)
+		rel.WorkspaceRepositoryID = &id
+	}
+	if mrTagURL.Valid {
+		rel.TagURL = &mrTagURL.String
+	}
+	rel.ReleaseStatus = mrReleaseStatus.String
+	if mrReleasedAt.Valid {
+		rel.ReleasedAt = &mrReleasedAt.String
+	}
+	if mrLastSyncedAt.Valid {
+		rel.LastSyncedAt = &mrLastSyncedAt.String
+	}
+	if mrAssetsJSON.Valid && mrAssetsJSON.String != "" {
+		_ = json.Unmarshal([]byte(mrAssetsJSON.String), &rel.Assets)
 	}
 	if mrIsDraft.Valid {
 		rel.IsDraft = mrIsDraft.Bool
@@ -622,14 +654,18 @@ func (s *PlanningService) SetMilestoneStatus(milestoneID, workspaceID int, statu
 // control (e.g. "tag promotes branch milestone to in-progress, not
 // completed").
 func (s *PlanningService) AttachRelease(params ReleaseMilestoneParams) error {
+	assetsJSON := releaseAssetsJSON(params.Assets)
 	_, err := s.db.ExecWrite(`
 		INSERT INTO milestone_releases (
 			milestone_id, tag_name, name, body, is_draft, is_prerelease,
-			target_commitish, scm_connection_id, scm_repository, scm_release_id,
+			target_commitish, workspace_repository_id, tag_url, release_status, released_at, assets_json,
+			scm_connection_id, scm_repository, scm_release_id,
 			scm_release_url, created_by
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT DO NOTHING
 	`, params.ID, params.TagName, params.Name, params.Body, params.IsDraft, params.IsPrerelease,
-		params.TargetCommitish, params.SCMConnectionID, params.SCMRepository, params.SCMReleaseID,
+		params.TargetCommitish, params.WorkspaceRepositoryID, params.TagURL, releaseStatusOrDefault(params.ReleaseStatus), params.ReleasedAt, assetsJSON,
+		params.SCMConnectionID, params.SCMRepository, params.SCMReleaseID,
 		params.SCMReleaseURL, params.CreatedBy)
 	if err != nil {
 		return fmt.Errorf("failed to insert milestone release: %w", err)
@@ -710,7 +746,9 @@ func (s *PlanningService) UpdateMilestone(params UpdateMilestoneParams) (*Milest
 func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneReleaseResult, error) {
 	rows, err := s.db.Query(`
 		SELECT id, milestone_id, tag_name, name, body, is_draft, is_prerelease,
-		       target_commitish, scm_connection_id, scm_repository,
+		       target_commitish, workspace_repository_id, tag_url, release_status,
+		       CAST(released_at AS TEXT), CAST(assets_json AS TEXT), CAST(last_synced_at AS TEXT),
+		       scm_connection_id, scm_repository,
 		       scm_release_id, scm_release_url, created_by, created_at
 		FROM milestone_releases
 		WHERE milestone_id = ? AND state = 'created'
@@ -725,12 +763,14 @@ func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneRel
 	for rows.Next() {
 		var r MilestoneReleaseResult
 		var name, body, targetCommitish sql.NullString
-		var scmConnectionID, createdBy sql.NullInt64
-		var scmRepository, scmReleaseID, scmReleaseURL sql.NullString
+		var scmConnectionID, createdBy, workspaceRepositoryID sql.NullInt64
+		var scmRepository, scmReleaseID, scmReleaseURL, tagURL sql.NullString
+		var releaseStatus, releasedAt, assetsJSON, lastSyncedAt sql.NullString
 		var isDraft, isPrerelease sql.NullBool
 
 		if err := rows.Scan(&r.ID, &r.MilestoneID, &r.TagName, &name, &body,
-			&isDraft, &isPrerelease, &targetCommitish, &scmConnectionID, &scmRepository,
+			&isDraft, &isPrerelease, &targetCommitish, &workspaceRepositoryID, &tagURL,
+			&releaseStatus, &releasedAt, &assetsJSON, &lastSyncedAt, &scmConnectionID, &scmRepository,
 			&scmReleaseID, &scmReleaseURL, &createdBy, &r.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan milestone release: %w", err)
 		}
@@ -738,6 +778,23 @@ func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneRel
 		r.Name = name.String
 		r.Body = body.String
 		r.TargetCommitish = targetCommitish.String
+		if workspaceRepositoryID.Valid {
+			id := int(workspaceRepositoryID.Int64)
+			r.WorkspaceRepositoryID = &id
+		}
+		if tagURL.Valid {
+			r.TagURL = &tagURL.String
+		}
+		r.ReleaseStatus = releaseStatus.String
+		if releasedAt.Valid {
+			r.ReleasedAt = &releasedAt.String
+		}
+		if lastSyncedAt.Valid {
+			r.LastSyncedAt = &lastSyncedAt.String
+		}
+		if assetsJSON.Valid && assetsJSON.String != "" {
+			_ = json.Unmarshal([]byte(assetsJSON.String), &r.Assets)
+		}
 		if isDraft.Valid {
 			r.IsDraft = isDraft.Bool
 		}
@@ -773,19 +830,24 @@ func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneRel
 
 // ReleaseMilestoneParams contains parameters for releasing a milestone.
 type ReleaseMilestoneParams struct {
-	ID              int
-	IdempotencyKey  string
-	TagName         string
-	Name            string
-	Body            string
-	IsDraft         bool
-	IsPrerelease    bool
-	TargetCommitish string
-	SCMConnectionID *int
-	SCMRepository   *string
-	SCMReleaseID    *string
-	SCMReleaseURL   *string
-	CreatedBy       *int
+	ID                    int
+	IdempotencyKey        string
+	WorkspaceRepositoryID *int
+	TagName               string
+	TagURL                *string
+	ReleaseStatus         string
+	ReleasedAt            *string
+	Assets                []models.SCMReleaseAsset
+	Name                  string
+	Body                  string
+	IsDraft               bool
+	IsPrerelease          bool
+	TargetCommitish       string
+	SCMConnectionID       *int
+	SCMRepository         *string
+	SCMReleaseID          *string
+	SCMReleaseURL         *string
+	CreatedBy             *int
 }
 
 // MilestoneReleaseAttempt is a durable claim for one idempotent release
@@ -800,15 +862,16 @@ type MilestoneReleaseAttempt struct {
 }
 
 type storedMilestoneReleaseRequest struct {
-	TagName         string
-	Name            sql.NullString
-	Body            sql.NullString
-	IsDraft         bool
-	IsPrerelease    bool
-	TargetCommitish sql.NullString
-	SCMConnectionID sql.NullInt64
-	SCMRepository   sql.NullString
-	CreatedBy       sql.NullInt64
+	TagName               string
+	Name                  sql.NullString
+	Body                  sql.NullString
+	IsDraft               bool
+	IsPrerelease          bool
+	TargetCommitish       sql.NullString
+	WorkspaceRepositoryID sql.NullInt64
+	SCMConnectionID       sql.NullInt64
+	SCMRepository         sql.NullString
+	CreatedBy             sql.NullInt64
 }
 
 func milestoneReleaseRequestMatches(params ReleaseMilestoneParams, stored storedMilestoneReleaseRequest) bool {
@@ -819,6 +882,7 @@ func milestoneReleaseRequestMatches(params ReleaseMilestoneParams, stored stored
 		params.IsPrerelease == stored.IsPrerelease &&
 		stored.TargetCommitish.Valid && params.TargetCommitish == stored.TargetCommitish.String &&
 		nullableIntMatches(params.SCMConnectionID, stored.SCMConnectionID) &&
+		nullableIntMatches(params.WorkspaceRepositoryID, stored.WorkspaceRepositoryID) &&
 		nullableStringMatches(params.SCMRepository, stored.SCMRepository) &&
 		nullableIntMatches(params.CreatedBy, stored.CreatedBy)
 }
@@ -859,16 +923,19 @@ func (s *PlanningService) BeginMilestoneRelease(ctx context.Context, params Rele
 	leaseExpiresAt := time.Now().UTC().Add(5 * time.Minute)
 
 	return database.WithTxResult(s.db, func(tx database.Tx) (*MilestoneReleaseAttempt, error) {
+		assetsJSON := releaseAssetsJSON(params.Assets)
 		result, err := tx.ExecWriteContext(ctx, `
 			INSERT INTO milestone_releases (
 				milestone_id, idempotency_key, state, lease_token, lease_expires_at,
 				tag_name, name, body, is_draft, is_prerelease, target_commitish,
+				workspace_repository_id, tag_url, release_status, released_at, assets_json,
 				scm_connection_id, scm_repository, created_by
-			) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT DO NOTHING
 		`, params.ID, params.IdempotencyKey, leaseToken, leaseExpiresAt,
 			params.TagName, params.Name, params.Body, params.IsDraft, params.IsPrerelease,
-			params.TargetCommitish, params.SCMConnectionID, params.SCMRepository, params.CreatedBy)
+			params.TargetCommitish, params.WorkspaceRepositoryID, params.TagURL, releaseStatusOrDefault(params.ReleaseStatus), params.ReleasedAt, assetsJSON,
+			params.SCMConnectionID, params.SCMRepository, params.CreatedBy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to persist pending milestone release: %w", err)
 		}
@@ -882,7 +949,7 @@ func (s *PlanningService) BeginMilestoneRelease(ctx context.Context, params Rele
 		var storedRequest storedMilestoneReleaseRequest
 		if err := tx.QueryRowContext(ctx, `
 				SELECT id, state, tag_name, name, body, is_draft, is_prerelease,
-				       target_commitish, scm_connection_id, scm_repository, created_by
+				       target_commitish, workspace_repository_id, scm_connection_id, scm_repository, created_by
 				FROM milestone_releases
 				WHERE milestone_id = ? AND idempotency_key = ?
 			`, params.ID, params.IdempotencyKey).Scan(
@@ -894,6 +961,7 @@ func (s *PlanningService) BeginMilestoneRelease(ctx context.Context, params Rele
 			&storedRequest.IsDraft,
 			&storedRequest.IsPrerelease,
 			&storedRequest.TargetCommitish,
+			&storedRequest.WorkspaceRepositoryID,
 			&storedRequest.SCMConnectionID,
 			&storedRequest.SCMRepository,
 			&storedRequest.CreatedBy,
@@ -959,14 +1027,18 @@ func (s *PlanningService) MarkMilestoneReleaseUncertain(ctx context.Context, att
 // CompleteMilestoneRelease atomically records the remote identity and marks
 // the milestone completed. Either both local effects commit or neither does.
 func (s *PlanningService) CompleteMilestoneRelease(ctx context.Context, attemptID int, leaseToken string, params ReleaseMilestoneParams) (*MilestoneResult, error) {
+	assetsJSON := releaseAssetsJSON(params.Assets)
 	err := database.WithTx(s.db, func(tx database.Tx) error {
 		result, err := tx.ExecWriteContext(ctx, `
 			UPDATE milestone_releases
-			SET state = 'created', scm_release_id = ?, scm_release_url = ?,
+			SET state = 'created', name = ?, body = ?, is_draft = ?, is_prerelease = ?,
+			    scm_release_id = ?, scm_release_url = ?, tag_url = ?,
+			    release_status = ?, released_at = ?, assets_json = ?, last_synced_at = CURRENT_TIMESTAMP,
 			    last_error = NULL, lease_token = NULL, lease_expires_at = NULL,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE id = ? AND lease_token = ? AND state = 'pending'
-		`, params.SCMReleaseID, params.SCMReleaseURL, attemptID, leaseToken)
+		`, params.Name, params.Body, params.IsDraft, params.IsPrerelease,
+			params.SCMReleaseID, params.SCMReleaseURL, params.TagURL, releaseStatusOrDefault(params.ReleaseStatus), params.ReleasedAt, assetsJSON, attemptID, leaseToken)
 		if err != nil {
 			return fmt.Errorf("failed to finalize milestone release: %w", err)
 		}
@@ -1003,15 +1075,18 @@ func (s *PlanningService) CompleteMilestoneRelease(ctx context.Context, attemptI
 // release metadata. Its local insert and milestone status transition are
 // transactional.
 func (s *PlanningService) ReleaseMilestone(params ReleaseMilestoneParams) (*MilestoneResult, error) {
+	assetsJSON := releaseAssetsJSON(params.Assets)
 	err := database.WithTx(s.db, func(tx database.Tx) error {
 		_, err := tx.ExecWrite(`
 			INSERT INTO milestone_releases (
 				milestone_id, idempotency_key, state, tag_name, name, body,
-				is_draft, is_prerelease, target_commitish, scm_connection_id,
+				is_draft, is_prerelease, target_commitish, workspace_repository_id,
+				tag_url, release_status, released_at, assets_json, scm_connection_id,
 				scm_repository, scm_release_id, scm_release_url, created_by
-			) VALUES (?, ?, 'created', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, 'created', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, params.ID, nullablePlanningString(params.IdempotencyKey), params.TagName, params.Name,
 			params.Body, params.IsDraft, params.IsPrerelease, params.TargetCommitish,
+			params.WorkspaceRepositoryID, params.TagURL, releaseStatusOrDefault(params.ReleaseStatus), params.ReleasedAt, assetsJSON,
 			params.SCMConnectionID, params.SCMRepository, params.SCMReleaseID,
 			params.SCMReleaseURL, params.CreatedBy)
 		if err != nil {
@@ -1037,6 +1112,24 @@ func nullablePlanningString(value string) any {
 		return nil
 	}
 	return value
+}
+
+func releaseStatusOrDefault(status string) string {
+	if strings.TrimSpace(status) == "" {
+		return "tag_only"
+	}
+	return status
+}
+
+func releaseAssetsJSON(assets []models.SCMReleaseAsset) string {
+	if len(assets) == 0 {
+		return "[]"
+	}
+	raw, err := json.Marshal(assets)
+	if err != nil {
+		return "[]"
+	}
+	return string(raw)
 }
 
 // DeleteMilestone deletes a milestone. HTTP adapters may supply an audit actor;

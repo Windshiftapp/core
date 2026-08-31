@@ -1048,7 +1048,7 @@ func (g *GitHubProvider) ListPullRequestReviewEvents(ctx context.Context, owner,
 			events = append(events, IssueComment{
 				ID: c.ID, Kind: "review_comment", Body: c.Body, User: c.User.toUser(),
 				AuthorAssociation: c.AuthorAssociation, Path: c.Path, Line: line, Side: c.Side,
-				ThreadID: c.InReplyToID, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+				ThreadID: strconv.FormatInt(c.InReplyToID, 10), CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
 			})
 		}
 		if len(comments) < 100 {
@@ -1082,7 +1082,7 @@ func (g *GitHubProvider) CanUserWriteRepository(ctx context.Context, owner, repo
 }
 
 // UpdateIssueComment updates an existing comment on an issue
-func (g *GitHubProvider) UpdateIssueComment(ctx context.Context, owner, repo string, commentID int64, commentBody string) error {
+func (g *GitHubProvider) UpdateIssueComment(ctx context.Context, owner, repo string, _ int, commentID int64, commentBody string) error {
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return err
 	}
@@ -1430,16 +1430,24 @@ type githubRelease struct {
 }
 
 func (r githubRelease) toRelease() Release {
+	status := "released"
+	if r.Draft {
+		status = "draft"
+	} else if r.Prerelease {
+		status = "prerelease"
+	}
 	return Release{
 		ID:           strconv.Itoa(r.ID),
 		TagName:      r.TagName,
 		Name:         r.Name,
 		Body:         r.Body,
 		URL:          r.HTMLURL,
+		Status:       status,
 		IsDraft:      r.Draft,
 		IsPrerelease: r.Prerelease,
 		CreatedAt:    r.CreatedAt,
 		PublishedAt:  r.PublishedAt,
+		ReleasedAt:   r.PublishedAt,
 	}
 }
 
