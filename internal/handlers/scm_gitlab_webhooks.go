@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 var gitLabWebhookEvents = []string{"push", "tag_push", "merge_request", "note", "release"}
@@ -36,16 +36,8 @@ func (h *SCMItemLinksHandler) webhookRepoAdmin(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return "", false
 	}
-	var workspaceID int
-	var providerType string
-	err := h.db.QueryRowContext(r.Context(), `
-		SELECT wsc.workspace_id, sp.provider_type
-		FROM workspace_repositories wr
-		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
-		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
-		WHERE wr.id = ?
-	`, repoID).Scan(&workspaceID, &providerType)
-	if errors.Is(err, sql.ErrNoRows) {
+	access, err := h.webhookRepo.GetRepositoryAccess(r.Context(), repoID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "workspace_repository")
 		return "", false
 	}
@@ -53,10 +45,10 @@ func (h *SCMItemLinksHandler) webhookRepoAdmin(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return "", false
 	}
-	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionWorkspaceAdmin, h.permissionService) {
+	if !RequireWorkspacePermission(w, r, user.ID, access.WorkspaceID, models.PermissionWorkspaceAdmin, h.permissionService) {
 		return "", false
 	}
-	return providerType, true
+	return access.ProviderType, true
 }
 
 func (h *SCMItemLinksHandler) webhookCallbackURL(r *http.Request, key string) string {
@@ -93,11 +85,8 @@ func (h *SCMItemLinksHandler) GetGitLabWebhookConfig(w http.ResponseWriter, r *h
 		respondBadRequest(w, r, "Webhooks on this endpoint are only available for GitLab repositories")
 		return
 	}
-	var key string
-	var active bool
-	var lastDelivery sql.NullTime
-	err := h.db.QueryRowContext(r.Context(), `SELECT webhook_key, is_active, last_delivery_at FROM scm_webhooks WHERE workspace_repository_id = ?`, repoID).Scan(&key, &active, &lastDelivery)
-	if errors.Is(err, sql.ErrNoRows) {
+	config, err := h.webhookRepo.GetConfig(r.Context(), repoID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondJSONOK(w, gitLabWebhookConfigResponse{Configured: false, Events: gitLabWebhookEvents})
 		return
 	}
@@ -105,9 +94,12 @@ func (h *SCMItemLinksHandler) GetGitLabWebhookConfig(w http.ResponseWriter, r *h
 		respondInternalError(w, r, err)
 		return
 	}
-	response := gitLabWebhookConfigResponse{Configured: true, CallbackURL: h.webhookCallbackURL(r, key), Events: gitLabWebhookEvents, Active: active}
-	if lastDelivery.Valid {
-		response.LastDeliveryAt = &lastDelivery.Time
+	response := gitLabWebhookConfigResponse{
+		Configured:     true,
+		CallbackURL:    h.webhookCallbackURL(r, config.WebhookKey),
+		Events:         gitLabWebhookEvents,
+		Active:         config.Active,
+		LastDeliveryAt: config.LastDeliveryAt,
 	}
 	respondJSONOK(w, response)
 }
@@ -144,19 +136,18 @@ func (h *SCMItemLinksHandler) RotateGitLabWebhookSecret(w http.ResponseWriter, r
 		respondInternalError(w, r, err)
 		return
 	}
-	var key string
-	err = h.db.QueryRowContext(r.Context(), `SELECT webhook_key FROM scm_webhooks WHERE workspace_repository_id = ?`, repoID).Scan(&key)
-	if errors.Is(err, sql.ErrNoRows) {
-		key, err = randomWebhookValue(18)
-		if err == nil {
-			_, err = h.db.ExecWriteContext(r.Context(), `
-				INSERT INTO scm_webhooks(workspace_repository_id, webhook_key, webhook_secret_encrypted, events, is_active)
-				VALUES (?, ?, ?, ?, true)
-			`, repoID, key, encrypted, `["push","tag_push","merge_request","note","release"]`)
-		}
-	} else if err == nil {
-		_, err = h.db.ExecWriteContext(r.Context(), `UPDATE scm_webhooks SET webhook_secret_encrypted=?, is_active=true, updated_at=CURRENT_TIMESTAMP WHERE workspace_repository_id=?`, encrypted, repoID)
+	newKey, err := randomWebhookValue(18)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
+	key, err := h.webhookRepo.RotateConfig(
+		r.Context(),
+		repoID,
+		newKey,
+		encrypted,
+		`["push","tag_push","merge_request","note","release"]`,
+	)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -172,7 +163,7 @@ func (h *SCMItemLinksHandler) DeleteGitLabWebhookConfig(w http.ResponseWriter, r
 	if _, ok := h.webhookRepoAdmin(w, r, repoID); !ok {
 		return
 	}
-	if _, err := h.db.ExecWriteContext(r.Context(), `DELETE FROM scm_webhooks WHERE workspace_repository_id = ?`, repoID); err != nil {
+	if err := h.webhookRepo.DeleteConfig(r.Context(), repoID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -209,18 +200,8 @@ func normalizeGitLabWebhookKind(payload gitLabWebhookPayload) string {
 // schedules a targeted repository sync. Polling remains the recovery path.
 func (h *SCMItemLinksHandler) ReceiveGitLabWebhook(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("webhookKey")
-	var hookID, repoID int
-	var encryptedSecret, externalProjectID, providerType string
-	err := h.db.QueryRowContext(r.Context(), `
-		SELECT sw.id, sw.workspace_repository_id, sw.webhook_secret_encrypted,
-		       wr.repository_external_id, sp.provider_type
-		FROM scm_webhooks sw
-		JOIN workspace_repositories wr ON wr.id = sw.workspace_repository_id
-		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
-		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
-		WHERE sw.webhook_key = ? AND sw.is_active = true AND wr.is_active = true
-	`, key).Scan(&hookID, &repoID, &encryptedSecret, &externalProjectID, &providerType)
-	if errors.Is(err, sql.ErrNoRows) {
+	target, err := h.webhookRepo.GetTargetByKey(r.Context(), key)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "scm_webhook")
 		return
 	}
@@ -228,11 +209,11 @@ func (h *SCMItemLinksHandler) ReceiveGitLabWebhook(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
-	if providerType != string(models.SCMProviderTypeGitLab) {
+	if target.ProviderType != string(models.SCMProviderTypeGitLab) {
 		respondBadRequest(w, r, "Invalid webhook provider")
 		return
 	}
-	secret, err := h.encryption.Decrypt(encryptedSecret)
+	secret, err := h.encryption.Decrypt(target.EncryptedSecret)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -263,7 +244,7 @@ func (h *SCMItemLinksHandler) ReceiveGitLabWebhook(w http.ResponseWriter, r *htt
 	if projectID == 0 {
 		projectID = payload.ProjectID
 	}
-	if strconv.FormatInt(projectID, 10) != externalProjectID {
+	if strconv.FormatInt(projectID, 10) != target.RepositoryExternalID {
 		respondJSON(w, http.StatusForbidden, map[string]string{"error": "project mismatch"})
 		return
 	}
@@ -273,35 +254,28 @@ func (h *SCMItemLinksHandler) ReceiveGitLabWebhook(w http.ResponseWriter, r *htt
 		deliveryID = hex.EncodeToString(digest[:])
 	}
 	summary, _ := json.Marshal(map[string]any{"object_kind": eventType, "project_id": projectID, "path": payload.Project.PathWithNamespace, "iid": payload.ObjectAttributes.IID, "action": payload.ObjectAttributes.Action, "ref": payload.Ref, "tag": payload.ObjectAttributes.Tag})
-	result, err := h.db.ExecWriteContext(r.Context(), `
-		INSERT INTO scm_webhook_deliveries(scm_webhook_id, delivery_id, event_type, payload_summary, status)
-		VALUES (?, ?, ?, ?, 'pending') ON CONFLICT DO NOTHING
-	`, hookID, deliveryID, eventType, string(summary))
+	inserted, err := h.webhookRepo.RecordPendingDelivery(r.Context(), target.ID, deliveryID, eventType, string(summary))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	inserted, _ := result.RowsAffected()
-	_, _ = h.db.ExecWriteContext(r.Context(), `UPDATE scm_webhooks SET last_delivery_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?`, hookID)
 	respondJSON(w, http.StatusAccepted, map[string]bool{"accepted": true})
-	if inserted == 0 {
+	if !inserted {
 		return
 	}
 
+	baseCtx := context.WithoutCancel(r.Context())
 	go func() {
 		started := time.Now()
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		ctx, cancel := context.WithTimeout(baseCtx, 45*time.Second)
 		defer cancel()
-		syncErr := h.syncService.SyncRepository(ctx, repoID)
+		syncErr := h.syncService.SyncRepository(ctx, target.WorkspaceRepositoryID)
 		status, errorMessage := "processed", ""
 		if syncErr != nil {
 			status, errorMessage = "failed", syncErr.Error()
-			slog.Warn("GitLab webhook sync failed", slog.Int("repository_id", repoID), slog.Any("error", syncErr))
+			slog.Warn("GitLab webhook sync failed", slog.Int("repository_id", target.WorkspaceRepositoryID), slog.Any("error", syncErr))
 		}
-		_, updateErr := h.db.ExecWriteContext(ctx, `
-			UPDATE scm_webhook_deliveries SET status=?, error_message=?, processing_time_ms=?, updated_at=CURRENT_TIMESTAMP
-			WHERE scm_webhook_id=? AND delivery_id=?
-		`, status, errorMessage, time.Since(started).Milliseconds(), hookID, deliveryID)
+		updateErr := h.webhookRepo.CompleteDelivery(ctx, target.ID, deliveryID, status, errorMessage, time.Since(started))
 		if updateErr != nil {
 			slog.Warn("GitLab webhook delivery update failed", slog.Any("error", updateErr), slog.String("delivery_id", deliveryID))
 		}

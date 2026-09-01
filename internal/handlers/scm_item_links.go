@@ -26,6 +26,7 @@ type SCMItemLinksHandler struct {
 	db                database.Database
 	encryption        *sso.SecretEncryption
 	syncService       *scm.SyncService
+	webhookRepo       *repository.SCMWebhookRepository
 	permissionService *services.PermissionService
 	baseURL           string
 }
@@ -105,6 +106,7 @@ func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncrypti
 		db:                db,
 		encryption:        encryption,
 		syncService:       scm.NewSyncService(db, encryption),
+		webhookRepo:       repository.NewSCMWebhookRepository(db),
 		permissionService: permissionService,
 		baseURL:           strings.TrimRight(baseURL, "/"),
 	}

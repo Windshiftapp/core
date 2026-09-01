@@ -583,11 +583,12 @@ func (s *SyncService) syncAttachedReleases(ctx context.Context, provider Provide
 			}
 			status := release.Status
 			if status == "" {
-				if release.IsDraft {
+				switch {
+				case release.IsDraft:
 					status = "draft"
-				} else if release.IsPrerelease {
+				case release.IsPrerelease:
 					status = "prerelease"
-				} else {
+				default:
 					status = "released"
 				}
 			}
