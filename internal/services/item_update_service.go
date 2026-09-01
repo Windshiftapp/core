@@ -105,219 +105,23 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 }
 
 func (s *ItemUpdateService) updateItem(ctx context.Context, req UpdateItemRequest, opts itemUpdateOptions) (*UpdateItemResult, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("item update requires a context")
+	if err := validateItemUpdateRequest(ctx, req, opts); err != nil {
+		return nil, err
 	}
-	if _, hasStatus := req.UpdateData["status_id"]; hasStatus && !opts.allowStatus {
-		return nil, &validation.ValidationError{
-			Field:   "status_id",
-			Message: "must be changed via the transition endpoint, not item update",
-		}
-	}
-	if _, hasItemType := req.UpdateData["item_type_id"]; hasItemType {
-		return nil, &validation.ValidationError{
-			Field:   "item_type_id",
-			Message: "must be changed via the item type change endpoint, not item update",
-		}
-	}
-	if _, hasWorkspace := req.UpdateData["workspace_id"]; hasWorkspace {
-		return nil, &validation.ValidationError{
-			Field:   "workspace_id",
-			Message: "must be changed via the workspace move endpoint, not item update",
-		}
-	}
-
-	// Start transaction first so the read-modify-write is atomic
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }() // Will be ignored if transaction is committed
+	defer func() { _ = tx.Rollback() }()
 
-	// Load existing item inside the transaction (with FOR UPDATE on Postgres for row-level locking)
-	originalItem, err := s.loadItemInTx(tx, req.ItemID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load item: %w", err)
-	}
-
-	// Create a copy for updates
-	existingItem := *originalItem
-
-	// Apply validation and updates
-	if err = s.validator.ValidateAndApplyUpdates(&existingItem, req.UpdateData, req.UserID); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-	if _, milestonesChanged := req.UpdateData["milestone_ids"]; milestonesChanged ||
-		hasAnyItemUpdateField(req.UpdateData, "iteration_id", "workspace_id") {
-		milestoneIDs, loadErr := planningMilestoneIDsForUpdate(tx, req.ItemID, &existingItem, milestonesChanged)
-		if loadErr != nil {
-			return nil, loadErr
-		}
-		if err := validation.ValidatePlanningAssignments(tx, existingItem.WorkspaceID, milestoneIDs, existingItem.IterationID); err != nil {
-			return nil, fmt.Errorf("validation failed: %w", err)
-		}
-	}
-	if opts.beforeUpdateTransaction != nil {
-		if err := opts.beforeUpdateTransaction(ctx, tx, originalItem, &existingItem); err != nil {
-			return nil, err
-		}
-	}
-
-	// Update the item in database (the repository marshals custom field
-	// values and bumps updated_at)
-	now := time.Now()
-	if err := repository.NewItemRepository(s.db).Update(tx, &existingItem); err != nil {
+	update := itemUpdateOperation{service: s, ctx: ctx, req: req, opts: opts, tx: tx}
+	if err := update.apply(); err != nil {
 		return nil, err
 	}
-
-	// Apply milestone-set replace if the validator parsed milestone_ids. The
-	// validator stashes ID-only Milestone stubs on existingItem.Milestones
-	// when "milestone_ids" appeared in updateData; otherwise the field is
-	// untouched and we leave the join table alone.
-	var milestoneOldIDs, milestoneNewIDs []int
-	hasMilestoneIDs := false
-	if _, ok := req.UpdateData["milestone_ids"]; ok {
-		hasMilestoneIDs = true
-
-		// Snapshot current milestone IDs in the transaction for history.
-		oldRows, err := tx.Query("SELECT milestone_id FROM item_milestones WHERE item_id = ? ORDER BY milestone_id", req.ItemID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read existing item_milestones: %w", err)
-		}
-		for oldRows.Next() {
-			var mID int
-			if err := oldRows.Scan(&mID); err != nil {
-				_ = oldRows.Close()
-				return nil, fmt.Errorf("failed to scan existing milestone id: %w", err)
-			}
-			milestoneOldIDs = append(milestoneOldIDs, mID)
-		}
-		if err := oldRows.Err(); err != nil {
-			_ = oldRows.Close()
-			return nil, fmt.Errorf("failed to iterate existing milestone ids: %w", err)
-		}
-		_ = oldRows.Close()
-
-		if _, err := tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", req.ItemID); err != nil {
-			return nil, fmt.Errorf("failed to clear item_milestones: %w", err)
-		}
-		for _, m := range existingItem.Milestones {
-			milestoneNewIDs = append(milestoneNewIDs, m.ID)
-			if _, err := tx.Exec(
-				"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-				req.ItemID, m.ID, now,
-			); err != nil {
-				return nil, fmt.Errorf("failed to attach milestone %d: %w", m.ID, err)
-			}
-		}
-	}
-
-	if opts.afterUpdateTransaction != nil {
-		if err := opts.afterUpdateTransaction(ctx, tx, originalItem, &existingItem); err != nil {
-			return nil, err
-		}
-	}
-
-	// Generate and record history entries.
-	eventHistory := s.compareAndGenerateHistory(originalItem, &existingItem, req.UserID)
-	var history []HistoryEntry
-	if opts.recordHistory {
-		history = append(history, eventHistory...)
-	}
-	if hasMilestoneIDs {
-		oldStr := joinIntsCSV(milestoneOldIDs)
-		newStr := joinIntsCSV(milestoneNewIDs)
-		if oldStr != newStr {
-			entry := HistoryEntry{
-				ItemID:    req.ItemID,
-				UserID:    req.UserID,
-				FieldName: "milestones",
-				OldValue:  oldStr,
-				NewValue:  newStr,
-				ChangedAt: now,
-			}
-			eventHistory = append(eventHistory, entry)
-			if opts.recordHistory {
-				history = append(history, entry)
-			}
-		}
-	}
-	if opts.recordHistory {
-		if err = s.recordItemHistory(tx, history); err != nil {
-			return nil, fmt.Errorf("failed to record history: %w", err)
-		}
-	}
-	if len(eventHistory) > 0 {
-		metadata := mergeItemEventMetadata(req.EventMetadata, itemEventMetadata(req.UserID, "application", nil))
-		if metadata.OccurredAt.IsZero() {
-			metadata.OccurredAt = now
-		}
-		recorder := itemevents.NewRecorder(s.db)
-		changes := itemevents.Changes(originalItem, &existingItem)
-		if hasMilestoneIDs && joinIntsCSV(milestoneOldIDs) != joinIntsCSV(milestoneNewIDs) {
-			changes = append(changes, itemevents.FieldChange{
-				Field: "milestones", OldValue: milestoneOldIDs, NewValue: milestoneNewIDs,
-			})
-		}
-		if s.hasStatusChanged(originalItem, &existingItem) {
-			if _, err := recorder.StatusChanged(ctx, tx, &existingItem, originalItem.StatusID, existingItem.StatusID, changes, metadata); err != nil {
-				return nil, err
-			}
-		} else if _, err := recorder.Updated(ctx, tx, &existingItem, changes, metadata); err != nil {
-			return nil, err
-		}
-	}
-
-	// Commit the transaction
-	if err = tx.Commit(); err != nil {
+	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	// Load the updated item with joins for response
-	updatedItem, err := s.loadItemWithJoins(req.ItemID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load updated item: %w", err)
-	}
-
-	// Check if status changed (for event emission)
-	statusChanged := s.hasStatusChanged(originalItem, updatedItem)
-
-	// Coding-agent binding trigger (WI-88), fired here so every update
-	// surface — cookie handlers, REST v1, MCP/AI tools, automation actions —
-	// gets it. The trigger no-ops when the assignee did not change or no
-	// binding matches the new assignee.
-	if opts.triggerAssignee {
-		maybeTriggerAssigneeRun(updatedItem.WorkspaceID, updatedItem.ID, originalItem.AssigneeID, updatedItem.AssigneeID, req.UserID)
-	}
-
-	// Live-update publish (WI-483): the update has committed. Announce the item
-	// (status kind when the status changed), and on a reparent refresh both the
-	// old and new parents' child lists.
-	if opts.publish {
-		updateKind := ItemChangeUpdated
-		if statusChanged {
-			updateKind = ItemChangeStatus
-		}
-		PublishItemChange(updatedItem.ID, updateKind)
-		oldParent, newParent := originalItem.ParentID, updatedItem.ParentID
-		reparented := (oldParent == nil) != (newParent == nil) ||
-			(oldParent != nil && newParent != nil && *oldParent != *newParent)
-		if reparented {
-			if oldParent != nil {
-				PublishItemChange(*oldParent, ItemChangeUpdated)
-			}
-			if newParent != nil {
-				PublishItemChange(*newParent, ItemChangeUpdated)
-			}
-		}
-	}
-
-	return &UpdateItemResult{
-		OriginalItem:  originalItem,
-		Item:          updatedItem,
-		StatusChanged: statusChanged,
-		FieldChanges:  history,
-	}, nil
+	return update.result()
 }
 
 // AddMilestone atomically adds one milestone to an item while preserving the
@@ -334,102 +138,29 @@ func (s *ItemUpdateService) AddMilestone(req UpdateItemRequest, milestoneID int)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to load item: %w", err)
 	}
-	rows, err := tx.Query(`
-		SELECT milestone_id
-		FROM item_milestones
-		WHERE item_id = ?
-		ORDER BY milestone_id
-	`, req.ItemID)
+	oldIDs, alreadyAttached, err := loadItemMilestoneIDs(tx, req.ItemID, milestoneID)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to read existing item milestones: %w", err)
+		return nil, false, err
 	}
-	var oldIDs []int
-	alreadyAttached := false
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return nil, false, fmt.Errorf("failed to scan existing item milestone: %w", err)
-		}
-		oldIDs = append(oldIDs, id)
-		alreadyAttached = alreadyAttached || id == milestoneID
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return nil, false, fmt.Errorf("failed to iterate existing item milestones: %w", err)
-	}
-	_ = rows.Close()
-
-	if alreadyAttached {
-		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			return nil, false, fmt.Errorf("failed to close duplicate milestone transaction: %w", err)
-		}
-		current, loadErr := s.loadItemWithJoins(req.ItemID)
-		if loadErr != nil {
-			return nil, false, fmt.Errorf("failed to load unchanged item: %w", loadErr)
-		}
-		return &UpdateItemResult{OriginalItem: originalItem, Item: current}, false, nil
-	}
-
 	newIDs := append(append([]int(nil), oldIDs...), milestoneID)
 	sort.Ints(newIDs)
-	if err := validation.ValidatePlanningAssignments(
-		tx,
-		originalItem.WorkspaceID,
-		newIDs,
-		originalItem.IterationID,
-	); err != nil {
+	if alreadyAttached {
+		return s.finishUnchangedMilestoneUpdate(tx, originalItem, req.ItemID, false)
+	}
+	if err := validation.ValidatePlanningAssignments(tx, originalItem.WorkspaceID, newIDs, originalItem.IterationID); err != nil {
 		return nil, false, fmt.Errorf("validation failed: %w", err)
 	}
 
 	now := time.Now()
-	insertResult, err := tx.Exec(`
-		INSERT INTO item_milestones (item_id, milestone_id, created_at)
-		VALUES (?, ?, ?)
-		ON CONFLICT(item_id, milestone_id) DO NOTHING
-	`, req.ItemID, milestoneID, now)
+	inserted, err := insertItemMilestone(tx, req.ItemID, milestoneID, now)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to attach milestone %d: %w", milestoneID, err)
+		return nil, false, err
 	}
-	rowsAffected, err := insertResult.RowsAffected()
+	if !inserted {
+		return s.finishUnchangedMilestoneUpdate(tx, originalItem, req.ItemID, true)
+	}
+	history, err := s.recordMilestoneAddition(tx, req, originalItem, oldIDs, newIDs, now)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to inspect milestone attachment: %w", err)
-	}
-	if rowsAffected == 0 {
-		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			return nil, false, fmt.Errorf("failed to close concurrent duplicate transaction: %w", err)
-		}
-		current, loadErr := s.loadItemWithJoins(req.ItemID)
-		if loadErr != nil {
-			return nil, false, fmt.Errorf("failed to load concurrently updated item: %w", loadErr)
-		}
-		return &UpdateItemResult{OriginalItem: originalItem, Item: current}, false, nil
-	}
-	if _, err := tx.Exec(`
-		UPDATE items
-		SET updated_at = ?, last_active_at = ?
-		WHERE id = ?
-	`, now, now, req.ItemID); err != nil {
-		return nil, false, fmt.Errorf("failed to update item activity time: %w", err)
-	}
-	history := []HistoryEntry{{
-		ItemID:    req.ItemID,
-		UserID:    req.UserID,
-		FieldName: "milestones",
-		OldValue:  joinIntsCSV(oldIDs),
-		NewValue:  joinIntsCSV(newIDs),
-		ChangedAt: now,
-	}}
-	if err := s.recordItemHistory(tx, history); err != nil {
-		return nil, false, fmt.Errorf("failed to record history: %w", err)
-	}
-	metadata := mergeItemEventMetadata(req.EventMetadata, itemEventMetadata(req.UserID, "application", nil))
-	if metadata.OccurredAt.IsZero() {
-		metadata.OccurredAt = now
-	}
-	if _, err := itemevents.NewRecorder(s.db).Updated(
-		context.Background(), tx, originalItem, itemHistoryEventChanges(history), metadata,
-	); err != nil {
 		return nil, false, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -446,6 +177,107 @@ func (s *ItemUpdateService) AddMilestone(req UpdateItemRequest, milestoneID int)
 		Item:         updatedItem,
 		FieldChanges: history,
 	}, true, nil
+}
+
+func loadItemMilestoneIDs(tx database.Tx, itemID, targetID int) (ids []int, found bool, err error) {
+	rows, err := tx.Query(`
+		SELECT milestone_id
+		FROM item_milestones
+		WHERE item_id = ?
+		ORDER BY milestone_id
+	`, itemID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to read existing item milestones: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, false, fmt.Errorf("failed to scan existing item milestone: %w", err)
+		}
+		ids = append(ids, id)
+		found = found || id == targetID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("failed to iterate existing item milestones: %w", err)
+	}
+	return ids, found, nil
+}
+
+func (s *ItemUpdateService) finishUnchangedMilestoneUpdate(
+	tx database.Tx,
+	originalItem *models.Item,
+	itemID int,
+	concurrent bool,
+) (*UpdateItemResult, bool, error) {
+	transactionKind := "duplicate milestone"
+	loadKind := "unchanged"
+	if concurrent {
+		transactionKind = "concurrent duplicate"
+		loadKind = "concurrently updated"
+	}
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+		return nil, false, fmt.Errorf("failed to close %s transaction: %w", transactionKind, err)
+	}
+	current, err := s.loadItemWithJoins(itemID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to load %s item: %w", loadKind, err)
+	}
+	return &UpdateItemResult{OriginalItem: originalItem, Item: current}, false, nil
+}
+
+func insertItemMilestone(tx database.Tx, itemID, milestoneID int, now time.Time) (bool, error) {
+	result, err := tx.Exec(`
+		INSERT INTO item_milestones (item_id, milestone_id, created_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(item_id, milestone_id) DO NOTHING
+	`, itemID, milestoneID, now)
+	if err != nil {
+		return false, fmt.Errorf("failed to attach milestone %d: %w", milestoneID, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect milestone attachment: %w", err)
+	}
+	return rowsAffected > 0, nil
+}
+
+func (s *ItemUpdateService) recordMilestoneAddition(
+	tx database.Tx,
+	req UpdateItemRequest,
+	originalItem *models.Item,
+	oldIDs, newIDs []int,
+	now time.Time,
+) ([]HistoryEntry, error) {
+	if _, err := tx.Exec(`
+		UPDATE items
+		SET updated_at = ?, last_active_at = ?
+		WHERE id = ?
+	`, now, now, req.ItemID); err != nil {
+		return nil, fmt.Errorf("failed to update item activity time: %w", err)
+	}
+	history := []HistoryEntry{{
+		ItemID:    req.ItemID,
+		UserID:    req.UserID,
+		FieldName: "milestones",
+		OldValue:  joinIntsCSV(oldIDs),
+		NewValue:  joinIntsCSV(newIDs),
+		ChangedAt: now,
+	}}
+	if err := s.recordItemHistory(tx, history); err != nil {
+		return nil, fmt.Errorf("failed to record history: %w", err)
+	}
+	metadata := mergeItemEventMetadata(req.EventMetadata, itemEventMetadata(req.UserID, "application", nil))
+	if metadata.OccurredAt.IsZero() {
+		metadata.OccurredAt = now
+	}
+	if _, err := itemevents.NewRecorder(s.db).Updated(
+		context.Background(), tx, originalItem, itemHistoryEventChanges(history), metadata,
+	); err != nil {
+		return nil, err
+	}
+	return history, nil
 }
 
 func hasAnyItemUpdateField(updateData map[string]any, fields ...string) bool {

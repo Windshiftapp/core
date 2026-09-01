@@ -147,7 +147,9 @@ node_modules
 bin
 WINDSHIFT.md
 AGENTS.md
-docs
+
+# Private working documentation
+/docs/
 
 # Local dev docker-compose
 docker-compose.yml
@@ -180,26 +182,9 @@ scripts/*
 blog/
 .fallow/
 .windshift-local
-/docs
-!/docs/
-/docs/*
-!/docs/0.8.2-performance-regression-gates.md
-!/docs/0.8.4-release-bug-security-review.md
-!/docs/cross-surface-authorization-contracts.md
-!/docs/recurrence-scheduling-safeguards.md
-!/docs/jira-service-management-import.md
-!/docs/jira-import-fidelity-gap-analysis.md
-!/docs/item-put-change-feed-audit-2026-08-25.md
-!/docs/WI-531-public-forms-backend-api-audit.md
-!/docs/WI-523-public-forms-completion.md
-!/docs/xray-jira-test-case-import.md
-!/docs/gitlab-scm.md
 /.codehamr
 /.agents/skills/donate-trace
 /skills-lock.json
 /cmd/ws/ws
 /playground
-/docs
-!/docs/
-!/docs/metrics.md
 /CONTEXT.md
