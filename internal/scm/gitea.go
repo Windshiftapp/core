@@ -454,7 +454,7 @@ func (g *GiteaProvider) ListPullRequestReviewEvents(ctx context.Context, owner, 
 				return nil, err
 			}
 			for _, c := range comments {
-				events = append(events, IssueComment{ID: c.ID, Kind: "review_comment", Body: c.Body, User: c.User.toUser(), Path: c.Path, Line: c.NewPosition, ThreadID: review.ID, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt})
+				events = append(events, IssueComment{ID: c.ID, Kind: "review_comment", Body: c.Body, User: c.User.toUser(), Path: c.Path, Line: c.NewPosition, ThreadID: fmt.Sprintf("%d", review.ID), CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt})
 			}
 		}
 		if len(reviews) < perPage {
@@ -501,7 +501,7 @@ func (g *GiteaProvider) CreateIssueComment(ctx context.Context, owner, repo stri
 }
 
 // UpdateIssueComment edits an existing issue/PR comment by its id.
-func (g *GiteaProvider) UpdateIssueComment(ctx context.Context, owner, repo string, commentID int64, commentBody string) error {
+func (g *GiteaProvider) UpdateIssueComment(ctx context.Context, owner, repo string, _ int, commentID int64, commentBody string) error {
 	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/issues/comments/%d",
 		url.PathEscape(owner), url.PathEscape(repo), commentID))
 
@@ -869,16 +869,24 @@ type giteaRelease struct {
 }
 
 func (r giteaRelease) toRelease() Release {
+	status := "released"
+	if r.Draft {
+		status = "draft"
+	} else if r.Prerelease {
+		status = "prerelease"
+	}
 	return Release{
 		ID:           fmt.Sprintf("%d", r.ID),
 		TagName:      r.TagName,
 		Name:         r.Name,
 		Body:         r.Body,
 		URL:          r.HTMLURL,
+		Status:       status,
 		IsDraft:      r.Draft,
 		IsPrerelease: r.Prerelease,
 		CreatedAt:    r.CreatedAt,
 		PublishedAt:  r.PublishedAt,
+		ReleasedAt:   r.PublishedAt,
 	}
 }
 

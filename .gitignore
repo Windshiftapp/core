@@ -19,6 +19,10 @@ cx
 # Test sources live in the adjacent private core-tests repository and are
 # overlaid onto this checkout by its runners.
 *_test.go
+!/internal/database/gitlab_schema_test.go
+!/internal/scm/gitlab_test.go
+!/internal/services/planning_milestones_release_test.go
+!/internal/utils/repository_path_test.go
 *_test.sh
 *.test.js
 *.test.ts

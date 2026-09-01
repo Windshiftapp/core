@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -16,6 +17,7 @@ import (
 	"windshift/internal/sanitize"
 	"windshift/internal/scm"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type MilestoneHandler struct {
@@ -28,6 +30,7 @@ type MilestoneHandler struct {
 type milestoneReleaseProvider interface {
 	CreateRelease(context.Context, string, string, scm.CreateReleaseOptions) (*scm.Release, error)
 	ListReleases(context.Context, string, string) ([]scm.Release, error)
+	ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
 }
 
 func NewMilestoneHandler(planningService *services.PlanningService, permissionService *services.PermissionService, credentialResolver *scm.CredentialResolver, auditor *logger.Auditor) *MilestoneHandler {
@@ -42,7 +45,7 @@ func NewMilestoneHandler(planningService *services.PlanningService, permissionSe
 			if err != nil {
 				return nil, err
 			}
-			releaseProvider, ok := provider.(scm.ReleaseProvider)
+			releaseProvider, ok := provider.(milestoneReleaseProvider)
 			if !ok {
 				return nil, errors.New("SCM provider does not support releases")
 			}
@@ -157,18 +160,24 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 		releases := make([]models.MilestoneRelease, 0, len(releaseResults))
 		for _, rr := range releaseResults {
 			rel := models.MilestoneRelease{
-				ID:              rr.ID,
-				MilestoneID:     rr.MilestoneID,
-				TagName:         rr.TagName,
-				Name:            rr.Name,
-				Body:            rr.Body,
-				IsDraft:         rr.IsDraft,
-				IsPrerelease:    rr.IsPrerelease,
-				TargetCommitish: rr.TargetCommitish,
-				SCMReleaseID:    rr.SCMReleaseID,
-				SCMReleaseURL:   rr.SCMReleaseURL,
-				CreatedBy:       rr.CreatedBy,
-				CreatedAt:       rr.CreatedAt,
+				ID:                    rr.ID,
+				MilestoneID:           rr.MilestoneID,
+				WorkspaceRepositoryID: rr.WorkspaceRepositoryID,
+				TagName:               rr.TagName,
+				TagURL:                rr.TagURL,
+				ReleaseStatus:         rr.ReleaseStatus,
+				ReleasedAt:            rr.ReleasedAt,
+				Assets:                rr.Assets,
+				LastSyncedAt:          rr.LastSyncedAt,
+				Name:                  rr.Name,
+				Body:                  rr.Body,
+				IsDraft:               rr.IsDraft,
+				IsPrerelease:          rr.IsPrerelease,
+				TargetCommitish:       rr.TargetCommitish,
+				SCMReleaseID:          rr.SCMReleaseID,
+				SCMReleaseURL:         rr.SCMReleaseURL,
+				CreatedBy:             rr.CreatedBy,
+				CreatedAt:             rr.CreatedAt,
 			}
 			// Apply same SCM field visibility rules as milestoneResultToModel
 			if rr.SCMConnectionID != nil {
@@ -638,18 +647,24 @@ func (h *MilestoneHandler) milestoneResultToModel(r *services.MilestoneResult, u
 
 	if r.LatestRelease != nil {
 		rel := &models.MilestoneRelease{
-			ID:              r.LatestRelease.ID,
-			MilestoneID:     r.LatestRelease.MilestoneID,
-			TagName:         r.LatestRelease.TagName,
-			Name:            r.LatestRelease.Name,
-			Body:            r.LatestRelease.Body,
-			IsDraft:         r.LatestRelease.IsDraft,
-			IsPrerelease:    r.LatestRelease.IsPrerelease,
-			TargetCommitish: r.LatestRelease.TargetCommitish,
-			SCMReleaseID:    r.LatestRelease.SCMReleaseID,
-			SCMReleaseURL:   r.LatestRelease.SCMReleaseURL,
-			CreatedBy:       r.LatestRelease.CreatedBy,
-			CreatedAt:       r.LatestRelease.CreatedAt,
+			ID:                    r.LatestRelease.ID,
+			MilestoneID:           r.LatestRelease.MilestoneID,
+			WorkspaceRepositoryID: r.LatestRelease.WorkspaceRepositoryID,
+			TagName:               r.LatestRelease.TagName,
+			TagURL:                r.LatestRelease.TagURL,
+			ReleaseStatus:         r.LatestRelease.ReleaseStatus,
+			ReleasedAt:            r.LatestRelease.ReleasedAt,
+			Assets:                r.LatestRelease.Assets,
+			LastSyncedAt:          r.LatestRelease.LastSyncedAt,
+			Name:                  r.LatestRelease.Name,
+			Body:                  r.LatestRelease.Body,
+			IsDraft:               r.LatestRelease.IsDraft,
+			IsPrerelease:          r.LatestRelease.IsPrerelease,
+			TargetCommitish:       r.LatestRelease.TargetCommitish,
+			SCMReleaseID:          r.LatestRelease.SCMReleaseID,
+			SCMReleaseURL:         r.LatestRelease.SCMReleaseURL,
+			CreatedBy:             r.LatestRelease.CreatedBy,
+			CreatedAt:             r.LatestRelease.CreatedAt,
 		}
 		// Expose scm_connection_id and scm_repository only if user has access to the connection's workspace
 		if r.LatestRelease.SCMConnectionID != nil {
@@ -670,6 +685,7 @@ func (h *MilestoneHandler) milestoneResultToModel(r *services.MilestoneResult, u
 
 // releaseRequest is the request body for the Release endpoint.
 type releaseRequest struct {
+	Mode            string `json:"mode"` // create (default) or attach
 	ConnectionID    int    `json:"connection_id"`
 	RepositoryID    int    `json:"repository_id"`
 	Repository      string `json:"repository"` // "owner/repo"
@@ -697,10 +713,19 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "tag_name is required")
 		return
 	}
+	req.Mode = strings.ToLower(strings.TrimSpace(req.Mode))
+	if req.Mode == "" {
+		req.Mode = "create"
+	}
+	if req.Mode != "create" && req.Mode != "attach" {
+		respondValidationError(w, r, "mode must be 'create' or 'attach'")
+		return
+	}
 
 	// Resolve every local dependency before persisting the attempt. No provider
 	// side effect may occur until the durable idempotency row exists.
 	var scmConnectionID *int
+	var workspaceRepositoryID *int
 	var scmRepository *string
 	var releaseProvider milestoneReleaseProvider
 	var owner, repository string
@@ -724,12 +749,14 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		repositoryName := linkedRepository.RepositoryName
-		parts := strings.SplitN(repositoryName, "/", 2)
-		if len(parts) != 2 {
-			respondValidationError(w, r, "repository must be in 'owner/repo' format")
+		repositoryID := linkedRepository.ID
+		workspaceRepositoryID = &repositoryID
+		var pathOK bool
+		owner, repository, pathOK = utils.SplitRepositoryPath(repositoryName)
+		if !pathOK {
+			respondValidationError(w, r, "repository must be in 'namespace/project' format")
 			return
 		}
-		owner, repository = parts[0], parts[1]
 		cid := req.ConnectionID
 		scmConnectionID = &cid
 		scmRepository = &repositoryName
@@ -745,6 +772,41 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdBy := user.ID
+	var existingRelease *scm.Release
+	if req.Mode == "attach" {
+		if releaseProvider == nil {
+			respondValidationError(w, r, "attach mode requires an SCM connection and linked repository")
+			return
+		}
+		releases, listErr := releaseProvider.ListReleases(r.Context(), owner, repository)
+		if listErr != nil {
+			respondBadRequest(w, r, "Failed to load SCM releases: "+listErr.Error())
+			return
+		}
+		for i := range releases {
+			if releases[i].TagName == req.TagName {
+				existingRelease = &releases[i]
+				break
+			}
+		}
+		if existingRelease == nil {
+			tags, listErr := releaseProvider.ListTags(r.Context(), owner, repository, time.Time{})
+			if listErr != nil {
+				respondBadRequest(w, r, "Failed to load SCM tags: "+listErr.Error())
+				return
+			}
+			for _, tag := range tags {
+				if tag.Name == req.TagName {
+					existingRelease = &scm.Release{TagName: tag.Name, TagURL: tag.URL, Status: "tag_only"}
+					break
+				}
+			}
+		}
+		if existingRelease == nil {
+			respondValidationError(w, r, "the selected tag or release no longer exists in the SCM repository")
+			return
+		}
+	}
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if len(idempotencyKey) > 200 {
 		respondValidationError(w, r, "Idempotency-Key must be at most 200 characters")
@@ -755,17 +817,18 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := services.ReleaseMilestoneParams{
-		ID:              id,
-		IdempotencyKey:  idempotencyKey,
-		TagName:         req.TagName,
-		Name:            req.Name,
-		Body:            req.Body,
-		IsDraft:         req.IsDraft,
-		IsPrerelease:    req.IsPrerelease,
-		TargetCommitish: req.TargetCommitish,
-		SCMConnectionID: scmConnectionID,
-		SCMRepository:   scmRepository,
-		CreatedBy:       &createdBy,
+		ID:                    id,
+		IdempotencyKey:        idempotencyKey,
+		TagName:               req.TagName,
+		Name:                  req.Name,
+		Body:                  req.Body,
+		IsDraft:               req.IsDraft,
+		IsPrerelease:          req.IsPrerelease,
+		TargetCommitish:       req.TargetCommitish,
+		SCMConnectionID:       scmConnectionID,
+		WorkspaceRepositoryID: workspaceRepositoryID,
+		SCMRepository:         scmRepository,
+		CreatedBy:             &createdBy,
 	}
 	attempt, err := h.planningService.BeginMilestoneRelease(r.Context(), params)
 	if err != nil {
@@ -791,7 +854,7 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if releaseProvider != nil {
-		var release *scm.Release
+		release := existingRelease
 		if attempt.NeedsReconcile {
 			releases, listErr := releaseProvider.ListReleases(r.Context(), owner, repository)
 			if listErr != nil {
@@ -806,7 +869,7 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if release == nil {
+		if release == nil && req.Mode == "create" {
 			release, err = releaseProvider.CreateRelease(r.Context(), owner, repository, scm.CreateReleaseOptions{
 				TagName:         req.TagName,
 				TargetCommitish: req.TargetCommitish,
@@ -821,8 +884,25 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		params.SCMReleaseID = &release.ID
-		params.SCMReleaseURL = &release.URL
+		if release.ID != "" {
+			params.SCMReleaseID = &release.ID
+		}
+		if release.URL != "" {
+			params.SCMReleaseURL = &release.URL
+		}
+		params.Name = release.Name
+		params.Body = release.Body
+		params.IsDraft = release.IsDraft
+		params.IsPrerelease = release.IsPrerelease
+		if release.TagURL != "" {
+			params.TagURL = &release.TagURL
+		}
+		params.ReleaseStatus = release.Status
+		params.Assets = release.Assets
+		if release.ReleasedAt != nil {
+			releasedAt := release.ReleasedAt.UTC().Format(time.RFC3339)
+			params.ReleasedAt = &releasedAt
+		}
 	}
 
 	result, err := h.planningService.CompleteMilestoneRelease(r.Context(), attempt.ID, attempt.LeaseToken, params)
@@ -843,8 +923,8 @@ func milestoneReleaseFallbackKey(milestoneID, userID int, req releaseRequest, re
 		repositoryName = *repository
 	}
 	canonical := fmt.Sprintf(
-		"%d\n%d\n%d\n%s\n%s\n%s\n%s\n%t\n%t\n%s",
-		milestoneID, userID, req.ConnectionID, repositoryName, req.TagName,
+		"%d\n%d\n%s\n%d\n%s\n%s\n%s\n%s\n%t\n%t\n%s",
+		milestoneID, userID, req.Mode, req.ConnectionID, repositoryName, req.TagName,
 		req.Name, req.Body, req.IsDraft, req.IsPrerelease, req.TargetCommitish,
 	)
 	sum := sha256.Sum256([]byte(canonical))

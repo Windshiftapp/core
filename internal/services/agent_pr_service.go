@@ -613,12 +613,8 @@ func boundPRNote(s string) string {
 	return strings.TrimSpace(s[:cut]) + "\n\n…(truncated)"
 }
 
-// splitRepoSlug splits "owner/repo" into its parts. Returns ok=false
-// when the input doesn't have exactly one slash separator.
+// splitRepoSlug splits "namespace/project" at the final slash so GitLab
+// subgroup paths remain part of the namespace.
 func splitRepoSlug(slug string) (owner, repo string, ok bool) {
-	parts := strings.SplitN(slug, "/", 3)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return "", "", false
-	}
-	return parts[0], parts[1], true
+	return splitRepositoryPath(slug)
 }

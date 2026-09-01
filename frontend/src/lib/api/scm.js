@@ -104,6 +104,17 @@ export const workspaceSCM = {
       method: 'POST',
     }),
 
+  getReleaseCandidates: (repoId) =>
+    fetchAPI(`/workspace-repositories/${repoId}/release-candidates`),
+
+  getWebhookConfig: (repoId) => fetchAPI(`/workspace-repositories/${repoId}/webhook`),
+
+  rotateWebhookSecret: (repoId) =>
+    fetchAPI(`/workspace-repositories/${repoId}/webhook/rotate-secret`, { method: 'POST' }),
+
+  deleteWebhookConfig: (repoId) =>
+    fetchAPI(`/workspace-repositories/${repoId}/webhook`, { method: 'DELETE' }),
+
   startOAuth: (workspaceId, connId) =>
     fetchAPI(`/workspaces/${workspaceId}/scm-connections/${connId}/auth/start`, {
       method: 'POST',

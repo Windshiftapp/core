@@ -3,9 +3,11 @@ package scm
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,6 +20,7 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 )
 
 // Sync pagination/budget constants applied to every per-repo sync. These
@@ -472,11 +475,10 @@ func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 
 // syncRepository performs the actual sync for a single repository
 func (s *SyncService) syncRepository(ctx context.Context, provider Provider, repoID int, repositoryName, defaultBranch string, workspaceID int, workspaceKey, itemKeyPattern string, lastSyncedAt time.Time) error {
-	parts := strings.SplitN(repositoryName, "/", 2)
-	if len(parts) != 2 {
+	owner, repo, ok := utils.SplitRepositoryPath(repositoryName)
+	if !ok {
 		return fmt.Errorf("invalid repository name format: %s", repositoryName)
 	}
-	owner, repo := parts[0], parts[1]
 
 	slog.Debug("Syncing repository", slog.String("component", "scm"), slog.String("repository", repositoryName), slog.String("workspace", workspaceKey))
 
@@ -503,6 +505,9 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 	if err := s.syncTagsAndReleases(ctx, provider, owner, repo, repoID, workspaceID, baselineRefs); err != nil {
 		syncErrs = append(syncErrs, fmt.Errorf("sync tags: %w", err))
 	}
+	if err := s.syncAttachedReleases(ctx, provider, owner, repo, repoID); err != nil {
+		syncErrs = append(syncErrs, fmt.Errorf("sync attached releases: %w", err))
+	}
 	if err := errors.Join(syncErrs...); err != nil {
 		return fmt.Errorf("sync repository %q: %w", repositoryName, err)
 	}
@@ -515,6 +520,110 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 		return fmt.Errorf("update repository sync checkpoint: %w", err)
 	}
 
+	return nil
+}
+
+// syncAttachedReleases refreshes milestone release records from current SCM
+// truth. Tags and releases are intentionally distinct: deleting a release
+// leaves a tag_only record, while deleting both marks the attachment missing.
+func (s *SyncService) syncAttachedReleases(ctx context.Context, provider Provider, owner, repo string, repoID int) error {
+	var attached int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM milestone_releases WHERE workspace_repository_id = ? AND state = 'created'`, repoID).Scan(&attached); err != nil || attached == 0 {
+		return err
+	}
+	releaseProvider, releasesOK := provider.(ReleaseProvider)
+	refProvider, refsOK := provider.(RefProvider)
+	if !releasesOK || !refsOK {
+		return nil
+	}
+	releases, err := releaseProvider.ListReleases(ctx, owner, repo)
+	if err != nil {
+		return err
+	}
+	tags, err := refProvider.ListTags(ctx, owner, repo, time.Time{})
+	if err != nil {
+		return err
+	}
+	releaseByTag := make(map[string]Release, len(releases))
+	for _, release := range releases {
+		releaseByTag[release.TagName] = release
+	}
+	tagByName := make(map[string]Tag, len(tags))
+	for _, tag := range tags {
+		tagByName[tag.Name] = tag
+	}
+
+	rows, err := s.db.QueryContext(ctx, `SELECT id, tag_name FROM milestone_releases WHERE workspace_repository_id = ? AND state = 'created'`, repoID)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	type attachedRelease struct {
+		id  int
+		tag string
+	}
+	var attachedRows []attachedRelease
+	for rows.Next() {
+		var row attachedRelease
+		if err := rows.Scan(&row.id, &row.tag); err != nil {
+			return err
+		}
+		attachedRows = append(attachedRows, row)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, row := range attachedRows {
+		if release, ok := releaseByTag[row.tag]; ok {
+			assetsJSON, _ := json.Marshal(release.Assets)
+			releasedAt := release.ReleasedAt
+			if releasedAt == nil {
+				releasedAt = release.PublishedAt
+			}
+			status := release.Status
+			if status == "" {
+				switch {
+				case release.IsDraft:
+					status = "draft"
+				case release.IsPrerelease:
+					status = "prerelease"
+				default:
+					status = "released"
+				}
+			}
+			_, err = s.db.ExecWriteContext(ctx, `
+				UPDATE milestone_releases
+				SET name=?, body=?, is_draft=?, is_prerelease=?, tag_url=?, release_status=?,
+				    released_at=?, assets_json=?, scm_release_id=?, scm_release_url=?,
+				    last_synced_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+				WHERE id=?
+			`, release.Name, release.Body, release.IsDraft, release.IsPrerelease, release.TagURL, status,
+				releasedAt, string(assetsJSON), release.ID, release.URL, row.id)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		if tag, ok := tagByName[row.tag]; ok {
+			_, err = s.db.ExecWriteContext(ctx, `
+				UPDATE milestone_releases
+				SET name=NULL, body=NULL, is_draft=false, is_prerelease=false, tag_url=?,
+				    release_status='tag_only', released_at=NULL, assets_json='[]',
+				    scm_release_id=NULL, scm_release_url=NULL, last_synced_at=CURRENT_TIMESTAMP,
+				    updated_at=CURRENT_TIMESTAMP WHERE id=?
+			`, tag.URL, row.id)
+		} else {
+			_, err = s.db.ExecWriteContext(ctx, `
+				UPDATE milestone_releases SET release_status='missing', tag_url=NULL,
+				    released_at=NULL, assets_json='[]', scm_release_id=NULL, scm_release_url=NULL,
+				    last_synced_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?
+			`, row.id)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -951,8 +1060,7 @@ func (s *SyncService) syncBranches(ctx context.Context, provider Provider, owner
 				continue // Item doesn't exist in this workspace
 			}
 
-			// Construct branch URL (best effort - varies by provider)
-			branchURL := fmt.Sprintf("https://github.com/%s/%s/tree/%s", owner, repo, branch.Name)
+			branchURL := branchWebURL(provider, owner, repo, branch.Name)
 
 			err = s.upsertItemSCMLink(ctx, itemID, repoID, models.SCMLinkTypeBranch,
 				branch.Name, branchURL, branch.Name, "", "", "", string(key.Source))
@@ -963,6 +1071,18 @@ func (s *SyncService) syncBranches(ctx context.Context, provider Provider, owner
 	}
 
 	return nil
+}
+
+func branchWebURL(provider Provider, owner, repo, branch string) string {
+	escapedBranch := url.PathEscape(branch)
+	switch typed := provider.(type) {
+	case *GitLabProvider:
+		return typed.projectWebURL(owner, repo) + "/-/tree/" + escapedBranch
+	case *GiteaProvider:
+		return typed.baseURL + "/" + owner + "/" + repo + "/src/branch/" + escapedBranch
+	default:
+		return "https://github.com/" + owner + "/" + repo + "/tree/" + escapedBranch
+	}
 }
 
 // findItemByKey finds an item by its workspace key and number. Returns 0
@@ -1238,11 +1358,10 @@ func (s *SyncService) refreshItemSCMLink(ctx context.Context, linkID int, userID
 		}
 	}
 
-	parts := strings.SplitN(repositoryName, "/", 2)
-	if len(parts) != 2 {
+	owner, repo, ok := utils.SplitRepositoryPath(repositoryName)
+	if !ok {
 		return fmt.Errorf("invalid repository name format: %s", repositoryName)
 	}
-	owner, repo := parts[0], parts[1]
 
 	return s.updateLinkFromProvider(ctx, provider, owner, repo, linkID, linkType, externalID, externalURL.String)
 }
@@ -1369,11 +1488,10 @@ func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoI
 	}
 
 	// Parse owner/repo from repository name
-	parts := strings.SplitN(repositoryName, "/", 2)
-	if len(parts) != 2 {
+	owner, repo, ok := utils.SplitRepositoryPath(repositoryName)
+	if !ok {
 		return nil, fmt.Errorf("invalid repository name format: %s", repositoryName)
 	}
-	owner, repo := parts[0], parts[1]
 
 	// Resolve provider credentials
 	credResolver := NewCredentialResolver(s.db, s.encryption)
@@ -1409,6 +1527,8 @@ func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoI
 		switch providerType {
 		case models.SCMProviderTypeGitHub:
 			resolvedBaseURL = "https://github.com"
+		case models.SCMProviderTypeGitLab:
+			resolvedBaseURL = "https://gitlab.com"
 		case models.SCMProviderTypeGitea:
 			resolvedBaseURL = "https://gitea.com"
 		}
@@ -1423,6 +1543,67 @@ func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoI
 		BaseURL:        resolvedBaseURL,
 		Provider:       provider,
 	}, nil
+}
+
+// ListReleaseCandidates returns existing tags, enriched with first-class SCM
+// release metadata when the provider exposes a release for the same tag.
+func (s *SyncService) ListReleaseCandidates(ctx context.Context, workspaceRepoID, userID int) ([]ReleaseCandidate, error) {
+	rc, err := s.resolveRepoAndProvider(ctx, workspaceRepoID, userID)
+	if err != nil {
+		return nil, err
+	}
+	refProvider, ok := rc.Provider.(RefProvider)
+	if !ok {
+		return nil, errors.New("SCM provider does not support tags")
+	}
+	releaseProvider, ok := rc.Provider.(ReleaseProvider)
+	if !ok {
+		return nil, errors.New("SCM provider does not support releases")
+	}
+
+	tags, err := refProvider.ListTags(ctx, rc.Owner, rc.Repo, time.Time{})
+	if err != nil {
+		return nil, fmt.Errorf("list tags: %w", err)
+	}
+	releases, err := releaseProvider.ListReleases(ctx, rc.Owner, rc.Repo)
+	if err != nil {
+		return nil, fmt.Errorf("list releases: %w", err)
+	}
+	releasesByTag := make(map[string]Release, len(releases))
+	for _, release := range releases {
+		releasesByTag[release.TagName] = release
+	}
+
+	candidates := make([]ReleaseCandidate, 0, len(tags)+len(releases))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		candidate := ReleaseCandidate{TagName: tag.Name, TagURL: tag.URL, SHA: tag.SHA, Status: "tag_only"}
+		if release, exists := releasesByTag[tag.Name]; exists {
+			releaseCopy := release
+			candidate.Release = &releaseCopy
+			candidate.Status = release.Status
+			if candidate.Status == "" {
+				candidate.Status = "released"
+			}
+			if release.TagURL != "" {
+				candidate.TagURL = release.TagURL
+			}
+		}
+		candidates = append(candidates, candidate)
+		seen[tag.Name] = struct{}{}
+	}
+	for _, release := range releases {
+		if _, exists := seen[release.TagName]; exists {
+			continue
+		}
+		releaseCopy := release
+		status := release.Status
+		if status == "" {
+			status = "released"
+		}
+		candidates = append(candidates, ReleaseCandidate{TagName: release.TagName, TagURL: release.TagURL, Status: status, Release: &releaseCopy})
+	}
+	return candidates, nil
 }
 
 // CreateBranchForRepository creates a branch in a workspace repository.
@@ -1452,8 +1633,7 @@ func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRe
 		return "", fmt.Errorf("failed to create branch: %w", err)
 	}
 
-	// Both GitHub and Gitea use /tree/ for branch URLs
-	branchURL := fmt.Sprintf("%s/%s/tree/%s", rc.BaseURL, rc.RepositoryName, branchName)
+	branchURL := branchWebURL(rc.Provider, rc.Owner, rc.Repo, branchName)
 
 	slog.Debug("Created branch", slog.String("component", "scm"), slog.String("branch", branchName), slog.String("repository", rc.RepositoryName))
 	return branchURL, nil
@@ -1558,6 +1738,8 @@ func (s *SyncService) CreatePullRequestForRepository(ctx context.Context, worksp
 		switch rc.ProviderType {
 		case models.SCMProviderTypeGitea:
 			prURL = fmt.Sprintf("%s/%s/pulls/%d", rc.BaseURL, rc.RepositoryName, pr.Number)
+		case models.SCMProviderTypeGitLab:
+			prURL = fmt.Sprintf("%s/%s/-/merge_requests/%d", rc.BaseURL, rc.RepositoryName, pr.Number)
 		default:
 			prURL = fmt.Sprintf("%s/%s/pull/%d", rc.BaseURL, rc.RepositoryName, pr.Number)
 		}

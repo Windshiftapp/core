@@ -27,6 +27,10 @@
   let repositories = $state([]);
   let selectedRepository = $state(''); // "owner/repo" full_name
   let loadingRepos = $state(false);
+  let releaseMode = $state('create');
+  let releaseCandidates = $state([]);
+  let loadingCandidates = $state(false);
+  const selectedProviderType = $derived(connections.find(connection => connection.id === selectedConnectionId)?.provider_type);
 
   // Release form fields (snapshot of milestone at open; user-edited thereafter)
   // svelte-ignore state_referenced_locally
@@ -64,6 +68,7 @@
 
       if (connections.length === 1) {
         selectedConnectionId = connections[0].id;
+        await loadRepositories(selectedConnectionId);
       }
     } catch (err) {
       console.error('Failed to load SCM connections:', err);
@@ -92,6 +97,7 @@
       repositories = repos;
       if (repos.length === 1) {
         selectedRepository = repos[0].repository_name ?? '';
+        await loadReleaseCandidates(selectedRepository);
       } else {
         selectedRepository = '';
       }
@@ -103,9 +109,34 @@
     }
   }
 
-  $effect(() => {
-    loadRepositories(selectedConnectionId);
-  });
+  async function loadReleaseCandidates(repositoryName) {
+    releaseCandidates = [];
+    if (releaseMode !== 'attach' || !repositoryName) return;
+    const repository = repositories.find(repo => repo.repository_name === repositoryName);
+    if (!repository?.id) return;
+    loadingCandidates = true;
+    try {
+      releaseCandidates = await api.workspaceSCM.getReleaseCandidates(repository.id) || [];
+      if (releaseCandidates.length === 1) tagName = releaseCandidates[0].tag_name;
+    } catch (err) {
+      console.error('Failed to load release candidates:', err);
+      error = err.message || 'Failed to load existing tags and releases.';
+    } finally {
+      loadingCandidates = false;
+    }
+  }
+
+  async function handleReleaseModeChange(mode) {
+    if (mode === 'attach') {
+      await loadReleaseCandidates(selectedRepository);
+    } else {
+      releaseCandidates = [];
+    }
+  }
+
+  async function handleConnectionChange(connection) {
+    await loadRepositories(connection?.id ?? null);
+  }
 
   function getConnectionLabel(conn) {
     const base = conn.name ?? conn.provider_name ?? `Connection ${conn.id}`;
@@ -115,7 +146,8 @@
   const canSubmit = $derived(
     !submitting &&
     tagName.trim().length > 0 &&
-    (!selectedConnectionId || selectedRepository.length > 0)
+    (!selectedConnectionId || selectedRepository.length > 0) &&
+    (releaseMode !== 'attach' || releaseCandidates.some(candidate => candidate.tag_name === tagName))
   );
 
   async function generateNotes() {
@@ -141,11 +173,12 @@
 
     try {
       const payload = {
+        mode: releaseMode,
         tag_name: tagName.trim(),
         name: releaseName.trim(),
         body: releaseBody.trim(),
-        is_draft: isDraft,
-        is_prerelease: isPrerelease,
+        is_draft: selectedProviderType === 'gitlab' ? false : isDraft,
+        is_prerelease: selectedProviderType === 'gitlab' ? false : isPrerelease,
         target_commitish: targetCommitish.trim()
       };
 
@@ -158,7 +191,9 @@
       idempotencyKey ??= crypto.randomUUID();
       const updatedMilestone = await api.milestones.release(milestone.id, payload, idempotencyKey);
       successToast(
-        updatedMilestone.latest_release?.scm_release_url
+        releaseMode === 'attach'
+          ? `Attached ${tagName.trim()} to the milestone.`
+          : updatedMilestone.latest_release?.scm_release_url
           ? `Release created at ${updatedMilestone.latest_release.scm_release_url}`
           : 'Milestone marked as completed.',
         'Released'
@@ -209,6 +244,7 @@
           allowClear={true}
           getValue={(c) => c.id}
           getLabel={getConnectionLabel}
+          onSelect={handleConnectionChange}
         />
       </div>
 
@@ -230,8 +266,25 @@
               placeholder="Select a repository"
               getValue={(r) => r.repository_name ?? ''}
               getLabel={(r) => r.repository_name ?? ''}
+              onSelect={(repository) => loadReleaseCandidates(repository.repository_name)}
             />
           {/if}
+        </div>
+      {/if}
+
+      {#if selectedConnectionId && selectedRepository}
+        <div>
+          <Label>Release action</Label>
+          <BasePicker
+            bind:value={releaseMode}
+            items={[
+              { value: 'create', label: 'Create a new SCM release' },
+              { value: 'attach', label: 'Attach an existing tag or release' }
+            ]}
+            getValue={(item) => item.value}
+            getLabel={(item) => item.label}
+            onSelect={(item) => handleReleaseModeChange(item.value)}
+          />
         </div>
       {/if}
     {:else}
@@ -242,16 +295,36 @@
 
     <!-- Tag Name -->
     <div>
-      <Label required>Tag Name</Label>
-      <Input
-        type="text"
-        bind:value={tagName}
-        placeholder="v1.0.0"
-        size="small"
-      />
+      <Label required>{releaseMode === 'attach' ? 'Existing tag or release' : 'Tag Name'}</Label>
+      {#if releaseMode === 'attach'}
+        {#if loadingCandidates}
+          <div class="flex items-center gap-2 text-sm py-2" style="color: var(--ds-text-subtle);">
+            <Loader2 class="w-4 h-4 animate-spin" />
+            Loading tags and releases…
+          </div>
+        {:else if releaseCandidates.length === 0}
+          <p class="text-sm py-2" style="color: var(--ds-text-subtle);">No tags or releases were found in this repository.</p>
+        {:else}
+          <BasePicker
+            bind:value={tagName}
+            items={releaseCandidates}
+            placeholder="Select a tag or release"
+            getValue={(candidate) => candidate.tag_name}
+            getLabel={(candidate) => `${candidate.tag_name} · ${candidate.release ? 'release' : 'tag'}`}
+          />
+        {/if}
+      {:else}
+        <Input
+          type="text"
+          bind:value={tagName}
+          placeholder="v1.0.0"
+          size="small"
+        />
+      {/if}
     </div>
 
     <!-- Release Title -->
+    {#if releaseMode === 'create'}
     <div>
       <Label>Release Title</Label>
       <Input
@@ -306,10 +379,15 @@
     </div>
 
     <!-- Draft / Pre-release checkboxes -->
-    <div class="flex items-center gap-6">
-      <Checkbox bind:checked={isDraft} label="Draft" size="small" />
-      <Checkbox bind:checked={isPrerelease} label="Pre-release" size="small" />
-    </div>
+    {#if selectedProviderType === 'gitlab'}
+      <p class="text-xs" style="color: var(--ds-text-subtle);">GitLab Releases are published directly and do not expose draft or pre-release states.</p>
+    {:else}
+      <div class="flex items-center gap-6">
+        <Checkbox bind:checked={isDraft} label="Draft" size="small" />
+        <Checkbox bind:checked={isPrerelease} label="Pre-release" size="small" />
+      </div>
+    {/if}
+    {/if}
   {/if}
 </div>
 
