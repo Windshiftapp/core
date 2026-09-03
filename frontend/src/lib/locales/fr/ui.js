@@ -1,0 +1,621 @@
+/**
+ * Traduction en français (fr) - Interface utilisateur
+ * Comprend : sélecteurs, éditeurs, boîtes de dialogue, composants, aria, disposition, widgets, pied de page
+ */
+
+export default {
+  pickers: {
+    selectStatus: 'Sélectionner un statut',
+    // Général
+    select: 'Sélectionner',
+    search: 'Rechercher',
+    options: 'Options',
+    clearSelection: 'Effacer la sélection',
+    noResultsFor: 'Aucun résultat pour « {query} »',
+    createItem: 'Créer « {value} »',
+    noItemsFound: 'Aucun élément trouvé',
+    noItemsAvailable: 'Aucun élément disponible',
+    startTypingToSearch: 'Commencez à taper pour rechercher…',
+    searchPages: 'Rechercher des pages…',
+
+    // Sélecteur d'actifs
+    selectAsset: 'Sélectionner un actif',
+    noTag: 'Aucune étiquette',
+    showingOfTotal: 'Affichage de {shown} sur {total} — tapez pour rechercher',
+
+    // Sélecteur d'utilisateur / d'attribué
+    selectUser: 'Sélectionner un utilisateur',
+    searchUsers: 'Rechercher des utilisateurs…',
+    users: 'Utilisateurs',
+    noUsersFound: 'Aucun utilisateur trouvé',
+    noUsersAvailable: 'Aucun utilisateur disponible',
+    assignTo: 'Attribuer à',
+    unassigned: 'Non attribué',
+    assignee: 'Attribué à',
+    user: 'Utilisateur',
+    group: 'Groupe',
+    searchUser: 'Rechercher un utilisateur…',
+    searchGroup: 'Rechercher un groupe…',
+
+    // Présence de l'agent dans les sélecteurs d'attribution (WI-272)
+    agentOnline: 'Agent en ligne — un exécuteur actif prendra en charge les éléments attribués',
+    agentOffline: 'Agent hors ligne — son pool d’exécuteurs n’a aucun exécuteur actif ; les éléments attribués seront mis en attente',
+    agentLocal: 'L’agent s’exécute sur ce serveur',
+    agentUnbound: 'Aucune liaison d’agent dans cet espace de travail — l’attribution ne démarrera pas d’exécution',
+
+    // Sélecteur de groupe
+    selectGroup: 'Sélectionner un groupe',
+
+    // Sélecteur de catégories
+    selectCategories: 'Sélectionner des catégories',
+    removeCategory: 'Retirer la catégorie',
+    categoriesSelected: '{count} catégories sélectionnées',
+    searchCategories: 'Rechercher des catégories…',
+    noCategoriesFound: 'Aucune catégorie trouvée',
+
+    // Sélecteur de collections
+    selectCollections: 'Sélectionner des collections',
+
+    // Sélecteur d'espaces de travail
+    selectWorkspaces: 'Sélectionner des espaces de travail',
+    searchWorkspaces: 'Rechercher des espaces de travail…',
+    noWorkspacesFound: 'Aucun espace de travail trouvé',
+
+    // Sélecteur de jeux de configuration
+    selectConfigurationSet: 'Sélectionner un jeu de configuration',
+    searchConfigurationSets: 'Rechercher des jeux de configuration…',
+    configurationSets: 'Jeux de configuration',
+    defaultConfiguration: 'Configuration par défaut',
+    defaultConfigurationDescription: 'Utilise les paramètres par défaut de l’espace de travail',
+    noConfigurationSetsFound: 'Aucun jeu de configuration trouvé',
+
+    // Sélecteur d'entité de jeu de configuration
+    entityAlreadyAssigned: '{label} est déjà attribué',
+    itemType: 'Type d’élément',
+    priorities: 'Priorités',
+    itemTypes: 'Types d’éléments',
+    level: 'Niveau {level}',
+    assigned: 'Attribué',
+    noEntitiesAssigned: 'Aucun {entities} attribué',
+    available: 'Disponible',
+    noEntitiesMatchSearch: 'Aucun {entities} ne correspond à votre recherche',
+    allEntitiesAssigned: 'Tous les {entities} sont attribués',
+    inConfigSet: 'Dans le jeu de config',
+    searchEntities: 'Rechercher {entities}…',
+
+    // Sélecteur de champs
+    selectField: 'Sélectionner un champ',
+    searchFields: 'Rechercher des champs…',
+    noFieldsFound: 'Aucun champ trouvé',
+    customFields: 'Champs personnalisés',
+    custom: 'Personnalisé',
+    customFieldDesc: 'Champ personnalisé',
+    fieldTypes: {
+      text: 'Texte',
+      number: 'Nombre',
+      date: 'Date',
+      select: 'Sélection',
+      multiselect: 'Sélection multiple',
+      checkbox: 'Case à cocher',
+      url: 'URL',
+      email: 'E-mail',
+      phone: 'Téléphone',
+      textarea: 'Zone de texte',
+      textArea: 'Zone de texte',
+      user: 'Utilisateur',
+      rating: 'Évaluation',
+      boolean: 'Booléen',
+      reference: 'Référence',
+      identifier: 'Identifiant',
+    },
+    fieldCategories: {
+      basic: 'Champs de base',
+      dates: 'Champs de date',
+      people: 'Personnes',
+      workflow: 'Flux de travail',
+      custom: 'Champs personnalisés',
+    },
+    fields: {
+      title: { name: 'Titre', description: 'Titre de l’élément' },
+      description: { name: 'Description', description: 'Description de l’élément' },
+      status: { name: 'Statut', description: 'Statut actuel' },
+      priority: { name: 'Priorité', description: 'Niveau de priorité' },
+      type: { name: 'Type', description: 'Type d’élément' },
+      assignee: { name: 'Attribué à', description: 'Utilisateur attribué' },
+      reporter: { name: 'Rapporteur', description: 'Personne ayant signalé l’élément' },
+      createdAt: { name: 'Créé le', description: 'Date de création de l’élément' },
+      updatedAt: { name: 'Mis à jour le', description: 'Dernière mise à jour de l’élément' },
+      dueDate: { name: 'Date d’échéance', description: 'Date d’échéance de l’élément' },
+      startDate: { name: 'Date de début', description: 'Début des travaux' },
+      estimate: { name: 'Estimation', description: 'Effort estimé' },
+      labels: { name: 'Étiquettes', description: 'Étiquettes de l’élément' },
+      sprint: { name: 'Sprint', description: 'Sprint associé' },
+      iteration: { name: 'Itération', description: 'Itération associée (sprint, version, etc.)' },
+      milestone: { name: 'Jalon', description: 'Jalon ciblé' },
+      parent: { name: 'Parent', description: 'Élément parent' },
+      children: { name: 'Enfants', description: 'Éléments enfants' },
+      links: { name: 'Liens', description: 'Éléments liés' },
+      attachments: { name: 'Pièces jointes', description: 'Fichiers joints' },
+      comments: { name: 'Commentaires', description: 'Commentaires de discussion' },
+      watchers: { name: 'Observateurs', description: 'Utilisateurs qui suivent cet élément' },
+    },
+
+    // Sélecteur d'icône
+    iconAndColor: 'Icône et couleur',
+    searchIcons: 'Rechercher des icônes…',
+    icons: 'Icônes',
+    colors: 'Couleurs',
+    icon: 'Icône',
+    color: 'Couleur',
+
+    // Combobox d'étiquettes
+    allLabels: 'Toutes les étiquettes',
+    selectLabels: 'Sélectionner des étiquettes',
+    noLabelsFoundFor: 'Aucune étiquette trouvée pour « {query} »',
+    labelCommaNotAllowed: 'Les noms d’étiquettes ne peuvent pas contenir de virgule',
+
+    // Sélecteur de mention
+    mentionUsers: 'Mentionner des utilisateurs',
+    searching: 'Recherche en cours…',
+    noNotificationPersonalTask: 'Les tâches personnelles n’envoient pas de notifications',
+
+    // Combobox de jalon
+    selectMilestone: 'Sélectionner un jalon',
+    selectMilestones: 'Sélectionner des jalons',
+    noMilestone: 'Aucun jalon',
+    milestones: 'Jalons',
+    milestonesSelected: '{count} jalons sélectionnés',
+    milestonesSelected_one: '{count} jalon sélectionné',
+    milestonesSelected_other: '{count} jalons sélectionnés',
+    noMilestonesFound: 'Aucun jalon trouvé',
+    showCompletedMilestones: 'Afficher les terminés',
+
+    // Combobox d'itération
+    selectIteration: 'Sélectionner une itération',
+    noIteration: 'Aucune itération',
+
+    // Sélecteur de priorité
+    selectPriority: 'Sélectionner une priorité',
+    noPriority: 'Aucune priorité',
+    loadingPriorities: 'Chargement des priorités…',
+    noPrioritiesConfigured: 'Aucune priorité configurée',
+
+    // Sélecteur de projet
+    selectProject: 'Sélectionner un projet',
+
+    // Sélecteur de dépôt
+    linkRepositories: 'Lier des dépôts',
+    selectRepositoriesFrom: 'Sélectionner des dépôts depuis {provider}',
+    searchRepositories: 'Rechercher des dépôts…',
+    loadingRepositories: 'Chargement des dépôts…',
+    noRepositoriesMatchSearch: 'Aucun dépôt ne correspond à votre recherche',
+    noRepositoriesAvailable: 'Aucun dépôt disponible',
+    alreadyLinked: 'Déjà lié',
+    linkSelected: 'Lier la sélection',
+    linking: 'Liaison en cours…',
+    repositoriesSelected: '{count} sélectionnés',
+
+    // Sélecteur de rôle
+    selectRole: 'Sélectionner un rôle',
+
+    // Sélecteur d'écran
+    selectScreen: 'Sélectionner un écran',
+
+    // Sélecteur de cas de test
+    searchTestCases: 'Rechercher des cas de test…',
+
+    // Sélecteur de flux de travail
+    selectWorkflow: 'Sélectionner un flux de travail',
+
+    // Sélecteur de jeu de conditions
+    selectConditionSet: 'Sélectionner un jeu de conditions',
+
+    // Sélecteur de jeu d'approbations
+    selectApprovalSet: 'Sélectionner un jeu d’approbations',
+  },
+
+  editors: {
+    enterText: 'Saisir du texte…',
+    selectDate: 'Sélectionner une date…',
+    clickToChangeColor: 'Cliquer pour changer la couleur',
+    saveEnter: 'Enregistrer (Entrée)',
+    cancelEscape: 'Annuler (Échap)',
+    availableFields: 'Champs disponibles',
+    selectedFields: 'Champs sélectionnés',
+    dragFieldsToAdd: 'Faites glisser les champs pour les ajouter',
+    dragToReorderOrDrop: 'Faites glisser pour réordonner ou déposer les champs ici',
+    dropFieldsHere: 'Déposez les champs ici pour les configurer',
+    noFieldsMatchSearch: 'Aucun champ ne correspond à votre recherche',
+    noFieldsAvailable: 'Aucun champ disponible',
+    allFieldsAdded: 'Tous les champs disponibles ont été ajoutés',
+    bold: 'Gras (Ctrl+B)',
+    italic: 'Italique (Ctrl+I)',
+    strikethrough: 'Barré',
+    inlineCode: 'Code en ligne',
+    bulletList: 'Liste à puces',
+    numberedList: 'Liste numérotée',
+    insertImage: 'Insérer une image',
+    userNotFound: 'Utilisateur introuvable',
+    insertDiagram: 'Insérer un schéma',
+    diagramEdit: 'Modifier le schéma',
+    diagramOpen: 'Ouvrir le schéma',
+    diagramUntitled: 'Schéma sans titre',
+    diagramNamePlaceholder: 'Nom du schéma',
+    diagramUnsaved: 'Modifications non enregistrées',
+    diagramUnsavedConfirm: 'Abandonner les modifications non enregistrées du schéma ?',
+    diagramDeleted: 'Le schéma a été supprimé',
+    diagramRenderError: 'Impossible d’afficher le schéma',
+    diagramLoadError: 'Impossible de charger le schéma',
+    diagramSaveError: 'Impossible d’enregistrer le schéma',
+    mermaidRendering: 'Rendu du schéma en cours',
+    mermaidParseError: 'Erreur d’analyse Mermaid',
+    mermaidEmpty: 'Bloc Mermaid vide',
+  },
+
+  dialogs: {
+    cancel: 'Annuler',
+    confirm: 'Confirmer',
+    save: 'Enregistrer',
+    close: 'Fermer',
+    delete: 'Supprimer',
+    update: 'Mettre à jour',
+    // Messages de confirmation pour les boîtes de dialogue confirm()
+    confirmations: {
+      deleteItem: 'Voulez-vous vraiment supprimer « {name} » ? Cette action est irréversible.',
+      deleteSection: 'Voulez-vous vraiment supprimer cette section ?',
+      discardChanges: 'Vous avez des modifications non enregistrées. Voulez-vous vraiment annuler ?',
+      dismissAllNotifications:
+        'Voulez-vous vraiment ignorer toutes les notifications ? Cette action est irréversible.',
+      removeAvatar: 'Voulez-vous vraiment supprimer votre photo de profil ?',
+      revokeCalendarFeed:
+        'Voulez-vous vraiment révoquer l’URL de votre flux de calendrier ? Tous les calendriers utilisant cette URL cesseront de se synchroniser.',
+      deleteTheme: 'Voulez-vous vraiment supprimer ce thème ? Cette action est irréversible.',
+      resetBoardConfig:
+        'Voulez-vous vraiment réinitialiser la configuration du tableau par défaut ? Cela supprimera votre configuration personnalisée.',
+      deleteCustomField:
+        'Voulez-vous vraiment supprimer le champ personnalisé « {name} » ? Cela le retirera de tous les projets.',
+      deleteLinkType:
+        'Voulez-vous vraiment supprimer ce type de lien ? Cela supprimera également tous les liens de ce type.',
+      deleteAsset: 'Voulez-vous vraiment supprimer cet actif ?',
+      deleteAssetSet:
+        'Voulez-vous vraiment supprimer cet ensemble d’actifs ? Cela supprimera tous les actifs, types et catégories qu’il contient.',
+      deleteAssetType:
+        'Voulez-vous vraiment supprimer ce type d’actif ? Les actifs utilisant ce type n’auront plus de type assigné.',
+      deleteCategory:
+        'Voulez-vous vraiment supprimer cette catégorie ? Les sous-catégories seront déplacées vers la catégorie parente.',
+      revokeRole: 'Voulez-vous vraiment révoquer ce rôle ?',
+      quitApplication: 'Voulez-vous vraiment quitter l’application ? Le serveur va s’arrêter.',
+      deleteConnection:
+        'Voulez-vous vraiment supprimer cette connexion ? Cette action est irréversible.',
+      deleteWidget: 'Supprimer cette section ? Tous les widgets de cette section seront retirés.',
+      deleteScreen:
+        'Voulez-vous vraiment supprimer l’écran « {name} » ? Cela affectera tous les espaces de travail utilisant cet écran.',
+    },
+    // Messages d'alerte pour les boîtes de dialogue alert()
+    alerts: {
+      nameRequired: 'Le nom est obligatoire',
+      pleaseSelectImage: 'Veuillez sélectionner un fichier image',
+      timerAlreadyRunning: 'Un chronomètre est déjà en cours d’exécution. Veuillez l’arrêter avant d’en démarrer un nouveau.',
+      noTimerRunning: 'Aucun chronomètre n’est actuellement en cours d’exécution.',
+      timerSyncing: 'Le chronomètre est en cours de synchronisation. Veuillez patienter et réessayer.',
+      startTimerFromItem: 'Veuillez démarrer un chronomètre depuis un élément de travail pour fournir du contexte.',
+      cannotDeleteDefaultScreen:
+        'Impossible de supprimer l’écran par défaut. Cet écran est requis pour les espaces de travail sans jeu de configuration.',
+      applicationShuttingDown: 'L’application est en cours d’arrêt…',
+      pdfExportComingSoon: 'L’exportation PDF arrive bientôt pour la vue par blocs de temps',
+      configUpdatedSuccess:
+        'Jeu de configuration mis à jour avec succès. Tous les éléments de travail utilisent déjà les statuts du nouveau flux de travail.',
+      failedToSave: 'Échec de l’enregistrement : {error}',
+      failedToDelete: 'Échec de la suppression : {error}',
+      shutdownFailed: 'Échec de l’arrêt de l’application',
+      failedToUpdate: 'Échec de la mise à jour : {error}',
+      failedToLoad: 'Échec du chargement : {error}',
+      stopTimerFailed: 'Échec de l’arrêt du chronomètre',
+      failedToCreate: 'Échec de la création : {error}',
+      failedToUpload: 'Échec du téléversement : {error}',
+      failedToGeneratePdf: 'Échec de la génération du PDF. Veuillez réessayer.',
+      failedToApplyConfig: 'Échec de l’application du changement de configuration : {error}',
+      failedToAddManager: 'Échec de l’ajout du responsable : {error}',
+      failedToRemoveManager: 'Échec du retrait du responsable : {error}',
+      failedToSaveWorkspace: 'Échec de l’enregistrement du projet. Veuillez vérifier votre saisie et réessayer.',
+      failedToResetConfig: 'Échec de la réinitialisation de la configuration : {error}',
+      failedToToggleStatus: 'Échec du basculement du statut du type de lien : {error}',
+      failedToAssignRole: 'Échec de l’attribution du rôle : {error}',
+      failedToRevokeRole: 'Échec de la révocation du rôle : {error}',
+      failedToUpdateRole: 'Échec de la mise à jour du rôle de chacun : {error}',
+      failedToLoadFields: 'Échec du chargement des champs : {error}',
+      failedToSaveFields: 'Échec de l’enregistrement des attributions de champs : {error}',
+      errorAddingTestCase: 'Erreur lors de l’ajout du cas de test : {error}',
+      failedToCreateLabel: 'Échec de la création de l’étiquette : {error}',
+      failedToSaveLayout: 'Échec de l’enregistrement des modifications de disposition',
+      statusInUseByTransitions:
+        'Impossible de supprimer « {name} » car il est utilisé dans {count} transitions du flux de travail. Pour supprimer ce statut, allez dans la gestion du flux de travail, retirez toutes les transitions qui l’utilisent, puis réessayez de supprimer le statut.',
+      statusInUseByTransitions_one:
+        'Impossible de supprimer « {name} » car il est utilisé dans {count} transition du flux de travail. Pour supprimer ce statut, allez dans la gestion du flux de travail, retirez toutes les transitions qui l’utilisent, puis réessayez de supprimer le statut.',
+      statusInUseByTransitions_other:
+        'Impossible de supprimer « {name} » car il est utilisé dans {count} transitions du flux de travail. Pour supprimer ce statut, allez dans la gestion du flux de travail, retirez toutes les transitions qui l’utilisent, puis réessayez de supprimer le statut.',
+    },
+  },
+
+  components: {
+    // Composant Avatar
+    avatar: {
+      defaultAlt: 'Avatar',
+    },
+
+    // Composant DataTable
+    dataTable: {
+      showingRange: 'Affichage de {start} à {end} sur {total}',
+    },
+
+    // Composants de schéma
+    diagram: {
+      loading: 'Chargement des schémas…',
+      loadError: 'Échec du chargement des schémas',
+      deleteError: 'Échec de la suppression du schéma',
+      confirmDelete: 'Voulez-vous vraiment supprimer ce schéma ?',
+      edit: 'Modifier le schéma',
+      untitled: 'Schéma sans titre',
+      namePlaceholder: 'Nom du schéma',
+      nameRequired: 'Veuillez saisir un nom de schéma',
+      saveError: 'Échec de l’enregistrement du schéma',
+      unsavedChanges: 'Modifications non enregistrées',
+      unsavedChangesConfirm: 'Vous avez des modifications non enregistrées. Voulez-vous vraiment fermer ?',
+    },
+
+    // Composant ErrorState
+    errorState: {
+      title: 'Une erreur est survenue',
+    },
+
+    // Composant Pagination
+    pagination: {
+      showingRange: 'Affichage de {start} à {end} sur {total}',
+      limitedTo: 'limité à {max} éléments',
+      itemsPerPage: 'Éléments par page :',
+      previousPage: 'Page précédente',
+      nextPage: 'Page suivante',
+      goToPage: 'Aller à la page {page}',
+      pageOf: 'Page {current} sur {total}',
+    },
+
+    // Composant UserAvatar
+    userAvatar: {
+      myWorkspace: 'Mon espace de travail',
+      myWorkspaceSubtitle: 'Espace de travail personnel pour les tâches et notes',
+      profileSubtitle: 'Gérer votre profil et vos paramètres',
+      security: 'Sécurité',
+      securitySubtitle: 'Gérer les mots de passe, le 2FA et les jetons d’API',
+      themeTitle: 'Thème : {mode}',
+      themeLight: 'Clair',
+      themeDark: 'Sombre',
+      themeSystem: 'Système',
+      desktopSite: 'Version pour ordinateur',
+      addToHomeScreen: 'Ajouter à l’écran d’accueil',
+    },
+  },
+
+  aria: {
+    close: 'Fermer',
+    dragToReorder: 'Faire glisser pour réordonner',
+    refresh: 'Actualiser',
+    removeField: 'Retirer le champ',
+    removeFromSection: 'Retirer de la section',
+    addNewStep: 'Ajouter une nouvelle étape',
+    removeCurrentStep: 'Retirer l’étape actuelle',
+    dismissNotification: 'Masquer la notification',
+    mainNavigation: 'Navigation principale',
+    mentionUsers: 'Mentionner des utilisateurs',
+    notifications: 'Notifications',
+    adminSettings: 'Paramètres d’administration',
+    userMenu: 'Menu utilisateur',
+    clearSearch: 'Effacer la recherche',
+  },
+
+  layout: {
+    addSection: 'Ajouter une section',
+    moveUp: 'Déplacer la section vers le haut',
+    moveDown: 'Déplacer la section vers le bas',
+    deleteSection: 'Supprimer la section',
+    editMode: 'Mode édition',
+    editDisplaySettings: 'Modifier les paramètres d’affichage',
+    items: 'éléments',
+  },
+
+  widgets: {
+    stats: { collections: 'Collections', totalItems: 'Total des éléments' },
+    removeWidget: 'Retirer le widget',
+    defaultWidth: 'Par défaut : largeur {width}/{columns}',
+    widthQuarter: 'Quart',
+    widthThird: 'Tiers',
+    widthHalf: 'Moitié',
+    widthTwoThirds: 'Deux tiers',
+    widthFull: 'Plein écran',
+    resizeAriaLabel: 'Redimensionner le widget',
+    resizeColumnsValue: '{count} sur 12 colonnes',
+    rowCount: 'Nombre de lignes',
+    density: 'Densité',
+    densityComfortable: 'Aéré',
+    densityCompact: 'Compact',
+    rowCount5: '5 lignes',
+    rowCount10: '10 lignes',
+    rowCount15: '15 lignes',
+    rowCountAll: 'Toutes les lignes',
+    narrowWidth: 'Étroit (1/3 de largeur)',
+    mediumWidth: 'Moyen (2/3 de largeur)',
+    fullWidth: 'Pleine largeur',
+    chart: {
+      items: 'éléments',
+      noDataAvailable: 'Aucune donnée disponible',
+    },
+    completionChart: {
+      title: 'Graphique de réalisation',
+      emptyMessage: 'Aucune donnée de réalisation disponible',
+    },
+    createdChart: {
+      title: 'Graphique des créations',
+      emptyMessage: 'Aucune donnée de création disponible',
+    },
+    recentItems: {
+      loadingText: 'Chargement des éléments récents…',
+      emptyTitle: 'Aucun élément récent',
+      emptySubtitle: 'Les éléments consultés récemment apparaîtront ici',
+      loadError: 'Échec du chargement des éléments récents',
+    },
+    savedSearch: {
+      loadingCollections: 'Chargement des collections enregistrées…',
+      setupTitle: 'Choisir une collection enregistrée',
+      setupSubtitle: 'Sélectionnez une collection pour afficher ses éléments de travail ici.',
+      selectCollection: 'Sélectionner une collection',
+      noCollections: 'Aucune collection enregistrée disponible',
+      collectionUnavailable: 'Collection enregistrée indisponible',
+      itemCount: '{count} éléments',
+      emptyTitle: 'Aucun élément de travail correspondant',
+      emptySubtitle: 'Cette collection enregistrée ne contient aucun élément correspondant',
+      loadError: 'Échec du chargement de la collection enregistrée',
+    },
+    milestoneProgress: {
+      emptyTitle: 'Aucun jalon',
+      emptySubtitle: 'Créez des jalons pour suivre la progression',
+      due: 'Échéance',
+      done: 'terminé',
+      item: 'élément',
+      items: 'éléments',
+      noItems: 'Aucun élément',
+      noStatus: 'Aucun statut',
+      activeMilestone: 'Actif',
+      noCategorizedWork: 'Aucun travail catégorisé',
+      chartAria: 'Répartition du statut des jalons',
+    },
+    myTasks: {
+      loadingText: 'Chargement de vos tâches…',
+      emptyTitle: 'Aucune tâche ne vous est attribuée',
+      emptySubtitle: 'Les tâches qui vous sont attribuées apparaîtront ici',
+      loadError: 'Échec du chargement de vos tâches',
+    },
+    overdueItems: {
+      loadingStatus: 'Chargement…',
+      itemCount: '{count} éléments en retard',
+      refreshAriaLabel: 'Actualiser les éléments en retard',
+      loadingText: 'Chargement des éléments en retard…',
+      emptyTitle: 'Aucun élément en retard',
+      emptySubtitle: 'Tous les éléments sont dans les temps',
+      loadError: 'Échec du chargement des éléments en retard',
+      daysOverdue: '{days}j de retard',
+    },
+    upcomingDeadlines: {
+      loadingStatus: 'Chargement…',
+      itemCount: '{count} échéances à venir',
+      refreshAriaLabel: 'Actualiser les échéances à venir',
+      loadingText: 'Chargement des échéances à venir…',
+      emptyTitle: 'Aucune échéance à venir',
+      emptySubtitle: 'Les éléments avec des dates d’échéance apparaîtront ici',
+      loadError: 'Échec du chargement des échéances à venir',
+    },
+    iterationTimeline: {
+      loadingStatus: 'Chargement…',
+      iterationCount: '{count} itérations',
+      refreshAriaLabel: 'Actualiser les itérations',
+      loadingText: 'Chargement des itérations…',
+      emptyTitle: 'Aucune itération active',
+      emptySubtitle: 'La chronologie des itérations apparaîtra ici',
+      loadError: 'Échec du chargement des itérations',
+      active: 'Active',
+      planned: 'Planifiée',
+      completed: 'Terminée',
+    },
+    testCoverage: {
+      loading: 'Chargement des données de couverture…',
+      loadError: 'Échec du chargement des données de couverture',
+      emptyTitle: 'Aucune exigence configurée',
+      emptyDescription: 'Configurez les types d’exigences dans les rapports de test pour voir les données de couverture.',
+      chartAria: 'Répartition de la couverture des tests',
+      covered: 'Couvert',
+      notCovered: 'Non couvert',
+      requirementCount: '{covered} sur {total} exigences',
+      requirements: '{count} exigences',
+      requirements_other: '{count} exigences',
+      requirements_one: '{count} exigence',
+      linkedCases: 'ont des cas de test liés',
+    },
+  },
+
+  recurrence: {
+    title: 'Récurrence',
+    description: 'Gérer les règles de tâches récurrentes',
+    frequency: 'Fréquence',
+    interval: 'Répéter tous les',
+    daily: 'Quotidien',
+    weekly: 'Hebdomadaire',
+    monthly: 'Mensuel',
+    yearly: 'Annuel',
+    daysOfWeek: 'Jours de la semaine',
+    dayOfMonth: 'Jour du mois',
+    endCondition: 'Se termine',
+    never: 'Jamais',
+    onDate: 'À la date',
+    afterOccurrences: 'Après un nombre d’occurrences',
+    occurrences: 'occurrences',
+    preview: 'Prochaines occurrences',
+    previewLoading: 'Chargement de l’aperçu…',
+    previewError: 'Échec du chargement de l’aperçu',
+    copySettings: 'Copier à partir du modèle',
+    copyAssignee: 'Copier l’attribué',
+    copyPriority: 'Copier la priorité',
+    copyCustomFields: 'Copier les champs personnalisés',
+    copyDescription: 'Copier la description',
+    leadTime: 'Générer à l’avance (jours)',
+    statusOnCreate: 'Statut à la création',
+    active: 'Actif',
+    inactive: 'Inactif',
+    instances: 'Instances générées',
+    instanceCount: '{count} instances',
+    forceGenerate: 'Générer maintenant',
+    generating: 'Génération en cours…',
+    generated: '{count} instances générées',
+    addRecurrence: 'Ajouter une récurrence',
+    noRule: 'Aucune récurrence définie',
+    setUp: 'Configurer la récurrence',
+    editRule: 'Modifier la récurrence',
+    deleteRule: 'Supprimer la récurrence',
+    deleteConfirm: 'Voulez-vous vraiment supprimer cette règle de récurrence ? Les instances générées ne seront pas affectées.',
+    startDate: 'Date de début',
+    endDate: 'Date de fin (optionnel)',
+    timezone: 'Fuseau horaire',
+    templateItem: 'Élément modèle',
+    scheduledDate: 'Date programmée',
+    sequenceNumber: 'Séquence',
+    noInstances: 'Aucune instance générée pour le moment',
+    settingsTab: 'Paramètres',
+    instancesTab: 'Instances',
+    searchPlaceholder: 'Rechercher des règles de récurrence…',
+    noMatchingResults: 'Aucune règle de récurrence ne correspond à votre recherche',
+    empty: 'Aucune règle de récurrence',
+    emptyDesc: 'Les règles de récurrence apparaîtront ici lorsque des plannings récurrents seront configurés sur des éléments.',
+    createFromItem: 'Pour créer une règle de récurrence, ouvrez un élément et configurez la récurrence dans la barre latérale des détails.',
+    rule: 'Règle',
+    everyDay: 'jour',
+    everyDays: 'jours',
+    everyWeek: 'semaine',
+    everyWeeks: 'semaines',
+    everyMonth: 'mois',
+    everyMonths: 'mois',
+    everyYear: 'an',
+    everyYears: 'ans',
+    mon: 'Lun',
+    tue: 'Mar',
+    wed: 'Mer',
+    thu: 'Jeu',
+    fri: 'Ven',
+    sat: 'Sam',
+    sun: 'Dim',
+  },
+
+  footer: {
+    platformName: 'Plateforme de gestion du travail Windshift',
+    aboutWindshift: 'À propos de Windshift',
+    apiReference: 'Référence API',
+    licenses: 'Licences',
+    reportProblem: 'Signaler un problème',
+  },
+};

@@ -15,6 +15,7 @@ export const SUPPORTED_LOCALES = [
   { code: 'pt-BR', name: 'Português (Brasil)', direction: 'ltr' },
   { code: 'ru', name: 'Русский', direction: 'ltr' },
   { code: 'zh-CN', name: '简体中文', direction: 'ltr' },
+  { code: 'fr', name: 'Français', direction: 'ltr' },
 ];
 
 // Reactive locale state.
