@@ -6,11 +6,9 @@
   import { IconTrash, IconPlayerPlay, IconEye } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
-  import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
   import { confirm } from '../../composables/useConfirm.js';
-  import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
@@ -18,8 +16,8 @@
   import { renderStatusBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { useEventListener } from 'runed';
   import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
+  import TestManagementHeader from './TestManagementHeader.svelte';
 
   let { workspaceId = null } = $props();
 
@@ -39,20 +37,7 @@
 
   onMount(async () => {
     await loadData();
-
-    // Check for URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const milestoneParam = urlParams.get('milestone');
-    if (milestoneParam) {
-      selectedMilestoneFilter = parseInt(milestoneParam);
-    }
   });
-
-  useEventListener(() => document, 'keydown', (e) => {
-    if ((/** @type {HTMLElement} */ (e.target)).tagName === 'INPUT' || (/** @type {HTMLElement} */ (e.target)).tagName === 'TEXTAREA' || (/** @type {HTMLElement} */ (e.target)).tagName === 'SELECT') return;
-    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); showAddForm(); }
-  });
-  useEventListener(() => window, 'trigger-test-run-form', () => showAddForm());
 
   async function loadData() {
     try {
@@ -116,7 +101,6 @@
   async function handleAssigneeFilterChange(event) {
     selectedAssigneeFilter = event.currentTarget.value;
     await loadData();
-    updateURL();
   }
 
   // Status rendering now handled by imported utility (renderStatusBadge)
@@ -278,52 +262,33 @@
       });
   });
 
-  // Handle milestone selection and update URL
-  function handleMilestoneSelect(result) {
-    selectedMilestoneFilter = result.value;
-    updateURL();
-  }
-
-  function updateURL() {
-    const url = new URL(window.location.href);
-    if (selectedMilestoneFilter) {
-      url.searchParams.set('milestone', selectedMilestoneFilter.toString());
-    } else {
-      url.searchParams.delete('milestone');
-    }
-    window.history.replaceState({}, '', url);
-  }
 </script>
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
-  <PageHeader
+  <TestManagementHeader
     title={t('testing.testRuns')}
     subtitle={t('testing.testRunsSubtitle')}
+    bind:milestoneFilter={selectedMilestoneFilter}
+    oncreate={showAddForm}
+    createEvent="trigger-test-run-form"
   >
-    {#snippet actions()}
-      <div class="flex items-center gap-3">
-        <div class="w-40">
-          <Select value={selectedAssigneeFilter} onchange={handleAssigneeFilterChange} options={[{ value: '', label: t('common.allAssignees') }, { value: 'unassigned', label: t('common.unassigned') }, ...$users.map(user => ({ value: user.id, label: `${user.first_name} ${user.last_name}` }))]} />
-        </div>
-        <div class="w-48">
-          <MilestoneCombobox
-            bind:value={selectedMilestoneFilter}
-            placeholder={t('milestones.allMilestones')}
-            onSelect={handleMilestoneSelect}
-          />
-        </div>
-        <Button
-          onclick={showAddForm}
-          variant="primary"
-          size="medium"
-          keyboardHint="A"
-          dataTestid="create-test-run-button"
-        >
-          {t('testing.createTestRun')}
-        </Button>
+    {#snippet leadingActions()}
+      <div class="w-40">
+        <Select value={selectedAssigneeFilter} onchange={handleAssigneeFilterChange} options={[{ value: '', label: t('common.allAssignees') }, { value: 'unassigned', label: t('common.unassigned') }, ...$users.map(user => ({ value: user.id, label: `${user.first_name} ${user.last_name}` }))]} />
       </div>
     {/snippet}
-  </PageHeader>
+    {#snippet primaryAction()}
+      <Button
+        onclick={showAddForm}
+        variant="primary"
+        size="medium"
+        keyboardHint="A"
+        dataTestid="create-test-run-button"
+      >
+        {t('testing.createTestRun')}
+      </Button>
+    {/snippet}
+  </TestManagementHeader>
 
   {#if showForm}
     <Modal

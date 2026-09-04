@@ -23,6 +23,7 @@
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
+  import DragHandleDots from '../components/DragHandleDots.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
   import { objectDisplayName } from '../utils/systemLabels.js';
 
@@ -922,14 +923,7 @@
                 >
                   <!-- 6-dot drag handle -->
                   <div class="flex-shrink-0">
-                    <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
-                      <circle cx="9" cy="6" r="1.5"/>
-                      <circle cx="15" cy="6" r="1.5"/>
-                      <circle cx="9" cy="12" r="1.5"/>
-                      <circle cx="15" cy="12" r="1.5"/>
-                      <circle cx="9" cy="18" r="1.5"/>
-                      <circle cx="15" cy="18" r="1.5"/>
-                    </svg>
+                    <DragHandleDots class="w-4 h-4 group-hover:text-blue-500" />
                   </div>
                   <!-- Color dot -->
                   <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.category_color || '#6b7280'};"></span>
@@ -1054,14 +1048,7 @@
 
                         <!-- Drag handle -->
                         <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="touch-action: none;">
-                          <svg class="w-3.5 h-3.5 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="9" cy="6" r="1.5"/>
-                            <circle cx="15" cy="6" r="1.5"/>
-                            <circle cx="9" cy="12" r="1.5"/>
-                            <circle cx="15" cy="12" r="1.5"/>
-                            <circle cx="9" cy="18" r="1.5"/>
-                            <circle cx="15" cy="18" r="1.5"/>
-                          </svg>
+                          <DragHandleDots class="w-3.5 h-3.5 group-hover:text-blue-500" />
                         </div>
                         <!-- Color dot -->
                         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getStatusColor(statusId)};"></span>

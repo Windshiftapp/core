@@ -7,7 +7,6 @@
   import { escapeHtml } from '../../utils/sanitize.ts';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
-  import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
@@ -20,9 +19,9 @@
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
-  import { useEventListener } from 'runed';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
+  import TestManagementHeader from './TestManagementHeader.svelte';
 
   let { workspaceId = null } = $props();
 
@@ -94,20 +93,7 @@
 
   onMount(async () => {
     await loadData();
-
-    // Check for URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const milestoneParam = urlParams.get('milestone');
-    if (milestoneParam) {
-      selectedMilestoneFilter = parseInt(milestoneParam);
-    }
   });
-
-  useEventListener(() => document, 'keydown', (e) => {
-    if ((/** @type {HTMLElement} */ (e.target)).tagName === 'INPUT' || (/** @type {HTMLElement} */ (e.target)).tagName === 'TEXTAREA' || (/** @type {HTMLElement} */ (e.target)).tagName === 'SELECT') return;
-    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); showAddForm(); }
-  });
-  useEventListener(() => window, 'trigger-test-plan-form', () => showAddForm());
 
   async function loadData() {
     try {
@@ -240,22 +226,6 @@
     ? $testSets.filter(set => set.milestone_id === selectedMilestoneFilter)
     : $testSets);
 
-  // Handle milestone selection and update URL
-  function handleMilestoneSelect(result) {
-    selectedMilestoneFilter = result.value;
-    updateURL();
-  }
-
-  function updateURL() {
-    const url = new URL(window.location.href);
-    if (selectedMilestoneFilter) {
-      url.searchParams.set('milestone', selectedMilestoneFilter.toString());
-    } else {
-      url.searchParams.delete('milestone');
-    }
-    window.history.replaceState({}, '', url);
-  }
-
   const workspaceTestBase = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
   const testSetColumns = $derived.by(() => [
     { key: 'id', label: t('common.id'), width: 'w-16' },
@@ -334,31 +304,25 @@
 </script>
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
-  <PageHeader
+  <TestManagementHeader
     title={t('testing.testPlans')}
     subtitle={t('testing.testPlansSubtitle')}
+    bind:milestoneFilter={selectedMilestoneFilter}
+    oncreate={showAddForm}
+    createEvent="trigger-test-plan-form"
   >
-    {#snippet actions()}
-      <div class="flex items-center gap-3">
-        <div class="w-48">
-          <MilestoneCombobox
-            bind:value={selectedMilestoneFilter}
-            placeholder={t('milestones.allMilestones')}
-            onSelect={handleMilestoneSelect}
-          />
-        </div>
-        <Button
-          onclick={showAddForm}
-          variant="primary"
-          size="medium"
-          keyboardHint="A"
-          dataTestid="test-set-create-button"
-        >
-          {t('testing.addTestPlan')}
-        </Button>
-      </div>
+    {#snippet primaryAction()}
+      <Button
+        onclick={showAddForm}
+        variant="primary"
+        size="medium"
+        keyboardHint="A"
+        dataTestid="test-set-create-button"
+      >
+        {t('testing.addTestPlan')}
+      </Button>
     {/snippet}
-  </PageHeader>
+  </TestManagementHeader>
 
   <!-- Add/Edit Test Plan Modal -->
   <Modal

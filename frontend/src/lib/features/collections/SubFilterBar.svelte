@@ -4,11 +4,9 @@
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
   import DynamicFilterPopover from '../shared/DynamicFilterPopover.svelte';
 
-  let { workspaceId = null } = $props();
+  let { workspaceId: _workspaceId = null } = $props();
 
   let filters = $state(JSON.parse(JSON.stringify(collectionStore.subFilterRows ?? [])));
-
-  void workspaceId;
 
   function applyFilters(rows) {
     const ql = QLBuilder.buildQuery({ dynamicFields: rows });

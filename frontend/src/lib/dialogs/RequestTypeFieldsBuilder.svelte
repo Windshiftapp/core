@@ -11,7 +11,7 @@
   import Spinner from '../components/Spinner.svelte';
   import Textarea from '../components/Textarea.svelte';
   import PortalModal from './PortalModal.svelte';
-  import DropIndicator from '../layout/DropIndicator.svelte';
+  import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -765,32 +765,16 @@
       <!-- Configured Fields list (full width) -->
       <div class="space-y-2">
         {#each currentStepFields as field, index (field.field_identifier)}
-          <div
-            data-configured-field
-            data-field-index={index}
-            data-field-id={field.field_identifier}
-            class="relative group flex items-center gap-2 px-3 py-2 rounded border transition-all"
+          <DraggableFieldRow
+            attributes={{ 'data-configured-field': true }}
+            fieldIndex={index}
+            fieldId={field.field_identifier}
+            closestEdge={fieldDragState.get(field.field_identifier)?.closestEdge}
+            class="gap-2 px-3 py-2 rounded border transition-all"
             style="border-color: var(--ds-border); background-color: var(--ds-background); user-select: none;"
+            handleColor="var(--ds-text-subtle)"
+            handleAttributes={{ 'data-testid': `request-type-field-drag-${field.field_identifier}` }}
           >
-            {#if fieldDragState.get(field.field_identifier)?.closestEdge}
-              <DropIndicator edge={fieldDragState.get(field.field_identifier)?.closestEdge} gap={8} />
-            {/if}
-
-            <div
-              class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded"
-              style="touch-action: none;"
-              data-testid={`request-type-field-drag-${field.field_identifier}`}
-            >
-              <svg class="w-4 h-4" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
-                <circle cx="9" cy="6" r="1.5"/>
-                <circle cx="15" cy="6" r="1.5"/>
-                <circle cx="9" cy="12" r="1.5"/>
-                <circle cx="15" cy="12" r="1.5"/>
-                <circle cx="9" cy="18" r="1.5"/>
-                <circle cx="15" cy="18" r="1.5"/>
-              </svg>
-            </div>
-
             <div class="flex-1 min-w-0">
               <div class="font-medium text-sm flex items-center gap-2 truncate" style="color: var(--ds-text);">
                 {capitalizeLabel(field.display_name || field.field_name || field.field_identifier)}
@@ -834,7 +818,7 @@
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
+          </DraggableFieldRow>
         {/each}
       </div>
 

@@ -7,7 +7,9 @@
   import Input from '../components/Input.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
-  import DropIndicator from '../layout/DropIndicator.svelte';
+  import DragHandleDots from '../components/DragHandleDots.svelte';
+  import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
+  import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
 
@@ -307,14 +309,7 @@
               >
                 <!-- Drag Handle -->
                 <div class="flex-shrink-0">
-                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="9" cy="6" r="1.5"/>
-                    <circle cx="15" cy="6" r="1.5"/>
-                    <circle cx="9" cy="12" r="1.5"/>
-                    <circle cx="15" cy="12" r="1.5"/>
-                    <circle cx="9" cy="18" r="1.5"/>
-                    <circle cx="15" cy="18" r="1.5"/>
-                  </svg>
+                  <DragHandleDots class="w-4 h-4 group-hover:text-blue-500" />
                 </div>
 
                 <div class="flex-1 min-w-0">
@@ -364,33 +359,15 @@
             </div>
           {:else}
             {#each selectedFields as field, index (field.field_identifier)}
-              <div
-                data-selected-field-editor
-                data-field-index={index}
-                data-field-id={field.field_identifier}
-                class="relative group flex items-center gap-3 px-3 py-2 rounded border hover:shadow-sm transition-all duration-200"
+              <DraggableFieldRow
+                attributes={{ 'data-selected-field-editor': true }}
+                fieldIndex={index}
+                fieldId={field.field_identifier}
+                closestEdge={fieldDragState.get(field.field_identifier)?.closestEdge}
+                class="gap-3 px-3 py-2 rounded border hover:shadow-sm transition-all duration-200"
                 style="background: var(--ds-background-input); border-color: var(--ds-border); user-select: none;"
+                handleClass="w-4 h-4 group-hover:text-blue-500"
               >
-                <!-- Drop indicator -->
-                {#if fieldDragState.get(field.field_identifier)?.closestEdge}
-                  <DropIndicator edge={fieldDragState.get(field.field_identifier)?.closestEdge} gap={8} />
-                {/if}
-
-                <!-- Drag Handle -->
-                <div
-                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
-                  style="touch-action: none;"
-                >
-                  <svg class="w-4 h-4 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="9" cy="6" r="1.5"/>
-                    <circle cx="15" cy="6" r="1.5"/>
-                    <circle cx="9" cy="12" r="1.5"/>
-                    <circle cx="15" cy="12" r="1.5"/>
-                    <circle cx="9" cy="18" r="1.5"/>
-                    <circle cx="15" cy="18" r="1.5"/>
-                  </svg>
-                </div>
-
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm flex items-center gap-2" style="color: var(--ds-text);">
                     <span class="truncate">{getFieldDisplayName(field)}</span>
@@ -407,25 +384,14 @@
                     <Checkbox bind:checked={field.is_required} label={t('common.required')} size="small" />
                   {/if}
 
-                  {#if isProtected(field)}
-                    <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4" style="color: var(--ds-text-subtlest);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                      </svg>
-                    </div>
-                  {:else}
-                    <button
-                      onclick={() => removeField(index)}
-                      class="text-red-500 hover:text-red-700 transition-colors p-1 rounded flex-shrink-0 remove-field-btn"
-                      title={t('aria.removeField')}
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  {/if}
+                  <FieldRemovalAction
+                    locked={isProtected(field)}
+                    removeClass="text-red-500 hover:text-red-700 transition-colors p-1 rounded flex-shrink-0 remove-field-btn"
+                    removeTitle={t('aria.removeField')}
+                    onremove={() => removeField(index)}
+                  />
                 </div>
-              </div>
+              </DraggableFieldRow>
             {/each}
           {/if}
         </div>
@@ -441,7 +407,7 @@
 </Modal>
 
 <style>
-  .remove-field-btn:hover {
+  :global(.remove-field-btn:hover) {
     background: color-mix(in srgb, currentColor 10%, transparent);
   }
 </style>

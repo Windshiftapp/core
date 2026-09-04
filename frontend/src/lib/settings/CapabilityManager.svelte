@@ -1,14 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, Power, PowerOff } from '@lucide/svelte';
+  import { Plus, Edit, Trash2 } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Radio from '../components/Radio.svelte';
   import Input from '../components/Input.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Select from '../components/Select.svelte';
@@ -17,6 +15,9 @@
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import EnabledStatus from './EnabledStatus.svelte';
+  import EntityFormModal from './EntityFormModal.svelte';
+  import EntityRowActions from './EntityRowActions.svelte';
 
   let capabilities = $state([]);
   let llmConnections = $state([]);
@@ -419,36 +420,13 @@
         <Lozenge appearance={typeAppearance(cap.capability_type)} size="sm">{typeLabel(cap.capability_type)}</Lozenge>
       {/snippet}
       {#snippet status(cap)}
-        {#if cap.is_enabled}
-          <div class="flex items-center gap-1">
-            <Power size={14} style="color: var(--ds-icon-success);" />
-            <span class="text-xs" style="color: var(--ds-text-success);">{t('common.enabled')}</span>
-          </div>
-        {:else}
-          <div class="flex items-center gap-1">
-            <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.disabled')}</span>
-          </div>
-        {/if}
+        <EnabledStatus enabled={cap.is_enabled} />
       {/snippet}
       {#snippet actions(cap)}
-        <div class="flex items-center justify-end gap-1">
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-subtle);"
-            title={t('common.edit')}
-            onclick={() => openEdit(cap)}
-          >
-            <Edit size={14} />
-          </button>
-          <Button
-            variant="danger-ghost"
-            size="small"
-            icon={Trash2}
-            title={t('common.delete')}
-            onclick={() => deleteCapability(cap)}
-          ></Button>
-        </div>
+        <EntityRowActions actions={[
+          { id: 'edit', icon: Edit, title: t('common.edit'), onclick: () => openEdit(cap) },
+          { id: 'delete', icon: Trash2, title: t('common.delete'), danger: true, onclick: () => deleteCapability(cap) },
+        ]} />
       {/snippet}
     </DataTable>
   {/if}
@@ -456,48 +434,33 @@
 
 <!-- Create Modal -->
 {#if showCreateModal}
-  <Modal
-    isOpen={true}
+  <EntityFormModal
+    title={t('settings.actionCapabilities.addCapability')}
     onclose={() => showCreateModal = false}
-    onSubmit={handleCreate}
-    submitDisabled={!canSubmit || saving}
+    onsubmit={handleCreate}
+    disabled={!canSubmit}
+    {saving}
+    confirmLabel={t('common.create')}
   >
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.actionCapabilities.addCapability')} onclose={() => showCreateModal = false} />
-      <div class="p-4 space-y-4">
-        {@render capabilityForm(false)}
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
-            {t('common.create')}
-          </Button>
-        </div>
-      </div>
+    {#snippet fields()}
+      {@render capabilityForm(false)}
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 <!-- Edit Modal -->
 {#if showEditModal}
-  <Modal
-    isOpen={true}
+  <EntityFormModal
+    title={t('settings.actionCapabilities.editCapability')}
     onclose={() => showEditModal = false}
-    onSubmit={handleUpdate}
-    submitDisabled={!canSubmit || saving}
+    onsubmit={handleUpdate}
+    disabled={!canSubmit}
+    {saving}
   >
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.actionCapabilities.editCapability')} onclose={() => showEditModal = false} />
-      <div class="p-4 space-y-4">
-        {@render capabilityForm(true)}
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
-            {t('common.save')}
-          </Button>
-        </div>
-      </div>
+    {#snippet fields()}
+      {@render capabilityForm(true)}
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 

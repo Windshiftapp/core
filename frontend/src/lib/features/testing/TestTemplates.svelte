@@ -8,16 +8,14 @@
   import { IconFiles } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
-  import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { useEventListener } from 'runed';
+  import TestManagementHeader from './TestManagementHeader.svelte';
 
   let { workspaceId = null } = $props();
 
@@ -71,18 +69,6 @@
 
   onMount(async () => {
     await loadData();
-
-    // Check for URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const milestoneParam = urlParams.get('milestone');
-    if (milestoneParam) {
-      selectedMilestoneFilter = parseInt(milestoneParam);
-    }
-  });
-
-  useEventListener(() => document, 'keydown', (e) => {
-    if ((/** @type {HTMLElement} */ (e.target)).tagName === 'INPUT' || (/** @type {HTMLElement} */ (e.target)).tagName === 'TEXTAREA' || (/** @type {HTMLElement} */ (e.target)).tagName === 'SELECT') return;
-    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); showAddForm(); }
   });
 
   async function loadData() {
@@ -221,48 +207,26 @@
     ? enrichedTemplates.filter(t => t.milestoneId === selectedMilestoneFilter)
     : enrichedTemplates);
 
-  // Handle milestone selection and update URL
-  function handleMilestoneSelect(result) {
-    selectedMilestoneFilter = result.value;
-    updateURL();
-  }
-
-  function updateURL() {
-    const url = new URL(window.location.href);
-    if (selectedMilestoneFilter) {
-      url.searchParams.set('milestone', selectedMilestoneFilter.toString());
-    } else {
-      url.searchParams.delete('milestone');
-    }
-    window.history.replaceState({}, '', url);
-  }
 </script>
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
-  <PageHeader
+  <TestManagementHeader
     title={t('testing.testRunTemplates')}
     subtitle={t('testing.testRunTemplatesSubtitle')}
+    bind:milestoneFilter={selectedMilestoneFilter}
+    oncreate={showAddForm}
   >
-    {#snippet actions()}
-      <div class="flex items-center gap-3">
-        <div class="w-48">
-          <MilestoneCombobox
-            bind:value={selectedMilestoneFilter}
-            placeholder={t('milestones.allMilestones')}
-            onSelect={handleMilestoneSelect}
-          />
-        </div>
-        <Button
-          onclick={showAddForm}
-          variant="primary"
-          size="medium"
-          keyboardHint="A"
-        >
-          {t('testing.createTemplate')}
-        </Button>
-      </div>
+    {#snippet primaryAction()}
+      <Button
+        onclick={showAddForm}
+        variant="primary"
+        size="medium"
+        keyboardHint="A"
+      >
+        {t('testing.createTemplate')}
+      </Button>
     {/snippet}
-  </PageHeader>
+  </TestManagementHeader>
 
   <Modal
     bind:isOpen={showForm}
