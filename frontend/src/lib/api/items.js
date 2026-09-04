@@ -128,7 +128,9 @@ export const items = {
   getAll: (filters = {}, requestOptions = {}) => {
     return fetchAPIV2(`/items${itemListQuery(filters)}`, requestOptions);
   },
-  get: (id, requestOptions = {}) => fetchV2Data(`/items/${id}`, requestOptions),
+  /** @param {number|string} idOrKey */
+  get: (idOrKey, requestOptions = {}) =>
+    fetchV2Data(`/items/${encodeURIComponent(idOrKey)}`, requestOptions),
   getDetailSummary: fetchItemDetailSummary,
   getByKey: (workspaceKey, itemNumber, requestOptions = {}) =>
     fetchV2Data(

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"reflect"
 	"slices"
@@ -378,6 +379,30 @@ func errorResponse(description string) map[string]any {
 }
 
 func ensureErrors(responses map[string]any, route v2.Route) {
+	for _, status := range route.DocumentedErrors {
+		code := strconv.Itoa(status)
+		if _, exists := responses[code]; exists {
+			continue
+		}
+		switch status {
+		case http.StatusBadRequest:
+			responses[code] = responseRef("InvalidRequestError")
+		case http.StatusUnauthorized:
+			responses[code] = responseRef("AuthenticationError")
+		case http.StatusForbidden:
+			responses[code] = responseRef("PermissionError")
+		case http.StatusNotFound:
+			responses[code] = responseRef("NotFoundError")
+		case http.StatusConflict:
+			responses[code] = responseRef("ConflictError")
+		case http.StatusTooManyRequests:
+			responses[code] = responseRef("RateLimitError")
+		case http.StatusInternalServerError:
+			responses[code] = responseRef("InternalError")
+		default:
+			responses[code] = errorResponse(http.StatusText(status) + ".")
+		}
+	}
 	if route.Auth == v2.AuthAuthenticated {
 		responses["401"] = responseRef("AuthenticationError")
 		responses["403"] = responseRef("PermissionError")

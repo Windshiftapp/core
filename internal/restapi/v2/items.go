@@ -192,11 +192,20 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		return result, itemError(err)
 	})
 	builder.Read(collection+"/{item_id}", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.Item, error) {
-		user, id, err := itemTarget(r)
+		user, err := principal(r)
 		if err != nil {
 			return nil, err
 		}
-		result, err := app.Get(r.Context(), user.ID, id, true)
+		reference, err := parseItemReference(r.PathValue("item_id"))
+		if err != nil {
+			return nil, err
+		}
+		var result *models.Item
+		if reference.ID > 0 {
+			result, err = app.Get(r.Context(), user.ID, reference.ID, true)
+		} else {
+			result, err = app.GetByKey(r.Context(), user.ID, reference.WorkspaceKey, reference.ItemNumber)
+		}
 		return result, itemError(err)
 	})
 	builder.JSON(http.MethodPatch, collection+"/{item_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemPatchRequest) (*models.Item, error) {
@@ -545,6 +554,70 @@ func itemTarget(r *http.Request) (*models.User, int, error) {
 	}
 	id, err := pathID(r, "item_id")
 	return user, id, err
+}
+
+type itemLookupReference struct {
+	ID           int
+	WorkspaceKey string
+	ItemNumber   int
+}
+
+func parseItemReference(raw string) (itemLookupReference, error) {
+	if looksLikeInteger(raw) {
+		id, err := strconv.Atoi(raw)
+		if err != nil || id < 1 {
+			return itemLookupReference{}, invalidItemReference("item_id must be a positive integer")
+		}
+		return itemLookupReference{ID: id}, nil
+	}
+
+	workspaceKey, itemNumberText, found := strings.Cut(raw, "-")
+	itemNumber, err := strconv.Atoi(itemNumberText)
+	if !found || !validWorkspaceKeyReference(workspaceKey) || err != nil || itemNumber < 1 {
+		return itemLookupReference{}, invalidItemReference("item_id must be a positive integer or an item key in KEY-NUMBER format")
+	}
+	return itemLookupReference{WorkspaceKey: workspaceKey, ItemNumber: itemNumber}, nil
+}
+
+func looksLikeInteger(value string) bool {
+	if value == "" {
+		return false
+	}
+	start := 0
+	if value[0] == '+' || value[0] == '-' {
+		start = 1
+	}
+	if start == len(value) {
+		return false
+	}
+	for i := start; i < len(value); i++ {
+		if value[i] < '0' || value[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validWorkspaceKeyReference(value string) bool {
+	if len(value) < 2 || len(value) > 10 {
+		return false
+	}
+	for i := range len(value) {
+		char := value[i]
+		isDigit := char >= '0' && char <= '9'
+		isUpper := char >= 'A' && char <= 'Z'
+		isLower := char >= 'a' && char <= 'z'
+		if !isDigit && !isUpper && !isLower {
+			return false
+		}
+	}
+	return true
+}
+
+func invalidItemReference(message string) error {
+	err := newError(http.StatusBadRequest, "invalid_request", message)
+	err.Details = map[string]any{"field": "item_id"}
+	return err
 }
 
 func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRequest, error) {

@@ -880,6 +880,20 @@ func applyParameterCorrections(route *Route) {
 	}
 
 	switch route.Method + " " + route.Path {
+	case "GET /items/{item_id}":
+		if !slices.Contains(route.DocumentedErrors, http.StatusBadRequest) {
+			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusBadRequest)
+		}
+		upsertParameter(route, ParameterMetadata{
+			Name:        "item_id",
+			In:          "path",
+			Required:    true,
+			Description: "Positive integer item ID, or a KEY-NUMBER item key when no integer ID is available. Numeric values are always resolved as IDs.",
+			Schema: map[string]any{"oneOf": []any{
+				map[string]any{"type": "integer", "minimum": 1, "example": 123},
+				map[string]any{"type": "string", "pattern": "^[A-Za-z0-9]{2,10}-[1-9][0-9]*$", "example": "WI-1238"},
+			}},
+		})
 	case "GET /milestones", "GET /workspaces/{workspace_id}/milestones":
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts results to one milestone category."))
 		upsertParameter(route, stringQuery("status", "Restricts results to a milestone status."))
@@ -960,6 +974,8 @@ func applyParameterCorrections(route *Route) {
 	}
 
 	switch route.Method + " " + route.Path {
+	case "GET /items/{item_id}":
+		route.Description = "Returns one authorization-checked item. A positive integer path value is resolved as the immutable item ID; only a non-numeric KEY-NUMBER value falls back to case-insensitive workspace-key lookup. Malformed references return 400, while missing or inaccessible items return the same 404 contract."
 	case "POST /items/batch", "POST /assets/summaries", "POST /milestones/test-statistics", "POST /iterations/progress":
 		route.Description = "Returns a bounded projection for up to 500 IDs. IDs are deduplicated by first occurrence; visible matches preserve request order, and missing or unauthorized resources are omitted without revealing which case applied. Results reflect committed state at request time and are all-or-nothing on computation failure."
 	case "GET /links/batch":
