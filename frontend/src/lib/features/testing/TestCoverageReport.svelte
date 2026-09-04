@@ -5,15 +5,20 @@
   import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Card from '../../components/Card.svelte';
+  import StatCard from '../../components/StatCard.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import FormField from '../../components/FormField.svelte';
   import PieChartSegments from '../../components/PieChartSegments.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import SectionHeader from '../../layout/SectionHeader.svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import { buildCoveragePieSegments } from '../../utils/pieChart.js';
   import {
-    IconShieldCheck,
     IconShieldX,
     IconSettings,
-    IconRefresh,
     IconCircleCheck,
     IconCircleX,
     IconLink
@@ -264,35 +269,26 @@
 <div class="coverage-report">
   <!-- Header with controls -->
   {#if !hideHeader}
-  <div class="report-header">
+  <Card variant="flat" padding="spacious">
     {#if !hideTitle}
-      <div class="header-left">
-        <div class="flex items-center gap-2">
-          <IconShieldCheck class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-            Requirements Coverage
-          </h3>
-        </div>
-        <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          Track which requirements have linked test cases
-        </p>
-      </div>
+      <SectionHeader
+        title={t('testing.requirementsCoverage')}
+        subtitle={t('testing.requirementsCoverageSubtitle')}
+      />
     {/if}
-    <div class="header-controls">
+    <div class="flex flex-wrap items-end gap-3">
       <!-- Collection selector -->
-      <div class="control-group">
-        <label class="control-label" for="collection-select">Collection</label>
+      <FormField id="collection-select" label={t('collections.collection')} class="mb-0 min-w-48">
         <Select
           id="collection-select"
           options={[{ value: '', label: 'Default' }, ...collections.map(c => ({ value: c.id, label: c.name }))]}
           value={selectedCollectionId ?? ''}
           onchange={(v) => handleCollectionChange({ target: { value: v } })}
         />
-      </div>
+      </FormField>
 
       <!-- Filter -->
-      <div class="control-group">
-        <label class="control-label" for="filter-select">Filter</label>
+      <FormField id="filter-select" label={t('common.filter')} class="mb-0 min-w-48">
         <Select
           id="filter-select"
           options={[
@@ -303,7 +299,7 @@
           value={filterCovered}
           onchange={(v) => handleFilterChange({ target: { value: v } })}
         />
-      </div>
+      </FormField>
 
       <!-- Configure button -->
       <Button variant="default" onclick={openConfigModal}>
@@ -311,15 +307,12 @@
         Configure
       </Button>
     </div>
-  </div>
+  </Card>
   {/if}
 
   <!-- Content -->
   {#if loading}
-    <div class="loading-state">
-      <IconRefresh class="w-8 h-8 animate-spin" style="color: var(--ds-text-subtle);" />
-      <p style="color: var(--ds-text-subtle);">{t('testing.loadingCoverageData')}</p>
-    </div>
+    <StateDisplay type="loading" message={t('testing.loadingCoverageData')} size="lg" />
   {:else if !config || selectedTypeIds.length === 0}
     <EmptyState
       icon={IconShieldX}
@@ -342,39 +335,23 @@
   {:else}
     <div class="coverage-content">
       <!-- Summary row -->
-      <div class="summary-row">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[180px_1fr]">
         <!-- Pie chart -->
-        <div class="pie-section">
-          <svg viewBox="0 0 140 140" role="img" aria-label="Coverage breakdown">
-            <PieChartSegments segments={pieSegments} {radius} />
-            <text class="pie-percent" x="70" y="68">{Math.round(coverageRate)}%</text>
-            <text class="pie-label" x="70" y="84">{t('testing.covered').toLowerCase()}</text>
-          </svg>
-        </div>
+        <Card variant="outlined" padding="default" class="flex items-center justify-center">
+          <div class="pie-section">
+            <svg viewBox="0 0 140 140" role="img" aria-label="Coverage breakdown">
+              <PieChartSegments segments={pieSegments} {radius} />
+              <text class="pie-percent" x="70" y="68">{Math.round(coverageRate)}%</text>
+              <text class="pie-label" x="70" y="84">{t('testing.covered').toLowerCase()}</text>
+            </svg>
+          </div>
+        </Card>
 
         <!-- Stats cards -->
-        <div class="stats-cards">
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-dot total"></span>
-              <span class="stat-title">{t('testing.totalRequirements')}</span>
-            </div>
-            <div class="stat-value">{summaryData.total}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-dot covered"></span>
-              <span class="stat-title">{t('testing.covered')}</span>
-            </div>
-            <div class="stat-value">{summaryData.covered}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-dot not-covered"></span>
-              <span class="stat-title">{t('testing.notCovered')}</span>
-            </div>
-            <div class="stat-value">{summaryData.not_covered}</div>
-          </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard icon={IconLink} label={t('testing.totalRequirements')} value={summaryData.total} color="blue" />
+          <StatCard icon={IconCircleCheck} label={t('testing.covered')} value={summaryData.covered} color="green" />
+          <StatCard icon={IconCircleX} label={t('testing.notCovered')} value={summaryData.not_covered} color="orange" />
         </div>
       </div>
 
@@ -398,15 +375,19 @@
 </div>
 
 <!-- Configuration Modal -->
-<Modal isOpen={showConfigModal} onclose={closeConfigModal} maxWidth="max-w-xl">
+<Modal
+  isOpen={showConfigModal}
+  onclose={closeConfigModal}
+  onSubmit={saveConfig}
+  submitDisabled={configLoading}
+  maxWidth="max-w-xl"
+>
+  <ModalHeader
+    title={t('testing.configureRequirementTypes')}
+    subtitle={t('testing.selectItemTypesForCoverageAnalysis')}
+    onClose={closeConfigModal}
+  />
   <div class="p-6">
-    <h3 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">
-      {t('testing.configureRequirementTypes')}
-    </h3>
-    <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-      {t('testing.selectItemTypesForCoverageAnalysis')}
-    </p>
-
     <div class="type-selection">
       {#if itemTypes.length === 0}
         <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noItemTypesAvailable')}</p>
@@ -429,13 +410,16 @@
       {/if}
     </div>
 
-    <div class="modal-footer">
-      <Button variant="default" onclick={closeConfigModal}>{t('common.cancel')}</Button>
-      <Button variant="primary" onclick={saveConfig} disabled={configLoading}>
-        {configLoading ? t('common.saving') : t('testing.saveConfiguration')}
-      </Button>
-    </div>
   </div>
+  <DialogFooter
+    cancelLabel={t('common.cancel')}
+    confirmLabel={t('testing.saveConfiguration')}
+    loadingLabel={t('common.saving')}
+    onCancel={closeConfigModal}
+    onConfirm={saveConfig}
+    loading={configLoading}
+    showKeyboardHint={true}
+  />
 </Modal>
 
 <style>
@@ -445,54 +429,10 @@
     gap: 1.5rem;
   }
 
-  .report-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--ds-border);
-  }
-
-  .header-controls {
-    display: flex;
-    align-items: flex-end;
-    gap: 1rem;
-  }
-
-  .control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .control-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--ds-text-subtle);
-  }
-
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-    gap: 0.75rem;
-  }
-
   .coverage-content {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-  }
-
-  .summary-row {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 0 1.25rem;
   }
 
   .pie-section {
@@ -521,61 +461,8 @@
     dominant-baseline: central;
   }
 
-  .stats-cards {
-    display: flex;
-    gap: 1rem;
-    flex: 1;
-  }
-
-  .stat-card {
-    flex: 1;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    background-color: var(--ds-surface);
-    border: 1px solid var(--ds-border);
-  }
-
-  .stat-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .stat-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-  }
-
-  .stat-dot.total {
-    background-color: var(--ds-text-subtle);
-  }
-
-  .stat-dot.covered {
-    background-color: var(--ds-status-success-solid, #10b981);
-  }
-
-  .stat-dot.not-covered {
-    background-color: var(--ds-status-danger-solid, #ef4444);
-  }
-
-  .stat-title {
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--ds-text-subtle);
-  }
-
-  .stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--ds-text);
-  }
-
   .table-section {
-    padding: 0 1.25rem 1.25rem;
+    padding-bottom: 1.25rem;
   }
 
   /* Modal styles */
@@ -628,11 +515,4 @@
     color: var(--ds-accent);
   }
 
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--ds-border);
-  }
 </style>

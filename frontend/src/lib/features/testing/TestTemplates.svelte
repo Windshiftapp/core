@@ -12,7 +12,9 @@
   import Select from '../../components/Select.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Modal from '../../dialogs/Modal.svelte';
-  import Label from '../../components/Label.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import FormField from '../../components/FormField.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import TestManagementHeader from './TestManagementHeader.svelte';
@@ -209,7 +211,7 @@
 
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
     title={t('testing.testRunTemplates')}
     subtitle={t('testing.testRunTemplatesSubtitle')}
@@ -233,53 +235,41 @@
     maxWidth="max-w-2xl"
     onclose={() => showForm = false}
   >
-    <div class="p-6" style="background-color: var(--ds-surface-raised);">
-      <h3 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('testing.createTestRunTemplate')}</h3>
-      <form class="space-y-4" onsubmit={(e) => { e.preventDefault(); createTemplate(); }}>
-        <div>
-          <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
+    <form onsubmit={(e) => { e.preventDefault(); createTemplate(); }}>
+      <ModalHeader title={t('testing.createTestRunTemplate')} showCloseButton={false} />
+      <div class="p-6 pb-2">
+        <FormField id="set-select" label={t('testing.selectTestPlan')}>
           <Select id="set-select" bind:value={selectedSetId} options={[{ value: '', label: t('testing.selectTestPlanPlaceholder') }, ...filteredTestSets.map(set => ({ value: set.id, label: set.name }))]} />
-        </div>
-        <div>
-          <Label for="template-name" color="default" class="mb-2">{t('testing.templateName')}</Label>
+        </FormField>
+        <FormField id="template-name" label={t('testing.templateName')}>
           <Input
             id="template-name"
             bind:value={templateName}
             placeholder={t('testing.templateNamePlaceholder')}
           />
-        </div>
-        <div>
-          <Label for="template-description" color="default" class="mb-2">{t('testing.descriptionOptional')}</Label>
+        </FormField>
+        <FormField id="template-description" label={t('testing.descriptionOptional')}>
           <Textarea
             id="template-description"
             bind:value={templateDescription}
             placeholder={t('testing.templateDescriptionPlaceholder')}
             rows={3}
           />
-        </div>
-        <div class="flex justify-end gap-3 pt-2">
-          <Button
-            variant="outline"
-            type="button"
-            onclick={() => showForm = false}
-            keyboardHint="Esc"
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            keyboardHint="↵"
-          >
-            {t('testing.createTemplate')}
-          </Button>
-        </div>
-      </form>
-    </div>
+        </FormField>
+      </div>
+      <DialogFooter
+        cancelLabel={t('common.cancel')}
+        confirmLabel={t('testing.createTemplate')}
+        onCancel={() => showForm = false}
+        onConfirm={createTemplate}
+        disabled={!selectedSetId || !templateName.trim()}
+        showKeyboardHint={true}
+      />
+    </form>
   </Modal>
 
   <!-- Content wrapper -->
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+  <div class="flex-1">
     <DataTable
       columns={templateColumns}
       data={filteredTemplates}

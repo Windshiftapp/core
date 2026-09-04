@@ -361,13 +361,15 @@ func (r *TestCoverageRepository) ListRequirements(params RequirementListParams) 
 }
 
 // coverageLinkedCountSubquery counts item_links that connect an item to a test_case
-// in either direction via the "tests" link type (link_type_id = 1).
+// in either direction via the system Tests link type.
 const coverageLinkedCountSubquery = `
-	SELECT COUNT(*) FROM item_links il
-	WHERE (
-		(il.source_type = 'item' AND il.source_id = i.id AND il.target_type = 'test_case' AND il.link_type_id = 1)
+	SELECT COUNT(*)
+	FROM item_links il
+	JOIN link_types lt ON lt.id = il.link_type_id
+	WHERE lt.builtin_key = 'tests' AND (
+		(il.source_type = 'item' AND il.source_id = i.id AND il.target_type = 'test_case')
 		OR
-		(il.target_type = 'item' AND il.target_id = i.id AND il.source_type = 'test_case' AND il.link_type_id = 1)
+		(il.target_type = 'item' AND il.target_id = i.id AND il.source_type = 'test_case')
 	)
 `
 

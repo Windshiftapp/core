@@ -2,16 +2,22 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { IconCheck, IconX, IconBug, IconArrowLeft, IconChevronRight, IconChevronLeft, IconAlertTriangle, IconPlus, IconLink, IconPlayerSkipForward } from '@tabler/icons-svelte-runes';
+  import { IconCheck, IconX, IconBug, IconArrowLeft, IconChevronRight, IconChevronLeft, IconPlus, IconLink, IconPlayerSkipForward } from '@tabler/icons-svelte-runes';
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
-  import Spinner from '../../components/Spinner.svelte';
+  import Card from '../../components/Card.svelte';
+  import Panel from '../../components/Panel.svelte';
+  import Progress from '../../components/Progress.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
+  import AlertBox from '../../components/AlertBox.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import CreateModal from '../../dialogs/CreateModal.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle } from '../../utils/statusColors.js';
+  import { getStatusLabel, getStatusButtonStyle } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { loadTestRunDetail } from './testRunDetailData.js';
@@ -28,6 +34,16 @@
   let pendingLinkStepId = $state(null);
   let sidebarCollapsed = $state(false);
   let previewImage = $state(null);
+
+  function getStatusColor(status) {
+    return {
+      passed: 'green',
+      failed: 'red',
+      blocked: 'amber',
+      skipped: 'gray',
+      not_run: 'gray'
+    }[status] || 'gray';
+  }
 
   function handleRenderedContentClick(event) {
     if (event.target.tagName === 'IMG') {
@@ -338,7 +354,7 @@
     }
   }
 
-  // Status colors now handled by imported utility (getStatusBadgeCSS, getStatusLabel)
+  // Status labels and button styles are shared with the other test views.
 
   function getCaseProgress(testCase, currentStepResults = stepResults) {
     const steps = testCase.test_steps || [];
@@ -392,13 +408,11 @@
 </script>
 
 {#if loading}
-  <div class="flex items-center justify-center h-96">
-    <Spinner size="lg" />
-  </div>
+  <StateDisplay type="loading" message={t('common.loading')} size="lg" />
 {:else if testRun && currentCase}
   <div
     class="flex min-h-screen"
-    style="background-color: var(--ds-surface-raised);"
+    style="background-color: var(--ds-surface);"
     data-testid="test-execution"
     data-run-id={runId}
     data-current-case-id={currentCase?.id}
@@ -487,12 +501,7 @@
               <div class="text-xs mb-2" style="color: var(--ds-text-subtle);">
                 {t('testing.stepsProgress', { completed: progress.completed, total: progress.total, percent: progress.percent })}
               </div>
-              <div class="w-full rounded-full h-1" style="background-color: var(--ds-progress-track);">
-                <div
-                  class="h-1 rounded-full transition-all duration-300"
-                  style="width: {progress.percent}%; background-color: var(--ds-progress-fill);"
-                ></div>
-              </div>
+              <Progress value={progress.percent} size="sm" />
             </button>
           {/if}
         {/each}
@@ -535,9 +544,9 @@
               {currentCase.title}
             </h1>
             {#if currentCase.preconditions}
-              <div class="text-sm mt-2 px-3 py-2 rounded border-l-4" style="background-color: var(--ds-background-neutral); border-left-color: var(--ds-status-info-solid);">
-                <strong style="color: var(--ds-text);">{t('testing.preconditions')}</strong> <span style="color: var(--ds-text-subtle);">{currentCase.preconditions}</span>
-              </div>
+              <AlertBox variant="info" class="mt-3">
+                <strong>{t('testing.preconditions')}:</strong> {currentCase.preconditions}
+              </AlertBox>
             {/if}
           </div>
           <div class="text-sm" style="color: var(--ds-text-subtle);">
@@ -599,32 +608,32 @@
                 <h3 class="font-medium mb-2" style="color: var(--ds-status-info-text);">{t('testing.action')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
+                <Panel padding="default" rounded="md" class="test-step-rendered" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.action || ''} readonly={true} showToolbar={false} />
-                </div>
+                </Panel>
               </div>
 
               <div>
                 <h3 class="font-medium mb-2" style="color: var(--ds-accent-purple);">{t('testing.data')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
+                <Panel padding="default" rounded="md" class="test-step-rendered" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.data || t('testing.noDataSpecified')} readonly={true} showToolbar={false} />
-                </div>
+                </Panel>
               </div>
 
               <div>
                 <h3 class="font-medium mb-2" style="color: var(--ds-status-success-text);">{t('testing.expected')}</h3>
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
+                <Panel padding="default" rounded="md" class="test-step-rendered" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.expected || ''} readonly={true} showToolbar={false} />
-                </div>
+                </Panel>
               </div>
             </div>
 
             <!-- Result Recording -->
-            <div class="mb-6">
+            <Card variant="raised" padding="spacious" shadow class="mb-6">
               <h3 class="font-medium mb-4" style="color: var(--ds-text);">{t('testing.recordResult')}</h3>
               
               <!-- Status Buttons -->
@@ -736,30 +745,34 @@
 
               <!-- Link Issue (shown when failed) -->
               {#if stepResults[currentStep.id]?.status === 'failed'}
-                <div class="mb-4 p-4 rounded" style="background-color: var(--ds-status-danger-bg); border: 1px solid var(--ds-status-danger-border);">
+                <AlertBox variant="error" class="mb-4">
+                  <div class="w-full">
                   <div class="flex items-center gap-2 mb-3">
-                    <IconAlertTriangle class="w-4 h-4" style="color: var(--ds-status-danger-text);" />
                     <h4 class="font-medium" style="color: var(--ds-status-danger-text);">{t('testing.linkIssue')}</h4>
                   </div>
 
                   {#if stepResults[currentStep.id]?.item_id}
                     {@const linkedItem = workspaceItems.find(i => i.id === stepResults[currentStep.id]?.item_id)}
-                    <div class="p-3 rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+                    <Panel padding="compact" rounded="md">
                       <div class="flex items-center justify-between">
                         <div>
-                          <div class="font-medium text-sm" style="color: var(--ds-text);">{linkedItem?.name || linkedItem?.title || t('testing.unknownItem')}</div>
+                          <a
+                            href={`/workspaces/${workspaceId}/items/${stepResults[currentStep.id].item_id}`}
+                            data-testid="test-execution-linked-item"
+                            class="font-medium text-sm hover:underline"
+                            style="color: var(--ds-text-link);"
+                          >
+                            {linkedItem?.name || linkedItem?.title || t('testing.unknownItem')}
+                          </a>
                           {#if linkedItem?.workspace_item_number}
                             <DescriptionText as="div">
                               #{linkedItem.workspace_item_number}
                             </DescriptionText>
                           {/if}
                         </div>
-                        <span class="px-2 py-1 text-xs rounded flex items-center gap-1" style="background-color: var(--ds-status-success-bg); color: var(--ds-status-success-text);">
-                          <IconLink class="w-3 h-3" />
-                          {t('testing.linked')}
-                        </span>
+                        <Lozenge color="green" icon={IconLink} text={t('testing.linked')} />
                       </div>
-                    </div>
+                    </Panel>
                   {:else}
                     <div class="space-y-3">
                       <div class="text-sm" style="color: var(--ds-status-danger-text);">{t('testing.stepFailedNoIssue')}</div>
@@ -770,6 +783,8 @@
                         <ItemPicker
                           items={workspaceItems}
                           placeholder={t('testing.searchItemsToLink')}
+                          searchTestid="test-execution-item-search"
+                          optionTestid={(option) => `test-execution-item-${option.value}`}
                           config={{
                             primary: { text: (item) => item.name || item.title || '' },
                             secondary: { text: (item) => item.workspace_item_number ? `#${item.workspace_item_number}` : '' },
@@ -791,13 +806,17 @@
                       </Button>
                     </div>
                   {/if}
-                </div>
+                  </div>
+                </AlertBox>
               {/if}
 
               <!-- Quick Navigation -->
               <div class="flex justify-between items-center pt-4 border-t" style="border-color: var(--ds-border);">
-                <span data-testid="test-execution-current-status" class="text-sm px-2 py-1 rounded" style={getStatusBadgeCSS(stepResults[currentStep.id]?.status || 'not_run')}>
-                  {t('common.status')}: {getStatusLabel(stepResults[currentStep.id]?.status || 'not_run')}
+                <span data-testid="test-execution-current-status">
+                  <Lozenge
+                    color={getStatusColor(stepResults[currentStep.id]?.status || 'not_run')}
+                    text={`${t('common.status')}: ${getStatusLabel(stepResults[currentStep.id]?.status || 'not_run')}`}
+                  />
                 </span>
                 
                 {#if currentCaseIndex < testCases.length - 1 || (currentCase.test_steps?.length && currentStepIndex < currentCase.test_steps.length - 1)}
@@ -823,18 +842,14 @@
                   </Button>
                 {/if}
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       {:else if currentCase}
         <!-- No steps content -->
         <div class="flex-1 p-6 overflow-y-auto flex items-center justify-center">
-          <div class="max-w-md text-center">
-            <div class="text-6xl mb-4">📝</div>
-            <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noTestSteps')}</h3>
-            <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-              {t('testing.noTestStepsDescription')}
-            </p>
+          <div class="max-w-md w-full">
+            <EmptyState icon={IconPlayerSkipForward} title={t('testing.noTestSteps')} description={t('testing.noTestStepsDescription')} />
               
             <!-- Navigation for cases without steps -->
             <div class="flex justify-center items-center gap-4 pt-4 border-t" style="border-color: var(--ds-border);">
@@ -879,17 +894,13 @@
     </div>
   </div>
 {:else}
-  <div class="text-center py-12">
-    <div style="color: var(--ds-text-subtle);">{t('testing.testRunNotFound')}</div>
-    <Button
-      onclick={goBack}
-      variant="primary"
-      size="medium"
-      class="mt-4"
-    >
-      {t('testing.backToTestRuns')}
-    </Button>
-  </div>
+  <StateDisplay type="empty" title={t('testing.testRunNotFound')}>
+    {#snippet action()}
+      <Button onclick={goBack} variant="primary" size="medium">
+        {t('testing.backToTestRuns')}
+      </Button>
+    {/snippet}
+  </StateDisplay>
 {/if}
 
 <!-- Create Item Modal -->

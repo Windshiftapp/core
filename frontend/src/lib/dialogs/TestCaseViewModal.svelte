@@ -13,6 +13,13 @@
   } from '@lucide/svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
+  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+  import StateDisplay from '../components/StateDisplay.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
+  import Lozenge from '../components/Lozenge.svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
   import { api } from '../api.js';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../utils/authenticatedDateFormatter.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -22,6 +29,7 @@
     testCaseId = null,
     workspaceId = null,
     embedded = false,
+    backLabel = null,
     onclose = null
   } = $props();
 
@@ -92,24 +100,14 @@
     onclose?.();
   }
 
-  function getStatusPillStyle(status) {
-    if (!status) {
-      return 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);';
-    }
+  function getStatusColor(status) {
+    if (!status) return 'gray';
     const normalized = status.toLowerCase();
-    if (normalized === 'passed') {
-      return 'background-color: var(--ds-background-success); color: var(--ds-text-success);';
-    }
-    if (normalized === 'failed') {
-      return 'background-color: var(--ds-background-danger); color: var(--ds-text-danger);';
-    }
-    if (normalized === 'blocked') {
-      return 'background-color: var(--ds-background-warning); color: var(--ds-text-warning);';
-    }
-    if (normalized === 'in_progress') {
-      return 'background-color: var(--ds-background-information); color: var(--ds-text-information);';
-    }
-    return 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);';
+    if (normalized === 'passed') return 'green';
+    if (normalized === 'failed') return 'red';
+    if (normalized === 'blocked') return 'amber';
+    if (normalized === 'in_progress') return 'blue';
+    return 'gray';
   }
 
   function getStatusIcon(status) {
@@ -153,24 +151,19 @@
     return `${minutes}m`;
   }
 
-  // Test case status style helper
-  function getTestCaseStatusStyle(status) {
-    if (status === 'inactive') {
-      return 'background-color: var(--ds-background-neutral); color: var(--ds-text-disabled);';
-    }
-    if (status === 'draft') {
-      return 'background-color: var(--ds-background-warning-bold); color: white;';
-    }
-    return 'background-color: var(--ds-background-success); color: var(--ds-text-success);';
+  function getTestCaseStatusColor(status) {
+    if (status === 'inactive') return 'gray';
+    if (status === 'draft') return 'amber';
+    return 'green';
   }
 </script>
 
 {#if embedded}
-  <div class="w-full bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-full flex flex-col overflow-hidden">
+  <Card variant="raised" padding="none" rounded="xl" shadow class="w-full max-h-full flex flex-col overflow-hidden">
     <div class="flex-1 overflow-y-auto">
       {@render previewContent()}
     </div>
-  </div>
+  </Card>
 {:else}
   <Modal
     bind:isOpen
@@ -184,72 +177,33 @@
 
 {#snippet previewContent()}
   <div class="p-6 space-y-6">
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">{t('testCase.preview')}</p>
-        <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">
-          {testCase ? testCase.title : t('common.loading')}
-        </h2>
-        {#if testCase?.folder_name}
-          <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-            {t('testCase.folder')}: {testCase.folder_name}
-          </p>
+    <PageHeader
+      title={testCase ? testCase.title : t('common.loading')}
+      subtitle={testCase?.folder_name ? `${t('testCase.folder')}: ${testCase.folder_name}` : t('testCase.preview')}
+      marginClass="mb-0"
+    >
+      {#snippet actions()}
+        {#if embedded}
+          <Button variant="ghost" icon={ArrowLeft} onclick={handleClose} dataTestid="test-case-detail-back">
+            {backLabel || t('testCase.backToItem')}
+          </Button>
         {/if}
-        <!-- Metadata badges -->
-        {#if testCase}
-          <div class="flex items-center gap-2 mt-3">
-            <!-- Priority badge -->
-            <span
-              class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-white capitalize"
-              style="background-color: {getPriorityColor(testCase.priority || 'medium')};"
-            >
-              {testCase.priority || 'medium'} {t('testCase.priority')}
-            </span>
-            <!-- Status badge -->
-            <span
-              class="inline-flex items-center px-2 py-1 text-xs font-medium rounded capitalize"
-              style={getTestCaseStatusStyle(testCase.status || 'active')}
-            >
-              {testCase.status || 'active'}
-            </span>
-            <!-- Duration badge -->
-            {#if formatDuration(testCase.estimated_duration)}
-              <span
-                class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded"
-                style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
-              >
-                <Clock class="w-3 h-3" />
-                {formatDuration(testCase.estimated_duration)}
-              </span>
-            {/if}
-          </div>
+      {/snippet}
+    </PageHeader>
+    {#if testCase}
+      <div class="flex flex-wrap items-center gap-2">
+        <Lozenge customBg={getPriorityColor(testCase.priority || 'medium')} text={`${testCase.priority || 'medium'} ${t('testCase.priority')}`} />
+        <Lozenge color={getTestCaseStatusColor(testCase.status || 'active')} text={testCase.status || 'active'} />
+        {#if formatDuration(testCase.estimated_duration)}
+          <Lozenge color="gray" icon={Clock} text={formatDuration(testCase.estimated_duration)} />
         {/if}
       </div>
-      {#if embedded}
-        <button
-          class="inline-flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover-bg transition"
-          onclick={handleClose}
-        >
-          <ArrowLeft class="w-4 h-4" />
-          {t('testCase.backToItem')}
-        </button>
-      {/if}
-    </div>
+    {/if}
 
     {#if loading}
-      <div class="flex items-center justify-center py-10">
-        <div
-          class="h-12 w-12 animate-spin rounded-full border-2 border-t-transparent"
-          style="border-color: var(--ds-interactive); border-top-color: transparent;"
-        ></div>
-      </div>
+      <StateDisplay type="loading" message={t('common.loading')} />
     {:else if error}
-      <div
-        class="rounded border p-4"
-        style="border-color: var(--ds-border-danger); background-color: var(--ds-background-danger); color: var(--ds-text-danger);"
-      >
-        {error}
-      </div>
+      <StateDisplay type="error" title={t('common.error')} message={error} />
     {:else if testCase}
       <div class="space-y-6">
         <!-- Action Buttons -->
@@ -275,52 +229,23 @@
         </div>
 
         {#if testCase.preconditions}
-          <div
-            class="rounded-2xl border shadow-sm p-5"
-            style="border-color: var(--ds-border); background-color: var(--ds-background-neutral); color: var(--ds-text);"
-          >
-            <p
-              class="text-xs font-semibold uppercase tracking-widest mb-2"
-              style="color: var(--ds-interactive);"
-            >
-              {t('testCase.preconditions')}
-            </p>
-            <p class="text-sm" style="color: var(--ds-text);">
-              {testCase.preconditions}
-            </p>
-          </div>
+          <AlertBox variant="info">
+            <strong>{t('testCase.preconditions')}:</strong> {testCase.preconditions}
+          </AlertBox>
         {/if}
 
         <!-- Test Steps Section -->
-        <div
-          class="rounded-2xl border shadow-sm overflow-hidden"
-          style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
-        >
-          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
+        <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">
+          {#snippet header()}
             <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
               <ListOrdered class="w-5 h-5" style="color: var(--ds-interactive);" />
               {t('testCase.testSteps')} ({testSteps.length})
             </h2>
-          </div>
+          {/snippet}
           <div class="p-6">
             {#if testSteps.length === 0}
-              <div
-                class="rounded-xl border border-dashed text-center space-y-4 p-8"
-                style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);"
-              >
-                <div
-                  class="w-16 h-16 mx-auto flex items-center justify-center rounded-full"
-                  style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-interactive);"
-                >
-                  <ClipboardList class="w-7 h-7" />
-                </div>
-                <div>
-                  <div class="text-lg font-medium mb-1" style="color: var(--ds-text);">
-                    {t('testCase.noStepsDefined')}
-                  </div>
-                  <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                    {t('testCase.noStepsHelp')}
-                  </div>
+              <EmptyState icon={ClipboardList} title={t('testCase.noStepsDefined')} description={t('testCase.noStepsHelp')}>
+                {#snippet action()}
                   <Button
                     variant="primary"
                     icon={Edit}
@@ -330,15 +255,12 @@
                   >
                     {t('testCase.addSteps')}
                   </Button>
-                </div>
-              </div>
+                {/snippet}
+              </EmptyState>
             {:else}
               <div class="space-y-4">
                 {#each testSteps as step}
-                  <div
-                    class="rounded-xl border shadow-sm p-4"
-                    style="border-color: var(--ds-border); background-color: var(--ds-surface);"
-                  >
+                  <Panel padding="default" rounded="lg" style="background-color: var(--ds-surface);">
                     <div class="flex items-start gap-4">
                       <div
                         class="flex-shrink-0 w-10 h-10 rounded-full text-white font-semibold text-base flex items-center justify-center"
@@ -383,66 +305,48 @@
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Panel>
                 {/each}
               </div>
             {/if}
           </div>
-        </div>
+        </Card>
 
         <!-- Recent Executions Section -->
-        <div
-          class="rounded-2xl border shadow-sm overflow-hidden"
-          style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
-        >
-          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
+        <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">
+          {#snippet header()}
             <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
               <Play class="w-5 h-5" style="color: var(--ds-icon-accent-green);" />
               {t('testCase.recentExecutions')} ({executions.length})
             </h2>
-          </div>
+          {/snippet}
           <div class="p-6">
             {#if executions.length === 0}
-              <div
-                class="rounded-xl border border-dashed text-center space-y-3 p-6"
-                style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);"
-              >
-                <div
-                  class="w-14 h-14 mx-auto flex items-center justify-center rounded-full"
-                  style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-text-information);"
-                >
-                  <History class="w-6 h-6" />
-                </div>
-                <div class="text-sm" style="color: var(--ds-text-subtle);">
-                  {t('testCase.noExecutions')}
-                </div>
-              </div>
+              <EmptyState icon={History} title={t('testCase.noExecutions')} />
             {:else}
               <div class="space-y-3">
                 {#each executions as execution}
                   {@const StatusIcon = getStatusIcon(execution.status)}
-                  <a
+                  <Panel
                     href={`${workspaceTestsBasePath}/runs/${execution.run_id}`}
-                    class="flex items-start gap-3 rounded-xl border p-4 transition hover:shadow-sm"
                     style="border-color: var(--ds-border); background-color: var(--ds-surface);"
+                    padding="default"
+                    rounded="lg"
+                    interactive
                   >
-                    <div class="flex-shrink-0 mt-0.5">
+                    <div class="flex items-start gap-3">
+                      <div class="flex-shrink-0 mt-0.5">
                       <StatusIcon
                         class="w-5 h-5"
                         style={`color: ${getStatusIconColor(execution.status)};`}
                       />
-                    </div>
-                    <div class="flex-1 min-w-0">
+                      </div>
+                      <div class="flex-1 min-w-0">
                       <div class="flex items-center justify-between gap-3 mb-1">
                         <div class="font-semibold text-sm truncate" style="color: var(--ds-text);">
                           {execution.run_name}
                         </div>
-                        <span
-                          class="text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap"
-                          style={getStatusPillStyle(execution.status)}
-                        >
-                          {execution.status || 'not_run'}
-                        </span>
+                        <Lozenge color={getStatusColor(execution.status)} text={execution.status || 'not_run'} />
                       </div>
                       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style="color: var(--ds-text-subtle);">
                         <span class="flex items-center gap-1">
@@ -456,13 +360,14 @@
                           <span>• {t('testCase.template')}: {execution.template_name}</span>
                         {/if}
                       </div>
+                      </div>
                     </div>
-                  </a>
+                  </Panel>
                 {/each}
               </div>
             {/if}
           </div>
-        </div>
+        </Card>
       </div>
     {/if}
   </div>

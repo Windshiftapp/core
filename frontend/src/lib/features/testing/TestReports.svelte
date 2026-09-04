@@ -8,12 +8,15 @@
   import TabNav from '../../components/TabNav.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Card from '../../components/Card.svelte';
+  import StatCard from '../../components/StatCard.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import FormField from '../../components/FormField.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import Chart from '../../widgets/Chart.svelte';
   import { IconChartBar, IconRefresh, IconCircleCheck, IconCircleX, IconAlertTriangle, IconPlayerSkipForward, IconClock, IconTrendingUp, IconSettings } from '@tabler/icons-svelte-runes';
   import TestCoverageReport from './TestCoverageReport.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
 
   let { workspaceId = null } = $props();
@@ -167,7 +170,7 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col" style="background-color: var(--ds-surface-raised);" data-testid="test-reports">
+<div class="min-h-screen flex flex-col" style="background-color: var(--ds-surface);" data-testid="test-reports">
   <!-- Tab Navigation - Always at top -->
   <div class="px-6">
     <TabNav {tabs} {basePath} defaultTab="test-runs" />
@@ -203,12 +206,9 @@
       </PageHeader>
 
       <!-- Content wrapper -->
-      <div class="flex-1 -mx-6 -mb-6 px-10 py-6 space-y-6">
+      <div class="flex-1 space-y-6">
         {#if loading}
-          <div class="text-center py-16">
-            <IconRefresh class="w-8 h-8 mx-auto mb-4 animate-spin" style="color: var(--ds-text-subtle);" />
-            <p style="color: var(--ds-text-subtle);">{t('testing.loadingReportData')}</p>
-          </div>
+          <StateDisplay type="loading" message={t('testing.loadingReportData')} size="lg" />
         {:else if !reportData || reportData.overall?.total_runs === 0}
           <EmptyState
             icon={IconChartBar}
@@ -216,86 +216,25 @@
             description={t('testing.completeTestRunsToSeeReports')}
           />
         {:else}
-    <!-- Stats Cards -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      <!-- Total Tests -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconClock class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.totalTests')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-total">
-          {reportData.overall.total_tests}
-        </div>
-        <DescriptionText as="div">
-          {t('testing.runsCount', { count: reportData.overall.total_runs })}
-        </DescriptionText>
-      </div>
-
-      <!-- Passed -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconCircleCheck class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.passed')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-passed">
-          {reportData.overall.passed}
-        </div>
-      </div>
-
-      <!-- Failed -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconCircleX class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.failed')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-failed">
-          {reportData.overall.failed}
-        </div>
-      </div>
-
-      <!-- Blocked -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconAlertTriangle class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.blocked')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-blocked">
-          {reportData.overall.blocked}
-        </div>
-      </div>
-
-      <!-- Skipped -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconPlayerSkipForward class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.skipped')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-skipped">
-          {reportData.overall.skipped}
-        </div>
-      </div>
-
-      <!-- Pass Rate -->
-      <div class="p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <IconTrendingUp class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.passRate')}</span>
-        </div>
-        <div class="text-2xl font-bold" style="color: var(--ds-text);" data-testid="test-report-pass-rate">
-          {reportData.overall.pass_rate.toFixed(1)}%
-        </div>
-      </div>
+      <StatCard icon={IconClock} label={t('testing.totalTests')} value={reportData.overall.total_tests} color="blue" dataTestid="test-report-total" />
+      <StatCard icon={IconCircleCheck} label={t('testing.passed')} value={reportData.overall.passed} color="green" dataTestid="test-report-passed" />
+      <StatCard icon={IconCircleX} label={t('testing.failed')} value={reportData.overall.failed} color="orange" dataTestid="test-report-failed" />
+      <StatCard icon={IconAlertTriangle} label={t('testing.blocked')} value={reportData.overall.blocked} color="orange" dataTestid="test-report-blocked" />
+      <StatCard icon={IconPlayerSkipForward} label={t('testing.skipped')} value={reportData.overall.skipped} color="purple" dataTestid="test-report-skipped" />
+      <StatCard icon={IconTrendingUp} label={t('testing.passRate')} value={`${reportData.overall.pass_rate.toFixed(1)}%`} color="green" dataTestid="test-report-pass-rate" />
     </div>
 
     <!-- Pass Rate Trend Chart -->
-    <div>
-      <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
+    <Card padding="none" shadow>
+      {#snippet header()}
+      <div class="flex items-center gap-2">
         <IconTrendingUp class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
+        <h3 class="font-semibold" style="color: var(--ds-text);">
           {t('testing.passRateTrend', { days })}
         </h3>
       </div>
+      {/snippet}
       <div class="p-5">
         {#if chartData.length > 0}
           <Chart
@@ -317,13 +256,14 @@
           </div>
         {/if}
       </div>
-    </div>
+    </Card>
 
     <!-- Recent Failures and Blocked Tables - Side by Side -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Recent Failures Table -->
-      <div>
-        <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
+      <Card padding="none" shadow>
+        {#snippet header()}
+        <div class="flex items-center gap-2">
           <IconCircleX class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <div>
             <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('testing.recentFailures')}</h3>
@@ -332,15 +272,17 @@
             </p>
           </div>
         </div>
+        {/snippet}
         {#if failureRows.length > 0}
           <DataTable
             columns={failuresColumns}
             data={failureRows}
             keyField="row_key"
+            class="border-0 rounded-none"
             emptyMessage={t('testing.noFailuresToShow')}
           >
             {#snippet test_case_link(item)}
-              <a href="{workspaceTestBase}/cases/{item.test_case_id}" data-testid={`test-report-failure-case-${item.test_case_id}`} style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
+              <a href="{workspaceTestBase}/cases/{item.test_case_id}?from=reports" data-testid={`test-report-failure-case-${item.test_case_id}`} style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
             {/snippet}
             {#snippet run_link(item)}
               <a href="{workspaceTestBase}/runs/{item.run_id}?from=reports" data-testid={`test-report-failure-run-${item.run_id}`} style="color: var(--ds-text-link);" class="hover:underline">{item.run_name}</a>
@@ -353,11 +295,12 @@
             description={t('testing.allTestsPassing')}
           />
         {/if}
-      </div>
+      </Card>
 
       <!-- Blocked Tests Table -->
-      <div>
-        <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
+      <Card padding="none" shadow>
+        {#snippet header()}
+        <div class="flex items-center gap-2">
           <IconAlertTriangle class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <div>
             <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('testing.blockedTests')}</h3>
@@ -366,15 +309,17 @@
             </p>
           </div>
         </div>
+        {/snippet}
         {#if blockedRows.length > 0}
           <DataTable
             columns={blockedColumns}
             data={blockedRows}
             keyField="row_key"
+            class="border-0 rounded-none"
             emptyMessage={t('testing.noBlockedTests')}
           >
             {#snippet test_case_link(item)}
-              <a href="{workspaceTestBase}/cases/{item.test_case_id}" style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
+              <a href="{workspaceTestBase}/cases/{item.test_case_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">{item.test_case_title}</a>
             {/snippet}
             {#snippet run_link(item)}
               <a href="{workspaceTestBase}/runs/{item.run_id}?from=reports" style="color: var(--ds-text-link);" class="hover:underline">{item.run_name}</a>
@@ -387,7 +332,7 @@
             description={t('testing.allTestsUnblocked')}
           />
         {/if}
-      </div>
+      </Card>
     </div>
         {/if}
       </div>
@@ -403,19 +348,17 @@
         {#snippet actions()}
           <div class="flex items-center gap-3">
             <!-- Collection selector -->
-            <div class="flex flex-col gap-1">
-              <label for="coverage-collection-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('collections.collection')}</label>
+            <FormField id="coverage-collection-select" label={t('collections.collection')} class="mb-0 min-w-48">
               <Select
                 id="coverage-collection-select"
                 options={[{ value: '', label: t('common.default') }, ...coverageCollections.map(c => ({ value: c.id, label: c.name }))]}
                 value={coverageSelectedCollectionId ?? ''}
                 onchange={(v) => handleCoverageCollectionChange({ target: { value: v } })}
               />
-            </div>
+            </FormField>
 
             <!-- Filter -->
-            <div class="flex flex-col gap-1">
-              <label for="coverage-filter-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('common.filter')}</label>
+            <FormField id="coverage-filter-select" label={t('common.filter')} class="mb-0 min-w-48">
               <Select
                 id="coverage-filter-select"
                 options={[
@@ -426,7 +369,7 @@
                 value={coverageFilterCovered}
                 onchange={(v) => handleCoverageFilterChange({ target: { value: v } })}
               />
-            </div>
+            </FormField>
 
             <!-- Configure button -->
             <div class="flex flex-col gap-1">
@@ -441,7 +384,7 @@
       </PageHeader>
 
       <!-- Content wrapper -->
-      <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+      <div class="flex-1">
         <TestCoverageReport
           {workspaceId}
           hideHeader={true}

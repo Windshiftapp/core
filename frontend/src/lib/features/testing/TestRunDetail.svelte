@@ -5,9 +5,15 @@
   import { IconArrowLeft, IconPlayerPlay, IconAlertTriangle, IconFileText, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import { confirm } from '../../composables/useConfirm.js';
-  import Spinner from '../../components/Spinner.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
+  import Card from '../../components/Card.svelte';
+  import Panel from '../../components/Panel.svelte';
+  import Progress from '../../components/Progress.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
+  import SectionHeader from '../../layout/SectionHeader.svelte';
+  import { getStatusLabel } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import { loadTestRunDetail } from './testRunDetailData.js';
@@ -121,14 +127,14 @@
 
   // Status colors now handled by imported utility (getStatusBadgeCSS, getStatusLabel)
 
-  function getStatusIcon(status) {
-    switch (status) {
-      case 'passed': return '✓';
-      case 'failed': return '✗';
-      case 'blocked': return '⚠';
-      case 'skipped': return '⊘';
-      default: return '○';
-    }
+  function getStatusColor(status) {
+    return {
+      passed: 'green',
+      failed: 'red',
+      blocked: 'amber',
+      skipped: 'gray',
+      not_run: 'gray'
+    }[status] || 'gray';
   }
 
   function getStepStatusStyle(status) {
@@ -203,39 +209,28 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);" data-testid="test-run-detail">
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);" data-testid="test-run-detail">
+  <div class="flex-1">
     {#if loading}
-      <div class="flex items-center justify-center py-12">
-        <Spinner />
-      </div>
+      <StateDisplay type="loading" message={t('common.loading')} size="lg" />
     {:else if testRun}
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <button
-            onclick={goBack}
-            class="p-2 rounded cursor-pointer"
-            style="color: var(--ds-icon);"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-          >
-            <IconArrowLeft class="w-5 h-5" />
-          </button>
-          <div>
-            <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
-              {testRun.name}
-            </h1>
-            <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              {t('testing.started')}: {formatAuthenticatedDateTime(testRun.started_at)}
-              {#if testRun.ended_at}
-                • {t('testing.ended')}: {formatAuthenticatedDateTime(testRun.ended_at)}
-              {/if}
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
+      <Button
+        onclick={goBack}
+        dataTestid="test-run-detail-back"
+        variant="ghost"
+        size="small"
+        icon={IconArrowLeft}
+        class="mb-4"
+      >
+        {fromPage === 'reports' ? t('testing.testRunReport') : t('testing.testRuns')}
+      </Button>
+      <PageHeader
+        title={testRun.name}
+        subtitle={`${t('testing.started')}: ${formatAuthenticatedDateTime(testRun.started_at)}${testRun.ended_at ? ` • ${t('testing.ended')}: ${formatAuthenticatedDateTime(testRun.ended_at)}` : ''}`}
+      >
+        {#snippet actions()}
+        <div class="flex flex-wrap items-center gap-3">
           {#if testRun.ended_at}
             <Button
               onclick={executeRun}
@@ -275,46 +270,44 @@
             {t('common.delete')}
           </Button>
         </div>
-      </div>
+        {/snippet}
+      </PageHeader>
 
       <!-- Test Run Details -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Overview -->
         <div class="lg:col-span-2">
           <div>
-            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('testing.testResults')}</h2>
+            <SectionHeader title={t('testing.testResults')} />
             
             {#if testResults.length > 0}
               <!-- Test Results Display -->
               <div class="space-y-4">
                 {#each testResults as result}
-                  <div data-testid={`test-run-result-${result.test_case_id}`} class="border rounded p-4" style="border-color: var(--ds-border);">
+                  <Card variant="outlined" padding="default" dataTestid={`test-run-result-${result.test_case_id}`}>
                     <div class="flex items-center justify-between mb-3">
                       <h3 class="font-medium" style="color: var(--ds-text);">
                         {result.test_case_title}
                       </h3>
-                      <span class="px-3 py-1 text-sm rounded-full" style={getStatusBadgeCSS(result.status)}>
-                        {getStatusIcon(result.status)}
-                        {getStatusLabel(result.status)}
-                      </span>
+                      <Lozenge color={getStatusColor(result.status)} text={getStatusLabel(result.status)} size="md" />
                     </div>
 
 
                     {#if result.actual_result}
                       <div class="mb-3">
                         <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('testing.actualResult')}</h4>
-                        <p class="text-sm p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                        <Panel padding="compact" rounded="md" class="text-sm" style="color: var(--ds-text-subtle);">
                           {result.actual_result}
-                        </p>
+                        </Panel>
                       </div>
                     {/if}
 
                     {#if result.notes}
                       <div class="mb-3">
                         <h4 class="text-sm font-medium mb-1" style="color: var(--ds-text);">{t('common.notes')}</h4>
-                        <p class="text-sm p-2 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                        <Panel padding="compact" rounded="md" class="text-sm" style="color: var(--ds-text-subtle);">
                           {result.notes}
-                        </p>
+                        </Panel>
                       </div>
                     {/if}
                     
@@ -326,12 +319,20 @@
                           <div class="space-y-3">
                             {#each result.test_steps as step, index}
                               {@const stepResult = result.stepResults[step.id]}
-                              <div data-testid={`test-run-step-result-${step.id}`} class="border rounded p-3" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
+                              <Panel padding="compact" rounded="md" style="background-color: var(--ds-surface);">
+                                <div data-testid={`test-run-step-result-${step.id}`}>
                                 <div class="flex items-center gap-2 text-sm mb-2">
                                   <span class="w-2 h-2 rounded-full" style="background-color: {getStepStatusStyle(stepResult?.status || 'not_run')};"></span>
                                   <span class="font-medium" style="color: var(--ds-text);">{t('testing.stepNumber', { number: index + 1 })}: {getStatusLabel(stepResult?.status || 'not_run')}</span>
-                                  {#if stepResult?.defect_id}
-                                    <IconAlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning-text);" />
+                                  {#if stepResult?.item_id}
+                                    <a
+                                      href={`/workspaces/${workspaceId}/items/${stepResult.item_id}`}
+                                      data-testid={`test-run-step-item-${step.id}`}
+                                      aria-label={t('testing.linked')}
+                                      title={t('testing.linked')}
+                                    >
+                                      <IconAlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning-text);" />
+                                    </a>
                                   {/if}
                                 </div>
 
@@ -360,7 +361,8 @@
                                     </div>
                                   </div>
                                 {/if}
-                              </div>
+                                </div>
+                              </Panel>
                             {/each}
                           </div>
                         </div>
@@ -386,26 +388,22 @@
                         {t('testing.executed')}: {formatAuthenticatedDateTime(result.executed_at)}
                       </div>
                     {/if}
-                  </div>
+                  </Card>
                 {/each}
               </div>
             {:else}
-              <div class="text-center py-8">
-                <div class="text-6xl mb-4">🧪</div>
-                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noResultsYet')}</div>
-                <div class="text-sm" style="color: var(--ds-text-subtle);">
-                  {t('testing.executeToSeeResults')}
-                </div>
-                <Button
-                  variant="primary"
-                  onclick={() => navigate(testPath(`/runs/${runId}/execute`))}
-                  icon={IconPlayerPlay}
-                  size="medium"
-                  class="mt-4"
-                >
-                  {t('testing.startExecution')}
-                </Button>
-              </div>
+              <EmptyState icon={IconPlayerPlay} title={t('testing.noResultsYet')} description={t('testing.executeToSeeResults')}>
+                {#snippet action()}
+                  <Button
+                    variant="primary"
+                    onclick={() => navigate(testPath(`/runs/${runId}/execute`))}
+                    icon={IconPlayerPlay}
+                    size="medium"
+                  >
+                    {t('testing.startExecution')}
+                  </Button>
+                {/snippet}
+              </EmptyState>
             {/if}
           </div>
         </div>
@@ -414,8 +412,8 @@
         <div class="space-y-6">
           <!-- Summary Stats -->
           {#if testResults.length > 0}
-            <div>
-              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.resultsSummary')}</h3>
+            <Card variant="raised" padding="spacious" shadow>
+              <SectionHeader title={t('testing.resultsSummary')} />
 
               {#if testResults.length > 0}
                 {@const summary = getResultsSummary(testResults)}
@@ -452,14 +450,19 @@
                     </span>
                   </div>
                 </div>
+                <Progress
+                  value={summary.successRate}
+                  color={summary.successRate >= 80 ? 'success' : summary.successRate >= 60 ? 'warning' : 'danger'}
+                  class="pt-1"
+                />
               </div>
               {/if}
-            </div>
+            </Card>
           {/if}
 
           <!-- Run Information -->
-          <div>
-            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.runInformation')}</h3>
+          <Card variant="raised" padding="spacious" shadow>
+            <SectionHeader title={t('testing.runInformation')} />
 
             <div class="space-y-3">
               <div>
@@ -492,21 +495,17 @@
                 </div>
               {/if}
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     {:else}
-      <div class="text-center py-12">
-        <div style="color: var(--ds-text-subtle);">{t('testing.testRunNotFound')}</div>
-        <Button
-          onclick={goBack}
-          variant="primary"
-          size="medium"
-          class="mt-4"
-        >
-          {t('testing.backToTestRuns')}
-        </Button>
-      </div>
+      <StateDisplay type="empty" icon={IconFileText} title={t('testing.testRunNotFound')}>
+        {#snippet action()}
+          <Button onclick={goBack} variant="primary" size="medium">
+            {t('testing.backToTestRuns')}
+          </Button>
+        {/snippet}
+      </StateDisplay>
     {/if}
   </div>
 </div>

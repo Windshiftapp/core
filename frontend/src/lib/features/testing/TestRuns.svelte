@@ -11,7 +11,9 @@
   import { confirm } from '../../composables/useConfirm.js';
   import DataTable from '../../components/DataTable.svelte';
   import Modal from '../../dialogs/Modal.svelte';
-  import Label from '../../components/Label.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import FormField from '../../components/FormField.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import { renderStatusBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -264,7 +266,7 @@
 
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
     title={t('testing.testRuns')}
     subtitle={t('testing.testRunsSubtitle')}
@@ -297,63 +299,47 @@
       onSubmit={createRun}
       submitDisabled={!selectedSetId || !runName}
     >
-      <div class="p-6 space-y-6">
-        <div class="flex items-start justify-between">
-          <div>
-            <h3 class="text-xl font-semibold" style="color: var(--ds-text);">{t('testing.createTestRun')}</h3>
-            <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{t('testing.createTestRunSubtitle')}</p>
-          </div>
-        </div>
-
+      <ModalHeader
+        title={t('testing.createTestRun')}
+        subtitle={t('testing.createTestRunSubtitle')}
+        showCloseButton={false}
+      />
+      <div class="p-6 pb-2">
         <div class="space-y-4">
-          <div>
-            <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
+          <FormField id="set-select" label={t('testing.selectTestPlan')}>
             <Select id="set-select" bind:value={selectedSetId} options={[{ value: '', label: t('testing.selectTestPlanPlaceholder') }, ...filteredTestSets.map(set => ({ value: set.id, label: set.name }))]} />
-          </div>
-          <div>
-            <Label for="run-name" color="default" class="mb-2">{t('testing.runName')}</Label>
+          </FormField>
+          <FormField id="run-name" label={t('testing.runName')}>
             <Input
               id="run-name"
               bind:value={runName}
               placeholder={t('testing.runNamePlaceholder')}
             />
-          </div>
-          <div>
-            <Label color="default" class="mb-2">{t('common.assignTo')}</Label>
+          </FormField>
+          <FormField label={t('common.assignTo')}>
             <UserPicker
               bind:value={selectedAssigneeId}
               {workspaceId}
               showUnassigned={true}
               placeholder={t('testing.selectAssigneeOptional')}
             />
-          </div>
-        </div>
-
-        <div class="flex gap-3 justify-end pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onclick={() => showForm = false}
-            keyboardHint="Esc"
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button
-            onclick={createRun}
-            variant="primary"
-            disabled={!selectedSetId || !runName}
-            keyboardHint="↵"
-            dataTestid="create-run-submit"
-          >
-            {t('testing.createRun')}
-          </Button>
+          </FormField>
         </div>
       </div>
+      <DialogFooter
+        cancelLabel={t('common.cancel')}
+        confirmLabel={t('testing.createRun')}
+        onCancel={() => showForm = false}
+        onConfirm={createRun}
+        disabled={!selectedSetId || !runName}
+        showKeyboardHint={true}
+        confirmTestid="create-run-submit"
+      />
     </Modal>
   {/if}
 
   <!-- Content wrapper -->
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+  <div class="flex-1">
     <DataTable
       columns={runColumns}
       data={allTestRuns}

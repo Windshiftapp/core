@@ -50,11 +50,11 @@
 
 <PageHeader {title} {subtitle}>
   {#snippet actions()}
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       {#if leadingActions}
         {@render leadingActions()}
       {/if}
-      <div class="w-48">
+      <div class="min-w-48">
         <MilestoneCombobox
           bind:value={milestoneFilter}
           placeholder={t('milestones.allMilestones')}

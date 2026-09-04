@@ -8,6 +8,7 @@ export const MAIN_APP_COMPONENT_LOADERS = {
   'test-templates': () => import('../features/testing/TestTemplates.svelte'),
   'test-runs': () => import('../features/testing/TestRuns.svelte'),
   'test-reports': () => import('../features/testing/TestReports.svelte'),
+  'test-case-detail': () => import('../features/testing/TestCaseDetail.svelte'),
   'test-steps': () => import('../features/testing/TestSteps.svelte'),
   'test-execution': () => import('../features/testing/TestExecution.svelte'),
   'test-run-detail': () => import('../features/testing/TestRunDetail.svelte'),
@@ -99,7 +100,11 @@ export const MAIN_APP_ROUTE_CONFIG = {
   }),
   'test-sets': route('Loading Test Plans...', 'Failed to load Test Plans', {
     wrapper: 'none',
-    getProps: workspaceProps,
+    matchViews: ['test-set-detail'],
+    getProps: (currentRoute) => ({
+      workspaceId: currentRoute.params.id,
+      testSetId: currentRoute.params.setId || null,
+    }),
   }),
   'test-templates': route('Loading Test Templates...', 'Failed to load Test Templates', {
     wrapper: 'none',
@@ -112,6 +117,14 @@ export const MAIN_APP_ROUTE_CONFIG = {
   'test-reports': route('Loading Test Reports...', 'Failed to load Test Reports', {
     wrapper: 'none',
     getProps: workspaceProps,
+  }),
+  'test-case-detail': route('Loading Test Case...', 'Failed to load Test Case', {
+    wrapper: 'none',
+    getProps: (currentRoute) => ({
+      workspaceId: currentRoute.params.id,
+      testCaseId: currentRoute.params.testId,
+      from: currentRoute.query?.from || null,
+    }),
   }),
   'test-steps': route('Loading Test Steps...', 'Failed to load Test Steps', {
     wrapper: 'none',

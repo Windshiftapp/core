@@ -7,8 +7,12 @@
   import { confirm } from '../../composables/useConfirm.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import Input from '../../components/Input.svelte';
-  import Spinner from '../../components/Spinner.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import Card from '../../components/Card.svelte';
+  import Panel from '../../components/Panel.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
@@ -148,9 +152,9 @@
 
   function getRunStatus(run) {
     if (run.ended_at) {
-      return { text: t('testing.completed'), style: 'background: var(--ds-status-success-bg); color: var(--ds-status-success-text);' };
+      return { text: t('testing.completed'), color: 'green' };
     }
-    return { text: t('testing.inProgress'), style: 'background: var(--ds-status-info-bg); color: var(--ds-status-info-text);' };
+    return { text: t('testing.inProgress'), color: 'blue' };
   }
 
   // Keyboard shortcuts
@@ -165,50 +169,28 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
+  <div class="flex-1">
     {#if loading}
-      <div class="flex items-center justify-center py-12">
-        <Spinner />
-      </div>
+      <StateDisplay type="loading" message={t('common.loading')} size="lg" />
     {:else if template}
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <button
-            onclick={goBack}
-            class="p-2 rounded cursor-pointer"
-            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.currentTarget.style.background = ''}
-          >
-            <IconArrowLeft class="w-5 h-5" />
-          </button>
-          <div class="flex-1">
-            {#if editMode}
-              <!-- svelte-ignore a11y_autofocus -->
-              <Input
-                type="text"
-                bind:value={editName}
-                onkeydown={handleEditKeydown}
-                class="text-2xl font-semibold px-2 py-1"
-                autofocus
-              />
-            {:else}
-              <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
-                {template.name}
-              </h1>
-            {/if}
-            <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-              Created: {formatAuthenticatedDateTime(template.created_at)}
-              {#if template.updated_at && template.updated_at !== template.created_at}
-                • Updated: {formatAuthenticatedDateTime(template.updated_at)}
-              {/if}
-            </div>
+      <Button onclick={goBack} variant="ghost" size="small" icon={IconArrowLeft} class="mb-4">
+        {t('testing.testRunTemplates')}
+      </Button>
+      {#if editMode}
+        <div class="flex items-center justify-between gap-4 mb-8">
+          <div class="flex-1 max-w-2xl">
+            <!-- svelte-ignore a11y_autofocus -->
+            <Input
+              type="text"
+              bind:value={editName}
+              onkeydown={handleEditKeydown}
+              class="text-xl font-medium"
+              autofocus
+            />
           </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          {#if editMode}
+          <div class="flex items-center gap-3">
             <Button
               variant="primary"
               onclick={saveEdit}
@@ -221,7 +203,15 @@
             >
               {t('common.cancel')}
             </Button>
-          {:else}
+          </div>
+        </div>
+      {:else}
+        <PageHeader
+          title={template.name}
+          subtitle={`Created: ${formatAuthenticatedDateTime(template.created_at)}${template.updated_at && template.updated_at !== template.created_at ? ` • Updated: ${formatAuthenticatedDateTime(template.updated_at)}` : ''}`}
+        >
+          {#snippet actions()}
+          <div class="flex flex-wrap items-center gap-3">
             <Button
               variant="default"
               onclick={toggleEditMode}
@@ -244,17 +234,18 @@
             >
               {t('testing.executeTemplate')}
             </Button>
-          {/if}
-        </div>
-      </div>
+          </div>
+          {/snippet}
+        </PageHeader>
+      {/if}
 
       <!-- Template Details -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
           <!-- Template Information -->
-          <div class="p-6" style="background-color: var(--ds-surface-raised);">
-            <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('testing.templateInformation')}</h2>
+          <Card variant="raised" padding="spacious" shadow>
+            <SectionHeader title={t('testing.templateInformation')} />
 
             <div class="space-y-4">
               <div>
@@ -284,10 +275,10 @@
                 {/if}
               </div>
             </div>
-          </div>
+          </Card>
 
           <!-- Executions List -->
-          <div class="p-6" style="background-color: var(--ds-surface-raised);">
+          <Card variant="raised" padding="spacious" shadow>
             <SectionHeader title={t('testing.executionsCount', { count: executions.length })}>
               {#snippet actions()}
                 <Button
@@ -305,8 +296,7 @@
               <div class="space-y-3">
                 {#each executions as execution}
                   {@const status = getRunStatus(execution)}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="border rounded p-4 transition" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'} onmouseleave={(e) => e.currentTarget.style.background = ''}>
+                  <Panel padding="default" hoverable>
                     <div class="flex items-center justify-between">
                       <div class="flex-1">
                         <div class="font-medium mb-1" style="color: var(--ds-text);">
@@ -320,57 +310,47 @@
                         </div>
                       </div>
                       <div class="flex items-center gap-3">
-                        <span class="px-2 py-1 text-xs font-semibold rounded-full" style={status.style}>
-                          {status.text}
-                        </span>
+                        <Lozenge color={status.color} text={status.text} />
                         <div class="flex gap-2">
                           {#if !execution.ended_at}
-                            <button
+                            <Button
                               onclick={() => continueExecution(execution)}
-                              class="cursor-pointer text-sm font-medium"
-                              style="color: var(--ds-text-success);"
+                              variant="link"
+                              size="small"
                             >
                               {t('common.continue')}
-                            </button>
+                            </Button>
                           {/if}
-                          <button
+                          <Button
                             onclick={() => viewRunDetails(execution)}
-                            class="cursor-pointer text-sm"
-                            style="color: var(--ds-text-link);"
+                            variant="link"
+                            size="small"
                           >
                             {execution.ended_at ? t('testing.results') : t('testing.progress')}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Panel>
                 {/each}
               </div>
             {:else}
-              <div class="text-center py-8">
-                <div class="text-6xl mb-4">🚀</div>
-                <div class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('testing.noExecutionsYet')}</div>
-                <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                  {t('testing.clickExecuteTemplate')}
-                </div>
-                <Button
-                  variant="primary"
-                  onclick={executeTemplate}
-                  icon={IconPlayerPlay}
-                  size="medium"
-                >
-                  {t('testing.executeTemplate')}
-                </Button>
-              </div>
+              <EmptyState icon={IconPlayerPlay} title={t('testing.noExecutionsYet')} description={t('testing.clickExecuteTemplate')}>
+                {#snippet action()}
+                  <Button variant="primary" onclick={executeTemplate} icon={IconPlayerPlay} size="medium">
+                    {t('testing.executeTemplate')}
+                  </Button>
+                {/snippet}
+              </EmptyState>
             {/if}
-          </div>
+          </Card>
         </div>
 
         <!-- Sidebar -->
         <div class="space-y-6">
           <!-- Quick Stats -->
-          <div class="p-6" style="background-color: var(--ds-surface-raised);">
-            <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.quickStats')}</h3>
+          <Card variant="raised" padding="spacious" shadow>
+            <SectionHeader title={t('testing.quickStats')} />
 
             <div class="space-y-3">
               <div class="flex justify-between">
@@ -390,12 +370,12 @@
                 </span>
               </div>
             </div>
-          </div>
+          </Card>
 
           <!-- Test Set Info -->
           {#if testSet}
-            <div class="p-6" style="background-color: var(--ds-surface-raised);">
-              <h3 class="font-semibold mb-4" style="color: var(--ds-text);">{t('testing.testPlanDetails')}</h3>
+            <Card variant="raised" padding="spacious" shadow>
+              <SectionHeader title={t('testing.testPlanDetails')} />
 
               <div class="space-y-3">
                 <div>
@@ -413,7 +393,7 @@
                   </div>
                 {/if}
               </div>
-            </div>
+            </Card>
           {/if}
         </div>
       </div>

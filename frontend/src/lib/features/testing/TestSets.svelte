@@ -11,10 +11,12 @@
   import Textarea from '../../components/Textarea.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import Modal from '../../dialogs/Modal.svelte';
-  import Label from '../../components/Label.svelte';
   import FormField from '../../components/FormField.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Panel from '../../components/Panel.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -23,7 +25,7 @@
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import TestManagementHeader from './TestManagementHeader.svelte';
 
-  let { workspaceId = null } = $props();
+  let { workspaceId = null, testSetId = null } = $props();
 
   const testSets = writable([]);
   const selectedSet = writable(null);
@@ -93,7 +95,16 @@
 
   onMount(async () => {
     await loadData();
+    if (testSetId) {
+      const directSet = $testSets.find((set) => String(set.id) === String(testSetId));
+      if (directSet) await manageSetTests(directSet);
+    }
   });
+
+  function closeTestCaseSelector() {
+    showTestCaseSelector = false;
+    if (testSetId) navigate(testPath('/sets'));
+  }
 
   async function loadData() {
     try {
@@ -303,7 +314,7 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
     title={t('testing.testPlans')}
     subtitle={t('testing.testPlansSubtitle')}
@@ -333,20 +344,18 @@
     onclose={() => showForm = false}
   >
     {#snippet children(submitHint)}
-    <div class="p-6">
-      <h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
-        {editingSet ? t('testing.editTestPlan') : t('testing.addTestPlan')}
-      </h3>
-
+    <ModalHeader
+      title={editingSet ? t('testing.editTestPlan') : t('testing.addTestPlan')}
+      showCloseButton={false}
+    />
+    <div class="p-6 pb-2">
       <div class="space-y-4">
-        <div>
-          <Label color="default" class="mb-2">{t('common.name')}</Label>
+        <FormField label={t('common.name')} required>
           <Input bind:value={formData.name} required dataTestid="test-set-name" />
-        </div>
+        </FormField>
 
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <Label color="default" class="mb-0">{t('common.description')}</Label>
+        <FormField label={t('common.description')}>
+          <div class="flex justify-end -mt-1 mb-2">
             {#if editingSet}
               <Button
                 type="button"
@@ -360,49 +369,42 @@
             {/if}
           </div>
           <Textarea bind:value={formData.description} rows={3} data-testid="test-set-description" />
-        </div>
+        </FormField>
 
-        <div>
-          <Label color="default" class="mb-2">{t('testing.milestoneOptional')}</Label>
+        <FormField label={t('testing.milestoneOptional')}>
           <MilestoneCombobox
             bind:value={formData.milestone_id}
             placeholder={t('testing.noMilestone')}
           />
-        </div>
-      </div>
-
-      <div class="flex gap-2 justify-end mt-6">
-        <Button
-          type="button"
-          variant="outline"
-          onclick={() => showForm = false}
-          keyboardHint="Esc"
-        >
-          {t('common.cancel')}
-        </Button>
-        <Button
-          variant="primary"
-          onclick={handleSubmit}
-          disabled={!formData.name.trim()}
-          keyboardHint={submitHint}
-          dataTestid="test-set-submit"
-        >
-          {editingSet ? t('common.save') : t('common.create')}
-        </Button>
+        </FormField>
       </div>
     </div>
+    <DialogFooter
+      cancelLabel={t('common.cancel')}
+      confirmLabel={editingSet ? t('common.save') : t('common.create')}
+      onCancel={() => showForm = false}
+      onConfirm={handleSubmit}
+      disabled={!formData.name.trim()}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
+      confirmTestid="test-set-submit"
+    />
     {/snippet}
   </Modal>
 
   <Modal
     isOpen={showTestCaseSelector && $selectedSet}
     maxWidth="max-w-2xl"
-    onclose={() => showTestCaseSelector = false}
+    onSubmit={handleStartRun}
+    submitDisabled={setTestCases.length === 0}
+    onclose={closeTestCaseSelector}
   >
-    <div class="p-6 max-h-[80vh] overflow-y-auto">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-xl font-semibold" style="color: var(--ds-text);">{t('testing.manageTestCasesFor', { name: $selectedSet?.name })}</h3>
-        <div class="flex items-center gap-2">
+    <ModalHeader
+      title={t('testing.manageTestCasesFor', { name: $selectedSet?.name })}
+      onClose={closeTestCaseSelector}
+    />
+    <div class="p-6 max-h-[65vh] overflow-y-auto">
+      <div class="flex justify-end mb-4">
           <Button
             type="button"
             size="small"
@@ -412,14 +414,6 @@
           >
             {generating ? t('common.generating') : t('testing.generateWithAI')}
           </Button>
-          <button
-            onclick={() => showTestCaseSelector = false}
-            class="p-1 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
-            style="color: var(--ds-text-subtle);"
-          >
-            <IconX size={20} />
-          </button>
-        </div>
       </div>
 
       <!-- Add Test Case Picker -->
@@ -437,7 +431,7 @@
         <h4 class="font-medium mb-3" style="color: var(--ds-text);">
           {t('testing.assignedTestCases', { count: setTestCases.length })}
         </h4>
-        <div class="border rounded overflow-hidden" style="border-color: var(--ds-border);">
+        <Panel padding="none" class="overflow-hidden">
           {#if setTestCases.length === 0}
             <EmptyState
               icon={IconFileText}
@@ -473,32 +467,23 @@
               {/each}
             </div>
           {/if}
-        </div>
-      </div>
-
-      <div class="mt-6 flex justify-end gap-3">
-        <Button
-          variant="ghost"
-          onclick={() => showTestCaseSelector = false}
-          dataTestid="test-set-manage-done"
-        >
-          {t('common.done')}
-        </Button>
-        <Button
-          variant="primary"
-          onclick={handleStartRun}
-          disabled={setTestCases.length === 0}
-          icon={IconPlayerPlay}
-          dataTestid="test-set-start-run"
-        >
-          {t('testing.startRun')}
-        </Button>
+        </Panel>
       </div>
     </div>
+    <DialogFooter
+      cancelLabel={t('common.done')}
+      confirmLabel={t('testing.startRun')}
+      onCancel={closeTestCaseSelector}
+      onConfirm={handleStartRun}
+      disabled={setTestCases.length === 0}
+      showKeyboardHint={true}
+      cancelTestid="test-set-manage-done"
+      confirmTestid="test-set-start-run"
+    />
   </Modal>
 
   <!-- Content wrapper -->
-  <div class="flex-1 -mx-6 -mb-6 px-10 py-6">
+  <div class="flex-1">
     <DataTable
       columns={testSetColumns}
       data={filteredTestSets}
