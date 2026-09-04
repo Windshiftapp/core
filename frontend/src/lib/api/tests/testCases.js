@@ -24,7 +24,9 @@ export const testCases = {
     return params.all ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
   },
   count: async (workspaceId) => {
-    const document = await fetchAPIV2(`/workspaces/${workspaceId}/test-cases?page=1&page_size=1`);
+    const document = await fetchAPIV2(
+      `/workspaces/${workspaceId}/test-cases?all=true&page=1&page_size=1`
+    );
     return { count: document?.pagination?.total_items ?? 0 };
   },
   move: (workspaceId, id, data) =>

@@ -34,7 +34,9 @@
   let showTextModal = $state(false);
   let tempTextValue = $state('');
 
-  let operatorOptions = $state([]);
+  let operatorOptions = $derived(
+    operatorsByType[filter.field?.type] || operatorsByType.text
+  );
   let valueOptions = $state([]); // For enum/select fields
   let loadingOptions = $state(false);
 
@@ -75,7 +77,6 @@
 
   $effect(() => {
     if (filter.field) {
-      operatorOptions = operatorsByType[filter.field.type] || operatorsByType.text;
       if (!operatorOptions.some((operator) => operator.value === filter.operator)) {
         onchange?.({ ...filter, operator: operatorOptions[0]?.value || '=' });
       }
