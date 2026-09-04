@@ -48,6 +48,10 @@ type actionExecuteRequest struct {
 	ItemID int `json:"item_id"`
 }
 
+type actionExecuteResponse struct {
+	Status models.ActionExecutionStatus `json:"status"`
+}
+
 func actionCatalog(actions actionApplication) readOperation[services.ActionCatalog] {
 	return func(r *http.Request) (services.ActionCatalog, error) {
 		user, workspaceID, _, err := actionTarget(r, false)
@@ -113,17 +117,17 @@ func deleteAction(actions actionApplication) commandOperation {
 	}
 }
 
-func executeAction(actions actionApplication) jsonOperation[actionExecuteRequest, map[string]models.ActionExecutionStatus] {
-	return func(r *http.Request, input actionExecuteRequest) (map[string]models.ActionExecutionStatus, error) {
+func executeAction(actions actionApplication) jsonOperation[actionExecuteRequest, actionExecuteResponse] {
+	return func(r *http.Request, input actionExecuteRequest) (actionExecuteResponse, error) {
 		user, workspaceID, actionID, err := actionTarget(r, true)
 		if err != nil {
-			return nil, err
+			return actionExecuteResponse{}, err
 		}
 		if input.ItemID <= 0 {
-			return nil, newError(http.StatusBadRequest, "invalid_request", "item_id is required")
+			return actionExecuteResponse{}, newError(http.StatusBadRequest, "invalid_request", "item_id is required")
 		}
 		status, err := actions.Execute(user.ID, workspaceID, actionID, input.ItemID)
-		return map[string]models.ActionExecutionStatus{"status": status}, actionError(err)
+		return actionExecuteResponse{Status: status}, actionError(err)
 	}
 }
 

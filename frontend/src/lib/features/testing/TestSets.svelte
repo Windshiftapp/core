@@ -156,7 +156,7 @@
       // Create a test run for this plan
       const runName = `${$selectedSet.name} - ${formatDateSimple(new Date())}`;
       const newRun = await api.tests.testRuns.create(workspaceId, {
-        set_id: $selectedSet.id,
+        plan_id: $selectedSet.id,
         name: runName
       });
 

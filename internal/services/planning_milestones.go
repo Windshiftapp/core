@@ -221,18 +221,20 @@ func milestoneOrderByClause(sortBy, sortOrder string) string {
 		dir = "DESC"
 	}
 	switch sortBy {
+	case "position":
+		return " ORDER BY m.position " + dir + ", m.name ASC, m.id ASC"
 	case "name":
-		return " ORDER BY m.name " + dir + ", m.position ASC"
+		return " ORDER BY m.name " + dir + ", m.position ASC, m.id ASC"
 	case "target_date":
 		// NULL dates sort last in ascending order on both backends via the
 		// IS NULL tiebreaker, keeping behavior consistent.
-		return " ORDER BY m.target_date IS NULL ASC, m.target_date " + dir + ", m.name ASC, m.position ASC"
+		return " ORDER BY m.target_date IS NULL ASC, m.target_date " + dir + ", m.name ASC, m.position ASC, m.id ASC"
 	case "status":
-		return " ORDER BY m.status " + dir + ", m.position ASC"
+		return " ORDER BY m.status " + dir + ", m.position ASC, m.id ASC"
 	case "created_at", "updated_at":
-		return " ORDER BY m." + sortBy + " " + dir + ", m.position ASC"
+		return " ORDER BY m." + sortBy + " " + dir + ", m.position ASC, m.id ASC"
 	default:
-		return " ORDER BY m.position ASC, m.name ASC"
+		return " ORDER BY m.position ASC, m.name ASC, m.id ASC"
 	}
 }
 

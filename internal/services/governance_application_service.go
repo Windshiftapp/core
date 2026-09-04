@@ -136,27 +136,27 @@ func (s *GovernanceApplicationService) DeleteApprovalSet(ctx context.Context, ac
 	return nil
 }
 
-func (s *GovernanceApplicationService) ListItemApprovals(ctx context.Context, userID, itemID int) ([]*models.ApprovalRequest, error) {
+func (s *GovernanceApplicationService) ListItemApprovals(ctx context.Context, userID, itemID, limit, offset int) ([]*models.ApprovalRequest, int, error) {
 	allowed, err := s.canViewItemAsApprover(ctx, userID, itemID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if !allowed {
-		return nil, ErrGovernanceNotFound
+		return nil, 0, ErrGovernanceNotFound
 	}
-	items, err := s.approvals.GetTimelineForItem(ctx, itemID)
+	items, total, err := s.approvals.GetTimelineForItemPage(ctx, itemID, limit, offset)
 	if items == nil && err == nil {
 		items = []*models.ApprovalRequest{}
 	}
-	return items, err
+	return items, total, err
 }
 
-func (s *GovernanceApplicationService) ListMyApprovals(ctx context.Context, userID int, status string) ([]*models.ApprovalRequest, error) {
-	items, err := s.approvals.GetForUser(ctx, userID, status)
+func (s *GovernanceApplicationService) ListMyApprovals(ctx context.Context, userID int, status string, limit, offset int) ([]*models.ApprovalRequest, int, error) {
+	items, total, err := s.approvals.GetForUserPage(ctx, userID, status, limit, offset)
 	if items == nil && err == nil {
 		items = []*models.ApprovalRequest{}
 	}
-	return items, err
+	return items, total, err
 }
 
 func (s *GovernanceApplicationService) GetApproval(ctx context.Context, userID, requestID int) (*models.ApprovalRequest, error) {

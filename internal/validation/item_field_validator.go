@@ -194,12 +194,8 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		item.Description = description
 	}
 
-	// is_task validation - can only be true for personal workspaces
 	if isTaskValue, ok := updateData["is_task"]; ok {
 		if isTaskBool, ok := isTaskValue.(bool); ok {
-			if err := v.ValidateIsTask(item.WorkspaceID, isTaskBool); err != nil {
-				return err
-			}
 			item.IsTask = isTaskBool
 		}
 	}
@@ -521,6 +517,9 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 			item.CustomFieldValues = make(map[string]any)
 		}
 	}
+	if err := ValidateTaskState(v.db, item.WorkspaceID, userID, item.IsTask, item.StatusID); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -720,27 +719,6 @@ func relatedWorkItemNotFoundError() *ValidationError {
 	}
 }
 
-// ValidateIsTask validates that is_task can only be true for personal workspaces
-func (v *ItemFieldValidator) ValidateIsTask(workspaceID int, isTask bool) error {
-	if !isTask {
-		return nil // is_task: false is always allowed
-	}
-
-	isPersonal, err := v.IsPersonalWorkspace(workspaceID)
-	if err != nil {
-		return err
-	}
-
-	if !isPersonal {
-		return &ValidationError{
-			Field:   "is_task",
-			Message: "Tasks can only be created in personal workspaces",
-		}
-	}
-
-	return nil
-}
-
 // ConvertCustomFieldValuesToJSON converts custom field values map to JSON for database storage
 func ConvertCustomFieldValuesToJSON(customFieldValues map[string]any) (sql.NullString, error) {
 	if len(customFieldValues) == 0 {
@@ -760,7 +738,7 @@ func ConvertCustomFieldValuesToJSON(customFieldValues map[string]any) (sql.NullS
 
 // ValidateCreateRequest validates required fields for item creation
 // deadcode-keep: called by core-tests/internal/validation/item_field_validator_test.go
-func (v *ItemFieldValidator) ValidateCreateRequest(item *models.Item) error {
+func (v *ItemFieldValidator) ValidateCreateRequest(item *models.Item, userID int) error {
 	// Title is required
 	if strings.TrimSpace(item.Title) == "" {
 		return &ValidationError{Field: "title", Message: "Title is required"}
@@ -774,12 +752,8 @@ func (v *ItemFieldValidator) ValidateCreateRequest(item *models.Item) error {
 	if !exists {
 		return &ValidationError{Field: "workspace_id", Message: "Workspace not found"}
 	}
-
-	// Validate is_task can only be true for personal workspaces
-	if item.IsTask {
-		if err := v.ValidateIsTask(item.WorkspaceID, item.IsTask); err != nil {
-			return err
-		}
+	if err := ValidateTaskState(v.db, item.WorkspaceID, userID, item.IsTask, item.StatusID); err != nil {
+		return err
 	}
 
 	// Validate item type if provided

@@ -460,9 +460,17 @@ func (s *ItemApplicationService) Batch(ctx context.Context, userID int, ids []in
 	if err != nil {
 		return nil, err
 	}
+	loadedByID := make(map[int]*models.Item, len(loaded))
+	for _, item := range loaded {
+		loadedByID[item.ID] = item
+	}
 	items := make([]models.Item, 0, len(loaded))
 	permissions := make(map[int]bool)
-	for _, item := range loaded {
+	for _, id := range ids {
+		item, exists := loadedByID[id]
+		if !exists {
+			continue
+		}
 		allowed, ok := permissions[item.WorkspaceID]
 		if !ok {
 			allowed, err = s.perm.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
@@ -671,7 +679,7 @@ func (s *ItemApplicationService) MovePreview(userID, itemID int, input ItemWorks
 	if err := s.requireWorkspaceMove(userID, itemID, input.DestinationWorkspaceID); err != nil {
 		return nil, err
 	}
-	return s.move.Preview(itemID, input)
+	return s.move.Preview(itemID, userID, input)
 }
 
 func (s *ItemApplicationService) MoveWorkspace(ctx context.Context, actor AuditActor, itemID int, input ItemWorkspaceMoveInput) (*ItemWorkspaceMoveResult, error) {

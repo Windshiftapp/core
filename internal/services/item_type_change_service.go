@@ -207,6 +207,13 @@ func (s *ItemTypeChangeService) ValidateStatusMapping(ctx context.Context, item 
 // and records the history rows. Callers must have already validated inputs via
 // Analyze + ValidateStatusMapping.
 func (s *ItemTypeChangeService) ApplyChange(itemID, userID, targetTypeID int, nextStatusID *int, original *models.Item) ([]HistoryEntry, error) {
+	finalStatusID := original.StatusID
+	if nextStatusID != nil {
+		finalStatusID = nextStatusID
+	}
+	if err := validation.ValidateTaskState(s.db, original.WorkspaceID, userID, original.IsTask, finalStatusID); err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	fields := map[string]any{"item_type_id": targetTypeID}
 	if nextStatusID != nil {

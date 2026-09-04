@@ -5,8 +5,29 @@ import (
 	"net/http"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
+
+type agentRerunResponse struct {
+	Started bool `json:"started"`
+}
+
+type agentRunCursorValue struct {
+	ID int `json:"id"`
+}
+
+type agentRunPage struct {
+	Runs       []*models.AgentRun `json:"runs"`
+	NextCursor string             `json:"next_cursor,omitempty"`
+	HasMore    bool               `json:"has_more"`
+}
+
+type agentRunEventPage struct {
+	Events     []*models.AgentRunEvent `json:"events"`
+	NextCursor string                  `json:"next_cursor,omitempty"`
+	HasMore    bool                    `json:"has_more"`
+}
 
 func registerAgentRunRoutes(builder *routeBuilder, runs agentRunApplication) {
 	builder.Read("/workspaces/{workspace_id}/agent-runs", AuthAuthenticated, []string{"items:read"}, listWorkspaceAgentRuns(runs))
@@ -18,56 +39,56 @@ func registerAgentRunRoutes(builder *routeBuilder, runs agentRunApplication) {
 	builder.Action(http.MethodPost, "/agent-runs/{run_id}/cancel", http.StatusOK, AuthAuthenticated, []string{"items:write"}, cancelAgentRun(runs))
 }
 
-func listWorkspaceAgentRuns(runs agentRunApplication) readOperation[[]*models.AgentRun] {
-	return func(r *http.Request) ([]*models.AgentRun, error) {
+func listWorkspaceAgentRuns(runs agentRunApplication) readOperation[agentRunPage] {
+	return func(r *http.Request) (agentRunPage, error) {
 		user, err := principal(r)
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
 		workspaceID, err := pathID(r, "workspace_id")
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
 		limit, beforeID, err := agentRunCursor(r)
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
-		result, err := runs.ListForWorkspace(r.Context(), user.ID, workspaceID, limit, beforeID)
-		return result, agentRunError(err)
+		result, err := runs.ListForWorkspace(r.Context(), user.ID, workspaceID, limit+1, beforeID)
+		return makeAgentRunPage(result, limit), agentRunError(err)
 	}
 }
 
-func listItemAgentRuns(runs agentRunApplication) readOperation[[]*models.AgentRun] {
-	return func(r *http.Request) ([]*models.AgentRun, error) {
+func listItemAgentRuns(runs agentRunApplication) readOperation[agentRunPage] {
+	return func(r *http.Request) (agentRunPage, error) {
 		user, err := principal(r)
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
 		itemID, err := pathID(r, "item_id")
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
 		limit, beforeID, err := agentRunCursor(r)
 		if err != nil {
-			return nil, err
+			return agentRunPage{}, err
 		}
-		result, err := runs.ListForItem(r.Context(), user.ID, itemID, limit, beforeID)
-		return result, agentRunError(err)
+		result, err := runs.ListForItem(r.Context(), user.ID, itemID, limit+1, beforeID)
+		return makeAgentRunPage(result, limit), agentRunError(err)
 	}
 }
 
-func rerunAgent(runs agentRunApplication) actionOperation[map[string]bool] {
-	return func(r *http.Request) (map[string]bool, error) {
+func rerunAgent(runs agentRunApplication) actionOperation[agentRerunResponse] {
+	return func(r *http.Request) (agentRerunResponse, error) {
 		user, err := principal(r)
 		if err != nil {
-			return nil, err
+			return agentRerunResponse{}, err
 		}
 		itemID, err := pathID(r, "item_id")
 		if err != nil {
-			return nil, err
+			return agentRerunResponse{}, err
 		}
 		started, err := runs.Rerun(r.Context(), user.ID, itemID)
-		return map[string]bool{"started": started}, agentRunError(err)
+		return agentRerunResponse{Started: started}, agentRunError(err)
 	}
 }
 
@@ -82,33 +103,51 @@ func getAgentRun(runs agentRunApplication) readOperation[*models.AgentRun] {
 	}
 }
 
-func getAgentRunUsage(runs agentRunApplication) readOperation[any] {
-	return func(r *http.Request) (any, error) {
+func getAgentRunUsage(runs agentRunApplication) readOperation[repository.RunUsageTotals] {
+	return func(r *http.Request) (repository.RunUsageTotals, error) {
 		user, id, err := agentRunTarget(r)
 		if err != nil {
-			return nil, err
+			return repository.RunUsageTotals{}, err
 		}
 		result, err := runs.Usage(r.Context(), user.ID, id)
 		return result, agentRunError(err)
 	}
 }
 
-func listAgentRunEvents(runs agentRunApplication) readOperation[[]*models.AgentRunEvent] {
-	return func(r *http.Request) ([]*models.AgentRunEvent, error) {
+func listAgentRunEvents(runs agentRunApplication) readOperation[agentRunEventPage] {
+	return func(r *http.Request) (agentRunEventPage, error) {
 		user, id, err := agentRunTarget(r)
 		if err != nil {
-			return nil, err
+			return agentRunEventPage{}, err
 		}
-		afterID, err := parseNonNegativeQueryInt(r, "after_id", 0)
-		if err != nil {
-			return nil, err
+		if r.URL.Query().Has("after_id") {
+			return agentRunEventPage{}, newError(http.StatusBadRequest, "invalid_request", "Use the opaque cursor parameter")
+		}
+		afterID := 0
+		if raw := r.URL.Query().Get("cursor"); raw != "" {
+			var cursor agentRunCursorValue
+			if err := decodeOpaqueCursor("agent-run-events", raw, &cursor); err != nil || cursor.ID <= 0 {
+				return agentRunEventPage{}, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid")
+			}
+			afterID = cursor.ID
 		}
 		limit, err := parsePositiveInt(r, "page_size", 200, 200)
 		if err != nil {
-			return nil, err
+			return agentRunEventPage{}, err
 		}
-		result, err := runs.Events(r.Context(), user.ID, id, afterID, limit)
-		return result, agentRunError(err)
+		result, err := runs.Events(r.Context(), user.ID, id, afterID, limit+1)
+		if err != nil {
+			return agentRunEventPage{}, agentRunError(err)
+		}
+		hasMore := len(result) > limit
+		if hasMore {
+			result = result[:limit]
+		}
+		next := ""
+		if len(result) > 0 {
+			next = encodeOpaqueCursor("agent-run-events", agentRunCursorValue{ID: result[len(result)-1].ID})
+		}
+		return agentRunEventPage{Events: result, NextCursor: next, HasMore: hasMore}, nil
 	}
 }
 
@@ -128,8 +167,29 @@ func agentRunCursor(r *http.Request) (limit, beforeID int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	beforeID, err = parseNonNegativeQueryInt(r, "before_id", 0)
-	return limit, beforeID, err
+	if r.URL.Query().Has("before_id") {
+		return 0, 0, newError(http.StatusBadRequest, "invalid_request", "Use the opaque cursor parameter")
+	}
+	if raw := r.URL.Query().Get("cursor"); raw != "" {
+		var cursor agentRunCursorValue
+		if err := decodeOpaqueCursor("agent-runs", raw, &cursor); err != nil || cursor.ID <= 0 {
+			return 0, 0, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid")
+		}
+		beforeID = cursor.ID
+	}
+	return limit, beforeID, nil
+}
+
+func makeAgentRunPage(runs []*models.AgentRun, limit int) agentRunPage {
+	hasMore := len(runs) > limit
+	if hasMore {
+		runs = runs[:limit]
+	}
+	next := ""
+	if hasMore && len(runs) > 0 {
+		next = encodeOpaqueCursor("agent-runs", agentRunCursorValue{ID: runs[len(runs)-1].ID})
+	}
+	return agentRunPage{Runs: runs, NextCursor: next, HasMore: hasMore}
 }
 
 func agentRunTarget(r *http.Request) (*models.User, int, error) {

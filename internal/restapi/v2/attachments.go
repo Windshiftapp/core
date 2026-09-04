@@ -11,14 +11,18 @@ import (
 	"windshift/internal/services"
 )
 
+type attachmentUploadForm struct {
+	File []byte `json:"file"`
+}
+
 func registerAttachmentRoutes(builder *routeBuilder, deps Deps) {
 	attachments := deps.Attachments
 	builder.Page("/items/{item_id}/attachments", AuthAuthenticated, []string{"items:read"}, listItemAttachments(attachments))
-	builder.Raw(http.MethodPost, "/items/{item_id}/attachments", AuthAuthenticated, []string{"items:write"}, uploadItemAttachment(attachments))
-	builder.Raw(http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/attachments", AuthAuthenticated, []string{"pages:write"}, uploadPageAttachment(deps))
+	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/items/{item_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"items:write"}, uploadItemAttachment(attachments))
+	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"pages:write"}, uploadPageAttachment(deps))
 	builder.Read("/attachments/{attachment_id}", AuthAuthenticated, []string{"items:read"}, getItemAttachment(attachments))
-	builder.Raw(http.MethodGet, "/attachments/{attachment_id}/content", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, false))
-	builder.Raw(http.MethodGet, "/attachments/{attachment_id}/thumbnail", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, true))
+	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/content", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, false))
+	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/thumbnail", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, true))
 	builder.Command(http.MethodDelete, "/attachments/{attachment_id}", AuthAuthenticated, []string{"items:write"}, deleteItemAttachment(attachments))
 }
 

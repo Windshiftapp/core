@@ -31,9 +31,9 @@ func registerTimeRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/time/projects/{project_id}/members", AuthAuthenticated, []string{"time:read"}, listTimeProjectMembers(projects))
 	builder.JSON(http.MethodPost, "/time/projects/{project_id}/members", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, addTimeProjectMember(projects))
 	builder.Command(http.MethodDelete, "/time/projects/{project_id}/members/{assignment_id}", AuthAuthenticated, []string{"time:write"}, removeTimeProjectMember(projects))
-	builder.JSON(http.MethodPost, "/timer/start", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, startTimer(deps.Timers))
-	builder.Read("/timer/active", AuthAuthenticated, []string{"time:read"}, getActiveTimer(deps.Timers))
-	builder.Action(http.MethodDelete, "/timer/stop", http.StatusOK, AuthAuthenticated, []string{"time:write"}, stopTimer(deps.Timers))
+	builder.JSON(http.MethodPost, "/time/timers", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, startTimer(deps.Timers))
+	builder.Read("/time/timers/active", AuthAuthenticated, []string{"time:read"}, getActiveTimer(deps.Timers))
+	builder.Action(http.MethodPost, "/time/timers/active/stop", http.StatusOK, AuthAuthenticated, []string{"time:write"}, stopTimer(deps.Timers))
 }
 
 type timeProjectApplication interface {

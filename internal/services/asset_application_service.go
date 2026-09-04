@@ -972,14 +972,17 @@ func (s *AssetApplicationService) DeleteAsset(userID, id int, actor AuditActor) 
 	return s.assets.DeleteAsset(actor, id)
 }
 func (s *AssetApplicationService) AssetSummaries(userID int, ids []int) ([]models.AssetSummary, error) {
-	if len(ids) == 0 || len(ids) > 500 {
-		return nil, fmt.Errorf("ids must contain between 1 and 500 values")
+	if len(ids) == 0 {
+		return []models.AssetSummary{}, nil
+	}
+	if len(ids) > 500 {
+		return nil, fmt.Errorf("ids must contain at most 500 values")
 	}
 	items, err := s.repo.FindAssetSummariesByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
-	result := items[:0]
+	visible := make(map[int]models.AssetSummary, len(items))
 	access := map[int]bool{}
 	for _, item := range items {
 		allowed, ok := access[item.SetID]
@@ -988,6 +991,12 @@ func (s *AssetApplicationService) AssetSummaries(userID int, ids []int) ([]model
 			access[item.SetID] = allowed
 		}
 		if allowed {
+			visible[item.ID] = item
+		}
+	}
+	result := make([]models.AssetSummary, 0, len(visible))
+	for _, id := range ids {
+		if item, ok := visible[id]; ok {
 			result = append(result, item)
 		}
 	}

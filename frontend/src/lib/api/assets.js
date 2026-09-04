@@ -84,7 +84,11 @@ export const assets = {
     return fetchAPIV2(`/asset-sets/${setId}/assets?${params}`, options);
   },
   getSummaries: (ids, options = {}) =>
-    fetchV2Data(`/assets/summaries?ids=${ids.join(',')}`, options),
+    fetchV2Data('/assets/summaries', {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify({ ids: [...new Set(ids)] }),
+    }),
   // Asset links
   getLinks: (id) => fetchV2Data(`/assets/${id}/links`),
   createLink: (id, data) =>

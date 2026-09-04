@@ -95,6 +95,9 @@ type assetRoleInput struct {
 type everyoneRoleInput struct {
 	RoleID *int `json:"role_id"`
 }
+type assetRoleAssignmentResponse struct {
+	Assigned bool `json:"assigned"`
+}
 type assetLinkInput struct {
 	LinkTypeID int    `json:"link_type_id"`
 	TargetType string `json:"target_type"`
@@ -102,6 +105,11 @@ type assetLinkInput struct {
 }
 type assetImportSuggestionsInput struct {
 	UploadID  string `json:"upload_id"`
+	HasHeader bool   `json:"has_header"`
+	Delimiter string `json:"delimiter"`
+}
+type assetImportUploadForm struct {
+	File      []byte `json:"file"`
 	HasHeader bool   `json:"has_header"`
 	Delimiter string `json:"delimiter"`
 }
@@ -117,7 +125,7 @@ func registerAssetRoutes(builder *routeBuilder, app *services.AssetApplicationSe
 
 func registerAssetImportRoutes(builder *routeBuilder, app *services.AssetApplicationService) {
 	base := "/asset-sets/{asset_set_id}/import"
-	builder.Raw(http.MethodPost, base+"/upload", AuthAuthenticated, []string{"assets:write"}, func(w http.ResponseWriter, r *http.Request) error {
+	builder.RawDocument[assetImportUploadForm, services.AssetCSVUpload](http.MethodPost, base+"/upload", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"assets:write"}, func(w http.ResponseWriter, r *http.Request) error {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return err
@@ -196,7 +204,7 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 		items, err := app.ListSets(user.ID)
 		return pageValues(items, page), page, len(items), assetError(err)
 	})
-	builder.JSON(http.MethodPost, path, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetSetCreate) (*models.AssetManagementSet, error) {
+	builder.SessionJSON(http.MethodPost, path, http.StatusCreated, false, func(r *http.Request, input assetSetCreate) (*models.AssetManagementSet, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
@@ -212,7 +220,7 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 		result, err := app.GetSet(user.ID, id)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPatch, path+"/{asset_set_id}", http.StatusOK, true, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetSetPatch) (*models.AssetManagementSet, error) {
+	builder.SessionJSON(http.MethodPatch, path+"/{asset_set_id}", http.StatusOK, true, func(r *http.Request, input assetSetPatch) (*models.AssetManagementSet, error) {
 		user, id, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return nil, err
@@ -220,7 +228,7 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 		result, err := app.UpdateSet(user.ID, id, auditActor(r, user), services.AssetSetPatch{Name: input.Name, Description: input.Description, IsDefault: input.IsDefault})
 		return result, assetError(err)
 	})
-	builder.Command(http.MethodDelete, path+"/{asset_set_id}", AuthAuthenticated, []string{"assets:write"}, func(r *http.Request) error {
+	builder.SessionCommand(http.MethodDelete, path+"/{asset_set_id}", func(r *http.Request) error {
 		user, id, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return err
@@ -252,15 +260,16 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 		result, err := app.SetRoles(user.ID, setID)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPost, rolesPath, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetRoleInput) (map[string]bool, error) {
+	builder.SessionJSON(http.MethodPost, rolesPath, http.StatusCreated, false, func(r *http.Request, input assetRoleInput) (assetRoleAssignmentResponse, error) {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
-			return nil, err
+			return assetRoleAssignmentResponse{}, err
 		}
 		err = app.AssignRole(user.ID, setID, auditActor(r, user), services.AssetRoleAssignment{UserID: input.UserID, GroupID: input.GroupID, RoleID: input.RoleID})
-		return map[string]bool{"assigned": true}, assetError(err)
+		err = assetError(err)
+		return assetRoleAssignmentResponse{Assigned: err == nil}, err
 	})
-	builder.Command(http.MethodDelete, rolesPath+"/{assignment_id}", AuthAuthenticated, []string{"assets:write"}, func(r *http.Request) error {
+	builder.SessionCommand(http.MethodDelete, rolesPath+"/{assignment_id}", func(r *http.Request) error {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return err
@@ -280,7 +289,7 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 		result, err := app.EveryoneRole(user.ID, setID)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPut, everyonePath, http.StatusOK, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input everyoneRoleInput) (*models.AssetSetEveryoneRole, error) {
+	builder.SessionJSON(http.MethodPut, everyonePath, http.StatusOK, false, func(r *http.Request, input everyoneRoleInput) (*models.AssetSetEveryoneRole, error) {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return nil, err
@@ -305,7 +314,7 @@ func registerAssetTypeRoutes(builder *routeBuilder, app *services.AssetApplicati
 		items, err := app.ListTypes(user.ID, setID)
 		return pageValues(items, page), page, len(items), assetError(err)
 	})
-	builder.JSON(http.MethodPost, collection, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetTypeCreate) (*models.AssetType, error) {
+	builder.SessionJSON(http.MethodPost, collection, http.StatusCreated, false, func(r *http.Request, input assetTypeCreate) (*models.AssetType, error) {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return nil, err
@@ -325,7 +334,7 @@ func registerAssetTypeRoutes(builder *routeBuilder, app *services.AssetApplicati
 		result, err := app.GetType(user.ID, id)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPatch, item, http.StatusOK, true, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetTypePatch) (*models.AssetType, error) {
+	builder.SessionJSON(http.MethodPatch, item, http.StatusOK, true, func(r *http.Request, input assetTypePatch) (*models.AssetType, error) {
 		user, id, err := assetTarget(r, "asset_type_id")
 		if err != nil {
 			return nil, err
@@ -333,7 +342,7 @@ func registerAssetTypeRoutes(builder *routeBuilder, app *services.AssetApplicati
 		result, err := app.UpdateType(user.ID, id, auditActor(r, user), services.AssetTypePatch{Name: input.Name, Description: input.Description, Icon: input.Icon, Color: input.Color, DisplayOrder: input.DisplayOrder, IsActive: input.IsActive})
 		return result, assetError(err)
 	})
-	builder.Command(http.MethodDelete, item, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request) error {
+	builder.SessionCommand(http.MethodDelete, item, func(r *http.Request) error {
 		user, id, err := assetTarget(r, "asset_type_id")
 		if err != nil {
 			return err
@@ -348,7 +357,7 @@ func registerAssetTypeRoutes(builder *routeBuilder, app *services.AssetApplicati
 		result, err := app.TypeFields(user.ID, id)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPut, item+"/fields", http.StatusOK, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetTypeFieldsInput) ([]models.AssetTypeField, error) {
+	builder.SessionJSON(http.MethodPut, item+"/fields", http.StatusOK, false, func(r *http.Request, input assetTypeFieldsInput) ([]models.AssetTypeField, error) {
 		user, id, err := assetTarget(r, "asset_type_id")
 		if err != nil {
 			return nil, err
@@ -377,7 +386,7 @@ func registerAssetCategoryRoutes(builder *routeBuilder, app *services.AssetAppli
 		items, err := app.ListCategories(user.ID, setID, r.URL.Query().Get("tree") == "true")
 		return pageValues(items, page), page, len(items), assetError(err)
 	})
-	builder.JSON(http.MethodPost, collection, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetCategoryCreate) (*models.AssetCategory, error) {
+	builder.SessionJSON(http.MethodPost, collection, http.StatusCreated, false, func(r *http.Request, input assetCategoryCreate) (*models.AssetCategory, error) {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return nil, err
@@ -393,7 +402,7 @@ func registerAssetCategoryRoutes(builder *routeBuilder, app *services.AssetAppli
 		result, err := app.GetCategory(user.ID, id)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPatch, item, http.StatusOK, true, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetCategoryPatch) (*models.AssetCategory, error) {
+	builder.SessionJSON(http.MethodPatch, item, http.StatusOK, true, func(r *http.Request, input assetCategoryPatch) (*models.AssetCategory, error) {
 		user, id, err := assetTarget(r, "category_id")
 		if err != nil {
 			return nil, err
@@ -401,14 +410,14 @@ func registerAssetCategoryRoutes(builder *routeBuilder, app *services.AssetAppli
 		result, err := app.UpdateCategory(user.ID, id, auditActor(r, user), services.AssetCategoryPatch{Name: input.Name, Description: input.Description})
 		return result, assetError(err)
 	})
-	builder.Command(http.MethodDelete, item, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request) error {
+	builder.SessionCommand(http.MethodDelete, item, func(r *http.Request) error {
 		user, id, err := assetTarget(r, "category_id")
 		if err != nil {
 			return err
 		}
 		return assetError(app.DeleteCategory(user.ID, id, auditActor(r, user)))
 	})
-	builder.JSON(http.MethodPost, item+"/move", http.StatusOK, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetCategoryMove) (*models.AssetCategory, error) {
+	builder.SessionJSON(http.MethodPost, item+"/move", http.StatusOK, false, func(r *http.Request, input assetCategoryMove) (*models.AssetCategory, error) {
 		user, id, err := assetTarget(r, "category_id")
 		if err != nil {
 			return nil, err
@@ -433,7 +442,7 @@ func registerAssetStatusRoutes(builder *routeBuilder, app *services.AssetApplica
 		items, err := app.ListStatuses(user.ID, setID)
 		return pageValues(items, page), page, len(items), assetError(err)
 	})
-	builder.JSON(http.MethodPost, collection, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetStatusCreate) (*models.AssetStatus, error) {
+	builder.SessionJSON(http.MethodPost, collection, http.StatusCreated, false, func(r *http.Request, input assetStatusCreate) (*models.AssetStatus, error) {
 		user, setID, err := assetTarget(r, "asset_set_id")
 		if err != nil {
 			return nil, err
@@ -449,7 +458,7 @@ func registerAssetStatusRoutes(builder *routeBuilder, app *services.AssetApplica
 		result, err := app.GetStatus(user.ID, id)
 		return result, assetError(err)
 	})
-	builder.JSON(http.MethodPatch, item, http.StatusOK, true, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetStatusPatch) (*models.AssetStatus, error) {
+	builder.SessionJSON(http.MethodPatch, item, http.StatusOK, true, func(r *http.Request, input assetStatusPatch) (*models.AssetStatus, error) {
 		user, id, err := assetTarget(r, "status_id")
 		if err != nil {
 			return nil, err
@@ -457,7 +466,7 @@ func registerAssetStatusRoutes(builder *routeBuilder, app *services.AssetApplica
 		result, err := app.UpdateStatus(user.ID, id, auditActor(r, user), services.AssetStatusPatch{Name: input.Name, Color: input.Color, Description: input.Description, IsDefault: input.IsDefault, DisplayOrder: input.DisplayOrder})
 		return result, assetError(err)
 	})
-	builder.Command(http.MethodDelete, item, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request) error {
+	builder.SessionCommand(http.MethodDelete, item, func(r *http.Request) error {
 		user, id, err := assetTarget(r, "status_id")
 		if err != nil {
 			return err
@@ -516,12 +525,12 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 		}
 		return assetError(app.DeleteAsset(user.ID, id, auditActor(r, user)))
 	})
-	builder.Read("/assets/summaries", AuthAuthenticated, []string{"assets:read"}, func(r *http.Request) ([]models.AssetSummary, error) {
+	builder.JSON(http.MethodPost, "/assets/summaries", http.StatusOK, false, AuthAuthenticated, []string{"assets:read"}, func(r *http.Request, input idBatchRequest) ([]models.AssetSummary, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
 		}
-		ids, err := parseLinkIDs(r.URL.Query().Get("ids"))
+		ids, err := normalizeBatchIDs(input.IDs)
 		if err != nil {
 			return nil, err
 		}

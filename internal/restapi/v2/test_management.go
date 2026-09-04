@@ -1,9 +1,12 @@
 package v2
 
 import (
+	"cmp"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
+	"time"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -97,6 +100,87 @@ type reorderRequest struct {
 	IDs []int `json:"ids"`
 }
 
+type reorderedResponse struct {
+	Reordered bool `json:"reordered"`
+}
+
+type movedResponse struct {
+	Moved bool `json:"moved"`
+}
+
+type linkedResponse struct {
+	Linked bool `json:"linked"`
+}
+
+type endedResponse struct {
+	Ended bool `json:"ended"`
+}
+
+type updatedResponse struct {
+	Updated bool `json:"updated"`
+}
+
+type testPlanSummaryResponse struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type testRunTemplateSummaryResponse struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	PlanID      int    `json:"plan_id"`
+	PlanName    string `json:"plan_name"`
+}
+
+type testExecutionSummaryResponse struct {
+	RunID        int        `json:"run_id"`
+	RunName      string     `json:"run_name"`
+	Status       string     `json:"status"`
+	StartedAt    time.Time  `json:"started_at"`
+	EndedAt      *time.Time `json:"ended_at"`
+	TemplateID   *int       `json:"template_id,omitempty"`
+	TemplateName string     `json:"template_name,omitempty"`
+	PlanID       int        `json:"plan_id"`
+	PlanName     string     `json:"plan_name"`
+}
+
+type testCaseConnectionsResponse struct {
+	TestPlans    []testPlanSummaryResponse        `json:"test_plans"`
+	RunTemplates []testRunTemplateSummaryResponse `json:"run_templates"`
+	Executions   []testExecutionSummaryResponse   `json:"executions"`
+}
+
+func mapTestCaseConnections(value *repository.TestCaseConnections) testCaseConnectionsResponse {
+	if value == nil {
+		return testCaseConnectionsResponse{}
+	}
+	result := testCaseConnectionsResponse{
+		TestPlans:    make([]testPlanSummaryResponse, len(value.TestSets)),
+		RunTemplates: make([]testRunTemplateSummaryResponse, len(value.RunTemplates)),
+		Executions:   make([]testExecutionSummaryResponse, len(value.Executions)),
+	}
+	for i, plan := range value.TestSets {
+		result.TestPlans[i] = testPlanSummaryResponse{ID: plan.ID, Name: plan.Name, Description: plan.Description}
+	}
+	for i, template := range value.RunTemplates {
+		result.RunTemplates[i] = testRunTemplateSummaryResponse{
+			ID: template.ID, Name: template.Name, Description: template.Description,
+			PlanID: template.SetID, PlanName: template.SetName,
+		}
+	}
+	for i, execution := range value.Executions {
+		result.Executions[i] = testExecutionSummaryResponse{
+			RunID: execution.RunID, RunName: execution.RunName, Status: execution.Status,
+			StartedAt: execution.StartedAt, EndedAt: execution.EndedAt,
+			TemplateID: execution.TemplateID, TemplateName: execution.TemplateName,
+			PlanID: execution.SetID, PlanName: execution.SetName,
+		}
+	}
+	return result
+}
+
 func registerTestFolderRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-folders"
 	builder.WorkspaceCRUD(path, "folder_id", "tests:read", "tests:write", workspaceCRUD[*models.TestFolder, testFolderCreate, testFolderPatch]{
@@ -120,12 +204,13 @@ func registerTestFolderRoutes(builder *routeBuilder, app *services.TestManagemen
 			return app.DeleteFolder(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (reorderedResponse, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
-			return nil, err
+			return reorderedResponse{}, err
 		}
-		return map[string]bool{"reordered": true}, testManagementError(app.ReorderFolders(user.ID, workspaceID, input.IDs))
+		err = testManagementError(app.ReorderFolders(user.ID, workspaceID, input.IDs))
+		return reorderedResponse{Reordered: err == nil}, err
 	})
 }
 
@@ -218,27 +303,29 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 			return app.DeleteCase(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
-	builder.JSON(http.MethodPost, path+"/{test_case_id}/move", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input moveTestCaseRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/{test_case_id}/move", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input moveTestCaseRequest) (movedResponse, error) {
 		user, workspaceID, id, err := testTarget(r, "test_case_id")
 		if err != nil {
-			return nil, err
+			return movedResponse{}, err
 		}
-		return map[string]bool{"moved": true}, testManagementError(app.MoveCase(user.ID, workspaceID, id, input.FolderID, input.SortOrder))
+		err = testManagementError(app.MoveCase(user.ID, workspaceID, id, input.FolderID, input.SortOrder))
+		return movedResponse{Moved: err == nil}, err
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (reorderedResponse, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
-			return nil, err
+			return reorderedResponse{}, err
 		}
-		return map[string]bool{"reordered": true}, testManagementError(app.ReorderCases(user.ID, workspaceID, input.IDs))
+		err = testManagementError(app.ReorderCases(user.ID, workspaceID, input.IDs))
+		return reorderedResponse{Reordered: err == nil}, err
 	})
-	builder.Read(path+"/{test_case_id}/connections", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (any, error) {
+	builder.Read(path+"/{test_case_id}/connections", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (testCaseConnectionsResponse, error) {
 		user, workspaceID, id, err := testTarget(r, "test_case_id")
 		if err != nil {
-			return nil, err
+			return testCaseConnectionsResponse{}, err
 		}
 		result, err := app.CaseConnections(user.ID, workspaceID, id)
-		return result, testManagementError(err)
+		return mapTestCaseConnections(result), testManagementError(err)
 	})
 	registerTestStepRoutes(builder, app, path+"/{test_case_id}/steps")
 	registerTestLabelRoutes(builder, app, path)
@@ -284,12 +371,13 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 		}
 		return testManagementError(app.DeleteStep(user.ID, workspaceID, caseID, stepID))
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (reorderedResponse, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
-			return nil, err
+			return reorderedResponse{}, err
 		}
-		return map[string]bool{"reordered": true}, testManagementError(app.ReorderSteps(user.ID, workspaceID, caseID, input.IDs))
+		err = testManagementError(app.ReorderSteps(user.ID, workspaceID, caseID, input.IDs))
+		return reorderedResponse{Reordered: err == nil}, err
 	})
 }
 
@@ -335,12 +423,13 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		result, err := app.ListCaseLabels(user.ID, workspaceID, caseID)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, labelsPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input labelReference) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, labelsPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input labelReference) (linkedResponse, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
-			return nil, err
+			return linkedResponse{}, err
 		}
-		return map[string]bool{"linked": true}, testManagementError(app.AddCaseLabel(user.ID, workspaceID, caseID, input.LabelID))
+		err = testManagementError(app.AddCaseLabel(user.ID, workspaceID, caseID, input.LabelID))
+		return linkedResponse{Linked: err == nil}, err
 	})
 	builder.Command(http.MethodDelete, labelsPath+"/{label_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
@@ -398,12 +487,13 @@ func registerTestPlanRoutes(builder *routeBuilder, app *services.TestManagementA
 		result, err := app.ListSetCases(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, relation+"/test-cases", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testCaseReference) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, relation+"/test-cases", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testCaseReference) (linkedResponse, error) {
 		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
-			return nil, err
+			return linkedResponse{}, err
 		}
-		return map[string]bool{"linked": true}, testManagementError(app.AddSetCase(user.ID, ws, id, input.TestCaseID))
+		err = testManagementError(app.AddSetCase(user.ID, ws, id, input.TestCaseID))
+		return linkedResponse{Linked: err == nil}, err
 	})
 	builder.Command(http.MethodDelete, relation+"/test-cases/{test_case_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, ws, id, err := testTarget(r, "plan_id")
@@ -416,70 +506,85 @@ func registerTestPlanRoutes(builder *routeBuilder, app *services.TestManagementA
 		}
 		return testManagementError(app.RemoveSetCase(user.ID, ws, id, caseID))
 	})
-	builder.Read(relation+"/runs", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestRun, error) {
+	builder.Read(relation+"/runs", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]testRunResponse, error) {
 		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.ListSetRuns(user.ID, ws, id)
-		return result, testManagementError(err)
+		return mapTestRuns(result), testManagementError(err)
 	})
 }
 
 type testRunTemplateCreate struct {
-	SetID       int    `json:"set_id"`
+	PlanID      int    `json:"plan_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 type testRunTemplatePatch struct {
-	SetID       *int    `json:"set_id"`
+	PlanID      *int    `json:"plan_id"`
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 }
 
+type testRunTemplateResponse struct {
+	ID          int       `json:"id"`
+	WorkspaceID int       `json:"workspace_id"`
+	PlanID      int       `json:"plan_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	PlanName    string    `json:"plan_name,omitempty"`
+}
+
 func registerTestRunTemplateRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-run-templates"
-	builder.WorkspaceCRUD(path, "template_id", "tests:read", "tests:write", workspaceCRUD[*models.TestRunTemplate, testRunTemplateCreate, testRunTemplatePatch]{
-		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestRunTemplate, int, error) {
+	builder.WorkspaceCRUD(path, "template_id", "tests:read", "tests:write", workspaceCRUD[*testRunTemplateResponse, testRunTemplateCreate, testRunTemplatePatch]{
+		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*testRunTemplateResponse, int, error) {
 			items, err := app.ListTemplates(userID, workspaceID)
-			return pagePointers(items, page), len(items), err
+			responses := mapTestRunTemplates(items)
+			return pagePointers(responses, page), len(responses), err
 		},
-		get: func(_ *http.Request, userID, workspaceID, id int) (*models.TestRunTemplate, error) {
-			return app.GetTemplate(userID, workspaceID, id)
+		get: func(_ *http.Request, userID, workspaceID, id int) (*testRunTemplateResponse, error) {
+			item, err := app.GetTemplate(userID, workspaceID, id)
+			return mapTestRunTemplate(item), err
 		},
-		create: func(_ *http.Request, userID, workspaceID int, input testRunTemplateCreate) (*models.TestRunTemplate, error) {
-			return app.CreateTemplate(userID, workspaceID, models.TestRunTemplate{SetID: input.SetID, Name: input.Name, Description: input.Description})
+		create: func(_ *http.Request, userID, workspaceID int, input testRunTemplateCreate) (*testRunTemplateResponse, error) {
+			item, err := app.CreateTemplate(userID, workspaceID, models.TestRunTemplate{SetID: input.PlanID, Name: input.Name, Description: input.Description})
+			return mapTestRunTemplate(item), err
 		},
-		patch: func(_ *http.Request, userID, workspaceID, id int, input testRunTemplatePatch) (*models.TestRunTemplate, error) {
-			return app.UpdateTemplate(userID, workspaceID, id, services.TestRunTemplatePatch{SetID: input.SetID, Name: input.Name, Description: input.Description})
+		patch: func(_ *http.Request, userID, workspaceID, id int, input testRunTemplatePatch) (*testRunTemplateResponse, error) {
+			item, err := app.UpdateTemplate(userID, workspaceID, id, services.TestRunTemplatePatch{SetID: input.PlanID, Name: input.Name, Description: input.Description})
+			return mapTestRunTemplate(item), err
 		},
 		delete: func(_ *http.Request, userID, workspaceID, id int) error {
 			return app.DeleteTemplate(userID, workspaceID, id)
 		},
 	})
 	item := path + "/{template_id}"
-	builder.Read(item+"/executions", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestRun, error) {
+	builder.Read(item+"/executions", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]testRunResponse, error) {
 		user, ws, id, err := testTarget(r, "template_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.ListTemplateExecutions(user.ID, ws, id)
-		return result, testManagementError(err)
+		return mapTestRuns(result), testManagementError(err)
 	})
-	builder.Action(http.MethodPost, item+"/execute", http.StatusCreated, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (*models.TestRun, error) {
+	builder.Action(http.MethodPost, item+"/execute", http.StatusCreated, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (*testRunResponse, error) {
 		user, ws, id, err := testTarget(r, "template_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.ExecuteTemplate(user.ID, ws, id)
-		return result, testManagementError(err)
+		return mapTestRun(result), testManagementError(err)
 	})
 }
 
 type testRunCreate struct {
 	Name       string `json:"name"`
 	TemplateID int    `json:"template_id"`
-	SetID      int    `json:"set_id"`
+	PlanID     int    `json:"plan_id"`
 	AssigneeID *int   `json:"assignee_id"`
 }
 type testRunPatch struct {
@@ -501,45 +606,89 @@ type itemReference struct {
 	ItemID int `json:"item_id"`
 }
 
+type testRunResponse struct {
+	ID             int        `json:"id"`
+	WorkspaceID    int        `json:"workspace_id"`
+	TemplateID     int        `json:"template_id,omitempty"`
+	PlanID         int        `json:"plan_id"`
+	Name           string     `json:"name"`
+	AssigneeID     *int       `json:"assignee_id,omitempty"`
+	StartedAt      time.Time  `json:"started_at"`
+	EndedAt        *time.Time `json:"ended_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	AssigneeName   string     `json:"assignee_name,omitempty"`
+	AssigneeEmail  string     `json:"assignee_email,omitempty"`
+	AssigneeAvatar string     `json:"assignee_avatar,omitempty"`
+}
+
+type testRunDetailResponse struct {
+	Run         *testRunResponse                      `json:"run"`
+	TestCases   []models.TestCase                     `json:"test_cases"`
+	Results     []services.TestRunResultWithCaseTitle `json:"results"`
+	StepResults []services.TestRunStepResult          `json:"step_results"`
+}
+
+func mapTestRunStepResults(values map[string]services.TestRunStepResult) []services.TestRunStepResult {
+	result := make([]services.TestRunStepResult, 0, len(values))
+	for _, value := range values {
+		result = append(result, value)
+	}
+	slices.SortFunc(result, func(a, b services.TestRunStepResult) int {
+		if byCase := cmp.Compare(a.TestCaseID, b.TestCaseID); byCase != 0 {
+			return byCase
+		}
+		return cmp.Compare(a.StepID, b.StepID)
+	})
+	return result
+}
+
 func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-runs"
-	builder.WorkspaceCRUD(path, "run_id", "tests:read", "tests:write", workspaceCRUD[*models.TestRun, testRunCreate, testRunPatch]{
-		list: func(r *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestRun, int, error) {
+	builder.WorkspaceCRUD(path, "run_id", "tests:read", "tests:write", workspaceCRUD[*testRunResponse, testRunCreate, testRunPatch]{
+		list: func(r *http.Request, userID, workspaceID int, page Pagination) ([]*testRunResponse, int, error) {
 			filters, err := testRunFilters(r)
 			if err != nil {
 				return nil, 0, err
 			}
-			items, err := app.ListRuns(userID, workspaceID, filters)
-			return pagePointers(items, page), len(items), err
+			items, total, err := app.ListRunsPage(userID, workspaceID, filters, page.PageSize, page.Offset)
+			responses := mapTestRuns(items)
+			return pointerSlice(responses), total, err
 		},
-		get: func(_ *http.Request, userID, workspaceID, id int) (*models.TestRun, error) {
-			return app.GetRun(userID, workspaceID, id)
+		get: func(_ *http.Request, userID, workspaceID, id int) (*testRunResponse, error) {
+			item, err := app.GetRun(userID, workspaceID, id)
+			return mapTestRun(item), err
 		},
-		create: func(r *http.Request, userID, workspaceID int, input testRunCreate) (*models.TestRun, error) {
-			return app.CreateRun(userID, workspaceID, auditActor(r, mustPrincipal(r)), services.TestRunCreateRequest{Name: input.Name, TemplateID: input.TemplateID, SetID: input.SetID, AssigneeID: input.AssigneeID})
+		create: func(r *http.Request, userID, workspaceID int, input testRunCreate) (*testRunResponse, error) {
+			item, err := app.CreateRun(userID, workspaceID, auditActor(r, mustPrincipal(r)), services.TestRunCreateRequest{Name: input.Name, TemplateID: input.TemplateID, SetID: input.PlanID, AssigneeID: input.AssigneeID})
+			return mapTestRun(item), err
 		},
-		patch: func(r *http.Request, userID, workspaceID, id int, input testRunPatch) (*models.TestRun, error) {
-			return app.UpdateRun(userID, workspaceID, id, auditActor(r, mustPrincipal(r)), services.TestRunPatch{Name: input.Name, AssigneeID: optionalInt(input.AssigneeID), AssigneeIDSet: input.AssigneeID.Set})
+		patch: func(r *http.Request, userID, workspaceID, id int, input testRunPatch) (*testRunResponse, error) {
+			item, err := app.UpdateRun(userID, workspaceID, id, auditActor(r, mustPrincipal(r)), services.TestRunPatch{Name: input.Name, AssigneeID: optionalInt(input.AssigneeID), AssigneeIDSet: input.AssigneeID.Set})
+			return mapTestRun(item), err
 		},
 		delete: func(r *http.Request, userID, workspaceID, id int) error {
 			return app.DeleteRun(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
 	item := path + "/{run_id}"
-	builder.Read(item+"/detail", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (*services.TestRunDetail, error) {
+	builder.Read(item+"/detail", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (*testRunDetailResponse, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.GetRunDetail(user.ID, ws, id)
-		return result, testManagementError(err)
+		if result == nil || err != nil {
+			return nil, testManagementError(err)
+		}
+		return &testRunDetailResponse{Run: mapTestRun(result.Run), TestCases: result.TestCases, Results: result.Results, StepResults: mapTestRunStepResults(result.StepResults)}, nil
 	})
-	builder.Action(http.MethodPost, item+"/end", http.StatusOK, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (map[string]bool, error) {
+	builder.Action(http.MethodPost, item+"/end", http.StatusOK, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (endedResponse, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
-			return nil, err
+			return endedResponse{}, err
 		}
-		return map[string]bool{"ended": true}, testManagementError(app.EndRun(user.ID, ws, id))
+		err = testManagementError(app.EndRun(user.ID, ws, id))
+		return endedResponse{Ended: err == nil}, err
 	})
 	builder.Read(item+"/results", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]services.TestRunResultWithCaseTitle, error) {
 		user, ws, id, err := testTarget(r, "run_id")
@@ -561,33 +710,34 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.UpdateResult(user.ID, ws, runID, resultID, services.TestResultUpdateRequest{Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes})
 		return result, testManagementError(err)
 	})
-	builder.Read(item+"/steps", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]services.TestRunStepResult, error) {
+	builder.Read(item+"/steps", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]services.TestRunStepResult, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.ListStepResults(user.ID, ws, id)
-		return result, testManagementError(err)
+		return mapTestRunStepResults(result), testManagementError(err)
 	})
-	builder.Read(item+"/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]string, error) {
+	builder.Read(item+"/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (services.TestRunMarkdownSummary, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
-			return nil, err
+			return services.TestRunMarkdownSummary{}, err
 		}
 		result, err := app.RunMarkdownSummary(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, item+"/steps/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testStepResultPatch) (map[string]bool, error) {
+	builder.JSON(http.MethodPatch, item+"/steps/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testStepResultPatch) (updatedResponse, error) {
 		user, ws, runID, err := testTarget(r, "run_id")
 		if err != nil {
-			return nil, err
+			return updatedResponse{}, err
 		}
 		stepID, err := pathID(r, "step_id")
 		if err != nil {
-			return nil, err
+			return updatedResponse{}, err
 		}
 		err = app.UpdateStepResult(user.ID, ws, runID, stepID, services.TestStepResultUpdateRequest{Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes, ItemID: input.ItemID})
-		return map[string]bool{"updated": true}, testManagementError(err)
+		err = testManagementError(err)
+		return updatedResponse{Updated: err == nil}, err
 	})
 	resultPath := "/workspaces/{workspace_id}/test-results/{result_id}/items"
 	builder.Read(resultPath, AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.Item, error) {
@@ -598,12 +748,13 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.ListResultItems(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, resultPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input itemReference) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, resultPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input itemReference) (linkedResponse, error) {
 		user, ws, id, err := testTarget(r, "result_id")
 		if err != nil {
-			return nil, err
+			return linkedResponse{}, err
 		}
-		return map[string]bool{"linked": true}, testManagementError(app.LinkResultItem(user.ID, ws, id, input.ItemID))
+		err = testManagementError(app.LinkResultItem(user.ID, ws, id, input.ItemID))
+		return linkedResponse{Linked: err == nil}, err
 	})
 	builder.Command(http.MethodDelete, resultPath+"/{item_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, ws, id, err := testTarget(r, "result_id")
@@ -619,18 +770,18 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 }
 
 func registerTestReportRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
-	builder.Read("/workspaces/{workspace_id}/test-reports/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]any, error) {
+	builder.Read("/workspaces/{workspace_id}/test-reports/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (services.TestReportSummary, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
-			return nil, err
+			return services.TestReportSummary{}, err
 		}
 		milestoneID, err := optionalPositiveQueryInt(r, "milestone_id")
 		if err != nil {
-			return nil, err
+			return services.TestReportSummary{}, err
 		}
 		days, err := parsePositiveInt(r, "days", 30, 365)
 		if err != nil {
-			return nil, err
+			return services.TestReportSummary{}, err
 		}
 		result, err := app.ReportsSummary(user.ID, workspaceID, milestoneID, days)
 		return result, testManagementError(err)
@@ -824,11 +975,41 @@ func testRunFilters(r *http.Request) (services.TestRunListFilters, error) {
 	if err != nil {
 		return services.TestRunListFilters{}, err
 	}
-	setID, err := optionalPositiveQueryInt(r, "set_id")
+	planID, err := optionalPositiveQueryInt(r, "plan_id")
 	if err != nil {
 		return services.TestRunListFilters{}, err
 	}
-	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: setID, IncludeEnded: r.URL.Query().Get("include_ended") == "true"}, nil
+	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: planID, IncludeEnded: r.URL.Query().Get("include_ended") == "true"}, nil
+}
+
+func mapTestRunTemplate(item *models.TestRunTemplate) *testRunTemplateResponse {
+	if item == nil {
+		return nil
+	}
+	return &testRunTemplateResponse{ID: item.ID, WorkspaceID: item.WorkspaceID, PlanID: item.SetID, Name: item.Name, Description: item.Description, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, PlanName: item.SetName}
+}
+
+func mapTestRunTemplates(items []models.TestRunTemplate) []testRunTemplateResponse {
+	result := make([]testRunTemplateResponse, len(items))
+	for i := range items {
+		result[i] = *mapTestRunTemplate(&items[i])
+	}
+	return result
+}
+
+func mapTestRun(item *models.TestRun) *testRunResponse {
+	if item == nil {
+		return nil
+	}
+	return &testRunResponse{ID: item.ID, WorkspaceID: item.WorkspaceID, TemplateID: item.TemplateID, PlanID: item.SetID, Name: item.Name, AssigneeID: item.AssigneeID, StartedAt: item.StartedAt, EndedAt: item.EndedAt, CreatedAt: item.CreatedAt, AssigneeName: item.AssigneeName, AssigneeEmail: item.AssigneeEmail, AssigneeAvatar: item.AssigneeAvatar}
+}
+
+func mapTestRuns(items []models.TestRun) []testRunResponse {
+	result := make([]testRunResponse, len(items))
+	for i := range items {
+		result[i] = *mapTestRun(&items[i])
+	}
+	return result
 }
 
 func testManagementError(err error) error {

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -19,7 +21,9 @@ type document struct {
 	Tags       []tag                                 `json:"tags"`
 	Paths      map[string]map[string]json.RawMessage `json:"paths"`
 	Components struct {
-		Parameters map[string]parameter `json:"parameters"`
+		Parameters map[string]parameter       `json:"parameters"`
+		Schemas    map[string]json.RawMessage `json:"schemas"`
+		Responses  map[string]json.RawMessage `json:"responses"`
 	} `json:"components"`
 }
 
@@ -36,13 +40,32 @@ type operation struct {
 	Security       []map[string][]string `json:"security"`
 	RequiredScopes []string              `json:"x-required-scopes"`
 	Parameters     []parameter           `json:"parameters"`
+	RequestBody    *requestBody          `json:"requestBody"`
+	Responses      map[string]response   `json:"responses"`
+}
+
+type requestBody struct {
+	Required bool                   `json:"required"`
+	Content  map[string]mediaObject `json:"content"`
+}
+
+type response struct {
+	Ref         string                 `json:"$ref"`
+	Description string                 `json:"description"`
+	Content     map[string]mediaObject `json:"content"`
+}
+
+type mediaObject struct {
+	Schema json.RawMessage `json:"schema"`
 }
 
 type parameter struct {
-	Ref         string `json:"$ref"`
-	Name        string `json:"name"`
-	In          string `json:"in"`
-	Description string `json:"description"`
+	Ref         string          `json:"$ref"`
+	Name        string          `json:"name"`
+	In          string          `json:"in"`
+	Description string          `json:"description"`
+	Required    bool            `json:"required"`
+	Schema      json.RawMessage `json:"schema"`
 }
 
 func main() {
@@ -71,7 +94,7 @@ func main() {
 	declaredTags := validateTags(spec.Tags)
 
 	want := make(map[string]v2.Route)
-	for _, route := range v2.Inventory() {
+	for _, route := range v2.BearerInventory() {
 		key := strings.ToLower(route.Method) + " " + route.Path
 		want[key] = route
 		item, ok := spec.Paths[route.Path]
@@ -89,6 +112,13 @@ func main() {
 		validateDocumentation(route, operation, declaredTags)
 		validateSecurity(route, operation)
 		validateParameters(route, operation, item, spec.Components.Parameters)
+		validateTransportContract(route, operation, spec.Components.Schemas)
+	}
+	if bytes.Contains(data, []byte("#/components/schemas/DataResponse")) ||
+		bytes.Contains(data, []byte("#/components/schemas/PageResponse")) ||
+		bytes.Contains(data, []byte("#/components/responses/DataResponse")) ||
+		bytes.Contains(data, []byte("#/components/responses/PageResponse")) {
+		fail("generic successful response contracts remain")
 	}
 
 	for path, item := range spec.Paths {
@@ -117,6 +147,7 @@ func validateParameters(route v2.Route, operation operation, item map[string]jso
 	parameters = append(parameters, operation.Parameters...)
 
 	declaredPath := make(map[string]bool)
+	resolvedParameters := make([]parameter, 0, len(parameters))
 	for _, candidate := range parameters {
 		resolved := candidate
 		if candidate.Ref != "" {
@@ -133,8 +164,27 @@ func validateParameters(route v2.Route, operation operation, item map[string]jso
 		if strings.TrimSpace(resolved.Description) == "" {
 			fail("route %s %s parameter %q has no description", route.Method, route.Path, resolved.Name)
 		}
+		if len(resolved.Schema) == 0 {
+			fail("route %s %s parameter %q has no schema", route.Method, route.Path, resolved.Name)
+		}
 		if resolved.In == "path" {
 			declaredPath[resolved.Name] = true
+		}
+		resolvedParameters = append(resolvedParameters, resolved)
+	}
+	if len(resolvedParameters) != len(route.Parameters) {
+		fail("route %s %s parameter metadata count differs: route=%d document=%d", route.Method, route.Path, len(route.Parameters), len(resolvedParameters))
+	}
+	for index, documented := range resolvedParameters {
+		metadata := route.Parameters[index]
+		var documentedSchema map[string]any
+		if err := json.Unmarshal(documented.Schema, &documentedSchema); err != nil {
+			fail("route %s %s parameter %q schema is invalid: %v", route.Method, route.Path, documented.Name, err)
+		}
+		documentedJSON, _ := json.Marshal(documentedSchema)
+		metadataJSON, _ := json.Marshal(metadata.Schema)
+		if documented.Name != metadata.Name || documented.In != metadata.In || documented.Description != metadata.Description || documented.Required != metadata.Required || !bytes.Equal(documentedJSON, metadataJSON) {
+			fail("route %s %s parameter %q differs from canonical route metadata", route.Method, route.Path, documented.Name)
 		}
 	}
 
@@ -146,6 +196,68 @@ func validateParameters(route v2.Route, operation operation, item map[string]jso
 			}
 		}
 	}
+}
+
+func validateTransportContract(route v2.Route, operation operation, schemas map[string]json.RawMessage) {
+	if route.RequestType == nil {
+		if operation.RequestBody != nil {
+			fail("route %s %s declares a request body not present in route metadata", route.Method, route.Path)
+		}
+	} else {
+		if operation.RequestBody == nil || !operation.RequestBody.Required {
+			fail("route %s %s must declare its required request body", route.Method, route.Path)
+		}
+		media, ok := operation.RequestBody.Content[route.RequestMediaType]
+		if !ok || len(media.Schema) == 0 {
+			fail("route %s %s must declare request media type %q with a schema", route.Method, route.Path, route.RequestMediaType)
+		}
+		name := exportedOperationName(operation.OperationID) + "Payload"
+		if _, ok := schemas[name]; !ok {
+			fail("route %s %s generated request schema %q is missing", route.Method, route.Path, name)
+		}
+	}
+
+	if route.SuccessStatus == 0 {
+		fail("route %s %s has no success status metadata", route.Method, route.Path)
+	}
+	status := strconv.Itoa(route.SuccessStatus)
+	success, ok := operation.Responses[status]
+	if !ok {
+		fail("route %s %s does not declare metadata success status %s", route.Method, route.Path, status)
+	}
+	for candidate := range operation.Responses {
+		if len(candidate) == 3 && candidate[0] == '2' && candidate != status {
+			fail("route %s %s declares unexpected success status %s", route.Method, route.Path, candidate)
+		}
+	}
+	if route.ResponseShape == v2.ResponseEmpty {
+		if len(success.Content) != 0 || success.Ref != "" {
+			fail("route %s %s must not declare a success body", route.Method, route.Path)
+		}
+		return
+	}
+	media, ok := success.Content[route.ResponseMediaType]
+	if !ok || len(media.Schema) == 0 {
+		fail("route %s %s must declare response media type %q with a schema", route.Method, route.Path, route.ResponseMediaType)
+	}
+	name := exportedOperationName(operation.OperationID) + "Result"
+	if _, ok := schemas[name]; !ok {
+		fail("route %s %s generated response schema %q is missing", route.Method, route.Path, name)
+	}
+	if route.Auth == v2.AuthAuthenticated {
+		for _, errorStatus := range []string{"401", "403", "429", "500"} {
+			if _, ok := operation.Responses[errorStatus]; !ok {
+				fail("route %s %s does not declare shared %s behavior", route.Method, route.Path, errorStatus)
+			}
+		}
+	}
+}
+
+func exportedOperationName(value string) string {
+	if value == "" {
+		return "Operation"
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
 }
 
 func validateTags(tags []tag) map[string]struct{} {
@@ -185,6 +297,14 @@ func validateDocumentation(route v2.Route, operation operation, declaredTags map
 	}
 	if strings.TrimSpace(operation.Description) == "" {
 		fail("route %s %s has no description", route.Method, route.Path)
+	}
+	if operation.OperationID != route.OperationID || operation.Tags[0] != route.Tag || operation.Summary != route.Summary || operation.Description != route.Description {
+		fail("route %s %s documentation differs from canonical route metadata", route.Method, route.Path)
+	}
+	for _, code := range route.DocumentedErrors {
+		if _, ok := operation.Responses[strconv.Itoa(code)]; !ok {
+			fail("route %s %s does not declare metadata error %d", route.Method, route.Path, code)
+		}
 	}
 }
 

@@ -41,8 +41,8 @@
       template = await api.tests.testRunTemplates.get(workspaceId, templateId);
       executions = await api.tests.testRunTemplates.getExecutions(workspaceId, templateId);
 
-      if (template.set_id) {
-        testSet = await api.tests.testPlans.get(workspaceId, template.set_id);
+      if (template.plan_id) {
+        testSet = await api.tests.testPlans.get(workspaceId, template.plan_id);
       }
     } catch (error) {
       console.error('Failed to load template:', error);
@@ -79,7 +79,7 @@
 
     try {
       await api.tests.testRunTemplates.update(workspaceId, templateId, {
-        set_id: template.set_id,
+        plan_id: template.plan_id,
         name: editName,
         description: editDescription
       });

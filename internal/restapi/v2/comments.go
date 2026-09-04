@@ -3,7 +3,6 @@ package v2
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,9 +22,17 @@ func registerCommentRoutes(builder *routeBuilder, deps Deps) {
 }
 
 type commentFeedDTO struct {
-	Comments []models.Comment `json:"comments"`
-	HasMore  bool             `json:"has_more"`
-	Total    *int             `json:"total"`
+	Comments      []models.Comment `json:"comments"`
+	NextCursor    string           `json:"next_cursor,omitempty"`
+	RefreshCursor string           `json:"refresh_cursor,omitempty"`
+	HasMore       bool             `json:"has_more"`
+	Total         *int             `json:"total"`
+}
+
+type commentCursor struct {
+	Direction string    `json:"direction"`
+	CreatedAt time.Time `json:"created_at"`
+	ID        int       `json:"id"`
 }
 
 type commentCreateRequest struct {
@@ -69,7 +76,11 @@ func listComments(deps Deps) readOperation[commentFeedDTO] {
 			}
 			total = &count
 		}
-		return commentFeedDTO{Comments: page.Comments, HasMore: page.HasMore, Total: total}, nil
+		nextCursor, refreshCursor := commentResponseCursors(page.Comments, options, page.HasMore)
+		return commentFeedDTO{
+			Comments: page.Comments, NextCursor: nextCursor, RefreshCursor: refreshCursor,
+			HasMore: page.HasMore, Total: total,
+		}, nil
 	}
 }
 
@@ -232,43 +243,53 @@ func parseCommentOptions(r *http.Request) (services.CommentFeedOptions, error) {
 		return services.CommentFeedOptions{}, err
 	}
 	options := services.CommentFeedOptions{Limit: limit}
-	before, hasBefore, err := parseCommentCursor(r, "before")
-	if err != nil {
-		return options, err
+	query := r.URL.Query()
+	for _, removed := range []string{"before", "before_id", "since", "since_id"} {
+		if query.Has(removed) {
+			return options, newError(http.StatusBadRequest, "invalid_request", "Use the opaque cursor parameter")
+		}
 	}
-	since, hasSince, err := parseCommentCursor(r, "since")
-	if err != nil {
-		return options, err
+	raw := query.Get("cursor")
+	if raw == "" {
+		return options, nil
 	}
-	if hasBefore && hasSince {
-		return options, newError(http.StatusBadRequest, "invalid_request", "before and since cannot be combined")
+	var cursor commentCursor
+	if err := decodeOpaqueCursor("comments", raw, &cursor); err != nil || cursor.ID == 0 || cursor.CreatedAt.IsZero() {
+		return options, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid")
 	}
-	if hasBefore {
-		options.Before = &before
-	}
-	if hasSince {
-		options.Since = &since
+	value := services.CommentFeedCursor{CreatedAt: cursor.CreatedAt, ID: cursor.ID}
+	switch cursor.Direction {
+	case "older":
+		options.Before = &value
+	case "newer":
+		options.Since = &value
+	default:
+		return options, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid")
 	}
 	return options, nil
 }
 
-func parseCommentCursor(r *http.Request, name string) (services.CommentFeedCursor, bool, error) {
-	rawTime, rawID := r.URL.Query().Get(name), r.URL.Query().Get(name+"_id")
-	if rawTime == "" && rawID == "" {
-		return services.CommentFeedCursor{}, false, nil
+func commentResponseCursors(comments []models.Comment, options services.CommentFeedOptions, hasMore bool) (nextCursor, refreshCursor string) {
+	if len(comments) == 0 {
+		return "", ""
 	}
-	if rawTime == "" || rawID == "" {
-		return services.CommentFeedCursor{}, false, newError(http.StatusBadRequest, "invalid_request", name+" and "+name+"_id must be provided together")
+	oldest, newest := comments[0], comments[0]
+	for _, comment := range comments[1:] {
+		if comment.CreatedAt.Before(oldest.CreatedAt) || comment.CreatedAt.Equal(oldest.CreatedAt) && comment.ID < oldest.ID {
+			oldest = comment
+		}
+		if comment.CreatedAt.After(newest.CreatedAt) || comment.CreatedAt.Equal(newest.CreatedAt) && comment.ID > newest.ID {
+			newest = comment
+		}
 	}
-	createdAt, err := time.Parse(time.RFC3339Nano, rawTime)
-	if err != nil {
-		return services.CommentFeedCursor{}, false, newError(http.StatusBadRequest, "invalid_request", name+" must be an RFC3339 timestamp")
+	refresh := encodeOpaqueCursor("comments", commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID})
+	if !hasMore {
+		return "", refresh
 	}
-	id, err := strconv.Atoi(rawID)
-	if err != nil || id == 0 {
-		return services.CommentFeedCursor{}, false, newError(http.StatusBadRequest, "invalid_request", name+"_id must be a non-zero integer")
+	if options.Since != nil {
+		return encodeOpaqueCursor("comments", commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID}), refresh
 	}
-	return services.CommentFeedCursor{CreatedAt: createdAt, ID: id}, true, nil
+	return encodeOpaqueCursor("comments", commentCursor{Direction: "older", CreatedAt: oldest.CreatedAt, ID: oldest.ID}), refresh
 }
 
 func renderCommentHTML(comments []models.Comment) error {

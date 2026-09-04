@@ -38,6 +38,8 @@
 	let hasMore = $state(false);
 	let isLoadingMore = $state(false);
 	let totalCount = $state(0);
+	let olderCursor = $state('');
+	let refreshCursor = $state('');
 	let reconciliationVersion = 0;
 
 	// Editing state
@@ -151,6 +153,8 @@
 
 		comments = response?.comments || [];
 		hasMore = Boolean(response?.has_more);
+		olderCursor = response?.next_cursor || '';
+		refreshCursor = response?.refresh_cursor || '';
 		totalCount = Number.isInteger(response?.total) ? response.total : comments.length;
 		onCommentsLoaded?.({ count: totalCount });
 	}
@@ -160,12 +164,11 @@
 	 * preserves loaded older pages, the draft box, and any in-progress editor.
 	 */
 	async function pollForNewComments() {
-		const newest = feedBoundary(comments, 'newest');
 		let response;
 		try {
 			response = await loadAttributedComments(api, itemId, {
 				limit: COMMENT_PAGE_SIZE,
-				...(newest ? { since: newest.created_at, sinceId: newest.id } : {})
+				...(refreshCursor ? { cursor: refreshCursor } : {})
 			});
 		} catch (err) {
 			console.warn('Comments poll failed:', err);
@@ -175,12 +178,15 @@
 		const next = response?.comments || [];
 		const existingIds = new Set(comments.map((comment) => comment.id));
 		const added = next.filter((comment) => !existingIds.has(comment.id));
+		const hadRefreshCursor = Boolean(refreshCursor);
+		refreshCursor = response?.refresh_cursor || refreshCursor;
 		const currentUserId = authStore.currentUser?.id;
 		const arrived = added.filter((comment) => comment.author_id !== currentUserId).length;
 
 		comments = mergeCommentRows(comments, next);
-		if (!newest) {
+		if (!hadRefreshCursor) {
 			hasMore = Boolean(response?.has_more);
+			olderCursor = response?.next_cursor || '';
 			totalCount = Number.isInteger(response?.total) ? response.total : comments.length;
 		} else {
 			totalCount += added.length;
@@ -202,7 +208,7 @@
 		const previousNewest = feedBoundary(comments, 'newest');
 		const existingIds = new Set(comments.map((comment) => comment.id));
 		const fresh = [];
-		let cursor = null;
+		let cursor = '';
 		let firstResponse = null;
 		let lastResponse = null;
 
@@ -211,7 +217,7 @@
 				const isFirstPage = firstResponse === null;
 				const response = await loadAttributedComments(api, itemId, {
 					limit: Math.min(100, targetCount - fresh.length),
-					...(cursor ? { before: cursor.created_at, beforeId: cursor.id } : {})
+					...(cursor ? { cursor } : {})
 				});
 				if (version !== reconciliationVersion) return;
 				firstResponse ??= response;
@@ -222,7 +228,7 @@
 				const page = response?.comments || [];
 				fresh.push(...page);
 				if (!response?.has_more || page.length === 0) break;
-				cursor = feedBoundary(page, 'oldest');
+				cursor = response?.next_cursor || '';
 			}
 		} catch (err) {
 			if (version !== reconciliationVersion) return;
@@ -239,6 +245,8 @@
 		comments = mergeCommentRows([], fresh);
 		totalCount = Number.isInteger(firstResponse?.total) ? firstResponse.total : comments.length;
 		hasMore = Boolean(lastResponse?.has_more);
+		olderCursor = lastResponse?.next_cursor || '';
+		refreshCursor = firstResponse?.refresh_cursor || refreshCursor;
 		if (editingCommentId && !comments.some((comment) => comment.id === editingCommentId)) {
 			editingCommentId = null;
 			editingContent = '';
@@ -249,19 +257,18 @@
 
 	async function loadMoreComments() {
 		if (isLoadingMore || !hasMore) return;
-		const oldest = feedBoundary(comments, 'oldest');
-		if (!oldest) return;
+		if (!olderCursor) return;
 
 		isLoadingMore = true;
 		error = '';
 		try {
 			const response = await loadAttributedComments(api, itemId, {
 				limit: COMMENT_PAGE_SIZE,
-				before: oldest.created_at,
-				beforeId: oldest.id
+				cursor: olderCursor
 			});
 			comments = mergeCommentRows(comments, response?.comments || []);
 			hasMore = Boolean(response?.has_more);
+			olderCursor = response?.next_cursor || '';
 			onCommentsLoaded?.({ count: totalCount });
 		} catch (err) {
 			console.error('Failed to load older comments:', err);

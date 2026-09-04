@@ -524,15 +524,16 @@ func (st *itemPersonalStore) ListTasks(workspaceID int) ([]repository.PersonalWo
 func (st *itemPersonalStore) CreateTask(workspaceID, userID int, s taskState) (int, error) {
 	statusID := statusForCompleted(s.Completed)
 	params := ItemCreationParams{
-		WorkspaceID:   workspaceID,
-		Title:         s.Title,
-		Description:   s.Description,
-		StatusID:      &statusID,
-		IsTask:        true,
-		AssigneeID:    &userID,
-		CreatorID:     &userID,
-		DueDate:       dueTime(s.Due),
-		EventMetadata: itemevents.Integration("todoist", "integration"),
+		WorkspaceID:      workspaceID,
+		Title:            s.Title,
+		Description:      s.Description,
+		StatusID:         &statusID,
+		IsTask:           true,
+		AssigneeID:       &userID,
+		CreatorID:        &userID,
+		ValidatingUserID: userID,
+		DueDate:          dueTime(s.Due),
+		EventMetadata:    itemevents.Integration("todoist", "integration"),
 	}
 	id, err := CreateItem(st.db, params)
 	return int(id), err

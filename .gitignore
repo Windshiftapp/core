@@ -173,6 +173,8 @@ scripts/*
 !scripts/.layering-baseline
 !scripts/.handler-db-access-allowlist
 !scripts/openapi-convert/
+!scripts/openapi-v2-generate/
+!scripts/openapi-v2-metadata/
 !scripts/openapi-convert/**
 !scripts/openapi-v2-check/
 !scripts/openapi-v2-check/**

@@ -230,49 +230,71 @@ func coverageSummary(total, covered int) models.TestCoverageSummary {
 	return result
 }
 
-func (s *TestManagementApplicationService) RunMarkdownSummary(userID, workspaceID, runID int) (map[string]string, error) {
+type TestRunMarkdownSummary struct {
+	Markdown string `json:"markdown"`
+}
+
+type TestReportOverall struct {
+	TotalRuns  int     `json:"total_runs"`
+	TotalTests int     `json:"total_tests"`
+	Passed     int64   `json:"passed"`
+	Failed     int64   `json:"failed"`
+	Blocked    int64   `json:"blocked"`
+	Skipped    int64   `json:"skipped"`
+	NotRun     int64   `json:"not_run"`
+	PassRate   float64 `json:"pass_rate"`
+}
+
+type TestReportSummary struct {
+	Overall        TestReportOverall          `json:"overall"`
+	Trend          []repository.TrendPoint    `json:"trend"`
+	RecentFailures []repository.RecentFailure `json:"recent_failures"`
+	RecentBlocked  []repository.RecentBlocked `json:"recent_blocked"`
+}
+
+func (s *TestManagementApplicationService) RunMarkdownSummary(userID, workspaceID, runID int) (TestRunMarkdownSummary, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
-		return nil, err
+		return TestRunMarkdownSummary{}, err
 	}
 	header, err := s.summaries.FindMarkdownRunHeader(runID, workspaceID)
 	if err != nil {
-		return nil, err
+		return TestRunMarkdownSummary{}, err
 	}
 	results, err := s.summaries.FindMarkdownResults(runID, workspaceID)
 	if err != nil {
-		return nil, err
+		return TestRunMarkdownSummary{}, err
 	}
-	return map[string]string{"markdown": testsummary.RenderMarkdown(header, results)}, nil
+	return TestRunMarkdownSummary{Markdown: testsummary.RenderMarkdown(header, results)}, nil
 }
 
-func (s *TestManagementApplicationService) ReportsSummary(userID, workspaceID int, milestoneID *int, days int) (map[string]any, error) {
+func (s *TestManagementApplicationService) ReportsSummary(userID, workspaceID int, milestoneID *int, days int) (TestReportSummary, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
-		return nil, err
+		return TestReportSummary{}, err
 	}
 	filter := repository.ReportFilter{WorkspaceID: workspaceID, MilestoneID: milestoneID, StartDate: time.Now().AddDate(0, 0, -days)}
 	stats, err := s.summaries.GetOverallStats(filter)
 	if err != nil {
-		return nil, err
+		return TestReportSummary{}, err
 	}
 	trend, err := s.summaries.GetTrend(filter)
 	if err != nil {
-		return nil, err
+		return TestReportSummary{}, err
 	}
 	failures, err := s.summaries.GetRecentFailures(filter, 20)
 	if err != nil {
-		return nil, err
+		return TestReportSummary{}, err
 	}
 	blocked, err := s.summaries.GetRecentBlocked(filter, 20)
 	if err != nil {
-		return nil, err
+		return TestReportSummary{}, err
 	}
-	return map[string]any{
-		"overall": map[string]any{
-			"total_runs": stats.TotalRuns, "total_tests": stats.TotalTests, "passed": stats.Passed,
-			"failed": stats.Failed, "blocked": stats.Blocked, "skipped": stats.Skipped,
-			"not_run": stats.NotRun, "pass_rate": stats.PassRate(),
+	return TestReportSummary{
+		Overall: TestReportOverall{
+			TotalRuns: stats.TotalRuns, TotalTests: stats.TotalTests, Passed: stats.Passed,
+			Failed: stats.Failed, Blocked: stats.Blocked, Skipped: stats.Skipped,
+			NotRun: stats.NotRun, PassRate: stats.PassRate(),
 		},
-		"trend": trend, "recent_failures": failures, "recent_blocked": blocked,
+		Trend: trend, RecentFailures: failures, RecentBlocked: blocked,
 	}, nil
 }
 
@@ -466,7 +488,7 @@ func (s *TestManagementApplicationService) ReorderCases(userID, workspaceID int,
 	return s.cases.Reorder(workspaceID, ids)
 }
 
-func (s *TestManagementApplicationService) CaseConnections(userID, workspaceID, id int) (any, error) {
+func (s *TestManagementApplicationService) CaseConnections(userID, workspaceID, id int) (*repository.TestCaseConnections, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err
 	}
@@ -789,6 +811,13 @@ func (s *TestManagementApplicationService) ListRuns(userID, workspaceID int, fil
 		return nil, err
 	}
 	return s.runs.List(workspaceID, filters)
+}
+
+func (s *TestManagementApplicationService) ListRunsPage(userID, workspaceID int, filters TestRunListFilters, limit, offset int) ([]models.TestRun, int, error) {
+	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
+		return nil, 0, err
+	}
+	return s.runs.ListPage(workspaceID, filters, limit, offset)
 }
 
 func (s *TestManagementApplicationService) GetRun(userID, workspaceID, id int) (*models.TestRun, error) {

@@ -183,7 +183,10 @@ func itemUpdateData(fields map[string]json.RawMessage) (map[string]any, error) {
 			updateData[field] = value
 		}
 	}
-	if raw, ok := fields["is_task"]; ok && string(raw) != "null" {
+	if raw, ok := fields["is_task"]; ok {
+		if string(raw) == "null" {
+			return nil, &validation.ValidationError{Field: "is_task", Message: "is_task cannot be null"}
+		}
 		var value bool
 		if err := decodeItemUpdateField(raw, "is_task", &value); err != nil {
 			return nil, err

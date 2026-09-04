@@ -17,7 +17,7 @@ func registerWorklogRoutes(builder *routeBuilder, deps Deps) {
 	builder.JSON(http.MethodPost, "/time/worklogs", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, createWorklog(deps))
 	builder.JSON(http.MethodPatch, "/time/worklogs/{worklog_id}", http.StatusOK, true, AuthAuthenticated, []string{"time:write"}, updateWorklog(deps))
 	builder.Command(http.MethodDelete, "/time/worklogs/{worklog_id}", AuthAuthenticated, []string{"time:delete"}, deleteWorklog(deps))
-	builder.Read("/items/{item_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listItemWorklogs(deps))
+	builder.Page("/items/{item_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listItemWorklogs(deps))
 	builder.Page("/time/projects/{project_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listProjectWorklogs(deps))
 }
 
@@ -179,28 +179,31 @@ func deleteWorklog(deps Deps) commandOperation {
 	}
 }
 
-func listItemWorklogs(deps Deps) readOperation[[]worklogDTO] {
-	return func(r *http.Request) ([]worklogDTO, error) {
+func listItemWorklogs(deps Deps) pageOperation[worklogDTO] {
+	return func(r *http.Request) ([]worklogDTO, Pagination, int, error) {
 		item, err := requireItem(r, deps, deps.Access.CanViewWorkspace)
 		if err != nil {
-			return nil, err
+			return nil, Pagination{}, 0, err
 		}
-		worklogs, err := deps.Worklogs.List(repository.WorklogDetailFilter{ItemID: &item.ID})
+		page, err := ParsePage(r)
 		if err != nil {
-			return nil, internalError(err)
+			return nil, Pagination{}, 0, err
 		}
-		visible := make([]models.Worklog, 0, len(worklogs))
-		user, _ := principal(r)
-		for _, worklog := range worklogs {
-			allowed, accessErr := deps.TimeAccess.CanViewProject(user.ID, worklog.ProjectID)
-			if accessErr != nil {
-				return nil, internalError(accessErr)
-			}
-			if allowed {
-				visible = append(visible, worklog)
-			}
+		user, err := principal(r)
+		if err != nil {
+			return nil, page, 0, err
 		}
-		return mapWorklogs(visible), nil
+		projectIDs, err := deps.TimeAccess.AccessibleTimeProjectIDs(user.ID)
+		if err != nil {
+			return nil, page, 0, internalError(err)
+		}
+		worklogs, total, err := deps.Worklogs.ListPage(repository.WorklogDetailFilter{
+			ItemID: &item.ID, AccessibleProjectIDs: projectIDs, Limit: page.PageSize, Offset: page.Offset,
+		})
+		if err != nil {
+			return nil, page, 0, internalError(err)
+		}
+		return mapWorklogs(worklogs), page, total, nil
 	}
 }
 
@@ -221,18 +224,15 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		filter := repository.WorklogDetailFilter{ProjectID: &projectID}
+		filter := repository.WorklogDetailFilter{ProjectID: &projectID, Limit: page.PageSize, Offset: page.Offset}
 		if err := applyWorklogDetailDates(r, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		worklogs, err := deps.Worklogs.List(filter)
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
-		total := len(worklogs)
-		start := min(page.Offset, total)
-		end := min(start+page.PageSize, total)
-		return mapWorklogs(worklogs[start:end]), page, total, nil
+		return mapWorklogs(worklogs), page, total, nil
 	}
 }
 

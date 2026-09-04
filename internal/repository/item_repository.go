@@ -811,13 +811,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
-		    due_date = ?, start_date = ?, end_date = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
+		    due_date = ?, start_date = ?, end_date = ?, is_task = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
 		    time_project_id = ?, assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, story_points = ?, estimate_minutes = ?, updated_at = ?, last_active_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
-		item.DueDate, item.StartDate, item.EndDate, item.IterationID, item.ProjectID, item.InheritProject,
+		item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
 		item.TimeProjectID, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, item.StoryPoints, item.EstimateMinutes, now, now, item.ID,
 	)

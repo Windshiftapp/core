@@ -59,7 +59,7 @@ func registerScopedCatalogRoutes(builder *routeBuilder, catalog catalogReader, w
 	builder.Read("/users/{user_id}", AuthAuthenticated, []string{"users:read"}, getUser(catalog))
 	builder.Read("/workspaces/{workspace_id}/labels", AuthAuthenticated, []string{"items:read"}, listLabels(catalog))
 	builder.Read("/workspaces/{workspace_id}/labels/{label_id}", AuthAuthenticated, []string{"items:read"}, getLabel(catalog))
-	builder.Raw(http.MethodGet, "/workspaces/{workspace_id}/item-templates", AuthAuthenticated, []string{"item-templates:read"}, listItemTemplates(catalog))
+	builder.RawResponse[itemTemplateListDocument](http.MethodGet, "/workspaces/{workspace_id}/item-templates", http.StatusOK, "application/json", AuthAuthenticated, []string{"item-templates:read"}, listItemTemplates(catalog))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/item-templates", http.StatusCreated, false, AuthAuthenticated, []string{"item-templates:write"}, createItemTemplate(templates))
 	builder.Read("/workspaces/{workspace_id}/item-templates/{template_id}", AuthAuthenticated, []string{"item-templates:read"}, getItemTemplate(catalog))
 	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/item-templates/{template_id}", http.StatusOK, true, AuthAuthenticated, []string{"item-templates:write"}, updateItemTemplate(templates))

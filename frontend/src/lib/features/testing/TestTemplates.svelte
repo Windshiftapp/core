@@ -107,7 +107,7 @@
 
     try {
       await api.tests.testRunTemplates.create(workspaceId, {
-        set_id: parseInt(selectedSetId),
+        plan_id: parseInt(selectedSetId),
         name: templateName,
         description: templateDescription || ''
       });
@@ -191,12 +191,12 @@
 
   // Enrich templates with test set and milestone info
   const enrichedTemplates = $derived.by(() => $testTemplates.map(template => {
-    const set = $testSets.find(s => s.id === template.set_id);
+    const set = $testSets.find(s => s.id === template.plan_id);
     const milestone = set ? $milestones.find(m => m.id === set.milestone_id) : null;
     return {
       ...template,
       testSetName: set?.name || 'Unknown',
-      testSetId: template.set_id,
+      testSetId: template.plan_id,
       milestoneName: milestone?.name || 'No milestone',
       milestoneId: set?.milestone_id
     };

@@ -85,7 +85,7 @@
 
     try {
       await api.tests.testRuns.create(workspaceId, {
-        set_id: parseInt(selectedSetId),
+        plan_id: parseInt(selectedSetId),
         name: runName,
         assignee_id: selectedAssigneeId || null
       });
@@ -248,14 +248,14 @@
     const filteredSetIds = new Set(filteredTestSets.map(s => s.id));
 
     return $testRuns
-      .filter(run => !selectedMilestoneFilter || filteredSetIds.has(run.set_id))
+      .filter(run => !selectedMilestoneFilter || filteredSetIds.has(run.plan_id))
       .map(run => {
-        const set = $testSets.find(s => s.id === run.set_id);
+        const set = $testSets.find(s => s.id === run.plan_id);
         const milestone = set ? $milestones.find(m => m.id === set.milestone_id) : null;
         return {
           ...run,
           testSetName: set?.name || 'Unknown',
-          testSetId: run.set_id,
+          testSetId: run.plan_id,
           milestoneName: milestone?.name || 'No milestone',
           milestoneId: set?.milestone_id
         };

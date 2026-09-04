@@ -3,8 +3,7 @@ import { dateInputToISOString } from '../utils/dateFormatter.js';
 import { fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { buildQueryString } from './utils.js';
 
-// Item ids per GET /items/batch request. Kept under the server cap (500) and
-// aligned with the links-batch chunk size to bound URL length.
+// Item ids per POST /items/batch request. Kept under the server cap (500).
 const ITEM_BATCH_CHUNK = 200;
 
 function itemMutationBody(data) {
@@ -154,7 +153,9 @@ export const items = {
       chunks.push(unique.slice(i, i + ITEM_BATCH_CHUNK));
     }
     const results = await Promise.all(
-      chunks.map((chunk) => fetchV2Data(`/items/batch?ids=${chunk.join(',')}`))
+      chunks.map((chunk) =>
+        fetchV2Data('/items/batch', { method: 'POST', body: JSON.stringify({ ids: chunk }) })
+      )
     );
     return results.flat();
   },
@@ -220,14 +221,14 @@ export const items = {
   getDeleteInfo: (id) => fetchV2Data(`/items/${id}/delete-info`),
   deleteCascade: withCrossTabNotice(
     (id) =>
-      fetchV2Data(`/items/${id}/cascade`, {
-        method: 'DELETE',
+      fetchV2Data(`/items/${id}/cascade-deletion`, {
+        method: 'POST',
       }),
     'delete'
   ),
   reparentChildren: (id, newParentId) =>
     fetchV2Data(`/items/${id}/reparent-children`, {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify({ parent_id: newParentId }),
     }),
   copy: withCrossTabNotice(

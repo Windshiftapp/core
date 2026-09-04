@@ -369,7 +369,7 @@ func (o *Output) printTestRunCSV(w *csv.Writer, run *TestRun) {
 		status = "completed"
 	}
 	_ = w.Write([]string{"ID", "NAME", "SET_ID", "ASSIGNEE", "STARTED", "ENDED", "STATUS"})
-	_ = w.Write([]string{fmt.Sprintf("%d", run.ID), run.Name, fmt.Sprintf("%d", run.SetID), assignee, started, ended, status})
+	_ = w.Write([]string{fmt.Sprintf("%d", run.ID), run.Name, fmt.Sprintf("%d", run.PlanID), assignee, started, ended, status})
 }
 
 func (o *Output) printTestResultsCSV(w *csv.Writer, results []TestResult) {
@@ -630,7 +630,7 @@ func (o *Output) printTestRunsTable(w *tabwriter.Writer, runs []TestRun) {
 func (o *Output) printTestRunDetailTable(w *tabwriter.Writer, run *TestRun) {
 	_, _ = fmt.Fprintf(w, "ID:\t%d\n", run.ID)
 	_, _ = fmt.Fprintf(w, "Name:\t%s\n", run.Name)
-	_, _ = fmt.Fprintf(w, "Set ID:\t%d\n", run.SetID)
+	_, _ = fmt.Fprintf(w, "Plan ID:\t%d\n", run.PlanID)
 	if run.AssigneeName != "" {
 		_, _ = fmt.Fprintf(w, "Assignee:\t%s\n", run.AssigneeName)
 	}

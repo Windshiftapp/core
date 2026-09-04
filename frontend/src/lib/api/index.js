@@ -102,6 +102,7 @@ import {
   portalCustomers,
   portalPasskey,
 } from './portal.js';
+import { queryLanguage } from './queryLanguage.js';
 import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
@@ -239,6 +240,9 @@ export const api = {
 
   // Search
   search,
+
+  // Query language metadata and value help
+  queryLanguage,
 
   // Milestone Categories
   milestoneCategories,

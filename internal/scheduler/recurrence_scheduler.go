@@ -11,6 +11,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/validation"
 
 	"github.com/teambition/rrule-go"
 )
@@ -308,6 +309,13 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 	}
 	if rule.CopyCustomFields {
 		item.CustomFieldValues = template.CustomFieldValues
+	}
+	actorUserID := 0
+	if rule.CreatedBy != nil {
+		actorUserID = *rule.CreatedBy
+	}
+	if err := validation.ValidateTaskState(rs.db, item.WorkspaceID, actorUserID, item.IsTask, item.StatusID); err != nil {
+		return fmt.Errorf("validate recurring item: %w", err)
 	}
 
 	itemID, err := rs.itemRepo.CreateWithRetry(context.Background(), item, func(tx database.Tx, itemID int) error {

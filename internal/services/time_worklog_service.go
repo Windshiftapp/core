@@ -123,6 +123,11 @@ func (s *TimeWorklogService) List(filter repository.WorklogDetailFilter) ([]mode
 	return s.worklogs.ListDetails(filter)
 }
 
+// ListPage returns a repository-bounded joined worklog page.
+func (s *TimeWorklogService) ListPage(filter repository.WorklogDetailFilter) ([]models.Worklog, int, error) {
+	return s.worklogs.ListDetailsPage(filter)
+}
+
 type preparedWorklog struct {
 	customerID      int64
 	description     string

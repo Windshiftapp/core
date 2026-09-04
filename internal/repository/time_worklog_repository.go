@@ -166,6 +166,8 @@ type WorklogDetailFilter struct {
 	ItemID               *int
 	DateFromUnix         *int64
 	DateToExclusiveUnix  *int64
+	Limit                int
+	Offset               int
 }
 
 // ListDetails returns joined worklogs ordered newest-first.
@@ -173,9 +175,53 @@ func (r *TimeWorklogRepository) ListDetails(filter WorklogDetailFilter) ([]model
 	if filter.AccessibleProjectIDs != nil && len(filter.AccessibleProjectIDs) == 0 {
 		return []models.Worklog{}, nil
 	}
+	where, args := worklogDetailWhere(filter)
+	query := worklogDetailSelect + "\n" + where
+	query += " ORDER BY w.date DESC, w.start_time DESC, w.id DESC"
+	if filter.Limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		args = append(args, filter.Limit, max(filter.Offset, 0))
+	}
 
-	query := worklogDetailSelect + "\nWHERE 1=1"
-	args := make([]any, 0)
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list worklog details: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	worklogs := make([]models.Worklog, 0)
+	for rows.Next() {
+		worklog, err := scanWorklogDetail(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan worklog details: %w", err)
+		}
+		worklogs = append(worklogs, worklog)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read worklog details: %w", err)
+	}
+	return worklogs, nil
+}
+
+// ListDetailsPage returns a repository-bounded page and its matching total.
+func (r *TimeWorklogRepository) ListDetailsPage(filter WorklogDetailFilter) ([]models.Worklog, int, error) {
+	if filter.Limit <= 0 {
+		return nil, 0, errors.New("worklog page limit must be positive")
+	}
+	if filter.AccessibleProjectIDs != nil && len(filter.AccessibleProjectIDs) == 0 {
+		return []models.Worklog{}, 0, nil
+	}
+	where, args := worklogDetailWhere(filter)
+	var total int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM time_worklogs w "+where, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count worklog details: %w", err)
+	}
+	items, err := r.ListDetails(filter)
+	return items, total, err
+}
+
+func worklogDetailWhere(filter WorklogDetailFilter) (query string, args []any) {
+	query = "WHERE 1=1"
 	if filter.AccessibleProjectIDs != nil {
 		placeholders := make([]string, len(filter.AccessibleProjectIDs))
 		for i, id := range filter.AccessibleProjectIDs {
@@ -204,26 +250,7 @@ func (r *TimeWorklogRepository) ListDetails(filter WorklogDetailFilter) ([]model
 		query += " AND w.date < ?"
 		args = append(args, *filter.DateToExclusiveUnix)
 	}
-	query += " ORDER BY w.date DESC, w.start_time DESC"
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list worklog details: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	worklogs := make([]models.Worklog, 0)
-	for rows.Next() {
-		worklog, err := scanWorklogDetail(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scan worklog details: %w", err)
-		}
-		worklogs = append(worklogs, worklog)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read worklog details: %w", err)
-	}
-	return worklogs, nil
+	return query, args
 }
 
 // GetDetail returns a joined worklog or ErrNotFound when it does not exist.

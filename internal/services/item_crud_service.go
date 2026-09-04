@@ -15,6 +15,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/validation"
 )
 
 var (
@@ -256,6 +257,9 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 		ParentID:          parentID,
 		RelatedWorkItemID: source.RelatedWorkItemID,
 		StoryPoints:       source.StoryPoints,
+	}
+	if err := validation.ValidateTaskState(s.db, newItem.WorkspaceID, opts.CreatorID, newItem.IsTask, newItem.StatusID); err != nil {
+		return nil, err
 	}
 
 	newID, err := s.repo.CreateWithRetry(context.Background(), newItem, func(tx database.Tx, itemID int) error {

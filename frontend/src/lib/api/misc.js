@@ -70,10 +70,7 @@ export const deleteDiagram = (diagramId) =>
 export const getComments = (itemId, params = {}) => {
   const searchParams = new URLSearchParams();
   if (params.limit) searchParams.set('page_size', params.limit);
-  if (params.before) searchParams.set('before', params.before);
-  if (params.beforeId) searchParams.set('before_id', params.beforeId);
-  if (params.since) searchParams.set('since', params.since);
-  if (params.sinceId) searchParams.set('since_id', params.sinceId);
+  if (params.cursor) searchParams.set('cursor', params.cursor);
   const query = searchParams.toString();
   return fetchV2Data(`/items/${itemId}/comments${query ? `?${query}` : ''}`);
 };

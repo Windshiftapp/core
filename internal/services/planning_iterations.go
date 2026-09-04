@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"windshift/internal/logger"
@@ -115,6 +116,8 @@ type IterationListParams struct {
 	TypeID        *int   // Filter by type
 	Status        string // Filter by status
 	IncludeGlobal bool   // Include global iterations
+	SortBy        string
+	SortOrder     string
 }
 
 // FindIterationByName returns a local workspace iteration by exact name.
@@ -139,7 +142,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	list.addWorkspaceScope("i.workspace_id", "i.is_global", params.WorkspaceID, params.WorkspaceIDs, params.IncludeGlobal)
 	list.addNullableIDFilter("i.type_id", params.TypeID)
 	list.addStringFilter("i.status", params.Status)
-	query, args := list.paginated(" ORDER BY i.start_date DESC, i.name", params.Limit, params.Offset)
+	query, args := list.paginated(iterationOrderByClause(params.SortBy, params.SortOrder), params.Limit, params.Offset)
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -155,6 +158,19 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 
 	return iterations, total, nil
+}
+
+func iterationOrderByClause(sortBy, sortOrder string) string {
+	direction := "ASC"
+	if strings.EqualFold(sortOrder, "desc") {
+		direction = "DESC"
+	}
+	switch sortBy {
+	case "start_date", "end_date", "name", "status", "created_at", "updated_at":
+		return " ORDER BY i." + sortBy + " " + direction + ", i.name ASC, i.id ASC"
+	default:
+		return " ORDER BY i.start_date DESC, i.name ASC, i.id ASC"
+	}
 }
 
 // GetIteration retrieves an iteration by ID.

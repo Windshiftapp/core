@@ -170,6 +170,40 @@ func (s *TimePermissionService) CanViewProject(userID, projectID int) (bool, err
 	return s.CanBookTimeOnProject(userID, projectID)
 }
 
+// AccessibleTimeProjectIDs resolves the projects whose worklogs a user may view.
+func (s *TimePermissionService) AccessibleTimeProjectIDs(userID int) ([]int, error) {
+	rows, err := s.db.Query("SELECT id FROM time_projects ORDER BY id")
+	if err != nil {
+		return nil, fmt.Errorf("list time projects for access: %w", err)
+	}
+	var candidates []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("scan time project for access: %w", err)
+		}
+		candidates = append(candidates, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close time project access rows: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read time projects for access: %w", err)
+	}
+	result := make([]int, 0, len(candidates))
+	for _, id := range candidates {
+		allowed, err := s.CanViewProject(userID, id)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			result = append(result, id)
+		}
+	}
+	return result, nil
+}
+
 // HasProjectManagers checks if a project has any manager restrictions configured
 func (s *TimePermissionService) HasProjectManagers(projectID int) (bool, error) {
 	var count int

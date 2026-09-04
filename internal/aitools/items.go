@@ -328,8 +328,8 @@ func init() {
 			}
 			title := sanitize.PlainTextField.Sanitize(args.Title)
 			desc := sanitize.Comment.Sanitize(args.Description)
-			// Centralized creation validation (parent hierarchy, cross-workspace
-			// parent visibility, status rules) — mirrors the cookie-auth and v1
+			// Centralized creation validation (parent hierarchy and cross-workspace
+			// parent visibility) mirrors the cookie-auth and v1
 			// create paths. Permission-shaped parent failures surface as "Parent
 			// item not found" so existence isn't leaked.
 			validationResult := services.ValidateItemCreation(env.DB, services.ItemValidationParams{
@@ -337,7 +337,6 @@ func init() {
 				Title:       title,
 				ItemTypeID:  args.ItemTypeID,
 				ParentID:    args.ParentID,
-				StatusID:    args.StatusID,
 				UserID:      env.UserID,
 				PermService: env.PermService,
 			})

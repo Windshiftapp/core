@@ -127,8 +127,21 @@ func listEntityLinks(links linkApplication, entityType, pathName string) readOpe
 	}
 }
 
-func listLinksBatch(links linkApplication) pageOperation[services.BatchItemLinks] {
-	return func(r *http.Request) ([]services.BatchItemLinks, Pagination, int, error) {
+type linkBatchCursor struct {
+	ItemID      int `json:"item_id"`
+	AfterLinkID int `json:"after_link_id"`
+}
+
+type batchItemLinksDTO struct {
+	ItemID       int               `json:"item_id"`
+	Outgoing     []models.ItemLink `json:"outgoing"`
+	Incoming     []models.ItemLink `json:"incoming"`
+	HasMoreLinks bool              `json:"has_more_links"`
+	NextCursor   string            `json:"next_cursor,omitempty"`
+}
+
+func listLinksBatch(links linkApplication) pageOperation[batchItemLinksDTO] {
+	return func(r *http.Request) ([]batchItemLinksDTO, Pagination, int, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err
@@ -142,11 +155,15 @@ func listLinksBatch(links linkApplication) pageOperation[services.BatchItemLinks
 			return nil, page, 0, err
 		}
 		afterID := 0
-		if raw := r.URL.Query().Get("after_id"); raw != "" {
-			afterID, err = strconv.Atoi(raw)
-			if err != nil || afterID < 0 {
-				return nil, page, 0, newError(http.StatusBadRequest, "invalid_request", "after_id must be non-negative")
+		if r.URL.Query().Has("after_id") {
+			return nil, page, 0, newError(http.StatusBadRequest, "invalid_request", "Use the opaque cursor parameter")
+		}
+		if raw := r.URL.Query().Get("cursor"); raw != "" {
+			var cursor linkBatchCursor
+			if err := decodeOpaqueCursor("item-links", raw, &cursor); err != nil || cursor.ItemID <= 0 || cursor.AfterLinkID <= 0 || len(ids) != 1 || ids[0] != cursor.ItemID || r.URL.Query().Get("ql") != "" {
+				return nil, page, 0, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid for the selected item")
 			}
+			afterID = cursor.AfterLinkID
 		}
 		sortBy := strings.TrimPrefix(r.URL.Query().Get("sort"), "-")
 		sortAsc := !strings.HasPrefix(r.URL.Query().Get("sort"), "-")
@@ -155,7 +172,17 @@ func listLinksBatch(links linkApplication) pageOperation[services.BatchItemLinks
 			Page: services.PaginationParams{Limit: page.PageSize, Offset: page.Offset}, SortBy: sortBy, SortAsc: sortAsc,
 			AfterID: afterID, IncludeCustomFields: r.URL.Query().Get("include_custom_fields") == "true",
 		})
-		return result, page, total, linkError(err)
+		if err != nil {
+			return nil, page, 0, linkError(err)
+		}
+		response := make([]batchItemLinksDTO, len(result))
+		for index, group := range result {
+			response[index] = batchItemLinksDTO{ItemID: group.ItemID, Outgoing: group.Outgoing, Incoming: group.Incoming, HasMoreLinks: group.HasMoreLinks}
+			if group.NextAfterLinkID > 0 {
+				response[index].NextCursor = encodeOpaqueCursor("item-links", linkBatchCursor{ItemID: group.ItemID, AfterLinkID: group.NextAfterLinkID})
+			}
+		}
+		return response, page, total, nil
 	}
 }
 

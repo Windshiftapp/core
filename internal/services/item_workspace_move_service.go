@@ -96,6 +96,7 @@ type itemMoveSnapshot struct {
 	RequestTypeID       *int
 	CustomFieldValues   map[string]any
 	Path                string
+	IsTask              bool
 }
 
 type ItemWorkspaceMoveService struct {
@@ -106,7 +107,7 @@ func NewItemWorkspaceMoveService(db database.Database) *ItemWorkspaceMoveService
 	return &ItemWorkspaceMoveService{db: db}
 }
 
-func (s *ItemWorkspaceMoveService) Preview(itemID int, input ItemWorkspaceMoveInput) (*ItemWorkspaceMovePreview, error) {
+func (s *ItemWorkspaceMoveService) Preview(itemID, actorUserID int, input ItemWorkspaceMoveInput) (*ItemWorkspaceMovePreview, error) {
 	item, err := s.loadSnapshot(itemID)
 	if err != nil {
 		return nil, err
@@ -141,6 +142,9 @@ func (s *ItemWorkspaceMoveService) Preview(itemID int, input ItemWorkspaceMoveIn
 	targetStatusID := pickMoveOption(input.TargetStatusID, item.StatusID, statuses)
 	if targetStatusID == 0 {
 		return nil, ErrItemWorkspaceMoveInvalidStatus
+	}
+	if err := validation.ValidateTaskState(s.db, input.DestinationWorkspaceID, actorUserID, item.IsTask, &targetStatusID); err != nil {
+		return nil, err
 	}
 
 	priorities, err := s.listDestinationPriorities(input.DestinationWorkspaceID)
@@ -219,7 +223,7 @@ func (s *ItemWorkspaceMoveService) loadSnapshot(itemID int) (*itemMoveSnapshot, 
 		SELECT i.id, i.workspace_id, i.workspace_item_number, w.name, w.key,
 		       i.item_type_id, it.name, i.status_id, st.name, i.priority_id, p.name,
 		       i.iteration_id, i.project_id, i.time_project_id, i.parent_id,
-		       i.channel_id, i.request_type_id, i.custom_field_values, COALESCE(i.path, '/')
+		       i.channel_id, i.request_type_id, i.custom_field_values, COALESCE(i.path, '/'), i.is_task
 		FROM items i
 		JOIN workspaces w ON w.id = i.workspace_id
 		LEFT JOIN item_types it ON it.id = i.item_type_id
@@ -228,7 +232,7 @@ func (s *ItemWorkspaceMoveService) loadSnapshot(itemID int) (*itemMoveSnapshot, 
 		WHERE i.id = ?
 	`, itemID).Scan(&out.ID, &out.WorkspaceID, &out.WorkspaceItemNumber, &out.WorkspaceName, &out.WorkspaceKey,
 		&itemTypeID, &itemTypeName, &statusID, &statusName, &priorityID, &priorityName,
-		&iterationID, &projectID, &timeProjectID, &parentID, &channelID, &requestTypeID, &customJSON, &out.Path)
+		&iterationID, &projectID, &timeProjectID, &parentID, &channelID, &requestTypeID, &customJSON, &out.Path, &out.IsTask)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -551,7 +555,7 @@ func (s *ItemWorkspaceMoveService) MoveContext(ctx context.Context, itemID, acto
 	if input.TargetStatusID <= 0 {
 		return nil, ErrItemWorkspaceMoveInvalidStatus
 	}
-	preview, err := s.Preview(itemID, input)
+	preview, err := s.Preview(itemID, actorUserID, input)
 	if err != nil {
 		return nil, err
 	}

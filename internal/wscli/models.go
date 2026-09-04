@@ -332,8 +332,6 @@ type MilestoneCreateRequest struct {
 	Description string `json:"description,omitempty"`
 	TargetDate  string `json:"target_date,omitempty"`
 	Status      string `json:"status,omitempty"`
-	Scope       string `json:"scope,omitempty"`
-	WorkspaceID *int   `json:"workspace_id,omitempty"`
 }
 
 type MilestoneUpdateRequest struct {
@@ -597,7 +595,7 @@ type TestRun struct {
 	ID             int        `json:"id"`
 	WorkspaceID    int        `json:"workspace_id"`
 	TemplateID     int        `json:"template_id,omitempty"`
-	SetID          int        `json:"set_id"`
+	PlanID         int        `json:"plan_id"`
 	Name           string     `json:"name"`
 	AssigneeID     *int       `json:"assignee_id,omitempty"`
 	AssigneeName   string     `json:"assignee_name,omitempty"`
@@ -609,7 +607,7 @@ type TestRun struct {
 }
 
 type TestRunCreateRequest struct {
-	SetID      int    `json:"set_id"`
+	PlanID     int    `json:"plan_id"`
 	Name       string `json:"name"`
 	TemplateID int    `json:"template_id,omitempty"`
 	AssigneeID *int   `json:"assignee_id,omitempty"`

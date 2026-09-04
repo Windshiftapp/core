@@ -1,10 +1,11 @@
 package v2
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,10 +18,20 @@ import (
 
 const maxItemBatch = 500
 
+type idBatchRequest struct {
+	IDs []int `json:"ids"`
+}
+
 type itemListMeta struct {
 	NextCursor     string   `json:"next_cursor,omitempty"`
 	Watermark      int64    `json:"watermark,omitempty"`
 	SortableFields []string `json:"sortable_fields"`
+}
+
+type transitionMatrixEntry struct {
+	ItemTypeID  int                             `json:"item_type_id"`
+	StatusID    int                             `json:"status_id"`
+	Transitions []services.ItemTransitionOption `json:"transitions"`
 }
 
 type itemCreateRequest struct {
@@ -136,17 +147,14 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		})
 		return result, itemError(err)
 	})
-	builder.Read(collection+"/batch", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, error) {
+	builder.JSON(http.MethodPost, collection+"/batch", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, func(r *http.Request, input idBatchRequest) ([]models.Item, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
 		}
-		ids, err := itemIDList(r.URL.Query().Get("ids"))
+		ids, err := normalizeBatchIDs(input.IDs)
 		if err != nil {
 			return nil, err
-		}
-		if len(ids) > maxItemBatch {
-			return nil, newError(http.StatusBadRequest, "invalid_request", fmt.Sprintf("ids supports at most %d values", maxItemBatch))
 		}
 		result, err := app.Batch(r.Context(), user.ID, ids)
 		return result, itemError(err)
@@ -362,7 +370,7 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.WatchStatus(r.Context(), user.ID, id)
 		return result, itemError(err)
 	})
-	builder.JSON(http.MethodPost, path+"/watch", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemWatchRequest) (services.ItemWatchStatus, error) {
+	builder.JSON(http.MethodPut, path+"/watch", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemWatchRequest) (services.ItemWatchStatus, error) {
 		user, id, err := itemTarget(r)
 		if err != nil {
 			return services.ItemWatchStatus{}, err
@@ -401,7 +409,7 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.DeleteInfo(user.ID, id)
 		return result, itemError(err)
 	})
-	builder.Action(http.MethodDelete, path+"/cascade", http.StatusOK, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) (services.ItemMutationCount, error) {
+	builder.Action(http.MethodPost, path+"/cascade-deletion", http.StatusOK, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) (services.ItemMutationCount, error) {
 		user, id, err := itemTarget(r)
 		if err != nil {
 			return services.ItemMutationCount{}, err
@@ -494,7 +502,7 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.ChangeType(r.Context(), auditActor(r, user), id, services.ItemTypeChangeInput{TargetItemTypeID: input.TargetItemTypeID, TargetStatusID: input.TargetStatusID})
 		return result, itemError(err)
 	})
-	builder.Read("/workspaces/{workspace_id}/transition-matrix", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (map[string][]services.ItemTransitionOption, error) {
+	builder.Read("/workspaces/{workspace_id}/transition-matrix", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]transitionMatrixEntry, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
@@ -504,7 +512,29 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 			return nil, err
 		}
 		result, err := app.TransitionMatrix(r.Context(), user.ID, workspaceID)
-		return result, itemError(err)
+		if err != nil {
+			return nil, itemError(err)
+		}
+		entries := make([]transitionMatrixEntry, 0, len(result))
+		for key, transitions := range result {
+			left, right, ok := strings.Cut(key, ":")
+			if !ok {
+				return nil, internalError(errors.New("invalid transition matrix key"))
+			}
+			itemTypeID, itemTypeErr := strconv.Atoi(left)
+			statusID, statusErr := strconv.Atoi(right)
+			if itemTypeErr != nil || statusErr != nil {
+				return nil, internalError(errors.New("invalid transition matrix key"))
+			}
+			entries = append(entries, transitionMatrixEntry{ItemTypeID: itemTypeID, StatusID: statusID, Transitions: transitions})
+		}
+		slices.SortFunc(entries, func(a, b transitionMatrixEntry) int {
+			if byType := cmp.Compare(a.ItemTypeID, b.ItemTypeID); byType != 0 {
+				return byType
+			}
+			return cmp.Compare(a.StatusID, b.StatusID)
+		})
+		return entries, nil
 	})
 }
 
@@ -654,6 +684,29 @@ func itemIDList(raw string) ([]int, error) {
 	return ids, nil
 }
 
+func normalizeBatchIDs(input []int) ([]int, error) {
+	if len(input) > maxItemBatch {
+		err := newError(http.StatusBadRequest, "invalid_request", "ids supports at most 500 values")
+		err.Details = map[string]string{"field": "ids"}
+		return nil, err
+	}
+	seen := make(map[int]struct{}, len(input))
+	ids := make([]int, 0, len(input))
+	for _, id := range input {
+		if id < 1 {
+			err := newError(http.StatusBadRequest, "invalid_request", "ids is invalid")
+			err.Details = map[string]string{"field": "ids"}
+			return nil, err
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 func validItemSort(value string) bool {
 	if id, err := strconv.Atoi(value); err == nil && id > 0 {
 		return true
@@ -713,6 +766,12 @@ func itemError(err error) error {
 	if errors.Is(err, services.ErrBulkItemForbidden) {
 		return newError(http.StatusForbidden, "forbidden", "Item update is not permitted")
 	}
+	var validationError *validation.ValidationError
+	if errors.As(err, &validationError) {
+		apiErr := newError(http.StatusBadRequest, "validation_failed", err.Error())
+		apiErr.Details = map[string]string{"field": validationError.Field}
+		return apiErr
+	}
 	if errors.Is(err, services.ErrBulkPatchLimit) || errors.Is(err, services.ErrBulkItemLimit) ||
 		errors.Is(err, services.ErrBulkFieldsRequired) || errors.Is(err, services.ErrBulkDuplicateItem) ||
 		services.IsBulkItemFieldError(err) || services.IsBulkItemValidationError(err) || errors.Is(err, repository.ErrRoadmapHierarchyRootLimit) {
@@ -724,8 +783,7 @@ func itemError(err error) error {
 	}
 	var creation *services.ItemCreationValidationError
 	var transition *services.TransitionRejection
-	var validationError *validation.ValidationError
-	if errors.As(err, &creation) || errors.As(err, &transition) || errors.As(err, &validationError) ||
+	if errors.As(err, &creation) || errors.As(err, &transition) ||
 		errors.Is(err, services.ErrMissingItemType) || errors.Is(err, services.ErrInvalidItemType) || errors.Is(err, services.ErrProjectNotFound) {
 		return newError(http.StatusBadRequest, "validation_failed", err.Error())
 	}

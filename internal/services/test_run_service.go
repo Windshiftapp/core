@@ -80,6 +80,15 @@ func (s *TestRunService) List(workspaceID int, filters TestRunListFilters) ([]mo
 	})
 }
 
+// ListPage retrieves a repository-bounded page of test runs.
+func (s *TestRunService) ListPage(workspaceID int, filters TestRunListFilters, limit, offset int) ([]models.TestRun, int, error) {
+	return s.repo.FindPage(workspaceID, repository.TestRunFilters{
+		AssigneeID: filters.AssigneeID, Unassigned: filters.Unassigned,
+		TemplateID: filters.TemplateID, SetID: filters.SetID, IncludeEnded: filters.IncludeEnded,
+		Limit: limit, Offset: offset,
+	})
+}
+
 // GetByID retrieves a single test run
 func (s *TestRunService) GetByID(id, workspaceID int) (*models.TestRun, error) {
 	return s.repo.FindByID(id, workspaceID)
