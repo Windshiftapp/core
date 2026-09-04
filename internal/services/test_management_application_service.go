@@ -377,13 +377,6 @@ func (s *TestManagementApplicationService) ListCases(userID int, params TestCase
 	return items, total, err
 }
 
-func (s *TestManagementApplicationService) CountCases(userID, workspaceID int) (int, error) {
-	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
-		return 0, err
-	}
-	return s.cases.CountAll(workspaceID)
-}
-
 func (s *TestManagementApplicationService) GetCase(userID, workspaceID, id int) (*models.TestCase, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err

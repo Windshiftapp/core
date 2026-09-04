@@ -11,18 +11,18 @@ import (
 )
 
 func registerLinkRoutes(builder *routeBuilder, links linkApplication, catalogs catalogMutationApplication) {
-	builder.Read("/link-types", AuthAuthenticated, []string{"items:read"}, listLinkTypes(links))
-	builder.JSON(http.MethodPost, "/link-types", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createLinkType(catalogs))
-	builder.Read("/link-types/{link_type_id}", AuthAuthenticated, []string{"items:read"}, getLinkType(catalogs))
-	builder.JSON(http.MethodPatch, "/link-types/{link_type_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchLinkType(catalogs))
-	builder.Command(http.MethodDelete, "/link-types/{link_type_id}", AuthAuthenticated, []string{"items:write"}, deleteLinkType(catalogs))
+	builder.Read("/link-types", AuthAuthenticated, []string{"links:read"}, listLinkTypes(links))
+	builder.JSON(http.MethodPost, "/link-types", http.StatusCreated, false, AuthAuthenticated, []string{"links:write"}, createLinkType(catalogs))
+	builder.Read("/link-types/{link_type_id}", AuthAuthenticated, []string{"links:read"}, getLinkType(catalogs))
+	builder.JSON(http.MethodPatch, "/link-types/{link_type_id}", http.StatusOK, true, AuthAuthenticated, []string{"links:write"}, patchLinkType(catalogs))
+	builder.Command(http.MethodDelete, "/link-types/{link_type_id}", AuthAuthenticated, []string{"links:write"}, deleteLinkType(catalogs))
 	builder.Read("/items/{item_id}/links", AuthAuthenticated, []string{"items:read"}, listEntityLinks(links, "item", "item_id"))
 	builder.Read("/pages/{page_id}/links", AuthAuthenticated, []string{"pages:read"}, listEntityLinks(links, "page", "page_id"))
-	builder.Read("/test-cases/{test_case_id}/links", AuthAuthenticated, []string{"items:read"}, listEntityLinks(links, "test_case", "test_case_id"))
+	builder.Read("/test-cases/{test_case_id}/links", AuthAuthenticated, []string{"tests:read"}, listEntityLinks(links, "test_case", "test_case_id"))
 	builder.Page("/links/batch", AuthAuthenticated, []string{"items:read"}, listLinksBatch(links))
-	builder.JSON(http.MethodPost, "/links", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createLink(links))
-	builder.Command(http.MethodDelete, "/links/{link_id}", AuthAuthenticated, []string{"items:write"}, deleteLink(links))
-	builder.Read("/links/search", AuthAuthenticated, []string{"items:read"}, searchLinks(links))
+	builder.JSON(http.MethodPost, "/links", http.StatusCreated, false, AuthAuthenticated, []string{"links:write"}, createLink(links))
+	builder.Command(http.MethodDelete, "/links/{link_id}", AuthAuthenticated, []string{"links:write"}, deleteLink(links))
+	builder.Read("/links/search", AuthAuthenticated, []string{"links:read"}, searchLinks(links))
 	builder.Read("/items/{item_id}/fields/{field_id}/links", AuthAuthenticated, []string{"items:read"}, listFieldLinks(links))
 }
 

@@ -25,3 +25,28 @@ export function isSelfOrDescendant(candidate, page) {
   if (candidate.id === page.id) return true;
   return candidate.path.startsWith(descendantPathPrefix(page));
 }
+
+/** Return a flat page list in parent-before-children display order. */
+export function orderPagesDepthFirst(pages) {
+  const pageIds = new Set(pages.map((page) => page.id));
+  const childrenByParent = new Map();
+  const roots = [];
+
+  for (const page of pages) {
+    if (page.parent_id == null || !pageIds.has(page.parent_id)) {
+      roots.push(page);
+      continue;
+    }
+    const children = childrenByParent.get(page.parent_id) ?? [];
+    children.push(page);
+    childrenByParent.set(page.parent_id, children);
+  }
+
+  const ordered = [];
+  const append = (page) => {
+    ordered.push(page);
+    for (const child of childrenByParent.get(page.id) ?? []) append(child);
+  };
+  for (const root of roots) append(root);
+  return ordered;
+}

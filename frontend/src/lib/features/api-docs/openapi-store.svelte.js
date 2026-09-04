@@ -1,8 +1,10 @@
 /** Pure reusable data helpers for the /api-docs renderer. */
 
-/** @typedef {{ summary?: string, tags?: string[] }} OpenAPIOperation */
-/** @typedef {{ paths?: Record<string, Record<string, OpenAPIOperation>> }} OpenAPISpec */
-/** @typedef {{ tag: string, path: string, method: string, operation: OpenAPIOperation, id: string }} OperationEntry */
+/** @typedef {{ $ref?: string, name?: string, in?: string }} OpenAPIParameter */
+/** @typedef {{ summary?: string, tags?: string[], parameters?: OpenAPIParameter[], security?: Record<string, string[]>[], 'x-required-scopes'?: string[] }} OpenAPIOperation */
+/** @typedef {{ parameters?: OpenAPIParameter[], get?: OpenAPIOperation, post?: OpenAPIOperation, put?: OpenAPIOperation, patch?: OpenAPIOperation, delete?: OpenAPIOperation, head?: OpenAPIOperation, options?: OpenAPIOperation }} OpenAPIPathItem */
+/** @typedef {{ paths?: Record<string, OpenAPIPathItem> }} OpenAPISpec */
+/** @typedef {{ tag: string, path: string, method: string, operation: OpenAPIOperation, pathParameters: OpenAPIParameter[], id: string }} OperationEntry */
 /** @typedef {{ tag: string, operations: OperationEntry[] }} OperationGroup */
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
@@ -65,7 +67,7 @@ export function groupOperationsByTag(spec) {
 
   for (const [path, item] of Object.entries(spec.paths)) {
     for (const method of HTTP_METHODS) {
-      const op = item[method];
+      const op = /** @type {OpenAPIOperation | undefined} */ (item[method]);
       if (!op) continue;
       const tags = op.tags?.length ? op.tags : ['untagged'];
       const entry = {
@@ -73,6 +75,7 @@ export function groupOperationsByTag(spec) {
         path,
         method,
         operation: op,
+        pathParameters: Array.isArray(item.parameters) ? item.parameters : [],
         id: operationId(method, path),
       };
       for (const tag of tags) {
@@ -81,6 +84,46 @@ export function groupOperationsByTag(spec) {
     }
   }
   return tagOrder.map((tag) => ({ tag, operations: byTag.get(tag) ?? [] }));
+}
+
+/**
+ * Resolve and merge path-level and operation-level parameters. OpenAPI lets an
+ * operation override an inherited parameter with the same name and location.
+ * @param {unknown} spec
+ * @param {OperationEntry} entry
+ * @returns {Record<string, unknown>[]}
+ */
+export function resolveOperationParameters(spec, entry) {
+  const merged = new Map();
+  for (const parameter of [
+    ...(entry.pathParameters || []),
+    ...(entry.operation.parameters || []),
+  ]) {
+    const resolved = parameter.$ref ? resolveRef(spec, parameter.$ref) : parameter;
+    if (!resolved || typeof resolved !== 'object') continue;
+    const value = /** @type {Record<string, unknown>} */ (resolved);
+    const key = `${String(value.in || '')}:${String(value.name || '')}`;
+    merged.set(key, value);
+  }
+  return [...merged.values()];
+}
+
+/**
+ * Return the scopes a browser should show for an operation. V2 uses the
+ * standards-safe extension; v1 keeps its historical security-array encoding.
+ * @param {OpenAPIOperation} operation
+ */
+export function operationRequiredScopes(operation) {
+  if (Array.isArray(operation['x-required-scopes'])) {
+    return operation['x-required-scopes'];
+  }
+  return [
+    ...new Set(
+      (operation.security || []).flatMap((requirement) =>
+        Object.values(requirement).flatMap((scopes) => (Array.isArray(scopes) ? scopes : []))
+      )
+    ),
+  ];
 }
 
 /**

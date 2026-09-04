@@ -10,13 +10,11 @@ import { testPlans } from './testPlans.js';
 import { testResults } from './testResults.js';
 import { testRuns } from './testRuns.js';
 import { testRunTemplates } from './testRunTemplates.js';
-import { testSets } from './testSets.js';
 
 export const tests = {
   testFolders,
   testLabels,
   testCases,
-  testSets,
   testPlans,
   testRunTemplates,
   testRuns,

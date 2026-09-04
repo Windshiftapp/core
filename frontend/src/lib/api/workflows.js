@@ -30,7 +30,6 @@ export const statuses = {
   get: async (...args) => normalizeStatus(await statusCRUD.get(...args)),
   create: async (...args) => normalizeStatus(await statusCRUD.create(...args)),
   update: async (...args) => normalizeStatus(await statusCRUD.update(...args)),
-  getNonDoneIds: () => fetchV2Data('/statuses/non-completed-ids'),
 };
 
 const workflowCRUD = createCrudClient('/workflows', { v2: true });
@@ -73,6 +72,4 @@ export const workflows = {
       method: 'PUT',
       body: JSON.stringify({ transitions: data }),
     }),
-  getAvailableTransitions: (id, statusId) =>
-    fetchV2Data(`/workflows/${id}/statuses/${statusId}/transitions`),
 };

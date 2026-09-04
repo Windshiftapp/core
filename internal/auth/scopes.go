@@ -20,11 +20,15 @@ const (
 	ScopeWorkspacesWrite  = "workspaces:write"
 	ScopeWorkspacesDelete = "workspaces:delete"
 
-	// Configuration resources (read-only via API)
+	// Workspace configuration
 	ScopeStatusesRead     = "statuses:read"
+	ScopeStatusesWrite    = "statuses:write"
 	ScopeWorkflowsRead    = "workflows:read"
+	ScopeWorkflowsWrite   = "workflows:write"
 	ScopeItemTypesRead    = "item-types:read"
+	ScopeItemTypesWrite   = "item-types:write"
 	ScopePrioritiesRead   = "priorities:read"
+	ScopePrioritiesWrite  = "priorities:write"
 	ScopeCustomFieldsRead = "custom-fields:read"
 
 	// Users
@@ -44,11 +48,6 @@ const (
 	ScopeIterationsRead   = "iterations:read"
 	ScopeIterationsWrite  = "iterations:write"
 	ScopeIterationsDelete = "iterations:delete"
-
-	// Projects
-	ScopeProjectsRead   = "projects:read"
-	ScopeProjectsWrite  = "projects:write"
-	ScopeProjectsDelete = "projects:delete"
 
 	// MCP — single binary scope; the MCP server exposes both read and write
 	// tools so we don't split this into :read/:write. It only opens the
@@ -70,6 +69,11 @@ const (
 	// automations.
 	ScopeActionsRead  = "actions:read"
 	ScopeActionsWrite = "actions:write"
+
+	// Cross-resource links. Entity-specific link reads use the entity scope;
+	// these scopes cover link-type discovery and generic search/mutations.
+	ScopeLinksRead  = "links:read"
+	ScopeLinksWrite = "links:write"
 
 	// Pages (workspace knowledge / wiki). :write covers create + edit + move;
 	// :delete is required for archive. Per-page ACLs still apply in-handler.
@@ -105,9 +109,15 @@ const (
 
 	// Agent skills (WI-258): the per-workspace library of markdown knowledge
 	// packs a run's prompt indexes and the agent reads via `ws skill get`.
-	// Read-only by design on the token surface — authoring is a workspace-
-	// admin UI concern, not an API-token one.
-	ScopeAgentSkillsRead = "agent-skills:read"
+	// Authoring additionally requires the workspace administration permission;
+	// run tokens remain read-only because their allowlist omits :write.
+	ScopeAgentSkillsRead  = "agent-skills:read"
+	ScopeAgentSkillsWrite = "agent-skills:write"
+
+	// Approvals. Workflow configuration uses workflows:*; these scopes cover
+	// live approval requests and decisions.
+	ScopeApprovalsRead  = "approvals:read"
+	ScopeApprovalsWrite = "approvals:write"
 
 	// Work item templates (WI-438): workspace-defined reusable bodies that
 	// pre-fill a new item's description. :read covers list/get (agents discover
@@ -149,7 +159,7 @@ type ScopeInfo struct {
 
 // scopeCatalog is the authoritative, ordered list of every scope the server
 // recognizes. AllValidScopes and DefaultAgentScopes are both derived from it,
-// and GET /api/scope-catalog serves it to the frontend pickers.
+// and GET /api-tokens/scope-catalog serves it to the frontend pickers.
 //
 // Ordering is presentation order: resources are grouped, reads precede writes
 // precede deletes, and admin scopes come last.
@@ -180,6 +190,9 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeActionsRead, Resource: "actions", ResourceLabel: "Automations", Action: "read", Label: "Read automations", Description: "Read automation graphs and the node catalog. Requires the workspace Administrator role.", AgentDefault: true},
 	{Scope: ScopeActionsWrite, Resource: "actions", ResourceLabel: "Automations", Action: "write", Label: "Edit automations", Description: "Create and update automations. Requires the workspace Administrator role.", AgentDefault: true},
 
+	{Scope: ScopeLinksRead, Resource: "links", ResourceLabel: "Links", Action: "read", Label: "Discover links", Description: "Read link types and search resources that can be linked.", AgentDefault: true},
+	{Scope: ScopeLinksWrite, Resource: "links", ResourceLabel: "Links", Action: "write", Label: "Manage links", Description: "Create and remove links between accessible resources.", AgentDefault: true},
+
 	{Scope: ScopeMilestonesRead, Resource: "milestones", ResourceLabel: "Milestones", Action: "read", Label: "Read milestones", Description: "Read milestones and their progress.", AgentDefault: true},
 	{Scope: ScopeMilestonesWrite, Resource: "milestones", ResourceLabel: "Milestones", Action: "write", Label: "Manage milestones", Description: "Create and update milestones."},
 	{Scope: ScopeMilestonesDelete, Resource: "milestones", ResourceLabel: "Milestones", Action: "delete", Label: "Delete milestones", Description: "Delete milestones. Destructive — opt in deliberately."},
@@ -187,10 +200,6 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeIterationsRead, Resource: "iterations", ResourceLabel: "Iterations", Action: "read", Label: "Read iterations", Description: "Read iterations and their contents.", AgentDefault: true},
 	{Scope: ScopeIterationsWrite, Resource: "iterations", ResourceLabel: "Iterations", Action: "write", Label: "Manage iterations", Description: "Create and update iterations."},
 	{Scope: ScopeIterationsDelete, Resource: "iterations", ResourceLabel: "Iterations", Action: "delete", Label: "Delete iterations", Description: "Delete iterations. Destructive — opt in deliberately."},
-
-	{Scope: ScopeProjectsRead, Resource: "projects", ResourceLabel: "Projects", Action: "read", Label: "Read projects", Description: "Read projects.", AgentDefault: true},
-	{Scope: ScopeProjectsWrite, Resource: "projects", ResourceLabel: "Projects", Action: "write", Label: "Manage projects", Description: "Create and update projects."},
-	{Scope: ScopeProjectsDelete, Resource: "projects", ResourceLabel: "Projects", Action: "delete", Label: "Delete projects", Description: "Delete projects. Destructive — opt in deliberately."},
 
 	{Scope: ScopeItemTemplatesRead, Resource: "item-templates", ResourceLabel: "Work item templates", Action: "read", Label: "Read templates", Description: "Read the reusable bodies that pre-fill new items.", AgentDefault: true},
 	{Scope: ScopeItemTemplatesWrite, Resource: "item-templates", ResourceLabel: "Work item templates", Action: "write", Label: "Manage templates", Description: "Create and update work item templates."},
@@ -205,11 +214,19 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeUserPreferencesWrite, Resource: "user-preferences", ResourceLabel: "Your preferences", Action: "write", Label: "Update your preferences", Description: "Update the token owner's own preferences document."},
 
 	{Scope: ScopeStatusesRead, Resource: "statuses", ResourceLabel: "Statuses", Action: "read", Label: "Read statuses", Description: "Read workspace statuses.", AgentDefault: true},
-	{Scope: ScopeWorkflowsRead, Resource: "workflows", ResourceLabel: "Workflows", Action: "read", Label: "Read workflows", Description: "Read workflows and their transitions.", AgentDefault: true},
+	{Scope: ScopeStatusesWrite, Resource: "statuses", ResourceLabel: "Statuses", Action: "write", Label: "Manage statuses", Description: "Create, update, and delete statuses and status categories."},
+	{Scope: ScopeWorkflowsRead, Resource: "workflows", ResourceLabel: "Workflows", Action: "read", Label: "Read workflows", Description: "Read workflows, transitions, conditions, and approval-set configuration.", AgentDefault: true},
+	{Scope: ScopeWorkflowsWrite, Resource: "workflows", ResourceLabel: "Workflows", Action: "write", Label: "Manage workflows", Description: "Create, update, and delete workflows, transitions, conditions, and approval-set configuration."},
 	{Scope: ScopeItemTypesRead, Resource: "item-types", ResourceLabel: "Item types", Action: "read", Label: "Read item types", Description: "Read the configured item types.", AgentDefault: true},
+	{Scope: ScopeItemTypesWrite, Resource: "item-types", ResourceLabel: "Item types", Action: "write", Label: "Manage item types", Description: "Create, update, and delete item types."},
 	{Scope: ScopePrioritiesRead, Resource: "priorities", ResourceLabel: "Priorities", Action: "read", Label: "Read priorities", Description: "Read the configured priorities.", AgentDefault: true},
+	{Scope: ScopePrioritiesWrite, Resource: "priorities", ResourceLabel: "Priorities", Action: "write", Label: "Manage priorities", Description: "Create, update, and delete priorities."},
 	{Scope: ScopeCustomFieldsRead, Resource: "custom-fields", ResourceLabel: "Custom fields", Action: "read", Label: "Read custom fields", Description: "Read custom field definitions.", AgentDefault: true},
 	{Scope: ScopeAgentSkillsRead, Resource: "agent-skills", ResourceLabel: "Agent skills", Action: "read", Label: "Read agent skills", Description: "Read the workspace library of agent knowledge packs.", AgentDefault: true},
+	{Scope: ScopeAgentSkillsWrite, Resource: "agent-skills", ResourceLabel: "Agent skills", Action: "write", Label: "Manage agent skills", Description: "Create, update, and delete workspace agent skills."},
+
+	{Scope: ScopeApprovalsRead, Resource: "approvals", ResourceLabel: "Approvals", Action: "read", Label: "Read approvals", Description: "Read approval requests visible to the token owner."},
+	{Scope: ScopeApprovalsWrite, Resource: "approvals", ResourceLabel: "Approvals", Action: "write", Label: "Act on approvals", Description: "Decide, cancel, delegate, refresh, or escalate approval requests."},
 
 	{Scope: ScopeMCPAccess, Resource: "mcp", ResourceLabel: "MCP server", Action: "access", Label: "Connect to the MCP server", Description: "Open the MCP transport. Each tool still requires the resource scopes above.", AgentDefault: true},
 
@@ -268,12 +285,13 @@ func defaultAgentScopes() []string {
 // documentation while the acting identity's page permissions remain enforced.
 var DefaultCodingAgentRunScopes = []string{
 	ScopeItemsRead, ScopeItemsWrite,
+	ScopeLinksRead, ScopeLinksWrite,
 	ScopeWorkspacesRead,
 	ScopeUsersRead,
 	ScopeItemTypesRead, ScopeWorkflowsRead,
 	ScopeStatusesRead, ScopePrioritiesRead, ScopeCustomFieldsRead,
 	ScopeItemTemplatesRead,
-	ScopeMilestonesRead, ScopeIterationsRead, ScopeProjectsRead,
+	ScopeMilestonesRead, ScopeIterationsRead,
 	ScopePagesRead, ScopePagesWrite,
 	ScopeTestsRead,
 	ScopeTimeRead, ScopeTimeWrite,
@@ -292,12 +310,13 @@ var DefaultCodingAgentRunScopes = []string{
 // resource-specific write/delete scope is deliberately absent.
 var DefaultCodingAgentPrivateTestScopes = []string{
 	ScopeItemsRead,
+	ScopeLinksRead,
 	ScopeWorkspacesRead,
 	ScopeUsersRead,
 	ScopeItemTypesRead, ScopeWorkflowsRead,
 	ScopeStatusesRead, ScopePrioritiesRead, ScopeCustomFieldsRead,
 	ScopeItemTemplatesRead,
-	ScopeMilestonesRead, ScopeIterationsRead, ScopeProjectsRead,
+	ScopeMilestonesRead, ScopeIterationsRead,
 	ScopePagesRead,
 	ScopeTestsRead,
 	ScopeTimeRead,
@@ -307,7 +326,7 @@ var DefaultCodingAgentPrivateTestScopes = []string{
 
 // AdminScopes returns the set of scopes that require system admin role.
 func AdminScopes() []string {
-	out := make([]string, 0, 8)
+	out := make([]string, 0, 9)
 	for _, s := range scopeCatalog {
 		if s.Admin {
 			out = append(out, s.Scope)

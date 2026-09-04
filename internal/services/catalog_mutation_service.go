@@ -443,13 +443,6 @@ func (s *CatalogMutationService) ReplaceWorkflowTransitions(actor AuditActor, wo
 	return s.workflow.GetTransitions(workflowID)
 }
 
-func (s *CatalogMutationService) AvailableWorkflowTransitions(workflowID, statusID int) ([]models.WorkflowTransition, error) {
-	if _, err := s.workflows.Get(workflowID); err != nil {
-		return nil, err
-	}
-	return s.workflows.ListAvailableTransitions(workflowID, statusID)
-}
-
 func (s *CatalogMutationService) ListLinkTypes(includeInactive bool) ([]models.LinkType, error) {
 	return s.linkTypes.List(includeInactive)
 }

@@ -199,7 +199,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		result, err := app.Patch(r.Context(), auditActor(r, user), id, itemPatchFields(input))
 		return result, itemError(err)
 	})
-	builder.Command(http.MethodDelete, collection+"/{item_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, collection+"/{item_id}", AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) error {
 		user, id, err := itemTarget(r)
 		if err != nil {
 			return err
@@ -326,14 +326,6 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.Descendants(r.Context(), user.ID, id, maxDepth)
 		return result, itemError(err)
 	})
-	builder.Read(path+"/tree", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*services.ItemTreeNode, error) {
-		user, id, err := itemTarget(r)
-		if err != nil {
-			return nil, err
-		}
-		result, err := app.Tree(r.Context(), user.ID, id)
-		return result, itemError(err)
-	})
 	builder.Read(path+"/time-rollup", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.TimeRollup, error) {
 		user, id, err := itemTarget(r)
 		if err != nil {
@@ -409,7 +401,7 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.DeleteInfo(user.ID, id)
 		return result, itemError(err)
 	})
-	builder.Action(http.MethodDelete, path+"/cascade", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) (services.ItemMutationCount, error) {
+	builder.Action(http.MethodDelete, path+"/cascade", http.StatusOK, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) (services.ItemMutationCount, error) {
 		user, id, err := itemTarget(r)
 		if err != nil {
 			return services.ItemMutationCount{}, err

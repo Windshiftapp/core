@@ -59,8 +59,7 @@
     loading = true;
     error = '';
     try {
-      const resp = await api.pages.getTree(destinationWorkspaceId);
-      const all = resp.pages || [];
+      const all = (await api.pages.getAll(destinationWorkspaceId)) || [];
       if (rememberSource) sourceTree = all;
       candidates = destinationWorkspaceId === workspaceId
         ? all.filter((candidate) => {

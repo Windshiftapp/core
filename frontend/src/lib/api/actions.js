@@ -50,11 +50,6 @@ export const actions = {
     fetchV2Data(`/workspaces/${workspaceId}/actions/${id}`, {
       method: 'DELETE',
     }),
-  toggle: (workspaceId, id, isEnabled) =>
-    fetchV2Data(`/workspaces/${workspaceId}/actions/${id}/toggle`, {
-      method: 'POST',
-      body: JSON.stringify({ is_enabled: isEnabled }),
-    }),
   execute: (workspaceId, actionId, itemId) =>
     fetchV2Data(`/workspaces/${workspaceId}/actions/${actionId}/execute`, {
       method: 'POST',

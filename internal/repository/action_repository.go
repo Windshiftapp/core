@@ -378,16 +378,6 @@ func (r *ActionRepository) Delete(id int) error {
 	return nil
 }
 
-// SetEnabled enables or disables an action
-func (r *ActionRepository) SetEnabled(id int, enabled bool) error {
-	_, err := r.db.ExecWrite(`UPDATE actions SET is_enabled = ?, updated_at = ? WHERE id = ?`,
-		enabled, time.Now(), id)
-	if err != nil {
-		return fmt.Errorf("failed to set action enabled status: %w", err)
-	}
-	return nil
-}
-
 // --------- Node Operations ---------
 
 // GetNodesByActionID retrieves all nodes for an action

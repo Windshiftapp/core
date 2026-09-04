@@ -41,7 +41,6 @@ type configurationReader interface {
 func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/statuses", AuthAuthenticated, []string{"statuses:read"}, listStatuses(deps.Statuses, deps.ObjectTranslations))
 	builder.JSON(http.MethodPost, "/statuses", http.StatusCreated, false, AuthAuthenticated, []string{"statuses:write"}, createStatus(deps.CatalogMutations))
-	builder.Read("/statuses/non-completed-ids", AuthAuthenticated, []string{"statuses:read"}, listNonDoneStatusIDs(deps.CatalogMutations))
 	builder.Read("/statuses/{status_id}", AuthAuthenticated, []string{"statuses:read"}, getStatus(deps.Statuses, deps.ObjectTranslations))
 	builder.JSON(http.MethodPatch, "/statuses/{status_id}", http.StatusOK, true, AuthAuthenticated, []string{"statuses:write"}, patchStatus(deps.CatalogMutations))
 	builder.Command(http.MethodDelete, "/statuses/{status_id}", AuthAuthenticated, []string{"statuses:write"}, deleteStatus(deps.CatalogMutations))
@@ -57,7 +56,6 @@ func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Command(http.MethodDelete, "/workflows/{workflow_id}", AuthAuthenticated, []string{"workflows:write"}, deleteWorkflow(deps.CatalogMutations))
 	builder.Read("/workflows/{workflow_id}/transitions", AuthAuthenticated, []string{"workflows:read"}, listWorkflowTransitions(deps.Workflows))
 	builder.JSON(http.MethodPut, "/workflows/{workflow_id}/transitions", http.StatusOK, false, AuthAuthenticated, []string{"workflows:write"}, replaceWorkflowTransitions(deps.CatalogMutations))
-	builder.Read("/workflows/{workflow_id}/statuses/{status_id}/transitions", AuthAuthenticated, []string{"workflows:read"}, listAvailableWorkflowTransitions(deps.CatalogMutations))
 	builder.Read("/item-types", AuthAuthenticated, []string{"item-types:read"}, listItemTypes(deps.Configuration, deps.ObjectTranslations))
 	builder.JSON(http.MethodPost, "/item-types", http.StatusCreated, false, AuthAuthenticated, []string{"item-types:write"}, createItemType(deps.CatalogMutations))
 	builder.Read("/item-types/{item_type_id}", AuthAuthenticated, []string{"item-types:read"}, getItemType(deps.Configuration, deps.ObjectTranslations))

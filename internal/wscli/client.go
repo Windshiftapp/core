@@ -551,7 +551,7 @@ func (c *Client) UpdateTestResult(workspaceID, runID, resultID int, req TestResu
 
 func (c *Client) ListTestSets(workspaceID int) ([]TestSet, error) {
 	var sets []TestSet
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets", workspaceID), &sets); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans", workspaceID), &sets); err != nil {
 		return nil, err
 	}
 	return sets, nil
@@ -559,7 +559,7 @@ func (c *Client) ListTestSets(workspaceID int) ([]TestSet, error) {
 
 func (c *Client) GetTestSet(workspaceID, id int) (*TestSet, error) {
 	var set TestSet
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets/%d", workspaceID, id), &set); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans/%d", workspaceID, id), &set); err != nil {
 		return nil, err
 	}
 	return &set, nil
@@ -567,7 +567,7 @@ func (c *Client) GetTestSet(workspaceID, id int) (*TestSet, error) {
 
 func (c *Client) GetTestSetTestCases(workspaceID, setID int) ([]TestCase, error) {
 	var cases []TestCase
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets/%d/test-cases", workspaceID, setID), &cases); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans/%d/test-cases", workspaceID, setID), &cases); err != nil {
 		return nil, err
 	}
 	return cases, nil
@@ -1238,13 +1238,11 @@ func (c *Client) GetAgentSkill(workspaceID, skillID int) (*AgentSkill, error) {
 
 // ListPages returns every visible page in server sort order.
 func (c *Client) ListPages(workspaceID int) ([]Page, error) {
-	var response struct {
-		Pages []Page `json:"pages"`
-	}
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/pages/tree", workspaceID), &response); err != nil {
+	var pages []Page
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/pages", workspaceID), &pages); err != nil {
 		return nil, err
 	}
-	return response.Pages, nil
+	return pages, nil
 }
 
 // SearchPages searches visible page titles and content. Results omit bodies.

@@ -113,11 +113,6 @@ func (s *ItemApplicationService) WithMutationEffects(mentions *MentionService) *
 	return s
 }
 
-type ItemTreeNode struct {
-	*models.Item
-	Children []*ItemTreeNode `json:"children"`
-}
-
 type ItemWatchStatus struct {
 	ItemID   int  `json:"item_id"`
 	Watching bool `json:"watching"`
@@ -976,31 +971,6 @@ func (s *ItemApplicationService) Descendants(ctx context.Context, userID, itemID
 		return nil, err
 	}
 	return items, nil
-}
-
-func (s *ItemApplicationService) Tree(ctx context.Context, userID, itemID int) (*ItemTreeNode, error) {
-	root, err := s.Get(ctx, userID, itemID, false)
-	if err != nil {
-		return nil, err
-	}
-	descendants, err := s.Descendants(ctx, userID, itemID, 0)
-	if err != nil {
-		return nil, err
-	}
-	nodes := make(map[int]*ItemTreeNode, len(descendants)+1)
-	rootNode := &ItemTreeNode{Item: root, Children: []*ItemTreeNode{}}
-	nodes[root.ID] = rootNode
-	for i := range descendants {
-		nodes[descendants[i].ID] = &ItemTreeNode{Item: &descendants[i], Children: []*ItemTreeNode{}}
-	}
-	for i := range descendants {
-		if descendants[i].ParentID != nil {
-			if parent := nodes[*descendants[i].ParentID]; parent != nil {
-				parent.Children = append(parent.Children, nodes[descendants[i].ID])
-			}
-		}
-	}
-	return rootNode, nil
 }
 
 func (s *ItemApplicationService) TimeRollup(ctx context.Context, userID, itemID, maxDepth int) (*models.TimeRollup, error) {

@@ -42,7 +42,7 @@
       executions = await api.tests.testRunTemplates.getExecutions(workspaceId, templateId);
 
       if (template.set_id) {
-        testSet = await api.tests.testSets.get(workspaceId, template.set_id);
+        testSet = await api.tests.testPlans.get(workspaceId, template.set_id);
       }
     } catch (error) {
       console.error('Failed to load template:', error);

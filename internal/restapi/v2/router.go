@@ -4,11 +4,13 @@ package v2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 
 	apispec "windshift/api"
+	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -188,7 +190,7 @@ type pageReader interface {
 }
 
 type pageApplication interface {
-	ListTree(int, int) (services.PageTreeResult, error)
+	List(int, int) ([]models.Page, error)
 	Get(int, int, int) (*models.Page, error)
 	Search(int, int, string, int) ([]models.Page, error)
 	ListArchived(int, int) ([]repository.ArchivedPageRow, error)
@@ -362,7 +364,6 @@ type actionApplication interface {
 	Create(int, int, services.AuditActor, models.CreateActionRequest) (*models.Action, error)
 	Update(int, int, int, services.AuditActor, models.UpdateActionRequest) (*models.Action, error)
 	Delete(int, int, int, services.AuditActor) error
-	Toggle(int, int, int, services.AuditActor, *bool) (*models.Action, error)
 	Logs(int, int, int, int, int) ([]*models.ActionExecutionLog, int, error)
 	Execute(int, int, int, int) (models.ActionExecutionStatus, error)
 }
@@ -565,6 +566,9 @@ func RegisterRoutes(deps Deps) error {
 	}
 
 	routes := buildRoutes(deps)
+	if err := validateRouteScopes(routes); err != nil {
+		return err
+	}
 	registerMount(deps.Mux, sessionPrefix, routes, deps, true)
 	registerMount(deps.Mux, restPrefix, routes, deps, false)
 	return nil
@@ -610,6 +614,27 @@ func buildRoutes(deps Deps) []route {
 	registerAssetRoutes(&builder, deps.Assets)
 	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail)
 	return builder.routes
+}
+
+func validateRouteScopes(routes []route) error {
+	for _, item := range routes {
+		switch item.Auth {
+		case AuthPublic:
+			if len(item.Scopes) != 0 {
+				return fmt.Errorf("v2: public route %s %s declares token scopes", item.Method, item.Path)
+			}
+		case AuthAuthenticated:
+			if len(item.Scopes) == 0 {
+				return fmt.Errorf("v2: authenticated route %s %s declares no token scope", item.Method, item.Path)
+			}
+			if err := tokenauth.ValidateScopes(item.Scopes); err != nil {
+				return fmt.Errorf("v2: route %s %s: %w", item.Method, item.Path, err)
+			}
+		default:
+			return fmt.Errorf("v2: route %s %s has unknown auth class %q", item.Method, item.Path, item.Auth)
+		}
+	}
+	return nil
 }
 
 func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps, session bool) {

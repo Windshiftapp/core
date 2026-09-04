@@ -289,31 +289,6 @@ func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, act
 	return nil
 }
 
-func (s *ActionApplicationService) Toggle(userID, workspaceID, actionID int, actor AuditActor, enabled *bool) (*models.Action, error) {
-	if err := s.requireManage(userID, workspaceID); err != nil {
-		return nil, err
-	}
-	action, err := s.actionInWorkspace(actionID, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	value := !action.IsEnabled
-	if enabled != nil {
-		value = *enabled
-	}
-	if err := s.repo.SetEnabled(action.ID, value); err != nil {
-		return nil, err
-	}
-	if s.runtime != nil {
-		s.runtime.InvalidateWorkspaceCache(workspaceID)
-	}
-	updated, err := s.repo.GetByID(action.ID)
-	if err == nil {
-		emitServiceAudit(s.db, actor, "automation.toggle", "automation", &updated.ID, updated.Name, nil)
-	}
-	return updated, err
-}
-
 func (s *ActionApplicationService) Logs(userID, workspaceID, actionID, limit, offset int) ([]*models.ActionExecutionLog, int, error) {
 	if _, err := s.Get(userID, workspaceID, actionID); err != nil {
 		return nil, 0, err

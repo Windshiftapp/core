@@ -267,8 +267,7 @@ func (r *StatusRepository) ListAvailableTransitionOptions(workflowID int, fromSt
 	return options, nil
 }
 
-// ListNonDoneIDs returns the IDs of statuses whose category is NOT marked
-// completed. Backs the GET /api/statuses/non-done-ids endpoint.
+// ListNonDoneIDs returns the IDs of statuses whose category is not completed.
 func (r *StatusRepository) ListNonDoneIDs() ([]int, error) {
 	rows, err := r.db.Query(`
 		SELECT s.id

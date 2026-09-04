@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,13 +9,18 @@ import (
 	"os"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	v2 "windshift/internal/restapi/v2"
 )
 
 type document struct {
-	OpenAPI string                          `json:"openapi"`
-	Tags    []tag                           `json:"tags"`
-	Paths   map[string]map[string]operation `json:"paths"`
+	OpenAPI    string                                `json:"openapi"`
+	Tags       []tag                                 `json:"tags"`
+	Paths      map[string]map[string]json.RawMessage `json:"paths"`
+	Components struct {
+		Parameters map[string]parameter `json:"parameters"`
+	} `json:"components"`
 }
 
 type tag struct {
@@ -23,10 +29,20 @@ type tag struct {
 }
 
 type operation struct {
-	OperationID string                `json:"operationId"`
-	Tags        []string              `json:"tags"`
-	Summary     string                `json:"summary"`
-	Security    []map[string][]string `json:"security"`
+	OperationID    string                `json:"operationId"`
+	Tags           []string              `json:"tags"`
+	Summary        string                `json:"summary"`
+	Description    string                `json:"description"`
+	Security       []map[string][]string `json:"security"`
+	RequiredScopes []string              `json:"x-required-scopes"`
+	Parameters     []parameter           `json:"parameters"`
+}
+
+type parameter struct {
+	Ref         string `json:"$ref"`
+	Name        string `json:"name"`
+	In          string `json:"in"`
+	Description string `json:"description"`
 }
 
 func main() {
@@ -44,6 +60,14 @@ func main() {
 	if !strings.HasPrefix(spec.OpenAPI, "3.") {
 		fail("openapi version %q is not 3.x", spec.OpenAPI)
 	}
+	loader := openapi3.NewLoader()
+	document, err := loader.LoadFromData(data)
+	if err != nil {
+		fail("parse OpenAPI document: %v", err)
+	}
+	if err := document.Validate(context.Background()); err != nil {
+		fail("validate OpenAPI document: %v", err)
+	}
 	declaredTags := validateTags(spec.Tags)
 
 	want := make(map[string]v2.Route)
@@ -54,12 +78,17 @@ func main() {
 		if !ok {
 			fail("route %s is missing", key)
 		}
-		operation, ok := item[strings.ToLower(route.Method)]
+		rawOperation, ok := item[strings.ToLower(route.Method)]
 		if !ok {
 			fail("route %s is missing", key)
 		}
+		var operation operation
+		if err := json.Unmarshal(rawOperation, &operation); err != nil {
+			fail("decode operation %s: %v", key, err)
+		}
 		validateDocumentation(route, operation, declaredTags)
 		validateSecurity(route, operation)
+		validateParameters(route, operation, item, spec.Components.Parameters)
 	}
 
 	for path, item := range spec.Paths {
@@ -74,6 +103,49 @@ func main() {
 		}
 	}
 	fmt.Printf("API v2 OpenAPI parity is valid (%d operations).\n", len(want))
+}
+
+func validateParameters(route v2.Route, operation operation, item map[string]json.RawMessage, components map[string]parameter) {
+	parameters := make([]parameter, 0, len(operation.Parameters)+4)
+	if raw := item["parameters"]; len(raw) > 0 {
+		var inherited []parameter
+		if err := json.Unmarshal(raw, &inherited); err != nil {
+			fail("decode path parameters for %s: %v", route.Path, err)
+		}
+		parameters = append(parameters, inherited...)
+	}
+	parameters = append(parameters, operation.Parameters...)
+
+	declaredPath := make(map[string]bool)
+	for _, candidate := range parameters {
+		resolved := candidate
+		if candidate.Ref != "" {
+			const prefix = "#/components/parameters/"
+			if !strings.HasPrefix(candidate.Ref, prefix) {
+				fail("route %s %s parameter has unsupported reference %q", route.Method, route.Path, candidate.Ref)
+			}
+			var ok bool
+			resolved, ok = components[strings.TrimPrefix(candidate.Ref, prefix)]
+			if !ok {
+				fail("route %s %s parameter reference %q is missing", route.Method, route.Path, candidate.Ref)
+			}
+		}
+		if strings.TrimSpace(resolved.Description) == "" {
+			fail("route %s %s parameter %q has no description", route.Method, route.Path, resolved.Name)
+		}
+		if resolved.In == "path" {
+			declaredPath[resolved.Name] = true
+		}
+	}
+
+	for _, part := range strings.Split(route.Path, "/") {
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			name := strings.TrimSuffix(strings.TrimPrefix(part, "{"), "}")
+			if !declaredPath[name] {
+				fail("route %s %s does not declare path parameter %q", route.Method, route.Path, name)
+			}
+		}
+	}
 }
 
 func validateTags(tags []tag) map[string]struct{} {
@@ -111,6 +183,9 @@ func validateDocumentation(route v2.Route, operation operation, declaredTags map
 	if len(summary) > 80 {
 		fail("route %s %s summary is longer than 80 characters", route.Method, route.Path)
 	}
+	if strings.TrimSpace(operation.Description) == "" {
+		fail("route %s %s has no description", route.Method, route.Path)
+	}
 }
 
 func validateSecurity(route v2.Route, operation operation) {
@@ -124,8 +199,11 @@ func validateSecurity(route v2.Route, operation operation) {
 		fail("authenticated route %s %s must declare one security requirement", route.Method, route.Path)
 	}
 	scopes, ok := operation.Security[0]["BearerAuth"]
-	if !ok || strings.Join(scopes, "\x00") != strings.Join(route.Scopes, "\x00") {
-		fail("route %s %s scopes do not match its inventory", route.Method, route.Path)
+	if !ok || len(scopes) != 0 {
+		fail("route %s %s must use an empty scope array for its HTTP bearer security scheme", route.Method, route.Path)
+	}
+	if strings.Join(operation.RequiredScopes, "\x00") != strings.Join(route.Scopes, "\x00") {
+		fail("route %s %s x-required-scopes do not match its inventory", route.Method, route.Path)
 	}
 }
 

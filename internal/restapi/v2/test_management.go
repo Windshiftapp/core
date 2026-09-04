@@ -73,8 +73,7 @@ func (b *routeBuilder) WorkspaceCRUD[Model, Create, Patch any](path, idParam, re
 func registerTestManagementRoutes(builder *routeBuilder, application *services.TestManagementApplicationService) {
 	registerTestFolderRoutes(builder, application)
 	registerTestCaseRoutes(builder, application)
-	registerTestSetRoutes(builder, application, "test-sets")
-	registerTestSetRoutes(builder, application, "test-plans")
+	registerTestPlanRoutes(builder, application)
 	registerTestRunTemplateRoutes(builder, application)
 	registerTestRunRoutes(builder, application)
 	registerTestReportRoutes(builder, application)
@@ -100,7 +99,7 @@ type reorderRequest struct {
 
 func registerTestFolderRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-folders"
-	builder.WorkspaceCRUD(path, "folder_id", "items:read", "items:write", workspaceCRUD[*models.TestFolder, testFolderCreate, testFolderPatch]{
+	builder.WorkspaceCRUD(path, "folder_id", "tests:read", "tests:write", workspaceCRUD[*models.TestFolder, testFolderCreate, testFolderPatch]{
 		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestFolder, int, error) {
 			items, err := app.ListFolders(userID, workspaceID)
 			return pagePointers(items, page), len(items), err
@@ -121,7 +120,7 @@ func registerTestFolderRoutes(builder *routeBuilder, app *services.TestManagemen
 			return app.DeleteFolder(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
 			return nil, err
@@ -184,7 +183,7 @@ type labelReference struct {
 
 func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-cases"
-	builder.WorkspaceCRUD(path, "test_case_id", "items:read", "items:write", workspaceCRUD[*models.TestCase, testCaseCreate, testCasePatch]{
+	builder.WorkspaceCRUD(path, "test_case_id", "tests:read", "tests:write", workspaceCRUD[*models.TestCase, testCaseCreate, testCasePatch]{
 		list: func(r *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestCase, int, error) {
 			folderID, all, err := testCaseFolder(r)
 			if err != nil {
@@ -219,29 +218,21 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 			return app.DeleteCase(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
-	builder.Read(path+"/count", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (map[string]int, error) {
-		user, workspaceID, _, err := testTarget(r, "")
-		if err != nil {
-			return nil, err
-		}
-		count, err := app.CountCases(user.ID, workspaceID)
-		return map[string]int{"count": count}, testManagementError(err)
-	})
-	builder.JSON(http.MethodPost, path+"/{test_case_id}/move", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input moveTestCaseRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/{test_case_id}/move", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input moveTestCaseRequest) (map[string]bool, error) {
 		user, workspaceID, id, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"moved": true}, testManagementError(app.MoveCase(user.ID, workspaceID, id, input.FolderID, input.SortOrder))
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"reordered": true}, testManagementError(app.ReorderCases(user.ID, workspaceID, input.IDs))
 	})
-	builder.Read(path+"/{test_case_id}/connections", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (any, error) {
+	builder.Read(path+"/{test_case_id}/connections", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (any, error) {
 		user, workspaceID, id, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -254,7 +245,7 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 }
 
 func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementApplicationService, path string) {
-	builder.Read(path, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestStep, error) {
+	builder.Read(path, AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestStep, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -262,7 +253,7 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 		result, err := app.ListSteps(user.ID, workspaceID, caseID)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, path, http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testStepCreate) (*models.TestStep, error) {
+	builder.JSON(http.MethodPost, path, http.StatusCreated, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testStepCreate) (*models.TestStep, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -270,7 +261,7 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 		result, err := app.CreateStep(user.ID, workspaceID, caseID, services.TestStepCreateRequest{Action: input.Action, Data: input.Data, Expected: input.Expected})
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, path+"/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testStepPatch) (*models.TestStep, error) {
+	builder.JSON(http.MethodPatch, path+"/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testStepPatch) (*models.TestStep, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -282,7 +273,7 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 		result, err := app.UpdateStep(user.ID, workspaceID, caseID, stepID, services.TestStepPatch{Action: input.Action, Data: input.Data, Expected: input.Expected})
 		return result, testManagementError(err)
 	})
-	builder.Command(http.MethodDelete, path+"/{step_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, path+"/{step_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return err
@@ -293,7 +284,7 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 		}
 		return testManagementError(app.DeleteStep(user.ID, workspaceID, caseID, stepID))
 	})
-	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, path+"/reorder", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input reorderRequest) (map[string]bool, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -304,7 +295,7 @@ func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementA
 
 func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagementApplicationService, casePath string) {
 	path := "/workspaces/{workspace_id}/test-labels"
-	builder.Read(path, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestLabel, error) {
+	builder.Read(path, AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestLabel, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
 			return nil, err
@@ -312,7 +303,7 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		result, err := app.ListLabels(user.ID, workspaceID)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, path, http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testLabelInput) (*models.TestLabel, error) {
+	builder.JSON(http.MethodPost, path, http.StatusCreated, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testLabelInput) (*models.TestLabel, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
 			return nil, err
@@ -320,7 +311,7 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		result, err := app.CreateLabel(user.ID, workspaceID, services.TestLabelCreateRequest{Name: input.Name, Color: input.Color, Description: input.Description})
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, path+"/{label_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testLabelPatch) (*models.TestLabel, error) {
+	builder.JSON(http.MethodPatch, path+"/{label_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testLabelPatch) (*models.TestLabel, error) {
 		user, workspaceID, id, err := testTarget(r, "label_id")
 		if err != nil {
 			return nil, err
@@ -328,7 +319,7 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		result, err := app.UpdateLabel(user.ID, workspaceID, id, services.TestLabelPatch{Name: input.Name, Color: input.Color, Description: input.Description})
 		return result, testManagementError(err)
 	})
-	builder.Command(http.MethodDelete, path+"/{label_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, path+"/{label_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, workspaceID, id, err := testTarget(r, "label_id")
 		if err != nil {
 			return err
@@ -336,7 +327,7 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		return testManagementError(app.DeleteLabel(user.ID, workspaceID, id))
 	})
 	labelsPath := casePath + "/{test_case_id}/labels"
-	builder.Read(labelsPath, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestLabel, error) {
+	builder.Read(labelsPath, AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestLabel, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
@@ -344,14 +335,14 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 		result, err := app.ListCaseLabels(user.ID, workspaceID, caseID)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, labelsPath, http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input labelReference) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, labelsPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input labelReference) (map[string]bool, error) {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"linked": true}, testManagementError(app.AddCaseLabel(user.ID, workspaceID, caseID, input.LabelID))
 	})
-	builder.Command(http.MethodDelete, labelsPath+"/{label_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, labelsPath+"/{label_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, workspaceID, caseID, err := testTarget(r, "test_case_id")
 		if err != nil {
 			return err
@@ -364,12 +355,12 @@ func registerTestLabelRoutes(builder *routeBuilder, app *services.TestManagement
 	})
 }
 
-type testSetCreate struct {
+type testPlanCreate struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	MilestoneID *int   `json:"milestone_id"`
 }
-type testSetPatch struct {
+type testPlanPatch struct {
 	Name        *string       `json:"name"`
 	Description *string       `json:"description"`
 	MilestoneID Optional[int] `json:"milestone_id"`
@@ -378,9 +369,9 @@ type testCaseReference struct {
 	TestCaseID int `json:"test_case_id"`
 }
 
-func registerTestSetRoutes(builder *routeBuilder, app *services.TestManagementApplicationService, segment string) {
-	path := "/workspaces/{workspace_id}/" + segment
-	builder.WorkspaceCRUD(path, "set_id", "items:read", "items:write", workspaceCRUD[*models.TestSet, testSetCreate, testSetPatch]{
+func registerTestPlanRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
+	path := "/workspaces/{workspace_id}/test-plans"
+	builder.WorkspaceCRUD(path, "plan_id", "tests:read", "tests:write", workspaceCRUD[*models.TestSet, testPlanCreate, testPlanPatch]{
 		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestSet, int, error) {
 			items, err := app.ListSets(userID, workspaceID)
 			return pagePointers(items, page), len(items), err
@@ -388,34 +379,34 @@ func registerTestSetRoutes(builder *routeBuilder, app *services.TestManagementAp
 		get: func(_ *http.Request, userID, workspaceID, id int) (*models.TestSet, error) {
 			return app.GetSet(userID, workspaceID, id)
 		},
-		create: func(r *http.Request, userID, workspaceID int, input testSetCreate) (*models.TestSet, error) {
+		create: func(r *http.Request, userID, workspaceID int, input testPlanCreate) (*models.TestSet, error) {
 			return app.CreateSet(userID, workspaceID, auditActor(r, mustPrincipal(r)), models.TestSet{Name: input.Name, Description: input.Description, MilestoneID: input.MilestoneID})
 		},
-		patch: func(r *http.Request, userID, workspaceID, id int, input testSetPatch) (*models.TestSet, error) {
+		patch: func(r *http.Request, userID, workspaceID, id int, input testPlanPatch) (*models.TestSet, error) {
 			return app.UpdateSet(userID, workspaceID, id, auditActor(r, mustPrincipal(r)), services.TestSetPatch{Name: input.Name, Description: input.Description, MilestoneID: optionalInt(input.MilestoneID), MilestoneIDSet: input.MilestoneID.Set})
 		},
 		delete: func(r *http.Request, userID, workspaceID, id int) error {
 			return app.DeleteSet(userID, workspaceID, id, auditActor(r, mustPrincipal(r)))
 		},
 	})
-	relation := path + "/{set_id}"
-	builder.Read(relation+"/test-cases", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestCase, error) {
-		user, ws, id, err := testTarget(r, "set_id")
+	relation := path + "/{plan_id}"
+	builder.Read(relation+"/test-cases", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestCase, error) {
+		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
 			return nil, err
 		}
 		result, err := app.ListSetCases(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, relation+"/test-cases", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testCaseReference) (map[string]bool, error) {
-		user, ws, id, err := testTarget(r, "set_id")
+	builder.JSON(http.MethodPost, relation+"/test-cases", http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testCaseReference) (map[string]bool, error) {
+		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"linked": true}, testManagementError(app.AddSetCase(user.ID, ws, id, input.TestCaseID))
 	})
-	builder.Command(http.MethodDelete, relation+"/test-cases/{test_case_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
-		user, ws, id, err := testTarget(r, "set_id")
+	builder.Command(http.MethodDelete, relation+"/test-cases/{test_case_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
+		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
 			return err
 		}
@@ -425,8 +416,8 @@ func registerTestSetRoutes(builder *routeBuilder, app *services.TestManagementAp
 		}
 		return testManagementError(app.RemoveSetCase(user.ID, ws, id, caseID))
 	})
-	builder.Read(relation+"/runs", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestRun, error) {
-		user, ws, id, err := testTarget(r, "set_id")
+	builder.Read(relation+"/runs", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestRun, error) {
+		user, ws, id, err := testTarget(r, "plan_id")
 		if err != nil {
 			return nil, err
 		}
@@ -448,7 +439,7 @@ type testRunTemplatePatch struct {
 
 func registerTestRunTemplateRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-run-templates"
-	builder.WorkspaceCRUD(path, "template_id", "items:read", "items:write", workspaceCRUD[*models.TestRunTemplate, testRunTemplateCreate, testRunTemplatePatch]{
+	builder.WorkspaceCRUD(path, "template_id", "tests:read", "tests:write", workspaceCRUD[*models.TestRunTemplate, testRunTemplateCreate, testRunTemplatePatch]{
 		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestRunTemplate, int, error) {
 			items, err := app.ListTemplates(userID, workspaceID)
 			return pagePointers(items, page), len(items), err
@@ -467,7 +458,7 @@ func registerTestRunTemplateRoutes(builder *routeBuilder, app *services.TestMana
 		},
 	})
 	item := path + "/{template_id}"
-	builder.Read(item+"/executions", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.TestRun, error) {
+	builder.Read(item+"/executions", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestRun, error) {
 		user, ws, id, err := testTarget(r, "template_id")
 		if err != nil {
 			return nil, err
@@ -475,7 +466,7 @@ func registerTestRunTemplateRoutes(builder *routeBuilder, app *services.TestMana
 		result, err := app.ListTemplateExecutions(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.Action(http.MethodPost, item+"/execute", http.StatusCreated, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) (*models.TestRun, error) {
+	builder.Action(http.MethodPost, item+"/execute", http.StatusCreated, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (*models.TestRun, error) {
 		user, ws, id, err := testTarget(r, "template_id")
 		if err != nil {
 			return nil, err
@@ -512,7 +503,7 @@ type itemReference struct {
 
 func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
 	path := "/workspaces/{workspace_id}/test-runs"
-	builder.WorkspaceCRUD(path, "run_id", "items:read", "items:write", workspaceCRUD[*models.TestRun, testRunCreate, testRunPatch]{
+	builder.WorkspaceCRUD(path, "run_id", "tests:read", "tests:write", workspaceCRUD[*models.TestRun, testRunCreate, testRunPatch]{
 		list: func(r *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestRun, int, error) {
 			filters, err := testRunFilters(r)
 			if err != nil {
@@ -535,7 +526,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		},
 	})
 	item := path + "/{run_id}"
-	builder.Read(item+"/detail", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*services.TestRunDetail, error) {
+	builder.Read(item+"/detail", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (*services.TestRunDetail, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -543,14 +534,14 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.GetRunDetail(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.Action(http.MethodPost, item+"/end", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) (map[string]bool, error) {
+	builder.Action(http.MethodPost, item+"/end", http.StatusOK, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (map[string]bool, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ended": true}, testManagementError(app.EndRun(user.ID, ws, id))
 	})
-	builder.Read(item+"/results", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]services.TestRunResultWithCaseTitle, error) {
+	builder.Read(item+"/results", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]services.TestRunResultWithCaseTitle, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -558,7 +549,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.ListResults(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, item+"/results/{result_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testResultPatch) (*models.TestResult, error) {
+	builder.JSON(http.MethodPatch, item+"/results/{result_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testResultPatch) (*models.TestResult, error) {
 		user, ws, runID, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -570,7 +561,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.UpdateResult(user.ID, ws, runID, resultID, services.TestResultUpdateRequest{Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes})
 		return result, testManagementError(err)
 	})
-	builder.Read(item+"/steps", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (map[string]services.TestRunStepResult, error) {
+	builder.Read(item+"/steps", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]services.TestRunStepResult, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -578,7 +569,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.ListStepResults(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.Read(item+"/summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (map[string]string, error) {
+	builder.Read(item+"/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]string, error) {
 		user, ws, id, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -586,7 +577,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.RunMarkdownSummary(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, item+"/steps/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input testStepResultPatch) (map[string]bool, error) {
+	builder.JSON(http.MethodPatch, item+"/steps/{step_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input testStepResultPatch) (map[string]bool, error) {
 		user, ws, runID, err := testTarget(r, "run_id")
 		if err != nil {
 			return nil, err
@@ -599,7 +590,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		return map[string]bool{"updated": true}, testManagementError(err)
 	})
 	resultPath := "/workspaces/{workspace_id}/test-results/{result_id}/items"
-	builder.Read(resultPath, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, error) {
+	builder.Read(resultPath, AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.Item, error) {
 		user, ws, id, err := testTarget(r, "result_id")
 		if err != nil {
 			return nil, err
@@ -607,14 +598,14 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		result, err := app.ListResultItems(user.ID, ws, id)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, resultPath, http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemReference) (map[string]bool, error) {
+	builder.JSON(http.MethodPost, resultPath, http.StatusOK, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input itemReference) (map[string]bool, error) {
 		user, ws, id, err := testTarget(r, "result_id")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]bool{"linked": true}, testManagementError(app.LinkResultItem(user.ID, ws, id, input.ItemID))
 	})
-	builder.Command(http.MethodDelete, resultPath+"/{item_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, resultPath+"/{item_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, ws, id, err := testTarget(r, "result_id")
 		if err != nil {
 			return err
@@ -628,7 +619,7 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 }
 
 func registerTestReportRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
-	builder.Read("/workspaces/{workspace_id}/test-reports/summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (map[string]any, error) {
+	builder.Read("/workspaces/{workspace_id}/test-reports/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (map[string]any, error) {
 		user, workspaceID, _, err := testTarget(r, "")
 		if err != nil {
 			return nil, err
@@ -666,7 +657,7 @@ func registerTestCoverageRoutes(builder *routeBuilder, app *services.TestManagem
 }
 
 func registerTestCoverageScope(builder *routeBuilder, app *services.TestManagementApplicationService, path string, scope func(*http.Request) (services.TestCoverageScope, error)) {
-	builder.Read(path+"/config", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.TestCoverageConfiguration, error) {
+	builder.Read(path+"/config", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (*models.TestCoverageConfiguration, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
@@ -678,7 +669,7 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		result, err := app.CoverageConfig(user.ID, target)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPost, path+"/config", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input coverageConfigRequest) (*models.TestCoverageConfiguration, error) {
+	builder.JSON(http.MethodPost, path+"/config", http.StatusCreated, false, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input coverageConfigRequest) (*models.TestCoverageConfiguration, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
@@ -690,7 +681,7 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		result, err := app.CreateCoverageConfig(user.ID, target, input.RequirementItemTypeIDs)
 		return result, testManagementError(err)
 	})
-	builder.JSON(http.MethodPatch, path+"/config/{config_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input coverageConfigRequest) (*models.TestCoverageConfiguration, error) {
+	builder.JSON(http.MethodPatch, path+"/config/{config_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input coverageConfigRequest) (*models.TestCoverageConfiguration, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, err
@@ -706,7 +697,7 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		result, err := app.UpdateCoverageConfig(user.ID, target, configID, input.RequirementItemTypeIDs)
 		return result, testManagementError(err)
 	})
-	builder.Command(http.MethodDelete, path+"/config/{config_id}", AuthAuthenticated, []string{"items:write"}, func(r *http.Request) error {
+	builder.Command(http.MethodDelete, path+"/config/{config_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
 		user, err := principal(r)
 		if err != nil {
 			return err
@@ -721,7 +712,7 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		}
 		return testManagementError(app.DeleteCoverageConfig(user.ID, target, configID))
 	})
-	builder.Read(path+"/summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (models.TestCoverageSummary, error) {
+	builder.Read(path+"/summary", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) (models.TestCoverageSummary, error) {
 		user, err := principal(r)
 		if err != nil {
 			return models.TestCoverageSummary{}, err
@@ -733,7 +724,7 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		result, err := app.CoverageSummary(user.ID, target)
 		return result, testManagementError(err)
 	})
-	builder.PageMetadata(path+"/requirements", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.RequirementCoverageItem, Pagination, int, coverageMeta, error) {
+	builder.PageMetadata(path+"/requirements", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.RequirementCoverageItem, Pagination, int, coverageMeta, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, coverageMeta{}, err

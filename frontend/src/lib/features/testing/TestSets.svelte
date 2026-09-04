@@ -77,7 +77,7 @@
     try {
       const { description } = await api.ai.summarizeTestPlanDescription(set.id);
       const next = description ?? '';
-      await api.tests.testSets.update(workspaceId, set.id, {
+      await api.tests.testPlans.update(workspaceId, set.id, {
         name: set.name,
         description: next,
         milestone_id: set.milestone_id,
@@ -112,7 +112,7 @@
   async function loadData() {
     try {
       const [sets, milestonesData] = await Promise.all([
-        api.tests.testSets.getAll(workspaceId),
+        api.tests.testPlans.getAll(workspaceId),
         api.milestones.getAll() // Get all milestones
       ]);
       testSets.set(sets || []);
@@ -152,9 +152,9 @@
       const data = { ...formData };
 
       if (editingSet) {
-        await api.tests.testSets.update(workspaceId, editingSet.id, data);
+        await api.tests.testPlans.update(workspaceId, editingSet.id, data);
       } else {
-        await api.tests.testSets.create(workspaceId, data);
+        await api.tests.testPlans.create(workspaceId, data);
       }
       await loadData();
       showForm = false;
@@ -192,7 +192,7 @@
     });
     if (!ok) return;
     try {
-      await api.tests.testSets.delete(workspaceId, id);
+      await api.tests.testPlans.delete(workspaceId, id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete test plan:', error);
@@ -207,7 +207,7 @@
 
   async function loadSetTestCases(setId) {
     try {
-      const cases = await api.tests.testSets.getTestCases(workspaceId, setId);
+      const cases = await api.tests.testPlans.getTestCases(workspaceId, setId);
       setTestCases = cases || [];
     } catch (error) {
       console.error('Failed to load set test cases:', error);
@@ -218,7 +218,7 @@
     if (!testCase || !testCase.id) return;
 
     try {
-      await api.tests.testSets.addTestCase(workspaceId, $selectedSet.id, testCase.id);
+      await api.tests.testPlans.addTestCase(workspaceId, $selectedSet.id, testCase.id);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to add test case to set:', error);
@@ -228,7 +228,7 @@
 
   async function removeTestCaseFromSet(testCaseId) {
     try {
-      await api.tests.testSets.removeTestCase(workspaceId, $selectedSet.id, testCaseId);
+      await api.tests.testPlans.removeTestCase(workspaceId, $selectedSet.id, testCaseId);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to remove test case from set:', error);

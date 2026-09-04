@@ -2,7 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachInstruction, extractInstruction } from '@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item';
-  import { isSelfOrDescendant } from './pageHierarchy.js';
+  import { isSelfOrDescendant, orderPagesDepthFirst } from './pageHierarchy.js';
   import { api } from '../../api.js';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -363,8 +363,7 @@
   async function loadTree() {
     loading = true;
     try {
-      const resp = await api.pages.getTree(workspaceId);
-      pages = flattenDepthFirst(resp.tree || []);
+      pages = orderPagesDepthFirst((await api.pages.getAll(workspaceId)) || []);
       // Cache every label we encounter so the filter row can render names
       // + colors for active filters without an extra round-trip.
       for (const page of pages) {
@@ -377,8 +376,9 @@
       // Seed expanded state from localStorage; on a workspace's first
       // visit the seed is just the root ids so the tree opens with the
       // top level visible and every nested subtree collapsed.
-      const rootIds = (resp.tree || [])
-        .map((n) => n?.id)
+      const rootIds = pages
+        .filter((page) => page.parent_id == null)
+        .map((page) => page.id)
         .filter((id) => Number.isFinite(id));
       expandedIds = loadExpanded(workspaceId, rootIds);
     } catch (err) {
@@ -386,17 +386,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function flattenDepthFirst(nodes) {
-    const out = [];
-    for (const node of nodes) {
-      out.push(node);
-      if (node.children?.length) {
-        out.push(...flattenDepthFirst(node.children));
-      }
-    }
-    return out;
   }
 
   function selectPage(id) {

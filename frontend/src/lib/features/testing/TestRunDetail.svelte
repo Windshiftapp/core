@@ -94,7 +94,7 @@
   async function executeRun() {
     try {
       // Get existing runs for this test plan to generate sequential numbering
-      const setRuns = await api.tests.testSets.getRuns(workspaceId, testRun.set_id);
+      const setRuns = await api.tests.testPlans.getRuns(workspaceId, testRun.set_id);
       const executionCount = setRuns.length;
       
       const newRunName = prompt(

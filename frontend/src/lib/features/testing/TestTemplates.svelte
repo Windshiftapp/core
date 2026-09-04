@@ -88,7 +88,7 @@
   async function loadData() {
     try {
       const [sets, templates, milestonesData] = await Promise.all([
-        api.tests.testSets.getAll(workspaceId),
+        api.tests.testPlans.getAll(workspaceId),
         api.tests.testRunTemplates.getAll(workspaceId),
         api.milestones.getAll()
       ]);
@@ -327,4 +327,3 @@
     />
   </div>
 </div>
-

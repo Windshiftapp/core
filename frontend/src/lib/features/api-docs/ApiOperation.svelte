@@ -2,14 +2,19 @@
   import MethodBadge from './MethodBadge.svelte';
   import ApiSchema from './ApiSchema.svelte';
   import { renderMarkdown } from '../../utils/render-markdown.js';
-  import { resolveRef } from './openapi-store.svelte.js';
+  import {
+    operationRequiredScopes,
+    resolveOperationParameters,
+    resolveRef,
+  } from './openapi-store.svelte.js';
 
   let { spec, entry } = $props();
 
   // entry = { tag, path, method, operation, id }
   const op = $derived(entry.operation);
-  const params = $derived(op.parameters || []);
+  const params = $derived(resolveOperationParameters(spec, entry));
   const grouped = $derived(groupParams(params));
+  const requiredScopes = $derived(operationRequiredScopes(op));
 
   function groupParams(list) {
     const buckets = { path: [], query: [], header: [], cookie: [] };
@@ -82,12 +87,15 @@
           {#each Object.keys(req) as scheme}
             <span class="security-pill">
               {scheme}
-              {#if req[scheme] && req[scheme].length > 0}
-                <span class="security-scopes">({req[scheme].join(', ')})</span>
-              {/if}
             </span>
           {/each}
         {/each}
+        {#if requiredScopes.length > 0}
+          <span class="security-pill">
+            Required scopes
+            <span class="security-scopes">({requiredScopes.join(', ')})</span>
+          </span>
+        {/if}
       </div>
     </section>
   {/if}

@@ -12,7 +12,7 @@ import (
 )
 
 func registerPageRoutes(builder *routeBuilder, pages pageApplication) {
-	builder.Read("/workspaces/{workspace_id}/pages/tree", AuthAuthenticated, []string{"pages:read"}, listPageTree(pages))
+	builder.Read("/workspaces/{workspace_id}/pages", AuthAuthenticated, []string{"pages:read"}, listPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/archived", AuthAuthenticated, []string{"pages:read"}, listArchivedPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/search", AuthAuthenticated, []string{"pages:read"}, searchPages(pages))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/pages", http.StatusCreated, false, AuthAuthenticated, []string{"pages:write"}, createPage(pages))
@@ -73,13 +73,13 @@ type archivedPageDTO struct {
 	ArchivedByName string    `json:"archived_by_name"`
 }
 
-func listPageTree(pages pageApplication) readOperation[services.PageTreeResult] {
-	return func(r *http.Request) (services.PageTreeResult, error) {
+func listPages(pages pageApplication) readOperation[[]models.Page] {
+	return func(r *http.Request) ([]models.Page, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
-			return services.PageTreeResult{}, err
+			return nil, err
 		}
-		result, err := pages.ListTree(user.ID, workspaceID)
+		result, err := pages.List(user.ID, workspaceID)
 		return result, pageError(err)
 	}
 }

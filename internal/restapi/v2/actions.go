@@ -11,17 +11,16 @@ import (
 )
 
 func registerActionRoutes(builder *routeBuilder, actions actionApplication) {
-	builder.Read("/action-templates", AuthAuthenticated, []string{"items:read"}, listActionTemplates(actions))
-	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/action-templates/{template_key}/apply", http.StatusCreated, AuthAuthenticated, []string{"items:write"}, applyActionTemplate(actions))
-	builder.Read("/workspaces/{workspace_id}/action-catalog", AuthAuthenticated, []string{"items:read"}, actionCatalog(actions))
-	builder.Read("/workspaces/{workspace_id}/actions", AuthAuthenticated, []string{"items:read"}, listActions(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createAction(actions))
-	builder.Read("/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"items:read"}, getAction(actions))
-	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/actions/{action_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, updateAction(actions))
-	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"items:write"}, deleteAction(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/toggle", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, toggleAction(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/execute", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, executeAction(actions))
-	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/logs", AuthAuthenticated, []string{"items:read"}, actionLogs(actions))
+	builder.Read("/action-templates", AuthAuthenticated, []string{"actions:read"}, listActionTemplates(actions))
+	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/action-templates/{template_key}/apply", http.StatusCreated, AuthAuthenticated, []string{"actions:write"}, applyActionTemplate(actions))
+	builder.Read("/workspaces/{workspace_id}/action-catalog", AuthAuthenticated, []string{"actions:read"}, actionCatalog(actions))
+	builder.Read("/workspaces/{workspace_id}/actions", AuthAuthenticated, []string{"actions:read"}, listActions(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions", http.StatusCreated, false, AuthAuthenticated, []string{"actions:write"}, createAction(actions))
+	builder.Read("/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:read"}, getAction(actions))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/actions/{action_id}", http.StatusOK, true, AuthAuthenticated, []string{"actions:write"}, updateAction(actions))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:write"}, deleteAction(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/execute", http.StatusOK, false, AuthAuthenticated, []string{"actions:write"}, executeAction(actions))
+	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/logs", AuthAuthenticated, []string{"actions:read"}, actionLogs(actions))
 }
 
 func listActionTemplates(actions actionApplication) readOperation[[]services.ActionTemplateSummary] {
@@ -43,10 +42,6 @@ func applyActionTemplate(actions actionApplication) actionOperation[*services.Ap
 		result, err := actions.ApplyTemplate(r.Context(), user.ID, workspaceID, auditActor(r, user), key)
 		return result, actionError(err)
 	}
-}
-
-type actionToggleRequest struct {
-	IsEnabled bool `json:"is_enabled"`
 }
 
 type actionExecuteRequest struct {
@@ -115,17 +110,6 @@ func deleteAction(actions actionApplication) commandOperation {
 			return err
 		}
 		return actionError(actions.Delete(user.ID, workspaceID, actionID, auditActor(r, user)))
-	}
-}
-
-func toggleAction(actions actionApplication) jsonOperation[actionToggleRequest, *models.Action] {
-	return func(r *http.Request, input actionToggleRequest) (*models.Action, error) {
-		user, workspaceID, actionID, err := actionTarget(r, true)
-		if err != nil {
-			return nil, err
-		}
-		result, err := actions.Toggle(user.ID, workspaceID, actionID, auditActor(r, user), &input.IsEnabled)
-		return result, actionError(err)
 	}
 }
 

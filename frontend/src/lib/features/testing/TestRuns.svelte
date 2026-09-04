@@ -63,7 +63,7 @@
       }
 
       const [sets, runs, milestonesData, usersData] = await Promise.all([
-        api.tests.testSets.getAll(workspaceId),
+        api.tests.testPlans.getAll(workspaceId),
         api.tests.testRuns.getAll(workspaceId, params),
         api.milestones.getAll(),
         api.getUsers()
