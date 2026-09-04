@@ -4,10 +4,10 @@
   import { navigate, currentRoute } from '../../router.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Button from '../../components/Button.svelte';
-  import { useEventListener } from 'runed';
-  import { uiStore } from '../../stores/ui.svelte.js';
+  import { uiStore, WS_SIDEBAR_DEFAULT_WIDTH } from '../../stores/ui.svelte.js';
   import { collectionStore } from '../../stores/collectionContext.js';
   import ScrollableSidebar from '../../layout/ScrollableSidebar.svelte';
+  import SidebarResizeHandle from '../../layout/SidebarResizeHandle.svelte';
 
 
   const MIN_WIDTH = 180;
@@ -16,44 +16,6 @@
 
   let sidebarWidth = $derived($uiStore.wsSidebarWidth);
   let isCollapsed = $derived($uiStore.wsSidebarCollapsed);
-  let isResizing = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-
-  function onResizeStart(e) {
-    e.preventDefault();
-    resizeStartX = e.clientX;
-    resizeStartWidth = isCollapsed ? 48 : sidebarWidth;
-    isResizing = true;
-  }
-
-  function handleResizeMove(e) {
-    const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
-    if (rawWidth < COLLAPSE_THRESHOLD) {
-      if (!isCollapsed) {
-        uiStore.wsSidebarCollapsed = true;
-      }
-    } else {
-      if (isCollapsed) {
-        uiStore.wsSidebarCollapsed = false;
-      }
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rawWidth));
-      uiStore.wsSidebarWidth = newWidth;
-    }
-  }
-
-  function handleResizeUp() {
-    isResizing = false;
-  }
-
-  useEventListener(() => isResizing ? window : undefined, 'mousemove', handleResizeMove);
-  useEventListener(() => isResizing ? window : undefined, 'mouseup', handleResizeUp);
-
-  function onResizeHandleDblClick() {
-    uiStore.wsSidebarCollapsed = false;
-    uiStore.resetWsSidebarWidth();
-  }
-
   let { collectionId = null } = $props();
 
   const collectionViewItems = [
@@ -76,12 +38,20 @@
 </script>
 
 {#snippet resizeHandle()}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="ws-resize-handle"
-    onmousedown={onResizeStart}
-    ondblclick={onResizeHandleDblClick}
-  ></div>
+  <SidebarResizeHandle
+    width={sidebarWidth}
+    minWidth={MIN_WIDTH}
+    maxWidth={MAX_WIDTH}
+    defaultWidth={WS_SIDEBAR_DEFAULT_WIDTH}
+    collapsed={isCollapsed}
+    collapsedWidth={48}
+    collapseThreshold={COLLAPSE_THRESHOLD}
+    label="Resize collection navigation"
+    title="Drag to resize, double-click to reset"
+    onresize={(width) => uiStore.wsSidebarWidth = width}
+    onresizeend={(width) => uiStore.wsSidebarWidth = width}
+    oncollapsechange={(collapsed) => uiStore.wsSidebarCollapsed = collapsed}
+  />
 {/snippet}
 
 {#snippet expandedHeader()}
@@ -236,22 +206,6 @@
 {/if}
 
 <style>
-  .ws-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 4px;
-    height: 100%;
-    cursor: col-resize;
-    z-index: 10;
-    transition: background-color 150ms ease;
-  }
-
-  .ws-resize-handle:hover,
-  .ws-resize-handle:active {
-    background-color: var(--ds-border-focused, #3b82f6);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     nav,
     nav .border-t {

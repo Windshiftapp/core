@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
   import ApiDocsSidebar from '../features/api-docs/ApiDocsSidebar.svelte';
+  import SidebarResizeHandle from '../layout/SidebarResizeHandle.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import {
     API_SPEC_VERSIONS,
     filterGroups,
@@ -34,14 +36,8 @@
   const SIDEBAR_MIN_WIDTH = 240;
   const SIDEBAR_MAX_WIDTH = 560;
   const SIDEBAR_DEFAULT_WIDTH = 320;
-  const SIDEBAR_KEYBOARD_STEP = 16;
   let sidebarWidth = $state(SIDEBAR_DEFAULT_WIDTH);
   let sidebarMaxWidth = $state(SIDEBAR_MAX_WIDTH);
-  let isResizing = $state(false);
-  let resizeStartX = 0;
-  let resizeStartWidth = SIDEBAR_DEFAULT_WIDTH;
-  /** @type {number | null} */
-  let resizePointerId = null;
 
   const allOperations = $derived(groups.flatMap((g) => g.operations));
   const navigationOperations = $derived(
@@ -90,47 +86,9 @@
     }
   }
 
-  /** @param {PointerEvent} event */
-  function startSidebarResize(event) {
-    if (event.button !== 0 || isResizing) return;
-    event.preventDefault();
-    resizeStartX = event.clientX;
-    resizeStartWidth = sidebarWidth;
-    resizePointerId = event.pointerId;
-    isResizing = true;
-    const handle = /** @type {HTMLElement} */ (event.currentTarget);
-    handle.setPointerCapture?.(event.pointerId);
-  }
-
-  /** @param {PointerEvent} event */
-  function resizeSidebar(event) {
-    if (!isResizing || event.pointerId !== resizePointerId) return;
-    setSidebarWidth(resizeStartWidth + event.clientX - resizeStartX, false);
-  }
-
-  /** @param {PointerEvent} event */
-  function finishSidebarResize(event) {
-    if (!isResizing || event.pointerId !== resizePointerId) return;
-    isResizing = false;
-    resizePointerId = null;
-    setSidebarWidth(sidebarWidth);
-  }
-
   function updateSidebarBounds() {
     sidebarMaxWidth = getSidebarMaxWidth();
     sidebarWidth = clampSidebarWidth(sidebarWidth);
-  }
-
-  /** @param {KeyboardEvent} event */
-  function resizeSidebarWithKeyboard(event) {
-    let nextWidth = sidebarWidth;
-    if (event.key === 'ArrowLeft') nextWidth -= SIDEBAR_KEYBOARD_STEP;
-    else if (event.key === 'ArrowRight') nextWidth += SIDEBAR_KEYBOARD_STEP;
-    else if (event.key === 'Home') nextWidth = SIDEBAR_MIN_WIDTH;
-    else if (event.key === 'End') nextWidth = sidebarMaxWidth;
-    else return;
-    event.preventDefault();
-    setSidebarWidth(nextWidth);
   }
 
   useEventListener(
@@ -242,30 +200,19 @@
         onselect={handleSelect}
         onversionchange={handleVersionChange}
       />
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div
-        class="sidebar-resize-handle"
-        class:sidebar-resize-handle--active={isResizing}
-        role="separator"
-        aria-label="Resize API navigation"
-        aria-orientation="vertical"
-        aria-valuemin={SIDEBAR_MIN_WIDTH}
-        aria-valuemax={sidebarMaxWidth}
-        aria-valuenow={sidebarWidth}
-        tabindex="0"
-        title="Drag to resize. Double-click to reset."
-        data-testid="api-docs-sidebar-resize"
-        onpointerdown={startSidebarResize}
-        onpointermove={resizeSidebar}
-        onpointerup={finishSidebarResize}
-        onpointercancel={finishSidebarResize}
-        onlostpointercapture={finishSidebarResize}
-        onkeydown={resizeSidebarWithKeyboard}
-        ondblclick={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
-      ></div>
+      <SidebarResizeHandle
+        width={sidebarWidth}
+        minWidth={SIDEBAR_MIN_WIDTH}
+        maxWidth={sidebarMaxWidth}
+        defaultWidth={SIDEBAR_DEFAULT_WIDTH}
+        label={t('aria.resizeNavigation')}
+        title={t('aria.sidebarResizeHint')}
+        testId="api-docs-sidebar-resize"
+        onresize={(width) => setSidebarWidth(width, false)}
+        onresizeend={(width) => setSidebarWidth(width)}
+      />
     </div>
-    <main class="main" class:main--resizing={isResizing} data-testid="api-docs-main" bind:this={mainPanel}>
+    <main class="main" data-testid="api-docs-main" bind:this={mainPanel}>
       {#if selectedEntry}
         <nav class="operation-nav" aria-label="Operation navigation">
           <button
@@ -318,45 +265,12 @@
     overflow-y: auto;
     background: var(--ds-surface);
   }
-  .main--resizing {
-    cursor: col-resize;
-    user-select: none;
-  }
   .sidebar-pane {
     position: relative;
     flex: 0 0 auto;
     min-width: 240px;
     max-width: min(560px, 60vw);
     height: 100%;
-  }
-  .sidebar-resize-handle {
-    position: absolute;
-    z-index: 10;
-    top: 0;
-    right: -4px;
-    width: 8px;
-    height: 100%;
-    cursor: col-resize;
-    touch-action: none;
-  }
-  .sidebar-resize-handle::after {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 3px;
-    width: 2px;
-    content: '';
-    background: transparent;
-    transition: background-color 120ms ease;
-  }
-  .sidebar-resize-handle:hover::after,
-  .sidebar-resize-handle:focus-visible::after,
-  .sidebar-resize-handle--active::after {
-    background: var(--ds-border-focused);
-  }
-  .sidebar-resize-handle:focus-visible {
-    outline: 2px solid var(--ds-border-focused);
-    outline-offset: -2px;
   }
   .operation-nav {
     position: sticky;

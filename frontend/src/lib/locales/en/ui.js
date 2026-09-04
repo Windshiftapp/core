@@ -405,6 +405,8 @@ export default {
     removeCurrentStep: 'Remove current step',
     dismissNotification: 'Dismiss notification',
     mainNavigation: 'Main navigation',
+    resizeNavigation: 'Resize navigation sidebar',
+    sidebarResizeHint: 'Drag to resize. Double-click to reset.',
     mentionUsers: 'Mention users',
     notifications: 'Notifications',
     adminSettings: 'Admin settings',

@@ -21,6 +21,10 @@
     },
     compact = false,
     testIdPrefix = null,
+    fieldGroups = null,
+    customFieldItems = null,
+    optionLoader = null,
+    specializedPickers = true,
     onchange = undefined,
     onremove = undefined,
     onexecute = undefined,
@@ -35,6 +39,7 @@
   let loadingOptions = $state(false);
 
   let lastLoadedFieldId = null;
+  let valueLoadToken = 0;
   let loadedIterations = $state([]);
 
   // Map filter.values (iteration names) to iteration IDs for the picker
@@ -71,12 +76,15 @@
   $effect(() => {
     if (filter.field) {
       operatorOptions = operatorsByType[filter.field.type] || operatorsByType.text;
+      if (!operatorOptions.some((operator) => operator.value === filter.operator)) {
+        onchange?.({ ...filter, operator: operatorOptions[0]?.value || '=' });
+      }
       loadValueOptions(filter.field);
     }
   });
 
   $effect(() => {
-    if (filter.field?.id === 'iteration' && isMultiValueOperator(filter.operator)) {
+    if (specializedPickers && filter.field?.id === 'iteration' && isMultiValueOperator(filter.operator)) {
       ensureIterationsLoaded();
     }
   });
@@ -84,6 +92,22 @@
   async function loadValueOptions(field) {
     if (!field || field.id === lastLoadedFieldId) return;
     lastLoadedFieldId = field.id;
+
+    if (optionLoader) {
+      const token = ++valueLoadToken;
+      loadingOptions = true;
+      try {
+        const options = await optionLoader(field);
+        if (token === valueLoadToken) valueOptions = options || [];
+      } catch (error) {
+        if (token !== valueLoadToken) return;
+        console.error('Failed to load filter options:', error);
+        valueOptions = [];
+      } finally {
+        if (token === valueLoadToken) loadingOptions = false;
+      }
+      return;
+    }
 
     // Load options for enum/select fields
     if (field.type === 'enum' || field.type === 'select') {
@@ -293,6 +317,8 @@
       <FieldSelector
         selectedField={filter.field}
         placeholder="Choose field..."
+        {fieldGroups}
+        {customFieldItems}
         onSelect={handleFieldSelect}
         onClear={handleFieldClear}
       />
@@ -331,7 +357,7 @@
 		<div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">No value required</div>
 	  {:else if isMultiValueOperator(filter.operator)}
         <!-- Multi-value selector for IN/NOT IN -->
-        {#if filter.field.id === 'iteration'}
+        {#if specializedPickers && filter.field.id === 'iteration'}
           <IterationCombobox
             multiSelect={true}
             values={iterationMultiValues}
@@ -380,21 +406,21 @@
             {/if}
           </div>
         {/if}
-      {:else if filter.field.id === 'milestone'}
+      {:else if specializedPickers && filter.field.id === 'milestone'}
         <!-- Milestone picker -->
         <MilestoneCombobox
           value={filter.value}
           placeholder="Select milestone..."
           onSelect={handleMilestoneSelect}
         />
-      {:else if filter.field.id === 'iteration'}
+      {:else if specializedPickers && filter.field.id === 'iteration'}
         <!-- Iteration picker -->
         <IterationCombobox
           value={filter.value}
           placeholder="Select iteration..."
           onSelect={handleIterationSelect}
         />
-      {:else if filter.field.type === 'user'}
+      {:else if specializedPickers && filter.field.type === 'user'}
         <!-- User picker -->
         <UserPicker
           value={filter.value}

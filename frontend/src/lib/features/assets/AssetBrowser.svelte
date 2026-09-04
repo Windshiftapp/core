@@ -10,6 +10,7 @@
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
+  import SidebarResizeHandle from '../../layout/SidebarResizeHandle.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -22,12 +23,12 @@
   import AssetImportWizard from './import/AssetImportWizard.svelte';
   import AssetSubFilterBar from './AssetSubFilterBar.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
+  import AssetDetailContent from './AssetDetailContent.svelte';
   import { retainValuesForType } from './assetFormValues.js';
   import { isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import { fetchAssetCategories, fetchAssetStatuses, flattenCategories } from './shared/assetSetUtils.js';
-  import { useEventListener } from 'runed';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -71,29 +72,6 @@
 
   // Asset detail panel resize state
   let assetPanelWidth = $state(320);
-  let isResizingAssetPanel = $state(false);
-  let assetResizeStartX = 0;
-  let assetResizeStartWidth = 0;
-
-  function startAssetPanelResize(event) {
-    event.preventDefault();
-    assetResizeStartX = event.clientX;
-    assetResizeStartWidth = assetPanelWidth;
-    isResizingAssetPanel = true;
-  }
-
-  function onAssetResizeMove(e) {
-    const deltaX = assetResizeStartX - e.clientX;
-    assetPanelWidth = Math.max(280, Math.min(600, assetResizeStartWidth + deltaX));
-  }
-
-  function onAssetResizeEnd() {
-    isResizingAssetPanel = false;
-  }
-
-  useEventListener(() => (isResizingAssetPanel ? document : null), 'mousemove', onAssetResizeMove);
-  useEventListener(() => (isResizingAssetPanel ? document : null), 'mouseup', onAssetResizeEnd);
-
   // Filter state
   let selectedCategoryId = $state(null);
   let searchMode = $state('simple'); // 'simple' or 'ql'
@@ -607,91 +585,7 @@
 
         <!-- Detail content -->
         <div class="rounded-lg p-6" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
-          {#if directAsset.description}
-            <div class="mb-6">
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.description')}</h4>
-              <p class="text-sm" style="color: var(--ds-text);">{directAsset.description}</p>
-            </div>
-          {/if}
-          <div class="grid grid-cols-2 gap-4">
-            {#if directAsset.asset_type_name}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.type')}</h4>
-                <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                  <ColorDot color={directAsset.asset_type_color || '#6b7280'} />
-                  {directAsset.asset_type_name}
-                </span>
-              </div>
-            {/if}
-            {#if directAsset.category_name}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
-                <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                  <IconFolder class="w-4 h-4 text-yellow-500" />
-                  {directAsset.category_name}
-                </span>
-              </div>
-            {/if}
-            {#if directAsset.status_name}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.status')}</h4>
-                <span class="inline-flex items-center gap-1.5" style="color: var(--ds-text);">
-                  <span class="w-2 h-2 rounded-full" style="background-color: {directAsset.status_color || '#6b7280'};"></span>
-                  {directAsset.status_name}
-                </span>
-              </div>
-            {/if}
-            {#if directAsset.asset_tag}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Asset Tag</h4>
-                <span class="text-sm font-mono" style="color: var(--ds-text);">{directAsset.asset_tag}</span>
-              </div>
-            {/if}
-            {#if directAsset.creator_name}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.createdBy')}</h4>
-                <span class="text-sm" style="color: var(--ds-text);">{directAsset.creator_name}</span>
-              </div>
-            {/if}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.created')}</h4>
-              <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(directAsset.created_at)}</span>
-            </div>
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.updated')}</h4>
-              <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(directAsset.updated_at)}</span>
-            </div>
-            {#if directAsset.linked_item_count > 0}
-              <div>
-                <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Linked Items</h4>
-                <span class="text-sm" style="color: var(--ds-text);">{directAsset.linked_item_count}</span>
-              </div>
-            {/if}
-          </div>
-          {#if directAsset.custom_field_values && Object.keys(directAsset.custom_field_values).length > 0}
-            <div class="border-t pt-4 mt-4" style="border-color: var(--ds-border);">
-              <h4 class="text-xs font-medium uppercase mb-3" style="color: var(--ds-text-subtlest);">Custom Fields</h4>
-              {#each Object.entries(directAsset.custom_field_values) as [fieldId, value]}
-                {@const fieldDef = displayTypeFields.find(f => String(f.custom_field_id) === String(fieldId))}
-                {#if fieldDef && value !== null && value !== ''}
-                  <div class="mb-3">
-                    <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{fieldDef.field_name}</h4>
-                    <CustomFieldRenderer
-                      field={{
-                        id: fieldDef.custom_field_id,
-                        name: fieldDef.field_name,
-                        field_type: fieldDef.field_type,
-                        options: fieldDef.options
-                      }}
-                      value={value}
-                      readonly={true}
-                      noPadding={true}
-                    />
-                  </div>
-                {/if}
-              {/each}
-            </div>
-          {/if}
+          <AssetDetailContent asset={directAsset} fieldDefinitions={displayTypeFields} layout="grid" />
         </div>
       {:else}
         <EmptyState
@@ -947,15 +841,16 @@
   <!-- Right sidebar: Asset detail (when selected) -->
   {#if selectedAsset}
     <div class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
-      <!-- Resize handle -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors z-10"
-        style="background-color: transparent;"
-        onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
-        onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-        onmousedown={startAssetPanelResize}
-      ></div>
+      <SidebarResizeHandle
+        width={assetPanelWidth}
+        minWidth={280}
+        maxWidth={600}
+        defaultWidth={320}
+        edge="left"
+        label="Resize asset details"
+        title="Drag to resize, double-click to reset"
+        onresize={(width) => assetPanelWidth = width}
+      />
       <div class="p-4 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border);">
         <h2 class="font-semibold truncate" style="color: var(--ds-text);">{selectedAsset.title}</h2>
         <div class="flex items-center gap-1">
@@ -994,91 +889,7 @@
         </div>
       </div>
       <div class="flex-1 overflow-auto p-4">
-        {#if selectedAsset.description}
-          <div class="mb-4">
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.description')}</h4>
-            <p class="text-sm" style="color: var(--ds-text);">{selectedAsset.description}</p>
-          </div>
-        {/if}
-        <div class="space-y-3">
-          {#if selectedAsset.asset_type_name}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.type')}</h4>
-              <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                <ColorDot color={selectedAsset.asset_type_color || '#6b7280'} />
-                {selectedAsset.asset_type_name}
-              </span>
-            </div>
-          {/if}
-          {#if selectedAsset.category_name}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
-              <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                <IconFolder class="w-4 h-4 text-yellow-500" />
-                {selectedAsset.category_name}
-              </span>
-            </div>
-          {/if}
-          {#if selectedAsset.status_name}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.status')}</h4>
-              <span class="inline-flex items-center gap-1.5" style="color: var(--ds-text);">
-                <span class="w-2 h-2 rounded-full" style="background-color: {selectedAsset.status_color || '#6b7280'};"></span>
-                {selectedAsset.status_name}
-              </span>
-            </div>
-          {/if}
-          {#if selectedAsset.asset_tag}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Asset Tag</h4>
-              <span class="text-sm font-mono" style="color: var(--ds-text);">{selectedAsset.asset_tag}</span>
-            </div>
-          {/if}
-          {#if selectedAsset.creator_name}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.createdBy')}</h4>
-              <span class="text-sm" style="color: var(--ds-text);">{selectedAsset.creator_name}</span>
-            </div>
-          {/if}
-          <div>
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.created')}</h4>
-            <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(selectedAsset.created_at)}</span>
-          </div>
-          <div>
-            <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.updated')}</h4>
-            <span class="text-sm" style="color: var(--ds-text);">{formatDateSimple(selectedAsset.updated_at)}</span>
-          </div>
-          {#if selectedAsset.linked_item_count > 0}
-            <div>
-              <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">Linked Items</h4>
-              <span class="text-sm" style="color: var(--ds-text);">{selectedAsset.linked_item_count}</span>
-            </div>
-          {/if}
-        </div>
-        {#if selectedAsset.custom_field_values && Object.keys(selectedAsset.custom_field_values).length > 0}
-          <div class="border-t pt-4 mt-4" style="border-color: var(--ds-border);">
-            <h4 class="text-xs font-medium uppercase mb-3" style="color: var(--ds-text-subtlest);">Custom Fields</h4>
-            {#each Object.entries(selectedAsset.custom_field_values) as [fieldId, value]}
-              {@const fieldDef = displayTypeFields.find(f => String(f.custom_field_id) === String(fieldId))}
-              {#if fieldDef && value !== null && value !== ''}
-                <div class="mb-3">
-                  <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{fieldDef.field_name}</h4>
-                  <CustomFieldRenderer
-                    field={{
-                      id: fieldDef.custom_field_id,
-                      name: fieldDef.field_name,
-                      field_type: fieldDef.field_type,
-                      options: fieldDef.options
-                    }}
-                    value={value}
-                    readonly={true}
-                    noPadding={true}
-                  />
-                </div>
-              {/if}
-            {/each}
-          </div>
-        {/if}
+        <AssetDetailContent asset={selectedAsset} fieldDefinitions={displayTypeFields} />
       </div>
     </div>
   {/if}

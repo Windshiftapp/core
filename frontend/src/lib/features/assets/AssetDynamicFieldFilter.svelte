@@ -1,14 +1,5 @@
 <script>
-  import { untrack } from 'svelte';
-  import { IconX, IconCalendar, IconPencil } from '@tabler/icons-svelte-runes';
-  import FieldSelector from '../../pickers/FieldSelector.svelte';
-  import BasePicker from '../../pickers/BasePicker.svelte';
-  import Modal from '../../dialogs/Modal.svelte';
-  import Button from '../../components/Button.svelte';
-  import Checkbox from '../../components/Checkbox.svelte';
-  import Input from '../../components/Input.svelte';
-  import { t } from '../../stores/i18n.svelte.js';
-	import { booleanOptions, operatorsByType, isMultiValueOperator, isNullOperator } from '../shared/filterOperators.js';
+  import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
 
   let {
     filter = { field: null, operator: '=', value: '', values: [] },
@@ -18,362 +9,52 @@
     categories = [],
     fieldGroups = [],
     customFieldItems = [],
-    /** @type {(...args: any[]) => void} */
     onChange = () => {},
-    /** @type {(e?: any) => void} */
     onRemove = () => {},
-    /** @type {(...args: any[]) => void} */
-    onExecute = () => {}
+    onExecute = () => {},
   } = $props();
 
-  let showTextModal = $state(false);
-  let tempTextValue = $state('');
-  let operatorOptions = $state([]);
-  let valueOptions = $state([]);
-  let loadingOptions = $state(false);
-
-  let currentFieldId = $derived(filter.field?.id);
-
-  $effect(() => {
-    const fieldId = currentFieldId; // subscribe only to derived field id
-    if (filter.field) {
-      untrack(() => {
-        updateOperatorOptions(filter.field.type);
-        loadValueOptions(filter.field);
-      });
-    }
-  });
-
-  function updateOperatorOptions(fieldType) {
-    operatorOptions = operatorsByType[fieldType] || operatorsByType.text;
-    const validOperators = operatorOptions.map(op => op.value);
-    if (!validOperators.includes(filter.operator)) {
-      onChange({ ...filter, operator: operatorOptions[0]?.value || '=' });
-    }
-  }
-
-  function loadValueOptions(field) {
-    if (!field) return;
-
-    if (field.type === 'enum' || field.type === 'select') {
-      loadingOptions = true;
-      try {
-        if (field.id === 'status') {
-          valueOptions = statuses.map(s => ({ value: s.name, label: s.name }));
-        } else if (field.id === 'type') {
-          valueOptions = assetTypes.map(t => ({ value: t.name, label: t.name }));
-        } else if (field.id === 'category') {
-          valueOptions = flattenCategoryOptions(categories);
-        } else if (field.options) {
-          // Handle both new ID-based format and legacy string array format
-          if (field.options.items && Array.isArray(field.options.items)) {
-            valueOptions = field.options.items.map(opt => ({ value: opt.id, label: opt.label }));
-          } else if (Array.isArray(field.options)) {
-            valueOptions = field.options.map(opt => ({ value: opt, label: opt }));
-          }
-        } else {
-          valueOptions = [];
-        }
-      } catch (error) {
-        console.error('Failed to load value options:', error);
-        valueOptions = [];
-      } finally {
-        loadingOptions = false;
-      }
-    } else {
-      valueOptions = [];
-    }
-  }
-
-  function flattenCategoryOptions(cats, level = 0) {
+  function flattenCategoryOptions(items, level = 0) {
     let result = [];
-    for (const cat of cats) {
-      result.push({ value: cat.name, label: '\u00A0'.repeat(level * 2) + cat.name });
-      if (cat.children?.length > 0) {
-        result = result.concat(flattenCategoryOptions(cat.children, level + 1));
+    for (const category of items) {
+      result.push({
+        value: category.name,
+        label: '\u00A0'.repeat(level * 2) + category.name,
+      });
+      if (category.children?.length) {
+        result = result.concat(flattenCategoryOptions(category.children, level + 1));
       }
     }
     return result;
   }
 
-  function handleFieldSelect(field) {
-    onChange({ ...filter, field: field, value: '', values: [] });
-  }
-
-  function handleFieldClear() {
-    onChange({ ...filter, field: null, value: '', values: [] });
-  }
-
-  function handleValueChange(event) {
-    onChange({ ...filter, value: event.target.value });
-  }
-
-  function handleValueKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      onExecute();
+  function loadOptions(field) {
+    if (field.type !== 'enum' && field.type !== 'select') return [];
+    if (field.id === 'status') {
+      return statuses.map((status) => ({ value: status.name, label: status.name }));
     }
-  }
-
-  function handleMultiValueToggle(value) {
-    const newValues = filter.values.includes(value)
-      ? filter.values.filter(v => v !== value)
-      : [...filter.values, value];
-    onChange({ ...filter, values: newValues });
-  }
-
-  function openTextModal() {
-    tempTextValue = filter.value || '';
-    showTextModal = true;
-  }
-
-  function closeTextModal() {
-    showTextModal = false;
-  }
-
-  function applyTextValue() {
-    onChange({ ...filter, value: tempTextValue });
-    onExecute();
-    showTextModal = false;
-  }
-
-  function clearTextValue() {
-    tempTextValue = '';
-    onChange({ ...filter, value: '' });
-    onExecute();
-    showTextModal = false;
+    if (field.id === 'type') {
+      return assetTypes.map((type) => ({ value: type.name, label: type.name }));
+    }
+    if (field.id === 'category') return flattenCategoryOptions(categories);
+    if (field.options?.items && Array.isArray(field.options.items)) {
+      return field.options.items.map((option) => ({ value: option.id, label: option.label }));
+    }
+    if (Array.isArray(field.options)) {
+      return field.options.map((option) => ({ value: option, label: option }));
+    }
+    return [];
   }
 </script>
 
-<div
-  class={compact ? "flex flex-col gap-2" : "flex items-start gap-2 p-2.5 rounded border"}
-  style={compact ? "" : "background-color: var(--ds-surface-raised); border-color: var(--ds-border);"}
->
-  <!-- Field Selector -->
-  <div class={compact ? "flex items-start gap-2 w-full" : "flex-1 min-w-0"} style={compact ? "" : "max-width: 250px;"}>
-    <div class={compact ? "flex-1" : ""}>
-      <FieldSelector
-        selectedField={filter.field}
-        placeholder="Choose field..."
-        {fieldGroups}
-        {customFieldItems}
-        onSelect={handleFieldSelect}
-        onClear={handleFieldClear}
-      />
-    </div>
-  </div>
-
-  {#if filter.field}
-    <!-- Operator + Value row -->
-    <div class={compact ? "flex gap-2 w-full" : "contents"}>
-      <!-- Operator Selector -->
-      <div class={compact ? "flex-shrink-0" : ""} style={compact ? "width: 90px;" : "min-width: 150px;"}>
-        <BasePicker
-          value={filter.operator}
-          items={operatorOptions}
-          placeholder={compact ? "=" : "Select operator"}
-          getValue={(item) => item.value}
-          getLabel={(item) => compact ? item.value : item.label}
-          onSelect={(item) => {
-            if (item) {
-              const newOperator = item.value;
-			  if (isMultiValueOperator(newOperator)) {
-                onChange({ ...filter, operator: newOperator, values: [], value: '' });
-			  } else if (isNullOperator(newOperator)) {
-				onChange({ ...filter, operator: newOperator, value: '', values: [] });
-              } else {
-                onChange({ ...filter, operator: newOperator, values: [] });
-              }
-            }
-          }}
-        />
-      </div>
-
-      <!-- Value Input -->
-      <div class={compact ? "flex-1 min-w-0" : "flex-1"} style={compact ? "" : "min-width: 200px;"}>
-	  {#if isNullOperator(filter.operator)}
-		<div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">No value required</div>
-	  {:else if isMultiValueOperator(filter.operator)}
-        {#if valueOptions.length > 0}
-          <div class="border rounded p-2 max-h-32 overflow-y-auto" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-            {#each valueOptions as option}
-              <div class="py-1 px-2 rounded filter-option-hover">
-                <Checkbox
-                  checked={filter.values.includes(option.value)}
-                  onchange={() => handleMultiValueToggle(option.value)}
-                  label={option.label}
-                  size="small"
-                />
-              </div>
-            {/each}
-          </div>
-        {:else}
-          <div
-            role="button"
-            tabindex="0"
-            onclick={openTextModal}
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
-            style="background-color: var(--ds-surface); border-color: var(--ds-border);"
-          >
-            {#if filter.value}
-              <span class="truncate flex-1" style="color: var(--ds-text);">{filter.value}</span>
-              <button
-                type="button"
-                onclick={(e) => { e.stopPropagation(); clearTextValue(); }}
-                class="p-0.5 rounded transition-colors flex-shrink-0"
-                style="color: var(--ds-text-subtle);"
-                title="Clear value"
-              >
-                <IconX class="w-3 h-3" />
-              </button>
-            {:else}
-              <span style="color: var(--ds-text-subtle);">Enter comma-separated values...</span>
-              <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
-            {/if}
-          </div>
-        {/if}
-      {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
-        {#if loadingOptions}
-          <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">Loading options...</div>
-        {:else if valueOptions.length > 0}
-          <BasePicker
-            value={filter.value}
-            items={valueOptions}
-            placeholder="Select value..."
-            showUnassigned={true}
-            unassignedLabel="Select value..."
-            getValue={(item) => item.value}
-            getLabel={(item) => item.label}
-            onSelect={(item) => {
-              onChange({ ...filter, value: item ? item.value : '' });
-            }}
-          />
-        {:else}
-          <div
-            role="button"
-            tabindex="0"
-            onclick={openTextModal}
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
-            style="background-color: var(--ds-surface); border-color: var(--ds-border);"
-          >
-            {#if filter.value}
-              <span class="truncate flex-1" style="color: var(--ds-text);">{filter.value}</span>
-              <button
-                type="button"
-                onclick={(e) => { e.stopPropagation(); clearTextValue(); }}
-                class="p-0.5 rounded transition-colors flex-shrink-0"
-                style="color: var(--ds-text-subtle);"
-                title="Clear value"
-              >
-                <IconX class="w-3 h-3" />
-              </button>
-            {:else}
-              <span style="color: var(--ds-text-subtle);">Enter value...</span>
-              <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
-            {/if}
-          </div>
-        {/if}
-      {:else if filter.field.type === 'date'}
-        <div class="relative">
-          <Input
-            type="date"
-            value={filter.value}
-            oninput={handleValueChange}
-            onkeydown={handleValueKeydown}
-            class="pr-10"
-            size="small"
-          />
-          <IconCalendar class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style="color: var(--ds-text-subtle);" />
-        </div>
-      {:else if filter.field.type === 'number'}
-        <Input
-          type="number"
-          placeholder="Enter number..."
-          value={filter.value}
-          oninput={handleValueChange}
-          onkeydown={handleValueKeydown}
-          size="small"
-        />
-      {:else if filter.field.type === 'boolean'}
-        <BasePicker
-          value={filter.value}
-          items={booleanOptions}
-          placeholder="Select value..."
-          showUnassigned={true}
-          unassignedLabel="Select value..."
-          getValue={(item) => item.value}
-          getLabel={(item) => item.label}
-          onSelect={(item) => {
-            onChange({ ...filter, value: item ? item.value : '' });
-          }}
-        />
-      {:else}
-        <div
-          role="button"
-          tabindex="0"
-          onclick={openTextModal}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
-          style="background-color: var(--ds-surface); border-color: var(--ds-border);"
-        >
-          {#if filter.value}
-            <span class="truncate flex-1" style="color: var(--ds-text);">{filter.value}</span>
-            <button
-              type="button"
-              onclick={(e) => { e.stopPropagation(); clearTextValue(); }}
-              class="p-0.5 rounded transition-colors flex-shrink-0"
-              style="color: var(--ds-text-subtle);"
-              title="Clear value"
-            >
-              <IconX class="w-3 h-3" />
-            </button>
-          {:else}
-            <span style="color: var(--ds-text-subtle);">Enter value...</span>
-            <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
-          {/if}
-        </div>
-      {/if}
-      </div>
-    </div>
-  {/if}
-
-  {#if !compact}
-    <button
-      type="button"
-      onclick={(e) => onRemove(e)}
-      class="p-2 rounded transition-colors"
-      style="color: var(--ds-text-subtle);"
-      title="Remove filter"
-    >
-      <IconX class="w-5 h-5" />
-    </button>
-  {/if}
-</div>
-
-<!-- Text Input Modal -->
-<Modal bind:isOpen={showTextModal} maxWidth="max-w-md" onclose={closeTextModal} onSubmit={applyTextValue}>
-  <div class="p-4">
-    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
-      {filter.field?.label || filter.field?.name || 'Enter Value'}
-    </h3>
-    <Input
-      type="text"
-      bind:value={tempTextValue}
-      placeholder="Enter value..."
-      size="small"
-    />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" size="sm" onclick={clearTextValue}>Clear</Button>
-      <Button variant="ghost" size="sm" onclick={closeTextModal}>Cancel</Button>
-      <Button variant="primary" size="sm" onclick={applyTextValue}>Apply</Button>
-    </div>
-  </div>
-</Modal>
-
-<style>
-  .filter-option-hover:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-</style>
+<DynamicFieldFilter
+  {filter}
+  {compact}
+  {fieldGroups}
+  {customFieldItems}
+  optionLoader={loadOptions}
+  specializedPickers={false}
+  onchange={onChange}
+  onremove={onRemove}
+  onexecute={onExecute}
+/>

@@ -24,14 +24,15 @@
   import { api } from '../api.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import ScrollableSidebar from '../layout/ScrollableSidebar.svelte';
+  import SidebarResizeHandle from '../layout/SidebarResizeHandle.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import PagesNavSidebar from '../features/pages/PagesNavSidebar.svelte';
   import WorkspaceAdminNav from './WorkspaceAdminNav.svelte';
   import { i18n, t } from '../stores/i18n.svelte.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../stores/workspaceGradient.svelte.js';
-  import { useEventListener } from 'runed';
   import {
     uiStore,
+    WS_SIDEBAR_DEFAULT_WIDTH,
     WS_SIDEBAR_MAX_WIDTH,
     WS_SIDEBAR_MIN_WIDTH,
   } from '../stores/ui.svelte.js';
@@ -53,48 +54,6 @@
 
   let sidebarWidth = $derived($uiStore.wsSidebarWidth);
   let isCollapsed = $derived($uiStore.wsSidebarCollapsed);
-  let isResizing = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-  let collapsedDuringDrag = $state(false);
-
-  function onResizeStart(e) {
-    e.preventDefault();
-    resizeStartX = e.clientX;
-    resizeStartWidth = isCollapsed ? COLLAPSED_WIDTH : sidebarWidth;
-    collapsedDuringDrag = false;
-    isResizing = true;
-  }
-
-  function handleResizeMove(e) {
-    const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
-    if (rawWidth < COLLAPSE_THRESHOLD) {
-      if (!isCollapsed) {
-        collapsedDuringDrag = true;
-        uiStore.wsSidebarCollapsed = true;
-      }
-    } else {
-      if (isCollapsed) {
-        uiStore.wsSidebarCollapsed = false;
-        collapsedDuringDrag = false;
-      }
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rawWidth));
-      uiStore.wsSidebarWidth = newWidth;
-    }
-  }
-
-  function handleResizeUp() {
-    isResizing = false;
-    collapsedDuringDrag = false;
-  }
-
-  useEventListener(() => isResizing ? window : undefined, 'mousemove', handleResizeMove);
-  useEventListener(() => isResizing ? window : undefined, 'mouseup', handleResizeUp);
-
-  function onResizeHandleDblClick() {
-    uiStore.wsSidebarCollapsed = false;
-    uiStore.resetWsSidebarWidth();
-  }
 
   let { workspaceId = null } = $props();
 
@@ -417,12 +376,20 @@
 </script>
 
 {#snippet resizeHandle()}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="ws-resize-handle"
-    onmousedown={onResizeStart}
-    ondblclick={onResizeHandleDblClick}
-  ></div>
+  <SidebarResizeHandle
+    width={sidebarWidth}
+    minWidth={MIN_WIDTH}
+    maxWidth={MAX_WIDTH}
+    defaultWidth={WS_SIDEBAR_DEFAULT_WIDTH}
+    collapsed={isCollapsed}
+    collapsedWidth={COLLAPSED_WIDTH}
+    collapseThreshold={COLLAPSE_THRESHOLD}
+    label={t('aria.resizeNavigation')}
+    title={t('aria.sidebarResizeHint')}
+    testId="workspace-sidebar-resize"
+    onresize={(width) => uiStore.wsSidebarWidth = width}
+    oncollapsechange={(collapsed) => uiStore.wsSidebarCollapsed = collapsed}
+  />
 {/snippet}
 
 {#snippet workspaceAvatar(collapsed = false)}
@@ -610,7 +577,7 @@
 {#if isCollapsed}
   <!-- Collapsed icon-only sidebar -->
   <ScrollableSidebar
-    class="relative h-full flex-shrink-0 border-r items-center py-4 {sidebarBgClass}"
+    class="workspace-resizable-sidebar relative h-full flex-shrink-0 border-r items-center py-4 {sidebarBgClass}"
     style="width: {COLLAPSED_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
     header={collapsedSidebarHeader}
@@ -625,7 +592,7 @@
   <!-- Workspace admin drilldown: keep the workspace identity header (with a
        back link) and swap the body for the folded admin module nav. -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     data-testid="workspace-admin-sidebar"
     aria-label={t('workspaceSettings.title')}
@@ -638,8 +605,9 @@
 {:else if $currentRoute.view === 'workspace-pages' || $currentRoute.view === 'workspace-pages-archived'}
   <!-- Pages drilldown keeps the common workspace identity header and swaps the body for the page tree. -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
+    data-testid="workspace-pages-sidebar"
     aria-label={t('pages.treeHeading')}
     header={drilldownSidebarHeader}
     footer={sidebarResizeHandle}
@@ -653,7 +621,7 @@
 {:else if $currentWorkspace?.is_personal}
   <!-- Simplified Personal Workspace Sidebar -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
     header={workspaceHeader}
@@ -669,7 +637,7 @@
 {:else}
   <!-- Regular Workspace Navigation Sidebar -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
     header={regularSidebarHeader}
@@ -783,21 +751,9 @@
     text-decoration: underline;
   }
 
-  /* Resize handle on sidebar right edge */
-  .ws-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 4px;
-    height: 100%;
-    cursor: col-resize;
-    z-index: 10;
-    transition: background-color 150ms ease;
-  }
-
-  .ws-resize-handle:hover,
-  .ws-resize-handle:active {
-    background-color: var(--ds-border-focused, #3b82f6);
+  /* Keep the shared handle's outer half clickable. */
+  :global(.workspace-resizable-sidebar.scrollable-sidebar) {
+    overflow: visible;
   }
 
   /* Enhanced navigation item transitions */

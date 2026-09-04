@@ -1,5 +1,4 @@
 <script>
-  import { useEventListener } from 'runed';
   import { AlertCircle } from '@lucide/svelte';
   import { api } from '../../api.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -11,6 +10,7 @@
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
+  import SidebarResizeHandle from '../../layout/SidebarResizeHandle.svelte';
 
   // All the props that the content needs
   let {
@@ -128,30 +128,10 @@
 
   // Panel resizing state
   let panelWidth = $state(320);
-  let isResizing = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-
-  function startResize(event) {
-    isResizing = true;
-    resizeStartX = event.clientX;
-    resizeStartWidth = panelWidth;
-    event.preventDefault();
+  function updatePanelWidth(width) {
+    panelWidth = width;
+    document.documentElement.style.setProperty('--panel-width', `${width}px`);
   }
-
-  function handleResizeMove(event) {
-    const deltaX = resizeStartX - event.clientX;
-    const newWidth = Math.max(280, Math.min(600, resizeStartWidth + deltaX));
-    panelWidth = newWidth;
-    document.documentElement.style.setProperty('--panel-width', `${newWidth}px`);
-  }
-
-  function handleResizeUp() {
-    isResizing = false;
-  }
-
-  useEventListener(() => isResizing ? document : undefined, 'mousemove', handleResizeMove);
-  useEventListener(() => isResizing ? document : undefined, 'mouseup', handleResizeUp);
 
   function handleNavigate(path) {
     onnavigate?.({ path });
@@ -452,15 +432,16 @@
 
         <!-- Resizable Right Panel -->
         <div class="flex-shrink-0 relative {isModal ? 'h-full' : ''}" style="width: var(--panel-width, 320px); min-width: 280px; max-width: 600px;">
-          <!-- Resize Handle -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors opacity-0 hover:opacity-100"
-            style="background-color: var(--ds-border);"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
-            onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-border)'}
-            onmousedown={startResize}
-          ></div>
+          <SidebarResizeHandle
+            width={panelWidth}
+            minWidth={280}
+            maxWidth={600}
+            defaultWidth={320}
+            edge="left"
+            label="Resize item details"
+            title="Drag to resize, double-click to reset"
+            onresize={updatePanelWidth}
+          />
           
           <!-- Panel Content -->
           <ItemDetailSidebar
