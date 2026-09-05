@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -920,10 +921,12 @@ type ActionEvent struct {
 
 // ExecutionContext holds context during action execution
 type ExecutionContext struct {
-	Action *Action      `json:"action"`
-	Event  *ActionEvent `json:"event"`
-	Item   *Item        `json:"item,omitempty"`
-	Actor  *User        `json:"actor,omitempty"`
+	Context         context.Context `json:"-"`
+	DurableEventKey string          `json:"-"`
+	Action          *Action         `json:"action"`
+	Event           *ActionEvent    `json:"event"`
+	Item            *Item           `json:"item,omitempty"`
+	Actor           *User           `json:"actor,omitempty"`
 	// EffectiveActorID is the user whose permissions govern this execution and
 	// whose identity downstream services record as the actor for side effects
 	// (comments authored, item history entries, etc.). It equals the action's

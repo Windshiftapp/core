@@ -390,10 +390,16 @@ func (as *AssetActionService) executeAction(action *models.AssetAction, event *m
 }
 
 func (as *AssetActionService) executeActionWithResult(action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain) (*AssetActionExecutionResult, error) {
-	return as.executeActionWithResultForEvent(action, event, chain, "")
+	return as.executeActionWithResultForEvent(context.Background(), action, event, chain, "")
 }
 
-func (as *AssetActionService) executeActionWithResultForEvent(action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain, durableEventKey string) (*AssetActionExecutionResult, error) {
+func (as *AssetActionService) executeActionWithResultForEvent(executionCtx context.Context, action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain, durableEventKey string) (*AssetActionExecutionResult, error) {
+	if executionCtx == nil {
+		executionCtx = context.Background()
+	}
+	if err := executionCtx.Err(); err != nil {
+		return nil, err
+	}
 	if action == nil {
 		return nil, fmt.Errorf("asset action is required")
 	}
@@ -448,6 +454,7 @@ func (as *AssetActionService) executeActionWithResultForEvent(action *models.Ass
 
 	// Build execution context
 	ctx := &models.AssetActionExecutionContext{
+		Context:     executionCtx,
 		Action:      action,
 		Event:       event,
 		Variables:   make(map[string]any),
@@ -510,6 +517,16 @@ func (as *AssetActionService) executeActionWithResultForEvent(action *models.Ass
 		err := as.executeNode(&node, ctx, &stepResult)
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
+		if contextErr := executionCtx.Err(); contextErr != nil {
+			stepResult.Status = models.ActionStatusFailed
+			stepResult.ErrorMessage = contextErr.Error()
+			ctx.StepResults = append(ctx.StepResults, stepResult)
+			log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(ctx.StepResults)
+			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+				return nil, fmt.Errorf("cancel asset action execution log: %w", logErr)
+			}
+			return &AssetActionExecutionResult{LogID: log.ID, Status: log.Status, ErrorMessage: log.ErrorMessage}, contextErr
+		}
 
 		if err != nil {
 			stepResult.Status = models.ActionStatusFailed

@@ -115,6 +115,11 @@ func (s *RunService) claimNext() *ClaimedJob {
 			s.failClaim(job, cancel, fmt.Sprintf("mint ws token: %v", err), false)
 			continue
 		}
+		if err := pinSandboxWSEnvironment(env); err != nil {
+			s.logger.Printf("run service: pin ws destination run=%d: %v", job.runID, err)
+			s.failClaim(job, cancel, "pin ws destination failed", true)
+			continue
+		}
 		return s.finishClaim(runCtx, job, &st, env)
 	}
 }
@@ -195,6 +200,15 @@ func (s *RunService) prepareClaimRepos(ctx context.Context, job queuedJob, state
 		}
 		state.repos = append(state.repos, repo)
 		state.checkouts = append(state.checkouts, prepared)
+		if err := writeSandboxWSConfig(prepared.Path, job.req.Env); err != nil {
+			for _, checkout := range state.checkouts {
+				_ = s.preparer.Cleanup(context.Background(), checkout)
+			}
+			if state.workspaceRoot != "" {
+				s.preparer.CleanupWorkspaceDir(job.runID)
+			}
+			return fmt.Errorf("pin checkout ws config: %w", err)
+		}
 		_ = s.repo.AppendEvent(ctx, job.runID, "lifecycle", fmt.Sprintf(
 			`{"phase":"worktree_ready","repo":%q,"path":%q,"branch":%q,"base_commit":%q}`,
 			repo.RepoSlug, prepared.Path, prepared.Branch, prepared.BaseCommit))
@@ -206,6 +220,13 @@ func (s *RunService) prepareClaimRepos(ctx context.Context, job queuedJob, state
 	state.path = primary.Path
 	if multi {
 		state.path = state.workspaceRoot
+		if err := writeSandboxWSConfig(state.workspaceRoot, job.req.Env); err != nil {
+			for _, checkout := range state.checkouts {
+				_ = s.preparer.Cleanup(context.Background(), checkout)
+			}
+			s.preparer.CleanupWorkspaceDir(job.runID)
+			return fmt.Errorf("pin workspace ws config: %w", err)
+		}
 	}
 	return nil
 }

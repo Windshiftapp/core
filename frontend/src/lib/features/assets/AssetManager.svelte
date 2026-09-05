@@ -106,13 +106,41 @@
     }
   }
 
-  // Load data when set changes
+  let setGeneration = 0;
+  let typeRequest = 0;
+  let categoryRequest = 0;
+  let roleRequest = 0;
+  let fieldsRequest = 0;
+
+  // Clear set-owned data and invalidate pending requests when selection changes.
   $effect(() => {
-    if (selectedSetId) {
+    const setId = selectedSetId;
+    setGeneration++;
+    assetTypes = [];
+    assetCategories = [];
+    roleAssignments = { user_roles: [], group_roles: [], everyone_role: null };
+    everyoneRoleId = null;
+    expandedCategories = new Set();
+    showTypeForm = false;
+    editingType = null;
+    showCategoryForm = false;
+    editingCategory = null;
+    showRoleForm = false;
+    showSetForm = false;
+    editingSet = null;
+    handleFieldsCancel();
+    if (setId) {
       loadAssetTypes();
       loadAssetCategories();
       loadSetRoles();
     }
+    return () => {
+      setGeneration++;
+      typeRequest++;
+      categoryRequest++;
+      roleRequest++;
+      fieldsRequest++;
+    };
   });
 
   // Asset Set functions
@@ -167,12 +195,15 @@
 
   // Asset Type functions
   async function loadAssetTypes() {
-    if (!selectedSetId) return;
+    const setId = selectedSetId;
+    const request = ++typeRequest;
+    if (!setId) return;
     try {
-      const types = await api.assetTypes.getAll(selectedSetId);
+      const types = await api.assetTypes.getAll(setId);
+      if (request !== typeRequest || setId !== selectedSetId) return;
       assetTypes = types || [];
     } catch (error) {
-      console.error('Failed to load asset types:', error);
+      if (request === typeRequest && setId === selectedSetId) console.error('Failed to load asset types:', error);
     }
   }
 
@@ -196,15 +227,19 @@
   }
 
   async function handleTypeSubmit() {
+    const generation = setGeneration;
     try {
       if (editingType) {
         await api.assetTypes.update(editingType.id, typeFormData);
       } else {
         await api.assetTypes.create(selectedSetId, typeFormData);
       }
+      if (generation !== setGeneration) return;
       await loadAssetTypes();
+      if (generation !== setGeneration) return;
       showTypeForm = false;
     } catch (error) {
+      if (generation !== setGeneration) return;
       console.error('Failed to save asset type:', error);
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
@@ -231,12 +266,17 @@
 
   // Field assignment functions
   async function showFieldsForm(type) {
+    const setId = selectedSetId;
+    const request = ++fieldsRequest;
     editingTypeForFields = type;
 
     try {
-      // Load all available custom fields (excluding system default fields)
-      // Note: Work item system fields (Status, Priority, etc.) don't apply to assets
-      const result = await api.customFields.getAll();
+      const [result, assignedFields] = await Promise.all([
+        api.customFields.getAll(),
+        api.assetTypes.getFields(type.id),
+      ]);
+      if (request !== fieldsRequest || setId !== selectedSetId) return;
+      // Work item system fields do not apply to assets.
       const customFields = (result || [])
         .filter(f => !f.system_default)
         .map(f => ({
@@ -251,8 +291,6 @@
 
       availableFields = customFields;
 
-      // Load currently assigned fields for this type
-      const assignedFields = await api.assetTypes.getFields(type.id);
       typeFields = (assignedFields || []).map((f, index) => ({
         field_identifier: f.custom_field_id.toString(),
         field_type: 'custom',
@@ -282,12 +320,14 @@
 
       showFieldsModal = true;
     } catch (error) {
+      if (request !== fieldsRequest || setId !== selectedSetId) return;
       console.error('Failed to load fields:', error);
       errorToast(t('dialogs.alerts.failedToLoadFields', { error: error.message }));
     }
   }
 
   async function handleFieldsSubmit() {
+    const generation = setGeneration;
     try {
       // Transform to API format with ordering and required flags
       // Only save custom fields - system fields are implicit
@@ -301,16 +341,19 @@
           }))
       };
       await api.assetTypes.updateFields(editingTypeForFields.id, fieldsData);
+      if (generation !== setGeneration) return;
       showFieldsModal = false;
       editingTypeForFields = null;
       typeFields = [];
     } catch (error) {
+      if (generation !== setGeneration) return;
       console.error('Failed to save field assignments:', error);
       errorToast(t('dialogs.alerts.failedToSaveFields', { error: error.message }));
     }
   }
 
   function handleFieldsCancel() {
+    fieldsRequest++;
     showFieldsModal = false;
     editingTypeForFields = null;
     typeFields = [];
@@ -318,7 +361,11 @@
 
   // Asset Category functions
   async function loadAssetCategories() {
-    assetCategories = await fetchAssetCategories(selectedSetId);
+    const setId = selectedSetId;
+    const request = ++categoryRequest;
+    const categories = await fetchAssetCategories(setId);
+    if (request !== categoryRequest || setId !== selectedSetId) return;
+    assetCategories = categories;
   }
 
   function showAddCategoryForm(parentId = null) {
@@ -338,15 +385,19 @@
   }
 
   async function handleCategorySubmit() {
+    const generation = setGeneration;
     try {
       if (editingCategory) {
         await api.assetCategories.update(editingCategory.id, categoryFormData);
       } else {
         await api.assetCategories.create(selectedSetId, categoryFormData);
       }
+      if (generation !== setGeneration) return;
       await loadAssetCategories();
+      if (generation !== setGeneration) return;
       showCategoryForm = false;
     } catch (error) {
+      if (generation !== setGeneration) return;
       console.error('Failed to save category:', error);
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
@@ -401,13 +452,16 @@
   }
 
   async function loadSetRoles() {
-    if (!selectedSetId) return;
+    const setId = selectedSetId;
+    const request = ++roleRequest;
+    if (!setId) return;
     try {
-      const roles = await api.assetSets.getRoles(selectedSetId);
+      const roles = await api.assetSets.getRoles(setId);
+      if (request !== roleRequest || setId !== selectedSetId) return;
       roleAssignments = roles || { user_roles: [], group_roles: [], everyone_role: null };
       everyoneRoleId = roles?.everyone_role?.role_id || null;
     } catch (error) {
-      console.error('Failed to load role assignments:', error);
+      if (request === roleRequest && setId === selectedSetId) console.error('Failed to load role assignments:', error);
     }
   }
 
@@ -417,6 +471,7 @@
   }
 
   async function handleRoleSubmit() {
+    const generation = setGeneration;
     try {
       const data = {
         role_id: roleFormData.role_id,
@@ -427,9 +482,12 @@
         data.group_id = roleFormData.group_id;
       }
       await api.assetSets.assignRole(selectedSetId, data);
+      if (generation !== setGeneration) return;
       await loadSetRoles();
+      if (generation !== setGeneration) return;
       showRoleForm = false;
     } catch (error) {
+      if (generation !== setGeneration) return;
       console.error('Failed to assign role:', error);
       errorToast(t('dialogs.alerts.failedToAssignRole', { error: error.message }));
     }
@@ -505,6 +563,7 @@
       <div class="flex items-center gap-2">
         <ItemPicker
           bind:value={selectedSetId}
+          optionTestid={(option) => `asset-manager-set-${option.value}`}
           items={assetSets}
           config={{
             primary: { text: (set) => set.name + (set.is_default ? ` (${t('assets.default')})` : '') },
@@ -576,6 +635,7 @@
       <nav class="flex gap-4">
         <button
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
+          data-testid="asset-manager-types-tab"
           onclick={() => activeTab = 'types'}
         >
           <IconSettings class="w-4 h-4 inline mr-1" />
@@ -583,6 +643,7 @@
         </button>
         <button
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
+          data-testid="asset-manager-categories-tab"
           onclick={() => activeTab = 'categories'}
         >
           <IconListTree class="w-4 h-4 inline mr-1" />
@@ -591,6 +652,7 @@
         {#if isSetAdmin}
           <button
             class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
+            data-testid="asset-manager-permissions-tab"
             onclick={() => activeTab = 'permissions'}
           >
             <IconUsers class="w-4 h-4 inline mr-1" />
@@ -652,10 +714,10 @@
           {#snippet actions(row)}
             {#if isSetAdmin}
               <div class="flex gap-1">
-                <Button variant="ghost" size="sm" onclick={() => showFieldsForm(row)} title="Configure Fields">
+                <Button variant="ghost" size="sm" dataTestid={`asset-manager-type-fields-${row.id}`} onclick={() => showFieldsForm(row)} title="Configure Fields">
                   <IconSettings class="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onclick={() => showEditTypeForm(row)}>
+                <Button variant="ghost" size="sm" dataTestid={`asset-manager-edit-type-${row.id}`} onclick={() => showEditTypeForm(row)}>
                   <IconEdit class="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onclick={() => deleteType(row.id)}>
@@ -878,6 +940,7 @@
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <Input
           type="text"
+          dataTestid="asset-manager-type-name"
           bind:value={typeFormData.name}
           required
           size="small"

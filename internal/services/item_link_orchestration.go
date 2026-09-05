@@ -1324,6 +1324,8 @@ func (s *ItemLinkService) emitLinkedEvents(actorUserID int, params CreateItemLin
 			Title:                         "Item Linked",
 			ReferencedWorkspaceID:         referencedWorkspaceID,
 			ReferencedWorkspacePermission: referencedPermission,
+			ReferencedEntityType:          params.TargetType,
+			ReferencedEntityID:            params.TargetID,
 			TemplateData: map[string]any{
 				"item.title":   sourceItem.Title,
 				"item.id":      params.SourceID,
@@ -1368,6 +1370,8 @@ func (s *ItemLinkService) emitUnlinkedEvents(actorUserID int, link *models.ItemL
 		Title:                         "Item Unlinked",
 		ReferencedWorkspaceID:         referencedWorkspaceID,
 		ReferencedWorkspacePermission: referencedPermission,
+		ReferencedEntityType:          link.TargetType,
+		ReferencedEntityID:            link.TargetID,
 		TemplateData: map[string]any{
 			"item.title":   sourceItem.Title,
 			"item.id":      link.SourceID,
@@ -1379,16 +1383,23 @@ func (s *ItemLinkService) emitUnlinkedEvents(actorUserID int, link *models.ItemL
 }
 
 func (s *ItemLinkService) notificationReferenceAccess(entityType string, entityID int) (workspaceID int, permission string) {
-	if entityType != "test_case" {
-		return 0, ""
-	}
 	workspaceID, _, found, err := s.ResolveEntityScope(entityType, entityID)
+	permissionByType := map[string]string{
+		"item":      models.PermissionItemView,
+		"test_case": models.PermissionTestView,
+		"page":      models.PermissionPageView,
+		"asset":     AssetPermissionKeyView,
+	}
+	permission = permissionByType[entityType]
+	if permission == "" {
+		return 0, "invalid"
+	}
 	if err != nil || !found {
 		// Keep the required permission populated with an invalid scope so the
 		// notification service drops every recipient fail-closed.
-		return 0, models.PermissionTestView
+		return 0, permission
 	}
-	return workspaceID, models.PermissionTestView
+	return workspaceID, permission
 }
 
 // lookupActorUsername returns template data without blocking link creation.

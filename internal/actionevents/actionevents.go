@@ -291,6 +291,9 @@ func RunTargets(ctx context.Context, store *TargetStore, eventKey string, callba
 	hasTransientFailure := false
 	var executed int64
 	for _, target := range targets {
+		if err := ctx.Err(); err != nil {
+			return executed, err
+		}
 		if target.State == "completed" || target.State == "skipped" {
 			continue
 		}

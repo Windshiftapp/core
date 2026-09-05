@@ -53,11 +53,14 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-evaluate item.view before every post-connect write so revocation takes
-	// effect before the next event or heartbeat is disclosed. Workspace identity
-	// is immutable for an item, so the stream does not need another item query.
+	// Re-resolve ownership and item.view before every post-connect write so a
+	// workspace move or membership revocation takes effect before disclosure.
 	authorized := func() bool {
-		ok, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+		currentWorkspaceID, err := itemRepo.GetWorkspaceID(itemID)
+		if err != nil {
+			return false
+		}
+		ok, err := h.permissionService.HasWorkspacePermission(user.ID, currentWorkspaceID, models.PermissionItemView)
 		return err == nil && ok
 	}
 

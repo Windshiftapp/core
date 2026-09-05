@@ -232,6 +232,7 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
+		worklogs = redactWorklogs(r, deps, worklogs)
 		return mapWorklogs(worklogs), page, total, nil
 	}
 }
@@ -335,6 +336,7 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 		ProjectID: current.ProjectID, ItemID: current.ItemID, Description: current.Description,
 		Date:            time.Unix(current.Date, 0).UTC().Format("2006-01-02"),
 		DurationMinutes: current.DurationMins, UserTimezone: userTimezone,
+		StoredStartUnix: current.StartTime, StoredEndUnix: current.EndTime,
 	}
 	if patch.ProjectID.Set {
 		input.ProjectID = patch.ProjectID.Value
@@ -351,27 +353,26 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 	if patch.Timezone.Set {
 		input.Timezone = patch.Timezone.Value
 	}
-	if patch.Duration.Set || patch.DurationMinutes.Set {
+	switch {
+	case patch.Duration.Set || patch.DurationMinutes.Set:
+		input.StoredStartUnix = 0
+		input.StoredEndUnix = 0
 		input.DurationMinutes = 0
 		if patch.Duration.Set {
 			input.Duration = patch.Duration.Value
 		} else {
 			input.DurationMinutes = patch.DurationMinutes.Value
 		}
-	} else if patch.StartTime.Set || patch.EndTime.Set {
-		location, err := time.LoadLocation(userTimezone)
-		if err != nil {
-			location = time.UTC
-		}
+	case patch.Date.Set || patch.StartTime.Set || patch.EndTime.Set:
 		input.DurationMinutes = 0
-		input.StartTime = time.Unix(current.StartTime, 0).In(location).Format("15:04")
-		input.EndTime = time.Unix(current.EndTime, 0).In(location).Format("15:04")
 		if patch.StartTime.Set {
 			input.StartTime = patch.StartTime.Value
 		}
 		if patch.EndTime.Set {
 			input.EndTime = patch.EndTime.Value
 		}
+	default:
+		input.PreserveStored = true
 	}
 	return input
 }

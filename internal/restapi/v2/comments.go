@@ -137,7 +137,7 @@ func updateComment(deps Deps) jsonOperation[commentPatchRequest, models.Comment]
 		if err != nil {
 			return models.Comment{}, err
 		}
-		if err := requireCommentEdit(deps, user.ID, comment); err != nil {
+		if err := requireCommentEdit(r, deps, user.ID, comment); err != nil {
 			return models.Comment{}, err
 		}
 		updated, err := deps.Comments.UpdateWithEffects(services.UpdateCommentParams{
@@ -159,7 +159,7 @@ func deleteComment(deps Deps) commandOperation {
 		if err != nil {
 			return err
 		}
-		if err := requireCommentEdit(deps, user.ID, comment); err != nil {
+		if err := requireCommentEdit(r, deps, user.ID, comment); err != nil {
 			return err
 		}
 		return commentError(deps.Comments.DeleteWithEffects(services.DeleteCommentParams{
@@ -230,7 +230,10 @@ func requireCommentPermission(deps Deps, userID, workspaceID int, permission str
 	return nil
 }
 
-func requireCommentEdit(deps Deps, userID int, comment *services.CommentWithDetails) error {
+func requireCommentEdit(r *http.Request, deps Deps, userID int, comment *services.CommentWithDetails) error {
+	if err := requireCommentRead(r, deps, userID, comment.ItemID, comment.WorkspaceID); err != nil {
+		return err
+	}
 	if comment.AuthorID != nil && *comment.AuthorID == userID {
 		return nil
 	}

@@ -562,7 +562,7 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 		if err != nil {
 			return models.RelationshipGraphResponse{}, err
 		}
-		result, err := app.RelationshipGraph(user.ID, id)
+		result, err := app.RelationshipGraph(r.Context(), user.ID, id)
 		return result, assetError(err)
 	})
 	builder.JSON(http.MethodPost, item+"/links", http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetLinkInput) (*models.ItemLink, error) {
@@ -629,10 +629,14 @@ func assetError(err error) error {
 		return newError(http.StatusServiceUnavailable, "service_unavailable", "Asset import storage is not configured")
 	case errors.Is(err, services.ErrAssetImportUploadNotFound):
 		return newError(http.StatusNotFound, "not_found", "Asset import upload was not found")
+	case errors.Is(err, repository.ErrAssetImportConfigConflict):
+		return newError(http.StatusConflict, "conflict", repository.ErrAssetImportConfigConflict.Error())
 	case errors.Is(err, repository.ErrDuplicateEntry):
 		return newError(http.StatusConflict, "conflict", "Asset resource already exists")
 	case errors.Is(err, services.ErrAssetConflict):
 		return newError(http.StatusConflict, "conflict", "Asset resource is still in use")
+	case errors.Is(err, services.ErrAssetVersionConflict):
+		return newError(http.StatusConflict, "conflict", services.ErrAssetVersionConflict.Error())
 	case errors.As(err, &validation):
 		return newError(http.StatusBadRequest, "invalid_request", validation.Error())
 	default:

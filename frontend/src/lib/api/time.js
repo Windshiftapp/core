@@ -69,7 +69,7 @@ export const time = {
       }),
     delete: (id) => fetchV2Data(`/time/worklogs/${id}`, { method: 'DELETE' }),
     getByItem: (itemId, requestOptions = {}) =>
-      fetchV2Data(`/items/${itemId}/worklogs`, requestOptions),
+      fetchAllV2Pages(`/items/${itemId}/worklogs`, requestOptions),
   },
 };
 

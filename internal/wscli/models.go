@@ -1080,7 +1080,6 @@ type TimeWorklogCreateRequest struct {
 	StartTime       string `json:"start_time,omitempty"`
 	EndTime         string `json:"end_time,omitempty"`
 	ItemID          *int   `json:"item_id,omitempty"`
-	ItemKey         string `json:"item_key,omitempty"`
 }
 
 // TimerStartRequest is the v2 start-timer request body.

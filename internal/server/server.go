@@ -430,13 +430,19 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to create notification manager: %w", err)
 	}
+	notificationAssetPermissions := services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)
+	notificationAuthorizer := services.NewNotificationAuthorizer(s.db, permService, notificationAssetPermissions)
 
 	s.notificationService = services.NewNotificationService(
 		s.db,
 		s.notificationManager,
 		permService,
 		services.DefaultNotificationServiceConfig(),
+		notificationAssetPermissions,
 	)
+	if err := services.PrepareDurableNotificationEngine(context.Background(), s.eventEngine, s.notificationService); err != nil {
+		return fmt.Errorf("prepare durable notification consumers: %w", err)
+	}
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
@@ -735,12 +741,14 @@ func (s *Server) initialize() error {
 	)
 
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService, permService)
+	notificationHandler.SetNotificationAuthorizer(notificationAuthorizer)
 	emailTemplateHandler := handlers.NewEmailTemplateHandler(repository.NewEmailTemplateRepository(s.db), logger.NewAuditor(s.db))
 
 	// Push dispatches every notification; VAPID config resolves env, persisted,
 	// then generated keys.
 	pushCfg := services.ResolveVAPIDConfig(s.db, cfg.Push, slog.Default())
 	pushService := services.NewPushService(s.db, pushCfg, permService)
+	pushService.SetNotificationAuthorizer(notificationAuthorizer)
 	pushHandler := handlers.NewPushHandler(pushService)
 	s.notificationManager.SetPushDispatcher(pushService)
 	if pushService.Enabled() {
@@ -885,6 +893,7 @@ func (s *Server) initialize() error {
 	} else if n > 0 {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
+	go s.runAssetImportRecovery(assetApplication)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -979,6 +988,9 @@ func (s *Server) initialize() error {
 
 	// Wire email reply service for bidirectional email threading
 	emailReplyService := services.NewEmailReplyService(s.db, smtpSender)
+	if err := services.PrepareDurableEmailReplyEngine(context.Background(), s.eventEngine, emailReplyService); err != nil {
+		return fmt.Errorf("prepare durable email reply consumer: %w", err)
+	}
 	commentService.SetEmailReplyService(emailReplyService)
 	s.notificationScheduler.SetEmailReplyOutbox(emailReplyService)
 
@@ -2317,6 +2329,21 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 		case <-s.magicLinkStopChan:
 			slog.Info("magic link cleanup scheduler stopped")
 			return
+		}
+	}
+}
+
+func (s *Server) runAssetImportRecovery(assets *services.AssetApplicationService) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.cleanupStopChan:
+			return
+		case <-ticker.C:
+			if _, err := assets.ReconcileInterruptedImports(); err != nil {
+				slog.Error("asset import recovery failed", "error", err)
+			}
 		}
 	}
 }

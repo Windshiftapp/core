@@ -83,11 +83,17 @@ var timeWorklogAddCmd = &cobra.Command{
 		req.DurationMinutes, _ = cmd.Flags().GetInt("duration-minutes")
 		req.StartTime, _ = cmd.Flags().GetString("start-time")
 		req.EndTime, _ = cmd.Flags().GetString("end-time")
-		req.ItemKey, _ = cmd.Flags().GetString("item-key")
 		if itemIDStr, _ := cmd.Flags().GetString("item-id"); itemIDStr != "" {
 			id, err := strconv.Atoi(itemIDStr)
 			if err != nil {
 				return fmt.Errorf("invalid item-id: %w", err)
+			}
+			req.ItemID = &id
+		}
+		if itemKey, _ := cmd.Flags().GetString("item-key"); itemKey != "" {
+			id, err := client.ResolveItemID(itemKey)
+			if err != nil {
+				return fmt.Errorf("failed to resolve item key %q: %w", itemKey, err)
 			}
 			req.ItemID = &id
 		}
@@ -237,6 +243,7 @@ func init() {
 	timeWorklogAddCmd.Flags().String("end-time", "", "End time HH:MM (pair with start-time)")
 	timeWorklogAddCmd.Flags().String("item-id", "", "Optional linked work item ID")
 	timeWorklogAddCmd.Flags().String("item-key", "", "Optional linked work item key (PROJ-42)")
+	timeWorklogAddCmd.MarkFlagsMutuallyExclusive("item-id", "item-key")
 
 	timeTimerStartCmd.Flags().Int("workspace-id", 0, "Workspace ID (required)")
 	timeTimerStartCmd.Flags().Int("project-id", 0, "Time project ID (required)")

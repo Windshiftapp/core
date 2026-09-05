@@ -35,6 +35,9 @@ type WorklogMutationInput struct {
 	EndTime         string
 	Timezone        string
 	UserTimezone    string
+	StoredStartUnix int64
+	StoredEndUnix   int64
+	PreserveStored  bool
 }
 
 // WorklogMutationResult contains the canonical row and normalized clock data.
@@ -173,12 +176,32 @@ func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (pr
 	if err != nil {
 		return preparedWorklog{}, worklogInputError{err}
 	}
-	durationMinutes, startUnix, endUnix, err := ParseWorklogTimes(date, WorklogTimeInput{
-		Duration: input.Duration, DurationMinutes: input.DurationMinutes,
-		StartTime: input.StartTime, EndTime: input.EndTime,
-	})
-	if err != nil {
-		return preparedWorklog{}, worklogInputError{err}
+	durationMinutes := input.DurationMinutes
+	startUnix := input.StoredStartUnix
+	endUnix := input.StoredEndUnix
+	if input.PreserveStored {
+		if _, err := ValidateWorklogDurationMinutes(durationMinutes); err != nil {
+			return preparedWorklog{}, worklogInputError{err}
+		}
+		if startUnix <= 0 || endUnix <= startUnix {
+			return preparedWorklog{}, worklogInputError{fmt.Errorf("stored worklog interval is invalid")}
+		}
+	} else {
+		startTime := input.StartTime
+		if startTime == "" && startUnix > 0 {
+			startTime = time.Unix(startUnix, 0).In(location).Format("15:04")
+		}
+		endTime := input.EndTime
+		if endTime == "" && endUnix > 0 {
+			endTime = time.Unix(endUnix, 0).In(location).Format("15:04")
+		}
+		durationMinutes, startUnix, endUnix, err = ParseWorklogTimes(date, WorklogTimeInput{
+			Duration: input.Duration, DurationMinutes: input.DurationMinutes,
+			StartTime: startTime, EndTime: endTime,
+		})
+		if err != nil {
+			return preparedWorklog{}, worklogInputError{err}
+		}
 	}
 	description := input.Description
 	warnings := sanitize.ApplyAllWithWarnings(

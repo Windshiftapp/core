@@ -537,6 +537,28 @@ func (s *Store) Complete(ctx context.Context, delivery Delivery, completedAt tim
 	return nil
 }
 
+// Renew extends a live fenced lease. An expired or reclaimed lease cannot be
+// revived by its previous owner.
+func (s *Store) Renew(ctx context.Context, delivery Delivery, now time.Time, leaseDuration time.Duration) (time.Time, error) {
+	if leaseDuration <= 0 {
+		return time.Time{}, errors.New("lease duration must be positive")
+	}
+	expiresAt := now.UTC().Add(leaseDuration)
+	result, err := s.db.ExecWriteContext(ctx, `
+		UPDATE domain_event_deliveries
+		SET lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE event_id = ? AND consumer_key = ? AND state = 'leased'
+		  AND lease_owner = ? AND lease_token = ? AND lease_expires_at > ?
+	`, expiresAt, delivery.Event.ID, delivery.ConsumerKey, delivery.LeaseOwner, delivery.LeaseToken, now.UTC())
+	if err != nil {
+		return time.Time{}, fmt.Errorf("renew domain event delivery lease: %w", err)
+	}
+	if err := requireOneAffected(result, ErrLeaseLost); err != nil {
+		return time.Time{}, err
+	}
+	return expiresAt, nil
+}
+
 // Fail releases a fenced lease into retry or terminal failure state.
 func (s *Store) Fail(
 	ctx context.Context,

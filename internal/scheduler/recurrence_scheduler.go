@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -297,6 +298,7 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 		DueDate:     &scheduledDate,
 		IsTask:      template.IsTask,
 		ParentID:    template.ParentID,
+		CreatorID:   rule.CreatedBy,
 	}
 	if rule.CopyDescription {
 		item.Description = template.Description
@@ -318,7 +320,8 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 		return fmt.Errorf("validate recurring item: %w", err)
 	}
 
-	itemID, err := rs.itemRepo.CreateWithRetry(context.Background(), item, func(tx database.Tx, itemID int) error {
+	ctx := context.Background()
+	itemID, err := rs.itemRepo.CreateWithRetry(ctx, item, func(tx database.Tx, itemID int) error {
 		seqNum, err := rs.recurrenceRepo.GetNextSequenceNumber(tx, rule.ID)
 		if err != nil {
 			return fmt.Errorf("get next recurrence sequence number: %w", err)
@@ -330,6 +333,18 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 			SequenceNumber:   seqNum,
 		}); err != nil {
 			return fmt.Errorf("create recurrence instance: %w", err)
+		}
+		created, err := rs.itemRepo.FindByIDForUpdate(tx, itemID)
+		if err != nil {
+			return fmt.Errorf("load recurring item for event: %w", err)
+		}
+		metadata := itemevents.System("recurrence")
+		if rule.CreatedBy != nil {
+			metadata = itemevents.User(*rule.CreatedBy, "recurrence")
+		}
+		metadata.OccurredAt = time.Now().UTC()
+		if _, err := itemevents.NewRecorder(rs.db).Created(ctx, tx, created, nil, metadata); err != nil {
+			return fmt.Errorf("record recurring item creation: %w", err)
 		}
 		return nil
 	})

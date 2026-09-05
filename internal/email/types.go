@@ -79,6 +79,7 @@ const (
 	ActionSkipped       ProcessingAction = "skipped"
 	ActionError         ProcessingAction = "error"
 	ActionAlreadyExists ProcessingAction = "already_exists"
+	ActionDeferred      ProcessingAction = "deferred"
 )
 
 // Provider defines the interface for email providers (Microsoft, Google, Generic)

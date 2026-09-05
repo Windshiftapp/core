@@ -393,13 +393,7 @@ func (h *AssetHandler) Update(w http.ResponseWriter, r *http.Request) {
 			in.CustomFieldValuesJSON = cfJSON
 		}
 	}
-	// Reuse the loaded asset metadata instead of querying it again.
-	snap := repository.AssetUpdateSnapshot{
-		SetID:                 row.SetID,
-		StatusID:              row.StatusID,
-		AssetTypeID:           row.AssetTypeID,
-		CustomFieldValuesJSON: row.CustomFieldValues,
-	}
+	snap := row.UpdateSnapshot()
 	asset, err := h.assetService.UpdateAsset(
 		services.NewAuditActorFromRequest(r, user, middleware.GetAPIToken(r.Context()), "bearer"),
 		row.ID,
@@ -407,6 +401,10 @@ func (h *AssetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		in,
 		suppliedCustomFields,
 	)
+	if errors.Is(err, services.ErrAssetVersionConflict) {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeConflict, err.Error()))
+		return
+	}
 	if errors.Is(err, repository.ErrNotFound) {
 		h.RespondError(w, r, restapi.ErrAssetNotFound)
 		return

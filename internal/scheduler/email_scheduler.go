@@ -367,6 +367,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	errorCount := 0
 	var lastBatchError string
 	var offenderUID uint32
+	deferredClaim := false
 
 	for _, msg := range messages {
 		if msg.FetchError != nil {
@@ -393,6 +394,15 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 			errorCount++
 			offenderUID = msg.UID
 			lastBatchError = fmt.Sprintf("process UID %d: %s", msg.UID, err.Error())
+			break
+		}
+		if result.Action == email.ActionDeferred {
+			slog.Info("deferring email behind unfinished tracking claim",
+				"channel_id", ch.ID,
+				"uid", msg.UID,
+				"message_id", parsed.MessageID,
+			)
+			deferredClaim = true
 			break
 		}
 
@@ -438,6 +448,13 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	failedMessageUID := 0
 	failedMessageUIDValidity := uint32(0)
 	failedMessageCount := 0
+	if deferredClaim {
+		healthErrorCount = state.ErrorCount
+		lastBatchError = state.LastError
+		failedMessageUID = state.FailedMessageUID
+		failedMessageUIDValidity = state.FailedMessageUIDValidity
+		failedMessageCount = state.FailedMessageCount
+	}
 	if errorCount > 0 {
 		healthErrorCount = state.ErrorCount + 1
 		failedMessageUID, failedMessageUIDValidity, failedMessageCount = nextFailedMessageAttempt(state, offenderUID, currentValidity)

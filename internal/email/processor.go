@@ -2,7 +2,9 @@ package email
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/mail"
@@ -86,13 +88,17 @@ func (p *Processor) ProcessEmail(
 	// 1. Preclaim tracking row. INSERT ... ON CONFLICT DO NOTHING reports 0
 	// rows affected when this dedup_key is already taken — that's our dedup
 	// signal, replacing the older "isAlreadyProcessed" SELECT pre-check.
-	claimed, err := p.preclaimTracking(ctx, email, channelID, dedupKey)
+	claim, err := p.preclaimTracking(ctx, email, channelID, dedupKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim tracking row: %w", err)
 	}
-	if !claimed {
+	if claim == trackingClaimCompleted {
 		slog.Debug("email already processed", "message_id", email.MessageID, "dedup_key", dedupKey)
 		return &ProcessingResult{Action: ActionAlreadyExists}, nil
+	}
+	if claim == trackingClaimInProgress {
+		slog.Debug("email tracking claim is still in progress", "message_id", email.MessageID, "dedup_key", dedupKey)
+		return &ProcessingResult{Action: ActionDeferred}, nil
 	}
 
 	// 2. Find or create portal customer by email
@@ -676,18 +682,26 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 
 const trackingClaimStaleAfter = 5 * time.Minute
 
+type trackingClaimState uint8
+
+const (
+	trackingClaimAcquired trackingClaimState = iota
+	trackingClaimCompleted
+	trackingClaimInProgress
+)
+
 // preclaimTracking inserts the tracking row up front (NULL item_id/comment_id)
 // so duplicate detection happens before item creation, not after. A process
 // crash can leave that preclaim behind forever, so an incomplete claim older
 // than the processing lease + request budget is atomically reclaimed. Returns
-// true when this caller owns the claim and should proceed; false when another
-// worker or a completed prior run owns it.
+// The result distinguishes ownership from a completed duplicate and a live
+// unfinished claim so callers do not advance the mailbox watermark too early.
 func (p *Processor) preclaimTracking(
 	ctx context.Context,
 	email *ParsedEmail,
 	channelID int,
 	dedupKey string,
-) (bool, error) {
+) (trackingClaimState, error) {
 	res, err := p.db.ExecWriteContext(ctx, `
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, dedup_key, in_reply_to, from_email, from_name, subject,
@@ -714,13 +728,31 @@ func (p *Processor) preclaimTracking(
 		time.Now().Add(-trackingClaimStaleAfter),
 	)
 	if err != nil {
-		return false, err
+		return trackingClaimInProgress, err
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
-		return false, err
+		return trackingClaimInProgress, err
 	}
-	return rows > 0, nil
+	if rows > 0 {
+		return trackingClaimAcquired, nil
+	}
+
+	var itemID, commentID sql.NullInt64
+	if err := p.db.QueryRowContext(ctx, `
+		SELECT item_id, comment_id
+		FROM email_message_tracking
+		WHERE channel_id = ? AND dedup_key = ?
+	`, channelID, dedupKey).Scan(&itemID, &commentID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return trackingClaimInProgress, nil
+		}
+		return trackingClaimInProgress, err
+	}
+	if itemID.Valid || commentID.Valid {
+		return trackingClaimCompleted, nil
+	}
+	return trackingClaimInProgress, nil
 }
 
 // releaseTrackingClaim removes a preclaim row whose downstream item/comment

@@ -758,6 +758,9 @@ func (s *AssetService) InsertImportedAsset(in repository.ImportAssetRowInput) (i
 	customFieldValues := loadStoredCustomFieldValues(in.CustomFieldValuesJSON)
 	var assetID int
 	err := database.WithTx(s.db, func(tx database.Tx) error {
+		if err := s.repo.RenewImportJobLeaseInTx(tx, in.ImportJobID, in.SetID); err != nil {
+			return err
+		}
 		var err error
 		assetID, err = s.repo.InsertImportedAssetInTx(tx, in)
 		if err != nil {
@@ -839,6 +842,13 @@ func (s *AssetService) UpdateAssetWithContext(actor AuditActor, assetID int, old
 	oldValues := map[string]any{"status_id": oldStatusID}
 	newValues := map[string]any{"title": in.Title, "asset_type_id": in.AssetTypeID, "status_id": newStatusID}
 	err := database.WithTx(s.db, func(tx database.Tx) error {
+		version, err := s.repo.LockAssetVersion(tx, assetID)
+		if err != nil {
+			return err
+		}
+		if !version.Equal(oldSnap.UpdatedAt) {
+			return ErrAssetVersionConflict
+		}
 		if err := s.repo.UpdateAssetInTx(tx, assetID, in); err != nil {
 			return err
 		}
@@ -913,14 +923,10 @@ func (s *AssetService) MutateAsset(actor AuditActor, assetID int, patch AssetMut
 	if err != nil {
 		return nil, err
 	}
-	snap, err := s.repo.GetAssetUpdateSnapshot(assetID)
-	if err != nil {
-		return nil, err
-	}
 	return s.UpdateAssetWithContext(
 		actor,
 		assetID,
-		*snap,
+		row.UpdateSnapshot(),
 		repository.UpdateAssetInput{
 			AssetTypeID: current.AssetTypeID,
 			CategoryID:  current.CategoryID,

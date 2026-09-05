@@ -287,10 +287,7 @@
       {#if $notifications.length > 10}
         <div class="mt-6 p-4 rounded text-center" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
           <p class="text-sm mb-3" style="color: var(--ds-text-subtle);">
-            Showing {Math.min(filteredNotifications.length, 50)} notifications. 
-            {#if $notifications.length > 50}
-              Older notifications are automatically archived.
-            {/if}
+            Showing {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? 's' : ''}.
           </p>
           {#if unreadCount > 0}
             <Button

@@ -42,6 +42,11 @@ func (h *CommentHandler) checkCommentEditPermission(w http.ResponseWriter, r *ht
 		h.RespondNotFound(w, r)
 		return false
 	}
+	canView, err := h.Perms.CanViewWorkspace(userID, comment.WorkspaceID)
+	if err != nil || !canView {
+		h.RespondNotFound(w, r)
+		return false
+	}
 
 	if comment.AuthorID != nil && *comment.AuthorID == userID {
 		return true

@@ -205,7 +205,7 @@ func (c *DurableActionConsumer) Handle(ctx context.Context, event events.Event) 
 					if err != nil {
 						return errors.Is(err, sql.ErrNoRows), fmt.Errorf("load frozen action %d: %w", actionID, err)
 					}
-					if err := c.actions.executeActionForEvent(action, actionEvent, nil, event.Key); err != nil {
+					if err := c.actions.executeActionForEvent(ctx, action, actionEvent, nil, event.Key); err != nil {
 						return false, fmt.Errorf("execute frozen action %d: %w", actionID, err)
 					}
 					return false, nil

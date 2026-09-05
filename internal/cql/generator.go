@@ -20,6 +20,8 @@ type SQLGenerator struct {
 	itemCustomFieldMap    CustomFieldMap // Item-side custom field map, used by inner item queries inside asset linkedOf()
 	legacyNameKeyFallback bool           // Also read legacy custom_field_values keyed by field name
 	evaluationTime        time.Time      // Captured once per top-level SQL generation
+	itemWorkspaceScope    []int
+	itemWorkspaceScoped   bool
 }
 
 // NewSQLGenerator creates an outer work-item query generator. A nil field map
@@ -100,7 +102,27 @@ func (g *SQLGenerator) GenerateSQLAt(ast *ASTNode, evaluationTime time.Time) (sq
 
 	local := *g
 	local.evaluationTime = evaluationTime.UTC()
-	return local.generateNode(ast)
+	clause, args, err := local.generateNode(ast)
+	if err != nil || !local.itemWorkspaceScoped || local.entityType != EntityTypeItem {
+		return clause, args, err
+	}
+	if len(local.itemWorkspaceScope) == 0 {
+		return "1 = 0", nil, nil
+	}
+	placeholders := make([]string, len(local.itemWorkspaceScope))
+	for i, id := range local.itemWorkspaceScope {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	return fmt.Sprintf("(%s) AND %si.workspace_id IN (%s)", clause, local.aliasPrefix, strings.Join(placeholders, ",")), args, nil
+}
+
+func (g *SQLGenerator) innerGenerator(fields CustomFieldMap) *SQLGenerator {
+	inner := NewInnerSQLGenerator(g.workspaceMap, fields, g.dbDriver)
+	inner.legacyNameKeyFallback = g.legacyNameKeyFallback
+	inner.itemWorkspaceScope = g.itemWorkspaceScope
+	inner.itemWorkspaceScoped = g.itemWorkspaceScoped
+	return inner
 }
 
 // generateNode generates SQL for a single AST node
@@ -956,8 +978,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []any, 
 			return "", nil, fmt.Errorf("childrenOf() inner query parse error: %w", err)
 		}
 
-		innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.customFieldMap, g.dbDriver)
-		innerGenerator.legacyNameKeyFallback = g.legacyNameKeyFallback
+		innerGenerator := g.innerGenerator(g.customFieldMap)
 		innerSQL, innerArgs, err := innerGenerator.GenerateSQLAt(innerAST, g.evaluationTime)
 		if err != nil {
 			return "", nil, fmt.Errorf("childrenOf() inner query SQL generation error: %w", err)
@@ -967,7 +988,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []any, 
 		// Base case: find direct children of items matching the inner query
 		// Recursive case: find children of those children
 		// Note: Uses inner_ prefix for all table aliases to avoid collision with outer query's aliases
-		sql := fmt.Sprintf(`i.id IN (
+		sql := fmt.Sprintf(`%si.id IN (
 			WITH RECURSIVE descendants AS (
 				-- Base case: direct children of items matching the inner query
 				SELECT child.id FROM items child
@@ -992,7 +1013,7 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []any, 
 				JOIN descendants d ON rec_i.parent_id = d.id
 			)
 			SELECT id FROM descendants
-		)`, innerSQL)
+		)`, g.aliasPrefix, innerSQL)
 
 		return sql, innerArgs, nil
 
@@ -1037,8 +1058,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []a
 		return "", nil, fmt.Errorf("linkedOf() inner query parse error: %w", err)
 	}
 
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.customFieldMap, g.dbDriver)
-	innerGenerator.legacyNameKeyFallback = g.legacyNameKeyFallback
+	innerGenerator := g.innerGenerator(g.customFieldMap)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQLAt(innerAST, g.evaluationTime)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)
@@ -1048,7 +1068,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []a
 	// 1. Finds the link type by matching the label against forward_label or reverse_label
 	// 2. If forward_label matches: return target items (source -> target direction)
 	// 3. If reverse_label matches: return source items (target <- source direction)
-	sql = fmt.Sprintf(`i.id IN (
+	sql = fmt.Sprintf(`%si.id IN (
 		SELECT CASE
 			WHEN lt.forward_label = ? THEN il.target_id
 			WHEN lt.reverse_label = ? THEN il.source_id
@@ -1091,7 +1111,7 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []a
 					WHERE %s
 				))
 			)
-	)`, innerSQL, innerSQL)
+	)`, g.aliasPrefix, innerSQL, innerSQL)
 
 	args = make([]any, 0, 6+2*len(innerArgs))
 	args = append(args, linkLabel, linkLabel, linkLabel, linkLabel, linkLabel)
@@ -1133,8 +1153,7 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 	// itemCustomFieldMap is the item-side custom-field map supplied by the
 	// asset evaluator's caller — required for cf_<name> inside linkedOf() to
 	// resolve to the numeric JSON key used in items.custom_field_values.
-	innerGenerator := NewInnerSQLGenerator(g.workspaceMap, g.itemCustomFieldMap, g.dbDriver)
-	innerGenerator.legacyNameKeyFallback = g.legacyNameKeyFallback
+	innerGenerator := g.innerGenerator(g.itemCustomFieldMap)
 	innerSQL, innerArgs, err := innerGenerator.GenerateSQLAt(innerAST, g.evaluationTime)
 	if err != nil {
 		return "", nil, fmt.Errorf("linkedOf() inner query SQL generation error: %w", err)

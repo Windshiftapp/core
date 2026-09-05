@@ -256,7 +256,8 @@ CREATE TABLE IF NOT EXISTS asset_import_jobs (
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	started_at DATETIME,
-	completed_at DATETIME
+	completed_at DATETIME,
+	lease_expires_at BIGINT -- Unix seconds; migration: 20260905_asset_import_leases
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_set_id ON asset_import_jobs(set_id);
@@ -264,3 +265,11 @@ CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_status ON asset_import_jobs(sta
 CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_created_by ON asset_import_jobs(created_by);
 
 -- migration: 0000_baseline
+
+-- migration: 20260905_asset_import_upload_ownership
+CREATE TABLE IF NOT EXISTS asset_import_uploads (
+ id TEXT PRIMARY KEY,
+ set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at BIGINT NOT NULL
+);
