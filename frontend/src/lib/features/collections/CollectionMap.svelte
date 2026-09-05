@@ -27,6 +27,7 @@
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
   import { childItemTypesForParent } from '../../utils/hierarchy.js';
+  import { indexCollectionHierarchy } from './collectionHierarchy.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -185,21 +186,17 @@
     const parentId = currentParentId;
 
     // Compute into local variables to avoid read-after-write on $state
-    const itemIdSet = new Set(items.map(i => i.id));
+    const hierarchyIndex = indexCollectionHierarchy(items);
     const newBackbone = parentId === null
-      ? items.filter(item => !item.parent_id || !itemIdSet.has(item.parent_id)).sort((a, b) => a.id - b.id)
-      : items.filter(item => item.parent_id === parentId).sort((a, b) => a.id - b.id);
+      ? [...hierarchyIndex.roots].sort((a, b) => a.id - b.id)
+      : [...(hierarchyIndex.childrenByParent.get(parentId) || [])].sort((a, b) => a.id - b.id);
 
     // Group child items by their parent ID (children of current backbone items)
     const newChildren = {};
-    items
-      .filter(item => item.parent_id && newBackbone.some(b => b.id === item.parent_id))
-      .forEach(child => {
-        if (!newChildren[child.parent_id]) {
-          newChildren[child.parent_id] = [];
-        }
-        newChildren[child.parent_id].push(child);
-      });
+    for (const backbone of newBackbone) {
+      const children = hierarchyIndex.childrenByParent.get(backbone.id);
+      if (children?.length) newChildren[backbone.id] = [...children];
+    }
 
     // Sort child items within each parent group
     Object.keys(newChildren).forEach(pid => {

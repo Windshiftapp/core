@@ -13,6 +13,32 @@ function matchesField(field, identifier) {
   );
 }
 
+export function findQlCompletionField(catalog, filterField) {
+  if (filterField?.completion) return filterField.completion;
+
+  const identifiers = [filterField?.id];
+  if (filterField?.customFieldId != null) {
+    identifiers.unshift(`cfid_${filterField.customFieldId}`);
+  }
+  return (catalog?.fields || []).find((field) =>
+    identifiers.some((identifier) => identifier && matchesField(field, identifier))
+  );
+}
+
+export function completionFieldToFilterField(field) {
+  const customFieldId = /^cfid_(\d+)$/i.exec(field?.name || '')?.[1];
+  const id = (field?.aliases || []).find((alias) => alias.startsWith('cf_')) || field?.name;
+  return {
+    id,
+    customFieldId: customFieldId ? Number(customFieldId) : undefined,
+    name: field?.label || field?.name || '',
+    type: field?.field_type || field?.value_type || 'text',
+    description: field?.description || '',
+    isCustom: Boolean(customFieldId),
+    completion: field,
+  };
+}
+
 function findClauseStart(text) {
   let quote = null;
   let escaped = false;
@@ -284,10 +310,8 @@ export function applyQlSuggestion(query, context, suggestion) {
 export function completionValues(rows, valueHelp) {
   return (rows || [])
     .map((row) => {
-      const value = row?.[valueHelp.value_field];
-      const label = (valueHelp.label_fields || [])
-        .map((field) => row?.[field])
-        .find((candidate) => candidate != null && String(candidate).trim() !== '');
+      const value = row?.value ?? row?.[valueHelp.value_field];
+      const label = row?.label;
       return value == null ? null : { value, label: String(label ?? value) };
     })
     .filter(Boolean);

@@ -4,7 +4,7 @@
  */
 
 // Map color names to hex values (500-level for display as solid colors)
-const colorToHex = {
+export const namedColorHex = {
   red: '#ef4444',
   orange: '#f97316',
   amber: '#f59e0b',
@@ -34,5 +34,5 @@ const colorToHex = {
  * @returns {string} Hex code (e.g., '#3b82f6')
  */
 export function getHexFromColorName(colorName) {
-  return colorToHex[colorName] || colorToHex.zinc;
+  return namedColorHex[colorName] || namedColorHex.zinc;
 }

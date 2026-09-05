@@ -5,7 +5,10 @@
   import SearchInput from '../components/SearchInput.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { fieldOptionsObject } from '../utils/optionUtils.js';
+  import {
+    completionFieldToFilterField,
+    findQlCompletionField,
+  } from '../utils/qlCompletion.js';
 
   let {
     placeholder = '',
@@ -23,6 +26,7 @@
   let isOpen = $state(false);
   let searchQuery = $state('');
   let customFields = $state([]);
+  let completionCatalog = $state(null);
   let dropdownElement = $state();
 
   // Helper to get field translation (handles both object and string formats)
@@ -36,7 +40,7 @@
   }
 
   // Standard fields grouped by category
-  const standardFields = $derived(fieldGroups || [
+  const standardFields = $derived((fieldGroups || [
     {
       category: t('pickers.fieldCategories.basic'),
       fields: [
@@ -70,7 +74,13 @@
         { id: 'labels', name: getFieldTranslation('labels').name, type: 'enum', description: getFieldTranslation('labels').description }
       ]
     },
-  ]);
+  ]).map((group) => ({
+    ...group,
+    fields: group.fields.map((field) => ({
+      ...field,
+      completion: findQlCompletionField(completionCatalog, field),
+    })),
+  })));
 
   // Filtered fields derived from search query
   const filteredFields = $derived.by(() => {
@@ -113,18 +123,12 @@
       return;
     }
     try {
-      const result = await api.customFields.getAll();
-      customFields = (result || []).map(field => ({
-        id: `cf_${field.name}`,
-        customFieldId: field.id,
-        name: field.name,
-        type: field.field_type,
-        description: field.description || t('pickers.customFieldDesc', { name: field.name }),
-        isCustom: true,
-        options: field.options ? fieldOptionsObject(field.options) : null
-      }));
+      completionCatalog = await api.queryLanguage.getCatalog();
+      customFields = (completionCatalog?.fields || [])
+        .filter((field) => /^cfid_\d+$/i.test(field.name))
+        .map(completionFieldToFilterField);
     } catch (error) {
-      console.error('Failed to load custom fields:', error);
+      console.error('Failed to load query-language fields:', error);
       customFields = [];
     }
   }
@@ -177,6 +181,7 @@
       user: t('pickers.fieldTypes.user'),
       reference: t('pickers.fieldTypes.reference'),
       select: t('pickers.fieldTypes.select'),
+      multiselect: t('pickers.fieldTypes.select'),
       textarea: t('pickers.fieldTypes.textArea'),
       identifier: t('pickers.fieldTypes.identifier')
     };
@@ -193,6 +198,7 @@
       user: 'bg-indigo-100 text-indigo-800',
       reference: 'bg-pink-100 text-pink-800',
       select: 'bg-orange-100 text-orange-800',
+      multiselect: 'bg-orange-100 text-orange-800',
       textarea: 'bg-blue-100 text-blue-800'
     };
     return colors[type] || 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200';

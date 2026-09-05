@@ -34,6 +34,7 @@
   let editingId = $state(null);
   let editingObject = $state(null);
   let translationEditor = $state(null);
+  let saving = $state(false);
 
   function getStatusDisplayValue(status, field) {
     return objectDisplayValue(status, field);
@@ -115,6 +116,8 @@
   }
 
   async function saveStatus() {
+    if (saving) return;
+    saving = true;
     try {
       if (!formData.name.trim()) {
         errorToast(t('dialogs.alerts.nameRequired'));
@@ -139,6 +142,8 @@
     } catch (error) {
       console.error('Failed to save status:', error);
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+    } finally {
+      saving = false;
     }
   }
 
@@ -312,7 +317,7 @@
     </DataTable>
   {/if}
 
-  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus}>
+  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus} submitDisabled={saving}>
     {#snippet children(submitHint)}
     <!-- Modal header -->
     <ModalHeader title={editingId ? t('statuses.editStatus') : t('statuses.createStatus')} showCloseButton={false} />
@@ -382,6 +387,7 @@
           onCancel={cancelForm}
           onConfirm={saveStatus}
           confirmLabel={editingId ? t('common.update') : t('common.create')}
+          loading={saving}
           showKeyboardHint={true}
           confirmKeyboardHint={submitHint}
           class="mx-[-1.5rem] mb-[-1rem] mt-0"

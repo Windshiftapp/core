@@ -5,6 +5,7 @@
  */
 import { api } from '../api.js';
 import { capabilitiesStore } from './capabilities.svelte.js';
+import { scopeCatalogStore } from './scopeCatalog.svelte.js';
 
 class SecurityStore {
   // === User ===
@@ -44,7 +45,9 @@ class SecurityStore {
 
   // === Token Form ===
   // The grantable scopes, loaded from the server catalog (auth.ScopeCatalog).
-  scopeCatalog = $state([]);
+  get scopeCatalog() {
+    return scopeCatalogStore.catalog;
+  }
   newTokenName = $state('');
   // A conservative starting selection; the "Agent default" preset in the picker
   // applies the same set an MCP or `ws` CLI token gets when minted without one.
@@ -169,12 +172,7 @@ class SecurityStore {
    * accepts, instead of a copy in the frontend that drifts as scopes are added.
    */
   async loadScopeCatalog() {
-    try {
-      this.scopeCatalog = (await api.getScopeCatalog()) || [];
-    } catch (err) {
-      console.warn('Failed to load scope catalog:', err);
-      this.scopeCatalog = [];
-    }
+    return scopeCatalogStore.load();
   }
 
   // === Credential Actions ===

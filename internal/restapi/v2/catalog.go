@@ -40,6 +40,13 @@ type configurationReader interface {
 
 func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/query-language/catalog", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionCatalog(deps.Configuration))
+	builder.Read("/query-language/values", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionValues(queryLanguageValueLoader{
+		configuration: deps.Configuration,
+		statuses:      deps.Statuses,
+		catalog:       deps.Catalog,
+		planning:      deps.Planning,
+		timeProjects:  deps.TimeProjects,
+	}, deps.ObjectTranslations))
 	builder.Read("/statuses", AuthAuthenticated, []string{"statuses:read"}, listStatuses(deps.Statuses, deps.ObjectTranslations))
 	builder.JSON(http.MethodPost, "/statuses", http.StatusCreated, false, AuthAuthenticated, []string{"statuses:write"}, createStatus(deps.CatalogMutations))
 	builder.Read("/statuses/{status_id}", AuthAuthenticated, []string{"statuses:read"}, getStatus(deps.Statuses, deps.ObjectTranslations))

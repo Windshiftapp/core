@@ -2,24 +2,26 @@
   import { Search, X, BookOpen } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import Input from '../components/Input.svelte';
-  import { portalStore, gradients } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import { gradients } from '../stores/portalPresentation.js';
+  import { portalSearchStore } from '../stores/portalSearch.svelte.js';
   import { safeCssUrl } from '../utils/sanitize';
 
   function handleSearch(e) {
     e.preventDefault();
-    portalStore.performSearch();
+    portalSearchStore.search();
   }
 
   function handleSearchKeydown(e) {
     if (e.key === 'Escape') {
-      portalStore.closeSearchResults();
+      portalSearchStore.close();
       e.preventDefault();
     }
   }
 
   function handleSearchInput(e) {
-    portalStore.searchQuery = e.target.value;
-    portalStore.debouncedSearch();
+    portalSearchStore.query = e.target.value;
+    portalSearchStore.searchDebounced();
   }
 
   // Compute background style - image takes priority over gradient. The image
@@ -52,7 +54,7 @@
           </div>
           <Input
             type="text"
-            value={portalStore.searchQuery}
+            value={portalSearchStore.query}
             oninput={handleSearchInput}
             onkeydown={handleSearchKeydown}
             placeholder={portalStore.editableSearchPlaceholder}
@@ -95,20 +97,20 @@
       {/if}
 
       <!-- Search Results Dropdown -->
-      {#if portalStore.showSearchResults}
+      {#if portalSearchStore.visible}
         <div
           class="absolute left-0 right-0 mt-2 rounded shadow-2xl max-h-[70vh] overflow-hidden flex flex-col z-50"
           style="background-color: var(--ds-surface-card);"
         >
           <!-- Results Content -->
           <div class="flex-1 overflow-y-auto p-6 text-left">
-            {#if portalStore.searchLoading}
+            {#if portalSearchStore.loading}
               <!-- Loading State -->
               <div class="flex flex-col items-center justify-center py-12">
                 <Spinner size="lg" class="mb-4" />
                 <p class="text-sm" style="color: var(--ds-text-subtle);">Searching knowledge base...</p>
               </div>
-            {:else if portalStore.searchError}
+            {:else if portalSearchStore.error}
               <!-- Error State -->
               <div class="flex flex-col items-center justify-center py-12">
                 <div class="w-12 h-12 rounded-full flex items-center justify-center mb-4" style="background-color: var(--ds-danger-subtle);">
@@ -116,16 +118,16 @@
                 </div>
                 <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">Search Failed</h3>
                 <p class="text-sm text-center" style="color: var(--ds-text-subtle);">
-                  {portalStore.searchError}
+                  {portalSearchStore.error}
                 </p>
               </div>
-            {:else if portalStore.searchResults && portalStore.searchResults.data && portalStore.searchResults.data.length > 0}
+            {:else if portalSearchStore.results && portalSearchStore.results.data && portalSearchStore.results.data.length > 0}
               <!-- Results List -->
               <div class="space-y-3">
                 <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-                  Found {portalStore.searchResults.data.length} result{portalStore.searchResults.data.length !== 1 ? 's' : ''} for "{portalStore.searchQuery}"
+                  Found {portalSearchStore.results.data.length} result{portalSearchStore.results.data.length !== 1 ? 's' : ''} for "{portalSearchStore.query}"
                 </div>
-                {#each portalStore.searchResults.data as result}
+                {#each portalSearchStore.results.data as result}
                   {@const parsed = portalStore.parseDocmostShareLink(portalStore.knowledgeBaseShareLink)}
                   <a
                     href="{parsed.baseURL}/share/{parsed.shareID}/p/{result.slugId}"
@@ -169,7 +171,7 @@
                 </div>
                 <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">No Results Found</h3>
                 <p class="text-sm text-center" style="color: var(--ds-text-subtle);">
-                  We couldn't find any articles matching "{portalStore.searchQuery}"
+                  We couldn't find any articles matching "{portalSearchStore.query}"
                 </p>
               </div>
             {/if}

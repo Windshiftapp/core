@@ -1,5 +1,5 @@
 <script>
-  import { AlertCircle, ChevronDown, ChevronUp, MoreHorizontal, Briefcase, Calendar, Globe, Building2, Repeat, Shield } from '@lucide/svelte';
+  import { AlertCircle, ChevronDown, ChevronUp, MoreHorizontal, Briefcase, Globe, Building2, Repeat, Shield } from '@lucide/svelte';
   import { priorityIconMap } from '../../utils/icons.js';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { rruleToText } from '../../editors/rruleUtils.js';
@@ -36,23 +36,8 @@
   import { objectDisplayName } from '../../utils/systemLabels.js';
   import Badge from '../../components/Badge.svelte';
   import ApprovalsTimeline from './ApprovalsTimeline.svelte';
-
-  // Click outside action
-  function clickOutside(node) {
-    const handleClick = (event) => {
-      if (!node.contains(event.target)) {
-        node.dispatchEvent(new CustomEvent('clickOutside'));
-      }
-    };
-    
-    document.addEventListener('click', handleClick, true);
-    
-    return {
-      destroy() {
-        document.removeEventListener('click', handleClick, true);
-      }
-    };
-  }
+  import SidebarDateField from './SidebarDateField.svelte';
+  import { clickOutside } from '../../actions/clickOutside.js';
   
   const iterationConfig = buildIterationPickerConfig({
     icon: {
@@ -408,19 +393,6 @@
     if (!canEdit || !isSystemFieldEditable('story_points')) return;
     storyPointsEditValue = item?.story_points ?? '';
     editingStoryPoints = true;
-  }
-
-  // Svelte action to focus and show date picker
-  function focusAndShowPicker(node) {
-    node.focus();
-    // Use setTimeout to ensure the focus has taken effect
-    setTimeout(() => {
-      try {
-        node.showPicker();
-      } catch (e) {
-        // showPicker() may not be supported in all browsers
-      }
-    }, 0);
   }
 
   // Helper to check if a system field should be shown. Keep the legacy
@@ -1152,133 +1124,43 @@
       </button>
 
       {#if schedulingExpanded}
-      <!-- Due Date Field -->
       {#if shouldShowSystemField('due_date')}
-      <div class="mb-3">
-        {#if editingDueDate}
-          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-            oncancelEdit?.({ field: 'due_date' });
-          }}>
-            <input
-              type="date"
-              value={item?.due_date ? item.due_date.split('T')[0] : ''}
-              onchange={(e) => {
-                onsaveField?.({
-                  field: 'due_date',
-                  value: e.currentTarget.value || null
-                });
-              }}
-              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-              use:focusAndShowPicker
-            />
-          </div>
-        {:else}
-          <button
-            onclick={startEditingDueDate}
-            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-            disabled={!canEdit || !isSystemFieldEditable('due_date')}
-          >
-            <Text variant="subtle" size="sm">{t('common.dueDate')}</Text>
-            <div class="flex items-center gap-2">
-              {#if item?.due_date}
-                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-                <span style="color: var(--ds-text);">{formatDateOnly(item.due_date)}</span>
-              {:else}
-                <Text variant="subtle" size="sm">{t('common.none')}</Text>
-              {/if}
-            </div>
-          </button>
-        {/if}
-      </div>
+        <SidebarDateField
+          fieldKey="due_date"
+          label={t('common.dueDate')}
+          value={item?.due_date}
+          editing={editingDueDate}
+          editable={canEdit && isSystemFieldEditable('due_date')}
+          onStartEdit={startEditingDueDate}
+          onCancel={() => oncancelEdit?.({ field: 'due_date' })}
+          onSave={(value) => onsaveField?.({ field: 'due_date', value })}
+        />
       {/if}
 
-      <!-- Start Date Field -->
       {#if shouldShowSystemField('start_date')}
-      <div class="mb-3">
-        {#if editingStartDate}
-          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-            oncancelEdit?.({ field: 'start_date' });
-          }}>
-            <input
-              type="date"
-              value={item?.start_date ? item.start_date.split('T')[0] : ''}
-              onchange={(e) => {
-                onsaveField?.({
-                  field: 'start_date',
-                  value: e.currentTarget.value || null
-                });
-              }}
-              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-              use:focusAndShowPicker
-            />
-          </div>
-        {:else}
-          <button
-            onclick={startEditingStartDate}
-            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-            disabled={!canEdit || !isSystemFieldEditable('start_date')}
-          >
-            <Text variant="subtle" size="sm">{t('common.startDate')}</Text>
-            <div class="flex items-center gap-2">
-              {#if item?.start_date}
-                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-                <span style="color: var(--ds-text);">{formatDateOnly(item.start_date)}</span>
-              {:else}
-                <Text variant="subtle" size="sm">{t('common.none')}</Text>
-              {/if}
-            </div>
-          </button>
-        {/if}
-      </div>
+        <SidebarDateField
+          fieldKey="start_date"
+          label={t('common.startDate')}
+          value={item?.start_date}
+          editing={editingStartDate}
+          editable={canEdit && isSystemFieldEditable('start_date')}
+          onStartEdit={startEditingStartDate}
+          onCancel={() => oncancelEdit?.({ field: 'start_date' })}
+          onSave={(value) => onsaveField?.({ field: 'start_date', value })}
+        />
       {/if}
 
-      <!-- End Date Field -->
       {#if shouldShowSystemField('end_date')}
-      <div class="mb-3">
-        {#if editingEndDate}
-          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-            oncancelEdit?.({ field: 'end_date' });
-          }}>
-            <input
-              type="date"
-              value={item?.end_date ? item.end_date.split('T')[0] : ''}
-              onchange={(e) => {
-                onsaveField?.({
-                  field: 'end_date',
-                  value: e.currentTarget.value || null
-                });
-              }}
-              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-              use:focusAndShowPicker
-            />
-          </div>
-        {:else}
-          <button
-            onclick={startEditingEndDate}
-            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-            disabled={!canEdit || !isSystemFieldEditable('end_date')}
-          >
-            <Text variant="subtle" size="sm">{t('common.endDate')}</Text>
-            <div class="flex items-center gap-2">
-              {#if item?.end_date}
-                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-                <span style="color: var(--ds-text);">{formatDateOnly(item.end_date)}</span>
-              {:else}
-                <Text variant="subtle" size="sm">{t('common.none')}</Text>
-              {/if}
-            </div>
-          </button>
-        {/if}
-      </div>
+        <SidebarDateField
+          fieldKey="end_date"
+          label={t('common.endDate')}
+          value={item?.end_date}
+          editing={editingEndDate}
+          editable={canEdit && isSystemFieldEditable('end_date')}
+          onStartEdit={startEditingEndDate}
+          onCancel={() => oncancelEdit?.({ field: 'end_date' })}
+          onSave={(value) => onsaveField?.({ field: 'end_date', value })}
+        />
       {/if}
 
       <!-- Date-type Custom Fields in Scheduling -->

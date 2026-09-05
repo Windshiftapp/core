@@ -2,7 +2,8 @@
   import { api } from '../api.js';
   import { authStore } from '../stores';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';

@@ -7,6 +7,7 @@
   import { resolveScreenId } from '../../utils/screenResolution.js';
   import { navigate } from '../../router.js';
   import { collectionStore, reloadCollection, refreshCollectionItem } from '../../stores/collectionContext.js';
+  import { indexCollectionHierarchy } from './collectionHierarchy.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
@@ -433,18 +434,18 @@
     if (collectionStore.loading) return [];
     return [...collectionStore.items].sort((a, b) => (a.level || 0) - (b.level || 0) || a.id - b.id);
   });
+  let hierarchyIndex = $derived(indexCollectionHierarchy(allItemsSorted));
 
   function getRootItems() {
-    const itemIds = new Set(allItemsSorted.map(i => i.id));
-    return allItemsSorted.filter(item => item.parent_id === null || !itemIds.has(item.parent_id));
+    return hierarchyIndex.roots;
   }
 
   function getItemsByParent(parentId) {
-    return allItemsSorted.filter(item => item.parent_id === parentId);
+    return hierarchyIndex.childrenByParent.get(parentId) || [];
   }
 
   function hasChildren(itemId) {
-    return allItemsSorted.some(item => item.parent_id === itemId);
+    return hierarchyIndex.childrenByParent.has(itemId);
   }
 
   function toggleExpanded(itemId) {

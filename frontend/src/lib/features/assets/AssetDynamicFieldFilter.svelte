@@ -29,7 +29,7 @@
   }
 
   function loadOptions(field) {
-    if (field.type !== 'enum' && field.type !== 'select') return [];
+    if (!['enum', 'select', 'multiselect'].includes(field.type)) return [];
     if (field.id === 'status') {
       return statuses.map((status) => ({ value: status.name, label: status.name }));
     }
@@ -53,7 +53,6 @@
   {fieldGroups}
   {customFieldItems}
   optionLoader={loadOptions}
-  specializedPickers={false}
   onchange={onChange}
   onremove={onRemove}
   onexecute={onExecute}

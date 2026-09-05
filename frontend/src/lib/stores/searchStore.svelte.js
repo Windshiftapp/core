@@ -2,6 +2,7 @@ import { derived, get, writable } from 'svelte/store';
 import { api } from '../api.js';
 import { confirm } from '../composables/useConfirm.js';
 import { QLBuilder } from '../utils/ql.js';
+import { completionFieldToFilterField } from '../utils/qlCompletion.js';
 import { t } from './i18n.svelte.js';
 import { warningToast } from './toasts.svelte.js';
 
@@ -232,16 +233,14 @@ export function createWorkItemSearchStore() {
     let statusCatalog = get(allStatuses);
     let priorityCatalog = get(allPriorities);
     try {
-      const [cf, st, pr] = await Promise.all([
-        api.customFields.getAll(),
+      const [catalog, st, pr] = await Promise.all([
+        api.queryLanguage.getCatalog(),
         statusCatalog.length ? null : api.statuses.getAll(),
         priorityCatalog.length ? null : api.priorities.getAll(),
       ]);
-      customFieldsCatalog = (cf || []).map((field) => ({
-        id: `cf_${field.name}`,
-        name: field.name,
-        type: field.field_type,
-      }));
+      customFieldsCatalog = (catalog?.fields || [])
+        .filter((field) => /^cfid_\d+$/i.test(field.name))
+        .map(completionFieldToFilterField);
       if (st) {
         statusCatalog = (st || []).map((s) => ({ id: s.id, name: s.name || s.key || '' }));
       }

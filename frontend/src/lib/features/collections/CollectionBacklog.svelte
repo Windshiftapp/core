@@ -250,7 +250,7 @@
   async function handleRefreshWorkItems(event) {
     if (event.detail?.itemId) {
       try {
-        const newItem = await api.items.get(event.detail.itemId);
+        const newItem = event.detail.item ?? await api.items.get(event.detail.itemId);
         // When viewing a collection, accept items from any workspace (the collection defines scope).
         // Otherwise fall back to current-workspace check.
         const belongsToView = collectionId

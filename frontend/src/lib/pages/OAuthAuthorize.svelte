@@ -9,24 +9,15 @@
 	import { currentRoute } from '../router.js';
 	import ConsentCard from '../components/ConsentCard.svelte';
 	import Spinner from '../components/Spinner.svelte';
+	import { scopeCatalogStore } from '../stores/scopeCatalog.svelte.js';
 
 	// Scope descriptions come from the server catalog (auth.ScopeCatalog) so the
 	// consent screen can explain every scope a client might request. The previous
 	// hand-written map covered 8 of them and silently fell back to showing the
 	// raw scope string for the rest.
-	let scopeCatalog = $state([]);
 	let scopeDescriptions = $derived(
-		Object.fromEntries(scopeCatalog.map((s) => [s.scope, s.description]))
+		Object.fromEntries(scopeCatalogStore.catalog.map((s) => [s.scope, s.description]))
 	);
-
-	async function loadScopeCatalog() {
-		try {
-			scopeCatalog = (await api.getScopeCatalog()) || [];
-		} catch (err) {
-			console.warn('Failed to load scope catalog:', err);
-			scopeCatalog = [];
-		}
-	}
 
 	// Parse the query string the third-party app sent the browser with.
 	const params = $derived($currentRoute.query || {});
@@ -47,7 +38,7 @@
 	let actionError = $state('');
 
 	onMount(async () => {
-		loadScopeCatalog();
+		scopeCatalogStore.load();
 		try {
 			info = await api.oauth.authorizeInfo({
 				client_id: params.client_id || '',

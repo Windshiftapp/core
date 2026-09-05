@@ -894,6 +894,16 @@ func applyParameterCorrections(route *Route) {
 				map[string]any{"type": "string", "pattern": "^[A-Za-z0-9]{2,10}-[1-9][0-9]*$", "example": "WI-1238"},
 			}},
 		})
+	case "GET /query-language/values":
+		source := enumQuery("source", "Completion value catalog to search.",
+			"workspaces", "statuses", "status_categories", "priorities", "users", "milestones", "iterations", "projects", "item_types", "labels")
+		source.Required = true
+		upsertParameter(route, source)
+		valueField := enumQuery("value_field", "Resource field returned as the query-language value.", "id", "name", "key")
+		valueField.Required = true
+		upsertParameter(route, valueField)
+		upsertParameter(route, stringQuery("q", "Case-insensitive value-label search text."))
+		upsertParameter(route, integerQuery("limit", "Maximum number of completion values to return.", 100, defaultQLCompletionValueLimit))
 	case "GET /milestones", "GET /workspaces/{workspace_id}/milestones":
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts results to one milestone category."))
 		upsertParameter(route, stringQuery("status", "Restricts results to a milestone status."))

@@ -5,7 +5,7 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
+  import { applyCollectionItem, collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
   import {
     buildListColumnConfiguration,
@@ -29,6 +29,7 @@
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
+  import { checkItemVisibility } from './collectionService.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -142,7 +143,17 @@
   );
 
 
-  useEventListener(() => window, 'refresh-work-items', () => reloadCollection());
+  useEventListener(() => window, 'refresh-work-items', async (/** @type {CustomEvent} */ event) => {
+    const item = event.detail?.item;
+    if (!item) {
+      reloadCollection();
+      return;
+    }
+    const belongsToView = collectionId
+      ? await checkItemVisibility(item.id, { collection_id: collectionId })
+      : Number(item.workspace_id) === Number(workspaceId);
+    if (belongsToView) applyCollectionItem(item);
+  });
 
   // Board config depends only on the viewed collection/workspace, not on the
   // item set or load state — fetch it when the view changes, not every time
@@ -293,9 +304,8 @@
 
   const buildItemActions = createItemActionsBuilder({ viewItem, deleteItem });
 
-  // Handle inline editing events — reload from server to get fresh data
   function handleItemUpdated(data) {
-    reloadCollection();
+    applyCollectionItem(data.item);
   }
 
   function handleUpdateError(data) {

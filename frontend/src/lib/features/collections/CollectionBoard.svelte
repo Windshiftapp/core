@@ -70,7 +70,9 @@
     searchActive ? collectionStore.boardSearchHasMore : collectionStore.itemsHasMore
   );
   let activeItemsLoadingMore = $derived(
-    searchActive ? collectionStore.boardSearchLoadingMore : collectionStore.itemsLoadingMore
+    searchActive
+      ? collectionStore.boardSearchLoadingMore
+      : collectionStore.itemsLoadingMore || collectionStore.boardBackgroundLoading
   );
   let activeItemsRemainingCount = $derived(
     searchActive ? collectionStore.boardSearchRemainingCount : collectionStore.itemsRemainingCount
@@ -191,7 +193,7 @@
   async function handleRefreshWorkItems(event) {
     if (event.detail?.itemId) {
       try {
-        const newItem = await api.items.get(event.detail.itemId);
+        const newItem = event.detail.item ?? await api.items.get(event.detail.itemId);
         // Collection membership may span workspaces; verify it server-side.
         const belongsToView = collectionId
           ? await checkItemVisibility(newItem.id, { collection_id: collectionId })

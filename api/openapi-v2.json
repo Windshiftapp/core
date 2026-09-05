@@ -20508,6 +20508,14 @@
                       },
                       "type": "array"
                     },
+                    "description": {
+                      "description": "The description value.",
+                      "type": "string"
+                    },
+                    "field_type": {
+                      "description": "The field type value.",
+                      "type": "string"
+                    },
                     "label": {
                       "description": "The label value.",
                       "type": "string"
@@ -20528,24 +20536,9 @@
                       "description": "The value help value.",
                       "nullable": true,
                       "properties": {
-                        "api_version": {
-                          "description": "The api version value.",
+                        "source": {
+                          "description": "The source value.",
                           "type": "string"
-                        },
-                        "endpoint": {
-                          "description": "The endpoint value.",
-                          "type": "string"
-                        },
-                        "label_fields": {
-                          "description": "The label fields value.",
-                          "items": {
-                            "type": "string"
-                          },
-                          "type": "array"
-                        },
-                        "paginated": {
-                          "description": "The paginated value.",
-                          "type": "boolean"
                         },
                         "value_field": {
                           "description": "The value field value.",
@@ -20553,10 +20546,7 @@
                         }
                       },
                       "required": [
-                        "api_version",
-                        "endpoint",
-                        "label_fields",
-                        "paginated",
+                        "source",
                         "value_field"
                       ],
                       "type": "object"
@@ -20570,6 +20560,10 @@
                       "items": {
                         "additionalProperties": false,
                         "properties": {
+                          "description": {
+                            "description": "The description value.",
+                            "type": "string"
+                          },
                           "label": {
                             "description": "The label value.",
                             "type": "string"
@@ -20611,6 +20605,39 @@
               "logical_operators"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetQueryLanguageValuesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "description": "The description value.",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "The label value.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value value."
+                }
+              },
+              "required": [
+                "label",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -77783,6 +77810,109 @@
           }
         ],
         "summary": "Get the query language completion catalog",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/query-language/values": {
+      "get": {
+        "description": "Search query language completion values. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getQueryLanguageValues",
+        "parameters": [
+          {
+            "description": "Completion value catalog to search.",
+            "in": "query",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "enum": [
+                "workspaces",
+                "statuses",
+                "status_categories",
+                "priorities",
+                "users",
+                "milestones",
+                "iterations",
+                "projects",
+                "item_types",
+                "labels"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Resource field returned as the query-language value.",
+            "in": "query",
+            "name": "value_field",
+            "required": true,
+            "schema": {
+              "enum": [
+                "id",
+                "name",
+                "key"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Case-insensitive value-label search text.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of completion values to return.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetQueryLanguageValuesResult"
+                }
+              }
+            },
+            "description": "Search query language completion values response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Search query language completion values",
         "tags": [
           "Work items"
         ],

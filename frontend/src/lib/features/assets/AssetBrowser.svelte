@@ -69,6 +69,7 @@
   let statuses = $state([]);
   let displayTypeFields = $state([]);
   let showRelationshipGraph = $state(false);
+  let savingAsset = $state(false);
 
   // Asset detail panel resize state
   let assetPanelWidth = $state(320);
@@ -376,6 +377,9 @@
   }
 
   async function handleAssetSubmit() {
+    if (savingAsset) return;
+    savingAsset = true;
+
     try {
       // Validate required custom fields
       for (const field of selectedTypeFields) {
@@ -418,6 +422,8 @@
     } catch (error) {
       console.error('Failed to save asset:', error);
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
+    } finally {
+      savingAsset = false;
     }
   }
 
@@ -897,7 +903,13 @@
 {/if}
 
 <!-- Asset Form Modal -->
-<Modal isOpen={showAssetForm} onclose={() => showAssetForm = false} onSubmit={handleAssetSubmit}>
+<Modal
+  isOpen={showAssetForm}
+  preventClose={savingAsset}
+  submitDisabled={savingAsset}
+  onclose={() => showAssetForm = false}
+  onSubmit={handleAssetSubmit}
+>
   <ModalHeader title={editingAsset ? 'Edit Asset' : 'New Asset'} onClose={() => showAssetForm = false} />
   <form onsubmit={(e) => { e.preventDefault(); handleAssetSubmit(); }} class="p-6">
     <div class="space-y-4">
@@ -970,7 +982,13 @@
     </div>
     <div class="flex justify-end gap-2 mt-6">
       <Button variant="outline" type="button" onclick={() => showAssetForm = false} keyboardHint="Esc">{t('common.cancel')}</Button>
-      <Button dataTestid="asset-submit" type="submit" keyboardHint="↵">{editingAsset ? t('common.save') : t('common.create')}</Button>
+      <Button
+        dataTestid="asset-submit"
+        type="submit"
+        disabled={savingAsset}
+        loading={savingAsset}
+        keyboardHint="↵"
+      >{editingAsset ? t('common.save') : t('common.create')}</Button>
     </div>
   </form>
 </Modal>

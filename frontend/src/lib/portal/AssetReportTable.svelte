@@ -1,7 +1,8 @@
 <script>
   import { X, Table2, ChevronLeft, ChevronRight, Loader2, AlertCircle, Package } from '@lucide/svelte';
   import { api } from '../api.js';
-  import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
   import Input from '../components/Input.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';

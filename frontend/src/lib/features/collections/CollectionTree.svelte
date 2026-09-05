@@ -19,6 +19,7 @@
   import { formatDate } from '../../utils/dateFormatter.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
   import { itemTestCaseLinksStore, workspaceDataStore } from '../../stores/index.js';
+  import { indexCollectionHierarchy } from './collectionHierarchy.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -31,6 +32,7 @@
   let loading = $state(true);
   let currentCollectionName = $state('Default');
   let expandedItems = $state(new Set()); // Track which items are expanded
+  let hierarchyIndex = $derived(indexCollectionHierarchy(allItems));
   
   // Pagination state
   let currentPage = $state(1);
@@ -97,16 +99,15 @@
   });
 
   function getItemsByParent(parentId) {
-    return allItems.filter(item => item.parent_id === parentId);
+    return hierarchyIndex.childrenByParent.get(parentId) || [];
   }
 
   function getRootItems() {
-    const itemIds = new Set(allItems.map(i => i.id));
-    return allItems.filter(item => item.parent_id === null || !itemIds.has(item.parent_id));
+    return hierarchyIndex.roots;
   }
 
   function hasChildren(itemId) {
-    return allItems.some(item => item.parent_id === itemId);
+    return hierarchyIndex.childrenByParent.has(itemId);
   }
 
   function toggleExpanded(itemId) {

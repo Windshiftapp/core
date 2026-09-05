@@ -50,6 +50,10 @@
   });
 
   $effect(() => {
+    if (!focused) {
+      availableValues = [];
+      return;
+    }
     void loadValues(completionContext);
   });
 
@@ -82,7 +86,8 @@
       return;
     }
 
-    const cacheKey = JSON.stringify(valueHelp);
+    const fragment = context.fragment.trim();
+    const cacheKey = `${JSON.stringify(valueHelp)}:${fragment.toLowerCase()}`;
     if (valueCache.has(cacheKey)) {
       availableValues = valueCache.get(cacheKey);
       return;
@@ -90,7 +95,7 @@
 
     availableValues = [];
     try {
-      const rows = await api.queryLanguage.getValues(valueHelp);
+      const rows = await api.queryLanguage.getValues(valueHelp, fragment);
       if (token !== valueLoadToken) return;
       const values = completionValues(rows, valueHelp);
       valueCache.set(cacheKey, values);

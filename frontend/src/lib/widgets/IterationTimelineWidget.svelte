@@ -13,7 +13,6 @@
   let loading = $state(false);
   let error = $state(null);
   let currentWorkspaceId = $state(null);
-  let refreshInFlight = $state(false);
   let activeFetchId = $state(0);
 
   function isActiveIteration(iteration) {
@@ -40,7 +39,6 @@
     const fetchId = ++activeFetchId;
     loading = true;
     error = null;
-    refreshInFlight = true;
 
     try {
       const allIterations = await api.iterations.getAll({ workspace_id: workspaceId });
@@ -85,13 +83,12 @@
     } finally {
       if (fetchId === activeFetchId) {
         loading = false;
-        refreshInFlight = false;
       }
     }
   }
 
   function handleRefresh() {
-    if (!refreshInFlight) {
+    if (!loading) {
       loadIterations();
     }
   }

@@ -30,8 +30,17 @@
   export { className as class };
 
   const buttonType = $derived(/** @type {"button"|"submit"|"reset"} */ (type));
+  const effectiveDisabled = $derived(disabled || loading);
 
   let buttonEl = $state(null);
+
+  function handleClick(event) {
+    if (effectiveDisabled) {
+      event.preventDefault();
+      return;
+    }
+    onclick?.(event);
+  }
 
   // Install/uninstall @github/hotkey on the button element
   $effect(() => {
@@ -155,11 +164,11 @@
 <!-- Snippet for the button/link element -->
 {#snippet buttonElement()}
   {#if href}
-    <a bind:this={buttonEl} {id} {href} {target} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <a bind:this={buttonEl} {id} {href} {target} {style} aria-disabled={effectiveDisabled} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {id} type={buttonType} {disabled} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} {id} type={buttonType} disabled={effectiveDisabled} aria-busy={loading} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
       {@render buttonContent()}
     </button>
   {/if}

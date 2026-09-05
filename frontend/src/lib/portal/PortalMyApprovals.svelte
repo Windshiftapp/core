@@ -5,7 +5,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import { portalStore } from '../stores/portal.svelte.js';
+  import { portalApprovalsStore } from '../stores/portalActivity.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
@@ -77,17 +77,17 @@
 </script>
 
 <div class="space-y-6" data-testid="portal-my-approvals">
-  {#if portalStore.selectedApproval}
-    {@const req = portalStore.selectedApproval}
+  {#if portalApprovalsStore.selected}
+    {@const req = portalApprovalsStore.selected}
     {@const inPool = isInActivePool(req)}
     {@const myStep = activeStep(req)}
-    {@const itemCtx = portalStore.selectedApprovalRequest}
+    {@const itemCtx = portalApprovalsStore.selectedRequest}
 
     <!-- Approval Detail View -->
     <div class="space-y-4">
       <button
         type="button"
-        onclick={() => portalStore.closeApprovalDetail()}
+        onclick={() => portalApprovalsStore.closeDetail()}
         class="inline-flex items-center gap-2 text-sm font-medium mb-2 hover:underline"
         style="color: var(--ds-text-link);"
         id="portal-approval-close"
@@ -180,8 +180,8 @@
             </span>
           </div>
           <Textarea
-            value={portalStore.approvalComment}
-            oninput={(e) => (portalStore.approvalComment = e.target.value)}
+            value={portalApprovalsStore.comment}
+            oninput={(e) => (portalApprovalsStore.comment = e.target.value)}
             placeholder="Optional comment…"
             rows={3}
             data-testid="portal-approval-comment"
@@ -190,9 +190,9 @@
             <Button
               variant="primary"
               icon={Check}
-              disabled={portalStore.decidingApproval}
-              loading={portalStore.decidingApproval}
-              onclick={() => portalStore.decideApproval('approve')}
+              disabled={portalApprovalsStore.deciding}
+              loading={portalApprovalsStore.deciding}
+              onclick={() => portalApprovalsStore.decide('approve')}
               dataTestid="portal-approval-approve"
             >
               Approve
@@ -200,8 +200,8 @@
             <Button
               variant="danger"
               icon={X}
-              disabled={portalStore.decidingApproval}
-              onclick={() => portalStore.decideApproval('reject')}
+              disabled={portalApprovalsStore.deciding}
+              onclick={() => portalApprovalsStore.decide('reject')}
               dataTestid="portal-approval-reject"
             >
               Reject
@@ -209,8 +209,8 @@
             <Button
               variant="default"
               icon={MessageSquare}
-              disabled={portalStore.decidingApproval || portalStore.approvalComment.trim() === ''}
-              onclick={() => portalStore.decideApproval('comment')}
+              disabled={portalApprovalsStore.deciding || portalApprovalsStore.comment.trim() === ''}
+              onclick={() => portalApprovalsStore.decide('comment')}
               dataTestid="portal-approval-comment-submit"
             >
               Comment
@@ -248,11 +248,11 @@
       title="My approvals"
       subtitle="Review requests that are waiting for your decision."
     />
-    {#if portalStore.loadingApprovals}
+    {#if portalApprovalsStore.loading}
       <div class="flex justify-center py-12">
         <Spinner size="lg" />
       </div>
-    {:else if portalStore.myApprovals.length === 0}
+    {:else if portalApprovalsStore.approvals.length === 0}
       <div class="max-w-xl py-8 border-t" style="border-color: var(--ds-border);">
         <div class="flex items-start gap-3">
           <ShieldCheck class="w-5 h-5 mt-0.5" style="color: var(--ds-text-subtle);" />
@@ -266,9 +266,9 @@
       </div>
     {:else}
       <div class="border rounded-md overflow-hidden" style="border-color: var(--ds-border); background-color: var(--ds-surface-card);" data-testid="portal-approvals-list">
-        {#each portalStore.myApprovals as approval (approval.id)}
+        {#each portalApprovalsStore.approvals as approval (approval.id)}
           <button
-            onclick={() => portalStore.viewApproval(approval)}
+            onclick={() => portalApprovalsStore.view(approval)}
             class="w-full p-4 border-b last:border-b-0 text-left transition-colors hover:bg-black/[0.025]"
             style="border-color: var(--ds-border);"
             data-testid="portal-approval-row"

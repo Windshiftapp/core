@@ -1,4 +1,4 @@
-import { fetchV2Data } from './core.js';
+import { fetchAPI, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
 export const statusCategories = createCrudClient('/status-categories', { v2: true });
@@ -56,10 +56,7 @@ async function getWorkflow(id, requestOptions = {}) {
 }
 
 async function getAllWithTransitions() {
-  const items = (await workflowCRUD.getAll()) ?? [];
-  return Promise.all(
-    items.map(async (workflow) => ({ ...workflow, transitions: await getTransitions(workflow.id) }))
-  );
+  return fetchAPI('/workflows?include_transitions=true');
 }
 
 export const workflows = {

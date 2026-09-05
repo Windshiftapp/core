@@ -23,6 +23,7 @@
     milestonePickerConfig as milestoneConfig,
     iterationPickerConfig as iterationConfig,
   } from '../../pickers/pickerConfigs.js';
+  import { clickOutside } from '../../actions/clickOutside.js';
 
   // Helper to parse field options into [{id, label}] items
   function parseOptions(optionsStr) {
@@ -33,23 +34,6 @@
   async function loadUsers() {
     if (providedUsers !== null) return;
     await referenceDisplayCache.loadUsers();
-  }
-
-  // Click outside action
-  function clickOutside(node) {
-    const handleClick = (event) => {
-      if (!node.contains(event.target)) {
-        node.dispatchEvent(new CustomEvent('clickOutside'));
-      }
-    };
-
-    document.addEventListener('click', handleClick, true);
-
-    return {
-      destroy() {
-        document.removeEventListener('click', handleClick, true);
-      }
-    };
   }
 
   let {
@@ -325,8 +309,135 @@
   }
 </script>
 
+{#snippet readOnlyContent(interactive)}
+  {#if hasDisplayValue()}
+    {#if field.field_type === 'user'}
+      {#if userData}
+        <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+          <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
+            {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          </div>
+          <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
+        </div>
+      {:else if usersLoading}
+        <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
+      {:else}
+        <span style="color: var(--ds-text-subtle);">{t('common.unknownUser')}</span>
+      {/if}
+    {:else if field.field_type === 'milestone'}
+      <div class="flex items-center gap-2">
+        {#if milestoneData}
+          <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
+          <span style="color: var(--ds-text);">{milestoneData.name}</span>
+        {:else if interactive}
+          <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
+        {:else}
+          <span style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
+        {/if}
+      </div>
+    {:else if field.field_type === 'iteration'}
+      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        {#if iterationData}
+          {#if iterationData.is_global}
+            <Globe class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else}
+            <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {/if}
+        {:else}
+          <Calendar class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        {/if}
+        <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      </div>
+    {:else if field.field_type === 'asset'}
+      <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      </div>
+    {:else if field.field_type === 'portalcustomer'}
+      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      </div>
+    {:else if field.field_type === 'customerorganisation'}
+      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      </div>
+    {:else if field.field_type === 'linking'}
+      <div class="flex items-center gap-1 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <Link2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span style="color: var(--ds-text);">
+          {#if Array.isArray(value) && value.length > 0}
+            {value.length} linked
+          {:else if !Array.isArray(value) && value && typeof value === 'object'}
+            1 linked
+          {:else}
+            —
+          {/if}
+        </span>
+      </div>
+    {:else if field.field_type === 'combobox'}
+      <div class="flex items-center gap-1 flex-wrap {displayAlignment === 'end' ? 'justify-end' : ''}">
+        {#each getComboboxLabels(value) as labelName}
+          <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+            {labelName}
+          </span>
+        {/each}
+      </div>
+    {:else if isBooleanCustomFieldType(field.field_type)}
+      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span style="color: var(--ds-text);">{booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no')}</span>
+      </div>
+    {:else if field.field_type === 'email'}
+      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        {#if interactive}
+          <span style="color: var(--ds-text);">{value}</span>
+        {:else}
+          <a href={`mailto:${value}`} class="hover:underline" style="color: var(--ds-text);">{value}</a>
+        {/if}
+      </div>
+    {:else if field.field_type === 'url'}
+      <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        {#if interactive}
+          <span style="color: var(--ds-text);" class="truncate">{value}</span>
+        {:else}
+          <a href={safeHref(value)} target="_blank" rel="noopener noreferrer" class="hover:underline truncate" style="color: var(--ds-text);">{value}</a>
+        {/if}
+      </div>
+    {:else if field.field_type === 'number'}
+      <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+    {:else}
+      <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+    {/if}
+  {:else if interactive}
+    {#if field.field_type === 'user'}
+      <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'milestone'}
+      <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'asset'}
+      <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'portalcustomer'}
+      <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'customerorganisation'}
+      <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if isBooleanCustomFieldType(field.field_type)}
+      <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'email'}
+      <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {:else if field.field_type === 'url'}
+      <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {/if}
+    <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
+  {:else}
+    <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
+  {/if}
+{/snippet}
+
 {#if readonly}
-  <!-- Read-only display mode -->
   <div>
     {#if onStartEdit && !disabled}
       <button
@@ -335,197 +446,14 @@
         onclick={handleClick}
         data-testid={displayTestId}
       >
-		{#if hasDisplayValue()}
-          {#if field.field_type === 'user'}
-            <!-- Display user with avatar -->
-            {#if userData}
-              <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
-                {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-              </div>
-              <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
-            {:else if usersLoading}
-              <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
-            {:else}
-              <span style="color: var(--ds-text-subtle);">{t('common.unknownUser')}</span>
-            {/if}
-          {:else if field.field_type === 'milestone'}
-            <!-- Display milestone with color dot -->
-            {#if milestoneData}
-              <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
-              <span style="color: var(--ds-text);">{milestoneData.name}</span>
-            {:else}
-              <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
-            {/if}
-          {:else if field.field_type === 'iteration'}
-            <!-- Display iteration with icon -->
-            {#if iterationData}
-              {#if iterationData.is_global}
-                <Globe class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              {:else}
-                <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              {/if}
-            {:else}
-              <Calendar class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            {/if}
-            <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else if field.field_type === 'asset'}
-            <!-- Display asset with icon -->
-            <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else if field.field_type === 'portalcustomer'}
-            <!-- Display portal customer with icon -->
-            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else if field.field_type === 'customerorganisation'}
-            <!-- Display customer organisation with icon -->
-            <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else if field.field_type === 'combobox'}
-            <!-- Display labels as chips/tags -->
-            <div class="flex items-center gap-1 flex-wrap">
-              {#each getComboboxLabels(value) as labelName}
-                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {labelName}
-                </span>
-              {/each}
-            </div>
-          {:else if isBooleanCustomFieldType(field.field_type)}
-            <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);">{booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no')}</span>
-          {:else if field.field_type === 'email'}
-            <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);">{value}</span>
-          {:else if field.field_type === 'url'}
-            <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);" class="truncate">{value}</span>
-          {:else if field.field_type === 'number'}
-            <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else}
-            <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {/if}
-        {:else}
-          {#if field.field_type === 'user'}
-            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'milestone'}
-            <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'asset'}
-            <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'portalcustomer'}
-            <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'customerorganisation'}
-            <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if isBooleanCustomFieldType(field.field_type)}
-            <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'email'}
-            <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {:else if field.field_type === 'url'}
-            <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-          {/if}
-          <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
-        {/if}
+        {@render readOnlyContent(true)}
       </button>
     {:else}
-      <!-- Static display (no click handler or disabled) -->
       <div
         class="min-w-0 {displayAlignment === 'end' ? 'text-right' : ''} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {noPadding ? '' : 'px-3'} py-2 text-sm {disabled ? 'opacity-50' : ''}"
         data-testid={displayTestId}
       >
-		{#if hasDisplayValue()}
-          {#if field.field_type === 'user'}
-            {#if userData}
-              <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
-                <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
-                  {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                </div>
-                <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
-              </div>
-            {:else if usersLoading}
-              <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
-            {:else}
-              <span style="color: var(--ds-text-subtle);">{t('common.unknownUser')}</span>
-            {/if}
-          {:else if field.field_type === 'milestone'}
-            <div class="flex items-center gap-2">
-              {#if milestoneData}
-                <ColorDot color={milestoneData.category_color || '#9CA3AF'} />
-                <span style="color: var(--ds-text);">{milestoneData.name}</span>
-              {:else}
-                <span style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
-              {/if}
-            </div>
-          {:else if field.field_type === 'iteration'}
-            <div class="flex items-center gap-2">
-              {#if iterationData}
-                {#if iterationData.is_global}
-                  <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                {:else}
-                  <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                {/if}
-              {:else}
-                <Calendar class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              {/if}
-              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-            </div>
-          {:else if field.field_type === 'asset'}
-            <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
-              <Box class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-            </div>
-          {:else if field.field_type === 'portalcustomer'}
-            <div class="flex items-center gap-2">
-              <User class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-            </div>
-          {:else if field.field_type === 'customerorganisation'}
-            <div class="flex items-center gap-2">
-              <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-            </div>
-          {:else if field.field_type === 'linking'}
-            <div class="flex items-center gap-1">
-              <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">
-                {#if Array.isArray(value) && value.length > 0}
-                  {value.length} linked
-                {:else if !Array.isArray(value) && value && typeof value === 'object'}
-                  1 linked
-                {:else}
-                  —
-                {/if}
-              </span>
-            </div>
-          {:else if field.field_type === 'combobox'}
-            <div class="flex items-center gap-1 flex-wrap">
-              {#each getComboboxLabels(value) as labelName}
-                <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {labelName}
-                </span>
-              {/each}
-            </div>
-          {:else if isBooleanCustomFieldType(field.field_type)}
-            <div class="flex items-center gap-2">
-              <CheckSquare class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no')}</span>
-            </div>
-          {:else if field.field_type === 'email'}
-            <div class="flex items-center gap-2">
-              <Mail class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <a href={`mailto:${value}`} class="hover:underline" style="color: var(--ds-text);">{value}</a>
-            </div>
-          {:else if field.field_type === 'url'}
-            <div class="flex items-center gap-2">
-              <ExternalLink class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <a href={safeHref(value)} target="_blank" rel="noopener noreferrer" class="hover:underline truncate" style="color: var(--ds-text);">{value}</a>
-            </div>
-          {:else if field.field_type === 'number'}
-            <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {:else}
-            <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-          {/if}
-        {:else}
-          <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
-        {/if}
+        {@render readOnlyContent(false)}
       </div>
     {/if}
   </div>

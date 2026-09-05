@@ -17,14 +17,17 @@ function planningQuery(filters = {}) {
   return params.toString();
 }
 
-async function listPlanning(path, filters = {}) {
+async function listPlanning(path, filters = {}, requestOptions = {}) {
   const query = planningQuery(filters);
   const globalPath = `${path}${query ? `?${query}` : ''}`;
-  if (filters.workspace_id == null) return fetchAllV2Pages(globalPath);
+  if (filters.workspace_id == null) return fetchAllV2Pages(globalPath, requestOptions);
   const workspacePath = `/workspaces/${filters.workspace_id}${path}${query ? `?${query}` : ''}`;
-  const local = fetchAllV2Pages(workspacePath);
+  const local = fetchAllV2Pages(workspacePath, requestOptions);
   if (filters.include_global === false) return local;
-  const [localRows, globalRows] = await Promise.all([local, fetchAllV2Pages(globalPath)]);
+  const [localRows, globalRows] = await Promise.all([
+    local,
+    fetchAllV2Pages(globalPath, requestOptions),
+  ]);
   return [...localRows, ...globalRows];
 }
 
@@ -45,7 +48,8 @@ function iterationPatch(data) {
 }
 
 export const milestones = {
-  getAll: (filters = {}) => listPlanning('/milestones', filters),
+  getAll: (filters = {}, requestOptions = {}) =>
+    listPlanning('/milestones', filters, requestOptions),
   get: (id) => fetchV2Data(`/milestones/${id}`),
   create: (data) => planningCreate('/milestones', data),
   update: (id, data) =>
@@ -89,7 +93,8 @@ export const milestones = {
 export const iterationTypes = createCrudClient('/iteration-types');
 
 export const iterations = {
-  getAll: (filters = {}) => listPlanning('/iterations', filters),
+  getAll: (filters = {}, requestOptions = {}) =>
+    listPlanning('/iterations', filters, requestOptions),
   get: (id) => fetchV2Data(`/iterations/${id}`),
   create: (data) => planningCreate('/iterations', data),
   update: (id, data) =>

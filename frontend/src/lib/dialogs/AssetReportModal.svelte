@@ -7,7 +7,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import PortalModal from './PortalModal.svelte';
   import DialogFooter from './DialogFooter.svelte';
-  import { iconMap as portalIconMap } from '../stores/portal.svelte.js';
+  import { iconMap as portalIconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
 
   const portalIconOptions = Object.keys(portalIconMap).sort();

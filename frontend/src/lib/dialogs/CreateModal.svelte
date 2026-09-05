@@ -102,6 +102,7 @@
     workspace_id: null
   });
   let collectionCategoryId = $state(null);
+  let submitting = $state(false);
 
   // Derived state for display
   let currentTypeName = $derived(typeLabels[selectedType] || 'Item');
@@ -214,6 +215,8 @@
   }
 
   async function handleSubmit() {
+    if (submitting) return;
+    submitting = true;
     try {
       if (selectedType === 'work-item') {
         // Validate using store
@@ -237,7 +240,7 @@
         }
 
         window.dispatchEvent(new CustomEvent('refresh-work-items', {
-          detail: { itemId: result.id, parentId: formData.parent_id ?? null }
+          detail: { item: result, itemId: result.id, parentId: formData.parent_id ?? null }
         }));
         oncreated?.(result);
 
@@ -304,6 +307,8 @@
       } else {
         errorToast(`Failed to create ${currentTypeName.toLowerCase()}: ${errorMsg}`);
       }
+    } finally {
+      submitting = false;
     }
   }
 
@@ -311,7 +316,7 @@
     if (!isOpen) return;
     if (matchesShortcut(e, submitShortcut)) {
       e.preventDefault();
-      if (isFormValid) {
+      if (isFormValid && !submitting) {
         handleSubmit();
       }
     }
@@ -563,7 +568,8 @@
           variant="primary"
           size="medium"
           keyboardHint={getDisplayString(submitShortcut)}
-          disabled={!isFormValid}
+          loading={submitting}
+          disabled={!isFormValid || submitting}
         >
           {t('createModal.create')} {currentTypeName}
         </Button>

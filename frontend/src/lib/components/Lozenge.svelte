@@ -1,6 +1,7 @@
 <script>
   import { getLuminance, darkenColor, lightenColor, isGrayColor } from '../utils/colorUtils.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { namedColorHex } from '../utils/colors.js';
 
   /**
    * @type {{
@@ -52,30 +53,6 @@
     md: 'px-2.5 py-1 text-xs'
   };
 
-  // Color mappings using hex values (500-level, used in light mode)
-  const colorStyles = {
-    red: '#ef4444',
-    orange: '#f97316',
-    amber: '#f59e0b',
-    yellow: '#eab308',
-    lime: '#84cc16',
-    green: '#22c55e',
-    emerald: '#10b981',
-    teal: '#14b8a6',
-    cyan: '#06b6d4',
-    sky: '#0ea5e9',
-    blue: '#3b82f6',
-    indigo: '#6366f1',
-    violet: '#8b5cf6',
-    purple: '#a855f7',
-    fuchsia: '#d946ef',
-    pink: '#ec4899',
-    rose: '#f43f5e',
-    zinc: '#71717a',
-    grey: '#71717a',
-    gray: '#71717a'
-  };
-
   // Dark mode colors using 400-level shades (softer, less jarring)
   const darkColorStyles = {
     red: '#f87171', green: '#4ade80', blue: '#60a5fa',
@@ -116,12 +93,12 @@
     if (themeStore.isDarkMode) {
       const darkColor = darkColorStyles[color] || darkColorStyles.sky;
       if (isGray) {
-        const lightGray = lightenColor(colorStyles[color] || colorStyles.zinc, 1);
+        const lightGray = lightenColor(namedColorHex[color] || namedColorHex.zinc, 1);
         return `background-color: ${darkColor}30; border-color: ${lightGray}; color: ${lightGray};`;
       }
       return `background-color: ${darkColor}1A; border-color: ${darkColor}; color: ${darkColor};`;
     }
-    const baseColor = colorStyles[color] || colorStyles.sky;
+    const baseColor = namedColorHex[color] || namedColorHex.sky;
     return `background-color: ${baseColor}1A; border-color: ${baseColor}; color: ${baseColor};`;
   });
 </script>

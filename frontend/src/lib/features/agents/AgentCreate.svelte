@@ -147,7 +147,9 @@
         api.llmProviders.getEnabled(),
         agentBindings.getCandidates(workspaceId).catch(() => []),
         agentBindings.listToolCapabilities(workspaceId).catch(() => []),
-        api.workspaceSCM.getConnections(workspaceId).catch(() => []),
+        api.workspaceSCM
+          .getConnectionsOverview(workspaceId, { includeRepositories: true })
+          .catch(() => []),
         api.actionCapabilities.getForWorkspace(workspaceId, 'runner_pool').catch(() => []),
       ]);
       templates = templateResult || [];
@@ -155,18 +157,10 @@
       candidates = candidateResult || [];
       capabilityCatalog = capabilityResult || [];
       runnerPools = pools || [];
-      const linkedByConnection = await Promise.all(
-        (scmConnections || []).map(async (connection) => ({
-          connection,
-          repositories: await api.workspaceSCM
-            .getLinkedRepos(workspaceId, connection.id)
-            .catch(() => []),
-        }))
-      );
       repositoryOptions = [
         { value: '', label: 'Select a centrally configured repository', disabled: true },
-        ...linkedByConnection.flatMap(({ connection, repositories }) =>
-          repositories.map((repository) => ({
+        ...(scmConnections || []).flatMap((connection) =>
+          (connection.repositories || []).map((repository) => ({
             value: `${connection.id}:${repository.id}`,
             label:
               repository.repository_name

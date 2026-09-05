@@ -4,186 +4,23 @@
  */
 
 import { api } from '../api.js';
-import { navigate } from '../router.js';
 import { authStore } from '../stores';
-import { gradients } from '../utils/gradients.js';
 import { safeCssUrl } from '../utils/sanitize';
 import { createFooterLinkHelpers } from './footerLinks.js';
+import {
+  configurePortalActivityStore,
+  portalActivityStore,
+  portalApprovalsStore,
+  portalDraftsStore,
+  portalRequestsStore,
+} from './portalActivity.svelte.js';
 import { portalAuthStore } from './portalAuth.svelte.js';
+import { gradients } from './portalPresentation.js';
+import { configurePortalSearchStore, portalSearchStore } from './portalSearch.svelte.js';
 import { errorToast } from './toasts.svelte.js';
 
-// Re-export gradients for backward compatibility
-export { gradients };
-
-// Icon mapping for request types
-import {
-  AlertCircle,
-  Archive,
-  Award,
-  BarChart,
-  Bell,
-  Bookmark,
-  BookOpen,
-  Briefcase,
-  Bug,
-  Building,
-  Calendar,
-  Camera,
-  CheckCircle,
-  CheckSquare,
-  Clock,
-  Cloud,
-  Code,
-  Coffee,
-  Compass,
-  Copy,
-  Database,
-  Download,
-  Edit,
-  ExternalLink,
-  Feather,
-  FileText,
-  Filter,
-  Flag,
-  Folder,
-  Gift,
-  Globe,
-  Heart,
-  HelpCircle,
-  Home,
-  Image,
-  Info,
-  Key,
-  Layers,
-  Lightbulb,
-  Link,
-  Lock,
-  Mail,
-  Map as MapIcon,
-  MapPin,
-  Megaphone,
-  MessageSquare,
-  Minus,
-  Monitor,
-  Music,
-  Package,
-  Paperclip,
-  Pen,
-  Phone,
-  Printer,
-  RefreshCw,
-  Rocket,
-  Save,
-  Scissors,
-  Search,
-  Send,
-  Server,
-  Settings,
-  Shield,
-  Smile,
-  Star,
-  Table2,
-  Tag,
-  Target,
-  Terminal,
-  Trash,
-  Truck,
-  Upload,
-  User,
-  Users,
-  Video,
-  Volume2,
-  Watch,
-  Wifi,
-  Wrench,
-  XCircle,
-  Zap,
-} from '@lucide/svelte';
-
-// Icon map export for components
-export const iconMap = {
-  Target,
-  Zap,
-  BookOpen,
-  CheckSquare,
-  Bug,
-  Minus,
-  Star,
-  Flag,
-  Lightbulb,
-  Settings,
-  User,
-  Users,
-  Calendar,
-  Clock,
-  MapPin,
-  Search,
-  Filter,
-  Tag,
-  Bookmark,
-  Heart,
-  Shield,
-  Key,
-  Lock,
-  Globe,
-  Wifi,
-  Database,
-  Server,
-  Code,
-  Terminal,
-  FileText,
-  Folder,
-  Image,
-  Video,
-  Music,
-  Download,
-  Upload,
-  Send,
-  Mail,
-  Phone,
-  MessageSquare,
-  AlertCircle,
-  Info,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  Archive,
-  Trash,
-  Edit,
-  Copy,
-  Scissors,
-  Paperclip,
-  Link,
-  ExternalLink,
-  Package,
-  Building,
-  Rocket,
-  Award,
-  Bell,
-  Camera,
-  Coffee,
-  Compass,
-  Feather,
-  Gift,
-  Home,
-  Layers,
-  Map: MapIcon,
-  Megaphone,
-  Monitor,
-  Pen,
-  Printer,
-  RefreshCw,
-  Save,
-  Smile,
-  Wrench,
-  Truck,
-  Volume2,
-  Watch,
-  Briefcase,
-  Cloud,
-  BarChart,
-  Table2,
-};
+// Transitional exports for consumers that have not moved to portalPresentation yet.
+export { gradients, iconMap } from './portalPresentation.js';
 
 // Core state
 let portalData = $state(null);
@@ -195,7 +32,6 @@ let currentSlug = $state(null);
 let isEditing = $state(false);
 let isDarkMode = $state(false);
 let showCustomizePanel = $state(false);
-let showMyRequests = $state(false);
 let selectedGradient = $state(0);
 let activeSection = $state('hero-gradient');
 
@@ -248,45 +84,23 @@ let footerColumns = $state([
 // Knowledge base
 let knowledgeBaseShareLink = $state('');
 
-// Search state
-let searchQuery = $state('');
-let showSearchResults = $state(false);
-let searchResults = $state(/** @type {any} */ (null));
-let searchLoading = $state(false);
-let searchError = $state(null);
-
-// My Requests state
-let myRequests = $state([]);
-let loadingRequests = $state(false);
-let selectedRequest = $state(null);
-let requestComments = $state([]);
-let loadingComments = $state(false);
-let newCommentContent = $state('');
-let addingComment = $state(false);
-
-// Drafts are scoped to this portal and authenticated identity.
-let showMyDrafts = $state(false);
-let myDrafts = $state([]);
-let loadingDrafts = $state(false);
-
-// Approvals assigned to the active customer or linked internal user.
-let showMyApprovals = $state(false);
-let myApprovals = $state([]);
-let loadingApprovals = $state(false);
-let selectedApproval = $state(null);
-let loadingApprovalDetail = $state(false);
-let approvalComment = $state('');
-let decidingApproval = $state(false);
-// Request context for the selected approval.
-let selectedApprovalRequest = $state(null);
-
 // Pending request type (for opening form after login)
 let pendingRequestType = $state(null);
 
 // Internal state
 let isInitialLoad = true;
 let saveTimeout = null;
-let searchTimeout = null;
+
+configurePortalSearchStore({
+  getKnowledgeBaseShareLink: () => knowledgeBaseShareLink,
+  getSlug: () => portalData?.slug || currentSlug,
+});
+configurePortalActivityStore({
+  closeProfileMenu: () => {
+    showProfileMenu = false;
+  },
+  getSlug: () => currentSlug,
+});
 
 /**
  * Load portal data by slug
@@ -295,7 +109,13 @@ async function loadPortal(slug) {
   try {
     loading = true;
     error = null;
+    const switchedPortal = currentSlug !== slug;
     currentSlug = slug;
+
+    if (switchedPortal) {
+      portalSearchStore.reset();
+      portalActivityStore.reset();
+    }
 
     if (!slug) {
       error = 'Portal not specified';
@@ -630,14 +450,10 @@ function normalizeRequestTypes(types, isInternal = null) {
 }
 
 function hydrateUserBootstrap(bootstrap) {
-  if (!bootstrap?.authenticated) {
-    myRequests = [];
-    myApprovals = [];
-    return;
+  portalActivityStore.hydrate(bootstrap);
+  if (bootstrap?.authenticated) {
+    requestTypes = normalizeRequestTypes(requestTypes, bootstrap.is_internal === true);
   }
-  myRequests = bootstrap.my_requests || [];
-  myApprovals = bootstrap.my_approvals || [];
-  requestTypes = normalizeRequestTypes(requestTypes, bootstrap.is_internal === true);
 }
 
 /**
@@ -821,335 +637,6 @@ const { addFooterLink, removeFooterLink, updateColumnTitle, updateFooterLink } =
     saveCustomizations,
   });
 
-// Search functions
-async function performSearch() {
-  if (!searchQuery.trim()) return;
-
-  if (!knowledgeBaseShareLink) {
-    searchError = 'Knowledge base not configured';
-    showSearchResults = true;
-    return;
-  }
-
-  try {
-    searchLoading = true;
-    searchError = null;
-    searchResults = null;
-    showSearchResults = true;
-
-    const results = await api.portal.searchKnowledgeBase(portalData.slug, searchQuery);
-    searchResults = results;
-  } catch (err) {
-    console.error('Failed to search knowledge base:', err);
-    searchError = err.message || 'Failed to search knowledge base';
-  } finally {
-    searchLoading = false;
-  }
-}
-
-function debouncedSearch() {
-  if (searchTimeout) clearTimeout(searchTimeout);
-
-  if (searchQuery.length < 3) {
-    showSearchResults = false;
-    return;
-  }
-
-  searchTimeout = setTimeout(() => {
-    performSearch();
-  }, 400);
-}
-
-function closeSearchResults() {
-  showSearchResults = false;
-}
-
-// My Requests functions
-async function loadMyRequests() {
-  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
-
-  try {
-    loadingRequests = true;
-    myRequests = await api.portal.getMyRequests(currentSlug);
-  } catch (err) {
-    console.error('Failed to load requests:', err);
-  } finally {
-    loadingRequests = false;
-  }
-}
-
-async function viewRequest(request) {
-  selectedRequest = request;
-  // Update URL with request ID
-  navigate(`/portal/${currentSlug}?view=requests&id=${request.id}`);
-  await loadRequestComments(request.id);
-}
-
-async function loadRequestComments(itemId) {
-  if (!currentSlug) return;
-
-  try {
-    loadingComments = true;
-    requestComments = await api.portal.getRequestComments(currentSlug, itemId);
-  } catch (err) {
-    console.error('Failed to load comments:', err);
-  } finally {
-    loadingComments = false;
-  }
-}
-
-async function addComment() {
-  if (!newCommentContent.trim() || !selectedRequest || !currentSlug) return;
-
-  try {
-    addingComment = true;
-    const comment = await api.portal.addRequestComment(
-      currentSlug,
-      selectedRequest.id,
-      newCommentContent
-    );
-    requestComments = [...requestComments, comment];
-    newCommentContent = '';
-  } catch (err) {
-    console.error('Failed to add comment:', err);
-    errorToast('Failed to add comment. Please try again.');
-  } finally {
-    addingComment = false;
-  }
-}
-
-function closeRequestDetail() {
-  selectedRequest = null;
-  requestComments = [];
-  newCommentContent = '';
-  // Return to requests list URL
-  navigate(`/portal/${currentSlug}?view=requests`);
-}
-
-/**
- * Set showMyRequests directly without navigation (for URL sync)
- */
-function setShowMyRequests(value) {
-  showMyRequests = value;
-  if (value) {
-    showMyApprovals = false;
-    selectedApproval = null;
-    showMyDrafts = false;
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      loadMyRequests();
-    }
-  }
-  if (!value) {
-    selectedRequest = null;
-  }
-}
-
-/**
- * Load a specific request by ID and view it (for URL sync)
- */
-async function loadAndViewRequest(requestId) {
-  if (!currentSlug) return;
-  try {
-    const request = await api.portal.getRequestDetail(currentSlug, requestId);
-    selectedRequest = request;
-    await loadRequestComments(request.id);
-  } catch (err) {
-    console.error('Failed to load request:', err);
-  }
-}
-
-// My Approvals functions
-async function loadMyApprovals() {
-  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
-  try {
-    loadingApprovals = true;
-    myApprovals = (await api.portal.getMyApprovals(currentSlug)) || [];
-  } catch (err) {
-    console.error('Failed to load approvals:', err);
-    myApprovals = [];
-  } finally {
-    loadingApprovals = false;
-  }
-}
-
-async function viewApproval(approval) {
-  selectedApproval = approval;
-  navigate(`/portal/${currentSlug}?view=approvals&id=${approval.id}`);
-  await loadAndViewApproval(approval.id, /*replaceState*/ false);
-}
-
-async function loadAndViewApproval(approvalId, _replaceState = true) {
-  if (!currentSlug) return;
-  try {
-    loadingApprovalDetail = true;
-    const detail = await api.portal.getApproval(currentSlug, approvalId);
-    selectedApproval = detail;
-    selectedApprovalRequest = null;
-    if (detail?.item_id) {
-      try {
-        selectedApprovalRequest = await api.portal.getRequestDetail(currentSlug, detail.item_id);
-      } catch (reqErr) {
-        // Approval-pool gate (or stale snapshot) — show approval-only view.
-        console.warn('Failed to load request context for approval:', reqErr);
-        selectedApprovalRequest = null;
-      }
-    }
-  } catch (err) {
-    console.error('Failed to load approval:', err);
-    errorToast(err?.message || 'Failed to load approval');
-    selectedApproval = null;
-    selectedApprovalRequest = null;
-  } finally {
-    loadingApprovalDetail = false;
-  }
-}
-
-async function decideApproval(decision) {
-  if (!selectedApproval || !currentSlug) return;
-  if (
-    decision !== 'comment' &&
-    !window.confirm(`${decision === 'approve' ? 'Approve' : 'Reject'} this request?`)
-  )
-    return;
-  try {
-    decidingApproval = true;
-    await api.portal.decideApproval(currentSlug, selectedApproval.id, decision, approvalComment);
-    approvalComment = '';
-    // Reload detail to pick up the new decision and (possibly) terminal status.
-    await loadAndViewApproval(selectedApproval.id);
-    await loadMyApprovals();
-  } catch (err) {
-    console.error('Failed to decide approval:', err);
-    errorToast(err?.message || 'Failed to record decision');
-  } finally {
-    decidingApproval = false;
-  }
-}
-
-function closeApprovalDetail() {
-  selectedApproval = null;
-  selectedApprovalRequest = null;
-  approvalComment = '';
-  navigate(`/portal/${currentSlug}?view=approvals`);
-}
-
-function setShowMyApprovals(value) {
-  showMyApprovals = value;
-  if (value) {
-    showMyRequests = false;
-    selectedRequest = null;
-    showMyDrafts = false;
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      loadMyApprovals();
-    }
-  } else {
-    selectedApproval = null;
-  }
-}
-
-async function toggleMyApprovals() {
-  showMyApprovals = !showMyApprovals;
-  showProfileMenu = false;
-  if (showMyApprovals) {
-    showMyRequests = false;
-    selectedRequest = null;
-    showMyDrafts = false;
-    navigate(`/portal/${currentSlug}?view=approvals`);
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      await loadMyApprovals();
-    }
-  } else {
-    selectedApproval = null;
-    navigate(`/portal/${currentSlug}`);
-  }
-}
-
-async function toggleMyRequests() {
-  showMyRequests = !showMyRequests;
-  showProfileMenu = false;
-
-  // Update URL
-  if (showMyRequests) {
-    showMyApprovals = false;
-    selectedApproval = null;
-    showMyDrafts = false;
-    navigate(`/portal/${currentSlug}?view=requests`);
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      await loadMyRequests();
-    }
-  } else {
-    navigate(`/portal/${currentSlug}`);
-  }
-
-  if (!showMyRequests) {
-    selectedRequest = null;
-    requestComments = [];
-  }
-}
-
-// Drafts actions. Drafts only exist for authenticated portal sessions; the
-// menu item that drives toggleMyDrafts is hidden for guests, but we re-check
-// before fetching as defense in depth.
-async function loadMyDrafts() {
-  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
-  try {
-    loadingDrafts = true;
-    myDrafts = (await api.portal.drafts.list(currentSlug)) || [];
-  } catch (err) {
-    console.error('Failed to load drafts:', err);
-    myDrafts = [];
-  } finally {
-    loadingDrafts = false;
-  }
-}
-
-async function deleteDraft(requestTypeId) {
-  if (!currentSlug || requestTypeId == null) return;
-  try {
-    await api.portal.drafts.delete(currentSlug, requestTypeId);
-    myDrafts = myDrafts.filter((d) => d.request_type_id !== requestTypeId);
-  } catch (err) {
-    // 404 means it's already gone — treat as success.
-    if (err?.status !== 404) {
-      console.error('Failed to delete draft:', err);
-      errorToast(err?.message || 'Failed to delete draft');
-    } else {
-      myDrafts = myDrafts.filter((d) => d.request_type_id !== requestTypeId);
-    }
-  }
-}
-
-function setShowMyDrafts(value) {
-  showMyDrafts = value;
-  if (value) {
-    showMyRequests = false;
-    showMyApprovals = false;
-    selectedRequest = null;
-    selectedApproval = null;
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      loadMyDrafts();
-    }
-  }
-}
-
-async function toggleMyDrafts() {
-  showMyDrafts = !showMyDrafts;
-  showProfileMenu = false;
-
-  if (showMyDrafts) {
-    showMyRequests = false;
-    showMyApprovals = false;
-    selectedRequest = null;
-    selectedApproval = null;
-    navigate(`/portal/${currentSlug}?view=drafts`);
-    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
-      await loadMyDrafts();
-    }
-  } else {
-    navigate(`/portal/${currentSlug}`);
-  }
-}
-
 // Menu functions
 function closeAllMenus() {
   showProfileMenu = false;
@@ -1167,7 +654,6 @@ function reset() {
   isEditing = false;
   isDarkMode = false;
   showCustomizePanel = false;
-  showMyRequests = false;
   selectedGradient = 0;
   activeSection = 'hero-gradient';
   backgroundImageUrl = null;
@@ -1195,35 +681,14 @@ function reset() {
     { title: '', links: [] },
   ];
   knowledgeBaseShareLink = '';
-  searchQuery = '';
-  showSearchResults = false;
-  searchResults = null;
-  searchLoading = false;
-  searchError = null;
-  myRequests = [];
-  loadingRequests = false;
-  selectedRequest = null;
-  requestComments = [];
-  loadingComments = false;
-  newCommentContent = '';
-  addingComment = false;
+  portalSearchStore.reset();
+  portalActivityStore.reset();
   pendingRequestType = null;
-  showMyApprovals = false;
-  myApprovals = [];
-  loadingApprovals = false;
-  selectedApproval = null;
-  loadingApprovalDetail = false;
-  approvalComment = '';
-  decidingApproval = false;
-  showMyDrafts = false;
-  myDrafts = [];
-  loadingDrafts = false;
   isInitialLoad = true;
 }
 
-// Export the store with getters and actions
-export const portalStore = {
-  // Getters for core state
+// Focused shell and customization state.
+export const portalCustomizationStore = {
   get portalData() {
     return portalData;
   },
@@ -1236,10 +701,11 @@ export const portalStore = {
   get currentSlug() {
     return currentSlug;
   },
-
-  // Getters for UI state
   get isEditing() {
     return isEditing;
+  },
+  set isEditing(value) {
+    isEditing = value;
   },
   get isDarkMode() {
     return isDarkMode;
@@ -1247,227 +713,10 @@ export const portalStore = {
   get showCustomizePanel() {
     return showCustomizePanel;
   },
-  get showMyRequests() {
-    return showMyRequests;
-  },
-  get selectedGradient() {
-    return selectedGradient;
-  },
-  get activeSection() {
-    return activeSection;
-  },
-
-  // Getters for background image state
-  get backgroundImageUrl() {
-    return backgroundImageUrl;
-  },
-  get uploadingBackground() {
-    return uploadingBackground;
-  },
-  get selectedBackgroundCategory() {
-    return selectedBackgroundCategory;
-  },
-  get hasBackgroundImage() {
-    return backgroundImageUrl !== null && backgroundImageUrl !== '';
-  },
-  get hasGradient() {
-    return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value;
-  },
-  // Computed header background style - image takes priority over gradient.
-  // backgroundImageUrl is admin-controlled, so it's validated via safeCssUrl
-  // to prevent CSS injection through the inline style attribute.
-  get headerBackgroundStyle() {
-    const safeUrl = safeCssUrl(backgroundImageUrl);
-    if (safeUrl) {
-      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("${safeUrl}") center/cover no-repeat;`;
-    }
-    const gradientValue = gradients[selectedGradient]?.value;
-    if (gradientValue) {
-      return `background: ${gradientValue};`;
-    }
-    // Fall back to first gradient with a value (index 1 = "Blue to Purple")
-    return `background: ${gradients[1].value};`;
-  },
-
-  // Getters for logo state
-  get logoUrl() {
-    return logoUrl;
-  },
-  get hubLogoUrl() {
-    return hubLogoUrl;
-  },
-  get uploadingLogo() {
-    return uploadingLogo;
-  },
-  get effectiveLogoUrl() {
-    return logoUrl || hubLogoUrl;
-  }, // Portal logo with hub fallback
-
-  // Getters for menu states
-  get showProfileMenu() {
-    return showProfileMenu;
-  },
-  get showMainMenu() {
-    return showMainMenu;
-  },
-  get showLoginDialog() {
-    return showLoginDialog;
-  },
-
-  // Getters for editable content
-  get editableTitle() {
-    return editableTitle;
-  },
-  get editableDescription() {
-    return editableDescription;
-  },
-  get editableSearchPlaceholder() {
-    return editableSearchPlaceholder;
-  },
-  get editableSearchHint() {
-    return editableSearchHint;
-  },
-
-  // Getters for request types
-  get requestTypes() {
-    return requestTypes;
-  },
-  get loadingRequestTypes() {
-    return loadingRequestTypes;
-  },
-
-  // Getters for asset reports
-  get assetReports() {
-    return assetReports;
-  },
-  get loadingAssetReports() {
-    return loadingAssetReports;
-  },
-  get hasAssetSets() {
-    return hasAssetSets;
-  },
-
-  // Getters for sections/footer
-  get portalSections() {
-    return portalSections;
-  },
-  get footerColumns() {
-    return footerColumns;
-  },
-  get draggedRequestType() {
-    return draggedRequestType;
-  },
-  get draggedAssetReport() {
-    return draggedAssetReport;
-  },
-
-  // Getters for knowledge base
-  get knowledgeBaseShareLink() {
-    return knowledgeBaseShareLink;
-  },
-
-  // Getters for search
-  get searchQuery() {
-    return searchQuery;
-  },
-  get showSearchResults() {
-    return showSearchResults;
-  },
-  get searchResults() {
-    return searchResults;
-  },
-  get searchLoading() {
-    return searchLoading;
-  },
-  get searchError() {
-    return searchError;
-  },
-
-  // Getters for my requests
-  get myRequests() {
-    return myRequests;
-  },
-  get openRequestCount() {
-    return myRequests.filter((r) => !r.status_is_completed).length;
-  },
-  get loadingRequests() {
-    return loadingRequests;
-  },
-  get selectedRequest() {
-    return selectedRequest;
-  },
-  get requestComments() {
-    return requestComments;
-  },
-  get loadingComments() {
-    return loadingComments;
-  },
-  get newCommentContent() {
-    return newCommentContent;
-  },
-  get addingComment() {
-    return addingComment;
-  },
-  get pendingRequestType() {
-    return pendingRequestType;
-  },
-
-  // Getters for drafts
-  get showMyDrafts() {
-    return showMyDrafts;
-  },
-  get myDrafts() {
-    return myDrafts;
-  },
-  get loadingDrafts() {
-    return loadingDrafts;
-  },
-  get draftCount() {
-    return myDrafts.length;
-  },
-
-  // Getters for my approvals
-  get showMyApprovals() {
-    return showMyApprovals;
-  },
-  get myApprovals() {
-    return myApprovals;
-  },
-  get pendingApprovalCount() {
-    return myApprovals.filter((a) => a.status === 'pending').length;
-  },
-  get loadingApprovals() {
-    return loadingApprovals;
-  },
-  get selectedApproval() {
-    return selectedApproval;
-  },
-  // Item context (request detail) for the approval currently being viewed.
-  // Null when no approval is selected, or when the request fetch failed
-  // (e.g. the customer's pool membership has been revoked since the snapshot).
-  get selectedApprovalRequest() {
-    return selectedApproval ? selectedApprovalRequest : null;
-  },
-  get loadingApprovalDetail() {
-    return loadingApprovalDetail;
-  },
-  get approvalComment() {
-    return approvalComment;
-  },
-  get decidingApproval() {
-    return decidingApproval;
-  },
-
-  // Setters for UI state
-  set isEditing(value) {
-    isEditing = value;
-  },
   set showCustomizePanel(value) {
     const wasUsingManagementData = isEditing || showCustomizePanel;
     const shouldShowCustomizePanel = Boolean(value);
 
-    // Customization is an editing workflow. Keep both entry points in sync so
-    // draggable portal content is ready as soon as the panel opens.
     if (shouldShowCustomizePanel) {
       showCustomizePanel = true;
       isEditing = true;
@@ -1483,77 +732,109 @@ export const portalStore = {
       void loadRequestTypes({ forCustomization: usesManagementData });
     }
   },
-  set showMyRequests(value) {
-    showMyRequests = value;
+  get selectedGradient() {
+    return selectedGradient;
+  },
+  get activeSection() {
+    return activeSection;
   },
   set activeSection(value) {
     activeSection = value;
   },
-  set showProfileMenu(value) {
-    showProfileMenu = value;
+  get backgroundImageUrl() {
+    return backgroundImageUrl;
   },
-  set showMainMenu(value) {
-    showMainMenu = value;
+  get uploadingBackground() {
+    return uploadingBackground;
   },
-  set showLoginDialog(value) {
-    showLoginDialog = value;
-  },
-  set draggedRequestType(value) {
-    draggedRequestType = value;
-  },
-  set draggedAssetReport(value) {
-    draggedAssetReport = value;
+  get selectedBackgroundCategory() {
+    return selectedBackgroundCategory;
   },
   set selectedBackgroundCategory(value) {
     selectedBackgroundCategory = value;
   },
-
-  // Setters for editable content
+  get hasBackgroundImage() {
+    return backgroundImageUrl !== null && backgroundImageUrl !== '';
+  },
+  get hasGradient() {
+    return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value;
+  },
+  get headerBackgroundStyle() {
+    const safeUrl = safeCssUrl(backgroundImageUrl);
+    if (safeUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("${safeUrl}") center/cover no-repeat;`;
+    }
+    return `background: ${gradients[selectedGradient]?.value || gradients[1].value};`;
+  },
+  get logoUrl() {
+    return logoUrl;
+  },
+  get hubLogoUrl() {
+    return hubLogoUrl;
+  },
+  get uploadingLogo() {
+    return uploadingLogo;
+  },
+  get effectiveLogoUrl() {
+    return logoUrl || hubLogoUrl;
+  },
+  get showProfileMenu() {
+    return showProfileMenu;
+  },
+  set showProfileMenu(value) {
+    showProfileMenu = value;
+  },
+  get showMainMenu() {
+    return showMainMenu;
+  },
+  set showMainMenu(value) {
+    showMainMenu = value;
+  },
+  get showLoginDialog() {
+    return showLoginDialog;
+  },
+  set showLoginDialog(value) {
+    showLoginDialog = value;
+  },
+  get editableTitle() {
+    return editableTitle;
+  },
   set editableTitle(value) {
     editableTitle = value;
+  },
+  get editableDescription() {
+    return editableDescription;
   },
   set editableDescription(value) {
     editableDescription = value;
   },
+  get editableSearchPlaceholder() {
+    return editableSearchPlaceholder;
+  },
   set editableSearchPlaceholder(value) {
     editableSearchPlaceholder = value;
+  },
+  get editableSearchHint() {
+    return editableSearchHint;
   },
   set editableSearchHint(value) {
     editableSearchHint = value;
   },
-
-  // Setters for knowledge base
+  get footerColumns() {
+    return footerColumns;
+  },
+  get knowledgeBaseShareLink() {
+    return knowledgeBaseShareLink;
+  },
   set knowledgeBaseShareLink(value) {
     knowledgeBaseShareLink = value;
   },
-
-  // Setters for search
-  set searchQuery(value) {
-    searchQuery = value;
-  },
-
-  // Setters for my requests
-  set newCommentContent(value) {
-    newCommentContent = value;
+  get pendingRequestType() {
+    return pendingRequestType;
   },
   set pendingRequestType(value) {
     pendingRequestType = value;
   },
-
-  // Setters for drafts
-  set showMyDrafts(value) {
-    showMyDrafts = value;
-  },
-
-  // Setters for my approvals
-  set showMyApprovals(value) {
-    showMyApprovals = value;
-  },
-  set approvalComment(value) {
-    approvalComment = value;
-  },
-
-  // Actions
   loadPortal,
   hydrateUserBootstrap,
   toggleEditing,
@@ -1561,24 +842,56 @@ export const portalStore = {
   selectGradient,
   saveCustomizations,
   saveKnowledgeBaseConfig,
-  loadRequestTypes,
-  getSectionRequestTypes,
   parseDocmostShareLink,
-
-  // Asset report actions
-  loadAssetReports,
-  getSectionAssetReports,
-
-  // Background image actions
   selectBackgroundImage,
   removeBackgroundImage,
   handleBackgroundUpload,
-
-  // Logo actions
   handleLogoUpload,
   removeLogo,
+  addFooterLink,
+  removeFooterLink,
+  updateColumnTitle,
+  updateFooterLink,
+  closeAllMenus,
+  reset,
+};
 
-  // Section actions
+// Focused catalog and section state.
+export const portalCatalogStore = {
+  get requestTypes() {
+    return requestTypes;
+  },
+  get loadingRequestTypes() {
+    return loadingRequestTypes;
+  },
+  get assetReports() {
+    return assetReports;
+  },
+  get loadingAssetReports() {
+    return loadingAssetReports;
+  },
+  get hasAssetSets() {
+    return hasAssetSets;
+  },
+  get portalSections() {
+    return portalSections;
+  },
+  get draggedRequestType() {
+    return draggedRequestType;
+  },
+  set draggedRequestType(value) {
+    draggedRequestType = value;
+  },
+  get draggedAssetReport() {
+    return draggedAssetReport;
+  },
+  set draggedAssetReport(value) {
+    draggedAssetReport = value;
+  },
+  loadRequestTypes,
+  getSectionRequestTypes,
+  loadAssetReports,
+  getSectionAssetReports,
   addSection,
   deleteSection,
   updateSection,
@@ -1588,46 +901,82 @@ export const portalStore = {
   removeRequestTypeFromSection,
   addAssetReportToSection,
   removeAssetReportFromSection,
-
-  // Footer actions
-  addFooterLink,
-  removeFooterLink,
-  updateColumnTitle,
-  updateFooterLink,
-
-  // Search actions
-  performSearch,
-  debouncedSearch,
-  closeSearchResults,
-
-  // My Requests actions
-  loadMyRequests,
-  viewRequest,
-  loadRequestComments,
-  addComment,
-  closeRequestDetail,
-  toggleMyRequests,
-  setShowMyRequests,
-  loadAndViewRequest,
-
-  // Drafts actions
-  loadMyDrafts,
-  deleteDraft,
-  toggleMyDrafts,
-  setShowMyDrafts,
-
-  // My Approvals actions
-  loadMyApprovals,
-  viewApproval,
-  loadAndViewApproval,
-  decideApproval,
-  closeApprovalDetail,
-  toggleMyApprovals,
-  setShowMyApprovals,
-
-  // Menu actions
-  closeAllMenus,
-
-  // Reset
-  reset,
 };
+
+const compatibilityAliases = {
+  searchQuery: [portalSearchStore, 'query'],
+  showSearchResults: [portalSearchStore, 'visible'],
+  searchResults: [portalSearchStore, 'results'],
+  searchLoading: [portalSearchStore, 'loading'],
+  searchError: [portalSearchStore, 'error'],
+  performSearch: [portalSearchStore, 'search'],
+  debouncedSearch: [portalSearchStore, 'searchDebounced'],
+  closeSearchResults: [portalSearchStore, 'close'],
+  showMyRequests: [portalRequestsStore, 'visible'],
+  myRequests: [portalRequestsStore, 'requests'],
+  openRequestCount: [portalRequestsStore, 'openCount'],
+  loadingRequests: [portalRequestsStore, 'loading'],
+  selectedRequest: [portalRequestsStore, 'selected'],
+  requestComments: [portalRequestsStore, 'comments'],
+  loadingComments: [portalRequestsStore, 'loadingComments'],
+  newCommentContent: [portalRequestsStore, 'newComment'],
+  addingComment: [portalRequestsStore, 'addingComment'],
+  loadMyRequests: [portalRequestsStore, 'load'],
+  viewRequest: [portalRequestsStore, 'view'],
+  loadRequestComments: [portalRequestsStore, 'loadComments'],
+  addComment: [portalRequestsStore, 'addComment'],
+  closeRequestDetail: [portalRequestsStore, 'closeDetail'],
+  toggleMyRequests: [portalRequestsStore, 'toggle'],
+  setShowMyRequests: [portalRequestsStore, 'setVisible'],
+  loadAndViewRequest: [portalRequestsStore, 'loadAndView'],
+  showMyDrafts: [portalDraftsStore, 'visible'],
+  myDrafts: [portalDraftsStore, 'drafts'],
+  loadingDrafts: [portalDraftsStore, 'loading'],
+  draftCount: [portalDraftsStore, 'count'],
+  loadMyDrafts: [portalDraftsStore, 'load'],
+  deleteDraft: [portalDraftsStore, 'delete'],
+  toggleMyDrafts: [portalDraftsStore, 'toggle'],
+  setShowMyDrafts: [portalDraftsStore, 'setVisible'],
+  showMyApprovals: [portalApprovalsStore, 'visible'],
+  myApprovals: [portalApprovalsStore, 'approvals'],
+  pendingApprovalCount: [portalApprovalsStore, 'pendingCount'],
+  loadingApprovals: [portalApprovalsStore, 'loading'],
+  selectedApproval: [portalApprovalsStore, 'selected'],
+  selectedApprovalRequest: [portalApprovalsStore, 'selectedRequest'],
+  loadingApprovalDetail: [portalApprovalsStore, 'loadingDetail'],
+  approvalComment: [portalApprovalsStore, 'comment'],
+  decidingApproval: [portalApprovalsStore, 'deciding'],
+  loadMyApprovals: [portalApprovalsStore, 'load'],
+  viewApproval: [portalApprovalsStore, 'view'],
+  loadAndViewApproval: [portalApprovalsStore, 'loadAndView'],
+  decideApproval: [portalApprovalsStore, 'decide'],
+  closeApprovalDetail: [portalApprovalsStore, 'closeDetail'],
+  toggleMyApprovals: [portalApprovalsStore, 'toggle'],
+  setShowMyApprovals: [portalApprovalsStore, 'setVisible'],
+};
+
+const compatibilityDomains = [portalCustomizationStore, portalCatalogStore];
+
+// Transitional compatibility facade. New consumers should import a focused store.
+export const portalStore = new Proxy(
+  {},
+  {
+    get(_target, property) {
+      const alias = compatibilityAliases[property];
+      if (alias) return alias[0][alias[1]];
+      const domain = compatibilityDomains.find((store) => property in store);
+      return domain?.[property];
+    },
+    set(_target, property, value) {
+      const alias = compatibilityAliases[property];
+      if (alias) {
+        alias[0][alias[1]] = value;
+        return true;
+      }
+      const domain = compatibilityDomains.find((store) => property in store);
+      if (!domain) return false;
+      domain[property] = value;
+      return true;
+    },
+  }
+);

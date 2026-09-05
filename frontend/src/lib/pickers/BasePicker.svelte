@@ -46,8 +46,10 @@
 
     // E2E instrumentation. BasePicker is shared by UserPicker/ItemPicker, so
     // picker-specific testids are threaded as props rather than hardcoded:
+    //   inputTestid — applied to the combobox-mode input
     //   searchTestid — applied to the popover-mode search input
     //   optionTestid — (opt) => string, applied per option row
+    inputTestid = undefined,
     searchTestid = undefined,
     optionTestid = null,
 
@@ -519,6 +521,7 @@
         </div>
       {/each}
       <input bind:this={inputRef} use:melt={$input} {id} type="text"
+             data-testid={inputTestid}
              placeholder={selectedItems.length === 0 ? resolvedPlaceholder : ''}
              {disabled} aria-label={ariaLabel} onkeydowncapture={handleKeydown}
              class="min-w-0 basis-[120px] flex-1 px-1 py-0.5 bg-transparent border-0 outline-none text-sm"
@@ -531,6 +534,7 @@
   {:else}
     <!-- Single-select: Input/Trigger (original combobox mode) -->
     <input use:melt={$input} {id} type="text" placeholder={resolvedPlaceholder} {disabled}
+           data-testid={inputTestid}
            aria-label={ariaLabel}
            onkeydowncapture={handleKeydown}
            class="w-full px-4 py-2 pr-16 rounded border transition-all duration-200

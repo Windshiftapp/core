@@ -6792,6 +6792,80 @@
         ]
       }
     },
+    "/query-language/values": {
+      "get": {
+        "description": "Search query language completion values. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "source",
+            "In": "query",
+            "Description": "Completion value catalog to search.",
+            "Required": true,
+            "Schema": {
+              "enum": [
+                "workspaces",
+                "statuses",
+                "status_categories",
+                "priorities",
+                "users",
+                "milestones",
+                "iterations",
+                "projects",
+                "item_types",
+                "labels"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "Name": "value_field",
+            "In": "query",
+            "Description": "Resource field returned as the query-language value.",
+            "Required": true,
+            "Schema": {
+              "enum": [
+                "id",
+                "name",
+                "key"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive value-label search text.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum number of completion values to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Search query language completion values",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/recurrence-rules/preview": {
       "post": {
         "description": "Preview recurrence rule. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",

@@ -20,22 +20,13 @@
 	import { successToast, errorToast } from '../stores/toasts.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
 	import { t } from '../stores/i18n.svelte.js';
+	import { scopeCatalogStore } from '../stores/scopeCatalog.svelte.js';
 
 	// The scopes an admin may grant an OAuth client, fetched from the server
 	// catalog (auth.ScopeCatalog) minus admin scopes, which the OAuth surfaces
 	// reject outright. Previously hand-maintained here, which is what let the
 	// list fall behind the server allowlist.
-	let scopeCatalog = $state([]);
-	let scopeOptions = $derived(scopeCatalog.filter((s) => !s.admin));
-
-	async function loadScopeCatalog() {
-		try {
-			scopeCatalog = (await api.getScopeCatalog()) || [];
-		} catch (err) {
-			console.warn('Failed to load scope catalog:', err);
-			scopeCatalog = [];
-		}
-	}
+	let scopeOptions = $derived(scopeCatalogStore.catalog.filter((s) => !s.admin));
 
 	const DOCMOST_REQUIRED_SCOPES = ['items:read', 'workspaces:read', 'collections:read'];
 	const DOCMOST_LOCAL_CALLBACK = 'http://localhost:3000/api/integrations/oauth/windshift/callback';
@@ -62,7 +53,7 @@
 
 	onMount(() => {
 		loadClients();
-		loadScopeCatalog();
+		scopeCatalogStore.load();
 	});
 
 	async function loadClients() {

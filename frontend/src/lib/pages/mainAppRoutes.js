@@ -1,6 +1,25 @@
 // Keep every dynamic import literal in one registry so Vite preserves the
 // existing route-level chunks while MainApp remains a small composition root.
 export const MAIN_APP_COMPONENT_LOADERS = {
+  workspaces: () => import('../workspaces/Workspaces.svelte'),
+  'workspace-settings': () => import('../workspaces/WorkspaceSettings.svelte'),
+  'collections-list': () => import('../features/collections/CollectionsList.svelte'),
+  'collections-edit': () => import('../features/collections/Collections.svelte'),
+  channels: () => import('../features/channels/Channels.svelte'),
+  hub: () => import('../layout/Hub.svelte'),
+  organizations: () => import('../workspaces/Customers.svelte'),
+  'teams-list': () => import('../teams/TeamsList.svelte'),
+  'team-detail': () => import('../teams/TeamDetail.svelte'),
+  notifications: () => import('./NotificationsPage.svelte'),
+  'approvals-inbox': () => import('./ApprovalsInbox.svelte'),
+  search: () => import('./SearchPage.svelte'),
+  profile: () => import('./UserProfile.svelte'),
+  security: () => import('./Security.svelte'),
+  about: () => import('./About.svelte'),
+  'api-docs': () => import('./ApiDocs.svelte'),
+  'cli-authorize': () => import('./CliAuthorize.svelte'),
+  'oauth-authorize': () => import('./OAuthAuthorize.svelte'),
+  404: () => import('./NotFound.svelte'),
   admin: () => import('./Admin.svelte'),
   time: () => import('../features/time/Time.svelte'),
   'test-cases': () => import('../features/testing/TestCases.svelte'),
@@ -90,6 +109,62 @@ const workspaceProps = (currentRoute) => ({ workspaceId: currentRoute.params.id 
 
 /** @type {Record<string, MainAppRouteConfig>} */
 export const MAIN_APP_ROUTE_CONFIG = {
+  workspaces: route('Loading Workspaces...', 'Failed to load Workspaces', {
+    getProps: () => ({ showAdminHeader: false }),
+  }),
+  'workspace-settings': route(
+    'Loading Workspace Settings...',
+    'Failed to load Workspace Settings',
+    {
+      wrapper: 'surface-padded',
+      matchViews: [
+        'workspace-settings-general',
+        'workspace-settings-categories',
+        'workspace-settings-members',
+        'workspace-settings-configuration',
+        'workspace-settings-source-control',
+        'workspace-settings-coding-agents',
+        'workspace-settings-issue-sync',
+        'workspace-settings-recurrence',
+        'workspace-settings-templates',
+        'workspace-settings-danger',
+      ],
+      getProps: (currentRoute) => ({
+        workspaceId: currentRoute.params.id,
+        activeTab: WORKSPACE_SETTINGS_TABS[currentRoute.view] || 'general',
+      }),
+    }
+  ),
+  'collections-list': route('Loading Collections...', 'Failed to load Collections'),
+  'collections-edit': route('Loading Collection...', 'Failed to load Collection', {
+    getProps: (currentRoute) => ({ collectionId: currentRoute.params.id }),
+  }),
+  channels: route('Loading Channels...', 'Failed to load Channels', { wrapper: 'surface-full' }),
+  hub: route('Loading Hub...', 'Failed to load Hub', {
+    wrapper: 'surface',
+    matchViews: ['hub-inbox'],
+  }),
+  organizations: route('Loading Organizations...', 'Failed to load Organizations', {
+    matchViews: ['organization-contact-detail'],
+  }),
+  'teams-list': route('Loading Teams...', 'Failed to load Teams', { wrapper: 'surface-padded' }),
+  'team-detail': route('Loading Team...', 'Failed to load Team', {
+    wrapper: 'surface-padded',
+    getProps: (currentRoute) => ({
+      teamId: currentRoute.params.id,
+      section: currentRoute.params.section || 'overview',
+    }),
+  }),
+  notifications: route('Loading Notifications...', 'Failed to load Notifications'),
+  'approvals-inbox': route('Loading Approvals...', 'Failed to load Approvals'),
+  search: route('Loading Search...', 'Failed to load Search'),
+  profile: route('Loading Profile...', 'Failed to load Profile', { wrapper: 'surface-padded' }),
+  security: route('Loading Security...', 'Failed to load Security', { wrapper: 'surface-padded' }),
+  about: route('Loading About...', 'Failed to load About'),
+  'api-docs': route('Loading API Documentation...', 'Failed to load API Documentation'),
+  'cli-authorize': route('Loading Authorization...', 'Failed to load Authorization'),
+  'oauth-authorize': route('Loading Authorization...', 'Failed to load Authorization'),
+  404: route('Loading...', 'Failed to load page', { wrapper: 'surface-padded' }),
   admin: route('Loading Admin Panel...', 'Failed to load Admin Panel', {
     requirePermission: 'systemAdmin',
   }),

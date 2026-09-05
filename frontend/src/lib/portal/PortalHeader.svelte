@@ -15,7 +15,12 @@
     User,
   } from '@lucide/svelte';
   import { authStore } from '../stores';
-  import { portalStore } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import {
+    portalApprovalsStore,
+    portalDraftsStore,
+    portalRequestsStore,
+  } from '../stores/portalActivity.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { navigate } from '../router.js';
@@ -78,9 +83,9 @@
   }
 
   function goHome() {
-    portalStore.setShowMyRequests(false);
-    portalStore.setShowMyApprovals(false);
-    portalStore.setShowMyDrafts(false);
+    portalRequestsStore.setVisible(false);
+    portalApprovalsStore.setVisible(false);
+    portalDraftsStore.setVisible(false);
     closeMenus();
     if (portalStore.currentSlug) navigate(`/portal/${portalStore.currentSlug}`);
   }
@@ -169,31 +174,31 @@
       {#if isAnyUserAuthenticated}
         <button
           type="button"
-          onclick={() => portalStore.toggleMyRequests()}
+          onclick={() => portalRequestsStore.toggle()}
           class="hidden sm:inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors"
-          style="color: {shellText}; background-color: {portalStore.showMyRequests
+          style="color: {shellText}; background-color: {portalRequestsStore.visible
             ? shellControl
             : 'transparent'};"
           title={t('portal.myRequests')}
         >
           <List class="w-4 h-4" />
           <span>{t('portal.myRequests')}</span>
-          {#if portalStore.openRequestCount > 0}
+          {#if portalRequestsStore.openCount > 0}
             <span
               class="min-w-5 h-5 px-1.5 inline-flex items-center justify-center rounded-full text-[11px] font-semibold"
               style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
             >
-              {portalStore.openRequestCount}
+              {portalRequestsStore.openCount}
             </span>
           {/if}
         </button>
 
-        {#if portalStore.pendingApprovalCount > 0}
+        {#if portalApprovalsStore.pendingCount > 0}
           <button
             type="button"
-            onclick={() => portalStore.toggleMyApprovals()}
+            onclick={() => portalApprovalsStore.toggle()}
             class="hidden md:inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors"
-            style="color: {shellText}; background-color: {portalStore.showMyApprovals
+            style="color: {shellText}; background-color: {portalApprovalsStore.visible
               ? shellControl
               : 'transparent'};"
             title="My approvals"
@@ -204,7 +209,7 @@
               class="min-w-5 h-5 px-1.5 inline-flex items-center justify-center rounded-full text-[11px] font-semibold"
               style="background-color: var(--ds-warning-subtle, #fffbeb); color: var(--ds-text-warning, #92400e);"
             >
-              {portalStore.pendingApprovalCount}
+              {portalApprovalsStore.pendingCount}
             </span>
           </button>
         {/if}
@@ -306,11 +311,11 @@
                 onerror={removeBrokenAvatar}
               />
             {/if}
-            {#if portalStore.openRequestCount + portalStore.pendingApprovalCount > 0}
+            {#if portalRequestsStore.openCount + portalApprovalsStore.pendingCount > 0}
               <span
                 class="sm:hidden absolute -top-1 -right-1 min-w-4 h-4 px-1 inline-flex items-center justify-center rounded-full text-[10px] font-semibold text-white bg-red-500"
               >
-                {portalStore.openRequestCount + portalStore.pendingApprovalCount}
+                {portalRequestsStore.openCount + portalApprovalsStore.pendingCount}
               </span>
             {/if}
           </button>
@@ -379,36 +384,36 @@
             </button>
             <button
               type="button"
-              onclick={() => portalStore.toggleMyRequests()}
+              onclick={() => portalRequestsStore.toggle()}
               class="portal-menu-item"
-              class:portal-menu-active={portalStore.showMyRequests}
+              class:portal-menu-active={portalRequestsStore.visible}
             >
               <List class="w-4 h-4" />
               <span class="flex-1">{t('portal.myRequests')}</span>
-              {#if portalStore.openRequestCount > 0}
-                <span class="portal-menu-count">{portalStore.openRequestCount}</span>
+              {#if portalRequestsStore.openCount > 0}
+                <span class="portal-menu-count">{portalRequestsStore.openCount}</span>
               {/if}
             </button>
             <button
               type="button"
               data-testid="portal-drafts-link"
-              onclick={() => portalStore.toggleMyDrafts()}
+              onclick={() => portalDraftsStore.toggle()}
               class="portal-menu-item"
-              class:portal-menu-active={portalStore.showMyDrafts}
+              class:portal-menu-active={portalDraftsStore.visible}
             >
               <FileText class="w-4 h-4" />
               <span>{t('portal.myDrafts')}</span>
             </button>
             <button
               type="button"
-              onclick={() => portalStore.toggleMyApprovals()}
+              onclick={() => portalApprovalsStore.toggle()}
               class="portal-menu-item"
-              class:portal-menu-active={portalStore.showMyApprovals}
+              class:portal-menu-active={portalApprovalsStore.visible}
             >
               <CheckSquare class="w-4 h-4" />
               <span class="flex-1">My approvals</span>
-              {#if portalStore.pendingApprovalCount > 0}
-                <span class="portal-menu-count">{portalStore.pendingApprovalCount}</span>
+              {#if portalApprovalsStore.pendingCount > 0}
+                <span class="portal-menu-count">{portalApprovalsStore.pendingCount}</span>
               {/if}
             </button>
             {#if account?.canManageProfile}

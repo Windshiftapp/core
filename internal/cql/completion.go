@@ -16,6 +16,7 @@ const (
 	CompletionValuesIterations       CompletionValueSource = "iterations"
 	CompletionValuesProjects         CompletionValueSource = "projects"
 	CompletionValuesItemTypes        CompletionValueSource = "item_types"
+	CompletionValuesLabels           CompletionValueSource = "labels"
 )
 
 // CompletionField describes one canonical field offered by QL editors.
@@ -75,7 +76,7 @@ var (
 		{Name: "rank", ValueType: "number", Operators: orderedOperators},
 		{Name: "id", ValueType: "number", Operators: orderedOperators},
 		{Name: "key", ValueType: "string", Operators: equalityOperators},
-		{Name: "label", Aliases: []string{"labels"}, ValueType: "string", Operators: textOperators},
+		{Name: "label", Aliases: []string{"labels"}, ValueType: "string", ValueSource: CompletionValuesLabels, Operators: textOperators},
 	}
 )
 
