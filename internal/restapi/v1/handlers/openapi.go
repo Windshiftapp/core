@@ -23,17 +23,3 @@ func OpenAPISpecJSON(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	_, _ = w.Write(apispec.SpecJSON)
 }
-
-// OpenAPISpecYAML serves the embedded OpenAPI 3.0 spec as YAML.
-//
-// @Summary      OpenAPI 3.0 spec (YAML)
-// @Description  Returns the OpenAPI 3.0 description of this API. Public; no auth required.
-// @Tags         meta
-// @Produce      application/yaml
-// @Success      200  {string}  string  "OpenAPI 3.0 document"
-// @Router       /openapi.yaml [get]
-func OpenAPISpecYAML(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/yaml")
-	w.Header().Set("Cache-Control", "public, max-age=300")
-	_, _ = w.Write(apispec.SpecYAML)
-}

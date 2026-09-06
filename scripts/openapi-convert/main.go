@@ -13,12 +13,10 @@ import (
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
 	"github.com/getkin/kin-openapi/openapi3"
-	"sigs.k8s.io/yaml"
 )
 
 func main() {
 	in := flag.String("in", "api/swagger.json", "path to swagger 2.0 input (json)")
-	outYAML := flag.String("out-yaml", "api/openapi.yaml", "path to OpenAPI 3.0 yaml output")
 	outJSON := flag.String("out-json", "api/openapi.json", "path to OpenAPI 3.0 json output")
 	flag.Parse()
 
@@ -55,11 +53,8 @@ func main() {
 	if err := writeJSON(*outJSON, v3); err != nil {
 		die("write %s: %v", *outJSON, err)
 	}
-	if err := writeYAML(*outYAML, v3); err != nil {
-		die("write %s: %v", *outYAML, err)
-	}
 
-	fmt.Printf("converted %s -> %s, %s\n", *in, *outJSON, *outYAML)
+	fmt.Printf("converted %s -> %s\n", *in, *outJSON)
 }
 
 func setOperationalServers(doc *openapi3.T) error {
@@ -82,21 +77,6 @@ func writeJSON(path string, doc *openapi3.T) error {
 		return err
 	}
 	return os.WriteFile(path, append(out, '\n'), 0o600)
-}
-
-func writeYAML(path string, doc *openapi3.T) error {
-	jsonBytes, err := json.Marshal(doc)
-	if err != nil {
-		return err
-	}
-	yamlBytes, err := yaml.JSONToYAML(jsonBytes)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return err
-	}
-	return os.WriteFile(path, yamlBytes, 0o600)
 }
 
 func die(format string, args ...any) {
