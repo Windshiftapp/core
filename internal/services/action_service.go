@@ -1034,6 +1034,8 @@ func currentItemFieldValueResolved(itemRepo *repository.ItemRepository, ctx *mod
 		}
 		item, err := itemRepo.FindByIDWithDetailsContext(lookupContext, itemID)
 		if err != nil {
+			slog.Warn("failed to resolve action item name", slog.String("component", "actions"),
+				slog.Int("item_id", itemID), slog.String("field", fieldName), slog.Any("error", err))
 			// Do not silently substitute a stale iterator name after a failed read.
 			return nil, false
 		}
