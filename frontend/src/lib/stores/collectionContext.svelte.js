@@ -219,7 +219,9 @@ class CollectionStore {
     const viewChanged = view !== this.#currentView;
     const targetInitialLimit = initialItemsPageSize(view);
     const previousShowCompleted = this.showCompleted;
-    if (!sameCollection || viewChanged) {
+    if (BOARD_VIEWS.has(view)) {
+      this.showCompleted = true;
+    } else if (!sameCollection || viewChanged) {
       try {
         this.showCompleted =
           localStorage.getItem(this.#completionPreferenceKey(wsId, colId, view)) === 'true';

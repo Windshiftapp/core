@@ -6,7 +6,7 @@
   import Toggle from '../../components/Toggle.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
-  let { workspaceId: _workspaceId = null } = $props();
+  let { workspaceId: _workspaceId = null, showCompletionToggle = true } = $props();
 
   let filters = $state(JSON.parse(JSON.stringify(collectionStore.subFilterRows ?? [])));
 
@@ -17,13 +17,15 @@
   }
 </script>
 
-<Toggle
-  checked={!collectionStore.showCompleted}
-  onchange={(checked) => collectionStore.setShowCompleted(!checked)}
-  label={t('milestones.hideCompleted')}
-  labelPosition="left"
-  dataTestid="collection-hide-completed"
-/>
+{#if showCompletionToggle}
+  <Toggle
+    checked={!collectionStore.showCompleted}
+    onchange={(checked) => collectionStore.setShowCompleted(!checked)}
+    label={t('milestones.hideCompleted')}
+    labelPosition="left"
+    dataTestid="collection-hide-completed"
+  />
+{/if}
 
 <DynamicFilterPopover
   bind:filters

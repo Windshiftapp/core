@@ -1567,7 +1567,7 @@
           placeholder={t('common.search')}
           dataTestid="board-search-input"
         />
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if searchActive && (searchDebouncing || collectionStore.boardSearchLoading)}
