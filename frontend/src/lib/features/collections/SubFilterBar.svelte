@@ -3,6 +3,8 @@
   import { QLBuilder } from '../../utils/ql.js';
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
   import DynamicFilterPopover from '../shared/DynamicFilterPopover.svelte';
+  import Toggle from '../../components/Toggle.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId: _workspaceId = null } = $props();
 
@@ -14,6 +16,14 @@
     else collectionStore.clearSubFilter();
   }
 </script>
+
+<Toggle
+  checked={!collectionStore.showCompleted}
+  onchange={(checked) => collectionStore.setShowCompleted(!checked)}
+  label={t('milestones.hideCompleted')}
+  labelPosition="left"
+  dataTestid="collection-hide-completed"
+/>
 
 <DynamicFilterPopover
   bind:filters

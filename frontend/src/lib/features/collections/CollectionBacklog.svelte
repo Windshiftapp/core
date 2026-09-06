@@ -410,7 +410,7 @@
       const boundaryItem = await api.items.getBacklogBoundary(
         workspaceId,
         collectionId,
-        collectionStore.subFilterQL,
+        collectionStore.effectiveSubFilterQL,
         boundary,
       );
       if (!boundaryItem || boundaryItem.id === item.id) return;

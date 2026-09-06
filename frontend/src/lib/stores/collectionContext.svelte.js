@@ -120,6 +120,35 @@ class CollectionStore {
   // Raw filter rows backing the QL — kept so the SubFilterBar UI can hydrate
   // its builder when remounted on a different view of the same collection.
   subFilterRows = $state([]);
+  showCompleted = $state(false);
+
+  get effectiveSubFilterQL() {
+    if (this.showCompleted) return this.subFilterQL;
+    return this.subFilterQL
+      ? `(${this.subFilterQL}) AND status_completed = false`
+      : 'status_completed = false';
+  }
+
+  #completionPreferenceKey(wsId, colId, view) {
+    const scope = colId ? `collection-${colId}` : `workspace-${wsId}`;
+    return `collection-show-completed:${scope}:${view?.split('-').at(-1)}`;
+  }
+
+  async setShowCompleted(value) {
+    this.showCompleted = value;
+    try {
+      localStorage.setItem(
+        this.#completionPreferenceKey(this.#wsId, this.#colId, this.#currentView),
+        String(value)
+      );
+    } catch {
+      // Keep the setting usable when browser storage is unavailable.
+    }
+    this.clearBoardSearch();
+    if (this.#wsId || this.#colId) {
+      await this.load(this.#wsId, this.#colId, this.#currentView);
+    }
+  }
 
   // Server-side sort state
   sortableFields = $state([]);
@@ -189,19 +218,32 @@ class CollectionStore {
     const sameCollection = wsId === this.#wsId && colId === this.#colId;
     const viewChanged = view !== this.#currentView;
     const targetInitialLimit = initialItemsPageSize(view);
+    const previousShowCompleted = this.showCompleted;
+    if (!sameCollection || viewChanged) {
+      try {
+        this.showCompleted =
+          localStorage.getItem(this.#completionPreferenceKey(wsId, colId, view)) === 'true';
+      } catch {
+        this.showCompleted = false;
+      }
+    }
 
     // Switching between passive collection views does not need another network
     // roundtrip when the already-loaded item page is large enough and there is
     // no active server-side sort/filter. Board views may need capped-column
     // fetches, so they intentionally keep loading.
-    const canReuseTargetData = loadsItems(view)
-      ? this.items.length > 0 &&
-        !this.boardDeferred &&
-        (this.itemsPagination?.limit ?? 0) >= targetInitialLimit
-      : this.backlogPagination !== null;
+    const canReuseTargetData =
+      loadsItems(view) &&
+      loadsItems(this.#currentView) &&
+      this.items.length > 0 &&
+      !this.boardDeferred &&
+      (this.itemsPagination?.limit ?? 0) >= targetInitialLimit;
     if (
       sameCollection &&
       viewChanged &&
+      previousShowCompleted === this.showCompleted &&
+      !this.loading &&
+      !BOARD_VIEWS.has(this.#currentView) &&
       canReuseTargetData &&
       !this.subFilterQL &&
       !this.#sortBy &&
@@ -278,7 +320,7 @@ class CollectionStore {
           ? fetchCollectionBacklog(wsId, colId, {
               page: 1,
               limit: DEFAULT_PAGE_SIZE,
-              sub_ql: this.subFilterQL || undefined,
+              sub_ql: this.effectiveSubFilterQL || undefined,
               collection,
             })
           : Promise.resolve(null),
@@ -352,7 +394,7 @@ class CollectionStore {
    * completed statuses are paged separately so they cannot hide active work.
    */
   async #resolveBoardPartition(wsId, colId, view) {
-    if (!BOARD_VIEWS.has(view)) return null;
+    if (!BOARD_VIEWS.has(view) || !this.showCompleted) return null;
     try {
       const config = await this.getBoardConfiguration(wsId, colId);
       let statuses = this.boardStatuses;
@@ -371,7 +413,7 @@ class CollectionStore {
       }
 
       const completedStatusIds = statuses
-        .filter((status) => status.is_completed || status.category_name === 'Done')
+        .filter((status) => status.is_completed)
         .map((status) => status.id);
       const retentionDays = Number(config?.completed_item_retention_days);
       const completedActivityDays =
@@ -457,7 +499,7 @@ class CollectionStore {
       fetchCollectionItems(wsId, colId, {
         page,
         limit: pageLimit,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds),
@@ -483,7 +525,7 @@ class CollectionStore {
         const result = await fetchCollectionItems(wsId, colId, {
           page,
           limit: BOARD_UNFINISHED_PAGE_SIZE,
-          sub_ql: this.subFilterQL || undefined,
+          sub_ql: this.effectiveSubFilterQL || undefined,
           collection,
           ...this.#itemSortOptions(),
           ...this.#boardExclusionFilter(boardPartition?.statusIds),
@@ -530,7 +572,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(wsId, colId, {
         page,
         limit: BOARD_UNFINISHED_PAGE_SIZE,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds),
@@ -554,7 +596,7 @@ class CollectionStore {
     return fetchCollectionItems(wsId, colId, {
       page: 1,
       limit,
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
       collection,
       status_id: boardPartition.statusIds.join(','),
       completed_activity_days: boardPartition.completedActivityDays || undefined,
@@ -666,7 +708,7 @@ class CollectionStore {
       page,
       limit: BOARD_SEARCH_PAGE_SIZE,
       search: query,
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
       collection: this.boardCollection ?? undefined,
       ...this.#itemSortOptions(),
     });
@@ -701,7 +743,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page: nextPage,
         limit: pagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         ...this.#itemSortOptions(),
         ...(deferred
           ? {
@@ -747,7 +789,7 @@ class CollectionStore {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
       });
 
       if (loadId !== this.#loadId) return;
@@ -778,7 +820,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page,
         limit,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         ...this.#itemSortOptions(),
       });
 
@@ -850,7 +892,7 @@ class CollectionStore {
           ? fetchCollectionBacklog(this.#wsId, this.#colId, {
               page: 1,
               limit: backlogLimit,
-              sub_ql: this.subFilterQL || undefined,
+              sub_ql: this.effectiveSubFilterQL || undefined,
               collection,
             })
           : Promise.resolve(null),
@@ -978,6 +1020,7 @@ class CollectionStore {
 
   applyItem(item) {
     if (!item?.id) return;
+    if (this.#hideCompletedItem(item)) return;
     const index = this.items.findIndex((current) => current.id === item.id);
     if (index === -1) {
       this.items = [...this.items, item];
@@ -1004,7 +1047,7 @@ class CollectionStore {
     try {
       const changes = await fetchCollectionItemChanges(this.#wsId, this.#colId, {
         since: this.#changesWatermark,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
       });
       if (loadId !== this.#loadId) return;
       this.#changesWatermark = changes?.watermark ?? this.#changesWatermark;
@@ -1060,19 +1103,30 @@ class CollectionStore {
     const wsId = this.#wsId;
     const colId = this.#colId;
     const changes = await fetchCollectionItemChanges(wsId, colId, {
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
     });
     if (loadId !== this.#loadId || wsId !== this.#wsId || colId !== this.#colId) return;
     this.#changesWatermark = changes?.watermark ?? 0;
   }
 
   #applyUpdatedItem(updated) {
+    if (this.#hideCompletedItem(updated)) return;
     const idx = this.items.findIndex((i) => i.id === updated.id);
     if (idx !== -1) Object.assign(this.items[idx], updated);
     const bIdx = this.backlogItems.findIndex((i) => i.id === updated.id);
     if (bIdx !== -1) Object.assign(this.backlogItems[bIdx], updated);
     const searchIdx = this.boardSearchItems.findIndex((i) => i.id === updated.id);
     if (searchIdx !== -1) Object.assign(this.boardSearchItems[searchIdx], updated);
+  }
+
+  #hideCompletedItem(item) {
+    if (this.showCompleted) return false;
+    const status =
+      workspaceDataStore.statuses.find((candidate) => candidate.id === item.status_id) ??
+      this.boardStatuses.find((candidate) => candidate.id === item.status_id);
+    if (!status?.is_completed) return false;
+    this.#removeItemsById(new Set([item.id]));
+    return true;
   }
 
   #removeItemsById(ids) {
@@ -1096,7 +1150,7 @@ class CollectionStore {
     if (removedItems > 0 && this.itemsPagination) {
       this.itemsPagination = {
         ...this.itemsPagination,
-        total: Math.max(0, (this.itemsPagination.total ?? 0) - removedItems),
+        total_items: Math.max(0, (this.itemsPagination.total_items ?? 0) - removedItems),
       };
     }
     if (removedDeferredItems > 0 && this.boardDeferred) {
@@ -1105,7 +1159,7 @@ class CollectionStore {
       const pagination = this.boardDeferred.pagination
         ? {
             ...this.boardDeferred.pagination,
-            total,
+            total_items: total,
             total_pages: Math.ceil(total / limit),
           }
         : null;
@@ -1122,7 +1176,7 @@ class CollectionStore {
     if (removedBacklog > 0 && this.backlogPagination) {
       this.backlogPagination = {
         ...this.backlogPagination,
-        total: Math.max(0, (this.backlogPagination.total ?? 0) - removedBacklog),
+        total_items: Math.max(0, (this.backlogPagination.total_items ?? 0) - removedBacklog),
       };
       this.backlogHasMore = calcHasMore(this.backlogPagination);
     }

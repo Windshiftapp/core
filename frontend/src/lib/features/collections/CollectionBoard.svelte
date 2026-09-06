@@ -153,7 +153,7 @@
 
   $effect(() => {
     const query = searchQuery.trim();
-    const scope = `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.subFilterQL}`;
+    const scope = `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`;
     const effectId = ++searchEffectId;
     collectionStore.clearBoardSearch();
 
@@ -168,7 +168,7 @@
       if (
         effectId === searchEffectId &&
         query === searchQuery.trim() &&
-        scope === `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.subFilterQL}`
+        scope === `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`
       ) {
         searchDebouncing = false;
       }
