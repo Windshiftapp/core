@@ -22,6 +22,7 @@
     showRequiredToggle = true,
     protectedFieldIds = [],          // Field identifiers that cannot be removed
     showTypeLabels = true,           // Show system/custom badges
+    saving = false,
     onSave = () => {},
     onCancel = () => {}
   } = $props();
@@ -254,12 +255,14 @@
   });
 
   function handleClose() {
+    if (saving) return;
     fieldSearchQuery = '';
     cleanupDragAndDrop();
     onCancel();
   }
 
   function handleSave() {
+    if (saving) return;
     fieldSearchQuery = '';
     cleanupDragAndDrop();
     onSave();
@@ -274,10 +277,10 @@
   }
 </script>
 
-<Modal {isOpen} onclose={handleClose} maxWidth="max-w-4xl">
+<Modal {isOpen} preventClose={saving} onclose={handleClose} maxWidth="max-w-4xl">
   <ModalHeader title={effectiveTitle} {subtitle} icon={Settings} onClose={handleClose} />
 
-  <div class="p-6">
+  <div class="p-6" inert={saving} aria-busy={saving}>
     <!-- Two-panel layout -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Available Fields (Left Panel) -->
@@ -400,8 +403,8 @@
 
     <!-- Footer -->
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
-      <Button variant="outline" onclick={handleClose}>{t('common.cancel')}</Button>
-      <Button onclick={handleSave}>{t('common.save')}</Button>
+      <Button variant="outline" onclick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
+      <Button onclick={handleSave} loading={saving}>{t('common.save')}</Button>
     </div>
   </div>
 </Modal>

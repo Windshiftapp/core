@@ -106,7 +106,7 @@
     }
   }
 
-  let setGeneration = 0;
+  let savingConfiguration = $state(false);
   let typeRequest = 0;
   let categoryRequest = 0;
   let roleRequest = 0;
@@ -115,7 +115,6 @@
   // Clear set-owned data and invalidate pending requests when selection changes.
   $effect(() => {
     const setId = selectedSetId;
-    setGeneration++;
     assetTypes = [];
     assetCategories = [];
     roleAssignments = { user_roles: [], group_roles: [], everyone_role: null };
@@ -135,7 +134,6 @@
       loadSetRoles();
     }
     return () => {
-      setGeneration++;
       typeRequest++;
       categoryRequest++;
       roleRequest++;
@@ -156,19 +154,47 @@
     setFormData = { name: set.name, description: set.description || '', is_default: set.is_default };
   }
 
-  async function handleSetSubmit() {
+  async function saveConfiguration(save, refresh, complete, failureAction, failureMessage) {
+    if (savingConfiguration) return;
+    savingConfiguration = true;
     try {
-      if (editingSet) {
-        await api.assetSets.update(editingSet.id, setFormData);
-      } else {
-        await api.assetSets.create(setFormData);
-      }
-      await loadAssetSets();
-      showSetForm = false;
+      await save();
+      await refresh?.();
+      complete();
     } catch (error) {
-      console.error('Failed to save asset set:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
+      console.error(`Failed to ${failureAction}:`, error);
+      errorToast(t(failureMessage, { error: error.message }));
+    } finally {
+      savingConfiguration = false;
     }
+  }
+
+  function closeSetForm() {
+    if (!savingConfiguration) showSetForm = false;
+  }
+
+  function closeTypeForm() {
+    if (!savingConfiguration) showTypeForm = false;
+  }
+
+  function closeCategoryForm() {
+    if (!savingConfiguration) showCategoryForm = false;
+  }
+
+  function closeRoleForm() {
+    if (!savingConfiguration) showRoleForm = false;
+  }
+
+  async function handleSetSubmit() {
+    await saveConfiguration(
+      () => editingSet
+        ? api.assetSets.update(editingSet.id, setFormData)
+        : api.assetSets.create(setFormData),
+      loadAssetSets,
+      () => showSetForm = false,
+      'save asset set',
+      'dialogs.alerts.failedToSave'
+    );
   }
 
   async function deleteSet(id) {
@@ -227,22 +253,15 @@
   }
 
   async function handleTypeSubmit() {
-    const generation = setGeneration;
-    try {
-      if (editingType) {
-        await api.assetTypes.update(editingType.id, typeFormData);
-      } else {
-        await api.assetTypes.create(selectedSetId, typeFormData);
-      }
-      if (generation !== setGeneration) return;
-      await loadAssetTypes();
-      if (generation !== setGeneration) return;
-      showTypeForm = false;
-    } catch (error) {
-      if (generation !== setGeneration) return;
-      console.error('Failed to save asset type:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
-    }
+    await saveConfiguration(
+      () => editingType
+        ? api.assetTypes.update(editingType.id, typeFormData)
+        : api.assetTypes.create(selectedSetId, typeFormData),
+      loadAssetTypes,
+      () => showTypeForm = false,
+      'save asset type',
+      'dialogs.alerts.failedToSave'
+    );
   }
 
   async function deleteType(id) {
@@ -327,8 +346,7 @@
   }
 
   async function handleFieldsSubmit() {
-    const generation = setGeneration;
-    try {
+    await saveConfiguration(async () => {
       // Transform to API format with ordering and required flags
       // Only save custom fields - system fields are implicit
       const fieldsData = {
@@ -341,15 +359,11 @@
           }))
       };
       await api.assetTypes.updateFields(editingTypeForFields.id, fieldsData);
-      if (generation !== setGeneration) return;
+    }, null, () => {
       showFieldsModal = false;
       editingTypeForFields = null;
       typeFields = [];
-    } catch (error) {
-      if (generation !== setGeneration) return;
-      console.error('Failed to save field assignments:', error);
-      errorToast(t('dialogs.alerts.failedToSaveFields', { error: error.message }));
-    }
+    }, 'save field assignments', 'dialogs.alerts.failedToSaveFields');
   }
 
   function handleFieldsCancel() {
@@ -385,22 +399,15 @@
   }
 
   async function handleCategorySubmit() {
-    const generation = setGeneration;
-    try {
-      if (editingCategory) {
-        await api.assetCategories.update(editingCategory.id, categoryFormData);
-      } else {
-        await api.assetCategories.create(selectedSetId, categoryFormData);
-      }
-      if (generation !== setGeneration) return;
-      await loadAssetCategories();
-      if (generation !== setGeneration) return;
-      showCategoryForm = false;
-    } catch (error) {
-      if (generation !== setGeneration) return;
-      console.error('Failed to save category:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
-    }
+    await saveConfiguration(
+      () => editingCategory
+        ? api.assetCategories.update(editingCategory.id, categoryFormData)
+        : api.assetCategories.create(selectedSetId, categoryFormData),
+      loadAssetCategories,
+      () => showCategoryForm = false,
+      'save category',
+      'dialogs.alerts.failedToSave'
+    );
   }
 
   async function deleteCategory(id) {
@@ -471,8 +478,7 @@
   }
 
   async function handleRoleSubmit() {
-    const generation = setGeneration;
-    try {
+    await saveConfiguration(async () => {
       const data = {
         role_id: roleFormData.role_id,
       };
@@ -482,15 +488,9 @@
         data.group_id = roleFormData.group_id;
       }
       await api.assetSets.assignRole(selectedSetId, data);
-      if (generation !== setGeneration) return;
-      await loadSetRoles();
-      if (generation !== setGeneration) return;
+    }, loadSetRoles, () => {
       showRoleForm = false;
-    } catch (error) {
-      if (generation !== setGeneration) return;
-      console.error('Failed to assign role:', error);
-      errorToast(t('dialogs.alerts.failedToAssignRole', { error: error.message }));
-    }
+    }, 'assign role', 'dialogs.alerts.failedToAssignRole');
   }
 
   async function revokeRole(assignmentId, type) {
@@ -557,12 +557,13 @@
   ];
 </script>
 
-<div>
+<div inert={savingConfiguration} aria-busy={savingConfiguration}>
   <PageHeader title={t('assets.title')} icon={IconPackage} subtitle={t('assets.subtitle')}>
     {#snippet actions()}
       <div class="flex items-center gap-2">
         <ItemPicker
           bind:value={selectedSetId}
+          disabled={savingConfiguration}
           optionTestid={(option) => `asset-manager-set-${option.value}`}
           items={assetSets}
           config={{
@@ -897,10 +898,10 @@
 </div>
 
 <!-- Asset Set Form Modal -->
-<Modal isOpen={showSetForm} onclose={() => showSetForm = false} onSubmit={handleSetSubmit} submitDisabled={!setFormData.name.trim()}>
+<Modal isOpen={showSetForm} preventClose={savingConfiguration} onclose={closeSetForm} onSubmit={handleSetSubmit} submitDisabled={!setFormData.name.trim() || savingConfiguration}>
   {#snippet children({ submitHint })}
-    <ModalHeader title={editingSet ? t('assets.editSet') : t('assets.createAssetSet')} onClose={() => showSetForm = false} />
-    <div class="p-6 space-y-4">
+    <ModalHeader title={editingSet ? t('assets.editSet') : t('assets.createAssetSet')} onClose={closeSetForm} />
+    <div class="p-6 space-y-4" inert={savingConfiguration}>
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <Input
@@ -921,10 +922,11 @@
       <Checkbox bind:checked={setFormData.is_default} label={t('assets.default')} />
     </div>
     <DialogFooter
-      onCancel={() => showSetForm = false}
+      onCancel={closeSetForm}
       onConfirm={handleSetSubmit}
       confirmLabel={editingSet ? t('common.save') : t('common.create')}
       disabled={!setFormData.name.trim()}
+      loading={savingConfiguration}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />
@@ -932,10 +934,10 @@
 </Modal>
 
 <!-- Asset Type Form Modal -->
-<Modal isOpen={showTypeForm} onclose={() => showTypeForm = false} onSubmit={handleTypeSubmit} submitDisabled={!typeFormData.name.trim()}>
+<Modal isOpen={showTypeForm} preventClose={savingConfiguration} onclose={closeTypeForm} onSubmit={handleTypeSubmit} submitDisabled={!typeFormData.name.trim() || savingConfiguration}>
   {#snippet children({ submitHint })}
-    <ModalHeader title={editingType ? t('assets.editType') : t('assets.createType')} onClose={() => showTypeForm = false} />
-    <div class="p-6 space-y-4">
+    <ModalHeader title={editingType ? t('assets.editType') : t('assets.createType')} onClose={closeTypeForm} />
+    <div class="p-6 space-y-4" inert={savingConfiguration}>
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <Input
@@ -960,10 +962,11 @@
       <Checkbox bind:checked={typeFormData.is_active} label={t('common.active')} />
     </div>
     <DialogFooter
-      onCancel={() => showTypeForm = false}
+      onCancel={closeTypeForm}
       onConfirm={handleTypeSubmit}
       confirmLabel={editingType ? t('common.save') : t('common.create')}
       disabled={!typeFormData.name.trim()}
+      loading={savingConfiguration}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />
@@ -971,14 +974,15 @@
 </Modal>
 
 <!-- Category Form Modal -->
-<Modal isOpen={showCategoryForm} onclose={() => showCategoryForm = false} onSubmit={handleCategorySubmit} submitDisabled={!categoryFormData.name.trim()}>
+<Modal isOpen={showCategoryForm} preventClose={savingConfiguration} onclose={closeCategoryForm} onSubmit={handleCategorySubmit} submitDisabled={!categoryFormData.name.trim() || savingConfiguration}>
   {#snippet children({ submitHint })}
-    <ModalHeader title={editingCategory ? t('assets.editCategory') : t('assets.createCategory')} onClose={() => showCategoryForm = false} />
-    <div class="p-6 space-y-4">
+    <ModalHeader title={editingCategory ? t('assets.editCategory') : t('assets.createCategory')} onClose={closeCategoryForm} />
+    <div class="p-6 space-y-4" inert={savingConfiguration}>
       <div>
         <Label color="default" class="mb-1">{t('common.name')}</Label>
         <Input
           type="text"
+          dataTestid="asset-manager-category-name"
           bind:value={categoryFormData.name}
           required
           size="small"
@@ -998,10 +1002,11 @@
       </div>
     </div>
     <DialogFooter
-      onCancel={() => showCategoryForm = false}
+      onCancel={closeCategoryForm}
       onConfirm={handleCategorySubmit}
       confirmLabel={editingCategory ? t('common.save') : t('common.create')}
       disabled={!categoryFormData.name.trim()}
+      loading={savingConfiguration}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />
@@ -1009,10 +1014,10 @@
 </Modal>
 
 <!-- Role Assignment Form Modal -->
-<Modal isOpen={showRoleForm} onclose={() => showRoleForm = false} onSubmit={handleRoleSubmit} submitDisabled={roleFormData.type === 'user' ? !roleFormData.user_id : !roleFormData.group_id}>
+<Modal isOpen={showRoleForm} preventClose={savingConfiguration} onclose={closeRoleForm} onSubmit={handleRoleSubmit} submitDisabled={savingConfiguration || (roleFormData.type === 'user' ? !roleFormData.user_id : !roleFormData.group_id)}>
   {#snippet children({ submitHint })}
-    <ModalHeader title={t('assets.assignRole')} onClose={() => showRoleForm = false} />
-    <div class="p-6 space-y-4">
+    <ModalHeader title={t('assets.assignRole')} onClose={closeRoleForm} />
+    <div class="p-6 space-y-4" inert={savingConfiguration}>
       <!-- Assignee Type Toggle -->
       <div>
         <Label color="default" class="mb-2">{t('common.assignTo')}</Label>
@@ -1056,10 +1061,11 @@
       </div>
     </div>
     <DialogFooter
-      onCancel={() => showRoleForm = false}
+      onCancel={closeRoleForm}
       onConfirm={handleRoleSubmit}
       confirmLabel={t('common.assign')}
       disabled={roleFormData.type === 'user' ? !roleFormData.user_id : !roleFormData.group_id}
+      loading={savingConfiguration}
       showKeyboardHint={true}
       confirmKeyboardHint={submitHint}
     />
@@ -1076,6 +1082,7 @@
   showRequiredToggle={true}
   protectedFieldIds={['title']}
   showTypeLabels={true}
+  saving={savingConfiguration}
   onSave={handleFieldsSubmit}
   onCancel={handleFieldsCancel}
 />
