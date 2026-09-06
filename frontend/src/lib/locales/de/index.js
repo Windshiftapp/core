@@ -25,6 +25,7 @@ import quality from './quality.js';
 import review from './review.js';
 import adminOperations from './adminOperations.js';
 import dashboard from './dashboard.js';
+import zammad from './zammad.js';
 
 export default createLocale({
   admin,
@@ -48,4 +49,5 @@ export default createLocale({
   review,
   adminOperations,
   dashboard,
+  zammad,
 });

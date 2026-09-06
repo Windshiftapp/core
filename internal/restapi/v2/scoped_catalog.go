@@ -261,6 +261,8 @@ func workspaceMutationError(err error) error {
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, repository.ErrDuplicateEntry):
 		return newError(http.StatusConflict, "conflict", "Workspace key already exists")
+	case errors.Is(err, services.ErrWorkspaceHasProtectedIntegrationLinks):
+		return newError(http.StatusConflict, "conflict", "Remove all protected integration links from this workspace before deleting it.")
 	case errors.Is(err, services.ErrInvalidWorkspaceTemplate), errors.Is(err, services.ErrWorkspaceTemplateTooLarge), errors.Is(err, services.ErrPersonalWorkspaceTemplate):
 		return newError(http.StatusUnprocessableEntity, "unprocessable_entity", err.Error())
 	default:

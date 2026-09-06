@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/integrations"
 	"windshift/internal/models"
 )
 
@@ -80,7 +81,9 @@ func (r *IntegrationProviderRepository) List() ([]IntegrationProvider, error) {
 		if scanErr != nil {
 			return nil, fmt.Errorf("scan integration_provider: %w", scanErr)
 		}
-		providers = append(providers, p)
+		if integrations.SupportsAdminProviderCRUD(p.ProviderType) {
+			providers = append(providers, p)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate integration_providers: %w", err)
@@ -98,12 +101,18 @@ func (r *IntegrationProviderRepository) GetByID(id string) (*IntegrationProvider
 	if err != nil {
 		return nil, fmt.Errorf("get integration_provider %s: %w", id, err)
 	}
+	if !integrations.SupportsAdminProviderCRUD(p.ProviderType) {
+		return nil, ErrNotFound
+	}
 	return &p, nil
 }
 
 // Create inserts a new integration_provider. Returns ErrDuplicateEntry when
 // the slug collides with an existing row.
 func (r *IntegrationProviderRepository) Create(req IntegrationProviderInsert) error {
+	if !integrations.SupportsAdminProviderCRUD(models.IntegrationProviderType(req.ProviderType)) {
+		return ErrInvalidInput
+	}
 	_, err := r.db.ExecWrite(`
 		INSERT INTO integration_providers (
 			id, slug, name, provider_type, enabled,
@@ -127,6 +136,10 @@ func (r *IntegrationProviderRepository) Create(req IntegrationProviderInsert) er
 // updated_at is always bumped when at least one field is set. Returns
 // ErrNotFound when no row matches and ErrDuplicateEntry on slug collision.
 func (r *IntegrationProviderRepository) Update(id string, req IntegrationProviderUpdate) error {
+	if _, err := r.GetByID(id); err != nil {
+		return err
+	}
+
 	var sets []string
 	var args []any
 
@@ -156,11 +169,6 @@ func (r *IntegrationProviderRepository) Update(id string, req IntegrationProvide
 	}
 
 	if len(sets) == 0 {
-		// No fields to update — verify the row exists so callers still get
-		// ErrNotFound semantics for a missing id.
-		if _, err := r.GetByID(id); err != nil {
-			return err
-		}
 		return nil
 	}
 
@@ -185,6 +193,9 @@ func (r *IntegrationProviderRepository) Update(id string, req IntegrationProvide
 
 // Delete removes a row. Returns ErrNotFound when no row matches.
 func (r *IntegrationProviderRepository) Delete(id string) error {
+	if _, err := r.GetByID(id); err != nil {
+		return err
+	}
 	result, err := r.db.ExecWrite("DELETE FROM integration_providers WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete integration_provider %s: %w", id, err)

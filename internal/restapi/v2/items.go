@@ -833,6 +833,9 @@ func itemError(err error) error {
 	if errors.Is(err, services.ErrItemTypeMigrationRequired) {
 		return newError(http.StatusConflict, "migration_required", err.Error())
 	}
+	if errors.Is(err, services.ErrItemHasProtectedIntegrationLinks) {
+		return newError(http.StatusConflict, "conflict", "Remove all protected integration links from the affected items before deleting them.")
+	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
 	}

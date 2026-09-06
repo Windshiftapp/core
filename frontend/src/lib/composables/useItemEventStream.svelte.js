@@ -9,7 +9,7 @@ const DEBOUNCE_MS = 250;
  * initial load. Polling remains the fallback while disconnected.
  *
  * @param {() => (number|string|null|undefined)} getItemId
- * @param {{ onReconcile?: Function, onItem?: Function, onChildren?: Function, onComment?: Function, onLinks?: Function, onDeleted?: Function }} handlers
+ * @param {{ onReconcile?: Function, onItem?: Function, onChildren?: Function, onComment?: Function, onLinks?: Function, onZammad?: Function, onDeleted?: Function }} handlers
  * @returns {{ readonly connected: boolean }}
  */
 export function useItemEventStream(getItemId, handlers = {}) {
@@ -38,6 +38,7 @@ export function useItemEventStream(getItemId, handlers = {}) {
       if (kinds.has('children')) handlers.onChildren?.();
       if (kinds.has('comment')) handlers.onComment?.();
       if (kinds.has('links')) handlers.onLinks?.();
+      if (kinds.has('zammad')) handlers.onZammad?.();
       if (kinds.has('deleted')) handlers.onDeleted?.();
     };
     const schedule = (...kinds) => {
@@ -70,6 +71,7 @@ export function useItemEventStream(getItemId, handlers = {}) {
       handlers.onDeleted?.();
     });
     es.addEventListener('link', () => schedule('links'));
+    es.addEventListener('zammad', () => schedule('zammad'));
     // The browser auto-reconnects (honoring the server's retry hint). Until it
     // does, mark disconnected so the components' pollers resume as the fallback.
     es.onerror = () => {

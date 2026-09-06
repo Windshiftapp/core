@@ -17,6 +17,9 @@ var (
 	// ErrDuplicateEntry is returned when a unique constraint is violated
 	ErrDuplicateEntry = errors.New("duplicate entry")
 
+	// ErrConcurrentUpdate is returned when an optimistic write loses a race.
+	ErrConcurrentUpdate = errors.New("concurrent update")
+
 	// ErrDefaultChannel is returned when a delete is rejected because the
 	// channel became (or remained) the default for its route.
 	ErrDefaultChannel = errors.New("cannot delete default channel")

@@ -17,6 +17,10 @@ type UserNotificationDeleter interface {
 	DeleteUserNotifications(userID int) error
 }
 
+// ErrUserOffboardingHasProtectedIntegrationLinks prevents deleting a personal
+// workspace while provider-managed links still need explicit cleanup.
+var ErrUserOffboardingHasProtectedIntegrationLinks = errors.New("user has provider-managed integration links in personal workspace")
+
 // OffboardUser deactivates a user and anonymizes their PII while preserving
 // audit trails. The user row is kept (anonymized) so that FK references from
 // item_history, comments, time_worklogs, etc. remain valid.
@@ -34,6 +38,34 @@ func OffboardUser(db database.Database, userID int, notificationDeleter UserNoti
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	// Resolve the personal workspace and protect its external links before any
+	// mutation in this transaction. Offboarding must not orphan linked tickets.
+	var personalWsID *int
+	var wsID int
+	personalWorkspaceQuery := `SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ?`
+	if db.GetDriverName() == "postgres" {
+		personalWorkspaceQuery += " FOR UPDATE"
+	}
+	row := tx.QueryRow(personalWorkspaceQuery, userID)
+	if err := row.Scan(&wsID); err == nil {
+		personalWsID = &wsID
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find personal workspace: %w", err)
+	}
+	itemRepo := repository.NewItemRepository(db)
+	if personalWsID != nil {
+		if err := itemRepo.LockWorkspaceItemsTx(tx, *personalWsID); err != nil {
+			return nil, err
+		}
+		hasLinks, err := NewIntegrationLinkGuards(db).HasLinksForWorkspaceTx(tx, *personalWsID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check personal workspace integration links: %w", err)
+		}
+		if hasLinks {
+			return nil, ErrUserOffboardingHasProtectedIntegrationLinks
+		}
+	}
 
 	// a) Anonymize user record
 	if _, err := tx.Exec(`
@@ -58,15 +90,6 @@ func OffboardUser(db database.Database, userID int, notificationDeleter UserNoti
 	}
 
 	// b) Delete personal workspace (items cascade via FK)
-	var personalWsID *int
-	row := tx.QueryRow(`SELECT id FROM workspaces WHERE is_personal = true AND owner_id = ?`, userID)
-	var wsID int
-	if err := row.Scan(&wsID); err == nil {
-		personalWsID = &wsID
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to load personal workspace: %w", err)
-	}
-	itemRepo := repository.NewItemRepository(db)
 	if personalWsID != nil {
 		if err := itemRepo.DeleteByWorkspaceTx(tx, *personalWsID); err != nil {
 			return nil, fmt.Errorf("failed to delete personal workspace items: %w", err)

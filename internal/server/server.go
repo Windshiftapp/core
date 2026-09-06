@@ -107,6 +107,7 @@ type Server struct {
 	recurrenceScheduler          *scheduler.RecurrenceScheduler
 	cfvCleanupScheduler          *scheduler.CFVCleanupScheduler
 	todoistSyncScheduler         *scheduler.TodoistSyncScheduler
+	zammadSyncScheduler          *scheduler.ZammadSyncScheduler
 	runnerLeaseReaper            *scheduler.RunnerLeaseReaper
 	globalRankMigrationScheduler *scheduler.GlobalRankMigrationScheduler
 	codingRunService             *services.RunService
@@ -653,11 +654,7 @@ func (s *Server) initialize() error {
 	// Wire credential resolution into the action runtime so HTTP capabilities
 	// can reference tokens by ID. The service shares the same SSO_SECRET via
 	// a domain-separated HKDF label (ActionCredentialEncryptionInfo).
-	credentialSvc := services.NewActionCredentialService(
-		repository.NewActionCredentialRepository(s.db),
-		cfg.Auth.SessionSecret,
-	)
-	s.actionService.SetCredentialService(credentialSvc)
+	s.actionService.SetCredentialService(actionCredentialService)
 	// Lets container_run nodes dispatch to a remote runner pool (WI-146).
 	s.actionService.SetAgentRunRepository(repository.NewAgentRunRepository(s.db))
 	// One-shot scanner: warn about any legacy capability whose
@@ -873,7 +870,7 @@ func (s *Server) initialize() error {
 	workspaceBootstrapHandler := handlers.NewWorkspaceBootstrapHandler(workspaceHandler, userHandler, milestonePlanningService, permService, timeProjectHandler)
 	// Secretless access layer (WI-144): brokers a granted credential to a
 	// running job without it ever living on the runner host.
-	runnerBrokerHandler := handlers.NewRunnerBrokerHandler(tokenManager, repository.NewAgentRunRepository(s.db), credentialSvc, llmManager, &scmCredsAdapter{cr: scmCredResolver})
+	runnerBrokerHandler := handlers.NewRunnerBrokerHandler(tokenManager, repository.NewAgentRunRepository(s.db), actionCredentialService, llmManager, &scmCredsAdapter{cr: scmCredResolver})
 	runnerBrokerHandler.SetUsageRepository(repository.NewLLMUsageRepository(s.db)) // meter LLM token/cost at the broker (WI-493)
 	if bindingSvc != nil {
 		// Registers the coding-agent assignee trigger inside the item
@@ -1015,6 +1012,23 @@ func (s *Server) initialize() error {
 	commentService.SetApprovalService(approvalService)
 	s.actionService.SetApprovalService(approvalService)
 	workspaceRoleHandler.SetApprovalService(approvalService)
+
+	zammadService := services.NewZammadService(
+		s.db,
+		repository.NewZammadRepository(s.db),
+		actionCredentialService,
+		permService,
+		workflowService,
+		conditionService,
+		approvalService,
+	)
+	zammadService.SetEventCoordinator(eventCoordinator)
+	zammadService.SetOAuthEncryption(scmProviderHandler.GetEncryption())
+	zammadHandler := handlers.NewZammadHandler(repository.NewItemRepository(s.db), zammadService, permService, logger.NewAuditor(s.db))
+	integrationOAuthHandler.RegisterSystemOAuthFlow(models.IntegrationProviderZammad, zammadService, logger.NewAuditor(s.db))
+	s.zammadSyncScheduler = scheduler.NewZammadSyncScheduler(zammadService)
+	s.zammadSyncScheduler.Start()
+	zammadHandler.SetSyncAllTrigger(s.zammadSyncScheduler.TriggerSyncAll)
 
 	// Standard profiles execute in-process through the canonical aitools
 	// registry. Wiring is intentionally late because their final comments and
@@ -1552,6 +1566,7 @@ func (s *Server) initialize() error {
 			OAuth:       integrationOAuthHandler,
 			ItemLinks:   integrationItemLinksHandler,
 			TodoistSync: todoistSyncHandler,
+			Zammad:      zammadHandler,
 		},
 		Pages: routes.PageHandlers{
 			KnowledgeSearch: knowledgeSearchHandler,
@@ -2023,6 +2038,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.todoistSyncScheduler.Stop()
 	}
 
+	if s.zammadSyncScheduler != nil {
+		slog.Info("stopping Zammad sync scheduler")
+		s.zammadSyncScheduler.Stop()
+	}
+
 	if s.runnerLeaseReaper != nil {
 		slog.Info("stopping runner lease reaper")
 		s.runnerLeaseReaper.Stop()
@@ -2155,6 +2175,9 @@ func (s *Server) cleanup() {
 	// before closing the database so an in-flight rank batch cannot race cleanup.
 	if s.globalRankMigrationScheduler != nil {
 		s.globalRankMigrationScheduler.Stop()
+	}
+	if s.zammadSyncScheduler != nil {
+		s.zammadSyncScheduler.Stop()
 	}
 	// Stop rate limiters
 	if s.loginRateLimiter != nil {

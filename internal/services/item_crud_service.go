@@ -19,23 +19,26 @@ import (
 )
 
 var (
-	ErrCollectionNotFound = errors.New("collection not found")
-	ErrQLQuery            = errors.New("QL query error")
+	ErrCollectionNotFound               = errors.New("collection not found")
+	ErrQLQuery                          = errors.New("QL query error")
+	ErrItemHasProtectedIntegrationLinks = errors.New("item has provider-managed integration links")
 )
 
 // ItemCRUDService handles item CRUD operations
 type ItemCRUDService struct {
-	db            database.Database
-	repo          *repository.ItemRepository
-	workspaceRepo *repository.WorkspaceRepository
+	db                    database.Database
+	repo                  *repository.ItemRepository
+	workspaceRepo         *repository.WorkspaceRepository
+	integrationLinkGuards *IntegrationLinkGuards
 }
 
 // NewItemCRUDService creates a new item CRUD service
 func NewItemCRUDService(db database.Database) *ItemCRUDService {
 	return &ItemCRUDService{
-		db:            db,
-		repo:          repository.NewItemRepository(db),
-		workspaceRepo: repository.NewWorkspaceRepository(db),
+		db:                    db,
+		repo:                  repository.NewItemRepository(db),
+		workspaceRepo:         repository.NewWorkspaceRepository(db),
+		integrationLinkGuards: NewIntegrationLinkGuards(db),
 	}
 }
 
@@ -95,6 +98,13 @@ func (s *ItemCRUDService) DeleteSingleWithMetadata(itemID int, metadata itemeven
 		locked, err := s.repo.FindByIDForUpdate(tx, itemID)
 		if err != nil {
 			return err
+		}
+		hasProtectedLinks, err := s.integrationLinkGuards.HasLinksForItemsTx(tx, []int{itemID})
+		if err != nil {
+			return err
+		}
+		if hasProtectedLinks {
+			return ErrItemHasProtectedIntegrationLinks
 		}
 		if metadata.OccurredAt.IsZero() {
 			metadata.OccurredAt = time.Now()
@@ -159,6 +169,13 @@ func (s *ItemCRUDService) deleteItemSubtree(rootID int, itemIDs []int, descendan
 		}
 		if len(items) != len(itemIDs) {
 			return repository.ErrNotFound
+		}
+		hasProtectedLinks, err := s.integrationLinkGuards.HasLinksForItemsTx(tx, itemIDs)
+		if err != nil {
+			return err
+		}
+		if hasProtectedLinks {
+			return ErrItemHasProtectedIntegrationLinks
 		}
 		if metadata.OccurredAt.IsZero() {
 			metadata.OccurredAt = time.Now()

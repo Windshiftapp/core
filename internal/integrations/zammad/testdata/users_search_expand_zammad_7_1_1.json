@@ -1,0 +1,10 @@
+[
+  {
+    "id": 42,
+    "login": "ada.lovelace@example.invalid",
+    "firstname": "Ada",
+    "lastname": "Lovelace",
+    "active": true,
+    "group_ids": { "7": ["full"] }
+  }
+]

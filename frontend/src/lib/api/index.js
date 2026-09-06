@@ -57,6 +57,8 @@ import {
   itemIntegrationLinks,
   todoistSync,
   userIntegrations,
+  zammadConnections,
+  zammadTickets,
 } from './integrations.js';
 // Domain imports
 import { items } from './items.js';
@@ -414,6 +416,10 @@ export const api = {
 
   // Item Integration Links
   itemIntegrationLinks,
+
+  // Zammad ticket integration
+  zammadConnections,
+  zammadTickets,
 
   // OAuth Clients (admin only) — third-party apps registered against the
   // generic OAuth 2.0 server (/api/oauth/authorize + /api/oauth/token)

@@ -23,6 +23,7 @@ import teams from './teams.js';
 import supplemental from './supplemental.js';
 import adminOperations from './adminOperations.js';
 import dashboard from './dashboard.js';
+import zammad from './zammad.js';
 
 export default createLocale({
   common,
@@ -44,4 +45,5 @@ export default createLocale({
   supplemental,
   adminOperations,
   dashboard,
+  zammad,
 });
