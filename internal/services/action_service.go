@@ -997,43 +997,49 @@ func currentItemFieldValueResolved(itemRepo *repository.ItemRepository, ctx *mod
 		return nil, false
 	}
 	itemID := currentActionItemID(ctx)
-	// Resolve ordinary actions from their event without pinning ctx.Item to a
-	// snapshot. Later nodes must still see mutations made by earlier nodes.
-	if (ctx.Item == nil || fieldName == "status" || fieldName == "priority") && itemRepo != nil && itemID > 0 {
+	switch fieldName {
+	case "id", "item_id":
+		if itemID > 0 {
+			return itemID, true
+		}
+	case "workspace_id":
+		if workspaceID := currentActionWorkspaceID(ctx); workspaceID > 0 {
+			return workspaceID, true
+		}
+	}
+	if strings.HasPrefix(fieldName, "custom_field_") {
+		key := strings.TrimPrefix(fieldName, "custom_field_")
+		customFieldID, err := strconv.Atoi(key)
+		if itemRepo != nil && itemID > 0 && err == nil && customFieldID > 0 {
+			if val, readErr := itemRepo.GetItemCustomFieldValue(itemID, customFieldID); readErr == nil {
+				return val, true
+			}
+		}
+		if ctx.Item != nil && ctx.Item.CustomFieldValues != nil {
+			val, ok := ctx.Item.CustomFieldValues[key]
+			return val, ok
+		}
+	}
+	if itemRepo != nil && itemID > 0 && repository.IsAllowedItemColumn(fieldName) {
+		if val, err := itemRepo.GetAllowedColumnValue(itemID, fieldName); err == nil {
+			return val, true
+		}
+	}
+	// Only joined names need hydration. Resolve them without pinning ctx.Item:
+	// later nodes must see mutations, including inside iterator snapshots.
+	if (fieldName == "status" || fieldName == "priority") && itemRepo != nil && itemID > 0 {
 		lookupContext := ctx.Context
 		if lookupContext == nil {
 			lookupContext = context.Background()
 		}
-		if item, err := itemRepo.FindByIDWithDetailsContext(lookupContext, itemID); err == nil {
-			resolved := *ctx
-			resolved.Item = item
-			ctx = &resolved
+		item, err := itemRepo.FindByIDWithDetailsContext(lookupContext, itemID)
+		if err != nil {
+			// Do not silently substitute a stale iterator name after a failed read.
+			return nil, false
 		}
-	}
-	if ctx.Item != nil {
-		switch fieldName {
-		case "id", "item_id":
-			return ctx.Item.ID, true
-		case "workspace_id":
-			return ctx.Item.WorkspaceID, true
-		}
-		if strings.HasPrefix(fieldName, "custom_field_") {
-			customFieldID, err := strconv.Atoi(strings.TrimPrefix(fieldName, "custom_field_"))
-			if itemRepo != nil && err == nil && customFieldID > 0 {
-				if val, readErr := itemRepo.GetItemCustomFieldValue(itemID, customFieldID); readErr == nil {
-					return val, true
-				}
-			}
-			if ctx.Item.CustomFieldValues != nil {
-				val, ok := ctx.Item.CustomFieldValues[strings.TrimPrefix(fieldName, "custom_field_")]
-				return val, ok
-			}
-		}
-	}
-	if itemRepo != nil && itemID != 0 && repository.IsAllowedItemColumn(fieldName) {
-		if val, err := itemRepo.GetAllowedColumnValue(itemID, fieldName); err == nil {
-			return val, true
-		}
+		resolved := *ctx
+		resolved.Item = item
+		ctx = &resolved
 	}
 	if ctx.Item != nil {
 		switch fieldName {

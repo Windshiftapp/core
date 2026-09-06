@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -11,6 +13,21 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
+
+type actionReadCountingDB struct {
+	database.Database
+	reads int
+}
+
+func (db *actionReadCountingDB) QueryRow(query string, args ...any) *sql.Row {
+	db.reads++
+	return db.Database.QueryRow(query, args...)
+}
+
+func (db *actionReadCountingDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	db.reads++
+	return db.Database.QueryRowContext(ctx, query, args...)
+}
 
 type contextInputProbe struct {
 	service *ActionService
@@ -63,7 +80,17 @@ func TestActionExecutionResolvesTriggerItemAndEffectiveActor(t *testing.T) {
 			t.Fatalf("seed: %v", err)
 		}
 	}
-	service := &ActionService{db: db, repo: repository.NewActionRepository(db), itemRepo: repository.NewItemRepository(db), chainStore: NewExecutionChainStore()}
+	counted := &actionReadCountingDB{Database: db}
+	service := &ActionService{db: db, repo: repository.NewActionRepository(db), itemRepo: repository.NewItemRepository(counted), chainStore: NewExecutionChainStore()}
+	current := &models.ExecutionContext{Event: &models.ActionEvent{ItemID: 42, WorkspaceID: 42}}
+	for field, want := range map[string]any{"item.id": 42, "item.workspace_id": 42, "item.title": "Context item", "item.custom_field_17": "custom context"} {
+		if got, found := service.resolveExecutionValue(current, field); !found || got != want {
+			t.Fatalf("%s = %v, found=%t", field, got, found)
+		}
+	}
+	if counted.reads != 2 {
+		t.Fatalf("identity needs no reads; title and custom field need one each: got %d reads", counted.reads)
+	}
 	probe := &contextInputProbe{service: service}
 	service.RegisterNodeExecutor(probe)
 	actorID := 8
@@ -74,6 +101,14 @@ func TestActionExecutionResolvesTriggerItemAndEffectiveActor(t *testing.T) {
 	for _, want := range []string{`<input field="item.id" trust="untrusted">42</input>`, `custom context`, `<input field="user.id" trust="untrusted">8</input>`, `Effective User`} {
 		if !strings.Contains(probe.message, want) {
 			t.Errorf("message missing %q: %s", want, probe.message)
+		}
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	stale := &models.ExecutionContext{Context: cancelled, Item: &models.Item{ID: 42, StatusName: "Old", PriorityName: "Old"}}
+	for _, field := range []string{"item.status", "item.priority"} {
+		if got, found := service.resolveExecutionValue(stale, field); found || got != nil {
+			t.Errorf("failed read returned stale %s = %v", field, got)
 		}
 	}
 }
