@@ -616,6 +616,16 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 	for k, v := range event.NewValues {
 		ctx.Variables["new_"+k] = v
 	}
+	if err := as.loadExecutionActor(ctx); err != nil {
+		log.Status = models.ActionStatusFailed
+		log.ErrorMessage = err.Error()
+		completedAt := time.Now()
+		log.CompletedAt = &completedAt
+		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+			slog.Error("failed to update execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+		}
+		return err
+	}
 
 	sortedNodes, err := as.topologicalSort(action.Nodes, action.Edges)
 	if err != nil {
@@ -960,6 +970,18 @@ func derefTimePtr(p *time.Time) any {
 	return *p
 }
 
+// loadExecutionActor resolves the identity whose permissions govern the action.
+func (as *ActionService) loadExecutionActor(ctx *models.ExecutionContext) error {
+	if ctx.EffectiveActorID > 0 {
+		actor, err := repository.NewUserRepository(as.db).GetByID(ctx.EffectiveActorID)
+		if err != nil {
+			return fmt.Errorf("load action actor: %w", err)
+		}
+		ctx.Actor = actor
+	}
+	return nil
+}
+
 func (as *ActionService) currentItemFieldValue(ctx *models.ExecutionContext, fieldName string) any {
 	value, _ := currentItemFieldValueResolved(as.itemRepo, ctx, fieldName)
 	return value
@@ -975,6 +997,19 @@ func currentItemFieldValueResolved(itemRepo *repository.ItemRepository, ctx *mod
 		return nil, false
 	}
 	itemID := currentActionItemID(ctx)
+	// Resolve ordinary actions from their event without pinning ctx.Item to a
+	// snapshot. Later nodes must still see mutations made by earlier nodes.
+	if (ctx.Item == nil || fieldName == "status" || fieldName == "priority") && itemRepo != nil && itemID > 0 {
+		lookupContext := ctx.Context
+		if lookupContext == nil {
+			lookupContext = context.Background()
+		}
+		if item, err := itemRepo.FindByIDWithDetailsContext(lookupContext, itemID); err == nil {
+			resolved := *ctx
+			resolved.Item = item
+			ctx = &resolved
+		}
+	}
 	if ctx.Item != nil {
 		switch fieldName {
 		case "id", "item_id":

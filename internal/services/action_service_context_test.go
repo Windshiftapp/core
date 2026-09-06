@@ -1,12 +1,82 @@
 package services
 
 import (
+	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
+
+type contextInputProbe struct {
+	service *ActionService
+	message string
+}
+
+func (p *contextInputProbe) NodeType() models.ActionNodeType { return models.ActionNodeAIAgent }
+func (p *contextInputProbe) Execute(_ *models.ActionNode, ctx *models.ExecutionContext, _ *models.StepResult) error {
+	message, err := p.service.buildAIAgentUserMessage(ctx, []string{"item.id", "item.status", "item.priority", "item.custom_field_17", "user.id", "user.name"})
+	p.message = message
+	if err != nil {
+		return err
+	}
+	if ctx.Item != nil {
+		return fmt.Errorf("top-level context must not retain a stale item snapshot")
+	}
+	if _, err := p.service.db.Exec(`UPDATE items SET status_id = (SELECT id FROM statuses WHERE name = 'Context updated') WHERE id = ?`, ctx.Event.ItemID); err != nil {
+		return err
+	}
+	// The next input must observe a preceding step's mutation. An iterator
+	// snapshot must also preserve identity without pinning joined status names.
+	for _, snapshot := range []*models.Item{nil, {ID: ctx.Event.ItemID, StatusName: "Old"}} {
+		current := *ctx
+		current.Item = snapshot
+		value, found := p.service.resolveExecutionValue(&current, "item.status")
+		if !found || value != "Context updated" {
+			return fmt.Errorf("status after mutation = %v, found=%v", value, found)
+		}
+	}
+	return nil
+}
+
+func TestActionExecutionResolvesTriggerItemAndEffectiveActor(t *testing.T) {
+	db, err := database.NewSQLiteDB(filepath.Join(t.TempDir(), "action-context.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	for _, query := range []string{
+		`INSERT INTO users (id, email, username, first_name, last_name) VALUES (7, 'trigger@example.test', 'trigger', 'Trigger', 'User'), (8, 'effective@example.test', 'effective', 'Effective', 'User')`,
+		`INSERT INTO workspaces (id, name, key) VALUES (42, 'Context', 'CTX')`,
+		`INSERT INTO items (id, workspace_id, workspace_item_number, title, description, frac_index, status_id, priority_id, custom_field_values) VALUES (42, 42, 1, 'Context item', '', 'a0', (SELECT id FROM statuses LIMIT 1), (SELECT id FROM priorities LIMIT 1), '{"17":"custom context"}')`,
+		`INSERT INTO actions (id, workspace_id, name, trigger_type, is_enabled) VALUES (42, 42, 'Context action', 'manual', true)`,
+		`INSERT INTO statuses (name, category_id) VALUES ('Context updated', (SELECT id FROM status_categories LIMIT 1))`,
+	} {
+		if _, err := db.Exec(query); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	service := &ActionService{db: db, repo: repository.NewActionRepository(db), itemRepo: repository.NewItemRepository(db), chainStore: NewExecutionChainStore()}
+	probe := &contextInputProbe{service: service}
+	service.RegisterNodeExecutor(probe)
+	actorID := 8
+	action := &models.Action{ID: 42, WorkspaceID: 42, IsEnabled: true, TriggerType: models.ActionTriggerManual, ActorUserID: &actorID, Nodes: []models.ActionNode{{ID: 1, NodeType: models.ActionNodeAIAgent, NodeConfig: `{}`}}}
+	if err := service.executeAction(action, &models.ActionEvent{ItemID: 42, WorkspaceID: 42, ActorUserID: 7}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`<input field="item.id" trust="untrusted">42</input>`, `custom context`, `<input field="user.id" trust="untrusted">8</input>`, `Effective User`} {
+		if !strings.Contains(probe.message, want) {
+			t.Errorf("message missing %q: %s", want, probe.message)
+		}
+	}
+}
 
 func TestResolveExecutionValue(t *testing.T) {
 	assigneeID := 0
