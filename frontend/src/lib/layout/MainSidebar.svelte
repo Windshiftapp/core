@@ -210,7 +210,7 @@
         label={t('nav.create')}
         onclick={showCreateDropdown}
         expanded={$uiStore.navExpanded}
-        variant="accent"
+        variant="primary"
         isActive={activeSurface === 'create'}
         shortcut={getShortcutDisplay('global', 'create')}
         tooltipSuffix=" ({getShortcutDisplay('global', 'create')})"

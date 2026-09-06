@@ -535,11 +535,11 @@
     </div>
 
     <!-- Main Content - Step Execution -->
-    <div class="flex-1 flex flex-col">
+    <div class="min-w-0 flex-1 flex flex-col">
       <!-- Step Header -->
       <div class="p-6 border-b" style="border-color: var(--ds-border);">
-        <div class="flex items-center justify-between mb-4">
-          <div>
+        <div class="flex items-center justify-between gap-6 mb-4">
+          <div class="min-w-0 flex-1 [overflow-wrap:anywhere]">
             <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
               {currentCase.title}
             </h1>
@@ -549,7 +549,7 @@
               </AlertBox>
             {/if}
           </div>
-          <div class="text-sm" style="color: var(--ds-text-subtle);">
+          <div class="shrink-0 whitespace-nowrap text-sm" style="color: var(--ds-text-subtle);">
             {#if currentCase.test_steps && currentCase.test_steps.length > 0}
               {t('testing.stepOfTotal', { current: currentStepIndex + 1, total: currentCase.test_steps.length })}
             {:else}
