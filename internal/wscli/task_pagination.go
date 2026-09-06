@@ -25,7 +25,7 @@ func warnItemPagination(items *PaginatedResponse[Item]) {
 		total = items.Total
 	}
 	if total > len(items.Data) {
-		_, _ = fmt.Fprintf(stderr, "Showing %d of %d items (page %d/%d); use --page/--limit or task ls --all for more.\n", len(items.Data), total, items.Pagination.Page, items.Pagination.TotalPages)
+		_, _ = fmt.Fprintf(stderr, "Showing %d of %d items (page %d/%d); task ls supports --page/--limit and --all (reapply the relevant filters).\n", len(items.Data), total, items.Pagination.Page, items.Pagination.TotalPages)
 	}
 }
 
@@ -46,12 +46,12 @@ func listTaskPage(client *Client, filters map[string]string, page, limit int, al
 		if err != nil {
 			return nil, err
 		}
-		if !all {
-			return response, nil
-		}
 		if response.Pagination.Page != page || response.Pagination.TotalPages < 0 ||
 			(response.Pagination.TotalPages == 0 && (len(response.Data) > 0 || response.Pagination.TotalItems > 0)) {
 			return nil, fmt.Errorf("invalid pagination returned for page %d", page)
+		}
+		if !all {
+			return response, nil
 		}
 		before := len(combined)
 		for _, item := range response.Data {

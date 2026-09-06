@@ -800,7 +800,11 @@ Examples:
 			if err != nil {
 				return err
 			}
-			req.ParentID = &parentID
+			var parent *int
+			if parentID > 0 {
+				parent = &parentID
+			}
+			req.ParentID = &parent
 			hasChanges = true
 		}
 		if cmd.Flags().Changed("due-date") {

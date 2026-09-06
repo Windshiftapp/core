@@ -164,12 +164,13 @@ type ItemCreateRequest struct {
 // carry status_id — status changes go through TransitionRequest on a
 // dedicated endpoint so workflow and condition rules are enforced.
 type ItemUpdateRequest struct {
-	Title        *string        `json:"title,omitempty"`
-	Description  *string        `json:"description,omitempty"`
-	PriorityID   *int           `json:"priority_id,omitempty"`
-	ItemTypeID   *int           `json:"item_type_id,omitempty"`
-	AssigneeID   *int           `json:"assignee_id,omitempty"`
-	ParentID     *int           `json:"parent_id,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	PriorityID  *int    `json:"priority_id,omitempty"`
+	ItemTypeID  *int    `json:"item_type_id,omitempty"`
+	AssigneeID  *int    `json:"assignee_id,omitempty"`
+	// nil omits the field; a pointer to nil clears it with JSON null.
+	ParentID     **int          `json:"parent_id,omitempty"`
 	MilestoneIDs *[]int         `json:"milestone_ids,omitempty"`
 	IterationID  *int           `json:"iteration_id,omitempty"`
 	ProjectID    *int           `json:"project_id,omitempty"`
