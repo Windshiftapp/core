@@ -113,7 +113,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   $effect(() => {
     if (!itemDetailStore.notFound) return;
     itemDetailStore.notFound = false;
-    infoToast('This item was deleted.');
+    showDeletionFeedback();
     if (isModal && onclose) {
       onclose({ hasChanges: false });
     } else if (!isModal) {
@@ -746,7 +746,17 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     navigate(`/workspaces/${moved.workspace_id}/items/${moved.id}`);
   }
 
+  let deletionFeedbackItemId = null;
+
+  function showDeletionFeedback() {
+    const deletedId = String(itemId);
+    if (deletionFeedbackItemId === deletedId) return;
+    deletionFeedbackItemId = deletedId;
+    infoToast('This item was deleted.');
+  }
+
   function handleDeleteComplete(result) {
+    showDeletionFeedback();
     const collectionId = $currentRoute.params?.collectionId;
     // Navigate based on deletion result
     if (result?.mode === 'reparent' && result?.newParentId) {

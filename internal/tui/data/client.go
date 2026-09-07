@@ -255,7 +255,9 @@ func (c *Client) setItemField(itemID int, field string, value any) error {
 }
 
 func (c *Client) getAgentRuns(itemID int) ([]AgentRun, error) {
-	var document dataDocument[[]agentRunDTO]
+	var document dataDocument[struct {
+		Runs []agentRunDTO `json:"runs"`
+	}]
 	if err := c.doGet(fmt.Sprintf("/rest/api/v2/items/%d/agent-runs?page_size=10", itemID), &document); err != nil {
 		return nil, err
 	}
@@ -265,8 +267,8 @@ func (c *Client) getAgentRuns(itemID int) ([]AgentRun, error) {
 		}
 		return t.Format(time.RFC3339)
 	}
-	out := make([]AgentRun, 0, len(document.Data))
-	for _, r := range document.Data {
+	out := make([]AgentRun, 0, len(document.Data.Runs))
+	for _, r := range document.Data.Runs {
 		out = append(out, AgentRun{
 			ID:        r.ID,
 			Status:    SanitizeLine(r.Status),
