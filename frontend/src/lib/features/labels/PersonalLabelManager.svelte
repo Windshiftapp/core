@@ -129,6 +129,7 @@
 <div class="space-y-4">
   <div class="flex items-center justify-between gap-2">
     <Input
+      dataTestid="personal-label-search"
       placeholder={t('users.labels.searchPlaceholder') || 'Search labels'}
       bind:value={search}
       size="small"
@@ -148,6 +149,7 @@
 
   {#if showForm}
     <form
+      data-testid="personal-label-form"
       onsubmit={submitForm}
       class="rounded border p-4 space-y-3"
       style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);"
@@ -161,6 +163,7 @@
         <div class="flex-1">
           <Label class="block text-xs font-medium mb-1">{t('common.name') || 'Name'}</Label>
           <Input
+            dataTestid="personal-label-name"
             bind:value={formName}
             placeholder={t('users.labels.namePlaceholder') || 'e.g. urgent'}
             required
@@ -173,12 +176,12 @@
         </div>
       </div>
       <div class="flex gap-2 pt-1">
-        <Button type="submit" variant="primary" size="small" disabled={saving} icon={Check}>
+        <Button dataTestid="personal-label-save" type="submit" variant="primary" size="small" disabled={saving} icon={Check}>
           {editingId == null
             ? (t('common.create') || 'Create')
             : (t('common.save') || 'Save')}
         </Button>
-        <Button type="button" variant="default" size="small" onclick={closeForm} icon={X}>
+        <Button dataTestid="personal-label-cancel" type="button" variant="default" size="small" onclick={closeForm} icon={X}>
           {t('common.cancel') || 'Cancel'}
         </Button>
       </div>
@@ -226,6 +229,7 @@
               {label.name}
             </span>
             <button
+              data-testid="personal-label-edit-{label.id}"
               type="button"
               class="p-1 rounded hover:bg-[var(--ds-background-neutral-hovered)] transition-colors"
               aria-label={t('common.edit') || 'Edit'}
@@ -234,6 +238,7 @@
               <Pencil class="w-4 h-4" style="color: var(--ds-text-subtle);" />
             </button>
             <button
+              data-testid="personal-label-delete-{label.id}"
               type="button"
               class="p-1 rounded hover:bg-[var(--ds-background-neutral-hovered)] transition-colors"
               aria-label={t('common.delete') || 'Delete'}

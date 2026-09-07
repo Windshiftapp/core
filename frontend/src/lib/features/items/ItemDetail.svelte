@@ -110,17 +110,10 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 
   // Close the detail when the open item is deleted. Consume the shared flag
   // before closing so the next detail does not inherit the deletion state.
-  let deletionFeedbackItemId = null;
-  function announceDeletion() {
-    if (deletionFeedbackItemId === itemId) return;
-    deletionFeedbackItemId = itemId;
-    infoToast('This item was deleted.');
-  }
-
   $effect(() => {
     if (!itemDetailStore.notFound) return;
     itemDetailStore.notFound = false;
-    announceDeletion();
+    showDeletionFeedback();
     if (isModal && onclose) {
       onclose({ hasChanges: false });
     } else if (!isModal) {
@@ -753,9 +746,17 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     navigate(`/workspaces/${moved.workspace_id}/items/${moved.id}`);
   }
 
+  let deletionFeedbackItemId = null;
+
+  function showDeletionFeedback() {
+    const deletedId = String(itemId);
+    if (deletionFeedbackItemId === deletedId) return;
+    deletionFeedbackItemId = deletedId;
+    infoToast('This item was deleted.');
+  }
+
   function handleDeleteComplete(result) {
-    // The HTTP response can arrive before the live deletion event.
-    announceDeletion();
+    showDeletionFeedback();
     // Do not let the next detail briefly render the deleted shared-store item.
     itemDetailStore.reset();
     // Reparent navigation can reuse this component; allow its next item load.

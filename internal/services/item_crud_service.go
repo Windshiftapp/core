@@ -204,7 +204,7 @@ func (s *ItemCRUDService) deleteItemRelationsTx(tx database.Tx, itemID int) erro
 func (s *ItemCRUDService) finishItemDeletion(workspaceID int, itemIDs []int, parentID *int) {
 	repository.InvalidateItemListCountCache(s.db, workspaceID)
 	for _, id := range itemIDs {
-		PublishItemChange(id, ItemChangeDeleted)
+		PublishItemDeletion(id, workspaceID)
 	}
 	if parentID != nil {
 		PublishItemChange(*parentID, ItemChangeUpdated)

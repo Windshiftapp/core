@@ -8,8 +8,9 @@ import (
 // ItemSSEEvent is one item-change frame delivered to a subscriber of an item's
 // event stream.
 type ItemSSEEvent struct {
-	ItemID int
-	Kind   ItemChangeKind
+	ItemID      int
+	Kind        ItemChangeKind
+	WorkspaceID int
 }
 
 // ItemSubscriber is one open SSE connection's view of an item topic. The SSE
@@ -55,6 +56,16 @@ func NewSSEHub() *SSEHub {
 // event is dropped, so one slow client cannot stall the mutation path or other
 // subscribers. The copy-under-RLock keeps sends off the lock.
 func (h *SSEHub) PublishItemChange(itemID int, kind ItemChangeKind) {
+	h.publish(ItemSSEEvent{ItemID: itemID, Kind: kind})
+}
+
+// PublishItemDeletion carries ownership after the item row has been removed.
+func (h *SSEHub) PublishItemDeletion(itemID, workspaceID int) {
+	h.publish(ItemSSEEvent{ItemID: itemID, Kind: ItemChangeDeleted, WorkspaceID: workspaceID})
+}
+
+func (h *SSEHub) publish(ev ItemSSEEvent) {
+	itemID := ev.ItemID
 	if itemID <= 0 {
 		return
 	}
@@ -70,7 +81,6 @@ func (h *SSEHub) PublishItemChange(itemID int, kind ItemChangeKind) {
 	}
 	h.mu.RUnlock()
 
-	ev := ItemSSEEvent{ItemID: itemID, Kind: kind}
 	for _, s := range subs {
 		select {
 		case s.ch <- ev:

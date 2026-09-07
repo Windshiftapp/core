@@ -518,10 +518,10 @@
   {#if isSettingsView}
     <!-- Collapsed admin rail: back arrow + a module icon per settings page. -->
     <div class="flex flex-col items-center space-y-1 mt-6">
-      {@render collapsedNavIcon({ href: `/workspaces/${workspaceId}`, label: t('workspaceSettings.backToWorkspace'), icon: ArrowLeft, isActive: false })}
+      {@render collapsedNavIcon({ href: `/workspaces/${workspaceId}`, testId: 'workspace-back-link', label: t('workspaceSettings.backToWorkspace'), icon: ArrowLeft, isActive: false })}
       {@render sectionDivider()}
       {#each workspaceSettingsItems as item (item.id)}
-        {@render collapsedNavIcon({ href: workspaceSettingsRoute(workspaceId, item.id), label: t(item.labelKey), icon: item.icon, isActive: $currentRoute.view === item.view })}
+        {@render collapsedNavIcon({ href: workspaceSettingsRoute(workspaceId, item.id), testId: `workspace-admin-nav-${item.id}`, label: t(item.labelKey), icon: item.icon, isActive: $currentRoute.view === item.view })}
       {/each}
     </div>
   {:else if $currentWorkspace?.is_personal}

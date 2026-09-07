@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -53,15 +54,20 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-resolve ownership and item.view before every post-connect write so a
-	// workspace move or membership revocation takes effect before disclosure.
-	authorized := func() bool {
+	// Recheck current ownership before writes. Deletion events retain the final
+	// workspace because their item row is already gone, even after a move.
+	authorized := func(deletedWorkspaceID int) bool {
 		currentWorkspaceID, err := itemRepo.GetWorkspaceID(itemID)
-		if err != nil {
+		if deletedWorkspaceID > 0 && errors.Is(err, repository.ErrNotFound) {
+			currentWorkspaceID = deletedWorkspaceID
+		} else if err != nil {
 			return false
 		}
 		ok, err := h.permissionService.HasWorkspacePermission(user.ID, currentWorkspaceID, models.PermissionItemView)
-		return err == nil && ok
+		if err != nil || !ok {
+			return false
+		}
+		return true
 	}
 
 	flusher, ok := w.(http.Flusher)
@@ -99,10 +105,19 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case ev := <-sub.Events():
-			if !authorized() {
+			deleted := ev.Kind == services.ItemChangeDeleted
+			deletedWorkspaceID := 0
+			if deleted {
+				deletedWorkspaceID = ev.WorkspaceID
+			}
+			if !authorized(deletedWorkspaceID) {
 				return
 			}
 			writeSSEEvent(w, string(ev.Kind), ev.ItemID)
+			if deleted {
+				flusher.Flush()
+				return
+			}
 			if sub.TakeStale() {
 				// A later event was dropped (buffer overflow); tell the client to
 				// reconcile fully so nothing is missed.
@@ -111,7 +126,7 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		case <-heartbeat.C:
 			// Re-authorize before the next heartbeat write.
-			if !authorized() {
+			if !authorized(0) {
 				return
 			}
 			if sub.TakeStale() {
