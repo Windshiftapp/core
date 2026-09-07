@@ -15,7 +15,7 @@ export default {
       },
       workspaces: {
         title: 'Espaces de travail',
-        subtitle: 'Reprenez où vous vous étiez arrêté',
+        subtitle: 'Reprenez là où vous vous étiez arrêté',
       },
     },
     widgetCatalog: {
@@ -40,7 +40,7 @@ export default {
         description: 'Afficher les éléments de travail d’une collection enregistrée',
       },
       assignedToMe: {
-        name: 'Qui m’est attribué',
+        name: 'Mes éléments attribués',
         description: 'Éléments ouverts qui vous sont attribués dans tous les espaces de travail',
       },
       watchedItems: {
@@ -80,7 +80,7 @@ export default {
     editor: {
       newSection: 'Nouvelle section',
       deleteSectionConfirm: 'Supprimer cette section ? Tous les widgets de cette section seront retirés.',
-      doneEditing: 'Terminer l’édition',
+      doneEditing: 'Terminer les modifications',
       customize: 'Personnaliser',
       editModeDescription: 'Mode édition : ajoutez, renommez, réordonnez ou supprimez des sections et des widgets',
       addSection: 'Ajouter une section',

@@ -41,13 +41,13 @@ export default {
     bucketName: 'Nom du dossier',
     bucketNamePlaceholder: 'ex. Docs ingénierie',
     bucketDescription: 'Description',
-    bucketDescriptionPlaceholder: 'Quel type de documents va ici ?',
+    bucketDescriptionPlaceholder: 'Quels types de documents ce dossier contient-il ?',
 
     // Note form
     noteTitle: 'Titre',
     noteTitlePlaceholder: 'Titre de la note',
     noteContent: 'Contenu',
-    noteContentPlaceholder: 'Rédigez votre note en markdown…',
+    noteContentPlaceholder: 'Rédigez votre note en Markdown…',
 
     // Upload
     dropzoneTitle: 'Déposez les fichiers ici',
