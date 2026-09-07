@@ -61,6 +61,9 @@ func listTaskPage(client *Client, filters map[string]string, page, limit int, al
 			}
 		}
 		if page >= response.Pagination.TotalPages {
+			if len(combined) != response.Pagination.TotalItems {
+				return nil, fmt.Errorf("incomplete pagination: received %d of %d items; retry the query", len(combined), response.Pagination.TotalItems)
+			}
 			if combined == nil {
 				combined = []Item{}
 			}
