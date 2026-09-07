@@ -556,7 +556,7 @@
     scrollContent={false}
     reserveScrollbarSpace={false}
   >
-    <div class="flex flex-1 min-h-0">
+    <div class="flex h-full min-h-0">
       <PagesNavSidebar {workspaceId} embedded />
     </div>
   </ScrollableSidebar>
