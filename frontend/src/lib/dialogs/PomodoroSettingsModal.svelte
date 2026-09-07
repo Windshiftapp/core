@@ -39,7 +39,7 @@
   let form = $state({ ...defaultForm });
 
   const projectOptions = $derived([
-    { value: '', label: 'Select a project...' },
+    { value: '', label: t('time.pomodoro.selectProject') },
     ...projects
       .filter((project) => project.status === 'Active')
       .map((project) => ({
@@ -111,7 +111,7 @@
       loaded = true;
     } catch (err) {
       console.warn('[pomodoro-settings] failed to load settings:', err);
-      error = `Failed to load settings: ${err?.message || err}`;
+      error = t('time.pomodoro.loadError', { error: err?.message || err });
     } finally {
       loading = false;
     }
@@ -135,10 +135,10 @@
     try {
       const call = await getInvoke();
       await call('save_pomodoro_settings', { settings: toSettings(form) });
-      status = 'Settings saved';
+      status = t('time.pomodoro.settingsSaved');
     } catch (err) {
       console.warn('[pomodoro-settings] failed to save settings:', err);
-      error = `Failed to save settings: ${err?.message || err}`;
+      error = t('time.pomodoro.saveError', { error: err?.message || err });
     } finally {
       saving = false;
     }
@@ -171,34 +171,34 @@
   >
     <div class="flex items-center justify-between border-b px-6 py-4" style="border-color: var(--ds-border);">
       <div>
-        <h2 id="pomodoro-settings-title" class="text-lg font-semibold">Pomodoro Settings</h2>
-        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">Configure desktop timer behavior and automatic time logging.</p>
+        <h2 id="pomodoro-settings-title" class="text-lg font-semibold">{t('time.pomodoro.title')}</h2>
+        <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('time.pomodoro.subtitle')}</p>
       </div>
       <Button variant="ghost" icon={X} onclick={close} title={t('common.close')} />
     </div>
 
     <div class="px-6 py-5">
       {#if loading}
-        <p class="text-sm" style="color: var(--ds-text-subtle);">Loading settings...</p>
+        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('time.pomodoro.loadingSettings')}</p>
       {:else}
         <div class="grid gap-6 md:grid-cols-3">
           <section class="md:col-span-2">
             <div class="mb-3 flex items-center gap-2">
               <Clock class="h-5 w-5" style="color: var(--ds-icon);" />
-              <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Timer</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('time.pomodoro.timer')}</h3>
             </div>
 
             <div class="grid gap-x-4 md:grid-cols-2">
-              <FormField label="Work duration" helper="Minutes per focus session">
+              <FormField label={t('time.pomodoro.workDuration')} helper={t('time.pomodoro.workDurationHelper')}>
                 <Input type="number" min="1" step="1" bind:value={form.work_duration_minutes} />
               </FormField>
-              <FormField label="Short break" helper="Minutes between work sessions">
+              <FormField label={t('time.pomodoro.shortBreak')} helper={t('time.pomodoro.shortBreakHelper')}>
                 <Input type="number" min="1" step="1" bind:value={form.short_break_minutes} />
               </FormField>
-              <FormField label="Long break" helper="Minutes after a completed cycle">
+              <FormField label={t('time.pomodoro.longBreak')} helper={t('time.pomodoro.longBreakHelper')}>
                 <Input type="number" min="1" step="1" bind:value={form.long_break_minutes} />
               </FormField>
-              <FormField label="Sessions before long break" helper="Completed work sessions">
+              <FormField label={t('time.pomodoro.sessionsBeforeLongBreak')} helper={t('time.pomodoro.sessionsBeforeLongBreakHelper')}>
                 <Input type="number" min="1" step="1" bind:value={form.cycles_before_long_break} />
               </FormField>
             </div>
@@ -207,11 +207,11 @@
           <section>
             <div class="mb-3 flex items-center gap-2">
               <Play class="h-5 w-5" style="color: var(--ds-icon);" />
-              <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Behavior</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('time.pomodoro.behavior')}</h3>
             </div>
             <div class="space-y-4 rounded border p-4" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-              <Toggle bind:checked={form.auto_start_break} label="Auto-start breaks" />
-              <Toggle bind:checked={form.auto_start_work} label="Auto-start work" />
+              <Toggle bind:checked={form.auto_start_break} label={t('time.pomodoro.autoStartBreaks')} />
+              <Toggle bind:checked={form.auto_start_work} label={t('time.pomodoro.autoStartWork')} />
             </div>
           </section>
         </div>
@@ -219,23 +219,23 @@
         <section class="mt-6">
           <div class="mb-3 flex items-center gap-2">
             <FileText class="h-5 w-5" style="color: var(--ds-icon);" />
-            <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">Logging</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('time.pomodoro.logging')}</h3>
           </div>
 
           <div class="rounded border p-4" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-            <Toggle bind:checked={form.auto_log_enabled} label="Automatically log completed work sessions" />
+            <Toggle bind:checked={form.auto_log_enabled} label={t('time.pomodoro.autoLogCompletedSessions')} />
 
             {#if form.auto_log_enabled}
               <div class="mt-4 grid gap-x-4 md:grid-cols-2">
-                <FormField label="Project" helper="Active time projects from this workspace server">
+                <FormField label={t('time.pomodoro.project')} helper={t('time.pomodoro.projectHelper')}>
                   <Select
                     bind:value={form.log_project_id}
                     options={projectOptions}
-                    placeholder={projectsLoaded ? 'Select a project...' : 'Loading projects...'}
+                    placeholder={projectsLoaded ? t('time.pomodoro.selectProject') : t('time.pomodoro.loadingProjects')}
                   />
                 </FormField>
-                <FormField label="Description" helper="Used for new worklog entries">
-                  <Input bind:value={form.log_description} placeholder="Pomodoro session" />
+                <FormField label={t('time.pomodoro.description')} helper={t('time.pomodoro.descriptionHelper')}>
+                  <Input bind:value={form.log_description} placeholder={t('time.pomodoro.sessionPlaceholder')} />
                 </FormField>
               </div>
             {/if}
@@ -255,8 +255,8 @@
     </div>
 
     <div class="flex justify-end gap-3 border-t px-6 py-4" style="border-color: var(--ds-border);">
-      <Button variant="default" size="small" onclick={close}>Cancel</Button>
-      <Button variant="primary" size="small" onclick={save} loading={saving} disabled={loading}>Save Settings</Button>
+      <Button variant="default" size="small" onclick={close}>{t('time.pomodoro.cancel')}</Button>
+      <Button variant="primary" size="small" onclick={save} loading={saving} disabled={loading}>{t('time.pomodoro.saveSettings')}</Button>
     </div>
   </div>
 </ModalBackdrop>
