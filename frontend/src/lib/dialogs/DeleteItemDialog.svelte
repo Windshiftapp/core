@@ -254,6 +254,7 @@
               <Radio
                 name="deleteMode"
                 value="reparent"
+                dataTestid="item-delete-reparent"
                 bind:groupValue={selectedMode}
                 disabled={loading}
                 class="mt-1"

@@ -230,7 +230,7 @@ export const items = {
   ),
   reparentChildren: (id, newParentId) =>
     fetchV2Data(`/items/${id}/reparent-children`, {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ parent_id: newParentId }),
     }),
   copy: withCrossTabNotice(
