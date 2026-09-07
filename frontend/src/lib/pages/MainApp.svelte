@@ -30,6 +30,7 @@
   import { LazyComponentLoader } from '../utils/lazyComponentLoader.svelte.js';
   import { hasSessionExpired, reloadIfBuildChanged } from '../utils/lazyLoadRecovery.js';
   import WorkspaceNavigation from '../workspaces/WorkspaceNavigation.svelte';
+  import WorkspaceBreadcrumbs from '../workspaces/WorkspaceBreadcrumbs.svelte';
   import MainAppOverlays from './MainAppOverlays.svelte';
   import MainRouteContent from './MainRouteContent.svelte';
   import { useMainAppLifecycle } from './useMainAppLifecycle.js';
@@ -227,6 +228,10 @@
         effectiveView === 'personal-task-detail' ||
         MAIN_APP_TEST_VIEWS.has($currentRoute.view))
   );
+  const showWorkspaceBreadcrumbs = $derived(
+    !$uiStore.reviewFullscreen &&
+      (showWorkspaceNav || ['homepage', 'workspaces'].includes($currentRoute.view))
+  );
   const showCollectionNav = $derived(
     !$uiStore.reviewFullscreen && GLOBAL_COLLECTION_VIEWS.has($currentRoute.view)
   );
@@ -297,80 +302,88 @@
   <Button class="sr-only" onclick={toggleTerminal} hotkeyConfig={{ key: 'Mod+`' }}>Toggle Terminal</Button>
 
   <div
-    class="authenticated-content flex flex-1 min-h-0 overflow-hidden transition-[margin] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none"
+    class="authenticated-content flex flex-col flex-1 min-h-0 overflow-hidden transition-[margin] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none"
     class:has-mobile-context-nav={showWorkspaceNav}
     style={!$uiStore.reviewFullscreen ? `margin-left: ${$uiStore.navExpanded ? '200px' : '64px'}` : ''}
   >
-    {#if showWorkspaceNav}
-      <Button
-        class="mobile-workspace-nav-trigger"
-        variant="default"
-        size="small"
-        icon={Menu}
-        title={mobileWorkspaceNavOpen ? 'Close workspace navigation' : 'Open workspace navigation'}
-        dataTestid="mobile-workspace-nav-trigger"
-        onclick={() => mobileWorkspaceNavOpen = !mobileWorkspaceNavOpen}
-      >
-        Workspace
-      </Button>
-      {#if mobileWorkspaceNavOpen}
-        <button
-          type="button"
-          class="mobile-workspace-nav-backdrop"
-          aria-label="Close workspace navigation"
-          data-testid="mobile-workspace-nav-backdrop"
-          onclick={() => mobileWorkspaceNavOpen = false}
-        ></button>
-      {/if}
-      <div
-        class="workspace-context-nav h-full min-h-0"
-        class:mobile-open={mobileWorkspaceNavOpen}
-        out:slide={{ duration: 200, axis: 'x' }}
-      >
-        <WorkspaceNavigation
-          workspaceId={$currentRoute.path?.startsWith('/personal')
-            ? $workspacesStore.personalWorkspace?.id
-            : $currentRoute.params.id}
-        />
-      </div>
-    {:else if showCollectionNav}
-      <div class="h-full min-h-0" out:slide={{ duration: 200, axis: 'x' }}>
-        <CollectionNavigation collectionId={$currentRoute.params.id} />
-      </div>
+    {#if showWorkspaceBreadcrumbs}
+      <WorkspaceBreadcrumbs
+        workspace={showWorkspaceNav ? $currentWorkspace : null}
+        onOpen={closeAllSidebarSurfaces}
+      />
     {/if}
-
-    <div class="flex-1 flex min-w-0 min-h-0 overflow-hidden main-split-container">
-      <div
-        class="flex flex-col min-w-0 min-h-0"
-        style={terminalState.visible
-          ? `width: ${terminalState.splitPercent}%; flex-shrink: 0;`
-          : 'flex: 1;'}
-      >
-        <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-          <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
-        </main>
-      </div>
-
-      {#if terminalState.visible}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class="terminal-resize-handle w-1 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors flex-shrink-0"
-          style="background-color: var(--ds-border);"
-          onmousedown={handleTerminalResizeStart}
-        ></div>
-        <div
-          class="flex flex-col min-w-0"
-          style="width: {100 - terminalState.splitPercent}%; flex-shrink: 0;"
+    <div class="authenticated-body flex flex-1 min-h-0 overflow-hidden">
+      {#if showWorkspaceNav}
+        <Button
+          class="mobile-workspace-nav-trigger"
+          variant="default"
+          size="small"
+          icon={Menu}
+          title={mobileWorkspaceNavOpen ? 'Close workspace navigation' : 'Open workspace navigation'}
+          dataTestid="mobile-workspace-nav-trigger"
+          onclick={() => mobileWorkspaceNavOpen = !mobileWorkspaceNavOpen}
         >
-          {#if TerminalPanelComponent}
-            <TerminalPanelComponent />
-          {:else if terminalLoading}
-            <div class="flex items-center justify-center h-full" style="background-color: #1a1b26;">
-              <Spinner />
-            </div>
-          {/if}
+          Workspace
+        </Button>
+        {#if mobileWorkspaceNavOpen}
+          <button
+            type="button"
+            class="mobile-workspace-nav-backdrop"
+            aria-label="Close workspace navigation"
+            data-testid="mobile-workspace-nav-backdrop"
+            onclick={() => mobileWorkspaceNavOpen = false}
+          ></button>
+        {/if}
+        <div
+          class="workspace-context-nav h-full min-h-0"
+          class:mobile-open={mobileWorkspaceNavOpen}
+          out:slide={{ duration: 200, axis: 'x' }}
+        >
+          <WorkspaceNavigation
+            workspaceId={$currentRoute.path?.startsWith('/personal')
+              ? $workspacesStore.personalWorkspace?.id
+              : $currentRoute.params.id}
+          />
+        </div>
+      {:else if showCollectionNav}
+        <div class="h-full min-h-0" out:slide={{ duration: 200, axis: 'x' }}>
+          <CollectionNavigation collectionId={$currentRoute.params.id} />
         </div>
       {/if}
+
+      <div class="flex-1 flex min-w-0 min-h-0 overflow-hidden main-split-container">
+        <div
+          class="flex flex-col min-w-0 min-h-0"
+          style={terminalState.visible
+            ? `width: ${terminalState.splitPercent}%; flex-shrink: 0;`
+            : 'flex: 1;'}
+        >
+          <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
+          </main>
+        </div>
+
+        {#if terminalState.visible}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="terminal-resize-handle w-1 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors flex-shrink-0"
+            style="background-color: var(--ds-border);"
+            onmousedown={handleTerminalResizeStart}
+          ></div>
+          <div
+            class="flex flex-col min-w-0"
+            style="width: {100 - terminalState.splitPercent}%; flex-shrink: 0;"
+          >
+            {#if TerminalPanelComponent}
+              <TerminalPanelComponent />
+            {:else if terminalLoading}
+              <div class="flex items-center justify-center h-full" style="background-color: #1a1b26;">
+                <Spinner />
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -414,14 +427,14 @@
       min-width: 0;
     }
 
-    .authenticated-content.has-mobile-context-nav {
+    .authenticated-content.has-mobile-context-nav .authenticated-body {
       padding-top: 3.5rem;
     }
 
     .workspace-context-nav {
       position: fixed;
       z-index: 45;
-      top: 0;
+      top: 3rem;
       bottom: 0;
       left: 4rem;
       transform: translateX(-100%);
@@ -436,7 +449,7 @@
       display: inline-flex;
       position: fixed;
       z-index: 50;
-      top: 0.75rem;
+      top: 3.75rem;
       left: 4.75rem;
     }
 
@@ -444,7 +457,7 @@
       display: block;
       position: fixed;
       z-index: 30;
-      inset: 0 0 0 4rem;
+      inset: 3rem 0 0 4rem;
       border: 0;
       background: color-mix(in srgb, var(--ds-blanket, #091e42) 54%, transparent);
     }
@@ -479,10 +492,6 @@
 
   :global(.themed-nav .nav-button:hover) {
     background-color: var(--ds-background-neutral-hovered);
-  }
-
-  :global(.themed-nav .nav-button.nav-button-emphasized) {
-    background-color: color-mix(in srgb, var(--ds-interactive) 8%, transparent);
   }
 
   :global(.themed-nav .nav-button.nav-button-accent) {
