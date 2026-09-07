@@ -2002,7 +2002,7 @@ func stringifyExecutionValue(value any, nilValue string) (string, error) {
 	if value == nil {
 		return nilValue, nil
 	}
-	switch value.(type) {
+	switch value := value.(type) {
 	case map[string]any, map[string]string, []any, []string:
 		encoded, err := json.Marshal(value)
 		if err != nil {
@@ -2010,7 +2010,7 @@ func stringifyExecutionValue(value any, nilValue string) (string, error) {
 		}
 		return string(encoded), nil
 	case string:
-		return value.(string), nil
+		return value, nil
 	default:
 		return fmt.Sprintf("%v", value), nil
 	}
