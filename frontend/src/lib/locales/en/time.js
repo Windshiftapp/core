@@ -32,6 +32,38 @@ export default {
     durationHelperText:
       'Enter start time + duration (2h) to auto-calculate end time, or enter start + end times to auto-calculate duration. Time formats: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
 
+    pomodoro: {
+      title: 'Pomodoro Settings',
+      subtitle: 'Configure desktop timer behavior and automatic time logging.',
+      loadingSettings: 'Loading settings...',
+      loadError: 'Failed to load settings: {error}',
+      settingsSaved: 'Settings saved',
+      saveError: 'Failed to save settings: {error}',
+      timer: 'Timer',
+      workDuration: 'Work duration',
+      workDurationHelper: 'Minutes per focus session',
+      shortBreak: 'Short break',
+      shortBreakHelper: 'Minutes between work sessions',
+      longBreak: 'Long break',
+      longBreakHelper: 'Minutes after a completed cycle',
+      sessionsBeforeLongBreak: 'Sessions before long break',
+      sessionsBeforeLongBreakHelper: 'Completed work sessions',
+      behavior: 'Behavior',
+      autoStartBreaks: 'Auto-start breaks',
+      autoStartWork: 'Auto-start work',
+      logging: 'Logging',
+      autoLogCompletedSessions: 'Automatically log completed work sessions',
+      project: 'Project',
+      projectHelper: 'Active time projects from this workspace server',
+      selectProject: 'Select a project...',
+      loadingProjects: 'Loading projects...',
+      description: 'Description',
+      descriptionHelper: 'Used for new worklog entries',
+      sessionPlaceholder: 'Pomodoro session',
+      cancel: 'Cancel',
+      saveSettings: 'Save Settings',
+    },
+
     // Timesheet
     timesheet: {
       title: 'Timesheet',
