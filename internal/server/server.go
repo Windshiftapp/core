@@ -18,6 +18,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/aitools"
@@ -100,6 +101,12 @@ type Server struct {
 	db         database.Database
 	listener   net.Listener
 
+	permissionService *services.PermissionService
+	sessionManager    *auth.SessionManager
+	tokenManager      *auth.TokenManager
+	scimTokenManager  *auth.SCIMTokenManager
+	itemCache         *services.ItemCacheService
+
 	ldapHandler                  *handlers.LDAPHandler
 	notificationManager          *handlers.NotificationManager
 	notificationService          *services.NotificationService
@@ -156,9 +163,10 @@ type Server struct {
 	publicBoardLimiter    *middleware.RateLimiter
 	userConcurrency       *middleware.UserConcurrencyLimiter
 
-	actualPort   int
-	started      bool
-	shuttingDown bool
+	actualPort         int
+	started            bool
+	shuttingDown       bool
+	backgroundStopOnce sync.Once
 }
 
 // New creates a new Server instance with the given configuration.
@@ -285,6 +293,7 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize permission service: %w", err)
 	}
+	s.permissionService = permService
 
 	// Shared channel service used by ChannelHandler, WebhookHandler,
 	// FormHandler, RequestTypeHandler, and AssetReportHandler for the
@@ -322,6 +331,7 @@ func (s *Server) initialize() error {
 		cfg.Auth.SessionValidationCacheTTL,
 		primarySessionCacheMB,
 	)
+	s.sessionManager = sessionManager
 
 	effectivePort := cfg.Port
 	if cfg.AllowedPort != "" {
@@ -379,6 +389,7 @@ func (s *Server) initialize() error {
 
 	apiTokenCacheMB, _ := config.SplitSSHCacheBudget(s.memoryBudget.APITokenCacheMB, cfg.SSH.Enabled)
 	tokenManager := auth.NewTokenManager(s.db, s.tokenTracker, apiTokenCacheMB)
+	s.tokenManager = tokenManager
 	if cleaned, cleanupErr := tokenManager.CleanupExpiredTokens(); cleanupErr != nil {
 		slog.Warn("failed to cleanup expired api tokens on startup", "error", cleanupErr)
 	} else if cleaned > 0 {
@@ -520,6 +531,7 @@ func (s *Server) initialize() error {
 	transitionMatrixService := services.NewTransitionMatrixService(s.db)
 	bulkOperationMetrics := services.NewBulkOperationMetrics()
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService, s.memoryBudget.ItemCacheMB)
+	s.itemCache = itemHandler.ItemCacheService()
 	itemHandler.SetDBRequestTimeout(s.config.DB.RequestTimeout)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache, authorizationCacheInvalidator)
@@ -592,6 +604,7 @@ func (s *Server) initialize() error {
 	agentHandler := handlers.NewAgentHandler(s.db, permService)
 
 	scimTokenManager := auth.NewSCIMTokenManager(s.db, s.memoryBudget.SCIMTokenCacheMB)
+	s.scimTokenManager = scimTokenManager
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
 	scimHandler := handlers.NewSCIMHandler(
 		repository.NewSCIMRepository(s.db),
@@ -1979,29 +1992,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.databasePoolMonitor.Stop()
 	}
 
-	// Stop schedulers first - use safeClose helper to avoid panics on already-closed channels
-	safeClose := func(ch chan struct{}) {
-		if ch != nil {
-			defer func() { recover() }() //nolint:errcheck // Intentionally ignoring recover() return; used to suppress panics from closing already-closed channels
-			close(ch)
-		}
-	}
-
-	// Close, but do NOT nil, the stop channels: background schedulers select
-	// on these fields in a loop, so the nil-write races with their reads (and
-	// a select on a nil channel blocks forever, leaking the goroutine).
-	// Double-close safety comes from safeClose's recover, not from nil-ing.
-	safeClose(s.scmSyncStopChan)
-	safeClose(s.issueSyncStopChan)
-	safeClose(s.magicLinkStopChan)
-
-	if s.cleanupTicker != nil {
-		// Stop, but do NOT nil: runActivityCleanup selects on cleanupTicker.C
-		// in a loop and the nil-write races with that read.
-		s.cleanupTicker.Stop()
-	}
-	safeClose(s.cleanupStopChan)
-	safeClose(s.jiraHostStopChan)
+	s.stopBackgroundLoops()
 
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")
@@ -2141,6 +2132,9 @@ func isAPIPath(p string) bool {
 
 // cleanup releases all resources.
 func (s *Server) cleanup() {
+	// New also calls cleanup after a partially completed initialize. Signal any
+	// loops already started there, even when Shutdown was never reachable.
+	s.stopBackgroundLoops()
 	if s.databasePoolMonitor != nil {
 		s.databasePoolMonitor.Stop()
 	}
@@ -2228,10 +2222,45 @@ func (s *Server) cleanup() {
 		_ = s.tokenTracker.Close()
 	}
 
+	// These caches are owned by this HTTP server, including on partial startup.
+	// Close them after consumers have stopped, before releasing the shared DB.
+	if s.permissionService != nil {
+		_ = s.permissionService.Close()
+	}
+	if s.sessionManager != nil {
+		_ = s.sessionManager.Close()
+	}
+	if s.tokenManager != nil {
+		_ = s.tokenManager.Close()
+	}
+	if s.scimTokenManager != nil {
+		_ = s.scimTokenManager.Close()
+	}
+	if s.itemCache != nil {
+		_ = s.itemCache.Close()
+	}
+
 	// Close database
 	if s.db != nil {
 		_ = s.db.Close()
 	}
+}
+
+func (s *Server) stopBackgroundLoops() {
+	s.backgroundStopOnce.Do(func() {
+		// Do not nil these fields: workers read them concurrently.
+		if s.cleanupTicker != nil {
+			s.cleanupTicker.Stop()
+		}
+		for _, ch := range []chan struct{}{
+			s.scmSyncStopChan, s.issueSyncStopChan, s.magicLinkStopChan,
+			s.cleanupStopChan, s.jiraHostStopChan,
+		} {
+			if ch != nil {
+				close(ch)
+			}
+		}
+	})
 }
 
 // RegisterDatabasePool makes a process-local auxiliary SQL pool visible to
