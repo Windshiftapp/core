@@ -643,28 +643,6 @@
       data-width={canvasExpanded ? 'wide' : 'comfortable'}
     >
       <div class="toolbar">
-        <div class="title-wrap">
-          {#if PageTitleIcon}
-            <PageTitleIcon
-              size={22}
-              class="title-icon"
-              style="color: {pageTitleIconColor};"
-              aria-hidden="true"
-            />
-          {/if}
-          <Input
-            id="page-title-input"
-            bind:inputRef={titleInputEl}
-            class="title-input"
-            variant="ghost"
-            type="text"
-            value={draftTitle}
-            oninput={onTitleInput}
-            onkeydown={onTitleKeydown}
-            placeholder={t('pages.titlePlaceholder')}
-            disabled={!canEditPage}
-          />
-        </div>
         <div class="actions">
           {#if statusLabel && mode === 'edit' && canEditPage}
             <span
@@ -746,6 +724,28 @@
             placement="bottom-end"
             triggerClass="toolbar-kebab"
             triggerTestid="page-toolbar-kebab"
+          />
+        </div>
+        <div class="title-wrap">
+          {#if PageTitleIcon}
+            <PageTitleIcon
+              size={22}
+              class="title-icon"
+              style="color: {pageTitleIconColor};"
+              aria-hidden="true"
+            />
+          {/if}
+          <Input
+            id="page-title-input"
+            bind:inputRef={titleInputEl}
+            class="title-input"
+            variant="ghost"
+            type="text"
+            value={draftTitle}
+            oninput={onTitleInput}
+            onkeydown={onTitleKeydown}
+            placeholder={t('pages.titlePlaceholder')}
+            disabled={!canEditPage}
           />
         </div>
       </div>
@@ -945,9 +945,9 @@
 
   .toolbar {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
+    align-items: stretch;
     padding: 0 var(--page-gutter);
   }
 
@@ -983,7 +983,7 @@
   }
 
   .title-wrap {
-    flex: 1 1 18rem;
+    width: 100%;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -997,7 +997,7 @@
   :global(.title-input) {
     flex: 1;
     min-width: 0;
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.2;
     background: transparent;
