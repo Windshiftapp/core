@@ -103,18 +103,15 @@
     helpers: { isSelected }
   } = createCombobox({
     forceVisible: true,
-    // Lock background scroll while the dropdown is open (melt's default). With
-    // it off, scrolling the page/modal behind an open picker makes floating-ui
-    // chase the moving trigger and the portalled menu repositions/detaches
-    // mid-interaction — inside a tall scrollable modal the option can end up
-    // behind the dialog footer and become unclickable (teams on-call layer
-    // members, test-run assignee).
+    // Keep the page scrollable and fit the menu around its moving trigger.
     preventScroll: false,
     multiple: false, // We handle multi-select manually
-    positioning: positioning ?? {
+    positioning: {
       strategy: 'fixed',
       placement: 'bottom-start',
-      sameWidth: false
+      sameWidth: false,
+      ...positioning,
+      fitViewport: true
     },
     portal: 'body'
   });
@@ -559,12 +556,12 @@
   <!-- Dropdown Menu -->
   {#if $open}
     <div bind:this={menuRef} use:melt={$menu} data-testid="picker-dropdown"
-         class="fixed z-[70] min-w-[250px] rounded border shadow-lg overflow-hidden"
+         class="fixed z-[70] min-w-[250px] rounded border shadow-lg flex flex-col overflow-y-auto overscroll-contain"
          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
          in:fly={{ duration: 150, y: -5 }}>
       {#if popoverMode}
         <!-- Search input inside dropdown -->
-        <div class="p-2 border-b" style="border-color: var(--ds-border);">
+        <div class="p-2 border-b shrink-0" style="border-color: var(--ds-border);">
           <div class="relative">
             <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2" style="color: var(--ds-text-subtle);" />
             <input bind:this={searchInputRef} bind:value={popoverSearchTerm} type="text"
@@ -581,7 +578,7 @@
       {#if loading}
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
       {:else if options.length > 0}
-        <div role="listbox" data-testid="picker-option-list" class="max-h-60 overflow-y-auto">
+        <div role="listbox" data-testid="picker-option-list" class="min-h-0 max-h-60 overflow-y-auto overscroll-contain">
           {#each options as opt, index (opt.value ?? 'unassigned')}
             {@const itemSelected = multiple ? isItemSelected(opt.value) : $isSelected(opt)}
             {@const isHighlighted = highlightedIndex === index}

@@ -753,6 +753,7 @@
         {#if mode === 'edit' && canEditPage}
           <div class="appearance-actions" aria-label="Page icon">
             <IconSelector
+              dataTestid="page-icon-picker"
               bind:selectedIcon={pickerIcon}
               bind:selectedColor={pickerColor}
               compact
@@ -1188,7 +1189,7 @@
      originals; without that, the cascade tie silently restores the
      bordered card. Scope stays inside `.editor-frame` so inline
      editors and item descriptions keep their boxed look. */
-  :global(.editor-frame .milkdown-wrapper) {
+  :global(.editor-frame.editor-frame .milkdown-wrapper) {
     flex: 1;
     display: flex;
     flex-direction: column;

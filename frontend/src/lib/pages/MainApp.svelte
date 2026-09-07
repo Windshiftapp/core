@@ -358,7 +358,7 @@
             ? `width: ${terminalState.splitPercent}%; flex-shrink: 0;`
             : 'flex: 1;'}
         >
-          <main class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <main data-testid="main-content-scroll" class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
           </main>
         </div>
