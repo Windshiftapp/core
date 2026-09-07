@@ -606,12 +606,6 @@ func (s *ItemCRUDService) ListWithQLPageContext(ctx context.Context, params List
 		filters.QLArgs = resolvedQL.args
 	}
 
-	// If collection was resolved but produced no effective query, return empty results.
-	// A collection with no filter means "nothing to show yet."
-	if resolvedQL.collectionResolved && filters.QLQuery == "" {
-		return repository.ItemListPage{Items: []models.Item{}}, nil
-	}
-
 	// Apply workspace_id filter only when no collection was resolved
 	if !resolvedQL.collectionResolved && params.WorkspaceID > 0 {
 		filters.WorkspaceID = &params.WorkspaceID
@@ -666,11 +660,11 @@ func (s *ItemCRUDService) ListDistinctWorkspaceIDsWithQLContext(
 	workspaceIDs []int,
 	userID int,
 ) ([]int, error) {
-	if len(workspaceIDs) == 0 || strings.TrimSpace(qlQuery) == "" {
+	if len(workspaceIDs) == 0 {
 		return []int{}, nil
 	}
 
-	qlSQL, qlArgs, err := s.evaluateQLContext(ctx, qlQuery, cql.UserContext(userID))
+	qlSQL, qlArgs, err := s.evaluateQLContext(ctx, strings.TrimSpace(qlQuery), cql.UserContext(userID))
 	if err != nil {
 		return nil, err
 	}

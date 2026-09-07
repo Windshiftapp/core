@@ -1,5 +1,11 @@
 import { api } from '../../api.js';
 
+function collectionPagination(pagination) {
+  if (!pagination) return null;
+  // Store continuations use limit; v2 responses name the effective size page_size.
+  return { ...pagination, limit: pagination.page_size };
+}
+
 /**
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.
@@ -42,7 +48,7 @@ export async function fetchCollectionItems(
 
   const response = await api.items.getAll(filters);
   const items = response?.data ?? [];
-  const pagination = response?.pagination ?? null;
+  const pagination = collectionPagination(response?.pagination);
   const sortableFields = response?.meta?.sortable_fields ?? [];
   const watermark = response?.meta?.watermark ?? 0;
 
@@ -80,7 +86,7 @@ export async function fetchCollectionBacklog(
     include_watermark: true,
   });
   const items = response?.data ?? [];
-  const pagination = response?.pagination ?? null;
+  const pagination = collectionPagination(response?.pagination);
   const watermark = response?.meta?.watermark ?? 0;
   return { items, collectionName, pagination, watermark };
 }
