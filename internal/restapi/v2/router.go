@@ -385,9 +385,11 @@ type worklogApplication interface {
 type timeAccess interface {
 	CanBookTimeOnProject(int, int) (bool, error)
 	CanEditWorklog(int, int) (bool, error)
+	CanViewWorklog(int, int) (bool, error)
 	CanViewProject(int, int) (bool, error)
 	AccessibleTimeProjectIDs(int) ([]int, error)
 	GetAccessibleProjects(int) ([]int, error)
+	GetManagedProjects(int) ([]int, error)
 	IsTimeProjectManager(int, int) (bool, error)
 }
 

@@ -80,9 +80,6 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		// Restore legacy team-wide scope: every accessible project's worklogs,
-		// not just the caller's own rows, so timesheet team cells and totals
-		// keep all entries. nil = full access; empty = none.
 		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
@@ -93,6 +90,9 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		filter := repository.WorklogDetailFilter{AccessibleProjectIDs: accessible, Limit: page.PageSize, Offset: page.Offset}
 		if err := applyWorklogFilters(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
+		}
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
 		}
 		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
@@ -109,7 +109,7 @@ func getWorklog(deps Deps) readOperation[worklogDTO] {
 		if err != nil {
 			return worklogDTO{}, err
 		}
-		allowed, err := deps.TimeAccess.CanEditWorklog(user.ID, worklog.ID)
+		allowed, err := deps.TimeAccess.CanViewWorklog(user.ID, worklog.ID)
 		if err != nil {
 			return worklogDTO{}, internalError(err)
 		}
@@ -127,7 +127,7 @@ func createWorklog(deps Deps) jsonOperation[worklogCreateRequest, worklogDTO] {
 		if err != nil {
 			return worklogDTO{}, err
 		}
-		if err := requireWorklogProject(deps, user.ID, input.ProjectID, false); err != nil {
+		if err := requireWorklogBooking(deps, user.ID, input.ProjectID); err != nil {
 			return worklogDTO{}, err
 		}
 		if err := requireWorklogItem(r, deps, input.ItemID); err != nil {
@@ -158,7 +158,7 @@ func updateWorklog(deps Deps) jsonOperation[worklogPatchRequest, worklogDTO] {
 			return worklogDTO{}, newError(http.StatusNotFound, "not_found", "Worklog was not found")
 		}
 		input := mergeWorklogPatch(current, patch, user.Timezone)
-		if err := requireWorklogProject(deps, user.ID, input.ProjectID, false); err != nil {
+		if err := requireWorklogBooking(deps, user.ID, input.ProjectID); err != nil {
 			return worklogDTO{}, err
 		}
 		if err := requireWorklogItem(r, deps, input.ItemID); err != nil {
@@ -203,13 +203,15 @@ func listItemWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, page, 0, err
 		}
-		projectIDs, err := deps.TimeAccess.AccessibleTimeProjectIDs(user.ID)
+		projectIDs, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
 		if err != nil {
 			return nil, page, 0, internalError(err)
 		}
-		worklogs, total, err := deps.Worklogs.ListPage(repository.WorklogDetailFilter{
-			ItemID: &item.ID, AccessibleProjectIDs: projectIDs, Limit: page.PageSize, Offset: page.Offset,
-		})
+		filter := repository.WorklogDetailFilter{ItemID: &item.ID, AccessibleProjectIDs: projectIDs, Limit: page.PageSize, Offset: page.Offset}
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
+		}
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, page, 0, internalError(err)
 		}
@@ -227,8 +229,12 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		if err := requireWorklogProject(deps, user.ID, projectID, true); err != nil {
-			return nil, Pagination{}, 0, err
+		allowed, err := deps.TimeAccess.CanViewProject(user.ID, projectID)
+		if err != nil {
+			return nil, Pagination{}, 0, internalError(err)
+		}
+		if !allowed {
+			return nil, Pagination{}, 0, newError(http.StatusNotFound, "not_found", "Time project was not found")
 		}
 		page, err := ParsePage(r)
 		if err != nil {
@@ -238,6 +244,9 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err := applyWorklogDetailDates(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
+		}
 		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
@@ -245,6 +254,19 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		worklogs = redactWorklogs(r, deps, worklogs)
 		return mapWorklogs(worklogs), page, total, nil
 	}
+}
+
+// scopeWorklogReader applies ownership filtering before pagination and totals.
+func scopeWorklogReader(deps Deps, userID int, filter *repository.WorklogDetailFilter) error {
+	managed, err := deps.TimeAccess.GetManagedProjects(userID)
+	if err != nil {
+		return internalError(err)
+	}
+	if managed != nil {
+		filter.ViewerID = &userID
+		filter.ManagedProjectIDs = managed
+	}
+	return nil
 }
 
 func requireWorklog(r *http.Request, deps Deps) (*models.User, *models.Worklog, error) {
@@ -263,17 +285,11 @@ func requireWorklog(r *http.Request, deps Deps) (*models.User, *models.Worklog, 
 	return user, worklog, nil
 }
 
-func requireWorklogProject(deps Deps, userID, projectID int, manager bool) error {
+func requireWorklogBooking(deps Deps, userID, projectID int) error {
 	if projectID <= 0 {
 		return newError(http.StatusBadRequest, "invalid_request", "project_id is required")
 	}
-	var allowed bool
-	var err error
-	if manager {
-		allowed, err = deps.TimeAccess.IsTimeProjectManager(userID, projectID)
-	} else {
-		allowed, err = deps.TimeAccess.CanBookTimeOnProject(userID, projectID)
-	}
+	allowed, err := deps.TimeAccess.CanBookTimeOnProject(userID, projectID)
 	if err != nil {
 		return internalError(err)
 	}

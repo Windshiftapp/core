@@ -164,6 +164,9 @@ func scanWorklogDetail(scanner worklogDetailScanner) (models.Worklog, error) {
 // stored start/end timestamps, so entries that span a range boundary count
 // toward the days they cover. The upper bound is exclusive.
 type WorklogDetailFilter struct {
+	// ViewerID limits ordinary readers to their own entries; managed projects are exempt.
+	ViewerID             *int
+	ManagedProjectIDs    []int
 	AccessibleProjectIDs []int
 	CustomerID           *int
 	ProjectID            *int
@@ -226,6 +229,19 @@ func (r *TimeWorklogRepository) ListDetailsPage(filter WorklogDetailFilter) ([]m
 
 func worklogDetailWhere(filter WorklogDetailFilter) (query string, args []any) {
 	query = "WHERE 1=1"
+	if filter.ViewerID != nil {
+		query += " AND (w.user_id = ?"
+		args = append(args, *filter.ViewerID)
+		if len(filter.ManagedProjectIDs) > 0 {
+			placeholders := make([]string, len(filter.ManagedProjectIDs))
+			for i, id := range filter.ManagedProjectIDs {
+				placeholders[i] = "?"
+				args = append(args, id)
+			}
+			query += " OR w.project_id IN (" + strings.Join(placeholders, ",") + ")"
+		}
+		query += ")"
+	}
 	if filter.AccessibleProjectIDs != nil {
 		placeholders := make([]string, len(filter.AccessibleProjectIDs))
 		for i, id := range filter.AccessibleProjectIDs {

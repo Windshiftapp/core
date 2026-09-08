@@ -155,7 +155,8 @@ export default {
       noBudgetSet: 'No budget set',
       noProjectSelected: 'Select a project to view its report',
       printLoading: 'Preparing time report for print…',
-      printUnavailable: 'This time report is no longer available. Return to reports and export it again.',
+      printUnavailable:
+        'This time report is no longer available. Return to reports and export it again.',
       backToReports: 'Back to reports',
     },
 
@@ -253,7 +254,8 @@ export default {
       removeManager: 'Remove Manager',
       removeMember: 'Remove Member',
       noManagers: 'No managers assigned',
-      noManagersHint: 'When no managers are assigned, anyone can manage this project',
+      noManagersHint:
+        'When no managers are assigned, only global administrators and users with “Manage all time projects and worklogs” can manage this project',
       noMembers: 'No members assigned',
       noMembersHint: 'When no members are assigned, anyone can book time on this project',
       grantedAt: 'Added',
