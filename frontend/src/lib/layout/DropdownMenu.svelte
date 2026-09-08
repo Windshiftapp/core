@@ -453,6 +453,9 @@
             {#if itemData.badge}
               <span class="ml-auto text-xs {itemData.badgeClass || ''}" style="{itemData.badgeStyle || (itemData.badgeClass ? '' : 'color: var(--ds-text-subtlest);')}">{itemData.badge}</span>
             {/if}
+            {#if itemData.selected}
+              <Check class="ml-3 w-4 h-4 flex-shrink-0" style="color: var(--ds-icon-brand);" />
+            {/if}
           </svelte:element>
         {/if}
       {/each}
