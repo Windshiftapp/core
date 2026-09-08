@@ -1083,7 +1083,7 @@
     } catch (err) {
       updateLocalItemStatus(item.id, previousStatusId);
       console.error('Status transition failed:', err);
-      warningToast(t('collections.transition_failed'));
+      warningToast(err?.message || t('collections.transition_failed'));
       reloadCollection();
     }
   }
@@ -1236,7 +1236,7 @@
         } catch (err) {
           if (!isSameStatus) updateLocalItemStatus(data.item.id, previousStatusId);
           console.error('Board drop failed:', err);
-          if (!err?.swimlaneMoveFailed) warningToast(t('collections.transition_failed'));
+          if (!err?.swimlaneMoveFailed) warningToast(err?.message || t('collections.transition_failed'));
         }
         reloadCollection();
       }
@@ -1349,7 +1349,7 @@
         } catch (err) {
           updateLocalItemStatus(draggedItem.id, currentStatusId);
           console.error('Status transition failed:', err);
-          warningToast(t('collections.transition_failed'));
+          warningToast(err?.message || t('collections.transition_failed'));
           reloadCollection();
           return;
         }
