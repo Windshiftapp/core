@@ -57,6 +57,9 @@ func (s *ItemLinkService) ListBatch(ctx context.Context, userID int, params Batc
 			return nil, 0, err
 		}
 		ids, total = page.IDs, page.Total
+		if len(ids) == 0 {
+			return []BatchItemLinks{}, total, nil
+		}
 	}
 	if len(ids) == 0 || len(ids) > MaxBatchLinkItems {
 		return nil, 0, fmt.Errorf("ids must contain between 1 and %d unique values", MaxBatchLinkItems)

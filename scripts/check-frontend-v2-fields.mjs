@@ -15,7 +15,7 @@
  * Usage: bun run scripts/check-frontend-v2-fields.mjs
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
@@ -52,12 +52,16 @@ function frontendPattern(template) {
   return clean
     .split('/')
     .filter(Boolean)
-    .map((segment) => (/\$\{?[A-Za-z_]\w*\}?/.test(segment) || segment.includes('\u0000') ? '#' : segment))
+    .map((segment) =>
+      /\$\{?[A-Za-z_]\w*\}?/.test(segment) || segment.includes('\u0000') ? '#' : segment
+    )
     .join('|');
 }
 
 function requestSchemaFor(operation) {
-  const schema = operation?.requestBody?.content?.['application/json']?.schema;
+  const content = operation?.requestBody?.content;
+  const schema =
+    content?.['application/merge-patch+json']?.schema ?? content?.['application/json']?.schema;
   if (schema?.$ref) {
     const name = schema.$ref.split('/').pop();
     return spec.components?.schemas?.[name];
@@ -88,11 +92,17 @@ function objectExtent(source, start) {
   for (let i = start; i < source.length; i++) {
     const ch = source[i];
     if (quote) {
-      if (ch === '\\') { i += 1; continue; }
+      if (ch === '\\') {
+        i += 1;
+        continue;
+      }
       if (ch === quote) quote = null;
       continue;
     }
-    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      continue;
+    }
     if (ch === '{') depth += 1;
     else if (ch === '}') {
       depth -= 1;
@@ -106,10 +116,14 @@ function objectExtent(source, start) {
 function objectShape(inner) {
   const keys = [];
   let spread = false;
-  const pattern = /(?:^|[,{]\s*)(\.\.\.|'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|([A-Za-z_$][\w$]*))\s*:/g;
+  const pattern =
+    /(?:^|[,{])\s*(\.\.\.|'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|([A-Za-z_$][\w$]*))\s*:/g;
   let match;
   while ((match = pattern.exec(inner)) !== null) {
-    if (match[1] === '...') { spread = true; continue; }
+    if (match[1] === '...') {
+      spread = true;
+      continue;
+    }
     keys.push(match[2] ?? match[3] ?? match[4]);
   }
   return { keys, spread };
@@ -121,9 +135,22 @@ function readTemplate(source, i) {
   let depth = 0;
   for (; i < source.length; i++) {
     const ch = source[i];
-    if (ch === '\\') { out += ch + (source[i + 1] ?? ''); i += 1; continue; }
-    if (ch === '$' && source[i + 1] === '{') { depth += 1; out += '\u0000'; i += 1; continue; }
-    if (ch === '}' && depth > 0) { depth -= 1; out += '\u0000'; continue; }
+    if (ch === '\\') {
+      out += ch + (source[i + 1] ?? '');
+      i += 1;
+      continue;
+    }
+    if (ch === '$' && source[i + 1] === '{') {
+      depth += 1;
+      out += '\u0000';
+      i += 1;
+      continue;
+    }
+    if (ch === '}' && depth > 0) {
+      depth -= 1;
+      out += '\u0000';
+      continue;
+    }
     if (ch === '`' && depth === 0) return { text: out, next: i + 1 };
     out += ch;
   }
@@ -196,8 +223,12 @@ function scanFile(file) {
 walkFiles(frontendDir);
 
 if (errors.length > 0) {
-  console.error(`Frontend-v2 field guard: ${errors.length} static mismatch(es) found (${checked} payloads checked, ${skippedPayloads} dynamic bodies skipped).`);
+  console.error(
+    `Frontend-v2 field guard: ${errors.length} static mismatch(es) found (${checked} payloads checked, ${skippedPayloads} dynamic bodies skipped).`
+  );
   for (const error of errors) console.error(`  - ${error}`);
   process.exit(1);
 }
-console.log(`Frontend-v2 field guard: ok (${checked} static payload literal(s) matched to request schemas, ${skippedPayloads} dynamic bodies skipped).`);
+console.log(
+  `Frontend-v2 field guard: ok (${checked} static payload literal(s) matched to request schemas, ${skippedPayloads} dynamic bodies skipped).`
+);
