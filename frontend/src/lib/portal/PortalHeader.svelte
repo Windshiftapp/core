@@ -227,6 +227,7 @@
             style="color: {shellTextSubtle};"
             title="Portal settings"
             aria-label="Portal settings"
+            data-testid="portal-settings-button"
           >
             <Settings class="w-[18px] h-[18px]" />
           </button>
@@ -253,6 +254,7 @@
                   portalStore.showMainMenu = false;
                 }}
                 class="portal-menu-item"
+                data-testid="portal-customize-button"
               >
                 <Palette class="w-4 h-4" />
                 <span>{t('portal.customizeButton')}</span>
