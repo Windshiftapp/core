@@ -89,17 +89,6 @@
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-medium" style="color: var(--ds-text);">{widget.name}</h3>
                 <DescriptionText>{widget.description}</DescriptionText>
-                <div class="flex items-center gap-2 mt-2">
-                  <span
-                    class="text-xs px-2 py-0.5 rounded"
-                    style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
-                  >
-                    {widget.categoryLabel}
-                  </span>
-                  <span class="text-xs" style="color: var(--ds-text-subtlest);">
-                    {widget.widthLabel}
-                  </span>
-                </div>
               </div>
               <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="color: var(--ds-text-subtlest);">
                 <GripVertical class="w-5 h-5" />
