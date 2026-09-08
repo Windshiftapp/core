@@ -23,6 +23,7 @@
     onchange={(checked) => collectionStore.setShowCompleted(!checked)}
     label={t('milestones.hideCompleted')}
     labelPosition="left"
+    size="small"
     dataTestid="collection-hide-completed"
   />
 {/if}
