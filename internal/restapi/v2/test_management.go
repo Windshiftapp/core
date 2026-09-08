@@ -87,6 +87,9 @@ type testFolderCreate struct {
 	ParentID    *int   `json:"parent_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	// Accepted for parity with the folder PATCH payload; create ignores the
+	// value and assigns max sort order plus the standard step.
+	SortOrder *int `json:"sort_order"`
 }
 
 type testFolderPatch struct {
@@ -979,7 +982,9 @@ func testRunFilters(r *http.Request) (services.TestRunListFilters, error) {
 	if err != nil {
 		return services.TestRunListFilters{}, err
 	}
-	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: planID, IncludeEnded: r.URL.Query().Get("include_ended") == "true"}, nil
+	// Ended runs are included by default (legacy behavior); the UI never
+	// filters them out, so excluding them made completed runs look deleted.
+	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: planID, IncludeEnded: r.URL.Query().Get("include_ended") != "false"}, nil
 }
 
 func mapTestRunTemplate(item *models.TestRunTemplate) *testRunTemplateResponse {

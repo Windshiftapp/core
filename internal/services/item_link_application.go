@@ -13,7 +13,9 @@ import (
 	"windshift/internal/repository"
 )
 
-const MaxBatchLinkItems = 100
+// MaxBatchLinkItems bounds one /links/batch anchor list. Restored to the
+// item-batch cap (500) that the frontend chunks against (200 per request).
+const MaxBatchLinkItems = 500
 
 type BatchItemLinks struct {
 	ItemID          int               `json:"item_id"`

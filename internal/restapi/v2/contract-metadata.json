@@ -1619,7 +1619,21 @@
     "/asset-sets/{asset_set_id}/roles/{assignment_id}": {
       "delete": {
         "description": ". The server verifies resource ownership and deletion preconditions before removing the resource.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "type",
+            "In": "query",
+            "Description": "Assignment principal type.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -3778,6 +3792,17 @@
             "Schema": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          {
+            "Name": "completed_activity_days",
+            "In": "query",
+            "Description": "For completed items, include only those active within this many days. Incomplete items remain included.",
+            "Required": false,
+            "Schema": {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
             }
           }
         ],

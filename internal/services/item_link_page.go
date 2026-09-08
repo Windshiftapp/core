@@ -10,7 +10,9 @@ import (
 
 // MaxOneHopLinksPerItem bounds each anchor's direct-link page. A future
 // traversal layer can call this primitive once per breadth-first frontier.
-const MaxOneHopLinksPerItem = 50
+// Kept at the batch anchor cap so dependency badges are not silently truncated
+// for realistic collections.
+const MaxOneHopLinksPerItem = 500
 
 // OneHopItemLinksPage contains one anchor item's direct visible links.
 type OneHopItemLinksPage struct {
@@ -140,23 +142,23 @@ func (s *ItemLinkService) listOneHopItemLinkCandidates(
 			SELECT il.source_id AS anchor_id, il.id AS link_id, 1 AS outgoing
 			FROM item_links il
 			JOIN items source_item ON source_item.id = il.source_id
-			JOIN items target_item ON target_item.id = il.target_id
-			WHERE il.source_type = 'item' AND il.target_type = 'item'
+			LEFT JOIN items target_item ON target_item.id = il.target_id AND il.target_type = 'item'
+			WHERE il.source_type = 'item'
 			  AND il.source_id IN (` + itemPH + `)
 			  AND source_item.workspace_id IN (` + workspacePH + `)
-			  AND target_item.workspace_id IN (` + workspacePH + `)
+			  AND (il.target_type <> 'item' OR target_item.workspace_id IN (` + workspacePH + `))
 			  AND il.id > ?` + customFieldFilter + `
 
 			UNION ALL
 
 			SELECT il.target_id AS anchor_id, il.id AS link_id, 0 AS outgoing
 			FROM item_links il
-			JOIN items source_item ON source_item.id = il.source_id
 			JOIN items target_item ON target_item.id = il.target_id
-			WHERE il.source_type = 'item' AND il.target_type = 'item'
+			LEFT JOIN items source_item ON source_item.id = il.source_id AND il.source_type = 'item'
+			WHERE il.target_type = 'item'
 			  AND il.target_id IN (` + itemPH + `)
-			  AND source_item.workspace_id IN (` + workspacePH + `)
 			  AND target_item.workspace_id IN (` + workspacePH + `)
+			  AND (il.source_type <> 'item' OR source_item.workspace_id IN (` + workspacePH + `))
 			  AND il.id > ?` + customFieldFilter + `
 		), ranked AS (
 			SELECT anchor_id, link_id, outgoing,

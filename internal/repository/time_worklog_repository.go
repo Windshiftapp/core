@@ -397,7 +397,7 @@ func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Workl
 		query += " AND w.project_id = ?"
 		qa = append(qa, *f.ProjectID)
 	}
-	query += " ORDER BY w.date DESC"
+	query += " ORDER BY w.date DESC, w.start_time DESC, w.id DESC"
 
 	var total int
 	if err := r.db.QueryRow("SELECT COUNT(*) FROM ("+query+") AS filtered_worklogs", qa...).Scan(&total); err != nil {

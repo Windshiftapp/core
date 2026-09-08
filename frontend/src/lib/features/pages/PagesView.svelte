@@ -908,8 +908,8 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    flex: 1;
-    min-height: 0;
+    /* Keep the complete document inside the pane's scrollable canvas. */
+    flex: 1 0 auto;
   }
 
   .page-frame.canvas-expanded {

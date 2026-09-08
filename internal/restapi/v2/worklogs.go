@@ -80,11 +80,21 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		filter := repository.WorklogListFilter{UserID: user.ID, Limit: page.PageSize, Offset: page.Offset}
+		// Restore legacy team-wide scope: every accessible project's worklogs,
+		// not just the caller's own rows, so timesheet team cells and totals
+		// keep all entries. nil = full access; empty = none.
+		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
+		if err != nil {
+			return nil, Pagination{}, 0, internalError(err)
+		}
+		if accessible != nil && len(accessible) == 0 {
+			return []worklogDTO{}, page, 0, nil
+		}
+		filter := repository.WorklogDetailFilter{AccessibleProjectIDs: accessible, Limit: page.PageSize, Offset: page.Offset}
 		if err := applyWorklogFilters(r, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		worklogs, total, err := deps.Worklogs.ListMine(filter)
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
@@ -284,7 +294,7 @@ func requireWorklogItem(r *http.Request, deps Deps, itemID *int) error {
 	return err
 }
 
-func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) error {
+func applyWorklogFilters(r *http.Request, filter *repository.WorklogDetailFilter) error {
 	if err := applyWorklogDateRange(r, &filter.DateFromUnix, &filter.DateToExclusiveUnix); err != nil {
 		return err
 	}
@@ -294,6 +304,13 @@ func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) 
 			return newError(http.StatusBadRequest, "invalid_request", "project_id is invalid")
 		}
 		filter.ProjectID = &id
+	}
+	if raw := r.URL.Query().Get("customer_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil || id <= 0 {
+			return newError(http.StatusBadRequest, "invalid_request", "customer_id is invalid")
+		}
+		filter.CustomerID = &id
 	}
 	return nil
 }

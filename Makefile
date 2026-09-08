@@ -172,6 +172,7 @@ openapi-v2-check:
 	@go run ./scripts/openapi-v2-generate -spec api/openapi-v2.json -check
 	@go run ./scripts/openapi-v2-check -spec api/openapi-v2.json
 	@$(MAKE) --no-print-directory openapi-v2-client-smoke
+	@node scripts/check-frontend-v2-fields.mjs
 
 openapi-v2-client-smoke:
 	@tmpdir=$$(mktemp -d /tmp/windshift-v2-client.XXXXXX) && trap 'rm -rf "$$tmpdir"' EXIT && \

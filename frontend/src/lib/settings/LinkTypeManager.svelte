@@ -128,10 +128,7 @@
 
   async function toggleActive(linkType) {
     try {
-      await api.linkTypes.update(linkType.id, {
-        ...linkType,
-        active: !linkType.active
-      });
+      await api.linkTypes.update(linkType.id, { active: !linkType.active });
       await loadLinkTypes();
     } catch (error) {
       console.error('Failed to toggle link type status:', error);

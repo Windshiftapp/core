@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -917,6 +918,9 @@ func (s *AssetApplicationService) CreateAsset(userID, setID int, actor AuditActo
 	if input.StatusID == nil {
 		input.StatusID, _ = s.repo.GetDefaultStatus(setID)
 	}
+	if err := s.normalizeUserFieldValues(input.CustomFieldValues, input.AssetTypeID); err != nil {
+		return nil, err
+	}
 	encoded, err := json.Marshal(input.CustomFieldValues)
 	if err != nil {
 		return nil, err
@@ -956,6 +960,9 @@ func (s *AssetApplicationService) UpdateAsset(userID, id int, actor AuditActor, 
 	if patch.CustomFieldValues != nil {
 		input.CustomFieldValues = *patch.CustomFieldValues
 	}
+	if err := s.normalizeUserFieldValues(input.CustomFieldValues, input.AssetTypeID); err != nil {
+		return nil, err
+	}
 	encoded, err := json.Marshal(input.CustomFieldValues)
 	if err != nil {
 		return nil, err
@@ -963,6 +970,55 @@ func (s *AssetApplicationService) UpdateAsset(userID, id int, actor AuditActor, 
 	encodedString := string(encoded)
 	return s.assets.UpdateAsset(actor, id, snapshot, repository.UpdateAssetInput{AssetTypeID: input.AssetTypeID, CategoryID: input.CategoryID, StatusID: input.StatusID, Title: input.Title, Description: input.Description, AssetTag: input.AssetTag, CustomFieldValuesJSON: &encodedString}, input.CustomFieldValues)
 }
+
+// normalizeUserFieldValues stores bare user IDs for user-typed custom fields.
+// The UI sends {id, name} selections; persisting the object breaks CQL
+// user-field filters against these rows.
+func (s *AssetApplicationService) normalizeUserFieldValues(customFieldValues map[string]any, assetTypeID int) error {
+	if len(customFieldValues) == 0 {
+		return nil
+	}
+	userFieldIDs, err := s.repo.FindCustomFieldIDsByType(assetTypeID, "user")
+	if err != nil {
+		return err
+	}
+	for fieldID := range userFieldIDs {
+		fieldKey := strconv.Itoa(fieldID)
+		value, ok := customFieldValues[fieldKey]
+		if !ok || value == nil {
+			continue
+		}
+		if userID := extractAssetRefID(value); userID > 0 {
+			customFieldValues[fieldKey] = userID
+		} else {
+			delete(customFieldValues, fieldKey)
+		}
+	}
+	return nil
+}
+
+// extractAssetRefID pulls the bare integer ID from either a numeric value or
+// the {id, ...} object shape the reference pickers produce.
+func extractAssetRefID(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		if id, err := v.Int64(); err == nil {
+			return int(id)
+		}
+	case map[string]any:
+		if id, ok := v["id"]; ok {
+			return extractAssetRefID(id)
+		}
+	}
+	return 0
+}
+
 func (s *AssetApplicationService) DeleteAsset(userID, id int, actor AuditActor) error {
 	setID, err := s.repo.GetAssetSetID(id)
 	if err != nil {

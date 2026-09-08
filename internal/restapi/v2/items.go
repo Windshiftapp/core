@@ -67,6 +67,9 @@ type itemPatchRequest struct {
 	ParentID          Optional[int]            `json:"parent_id"`
 	IterationID       Optional[int]            `json:"iteration_id"`
 	ProjectID         Optional[int]            `json:"project_id"`
+	InheritProject    Optional[bool]           `json:"inherit_project"`
+	StoryPoints       Optional[float64]        `json:"story_points"`
+	EstimateMinutes   Optional[int]            `json:"estimate_minutes"`
 	MilestoneIDs      Optional[[]int]          `json:"milestone_ids"`
 	DueDate           Optional[time.Time]      `json:"due_date"`
 	StartDate         Optional[time.Time]      `json:"start_date"`
@@ -621,6 +624,10 @@ func invalidItemReference(message string) error {
 }
 
 func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRequest, error) {
+	return parseItemListAt(r, userID, time.Now().UTC())
+}
+
+func parseItemListAt(r *http.Request, userID int, now time.Time) (Pagination, services.ItemListRequest, error) {
 	page, err := ParsePage(r)
 	if err != nil {
 		return Pagination{}, services.ItemListRequest{}, err
@@ -645,10 +652,8 @@ func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRe
 	if request.CollectionID > 0 {
 		request.WorkspaceID = 0
 	}
-	if request.QL == "" && request.CollectionID == 0 {
-		if err := parseItemFilters(r, &request.Filters); err != nil {
-			return Pagination{}, services.ItemListRequest{}, err
-		}
+	if err := parseItemFilters(r, &request.Filters); err != nil {
+		return Pagination{}, services.ItemListRequest{}, err
 	}
 	request.Filters.TextQuery = strings.TrimSpace(query.Get("search"))
 	if request.Filters.TextQuery == "" {
@@ -663,6 +668,14 @@ func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRe
 		return Pagination{}, services.ItemListRequest{}, invalidQuery("status_id_not")
 	}
 	request.Filters.CompletedSince = stringPointer(query.Get("completed_since"))
+	if query.Has("completed_activity_days") {
+		days, err := parsePositiveInt(r, "completed_activity_days", 0, 3650)
+		if err != nil || days == 0 {
+			return Pagination{}, services.ItemListRequest{}, invalidQuery("completed_activity_days")
+		}
+		cutoff := now.UTC().AddDate(0, 0, -days)
+		request.Filters.CompletedActivitySince = &cutoff
+	}
 
 	sort := query.Get("sort")
 	if strings.HasPrefix(sort, "-") {
@@ -717,6 +730,9 @@ func itemPatchFields(input itemPatchRequest) map[string]json.RawMessage {
 	putOptional(fields, "parent_id", input.ParentID)
 	putOptional(fields, "iteration_id", input.IterationID)
 	putOptional(fields, "project_id", input.ProjectID)
+	putOptional(fields, "inherit_project", input.InheritProject)
+	putOptional(fields, "story_points", input.StoryPoints)
+	putOptional(fields, "estimate_minutes", input.EstimateMinutes)
 	putOptional(fields, "milestone_ids", input.MilestoneIDs)
 	putOptional(fields, "due_date", input.DueDate)
 	putOptional(fields, "start_date", input.StartDate)
