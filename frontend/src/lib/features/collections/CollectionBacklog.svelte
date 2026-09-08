@@ -751,7 +751,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mb-6">
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}
