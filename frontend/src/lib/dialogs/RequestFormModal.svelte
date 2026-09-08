@@ -47,11 +47,7 @@
   });
   let customFieldValues = $state({});
 
-  // Draft state — only used on the portal path (portalSlug truthy).
-  // resumedDraft tracks the most recently loaded draft so we can show the
-  // "Resuming draft" banner; cleared once the user opts to start fresh.
-  // savingDraft is shown briefly while the auto-save fetch is in flight so
-  // users get feedback that progress is persisted.
+  // Show the resume banner only for a draft loaded when the portal form opens.
   let resumedDraft = $state(null);
   let savingDraft = $state(false);
   let draftJustSaved = $state(false);
@@ -192,7 +188,6 @@
     try {
       const saved = await api.portal.drafts.save(portalSlug, buildDraftPayload());
       if (saved) {
-        resumedDraft = saved;
         draftJustSaved = true;
         if (draftSavedTimer) clearTimeout(draftSavedTimer);
         draftSavedTimer = setTimeout(() => {
