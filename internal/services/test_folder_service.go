@@ -7,6 +7,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/sanitize"
 )
 
 var (
@@ -44,6 +45,8 @@ func (s *TestFolderService) Get(workspaceID, id int) (*models.TestFolder, error)
 }
 
 func (s *TestFolderService) Create(workspaceID int, folder models.TestFolder) (models.TestFolder, error) {
+	folder.Name = sanitize.PlainTextField.Sanitize(folder.Name)
+	folder.Description = sanitize.RichText.Sanitize(folder.Description)
 	if folder.Name == "" {
 		return models.TestFolder{}, ErrTestFolderNameRequired
 	}
@@ -69,6 +72,8 @@ func (s *TestFolderService) Create(workspaceID int, folder models.TestFolder) (m
 
 func (s *TestFolderService) Update(workspaceID, id int, in TestFolderUpdateInput) (models.TestFolder, error) {
 	folder := in.Folder
+	folder.Name = sanitize.PlainTextField.Sanitize(folder.Name)
+	folder.Description = sanitize.RichText.Sanitize(folder.Description)
 	if folder.Name == "" {
 		return models.TestFolder{}, ErrTestFolderNameRequired
 	}

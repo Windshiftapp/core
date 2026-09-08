@@ -3,15 +3,15 @@
  */
 export default {
   analytics: {
-    title: 'Analytique',
-    subtitle: 'Santé et flux de livraison, sans nécessiter d’itérations',
-    loading: 'Chargement de l’analytique…',
+    title: 'Analyses',
+    subtitle: 'État du travail et rythme de livraison, sans avoir à définir d’itérations',
+    loading: 'Chargement des analyses…',
     noData: 'Aucune donnée disponible',
-    errorTitle: 'Impossible de charger l’analytique',
+    errorTitle: 'Impossible de charger les analyses',
     unsupportedVersion:
-      'Le serveur a retourné un format d’analytique non pris en charge. Rafraîchissez la page une fois le déploiement terminé.',
+      'Le serveur a retourné un format de données d’analyse non pris en charge. Rafraîchissez la page une fois le déploiement terminé.',
     collectionLoadError:
-      'Impossible de charger les collections. L’analytique affiche tous les éléments de l’espace de travail.',
+      'Impossible de charger les collections. Les analyses portent sur tous les éléments de l’espace de travail.',
     retry: 'Réessayer',
     dateRange: 'Plage de dates',
     collection: 'Collection',
@@ -25,7 +25,7 @@ export default {
       last30Days: '30 derniers jours',
       last12Weeks: '12 dernières semaines',
       last6Months: '6 derniers mois',
-      lastYear: 'L’année dernière',
+      lastYear: '12 derniers mois',
       custom: 'Personnalisée',
     },
     validation: {
@@ -37,18 +37,18 @@ export default {
       summary: '{items} éléments actuels · {from}–{to}',
       currentWorkspace: 'Cohorte de l’espace de travail actuel',
       currentWorkspaceNote:
-        'La plage de dates s’applique aux graphiques de flux et de livraison ; la santé et la maturité sont des instantanés actuels. Les graphiques historiques utilisent les éléments présents aujourd’hui dans cet espace de travail. Les éléments déplacés ou supprimés ne sont pas inclus.',
+        'La plage de dates s’applique aux graphiques de flux et de livraison ; l’état et l’ancienneté du travail reflètent la situation actuelle. Les graphiques historiques utilisent les éléments présents aujourd’hui dans cet espace de travail. Les éléments déplacés ou supprimés ne sont pas inclus.',
       currentCollection: 'Cohorte de la collection actuelle',
       currentCollectionNote:
-        'La plage de dates s’applique aux graphiques de flux et de livraison ; la santé et la maturité sont des instantanés actuels. Les graphiques historiques utilisent les éléments correspondant aujourd’hui à cette collection. Modifier la collection peut changer la cohorte.',
+        'La plage de dates s’applique aux graphiques de flux et de livraison ; l’état et l’ancienneté du travail reflètent la situation actuelle. Les graphiques historiques utilisent les éléments correspondant aujourd’hui à cette collection. Modifier la collection peut changer la cohorte.',
     },
     health: {
       title: 'Attention requise',
-      description: 'Travaux en cours non terminés présentant des signaux méritant un examen plus approfondi.',
+      description: 'Éléments non terminés présentant des signes qui méritent votre attention.',
       unfinished: 'Non terminé',
       overdue: 'En retard',
       stale: 'Inactif',
-      staleHint: 'Aucune activité depuis {days}+ jours',
+      staleHint: 'Aucune activité depuis au moins {days} jours',
       unassigned: 'Non attribué',
       withoutPriority: 'Sans priorité',
       withoutEstimate: 'Sans estimation',
@@ -64,21 +64,21 @@ export default {
         without_priority: 'Sans priorité',
         without_estimate: 'Sans estimation',
       },
-      allClear: 'Aucun élément non terminé ne correspond actuellement à un signal d’attention.',
+      allClear: 'Aucun élément non terminé ne nécessite actuellement votre attention.',
     },
     throughput: {
-      title: 'Créés vs terminés',
+      title: 'Éléments créés et terminés',
       description:
         'Arrivées hebdomadaires et premières finalisations. La réouverture d’un élément ne réécrit pas sa finalisation d’origine.',
       created: 'Créés',
       completed: 'Terminés',
       net: 'Variation nette',
-      average: 'Moyenne terminés / semaine',
+      average: 'Éléments terminés par semaine en moyenne',
       period: 'Période',
       definition: 'La finalisation correspond au premier passage à un statut terminé.',
     },
     aging: {
-      title: 'Maturité des travaux en cours',
+      title: 'Ancienneté des travaux en cours',
       description: 'Durée depuis laquelle les éléments actuellement non terminés sont ouverts.',
       total: 'Éléments actifs',
       median: 'Âge médian',
@@ -88,7 +88,7 @@ export default {
       byStatus: 'Âge par statut',
       oldest: 'Éléments non terminés les plus anciens',
       status: 'Statut',
-      noActive: 'Il n’y a aucun travail non terminé dans cette portée.',
+      noActive: 'Il n’y a aucun travail non terminé dans ce périmètre.',
       buckets: {
         '0_7': '0–7 jours',
         '8_14': '8–14 jours',
@@ -107,7 +107,7 @@ export default {
       period: 'Période de finalisation',
       completed: 'Terminés',
       slowest: 'Délais de livraison les plus longs',
-      completedDate: 'Premier terminé',
+      completedDate: 'Première date d’achèvement',
       duration: 'Délai de livraison',
       missingHistory: '{count} éléments actuellement terminés ont été exclus car leur historique de finalisation est manquant.',
       missingHistory_one:
@@ -121,8 +121,8 @@ export default {
       show: 'Afficher le tableau de données',
     },
     insufficientData: {
-      no_items: 'Cette portée ne contient encore aucun élément.',
-      no_active_items: 'Il n’y a aucun travail non terminé dans cette portée.',
+      no_items: 'Ce périmètre ne contient encore aucun élément.',
+      no_active_items: 'Il n’y a aucun travail non terminé dans ce périmètre.',
       no_completed_items: 'Aucune première finalisation n’a été enregistrée dans la plage de dates sélectionnée.',
       few_completed_items:
         'Seuls quelques éléments ont été terminés dans cette plage. Traitez les percentiles comme une tendance indicative.',

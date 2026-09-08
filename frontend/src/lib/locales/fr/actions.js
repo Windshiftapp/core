@@ -64,7 +64,7 @@ export default {
       aiAgent: 'Agent IA',
       relatedItems: 'Pour chaque élément lié',
       transitionItem: 'Faire évoluer l’élément',
-      roundRobinAssign: 'Assignation à tour de rôle',
+      roundRobinAssign: 'Attribution à tour de rôle',
       createMilestone: 'Créer un jalon',
     },
 
@@ -76,7 +76,7 @@ export default {
     runAsTriggerUser: 'Exécuter en tant qu’utilisateur déclencheur',
     runAsHint:
       'L’action s’exécute avec les autorisations de cet utilisateur. Laissez vide pour exécuter en tant que déclencheur initial.',
-    runAsReadonlyHint: 'Nécessite la permission « Définir l’acteur de l’action » pour être modifié.',
+    runAsReadonlyHint: 'Nécessite l’autorisation « Définir l’acteur de l’action » pour être modifié.',
 
     // Node palette and tips
     addNodes: 'Ajouter des nœuds',
@@ -154,7 +154,7 @@ export default {
       capability: 'Capacité',
       selectCapability: 'Sélectionner une capacité...',
       noCapabilitiesForWorkspace:
-        'Aucune capacité disponible dans cet espace de travail. Demandez à un administrateur d’en approvisionner une.',
+        'Aucune capacité disponible dans cet espace de travail. Demandez à un administrateur d’en configurer une.',
       configureRequest: 'Configurer la requête HTTP...',
       configureExtract: 'Configurer l’extraction IA...',
       selectModelAndTools: 'Sélectionner le modèle et les outils...',
@@ -191,12 +191,12 @@ export default {
       agentToolsHint:
         'Capacités du client HTTP que l’agent peut appeler. Seules les capacités restreintes à cet espace de travail sont répertoriées.',
       noToolsAvailable: 'Aucune capacité de client HTTP disponible pour cet espace de travail.',
-      maxSteps: 'Iterations max',
+      maxSteps: 'Nombre maximal d’itérations',
     },
 
     // Recipients
     recipients: {
-      assignee: 'Assigné',
+      assignee: 'Responsable',
       creator: 'Créateur',
       specific: 'Utilisateurs spécifiques',
     },
@@ -227,8 +227,8 @@ export default {
       completed: 'Terminé',
       failed: 'Échoué',
       skipped: 'Ignoré',
-      startedAt: 'Démarre à',
-      completedAt: 'Terminé à',
+      startedAt: 'Démarré le',
+      completedAt: 'Terminé le',
       error: 'Erreur',
       details: 'Détails',
       viewDetails: 'Afficher les détails',
@@ -267,10 +267,10 @@ export default {
 
     // Placeholder reference
     placeholders: {
-      title: 'Espaces réservés disponibles',
+      title: 'Variables disponibles',
       description:
-        'Utilisez ces espaces réservés dans votre modèle. Ils seront remplacés par des valeurs réelles lorsque l’action s’exécutera.',
-      showReference: 'Afficher la référence des espaces réservés',
+        'Utilisez ces variables dans votre modèle. Elles seront remplacées par des valeurs réelles lorsque l’action s’exécutera.',
+      showReference: 'Afficher la liste des variables',
       categories: {
         item: 'Champs de l’élément',
         user: 'Utilisateur actuel',

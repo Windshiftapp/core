@@ -541,13 +541,10 @@ func (s *CollectionApplicationService) GetBoardConfigurationBootstrap(ctx contex
 	if err != nil {
 		return nil, err
 	}
-	referencedWorkspaceIDs := []int{}
-	if collection.QLQuery != "" {
-		referencedWorkspaceIDs, err = s.items.ListDistinctWorkspaceIDsWithQLContext(ctx, collection.QLQuery, accessibleWorkspaceIDs, userID)
-		if err != nil {
-			slog.Warn("board configuration bootstrap: collection CQL workspace projection failed", "collection_id", collection.ID, "error", err)
-			referencedWorkspaceIDs = []int{}
-		}
+	referencedWorkspaceIDs, err := s.items.ListDistinctWorkspaceIDsWithQLContext(ctx, collection.QLQuery, accessibleWorkspaceIDs, userID)
+	if err != nil {
+		slog.Warn("board configuration bootstrap: collection CQL workspace projection failed", "collection_id", collection.ID, "error", err)
+		referencedWorkspaceIDs = []int{}
 	}
 	if len(referencedWorkspaceIDs) == 0 {
 		candidate := fallbackWorkspaceID

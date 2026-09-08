@@ -13,7 +13,9 @@ import (
 	"windshift/internal/repository"
 )
 
-const MaxBatchLinkItems = 100
+// MaxBatchLinkItems bounds one /links/batch anchor list. Restored to the
+// item-batch cap (500) that the frontend chunks against (200 per request).
+const MaxBatchLinkItems = 500
 
 type BatchItemLinks struct {
 	ItemID          int               `json:"item_id"`
@@ -55,6 +57,9 @@ func (s *ItemLinkService) ListBatch(ctx context.Context, userID int, params Batc
 			return nil, 0, err
 		}
 		ids, total = page.IDs, page.Total
+		if len(ids) == 0 {
+			return []BatchItemLinks{}, total, nil
+		}
 	}
 	if len(ids) == 0 || len(ids) > MaxBatchLinkItems {
 		return nil, 0, fmt.Errorf("ids must contain between 1 and %d unique values", MaxBatchLinkItems)

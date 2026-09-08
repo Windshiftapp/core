@@ -11,10 +11,16 @@
   import StatCard from '../../components/StatCard.svelte';
   import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDate, formatDateOnly, formatDateSimple, worklogDateKey } from '../../utils/dateFormatter.js';
+  import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
+  import { authStore } from '../../stores/auth.svelte.js';
+  import { dateKeyInZone, monthBoundsInZone, splitWorklogMinutesByDay } from '../../utils/worklogTimezone.js';
   import { openMarkdownPrintView } from '../print/markdownPrintWindow.js';
   import { buildTimeReportMarkdown } from './timeReportMarkdown.js';
+
+  // Reports group and label worklogs by civil date in the reporting timezone,
+  // derived from the stored timestamps and split at local midnight.
+  const reportTimezone = $derived(getUserTimezone(authStore?.currentUser));
 
   let worklogs = $state([]);
   let customers = $state([]);
@@ -108,9 +114,10 @@
       }
       memberMap[key].totalMinutes += w.duration_minutes;
       memberMap[key].entries += 1;
-      const dateStr = worklogDateKey(w.date);
-      memberMap[key].dates.add(dateStr);
-      dateSet.add(dateStr);
+      for (const dateStr of splitWorklogMinutesByDay(w.start_time, w.end_time, reportTimezone).keys()) {
+        memberMap[key].dates.add(dateStr);
+        dateSet.add(dateStr);
+      }
     });
 
     return Object.values(memberMap)
@@ -129,8 +136,9 @@
 
     const dailyMap = {};
     projectWorklogs.forEach(w => {
-      const dateStr = worklogDateKey(w.date);
-      dailyMap[dateStr] = (dailyMap[dateStr] || 0) + w.duration_minutes;
+      for (const [dateStr, minutes] of splitWorklogMinutesByDay(w.start_time, w.end_time, reportTimezone)) {
+        dailyMap[dateStr] = (dailyMap[dateStr] || 0) + minutes;
+      }
     });
 
     return Object.keys(dailyMap)
@@ -150,7 +158,7 @@
   ]);
 
   const reportColumns = $derived([
-    { key: 'date', label: t('common.date'), render: (w) => formatDateOnly(worklogDateKey(w.date)) },
+    { key: 'date', label: t('common.date'), render: (w) => formatDateOnly(dateKeyInZone(w.start_time, reportTimezone)) },
     { key: 'customer_name', label: t('time.reports.customer') },
     { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
     { key: 'description', label: t('common.description') },
@@ -161,15 +169,13 @@
   onMount(async () => {
     await Promise.all([loadCustomers(), loadProjects()]);
 
-    // Set default date range to current month
-    const now = new Date();
-    const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    const monthEnd = formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    // Set default date range to current month in the reporting timezone
+    const { from, to } = monthBoundsInZone(reportTimezone);
 
-    filters.date_from = monthStart;
-    filters.date_to = monthEnd;
-    projectDateFrom = monthStart;
-    projectDateTo = monthEnd;
+    filters.date_from = from;
+    filters.date_to = to;
+    projectDateFrom = from;
+    projectDateTo = to;
 
     await loadReports();
   });
@@ -195,7 +201,7 @@
   async function loadReports() {
     loading = true;
     try {
-      worklogs = (await api.time.worklogs.getAll(filters)) || [];
+      worklogs = (await api.time.worklogs.getAll({ ...filters, timezone: reportTimezone })) || [];
       calculateSummary();
     } catch (error) {
       console.error('Failed to load reports:', error);
@@ -212,7 +218,7 @@
     }
     projectLoading = true;
     try {
-      const dateFilters = {};
+      const dateFilters = { timezone: reportTimezone };
       if (projectDateFrom) dateFilters.date_from = projectDateFrom;
       if (projectDateTo) dateFilters.date_to = projectDateTo;
       projectWorklogs = (await api.time.projects.getWorklogs(selectedProjectId, dateFilters)) || [];
@@ -263,12 +269,12 @@
   }
 
   function clearFilters() {
-    const now = new Date();
+    const { from, to } = monthBoundsInZone(reportTimezone);
     filters = {
       customer_id: '',
       project_id: '',
-      date_from: formatDate(new Date(now.getFullYear(), now.getMonth(), 1)),
-      date_to: formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+      date_from: from,
+      date_to: to,
       description_filter: ''
     };
     loadReports();
@@ -306,7 +312,7 @@
 
     worklogs.forEach(worklog => {
       csvData.push([
-        worklogDateKey(worklog.date),
+        dateKeyInZone(worklog.start_time, reportTimezone),
         worklog.customer_name,
         worklog.project_name,
         worklog.description,
@@ -337,7 +343,7 @@
 
     projectWorklogs.forEach(worklog => {
       csvData.push([
-        worklogDateKey(worklog.date),
+        dateKeyInZone(worklog.start_time, reportTimezone),
         worklog.user_name || 'Unknown',
         worklog.customer_name,
         worklog.project_name,
@@ -409,7 +415,7 @@
         { label: 'Top Customer', value: `${summary.topCustomer?.name || 'N/A'} (${summary.topCustomer?.hours || 0}h)` },
       ],
       entries: worklogs.map((worklog) => ({
-        heading: `${formatDateOnly(worklogDateKey(worklog.date))} — ${worklog.project_name}`,
+        heading: `${formatDateOnly(dateKeyInZone(worklog.start_time, reportTimezone))} — ${worklog.project_name}`,
         fields: [
           { label: 'Customer', value: worklog.customer_name },
           { label: 'Duration', value: formatDuration(worklog.duration_minutes) },
@@ -449,7 +455,7 @@
         average: `${member.avgPerDay}h`,
       })),
       entries: projectWorklogs.map((worklog) => ({
-        heading: `${formatDateOnly(worklogDateKey(worklog.date))} — ${worklog.user_name || 'Unknown'}`,
+        heading: `${formatDateOnly(dateKeyInZone(worklog.start_time, reportTimezone))} — ${worklog.user_name || 'Unknown'}`,
         fields: [
           { label: 'Duration', value: formatDuration(worklog.duration_minutes) },
           { label: 'Description', value: worklog.description },
@@ -732,7 +738,7 @@
         <Chart
           type="line"
           series={[{ key: 'hours', label: t('time.reports.hoursLogged'), color: 'var(--ds-accent-blue)', values: dailyChartData.map(d => d.count ?? 0) }]}
-          categories={dailyChartData.map(d => d.label || formatDateSimple(d.date))}
+          categories={dailyChartData.map(d => d.label)}
           valueFormat={(v) => `${v}h`}
           showYAxis={true}
           yAxisFormat={(v) => `${Math.round(v)}h`}

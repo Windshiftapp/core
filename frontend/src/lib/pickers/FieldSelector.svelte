@@ -246,7 +246,7 @@
 
   <!-- Dropdown Menu -->
   {#if isOpen}
-    <div class="absolute z-50 mt-1 w-full max-w-md border rounded shadow-lg overflow-hidden" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+    <div data-testid="field-selector-menu" class="absolute z-50 mt-1 w-full max-w-md border rounded shadow-lg overflow-hidden" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
       <!-- Search Input -->
       <div class="p-2" style="border-bottom: 1px solid var(--ds-border);">
         <SearchInput
@@ -258,7 +258,7 @@
       </div>
 
       <!-- Field List -->
-      <div class="max-h-96 overflow-y-auto">
+      <div data-testid="field-selector-scroll" class="max-h-96 overflow-y-auto">
         {#if filteredFields.length === 0}
           <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
             {t('pickers.noFieldsFound', { query: searchQuery })}

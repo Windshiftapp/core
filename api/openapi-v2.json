@@ -18165,6 +18165,10 @@
                       "description": "The completed value.",
                       "type": "integer"
                     },
+                    "completed_points": {
+                      "description": "The completed points value.",
+                      "type": "number"
+                    },
                     "date": {
                       "description": "The date value.",
                       "type": "string"
@@ -18173,16 +18177,27 @@
                       "description": "The ideal value.",
                       "type": "integer"
                     },
+                    "ideal_points": {
+                      "description": "The ideal points value.",
+                      "type": "number"
+                    },
                     "remaining": {
                       "description": "The remaining value.",
                       "type": "integer"
+                    },
+                    "remaining_points": {
+                      "description": "The remaining points value.",
+                      "type": "number"
                     }
                   },
                   "required": [
                     "completed",
+                    "completed_points",
                     "date",
                     "ideal",
-                    "remaining"
+                    "ideal_points",
+                    "remaining",
+                    "remaining_points"
                   ],
                   "type": "object"
                 },
@@ -36776,6 +36791,17 @@
             "nullable": true,
             "type": "string"
           },
+          "estimate_minutes": {
+            "description": "Time estimate in minutes.",
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
+          },
+          "inherit_project": {
+            "default": false,
+            "description": "Inherit time-project membership from the parent.",
+            "type": "boolean"
+          },
           "is_task": {
             "description": "Replacement personal-task flag. True requires the item to be in the caller's own personal workspace with status Open or Done; null is invalid.",
             "type": "boolean"
@@ -36819,6 +36845,13 @@
             "format": "date-time",
             "nullable": true,
             "type": "string"
+          },
+          "story_points": {
+            "description": "Relative effort estimate.",
+            "format": "double",
+            "minimum": 0,
+            "nullable": true,
+            "type": "number"
           },
           "title": {
             "description": "Replacement plain-text title.",
@@ -39410,6 +39443,16 @@
             "nullable": true,
             "type": "string"
           },
+          "estimate_minutes": {
+            "description": "The estimate minutes value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "inherit_project": {
+            "description": "The inherit project value.",
+            "nullable": true,
+            "type": "boolean"
+          },
           "is_task": {
             "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
             "nullable": true,
@@ -39448,6 +39491,11 @@
             "format": "date-time",
             "nullable": true,
             "type": "string"
+          },
+          "story_points": {
+            "description": "The story points value.",
+            "nullable": true,
+            "type": "number"
           },
           "title": {
             "description": "The title value.",
@@ -63378,6 +63426,11 @@
             "description": "The parent id value.",
             "nullable": true,
             "type": "integer"
+          },
+          "sort_order": {
+            "description": "The sort order value.",
+            "nullable": true,
+            "type": "integer"
           }
         },
         "required": [
@@ -71668,6 +71721,17 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "description": "For completed items, include only those active within this many days. Incomplete items remain included.",
+            "in": "query",
+            "name": "completed_activity_days",
+            "required": false,
+            "schema": {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -75473,6 +75537,15 @@
             "required": false,
             "schema": {
               "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           }
@@ -79679,6 +79752,15 @@
               "format": "date",
               "type": "string"
             }
+          },
+          {
+            "description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -79931,6 +80013,15 @@
             "required": false,
             "schema": {
               "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           }

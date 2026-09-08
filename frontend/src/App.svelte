@@ -506,10 +506,6 @@
     background-color: var(--ds-background-neutral-hovered);
   }
 
-  :global(.themed-nav .nav-button.nav-button-emphasized) {
-    background-color: color-mix(in srgb, var(--ds-interactive) 8%, transparent);
-  }
-
   /* Exception: Primary buttons should keep their original colors and hover behavior */
   :global(.themed-nav .bg-primary) {
     color: var(--ds-text-inverse) !important;

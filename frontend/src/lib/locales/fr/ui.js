@@ -62,25 +62,25 @@ export default {
     noWorkspacesFound: 'Aucun espace de travail trouvé',
 
     // Sélecteur de jeux de configuration
-    selectConfigurationSet: 'Sélectionner un jeu de configuration',
-    searchConfigurationSets: 'Rechercher des jeux de configuration…',
-    configurationSets: 'Jeux de configuration',
+    selectConfigurationSet: 'Sélectionner un ensemble de configuration',
+    searchConfigurationSets: 'Rechercher des ensembles de configuration…',
+    configurationSets: 'Ensembles de configuration',
     defaultConfiguration: 'Configuration par défaut',
     defaultConfigurationDescription: 'Utilise les paramètres par défaut de l’espace de travail',
-    noConfigurationSetsFound: 'Aucun jeu de configuration trouvé',
+    noConfigurationSetsFound: 'Aucun ensemble de configuration trouvé',
 
-    // Sélecteur d'entité de jeu de configuration
+    // Sélecteur d'entité d’ensemble de configuration
     entityAlreadyAssigned: '{label} est déjà attribué',
     itemType: 'Type d’élément',
     priorities: 'Priorités',
     itemTypes: 'Types d’éléments',
     level: 'Niveau {level}',
     assigned: 'Attribué',
-    noEntitiesAssigned: 'Aucun {entities} attribué',
+    noEntitiesAssigned: 'Aucune attribution pour : {entities}',
     available: 'Disponible',
-    noEntitiesMatchSearch: 'Aucun {entities} ne correspond à votre recherche',
-    allEntitiesAssigned: 'Tous les {entities} sont attribués',
-    inConfigSet: 'Dans le jeu de config',
+    noEntitiesMatchSearch: 'Aucun résultat pour : {entities}',
+    allEntitiesAssigned: 'Tout est attribué : {entities}',
+    inConfigSet: 'Dans l’ensemble de configuration',
     searchEntities: 'Rechercher {entities}…',
 
     // Sélecteur de champs
@@ -121,7 +121,7 @@ export default {
       status: { name: 'Statut', description: 'Statut actuel' },
       priority: { name: 'Priorité', description: 'Niveau de priorité' },
       type: { name: 'Type', description: 'Type d’élément' },
-      assignee: { name: 'Attribué à', description: 'Utilisateur attribué' },
+      assignee: { name: 'Attribué à', description: 'Utilisateur responsable de l’élément' },
       reporter: { name: 'Rapporteur', description: 'Personne ayant signalé l’élément' },
       createdAt: { name: 'Créé le', description: 'Date de création de l’élément' },
       updatedAt: { name: 'Mis à jour le', description: 'Dernière mise à jour de l’élément' },
@@ -168,7 +168,7 @@ export default {
     milestonesSelected_one: '{count} jalon sélectionné',
     milestonesSelected_other: '{count} jalons sélectionnés',
     noMilestonesFound: 'Aucun jalon trouvé',
-    showCompletedMilestones: 'Afficher les terminés',
+    showCompletedMilestones: 'Afficher les jalons terminés',
 
     // Combobox d'itération
     selectIteration: 'Sélectionner une itération',
@@ -207,11 +207,11 @@ export default {
     // Sélecteur de flux de travail
     selectWorkflow: 'Sélectionner un flux de travail',
 
-    // Sélecteur de jeu de conditions
-    selectConditionSet: 'Sélectionner un jeu de conditions',
+    // Sélecteur d’ensemble de conditions
+    selectConditionSet: 'Sélectionner un ensemble de conditions',
 
     // Sélecteur de jeu d'approbations
-    selectApprovalSet: 'Sélectionner un jeu d’approbations',
+    selectApprovalSet: 'Sélectionner un ensemble d’approbations',
   },
 
   editors: {
@@ -300,11 +300,11 @@ export default {
       timerSyncing: 'Le chronomètre est en cours de synchronisation. Veuillez patienter et réessayer.',
       startTimerFromItem: 'Veuillez démarrer un chronomètre depuis un élément de travail pour fournir du contexte.',
       cannotDeleteDefaultScreen:
-        'Impossible de supprimer l’écran par défaut. Cet écran est requis pour les espaces de travail sans jeu de configuration.',
+        'Impossible de supprimer l’écran par défaut. Cet écran est requis pour les espaces de travail sans ensemble de configuration.',
       applicationShuttingDown: 'L’application est en cours d’arrêt…',
       pdfExportComingSoon: 'L’exportation PDF arrive bientôt pour la vue par blocs de temps',
       configUpdatedSuccess:
-        'Jeu de configuration mis à jour avec succès. Tous les éléments de travail utilisent déjà les statuts du nouveau flux de travail.',
+        'Ensemble de configuration mis à jour avec succès. Tous les éléments de travail utilisent déjà les statuts du nouveau flux de travail.',
       failedToSave: 'Échec de l’enregistrement : {error}',
       failedToDelete: 'Échec de la suppression : {error}',
       shutdownFailed: 'Échec de l’arrêt de l’application',
@@ -322,7 +322,7 @@ export default {
       failedToToggleStatus: 'Échec du basculement du statut du type de lien : {error}',
       failedToAssignRole: 'Échec de l’attribution du rôle : {error}',
       failedToRevokeRole: 'Échec de la révocation du rôle : {error}',
-      failedToUpdateRole: 'Échec de la mise à jour du rôle de chacun : {error}',
+      failedToUpdateRole: 'Échec de la mise à jour du rôle « Tout le monde » : {error}',
       failedToLoadFields: 'Échec du chargement des champs : {error}',
       failedToSaveFields: 'Échec de l’enregistrement des attributions de champs : {error}',
       errorAddingTestCase: 'Erreur lors de l’ajout du cas de test : {error}',
@@ -430,7 +430,7 @@ export default {
     widthThird: 'Tiers',
     widthHalf: 'Moitié',
     widthTwoThirds: 'Deux tiers',
-    widthFull: 'Plein écran',
+    widthFull: 'Pleine largeur',
     resizeAriaLabel: 'Redimensionner le widget',
     resizeColumnsValue: '{count} sur 12 colonnes',
     rowCount: 'Nombre de lignes',
@@ -560,7 +560,7 @@ export default {
     previewLoading: 'Chargement de l’aperçu…',
     previewError: 'Échec du chargement de l’aperçu',
     copySettings: 'Copier à partir du modèle',
-    copyAssignee: 'Copier l’attribué',
+    copyAssignee: 'Copier le responsable',
     copyPriority: 'Copier la priorité',
     copyCustomFields: 'Copier les champs personnalisés',
     copyDescription: 'Copier la description',

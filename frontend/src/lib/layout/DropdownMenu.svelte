@@ -55,6 +55,8 @@
   } = createPopover(/** @type {any} */ ({
     forceVisible: true,
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
       // svelte-ignore state_referenced_locally
       placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },
@@ -232,10 +234,11 @@
   <div
     use:melt={$content}
     data-menu-container
+    data-testid={triggerTestid ? `${triggerTestid}-menu` : undefined}
     role="menu"
     tabindex="-1"
     onkeydown={handleMenuKeydown}
-    class="{maxWidth} rounded shadow-xl border focus:outline-none z-[60]"
+    class="{maxWidth} rounded shadow-xl border overflow-y-auto overscroll-contain focus:outline-none z-[60]"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
   >
     <div>

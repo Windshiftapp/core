@@ -20,7 +20,19 @@ function planningQuery(filters = {}) {
 async function listPlanning(path, filters = {}, requestOptions = {}) {
   const query = planningQuery(filters);
   const globalPath = `${path}${query ? `?${query}` : ''}`;
-  if (filters.workspace_id == null) return fetchAllV2Pages(globalPath, requestOptions);
+  if (filters.workspace_id == null) {
+    if (filters.is_global === true) return fetchAllV2Pages(globalPath, requestOptions);
+    const workspaces = await fetchAllV2Pages('/workspaces', requestOptions);
+    const rows =
+      filters.include_global === false || filters.is_global === false
+        ? []
+        : await fetchAllV2Pages(globalPath, requestOptions);
+    for (const workspace of workspaces) {
+      const workspacePath = `/workspaces/${workspace.id}${path}${query ? `?${query}` : ''}`;
+      rows.push(...(await fetchAllV2Pages(workspacePath, requestOptions)));
+    }
+    return rows;
+  }
   const workspacePath = `/workspaces/${filters.workspace_id}${path}${query ? `?${query}` : ''}`;
   const local = fetchAllV2Pages(workspacePath, requestOptions);
   if (filters.include_global === false) return local;

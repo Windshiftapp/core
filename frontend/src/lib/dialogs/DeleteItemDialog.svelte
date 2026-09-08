@@ -79,7 +79,7 @@
 
   // Load reparent candidates when reparent mode is selected and we have children
   $effect(() => {
-    if (selectedMode === 'reparent' && hasChildren && deleteInfo?.hierarchyLevel != null) {
+    if (selectedMode === 'reparent' && hasChildren && deleteInfo?.hierarchy_level != null) {
       loadReparentCandidates();
     }
   });

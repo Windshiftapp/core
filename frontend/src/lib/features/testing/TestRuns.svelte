@@ -45,7 +45,9 @@
     try {
       // Build query params for assignee filter
       const params = {};
-      if (selectedAssigneeFilter) {
+      if (selectedAssigneeFilter === 'unassigned') {
+        params.unassigned = true;
+      } else if (selectedAssigneeFilter) {
         params.assignee_id = selectedAssigneeFilter;
       }
 

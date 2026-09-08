@@ -64,15 +64,17 @@ func (r *TimeWorklogRepository) ListCaptureWorklogs(itemID int, worklogIDs []int
 	return out, nil
 }
 
-// ListBriefingWorklogs returns a user's worklogs in a half-open time window.
+// ListBriefingWorklogs returns a user's worklogs overlapping a half-open time
+// window. Overlap is measured against the stored start/end timestamps so
+// entries that cross local midnight count toward the day they cover.
 func (r *TimeWorklogRepository) ListBriefingWorklogs(userID int, start, end time.Time) ([]BriefingWorklog, error) {
 	rows, err := r.db.Query(`
 		SELECT tw.description, tw.duration_minutes, tp.name
 		FROM time_worklogs tw
 		JOIN time_projects tp ON tw.project_id = tp.id
-		WHERE tw.user_id = ? AND tw.date >= ? AND tw.date < ?
-		ORDER BY tw.date DESC
-	`, userID, start.Unix(), end.Unix())
+		WHERE tw.user_id = ? AND tw.start_time < ? AND tw.end_time > ?
+		ORDER BY tw.start_time DESC
+	`, userID, end.Unix(), start.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("list briefing worklogs: %w", err)
 	}
@@ -158,7 +160,9 @@ func scanWorklogDetail(scanner worklogDetailScanner) (models.Worklog, error) {
 
 // WorklogDetailFilter narrows cookie-auth worklog list endpoints. A nil
 // AccessibleProjectIDs slice means unrestricted access; an empty non-nil
-// slice returns no rows.
+// slice returns no rows. Date bounds are interval overlaps against the
+// stored start/end timestamps, so entries that span a range boundary count
+// toward the days they cover. The upper bound is exclusive.
 type WorklogDetailFilter struct {
 	AccessibleProjectIDs []int
 	CustomerID           *int
@@ -177,7 +181,7 @@ func (r *TimeWorklogRepository) ListDetails(filter WorklogDetailFilter) ([]model
 	}
 	where, args := worklogDetailWhere(filter)
 	query := worklogDetailSelect + "\n" + where
-	query += " ORDER BY w.date DESC, w.start_time DESC, w.id DESC"
+	query += " ORDER BY w.start_time DESC, w.id DESC"
 	if filter.Limit > 0 {
 		query += " LIMIT ? OFFSET ?"
 		args = append(args, filter.Limit, max(filter.Offset, 0))
@@ -243,11 +247,11 @@ func worklogDetailWhere(filter WorklogDetailFilter) (query string, args []any) {
 		args = append(args, *filter.ItemID)
 	}
 	if filter.DateFromUnix != nil {
-		query += " AND w.date >= ?"
+		query += " AND w.end_time > ?"
 		args = append(args, *filter.DateFromUnix)
 	}
 	if filter.DateToExclusiveUnix != nil {
-		query += " AND w.date < ?"
+		query += " AND w.start_time < ?"
 		args = append(args, *filter.DateToExclusiveUnix)
 	}
 	return query, args
@@ -357,7 +361,8 @@ func (r *TimeWorklogRepository) Create(in NewWorklog) (int64, error) {
 }
 
 // WorklogListFilter narrows ListForUser results. Nil pointer fields disable
-// the corresponding filter; the upper date bound is exclusive.
+// the corresponding filter. Date bounds are interval overlaps against the
+// stored start/end timestamps; the upper bound is exclusive.
 type WorklogListFilter struct {
 	UserID              int
 	DateFromUnix        *int64
@@ -386,18 +391,18 @@ func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Workl
 	qa := []any{f.UserID}
 
 	if f.DateFromUnix != nil {
-		query += " AND w.date >= ?"
+		query += " AND w.end_time > ?"
 		qa = append(qa, *f.DateFromUnix)
 	}
 	if f.DateToExclusiveUnix != nil {
-		query += " AND w.date < ?"
+		query += " AND w.start_time < ?"
 		qa = append(qa, *f.DateToExclusiveUnix)
 	}
 	if f.ProjectID != nil {
 		query += " AND w.project_id = ?"
 		qa = append(qa, *f.ProjectID)
 	}
-	query += " ORDER BY w.date DESC"
+	query += " ORDER BY w.start_time DESC, w.id DESC"
 
 	var total int
 	if err := r.db.QueryRow("SELECT COUNT(*) FROM ("+query+") AS filtered_worklogs", qa...).Scan(&total); err != nil {

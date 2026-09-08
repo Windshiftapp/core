@@ -54,71 +54,71 @@
   }
 </script>
 
-<div class="milestones-container">
+<div>
   {#if milestones && milestones.length > 0}
-    <div class="milestone-grid">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),1fr))] gap-3">
       {#each milestones as milestone (milestone.milestone_id)}
         {@const breakdown = normalizeBreakdown(milestone.status_breakdown)}
         {@const segments = buildSegments(breakdown, milestone.total_items)}
 
-        <div class="milestone-card">
-          <div class="card-header">
-            <div class="title-group">
+        <div class="flex min-w-0 flex-col rounded-lg border border-ds-border bg-ds-surface p-4">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2">
               <div
-                class="icon-pill"
-                style={`background-color: color-mix(in srgb, ${milestone.category_color || '#2563eb'} 12%, transparent);`}
+                class="flex size-7 shrink-0 items-center justify-center rounded-md"
+                style={`background-color: color-mix(in srgb, ${milestone.category_color || 'var(--ds-icon-accent)'} 12%, transparent);`}
               >
-                <Flag class="icon" style={`color: ${milestone.category_color || '#2563eb'};`} />
+                <Flag size={16} style={`color: ${milestone.category_color || 'var(--ds-icon-accent)'};`} />
               </div>
-              <div class="title-text">
-                <p class="milestone-name">{milestone.milestone_name}</p>
+              <div class="flex min-w-0 flex-col gap-1">
+                <p class="text-sm leading-snug font-semibold wrap-anywhere text-ds-text">{milestone.milestone_name}</p>
                 {#if milestone.target_date}
-                  <p class="milestone-date">{t('widgets.milestoneProgress.due')} {formatDate(milestone.target_date)}</p>
+                  <p class="text-xs text-ds-text-subtle">{t('widgets.milestoneProgress.due')} {formatDate(milestone.target_date)}</p>
                 {/if}
               </div>
             </div>
-            <div class="percent-chip">
+            <div class="shrink-0 rounded bg-(--ds-background-neutral) px-2 py-1 text-xs font-semibold tabular-nums text-ds-text">
               {formatPercent(milestone.percent_complete)}%
             </div>
           </div>
 
-          <div class="card-body">
-            <div class="pie-wrapper">
+          <div class="mt-auto grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-3">
+            <div class="flex items-center justify-center">
               {#if milestone.total_items > 0}
-                <svg viewBox="0 0 140 140" role="img" aria-label={t('widgets.milestoneProgress.chartAria')}>
-                  <PieChartSegments {segments} {radius} />
-                  <text class="pie-total" x="70" y="68">{milestone.total_items || 0}</text>
-                  <text class="pie-label" x="70" y="84">{t('widgets.milestoneProgress.items')}</text>
+                <svg class="size-24 overflow-visible" viewBox="0 0 140 140" role="img" aria-label={t('widgets.milestoneProgress.chartAria')}>
+                  <PieChartSegments {segments} {radius} strokeWidth={10} />
+                  <text text-anchor="middle" class="fill-ds-text text-[1.75rem] font-semibold tabular-nums" x="70" y="68">{milestone.total_items || 0}</text>
+                  <text text-anchor="middle" class="fill-ds-text-subtle text-sm" x="70" y="84">{t('widgets.milestoneProgress.items')}</text>
                 </svg>
               {:else}
-                <div class="pie-empty">
+                <div class="flex size-20 items-center justify-center rounded-full border border-dashed border-ds-border text-center text-xs text-ds-text-subtle">
                   <p>{t('widgets.milestoneProgress.noItems')}</p>
                 </div>
               {/if}
             </div>
 
-            <div class="summary">
-              <p class="summary-value">
+            <div class="flex flex-col gap-1 wrap-anywhere">
+              <p class="text-sm font-medium tabular-nums text-ds-text">
                 {milestone.completed_items || 0}/{milestone.total_items || 0} {t('widgets.milestoneProgress.done')}
               </p>
-              <p class="summary-subtle">
+              <p class="text-xs text-ds-text-subtle capitalize">
                 {milestone.status ? milestone.status.replace(/_/g, ' ') : t('widgets.milestoneProgress.activeMilestone')}
               </p>
             </div>
 
-            <ul class="legend">
+            <ul class="col-span-full m-0 flex list-none flex-wrap gap-x-4 gap-y-2 border-t border-ds-border px-0 pt-3 text-xs leading-normal wrap-anywhere text-ds-text-subtle">
               {#if breakdown.length > 0}
                 {#each breakdown as segment (segment.key)}
-                  <li>
-                    <span class="legend-dot" style={`background-color:${segment.color};`}></span>
-                    <div>
-                      <p class="legend-label">{segment.label}</p>
-                      <p class="legend-value">{segment.count} {segment.count === 1 ? t('widgets.milestoneProgress.item') : t('widgets.milestoneProgress.items')}</p>
+                  <li class="flex min-w-0 items-baseline gap-1.5">
+                    <span class="size-2 shrink-0 rounded-full" style={`background-color:${segment.color};`}></span>
+                    <div class="flex min-w-0 flex-wrap items-baseline gap-1">
+                      <p>{segment.label}</p>
+                      <p class="tabular-nums">{segment.count} {segment.count === 1 ? t('widgets.milestoneProgress.item') : t('widgets.milestoneProgress.items')}</p>
                     </div>
                   </li>
                 {/each}
               {:else}
-                <li class="legend-empty">{t('widgets.milestoneProgress.noCategorizedWork')}</li>
+                <li>{t('widgets.milestoneProgress.noCategorizedWork')}</li>
               {/if}
             </ul>
           </div>
@@ -133,194 +133,3 @@
     />
   {/if}
 </div>
-
-<style>
-  .milestones-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    overflow: visible;
-  }
-
-  .milestone-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-
-  .milestone-card {
-    border: 1px solid var(--ds-border);
-    border-radius: 1rem;
-    padding: 1rem;
-    background: var(--ds-surface-raised);
-    flex: 0 1 320px;
-    min-width: 260px;
-    max-width: 360px;
-    width: min(100%, 320px);
-    box-sizing: border-box;
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .title-group {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .icon-pill {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .title-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-
-  .milestone-name {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--ds-text);
-  }
-
-  .milestone-date {
-    font-size: 0.78rem;
-    color: var(--ds-text-subtle);
-  }
-
-  .percent-chip {
-    background: rgba(16, 185, 129, 0.12);
-    color: #047857;
-    font-weight: 600;
-    padding: 0.3rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-  }
-
-  .card-body {
-    display: grid;
-    grid-template-columns: minmax(140px, 160px) 1fr;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .pie-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  svg {
-    width: 140px;
-    height: 140px;
-  }
-
-  .pie-total {
-    font-size: 1.5rem;
-    font-weight: 600;
-    text-anchor: middle;
-    fill: var(--ds-text);
-  }
-
-  .pie-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-anchor: middle;
-    fill: var(--ds-text-subtle);
-  }
-
-  .pie-empty {
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    border: 1px dashed var(--ds-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--ds-text-subtlest);
-    font-size: 0.85rem;
-  }
-
-  .summary {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-
-  .summary-value {
-    font-weight: 600;
-    color: var(--ds-text);
-  }
-
-  .summary-subtle {
-    font-size: 0.8rem;
-    color: var(--ds-text-subtle);
-    text-transform: capitalize;
-  }
-
-  .legend {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-    list-style: none;
-    padding: 0;
-    margin: 0.75rem 0 0;
-  }
-
-  .legend li {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .legend-dot {
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .legend-label {
-    font-size: 0.82rem;
-    color: var(--ds-text);
-    font-weight: 500;
-  }
-
-  .legend-value {
-    font-size: 0.75rem;
-    color: var(--ds-text-subtle);
-  }
-
-  .legend-empty {
-    font-size: 0.8rem;
-    color: var(--ds-text-subtle);
-  }
-
-  @media (max-width: 768px) {
-    .milestone-grid {
-      flex-direction: column;
-    }
-
-    .card-body {
-      grid-template-columns: 1fr;
-    }
-
-    .legend {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>

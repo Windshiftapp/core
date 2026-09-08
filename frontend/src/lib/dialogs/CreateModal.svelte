@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
@@ -362,15 +363,15 @@
     selectedType = initialType;
   });
 
-  // The modal is lazy-loaded, so workspace context must arrive as state rather
-  // than a timer-based window event that can fire before this component mounts.
+  // Apply opening context without overwriting later workspace selections.
   $effect(() => {
-    if (
-      isOpen &&
-      initialWorkspaceId &&
-      workItemFormStore.formData.workspace_id !== Number(initialWorkspaceId)
-    ) {
-      applyWorkspace(initialWorkspaceId);
+    const workspaceId = initialWorkspaceId;
+    if (isOpen && workspaceId) {
+      untrack(() => {
+        if (workItemFormStore.formData.workspace_id !== Number(workspaceId)) {
+          void applyWorkspace(workspaceId);
+        }
+      });
     }
   });
 

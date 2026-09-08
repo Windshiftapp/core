@@ -30,6 +30,8 @@
     states: { open }
   } = createPopover({
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
       placement: 'bottom-start',
       gutter: 4,
       flip: true
@@ -183,7 +185,7 @@
   <div
     use:melt={$content}
     data-testid={testId ? `${testId}-dropdown` : undefined}
-    class="z-[70] rounded-lg shadow-lg overflow-hidden"
+    class="z-[70] rounded-lg shadow-lg flex flex-col overflow-hidden"
     style="
       background-color: var(--ds-surface-raised);
       border: 1px solid var(--ds-border);
@@ -193,7 +195,7 @@
   >
     <!-- Search Input (optional) -->
     {#if searchable}
-      <div class="p-2 border-b" style="border-color: var(--ds-border);">
+      <div class="p-2 border-b shrink-0" style="border-color: var(--ds-border);">
         <Input
           bind:inputRef={inputElement}
           bind:value={searchTerm}
@@ -210,7 +212,7 @@
     <div
       bind:this={listRef}
       data-testid={testId ? `${testId}-listbox` : undefined}
-      class="max-h-48 overflow-y-auto"
+      class="min-h-0 max-h-48 overflow-y-auto overscroll-contain"
       role="listbox"
       id={listboxId}
       tabindex="0"

@@ -1673,6 +1673,7 @@ func (s *Server) initialize() error {
 		TimeProjects:       services.NewTimeProjectApplicationService(s.db, timePermissionService, v2Access),
 		Timers:             timerService,
 		SystemAdmins:       permService,
+		GlobalPermission:   permService,
 		Groups:             groupHandler.Application(),
 		AdminUsers:         services.NewUserReadService(s.db),
 		Comments:           commentService,

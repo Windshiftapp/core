@@ -1619,7 +1619,21 @@
     "/asset-sets/{asset_set_id}/roles/{assignment_id}": {
       "delete": {
         "description": ". The server verifies resource ownership and deletion preconditions before removing the resource.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "type",
+            "In": "query",
+            "Description": "Assignment principal type.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "user",
+                "group"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -3779,6 +3793,17 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "Name": "completed_activity_days",
+            "In": "query",
+            "Description": "For completed items, include only those active within this many days. Incomplete items remain included.",
+            "Required": false,
+            "Schema": {
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -5662,6 +5687,15 @@
             "Required": false,
             "Schema": {
               "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
               "type": "string"
             }
           }
@@ -7652,6 +7686,15 @@
               "format": "date",
               "type": "string"
             }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7774,6 +7817,15 @@
             "Required": false,
             "Schema": {
               "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
               "type": "string"
             }
           }

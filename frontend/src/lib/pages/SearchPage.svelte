@@ -236,12 +236,12 @@
         />
       </div>
 
-      {#if itemsPagination && itemsPagination.total > 0}
+      {#if itemsPagination && itemsPagination.total_items > 0}
         <div data-testid="global-search-pagination" class="mt-6">
           <Pagination
             currentPage={itemsPagination.page}
-            totalItems={itemsPagination.total}
-            itemsPerPage={itemsPagination.limit}
+            totalItems={itemsPagination.total_items}
+            itemsPerPage={itemsPagination.page_size}
             maxItems={10000}
             onpageChange={handlePageChange}
             onpageSizeChange={handlePageSizeChange}

@@ -46,6 +46,7 @@
     forceVisible: true,
     positioning: {
       strategy: 'fixed',
+      fitViewport: true,
       placement: 'bottom-start',
       sameWidth: untrack(() => !menuWidth),
       gutter: 4
@@ -203,16 +204,18 @@
   <div
     use:melt={$content}
     bind:this={listboxElement}
+    data-testid={id ? `${id}-listbox` : undefined}
     data-popover-owner={portalOwner}
     role="listbox"
     tabindex="-1"
     aria-activedescendant={highlightedIndex >= 0 ? optionId(options[highlightedIndex], highlightedIndex) : undefined}
     onkeydown={handleListboxKeydown}
-    class="rounded border shadow-lg max-h-60 overflow-y-auto z-[60] focus:outline-none"
+    class="rounded border shadow-lg flex flex-col overflow-hidden z-[60] focus:outline-none"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); width: {menuWidth || undefined};
            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
     transition:fly={{ duration: 150, y: -5 }}
   >
+    <div class="min-h-0 max-h-60 overflow-y-auto overscroll-contain">
     {#each options as opt, index (opt.value ?? `opt-${index}`)}
       {@const isSelected = String(opt.value) === String(value)}
       {@const isHighlighted = highlightedIndex === index}
@@ -240,5 +243,6 @@
         {/if}
       </div>
     {/each}
+    </div>
   </div>
 {/if}

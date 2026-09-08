@@ -307,7 +307,7 @@ export const items = {
   // Watch/unwatch items
   addWatch: (id) =>
     fetchV2Data(`/items/${id}/watch`, {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify({}),
     }),
   removeWatch: (id) =>

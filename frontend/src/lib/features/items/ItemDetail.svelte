@@ -806,6 +806,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       },
       {
         id: 'watch',
+        testid: 'item-watch-toggle',
         type: 'regular',
         icon: itemDetailStore.isWatching ? BookmarkCheck : Bookmark,
         title: itemDetailStore.isWatching ? t('items.unwatchWorkItem') : t('items.watchWorkItem'),

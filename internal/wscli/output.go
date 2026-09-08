@@ -37,6 +37,9 @@ func (o *Output) printJSON(data any) {
 }
 
 func (o *Output) printTable(data any) {
+	if items, ok := data.(*PaginatedResponse[Item]); ok {
+		warnItemPagination(items)
+	}
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	defer func() { _ = w.Flush() }() //nolint:errcheck // output to stdout
 
@@ -144,6 +147,9 @@ func (o *Output) printTable(data any) {
 }
 
 func (o *Output) printCSV(data any) {
+	if items, ok := data.(*PaginatedResponse[Item]); ok {
+		warnItemPagination(items)
+	}
 	w := csv.NewWriter(stdout)
 	defer w.Flush()
 

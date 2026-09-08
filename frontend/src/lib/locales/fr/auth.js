@@ -15,7 +15,7 @@ export default {
     signIn: 'Se connecter',
     signOut: 'Se déconnecter',
     signUp: 'S’inscrire',
-    register: 'S’enregistrer',
+    register: 'S’inscrire',
     forgotPassword: 'Mot de passe oublié ?',
     resetPassword: 'Réinitialiser le mot de passe',
     changePassword: 'Changer le mot de passe',
@@ -26,7 +26,7 @@ export default {
     rememberMe: 'Se souvenir de moi',
     staySignedIn: 'Rester connecté à Windshift pendant 30 jours',
     emailOrUsername: 'E-mail ou nom d’utilisateur',
-    welcomeBack: 'Bon retour',
+    welcomeBack: 'Heureux de vous revoir',
     loginTitle: 'Connectez-vous à votre compte',
     loginSubtitle: 'Saisissez vos identifiants pour continuer',
     loggingIn: 'Connexion en cours…',
@@ -128,7 +128,7 @@ export default {
     connectedAccounts: 'Comptes connectés',
     connectedAccountsTab: 'Comptes',
     connectedAccountsDesc:
-      'Connectez vos comptes de gestion de code source pour créer des branches et des demandes de tirage (pull requests)',
+      'Connectez vos comptes de gestion de code source pour créer des branches et des pull requests',
     labels: {
       tabLabel: 'Étiquettes personnelles',
       tabDescription: 'Gérer vos étiquettes personnelles.',
@@ -170,7 +170,7 @@ export default {
       manageTokens: 'Gérer les jetons',
       hideTokens: 'Masquer les jetons',
       tokenExpirationHint:
-        'Le jeton reste valide jusqu’à cette date dans votre fuseau horaire configuré. Laissez vide pour aucune expiration.',
+        'Le jeton reste valide jusqu’à cette date dans votre fuseau horaire configuré. Laissez ce champ vide pour que le jeton n’expire jamais.',
       existingTokens: 'Jetons existants',
       tokenDates: 'Créé le {created} • Expire le {expires}',
       neverExpires: 'N’expire jamais',
@@ -221,7 +221,7 @@ export default {
     tokenWarning: 'Veillez à copier votre jeton dès maintenant. Vous ne pourrez plus le revoir.',
     enterSecurityKeyName: 'Veuillez saisir un nom pour cette clé de sécurité',
     webAuthnNotSupported: 'WebAuthn n’est pas pris en charge par ce navigateur',
-    invalidRegistrationChallenge: 'Défis d’inscription non valide reçu du serveur',
+    invalidRegistrationChallenge: 'Défi d’inscription non valide reçu du serveur',
     noActiveFidoCredentials:
       'Aucun identifiant FIDO actif trouvé. Veuillez d’abord enregistrer une clé de sécurité.',
     authenticationFailed: 'Échec de l’authentification',
@@ -234,7 +234,7 @@ export default {
   },
 
   portalLogin: {
-    welcomeBack: 'Bon retour',
+    welcomeBack: 'Heureux de vous revoir',
     signInToCustomize: 'Connectez-vous pour personnaliser ce portail',
     emailOrUsername: 'E-mail ou nom d’utilisateur',
     enterEmailOrUsername: 'Saisissez votre e-mail ou nom d’utilisateur',

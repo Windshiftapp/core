@@ -76,7 +76,9 @@ export const assets = {
     for (const [key, value] of Object.entries(filters)) {
       if (value == null || value === '') continue;
       if (key === 'limit') params.set('page_size', String(value));
-      else if (key !== 'offset') params.set(key, String(value));
+      else if (key === 'cql') {
+        if (!filters.ql) params.set('ql', String(value));
+      } else if (key !== 'offset') params.set(key, String(value));
     }
     if (filters.offset && filters.limit) {
       params.set('page', String(Math.floor(filters.offset / filters.limit) + 1));

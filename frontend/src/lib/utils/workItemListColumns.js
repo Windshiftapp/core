@@ -12,6 +12,20 @@ export function sortListColumns(columns) {
   return [...(columns || [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 }
 
+// Map fetched board columns back to the save payload shape. Responses carry
+// server-managed fields (board_configuration_id, created_at, updated_at) that
+// the typed v2 request schema rejects.
+export function boardColumnsForSave(columns) {
+  return [...(columns || [])].map(({ id, name, display_order, wip_limit, color, status_ids }) => ({
+    id: id ?? null,
+    name,
+    display_order,
+    wip_limit: wip_limit ?? null,
+    color: color ?? '',
+    status_ids: status_ids || [],
+  }));
+}
+
 export function listColumnsFromConfig(config) {
   return config?.list_columns?.length > 0
     ? sortListColumns(config.list_columns)
@@ -20,7 +34,7 @@ export function listColumnsFromConfig(config) {
 
 export function buildListColumnConfiguration(config, listColumns) {
   return {
-    columns: config?.columns || [],
+    columns: boardColumnsForSave(config?.columns),
     backlog_status_ids: config?.backlog_status_ids || [],
     list_columns: listColumns,
     card_fields: config?.card_fields || [],

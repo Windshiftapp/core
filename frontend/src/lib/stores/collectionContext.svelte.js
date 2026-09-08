@@ -504,7 +504,7 @@ class CollectionStore {
         sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
         ...this.#itemSortOptions(),
-        ...this.#boardExclusionFilter(boardPartition?.statusIds),
+        ...this.#boardExclusionFilter(boardPartition?.statusIds ?? null),
       });
 
     if (!isBoard) return fetchPage(1, limit);
@@ -1086,6 +1086,7 @@ class CollectionStore {
       }
 
       const updatedItems = await fetchItemsById(loadedChangedIds);
+      if (loadId !== this.#loadId) return;
       for (const updated of updatedItems) {
         this.#applyUpdatedItem(updated);
       }

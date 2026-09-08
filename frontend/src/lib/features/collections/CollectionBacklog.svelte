@@ -832,7 +832,7 @@
               >
                 {collectionStore.backlogLoadingMore ? t('common.loading') : t('common.loadMore')}
                 {#if collectionStore.backlogPagination?.total_items}
-                  ({collectionStore.backlogPagination.total - collectionStore.backlogItems.length} {t('common.remaining')})
+                  ({collectionStore.backlogPagination.total_items - collectionStore.backlogItems.length} {t('common.remaining')})
                 {/if}
               </button>
             </div>

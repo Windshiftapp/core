@@ -15,7 +15,7 @@ import { warningToast } from './toasts.svelte.js';
  * URL round-trip, and the polished raw-mode UX (confirm-then-snapshot,
  * tryParseToBuilder on reset, warning toast for dropped clauses).
  */
-export function createWorkItemSearchStore() {
+export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
   // ===== Filter state =====
   const searchQuery = writable('');
   const selectedWorkspaces = writable([]);
@@ -174,7 +174,7 @@ export function createWorkItemSearchStore() {
   // ===== Search execution =====
   async function executeSearch({ page = 1, limit = 50 } = {}) {
     const finalQl = get(qlQuery);
-    if (!finalQl?.trim()) {
+    if (!allowEmptyQuery && !finalQl?.trim()) {
       workItems.set([]);
       pagination.set(null);
       qlError.set(null);

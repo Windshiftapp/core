@@ -19,6 +19,7 @@
   import ItemDetail from '../items/ItemDetail.svelte';
   import RoadmapItemPreview from './RoadmapItemPreview.svelte';
   import { buildHierarchyDatePatches, projectHierarchyDates } from './roadmapHierarchyDates.js';
+  import { boardColumnsForSave } from '../../utils/workItemListColumns.js';
   import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, CalendarClock, RotateCcw } from '@lucide/svelte';
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
@@ -730,7 +731,7 @@
   // Save roadmap config
   async function saveConfig() {
     const payload = {
-      columns: boardConfig?.columns || [],
+      columns: boardColumnsForSave(boardConfig?.columns),
       backlog_status_ids: boardConfig?.backlog_status_ids || [],
       list_columns: boardConfig?.list_columns || [],
       card_fields: boardConfig?.card_fields || [],

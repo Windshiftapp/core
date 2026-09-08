@@ -80,11 +80,21 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		filter := repository.WorklogListFilter{UserID: user.ID, Limit: page.PageSize, Offset: page.Offset}
-		if err := applyWorklogFilters(r, &filter); err != nil {
+		// Restore legacy team-wide scope: every accessible project's worklogs,
+		// not just the caller's own rows, so timesheet team cells and totals
+		// keep all entries. nil = full access; empty = none.
+		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
+		if err != nil {
+			return nil, Pagination{}, 0, internalError(err)
+		}
+		if accessible != nil && len(accessible) == 0 {
+			return []worklogDTO{}, page, 0, nil
+		}
+		filter := repository.WorklogDetailFilter{AccessibleProjectIDs: accessible, Limit: page.PageSize, Offset: page.Offset}
+		if err := applyWorklogFilters(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		worklogs, total, err := deps.Worklogs.ListMine(filter)
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
@@ -225,7 +235,7 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 			return nil, Pagination{}, 0, err
 		}
 		filter := repository.WorklogDetailFilter{ProjectID: &projectID, Limit: page.PageSize, Offset: page.Offset}
-		if err := applyWorklogDetailDates(r, &filter); err != nil {
+		if err := applyWorklogDetailDates(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
 		worklogs, total, err := deps.Worklogs.ListPage(filter)
@@ -284,8 +294,8 @@ func requireWorklogItem(r *http.Request, deps Deps, itemID *int) error {
 	return err
 }
 
-func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) error {
-	if err := applyWorklogDateRange(r, &filter.DateFromUnix, &filter.DateToExclusiveUnix); err != nil {
+func applyWorklogFilters(r *http.Request, user *models.User, filter *repository.WorklogDetailFilter) error {
+	if err := applyWorklogDateRange(r, user, &filter.DateFromUnix, &filter.DateToExclusiveUnix); err != nil {
 		return err
 	}
 	if raw := r.URL.Query().Get("project_id"); raw != "" {
@@ -295,16 +305,42 @@ func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) 
 		}
 		filter.ProjectID = &id
 	}
+	if raw := r.URL.Query().Get("customer_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil || id <= 0 {
+			return newError(http.StatusBadRequest, "invalid_request", "customer_id is invalid")
+		}
+		filter.CustomerID = &id
+	}
 	return nil
 }
 
-func applyWorklogDetailDates(r *http.Request, filter *repository.WorklogDetailFilter) error {
-	return applyWorklogDateRange(r, &filter.DateFromUnix, &filter.DateToExclusiveUnix)
+func applyWorklogDetailDates(r *http.Request, user *models.User, filter *repository.WorklogDetailFilter) error {
+	return applyWorklogDateRange(r, user, &filter.DateFromUnix, &filter.DateToExclusiveUnix)
 }
 
-func applyWorklogDateRange(r *http.Request, from, to **int64) error {
+// reportTimezone resolves the optional timezone query parameter used to
+// interpret civil date filters, falling back to the acting user's profile
+// timezone so client-side grouping and server-side inclusion agree.
+func reportTimezone(r *http.Request, user *models.User) (*time.Location, error) {
+	raw := r.URL.Query().Get("timezone")
+	if raw == "" {
+		raw = user.Timezone
+	}
+	_, location, err := services.ResolveTimezone(raw)
+	if err != nil {
+		return nil, newError(http.StatusBadRequest, "invalid_request", err.Error())
+	}
+	return location, nil
+}
+
+func applyWorklogDateRange(r *http.Request, user *models.User, from, to **int64) error {
 	if raw := r.URL.Query().Get("from"); raw != "" {
-		start, _, err := services.CivilDateRangeUTC(raw, raw, time.UTC)
+		location, err := reportTimezone(r, user)
+		if err != nil {
+			return err
+		}
+		start, _, err := services.CivilDateRangeUTC(raw, raw, location)
 		if err != nil {
 			return newError(http.StatusBadRequest, "invalid_request", "from must use YYYY-MM-DD")
 		}
@@ -312,7 +348,11 @@ func applyWorklogDateRange(r *http.Request, from, to **int64) error {
 		*from = &value
 	}
 	if raw := r.URL.Query().Get("to"); raw != "" {
-		_, end, err := services.CivilDateRangeUTC(raw, raw, time.UTC)
+		location, err := reportTimezone(r, user)
+		if err != nil {
+			return err
+		}
+		_, end, err := services.CivilDateRangeUTC(raw, raw, location)
 		if err != nil {
 			return newError(http.StatusBadRequest, "invalid_request", "to must use YYYY-MM-DD")
 		}
@@ -353,10 +393,20 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 	if patch.Timezone.Set {
 		input.Timezone = patch.Timezone.Value
 	}
+	if patch.StartTime.Set {
+		input.StartTime = patch.StartTime.Value
+	}
+	if patch.EndTime.Set {
+		input.EndTime = patch.EndTime.Value
+	}
 	switch {
 	case patch.Duration.Set || patch.DurationMinutes.Set:
-		input.StoredStartUnix = 0
-		input.StoredEndUnix = 0
+		// Duration-only input restarts from local midnight on the entry date.
+		// Supplied clocks keep precedence and are cross-checked in the service.
+		if !patch.StartTime.Set && !patch.EndTime.Set {
+			input.StoredStartUnix = 0
+			input.StoredEndUnix = 0
+		}
 		input.DurationMinutes = 0
 		if patch.Duration.Set {
 			input.Duration = patch.Duration.Value
@@ -364,13 +414,9 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 			input.DurationMinutes = patch.DurationMinutes.Value
 		}
 	case patch.Date.Set || patch.StartTime.Set || patch.EndTime.Set:
+		// Date or clock edits reconstruct the interval from the patched or
+		// stored civil clocks resolved on the selected day.
 		input.DurationMinutes = 0
-		if patch.StartTime.Set {
-			input.StartTime = patch.StartTime.Value
-		}
-		if patch.EndTime.Set {
-			input.EndTime = patch.EndTime.Value
-		}
 	default:
 		input.PreserveStored = true
 	}

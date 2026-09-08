@@ -387,11 +387,16 @@ type timeAccess interface {
 	CanEditWorklog(int, int) (bool, error)
 	CanViewProject(int, int) (bool, error)
 	AccessibleTimeProjectIDs(int) ([]int, error)
+	GetAccessibleProjects(int) ([]int, error)
 	IsTimeProjectManager(int, int) (bool, error)
 }
 
 type systemAdministrator interface {
 	IsSystemAdmin(int) (bool, error)
+}
+
+type globalPermissionReader interface {
+	HasGlobalPermission(int, string) (bool, error)
 }
 
 type groupApplication interface {
@@ -539,6 +544,7 @@ type Deps struct {
 	TimeProjects       timeProjectApplication
 	Timers             timerApplication
 	SystemAdmins       systemAdministrator
+	GlobalPermission   globalPermissionReader
 	Groups             groupApplication
 	AdminUsers         adminUserApplication
 	Comments           commentApplication
@@ -754,7 +760,7 @@ func buildRoutes(deps Deps) []route {
 	registerWorklogRoutes(&builder, deps)
 	registerTimeRoutes(&builder, deps)
 	registerAdminRoutes(&builder, deps)
-	registerPageRoutes(&builder, deps.PageApplication)
+	registerPageRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
@@ -918,6 +924,7 @@ func applyParameterCorrections(route *Route) {
 	case "GET /items/{item_id}/worklogs", "GET /time/projects/{project_id}/worklogs":
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))
 		upsertParameter(route, dateQuery("to", "Includes worklogs on or before this civil date."))
+		upsertParameter(route, stringQuery("timezone", "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone."))
 	case "GET /asset-sets/{asset_set_id}/assets":
 		for _, name := range []string{"type_id", "category_id", "status_id"} {
 			upsertParameter(route, stringQuery(name, "Restricts assets by "+strings.ReplaceAll(name, "_", " ")+"."))
@@ -975,8 +982,10 @@ func applyParameterCorrections(route *Route) {
 	case "GET /workspaces/{workspace_id}/test-reports/summary":
 		upsertParameter(route, positiveIDQuery("milestone_id", "Restricts the report to one milestone."))
 		upsertParameter(route, integerQuery("days", "Number of recent civil days included in trend calculations.", 365, 30))
-	case "DELETE /asset-management-sets/{asset_set_id}/roles/{assignment_id}":
+	case "DELETE /asset-sets/{asset_set_id}/roles/{assignment_id}":
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
+	case "GET /items":
+		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
 	case "POST /milestones/{milestone_id}/release":
 		upsertParameter(route, ParameterMetadata{Name: "Idempotency-Key", In: "header", Description: "Caller-generated key that makes retries return the original release result.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /openapi.json":
