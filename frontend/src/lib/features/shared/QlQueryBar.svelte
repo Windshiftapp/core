@@ -17,6 +17,10 @@
 
   let {
     query = '',
+    completionCatalog = null,
+    compact = false,
+    editorTestId = 'ql-editor',
+    placeholder = null,
     mode = 'builder', // 'builder' | 'raw'
     error = null,
     onenterrawmode = null,
@@ -29,7 +33,8 @@
   let focused = $state(false);
   let dismissed = $state(false);
   let cursor = $state(0);
-  let catalog = $state(null);
+  let remoteCatalog = $state(null);
+  let catalog = $derived(completionCatalog ?? remoteCatalog);
   let catalogLoading = false;
   let activeIndex = $state(0);
   let availableValues = $state([]);
@@ -60,7 +65,7 @@
   async function loadCatalog() {
     catalogLoading = true;
     try {
-      catalog = await api.queryLanguage.getCatalog();
+      remoteCatalog = await api.queryLanguage.getCatalog();
     } catch (err) {
       console.warn('Failed to load QL completion catalog:', err);
     } finally {
@@ -122,7 +127,14 @@
       return;
     }
 
-    if (suggestions.length === 0) return;
+    if (event.isComposing) return;
+    if (suggestions.length === 0) {
+      if (compact && event.key === 'Enter') {
+        event.preventDefault();
+        onexecute?.();
+      }
+      return;
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       activeIndex = (activeIndex + 1) % suggestions.length;
@@ -172,46 +184,48 @@
   }
 </script>
 
-<div class="mb-4">
-  <div class="flex items-center gap-3 text-xs" style="color: var(--ds-text-subtle);">
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="font-medium shrink-0">{t('collections.query')}:</span>
-      <code
-        class="font-mono truncate"
-        title={query || t('collections.noQuery')}
-        data-testid="ql-query-summary"
-      >
-        {query || t('collections.noFiltersApplied')}
-      </code>
-      {#if mode === 'builder'}
-        <Button dataTestid="ql-enter-raw-mode" variant="ghost" size="sm" onclick={() => onenterrawmode?.()}>
-          {t('collections.editCqlManually')}
-        </Button>
-      {:else}
-        <Button dataTestid="ql-reset-to-builder" variant="ghost" size="sm" onclick={() => onreset?.()}>
-          {t('collections.resetToBuilder')}
-        </Button>
+<div class={compact ? "relative" : "mb-4"}>
+  {#if !compact}
+    <div class="flex items-center gap-3 text-xs" style="color: var(--ds-text-subtle);">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="font-medium shrink-0">{t('collections.query')}:</span>
+        <code
+          class="font-mono truncate"
+          title={query || t('collections.noQuery')}
+          data-testid="ql-query-summary"
+        >
+          {query || t('collections.noFiltersApplied')}
+        </code>
+        {#if mode === 'builder'}
+          <Button dataTestid="ql-enter-raw-mode" variant="ghost" size="sm" onclick={() => onenterrawmode?.()}>
+            {t('collections.editCqlManually')}
+          </Button>
+        {:else}
+          <Button dataTestid="ql-reset-to-builder" variant="ghost" size="sm" onclick={() => onreset?.()}>
+            {t('collections.resetToBuilder')}
+          </Button>
+        {/if}
+      </div>
+      {#if error && mode === 'builder'}
+        <span style="color: var(--ds-text-danger);">{t('collections.error')}</span>
       {/if}
     </div>
-    {#if error && mode === 'builder'}
-      <span style="color: var(--ds-text-danger);">{t('collections.error')}</span>
-    {/if}
-  </div>
+  {/if}
 
   {#if mode === 'raw'}
-    <div class="mt-3 p-3 rounded-lg border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <label for="ql-editor" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">
+    <div class={compact ? "relative" : "mt-3 p-3 rounded-lg border"} style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <label for="ql-editor" class={compact ? "sr-only" : "block text-xs font-medium mb-2"} style="color: var(--ds-text-subtle);">
         {t('collections.queryLanguage')}
       </label>
       <Textarea
         id="ql-editor"
-        data-testid="ql-editor"
+        data-testid={editorTestId}
         bind:textareaRef
         value={query}
         oninput={handleQueryChange}
-        placeholder={t('collections.queryPlaceholder')}
+        placeholder={placeholder ?? t('collections.queryPlaceholder')}
         class="font-mono text-sm"
-        rows={2}
+        rows={compact ? 1 : 2}
         onkeydown={handleKeydown}
         onkeyup={handleKeyup}
         onselect={updateCursor}
@@ -228,7 +242,7 @@
           id="ql-suggestions"
           data-testid="ql-suggestions"
           role="listbox"
-          class="mt-1 max-h-56 overflow-y-auto rounded-md border p-1 shadow-sm"
+          class={`mt-1 max-h-56 overflow-y-auto rounded-md border p-1 shadow-sm ${compact ? "absolute inset-x-0 top-full z-50" : ""}`}
           style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
         >
           {#each suggestions as suggestion, index}
@@ -261,14 +275,16 @@
           {error}
         </DescriptionText>
       {/if}
-      <div class="mt-2 flex items-center justify-between">
-        <span class="text-xs" style="color: var(--ds-text-subtlest);">
-          {t('collections.executeShortcut', { shortcut: getShortcutDisplay('ql', 'execute') })}
-        </span>
-        <div class="flex gap-2">
-          <Button variant="primary" size="sm" onclick={() => onexecute?.()}>{t('collections.execute')}</Button>
+      {#if !compact}
+        <div class="mt-2 flex items-center justify-between">
+          <span class="text-xs" style="color: var(--ds-text-subtlest);">
+            {t('collections.executeShortcut', { shortcut: getShortcutDisplay('ql', 'execute') })}
+          </span>
+          <div class="flex gap-2">
+            <Button variant="primary" size="sm" onclick={() => onexecute?.()}>{t('collections.execute')}</Button>
+          </div>
         </div>
-      </div>
+      {/if}
     </div>
   {/if}
 </div>
