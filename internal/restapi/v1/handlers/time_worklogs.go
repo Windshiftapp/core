@@ -85,6 +85,7 @@ func mapWorklogToResponse(wl models.Worklog) worklogResponse {
 // @Security     BearerAuth
 // @Param        date_from   query     string  false  "Inclusive start date (YYYY-MM-DD)"
 // @Param        date_to     query     string  false  "Inclusive end date (YYYY-MM-DD)"
+// @Param        timezone    query     string  false  "IANA timezone used to interpret date_from/date_to (defaults to the profile timezone)"
 // @Param        project_id  query     int     false  "Filter by time project ID"
 // @Param        page        query     int     false  "Page (1-indexed)"
 // @Param        limit       query     int     false  "Page size"
@@ -105,8 +106,14 @@ func (h *TimeWorklogHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		Offset: pagination.Offset,
 	}
 
+	reportLocation, locationErr := h.resolveReportTimezone(r, user.Timezone)
+	if locationErr != nil {
+		h.RespondError(w, r, locationErr)
+		return
+	}
+
 	if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" {
-		start, _, err := services.CivilDateRangeUTC(dateFrom, dateFrom, time.UTC)
+		start, _, err := services.CivilDateRangeUTC(dateFrom, dateFrom, reportLocation)
 		if err != nil {
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "invalid date_from format, use YYYY-MM-DD"))
 			return
@@ -115,7 +122,7 @@ func (h *TimeWorklogHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		filter.DateFromUnix = &from
 	}
 	if dateTo := r.URL.Query().Get("date_to"); dateTo != "" {
-		_, endExclusive, err := services.CivilDateRangeUTC(dateTo, dateTo, time.UTC)
+		_, endExclusive, err := services.CivilDateRangeUTC(dateTo, dateTo, reportLocation)
 		if err != nil {
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "invalid date_to format, use YYYY-MM-DD"))
 			return
@@ -339,6 +346,18 @@ func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.RespondNoContent(w)
+}
+
+func (h *TimeWorklogHandler) resolveReportTimezone(r *http.Request, profileTimezone string) (*time.Location, *restapi.APIError) {
+	raw := r.URL.Query().Get("timezone")
+	if raw == "" {
+		raw = profileTimezone
+	}
+	_, location, err := services.ResolveTimezone(raw)
+	if err != nil {
+		return nil, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error())
+	}
+	return location, nil
 }
 
 func (h *TimeWorklogHandler) respondMutationError(w http.ResponseWriter, r *http.Request, err error) {

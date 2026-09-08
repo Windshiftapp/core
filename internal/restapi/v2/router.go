@@ -924,6 +924,7 @@ func applyParameterCorrections(route *Route) {
 	case "GET /items/{item_id}/worklogs", "GET /time/projects/{project_id}/worklogs":
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))
 		upsertParameter(route, dateQuery("to", "Includes worklogs on or before this civil date."))
+		upsertParameter(route, stringQuery("timezone", "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone."))
 	case "GET /asset-sets/{asset_set_id}/assets":
 		for _, name := range []string{"type_id", "category_id", "status_id"} {
 			upsertParameter(route, stringQuery(name, "Restricts assets by "+strings.ReplaceAll(name, "_", " ")+"."))

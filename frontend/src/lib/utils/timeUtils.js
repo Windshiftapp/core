@@ -73,7 +73,8 @@ export function durationToString(totalMinutes, options = {}) {
 }
 
 /**
- * Compute positive minutes between two HH:MM times; returns 0 if end <= start or inputs are invalid.
+ * Compute positive minutes between two HH:MM times; an end at or before the
+ * start wraps to the next day (overnight entry). Returns 0 for invalid input.
  */
 export function minutesBetweenTimes(startTime, endTime) {
   if (!startTime || !endTime) return 0;
@@ -82,9 +83,12 @@ export function minutesBetweenTimes(startTime, endTime) {
   const [endHours, endMins] = endTime.split(':').map(Number);
 
   const startTotal = startHours * 60 + startMins;
-  const endTotal = endHours * 60 + endMins;
+  let endTotal = endHours * 60 + endMins;
+  if (endTotal <= startTotal) {
+    endTotal += 24 * 60;
+  }
 
-  return endTotal > startTotal ? endTotal - startTotal : 0;
+  return endTotal - startTotal;
 }
 
 /**

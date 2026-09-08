@@ -249,7 +249,7 @@ func init() {
 		Group:       CapabilityTime,
 		Access:      AccessWrite,
 		Risk:        RiskMedium,
-		Description: "Log a time entry on a time tracking project. Date and HH:MM are exact local wall-clock values in the acting user's IANA timezone: never convert or pre-offset them. Provide duration OR duration_minutes OR start_time + end_time. Use timezone only when the user explicitly names a different zone.",
+		Description: "Log a time entry on a time tracking project. Date and HH:MM are exact local wall-clock values in the acting user's IANA timezone: never convert or pre-offset them. Provide duration OR duration_minutes OR start_time + end_time; when clocks and a duration are both sent the duration must match, and an end clock at or before the start means the next day. Use timezone only when the user explicitly names a different zone.",
 		Scopes:      []string{auth.ScopeTimeWrite},
 		Run: func(_ context.Context, env *Env, args logTimeArgs) (any, error) {
 			if args.ProjectID == 0 || args.Description == "" || args.Date == "" {

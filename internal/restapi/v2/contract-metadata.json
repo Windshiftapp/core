@@ -5689,6 +5689,15 @@
               "format": "date",
               "type": "string"
             }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7677,6 +7686,15 @@
               "format": "date",
               "type": "string"
             }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7799,6 +7817,15 @@
             "Required": false,
             "Schema": {
               "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
               "type": "string"
             }
           }

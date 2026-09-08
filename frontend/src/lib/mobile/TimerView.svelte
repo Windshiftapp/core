@@ -14,7 +14,7 @@
   // Most-recent-first; the worklog list/edit/delete + modal all come from the
   // same store the desktop Time view uses, so behaviour is identical.
   const worklogs = $derived(
-    [...timeEntryStore.worklogs].sort((a, b) => (b.date ?? 0) - (a.date ?? 0)).slice(0, 20)
+    [...timeEntryStore.worklogs].sort((a, b) => (b.start_time ?? b.date ?? 0) - (a.start_time ?? a.date ?? 0)).slice(0, 20)
   );
 
   function fmtDay(epochSeconds) {
@@ -102,7 +102,7 @@
               <span class="wl-sub">
                 {#if formatItemKey(w)}<span class="wl-key">{formatItemKey(w)}</span>{/if}
                 <span class="wl-dur">{timeEntryStore.formatDuration(w.duration_minutes)}</span>
-                <span class="wl-day">{fmtDay(w.date)}</span>
+                <span class="wl-day">{fmtDay(w.start_time || w.date)}</span>
               </span>
             </button>
             <button class="wl-del" onclick={(e) => removeWorklog(w, e)} data-testid="worklog-delete" aria-label="Delete worklog" type="button">
