@@ -18165,6 +18165,10 @@
                       "description": "The completed value.",
                       "type": "integer"
                     },
+                    "completed_points": {
+                      "description": "The completed points value.",
+                      "type": "number"
+                    },
                     "date": {
                       "description": "The date value.",
                       "type": "string"
@@ -18173,16 +18177,27 @@
                       "description": "The ideal value.",
                       "type": "integer"
                     },
+                    "ideal_points": {
+                      "description": "The ideal points value.",
+                      "type": "number"
+                    },
                     "remaining": {
                       "description": "The remaining value.",
                       "type": "integer"
+                    },
+                    "remaining_points": {
+                      "description": "The remaining points value.",
+                      "type": "number"
                     }
                   },
                   "required": [
                     "completed",
+                    "completed_points",
                     "date",
                     "ideal",
-                    "remaining"
+                    "ideal_points",
+                    "remaining",
+                    "remaining_points"
                   ],
                   "type": "object"
                 },
