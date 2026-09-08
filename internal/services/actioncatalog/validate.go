@@ -2,6 +2,7 @@ package actioncatalog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -313,6 +314,10 @@ func (e ValidationErrors) Has(code string) bool {
 	return false
 }
 
+// errInvalidConfigJSON marks config that failed JSON parsing, as opposed
+// to valid JSON that violates the resolved schema.
+var errInvalidConfigJSON = errors.New("invalid JSON")
+
 // validateConfigJSON parses a JSON config string and validates it against
 // the resolved schema. An empty string is treated as `{}` — that's how
 // the storage layer represents "no config" today.
@@ -326,7 +331,7 @@ func validateConfigJSON(resolved *jsonschema.Resolved, cfg string) error {
 	}
 	var instance any
 	if err := json.Unmarshal([]byte(cfg), &instance); err != nil {
-		return fmt.Errorf("invalid JSON: %w", err)
+		return fmt.Errorf("%w: %w", errInvalidConfigJSON, err)
 	}
 	if err := resolved.Validate(instance); err != nil {
 		return err
@@ -342,7 +347,7 @@ func schemaErrCode(err error) string {
 	if err == nil {
 		return ""
 	}
-	if strings.HasPrefix(err.Error(), "invalid JSON") {
+	if errors.Is(err, errInvalidConfigJSON) {
 		return CodeInvalidConfigJSON
 	}
 	return CodeInvalidConfig

@@ -377,7 +377,7 @@ func (s *ActionApplicationService) requireSetActor(userID int) error {
 func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerType, roleIDs []int) ([]int, error) {
 	if trigger != models.ActionTriggerManual {
 		if len(roleIDs) > 0 {
-			return nil, errors.New("allowed_role_ids can only be set on manual actions")
+			return nil, &InvalidRequestError{Message: "allowed_role_ids can only be set on manual actions"}
 		}
 		return []int{}, nil
 	}
@@ -385,7 +385,7 @@ func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerTyp
 	result := make([]int, 0, len(roleIDs))
 	for _, id := range roleIDs {
 		if id <= 0 {
-			return nil, errors.New("allowed_role_ids must contain positive role IDs")
+			return nil, &InvalidRequestError{Message: "allowed_role_ids must contain positive role IDs"}
 		}
 		if _, ok := seen[id]; !ok {
 			seen[id] = struct{}{}
@@ -398,7 +398,7 @@ func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerTyp
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.New("allowed_role_ids contains an unknown workspace role")
+		return nil, &InvalidRequestError{Message: "allowed_role_ids contains an unknown workspace role"}
 	}
 	return result, nil
 }

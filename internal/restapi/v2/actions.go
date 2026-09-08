@@ -167,10 +167,11 @@ func actionError(err error) error {
 		return nil
 	}
 	var validation *services.ActionValidationError
+	var invalidRequest *services.InvalidRequestError
 	switch {
 	case errors.Is(err, services.ErrActionNotVisible), errors.Is(err, repository.ErrNotFound):
 		return newError(http.StatusNotFound, "not_found", "Action was not found")
-	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), strings.Contains(err.Error(), "allowed_role_ids"):
+	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), errors.As(err, &invalidRequest):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		return internalError(err)

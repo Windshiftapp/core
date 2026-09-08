@@ -262,17 +262,17 @@ func linkError(err error) error {
 	if err == nil {
 		return nil
 	}
+	var invalidRequest *services.InvalidRequestError
 	switch {
 	case errors.Is(err, services.ErrLinkSelfReference), errors.Is(err, services.ErrLinkInvalidEntityType), errors.Is(err, services.ErrInvalidLinkTypeForEntities), errors.Is(err, services.ErrQLQuery):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
+	case errors.As(err, &invalidRequest):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, services.ErrLinkExists):
 		return newError(http.StatusConflict, "conflict", "Link already exists")
 	case errors.Is(err, services.ErrLinkNotFound), errors.Is(err, services.ErrLinkCrossWorkspacePage), services.IsEntityNotAccessible(err):
 		return newError(http.StatusNotFound, "not_found", "Link was not found")
 	default:
-		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "ids must") || strings.Contains(err.Error(), "custom field") || strings.Contains(err.Error(), "field options") || strings.Contains(err.Error(), "not allowed") || strings.Contains(err.Error(), "does not match") {
-			return newError(http.StatusBadRequest, "invalid_request", err.Error())
-		}
 		return internalError(err)
 	}
 }
