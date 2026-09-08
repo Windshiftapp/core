@@ -120,7 +120,7 @@
   async function loadData() {
     try {
       // In workspace view, filter milestones by workspace_id and include global
-      const filters = isGlobalView ? {} : { workspace_id: workspaceId, include_global: true };
+      const filters = isGlobalView ? { is_global: true } : { workspace_id: workspaceId, include_global: true };
       const [_, milestones, ws] = await Promise.all([
         categoriesStore.init(),
         api.milestones.getAll(filters),
@@ -274,7 +274,7 @@
     showReleaseModal = false;
     releasingMilestone = null;
     // Refresh milestones to show updated status
-    const filters = isGlobalView ? {} : { workspace_id: workspaceId, include_global: true };
+    const filters = isGlobalView ? { is_global: true } : { workspace_id: workspaceId, include_global: true };
     try {
       const milestones = await api.milestones.getAll(filters);
       milestonesStore.set(milestones || []);
