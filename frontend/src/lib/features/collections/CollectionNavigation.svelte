@@ -32,7 +32,7 @@
   }
 
   let collectionName = $derived(collectionStore.collectionName);
-  let itemCount = $derived(collectionStore.itemsPagination?.total_items ?? 0);
+  let itemCount = $derived(collectionStore.itemsTotalCount);
 
   const sidebarBgStyle = 'background-color: var(--ds-surface); border-color: var(--ds-border);';
 </script>
