@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -175,6 +176,9 @@ type ItemChangesRequest struct {
 	UserID, WorkspaceID, CollectionID int
 	Since                             int64
 	SinceProvided                     bool
+	Through                           int64
+	ThroughProvided                   bool
+	Limit                             int
 	SubQL                             string
 }
 
@@ -182,6 +186,9 @@ type ItemChangesResult struct {
 	ChangedItemIDs     []int `json:"changed_item_ids"`
 	RemovedItemIDs     []int `json:"removed_item_ids"`
 	Watermark          int64 `json:"watermark"`
+	NextCursor         int64 `json:"next_cursor"`
+	HasMore            bool  `json:"has_more"`
+	ResetRequired      bool  `json:"reset_required"`
 	RequiresFullReload bool  `json:"requires_full_reload"`
 	MembershipDirty    bool  `json:"membership_dirty"`
 }
@@ -292,17 +299,42 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			return ItemChangesResult{}, repository.ErrNotFound
 		}
 	}
-	result.Watermark, err = changes.CurrentWatermark(workspaceIDs, request.WorkspaceID)
-	if err != nil || !request.SinceProvided || request.Since >= result.Watermark {
-		return result, err
+	if request.Since < 0 || request.Through < 0 || (request.ThroughProvided && request.Through < request.Since) || request.Limit < 0 || request.Limit > 500 {
+		return ItemChangesResult{}, &validation.ValidationError{Field: "since", Message: "invalid item change window"}
 	}
-	entries, err := changes.QuerySince(workspaceIDs, request.WorkspaceID, request.Since, 501)
+	result.Watermark, err = changes.StableCurrentWatermark(workspaceIDs, request.WorkspaceID)
 	if err != nil {
 		return ItemChangesResult{}, err
 	}
-	if len(entries) > 500 {
-		result.RequiresFullReload, result.MembershipDirty = true, true
+	result.NextCursor = result.Watermark
+	if request.Since > result.Watermark || (request.ThroughProvided && request.Through > result.Watermark) {
+		result.ResetRequired, result.RequiresFullReload, result.MembershipDirty = true, true, true
 		return result, nil
+	}
+	if request.ThroughProvided {
+		result.Watermark = request.Through
+		result.NextCursor = request.Through
+	}
+	if !request.SinceProvided {
+		return result, nil
+	}
+	limit := request.Limit
+	if limit == 0 {
+		limit = 500
+	}
+	entries, err := changes.QueryPage(workspaceIDs, request.WorkspaceID, request.Since, result.Watermark, limit+1)
+	if err != nil {
+		return ItemChangesResult{}, err
+	}
+	if len(entries) > limit {
+		result.HasMore = true
+		entries = entries[:limit]
+		result.NextCursor = entries[len(entries)-1].Cursor
+		// Existing clients omit limit and advance directly to watermark.
+		if request.Limit == 0 {
+			result.RequiresFullReload, result.MembershipDirty = true, true
+			return result, nil
+		}
 	}
 	removed := make(map[int]bool)
 	changed := make(map[int]bool)
@@ -311,8 +343,11 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			result.RequiresFullReload, result.MembershipDirty = true, true
 			return result, nil
 		}
-		if entry.Deleted {
+		if entry.ChangeType == "delete" {
 			removed[entry.ItemID] = true
+			continue
+		}
+		if changed[entry.ItemID] || removed[entry.ItemID] {
 			continue
 		}
 		visible, err := s.itemVisibleInDelta(ctx, request, workspaceIDs, entry.ItemID)
@@ -333,6 +368,8 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			result.ChangedItemIDs = append(result.ChangedItemIDs, id)
 		}
 	}
+	slices.Sort(result.ChangedItemIDs)
+	slices.Sort(result.RemovedItemIDs)
 	result.MembershipDirty = len(result.RemovedItemIDs) > 0
 	return result, nil
 }

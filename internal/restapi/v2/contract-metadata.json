@@ -3998,7 +3998,7 @@
     },
     "/items/changes": {
       "get": {
-        "description": "Get item changes. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow.",
         "parameters": [
           {
             "Name": "workspace_id",
@@ -4023,7 +4023,7 @@
           {
             "Name": "since",
             "In": "query",
-            "Description": "Return changes after this non-negative item-change watermark. Omit it to request a full-reload decision.",
+            "Description": "Exclusive change cursor. Omit to obtain a stable watermark before a full load.",
             "Required": false,
             "Schema": {
               "format": "int64",
@@ -4039,6 +4039,29 @@
             "Schema": {
               "minLength": 1,
               "type": "string"
+            }
+          },
+          {
+            "Name": "through",
+            "In": "query",
+            "Description": "Inclusive fixed watermark from the first page. Must be greater than or equal to since.",
+            "Required": false,
+            "Schema": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum log events per page. Supply explicitly to enable incremental pagination; omitted limits preserve the full-reload fallback on overflow.",
+            "Required": false,
+            "Schema": {
+              "default": 500,
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
             }
           }
         ],

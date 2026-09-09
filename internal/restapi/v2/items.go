@@ -280,8 +280,24 @@ func registerItemSetRoutes(builder *routeBuilder, app *services.ItemApplicationS
 				return services.ItemChangesResult{}, invalidQuery("since")
 			}
 		}
+		throughRaw := strings.TrimSpace(r.URL.Query().Get("through"))
+		var through int64
+		if throughRaw != "" {
+			through, err = strconv.ParseInt(throughRaw, 10, 64)
+			if err != nil || through < 0 || through < since {
+				return services.ItemChangesResult{}, invalidQuery("through")
+			}
+		}
+		var limit int
+		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+			limit, err = strconv.Atoi(raw)
+			if err != nil || limit < 1 || limit > 500 {
+				return services.ItemChangesResult{}, invalidQuery("limit")
+			}
+		}
 		result, err := app.Changes(r.Context(), services.ItemChangesRequest{
 			UserID: user.ID, WorkspaceID: workspaceID, CollectionID: collectionID,
+			Through: through, ThroughProvided: throughRaw != "", Limit: limit,
 			Since: since, SinceProvided: sinceRaw != "", SubQL: r.URL.Query().Get("sub_ql"),
 		})
 		return result, itemError(err)

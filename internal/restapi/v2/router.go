@@ -869,6 +869,10 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
 	}
 	switch route.Method + " " + route.Path {
+	case "GET /items/changes":
+		upsertParameter(route, ParameterMetadata{Name: "since", In: "query", Description: "Exclusive change cursor. Omit to obtain a stable watermark before a full load.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
+		upsertParameter(route, ParameterMetadata{Name: "through", In: "query", Description: "Inclusive fixed watermark from the first page. Must be greater than or equal to since.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
+		upsertParameter(route, integerQuery("limit", "Maximum log events per page. Supply explicitly to enable incremental pagination; omitted limits preserve the full-reload fallback on overflow.", 500, 500))
 	case "GET /items/{item_id}/comments", "GET /workspaces/{workspace_id}/agent-runs", "GET /items/{item_id}/agent-runs", "GET /agent-runs/{run_id}/events":
 		filtered := route.Parameters[:0]
 		for _, parameter := range route.Parameters {
@@ -986,6 +990,8 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("days", "Number of recent civil days included in trend calculations.", 365, 30))
 	case "DELETE /asset-sets/{asset_set_id}/roles/{assignment_id}":
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
+	case "GET /items/changes":
+		route.Description = "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow."
 	case "GET /items":
 		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
 	case "POST /milestones/{milestone_id}/release":

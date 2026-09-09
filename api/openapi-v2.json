@@ -7908,9 +7908,17 @@
                 },
                 "type": "array"
               },
+              "has_more": {
+                "description": "The has more value.",
+                "type": "boolean"
+              },
               "membership_dirty": {
                 "description": "The membership dirty value.",
                 "type": "boolean"
+              },
+              "next_cursor": {
+                "description": "The next cursor value.",
+                "type": "integer"
               },
               "removed_item_ids": {
                 "description": "The removed item ids value.",
@@ -7923,6 +7931,10 @@
                 "description": "The requires full reload value.",
                 "type": "boolean"
               },
+              "reset_required": {
+                "description": "The reset required value.",
+                "type": "boolean"
+              },
               "watermark": {
                 "description": "The watermark value.",
                 "type": "integer"
@@ -7930,9 +7942,12 @@
             },
             "required": [
               "changed_item_ids",
+              "has_more",
               "membership_dirty",
+              "next_cursor",
               "removed_item_ids",
               "requires_full_reload",
+              "reset_required",
               "watermark"
             ],
             "type": "object"
@@ -72155,7 +72170,7 @@
     },
     "/items/changes": {
       "get": {
-        "description": "Get item changes. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow.",
         "operationId": "getItemsChanges",
         "parameters": [
           {
@@ -72179,7 +72194,7 @@
             }
           },
           {
-            "description": "Return changes after this non-negative item-change watermark. Omit it to request a full-reload decision.",
+            "description": "Exclusive change cursor. Omit to obtain a stable watermark before a full load.",
             "in": "query",
             "name": "since",
             "required": false,
@@ -72197,6 +72212,29 @@
             "schema": {
               "minLength": 1,
               "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive fixed watermark from the first page. Must be greater than or equal to since.",
+            "in": "query",
+            "name": "through",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum log events per page. Supply explicitly to enable incremental pagination; omitted limits preserve the full-reload fallback on overflow.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
             }
           }
         ],
