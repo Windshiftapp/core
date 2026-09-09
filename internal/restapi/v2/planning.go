@@ -12,8 +12,11 @@ import (
 func registerPlanningRoutes(builder *routeBuilder, planning planningApplication) {
 	builder.Page("/milestones", AuthAuthenticated, []string{"milestones:read"}, listMilestones(planning, false))
 	builder.JSON(http.MethodPost, "/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"milestones:write"}, createMilestone(planning, false))
-	builder.Page("/workspaces/{workspace_id}/milestones", AuthAuthenticated, []string{"milestones:read"}, listMilestones(planning, true))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"milestones:write"}, createMilestone(planning, true))
+	builder.Page("/workspaces/{workspace_id}/milestones", AuthAuthenticated, []string{"items:read"}, listMilestones(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createMilestone(planning, true))
+	builder.Read("/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:read"}, getMilestone(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchMilestone(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:delete"}, deleteMilestone(planning))
 	builder.Read("/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:read"}, getMilestone(planning))
 	builder.JSON(http.MethodPatch, "/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"milestones:write"}, patchMilestone(planning))
 	builder.Command(http.MethodDelete, "/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:delete"}, deleteMilestone(planning))
@@ -22,12 +25,15 @@ func registerPlanningRoutes(builder *routeBuilder, planning planningApplication)
 	builder.Read("/milestones/{milestone_id}/test-statistics", AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatistics(planning))
 	builder.JSON(http.MethodPost, "/milestones/test-statistics", http.StatusOK, false, AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatisticsBatch(planning))
 	builder.JSON(http.MethodPost, "/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, reorderMilestones(planning, false))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, reorderMilestones(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, reorderMilestones(planning, true))
 
 	builder.Page("/iterations", AuthAuthenticated, []string{"iterations:read"}, listIterations(planning, false))
 	builder.JSON(http.MethodPost, "/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"iterations:write"}, createIteration(planning, false))
-	builder.Page("/workspaces/{workspace_id}/iterations", AuthAuthenticated, []string{"iterations:read"}, listIterations(planning, true))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"iterations:write"}, createIteration(planning, true))
+	builder.Page("/workspaces/{workspace_id}/iterations", AuthAuthenticated, []string{"items:read"}, listIterations(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createIteration(planning, true))
+	builder.Read("/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:read"}, getIteration(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchIteration(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:delete"}, deleteIteration(planning))
 	builder.Read("/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:read"}, getIteration(planning))
 	builder.JSON(http.MethodPatch, "/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"iterations:write"}, patchIteration(planning))
 	builder.Command(http.MethodDelete, "/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:delete"}, deleteIteration(planning))
@@ -187,7 +193,13 @@ func getMilestone(planning planningApplication) readOperation[models.Milestone] 
 			return models.Milestone{}, err
 		}
 		result, err := planning.GetMilestone(user.ID, id)
-		return milestoneModel(result), planningError(err)
+		if err != nil {
+			return models.Milestone{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
+		return milestoneModel(result), nil
 	}
 }
 
@@ -219,6 +231,9 @@ func patchMilestone(planning planningApplication) jsonOperation[models.Milestone
 		if err != nil {
 			return models.Milestone{}, planningError(err)
 		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
 		merged := patch.Apply(milestoneModel(existing))
 		result, err := planning.UpdateMilestone(user.ID, auditActor(r, user), services.UpdateMilestoneParams{
 			ID: id, Name: merged.Name, Description: merged.Description, TargetDate: merged.TargetDate,
@@ -233,6 +248,15 @@ func deleteMilestone(planning planningApplication) commandOperation {
 		user, id, err := planningTarget(r, "milestone_id")
 		if err != nil {
 			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetMilestone(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
 		}
 		return planningError(planning.DeleteMilestone(user.ID, auditActor(r, user), id))
 	}
@@ -325,7 +349,13 @@ func getIteration(planning planningApplication) readOperation[models.Iteration] 
 			return models.Iteration{}, err
 		}
 		result, err := planning.GetIteration(user.ID, id)
-		return iterationModel(result), planningError(err)
+		if err != nil {
+			return models.Iteration{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
+		return iterationModel(result), nil
 	}
 }
 
@@ -357,6 +387,9 @@ func patchIteration(planning planningApplication) jsonOperation[models.Iteration
 		if err != nil {
 			return models.Iteration{}, planningError(err)
 		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
 		merged := patch.Apply(iterationModel(existing))
 		result, err := planning.UpdateIteration(user.ID, auditActor(r, user), services.UpdateIterationParams{
 			ID: id, Name: merged.Name, Description: merged.Description, StartDate: merged.StartDate,
@@ -371,6 +404,15 @@ func deleteIteration(planning planningApplication) commandOperation {
 		user, id, err := planningTarget(r, "iteration_id")
 		if err != nil {
 			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetIteration(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
 		}
 		return planningError(planning.DeleteIteration(user.ID, auditActor(r, user), id))
 	}
@@ -490,4 +532,19 @@ func planningError(err error) error {
 	default:
 		return internalError(err)
 	}
+}
+
+// requirePlanningWorkspace binds nested routes to the object's owning workspace.
+func requirePlanningWorkspace(r *http.Request, global bool, workspaceID *int) error {
+	if r.PathValue("workspace_id") == "" {
+		return nil
+	}
+	id, err := pathID(r, "workspace_id")
+	if err != nil {
+		return err
+	}
+	if global || workspaceID == nil || *workspaceID != id {
+		return planningError(services.ErrPlanningForbidden)
+	}
+	return nil
 }

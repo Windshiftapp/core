@@ -25635,6 +25635,92 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdIterationsIterationIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "end_date": {
+                "description": "The end date value.",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_global": {
+                "description": "The is global value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "start_date": {
+                "description": "The start date value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "type_color": {
+                "description": "The type color value.",
+                "type": "string"
+              },
+              "type_id": {
+                "description": "The type id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "type_name": {
+                "description": "The type name value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "description",
+              "end_date",
+              "id",
+              "is_global",
+              "name",
+              "start_date",
+              "status",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdIterationsResult": {
         "additionalProperties": false,
         "properties": {
@@ -25808,6 +25894,253 @@
               "type": "object"
             },
             "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdMilestonesMilestoneIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category_color": {
+                "description": "The category color value.",
+                "type": "string"
+              },
+              "category_id": {
+                "description": "The category id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "category_name": {
+                "description": "The category name value.",
+                "type": "string"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "external_key": {
+                "description": "The external key value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_global": {
+                "description": "The is global value.",
+                "type": "boolean"
+              },
+              "latest_release": {
+                "additionalProperties": false,
+                "description": "The latest release value.",
+                "nullable": true,
+                "properties": {
+                  "body": {
+                    "description": "The body value.",
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "description": "The created at value.",
+                    "type": "string"
+                  },
+                  "created_by": {
+                    "description": "The created by value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "is_draft": {
+                    "description": "The is draft value.",
+                    "type": "boolean"
+                  },
+                  "is_prerelease": {
+                    "description": "The is prerelease value.",
+                    "type": "boolean"
+                  },
+                  "milestone_id": {
+                    "description": "The milestone id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "scm_connection_id": {
+                    "description": "The scm connection id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "scm_release_id": {
+                    "description": "The scm release id value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "scm_release_url": {
+                    "description": "The scm release url value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "scm_repository": {
+                    "description": "The scm repository value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "tag_name": {
+                    "description": "The tag name value.",
+                    "type": "string"
+                  },
+                  "target_commitish": {
+                    "description": "The target commitish value.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "id",
+                  "is_draft",
+                  "is_prerelease",
+                  "milestone_id",
+                  "tag_name"
+                ],
+                "type": "object"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "position": {
+                "description": "The position value.",
+                "type": "integer"
+              },
+              "releases": {
+                "description": "The releases value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "body": {
+                      "description": "The body value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "description": "The created by value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "is_draft": {
+                      "description": "The is draft value.",
+                      "type": "boolean"
+                    },
+                    "is_prerelease": {
+                      "description": "The is prerelease value.",
+                      "type": "boolean"
+                    },
+                    "milestone_id": {
+                      "description": "The milestone id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "scm_connection_id": {
+                      "description": "The scm connection id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "scm_release_id": {
+                      "description": "The scm release id value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "scm_release_url": {
+                      "description": "The scm release url value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "scm_repository": {
+                      "description": "The scm repository value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "tag_name": {
+                      "description": "The tag name value.",
+                      "type": "string"
+                    },
+                    "target_commitish": {
+                      "description": "The target commitish value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "id",
+                    "is_draft",
+                    "is_prerelease",
+                    "milestone_id",
+                    "tag_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "target_date": {
+                "description": "The target date value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "description",
+              "id",
+              "is_global",
+              "name",
+              "position",
+              "status",
+              "updated_at"
+            ],
+            "type": "object"
           }
         },
         "required": [
@@ -43424,6 +43757,142 @@
         ],
         "type": "object"
       },
+      "PatchWorkspacesWorkspaceIdIterationsIterationIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "description": "The description value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "end_date": {
+            "description": "The end date value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "The name value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "start_date": {
+            "description": "The start date value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "type_id": {
+            "additionalProperties": false,
+            "description": "The type id value.",
+            "properties": {
+              "Present": {
+                "description": "The Present value.",
+                "type": "boolean"
+              },
+              "Value": {
+                "description": "The Value value.",
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "Present"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdIterationsIterationIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "end_date": {
+                "description": "The end date value.",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_global": {
+                "description": "The is global value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "start_date": {
+                "description": "The start date value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "type_color": {
+                "description": "The type color value.",
+                "type": "string"
+              },
+              "type_id": {
+                "description": "The type id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "type_name": {
+                "description": "The type name value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "description",
+              "end_date",
+              "id",
+              "is_global",
+              "name",
+              "start_date",
+              "status",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PatchWorkspacesWorkspaceIdLabelsLabelIdPayload": {
         "additionalProperties": false,
         "properties": {
@@ -43472,6 +43941,312 @@
               "created_at",
               "id",
               "name",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdMilestonesMilestoneIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "additionalProperties": false,
+            "description": "The category id value.",
+            "properties": {
+              "Present": {
+                "description": "The Present value.",
+                "type": "boolean"
+              },
+              "Value": {
+                "description": "The Value value.",
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "Present"
+            ],
+            "type": "object"
+          },
+          "description": {
+            "description": "The description value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "The name value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "target_date": {
+            "additionalProperties": false,
+            "description": "The target date value.",
+            "properties": {
+              "Present": {
+                "description": "The Present value.",
+                "type": "boolean"
+              },
+              "Value": {
+                "description": "The Value value.",
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "Present"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdMilestonesMilestoneIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category_color": {
+                "description": "The category color value.",
+                "type": "string"
+              },
+              "category_id": {
+                "description": "The category id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "category_name": {
+                "description": "The category name value.",
+                "type": "string"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "external_key": {
+                "description": "The external key value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_global": {
+                "description": "The is global value.",
+                "type": "boolean"
+              },
+              "latest_release": {
+                "additionalProperties": false,
+                "description": "The latest release value.",
+                "nullable": true,
+                "properties": {
+                  "body": {
+                    "description": "The body value.",
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "description": "The created at value.",
+                    "type": "string"
+                  },
+                  "created_by": {
+                    "description": "The created by value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "is_draft": {
+                    "description": "The is draft value.",
+                    "type": "boolean"
+                  },
+                  "is_prerelease": {
+                    "description": "The is prerelease value.",
+                    "type": "boolean"
+                  },
+                  "milestone_id": {
+                    "description": "The milestone id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "scm_connection_id": {
+                    "description": "The scm connection id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "scm_release_id": {
+                    "description": "The scm release id value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "scm_release_url": {
+                    "description": "The scm release url value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "scm_repository": {
+                    "description": "The scm repository value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "tag_name": {
+                    "description": "The tag name value.",
+                    "type": "string"
+                  },
+                  "target_commitish": {
+                    "description": "The target commitish value.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "id",
+                  "is_draft",
+                  "is_prerelease",
+                  "milestone_id",
+                  "tag_name"
+                ],
+                "type": "object"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "position": {
+                "description": "The position value.",
+                "type": "integer"
+              },
+              "releases": {
+                "description": "The releases value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "body": {
+                      "description": "The body value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "type": "string"
+                    },
+                    "created_by": {
+                      "description": "The created by value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "is_draft": {
+                      "description": "The is draft value.",
+                      "type": "boolean"
+                    },
+                    "is_prerelease": {
+                      "description": "The is prerelease value.",
+                      "type": "boolean"
+                    },
+                    "milestone_id": {
+                      "description": "The milestone id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "scm_connection_id": {
+                      "description": "The scm connection id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "scm_release_id": {
+                      "description": "The scm release id value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "scm_release_url": {
+                      "description": "The scm release url value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "scm_repository": {
+                      "description": "The scm repository value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "tag_name": {
+                      "description": "The tag name value.",
+                      "type": "string"
+                    },
+                    "target_commitish": {
+                      "description": "The target commitish value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "id",
+                    "is_draft",
+                    "is_prerelease",
+                    "milestone_id",
+                    "tag_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "target_date": {
+                "description": "The target date value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "description",
+              "id",
+              "is_global",
+              "name",
+              "position",
+              "status",
               "updated_at"
             ],
             "type": "object"
@@ -83421,7 +84196,7 @@
           "Planning"
         ],
         "x-required-scopes": [
-          "iterations:read"
+          "items:read"
         ]
       },
       "post": {
@@ -83495,7 +84270,216 @@
           "Planning"
         ],
         "x-required-scopes": [
-          "iterations:write"
+          "items:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/iterations/{iteration_id}": {
+      "delete": {
+        "description": "Delete workspace iteration. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteWorkspacesWorkspaceIdIterationsIterationId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The iteration identifier.",
+            "in": "path",
+            "name": "iteration_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete workspace iteration",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:delete"
+        ]
+      },
+      "get": {
+        "description": "Get workspace iteration. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdIterationsIterationId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The iteration identifier.",
+            "in": "path",
+            "name": "iteration_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdIterationsIterationIdResult"
+                }
+              }
+            },
+            "description": "Get workspace iteration response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get workspace iteration",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      },
+      "patch": {
+        "description": "Update workspace iteration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdIterationsIterationId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The iteration identifier.",
+            "in": "path",
+            "name": "iteration_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdIterationsIterationIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdIterationsIterationIdResult"
+                }
+              }
+            },
+            "description": "Update workspace iteration response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update workspace iteration",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:write"
         ]
       }
     },
@@ -83957,7 +84941,7 @@
           "Planning"
         ],
         "x-required-scopes": [
-          "milestones:read"
+          "items:read"
         ]
       },
       "post": {
@@ -84031,7 +85015,7 @@
           "Planning"
         ],
         "x-required-scopes": [
-          "milestones:write"
+          "items:write"
         ]
       }
     },
@@ -84107,7 +85091,216 @@
           "Planning"
         ],
         "x-required-scopes": [
-          "milestones:write"
+          "items:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/milestones/{milestone_id}": {
+      "delete": {
+        "description": "Delete workspace milestone. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteWorkspacesWorkspaceIdMilestonesMilestoneId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete workspace milestone",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:delete"
+        ]
+      },
+      "get": {
+        "description": "Get workspace milestone. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdMilestonesMilestoneId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdMilestonesMilestoneIdResult"
+                }
+              }
+            },
+            "description": "Get workspace milestone response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get workspace milestone",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      },
+      "patch": {
+        "description": "Update workspace milestone. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdMilestonesMilestoneId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdMilestonesMilestoneIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdMilestonesMilestoneIdResult"
+                }
+              }
+            },
+            "description": "Update workspace milestone response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update workspace milestone",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "items:write"
         ]
       }
     },

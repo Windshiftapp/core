@@ -9570,6 +9570,119 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/iterations/{iteration_id}": {
+      "delete": {
+        "description": "Delete workspace iteration. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "iteration_id",
+            "In": "path",
+            "Description": "The iteration identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Delete workspace iteration",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "get": {
+        "description": "Get workspace iteration. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "iteration_id",
+            "In": "path",
+            "Description": "The iteration identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get workspace iteration",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "patch": {
+        "description": "Update workspace iteration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "iteration_id",
+            "In": "path",
+            "Description": "The iteration identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update workspace iteration",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/labels": {
       "get": {
         "description": "List workspace labels. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -9888,6 +10001,119 @@
           "500": {}
         },
         "summary": "Reorder workspace milestones",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/milestones/{milestone_id}": {
+      "delete": {
+        "description": "Delete workspace milestone. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Delete workspace milestone",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "get": {
+        "description": "Get workspace milestone. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get workspace milestone",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "patch": {
+        "description": "Update workspace milestone. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update workspace milestone",
         "tags": [
           "Planning"
         ]
