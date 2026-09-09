@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -96,7 +95,7 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 	req.Preconditions = sanitize.Comment.Sanitize(req.Preconditions)
 
 	if req.Title == "" {
-		return nil, fmt.Errorf("test case title is required")
+		return nil, &TestManagementValidationError{Msg: "test case title is required"}
 	}
 
 	// Set defaults
@@ -109,17 +108,17 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 
 	// Validate priority
 	if !isValidTestCasePriority(req.Priority) {
-		return nil, fmt.Errorf("invalid priority value: must be low, medium, high, or critical")
+		return nil, &TestManagementValidationError{Msg: "invalid priority value: must be low, medium, high, or critical"}
 	}
 
 	// Validate status
 	if !isValidTestCaseStatus(req.Status) {
-		return nil, fmt.Errorf("invalid status value: must be active, inactive, or draft")
+		return nil, &TestManagementValidationError{Msg: "invalid status value: must be active, inactive, or draft"}
 	}
 
 	// Validate estimated duration
 	if req.EstimatedDuration < 0 {
-		return nil, fmt.Errorf("estimated duration cannot be negative")
+		return nil, &TestManagementValidationError{Msg: "estimated duration cannot be negative"}
 	}
 
 	if err := s.validateFolderInWorkspace(workspaceID, req.FolderID); err != nil {
@@ -174,22 +173,22 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 	req.Preconditions = sanitize.Comment.Sanitize(req.Preconditions)
 
 	if req.Title == "" {
-		return nil, fmt.Errorf("test case title is required")
+		return nil, &TestManagementValidationError{Msg: "test case title is required"}
 	}
 
 	// Validate priority if provided
 	if req.Priority != "" && !isValidTestCasePriority(req.Priority) {
-		return nil, fmt.Errorf("invalid priority value: must be low, medium, high, or critical")
+		return nil, &TestManagementValidationError{Msg: "invalid priority value: must be low, medium, high, or critical"}
 	}
 
 	// Validate status if provided
 	if req.Status != "" && !isValidTestCaseStatus(req.Status) {
-		return nil, fmt.Errorf("invalid status value: must be active, inactive, or draft")
+		return nil, &TestManagementValidationError{Msg: "invalid status value: must be active, inactive, or draft"}
 	}
 
 	// Validate estimated duration
 	if req.EstimatedDuration < 0 {
-		return nil, fmt.Errorf("estimated duration cannot be negative")
+		return nil, &TestManagementValidationError{Msg: "estimated duration cannot be negative"}
 	}
 
 	if err := s.validateFolderInWorkspace(workspaceID, req.FolderID); err != nil {
@@ -374,7 +373,7 @@ func (s *TestCaseService) GetLabelsForTestCase(testCaseID int) ([]models.TestLab
 }
 
 var (
-	ErrTestLabelNameRequired = errors.New("label name is required")
+	ErrTestLabelNameRequired = &TestManagementValidationError{Msg: "label name is required"}
 )
 
 // TestLabelCreateRequest contains data for creating a label

@@ -1021,12 +1021,15 @@ func testManagementError(err error) error {
 	if err == nil {
 		return nil
 	}
+	var validation *services.TestManagementValidationError
 	switch {
 	case errors.Is(err, services.ErrTestManagementForbidden):
 		return newError(http.StatusNotFound, "not_found", "Test resource was not found")
 	case errors.Is(err, repository.ErrNotFound), errors.Is(err, services.ErrTestRunItemNotFound), errors.Is(err, services.ErrTestSetCaseNotFound), errors.Is(err, services.ErrTestSetMilestoneNotFound), errors.Is(err, services.ErrTestRunTemplateSetNotFound):
 		return newError(http.StatusNotFound, "not_found", "Test resource was not found")
+	case errors.As(err, &validation):
+		return newError(http.StatusBadRequest, "invalid_request", validation.Error())
 	default:
-		return newError(http.StatusBadRequest, "invalid_request", err.Error())
+		return internalError(err)
 	}
 }

@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	ErrTestFolderNameRequired      = errors.New("folder name is required")
-	ErrTestFolderParentNotFound    = errors.New("parent folder not found")
-	ErrTestFolderNestedDepth       = errors.New("nested folders deeper than two levels are not allowed")
-	ErrTestFolderParentSelf        = errors.New("folder cannot be its own parent")
-	ErrTestFolderParentHasChildren = errors.New("folders with subfolders cannot be nested under another folder")
+	ErrTestFolderNameRequired      = &TestManagementValidationError{Msg: "folder name is required"}
+	ErrTestFolderParentNotFound    = &TestManagementValidationError{Msg: "parent folder not found"}
+	ErrTestFolderNestedDepth       = &TestManagementValidationError{Msg: "nested folders deeper than two levels are not allowed"}
+	ErrTestFolderParentSelf        = &TestManagementValidationError{Msg: "folder cannot be its own parent"}
+	ErrTestFolderParentHasChildren = &TestManagementValidationError{Msg: "folders with subfolders cannot be nested under another folder"}
 )
 
 // TestFolderUpdateInput carries a folder update plus JSON-field presence flags
