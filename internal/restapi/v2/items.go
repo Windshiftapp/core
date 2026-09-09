@@ -873,7 +873,10 @@ func itemError(err error) error {
 	if errors.Is(err, repository.ErrNotFound) || errors.Is(err, services.ErrItemForbidden) || errors.Is(err, services.ErrItemDeletionForbidden) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
 	}
-	if errors.Is(err, services.ErrQLQuery) || errors.Is(err, services.ErrCollectionNotFound) || errors.Is(err, repository.ErrInvalidItemListCursor) {
+	if errors.Is(err, services.ErrCollectionNotFound) {
+		return collectionError(err)
+	}
+	if errors.Is(err, services.ErrQLQuery) || errors.Is(err, repository.ErrInvalidItemListCursor) {
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	}
 	if errors.Is(err, services.ErrItemConflict) {

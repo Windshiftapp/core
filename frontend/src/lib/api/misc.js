@@ -24,7 +24,7 @@ export const search = {
     }
 
     // Limit
-    if (params.limit) searchParams.append('page_size', Math.min(Number(params.limit), 100));
+    if (params.limit) searchParams.append('page_size', String(Math.min(Number(params.limit), 100)));
 
     return fetchV2Data(`/items/search?${searchParams.toString()}`);
   },

@@ -224,6 +224,9 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 			return !slices.Contains(request.WorkspaceIDs, id)
 		})
 	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
+		return ItemListResult{}, err
+	}
 	if request.ExcludePersonal {
 		workspaceIDs, err = repository.FilterSharedWorkspaceIDs(s.db, workspaceIDs)
 		if err != nil {
@@ -262,9 +265,35 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	}, nil
 }
 
+func (s *ItemApplicationService) requireCollectionRead(userID, collectionID int, workspaceIDs []int) error {
+	if collectionID <= 0 {
+		return nil
+	}
+	collection, err := repository.NewCollectionRepository(s.db).GetByID(collectionID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrCollectionNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if collection.WorkspaceID != nil {
+		if !slices.Contains(workspaceIDs, *collection.WorkspaceID) {
+			return ErrCollectionNotFound
+		}
+		return nil
+	}
+	if !collection.IsPublic && (collection.CreatedBy == nil || *collection.CreatedBy != userID) {
+		return ErrCollectionNotFound
+	}
+	return nil
+}
+
 func (s *ItemApplicationService) Backlog(ctx context.Context, request ItemBacklogRequest) (ItemListResult, error) {
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
+		return ItemListResult{}, err
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
 		return ItemListResult{}, err
 	}
 	items, total, err := s.crud.GetBacklogItemsContext(ctx, BacklogParams{
@@ -291,6 +320,9 @@ func (s *ItemApplicationService) Backlog(ctx context.Context, request ItemBacklo
 func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChangesRequest) (ItemChangesResult, error) {
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
+		return ItemChangesResult{}, err
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
 		return ItemChangesResult{}, err
 	}
 	result := ItemChangesResult{ChangedItemIDs: []int{}, RemovedItemIDs: []int{}}
