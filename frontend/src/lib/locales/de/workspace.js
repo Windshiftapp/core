@@ -504,7 +504,8 @@ export default {
     confirmDeleteCollection: 'Möchten Sie die Sammlung "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
     confirmDeleteItem: 'Möchten Sie "{title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
     noQueryToSave: 'Keine Abfrage zum Speichern. Bitte richten Sie zuerst einige Filter ein oder geben Sie eine QL-Abfrage ein.',
-    boardSummary: 'Gesamt: {itemCount} Vorgänge in {columnCount} Spalten',
+    itemsShown: '{count} angezeigt',
+    boardSummary: '{itemCount} Vorgänge in {columnCount} Spalten angezeigt',
     // Board card dependency hover summary
     blockedBy: 'Blockiert durch',
     blocking: 'Blockiert',

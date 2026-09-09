@@ -1,6 +1,7 @@
 <script>
   import { IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconPencil as Pencil, IconLayoutRows as Rows_3, IconListTree as ListTree, IconFolderOpen as FolderOpen, IconChevronRight } from '@tabler/icons-svelte-runes';
   import { GanttChart } from '@lucide/svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { navigate, currentRoute } from '../../router.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Button from '../../components/Button.svelte';
@@ -32,7 +33,7 @@
   }
 
   let collectionName = $derived(collectionStore.collectionName);
-  let itemCount = $derived(collectionStore.itemsTotalCount);
+  let itemCount = $derived(collectionStore.collectionTotal);
 
   const sidebarBgStyle = 'background-color: var(--ds-surface); border-color: var(--ds-border);';
 </script>
@@ -66,7 +67,7 @@
         <Tooltip content={collectionName}>
           <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{collectionName}</div>
         </Tooltip>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Collection{#if itemCount > 0} · {itemCount} items{/if}</div>
+        <div data-testid="collection-sidebar-count" class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.collection')}{itemCount !== null ? ` · ${itemCount} ${t('layout.items')}` : ''}</div>
       </div>
     </div>
   </div>
@@ -125,6 +126,7 @@
         <Tooltip content={view.label} placement="right">
           <a
             href={getNavUrl(view.id)}
+            data-testid="collection-nav-{view.id}"
             class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
@@ -170,6 +172,7 @@
         <Tooltip content={view.tooltip} placement="right">
           <a
             href={getNavUrl(view.id)}
+            data-testid="collection-nav-{view.id}"
             class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}

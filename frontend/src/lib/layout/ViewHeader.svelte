@@ -7,6 +7,7 @@
     collection = '',
     viewName = '',
     itemCount = null,
+    shownCount = null,
     actionButtons = null,
     hasGradient = false,
     textStyle = '',
@@ -14,10 +15,12 @@
     actions = null,
   } = $props();
 
-  // Build subtitle from workspace and item count
-  let subtitle = $derived(
-    workspaceName + (itemCount !== null ? ` • ${itemCount} ${t('layout.items')}` : '')
-  );
+  let countText = $derived([
+    itemCount !== null ? `${itemCount} ${t('layout.items')}` : '',
+    shownCount !== null && shownCount !== itemCount
+      ? t('collections.itemsShown', { count: shownCount }) : '',
+  ].filter(Boolean).join(' · '));
+  let subtitle = $derived([workspaceName, countText].filter(Boolean).join(' • '));
 </script>
 
 <BaseHeader

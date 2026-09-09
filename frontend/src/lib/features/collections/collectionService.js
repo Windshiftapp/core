@@ -6,6 +6,22 @@ function collectionPagination(pagination) {
   return { ...pagination, limit: pagination.page_size };
 }
 
+// Use the authorized item query without view filters, fetching only one summary.
+export async function fetchCollectionTotal(workspaceId, collectionId) {
+  const scope = collectionId ? { collection_id: collectionId } : { workspace_id: workspaceId };
+  const response = await api.items.getAll({
+    ...scope,
+    page: 1,
+    limit: 1,
+    omit_descriptions: true,
+    include_watermark: true,
+  });
+  return {
+    total: response?.pagination?.total_items ?? null,
+    watermark: response?.meta?.watermark ?? 0,
+  };
+}
+
 /**
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.

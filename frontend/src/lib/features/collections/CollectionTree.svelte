@@ -334,7 +334,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
-          itemCount={allItems.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : treeData.filter(item => !item.isTestCase).length}
         />
       </div>
 

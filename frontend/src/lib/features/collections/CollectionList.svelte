@@ -333,7 +333,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="List"
-          itemCount={itemsPagination?.total_items ?? workItems.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : filteredItems.length}
         />
       </div>
 

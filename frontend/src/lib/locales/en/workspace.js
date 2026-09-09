@@ -674,7 +674,8 @@ export default {
     noQueryToSave: 'No query to save. Please set up some filters or enter a QL query first.',
 
     // Board view
-    boardSummary: 'Total: {itemCount} work items across {columnCount} columns',
+    itemsShown: '{count} shown',
+    boardSummary: 'Showing {itemCount} work items across {columnCount} columns',
     allItems: 'All Items',
     transition_failed: 'Status transition failed. The board has been refreshed.',
     anotherWorkspace: 'another workspace',

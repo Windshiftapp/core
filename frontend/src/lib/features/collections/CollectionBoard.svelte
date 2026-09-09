@@ -1466,7 +1466,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('workspaceSettings.views.board')}
-          itemCount={collectionStore.itemsTotalCount}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : totalVisibleItems}
         >
           {#snippet actions()}
             <div class="flex items-center gap-3">

@@ -16,7 +16,13 @@ The v2 response contract uses `page`, `page_size`, `total_items`, and `total_pag
 `collectionService.js` adapts `page_size` to the collection store's existing
 `limit` option once, for both items and backlog. Continuations must use that
 effective server size, especially when the server caps a requested size.
-Headers, pagination controls, and remaining counts all use `total_items`.
+Pagination controls and remaining counts use the filtered response's `total_items`.
+Collection view headers and the collection sidebar instead use an independent
+membership total from the same authorized item endpoint, requested without view
+predicates. The existing subtitle shows `100 items · 50 shown`, omitting the
+shown count when equal. Completion visibility, sub-filters, board retention,
+pagination and collapsed branches do not change collection membership totals.
+Zero is displayed; an unavailable total is omitted. See `collection-counts.md`.
 The collection query editor opts into empty searches and consumes canonical v2
 pagination directly. The general search page still waits for a query.
 

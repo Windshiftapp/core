@@ -7,6 +7,7 @@ import {
   fetchCollectionBacklog,
   fetchCollectionItemChanges,
   fetchCollectionItems,
+  fetchCollectionTotal,
   fetchItemsById,
   getCollection,
 } from '../features/collections/collectionService.js';
@@ -88,6 +89,8 @@ class CollectionStore {
   items = $state([]);
   backlogItems = $state([]);
   collectionName = $state('Default');
+  collectionTotal = $state(null);
+  #countRequestId = 0;
   publicSlug = $state(null);
   loading = $state(false);
 
@@ -264,6 +267,7 @@ class CollectionStore {
       this.items = [];
       this.backlogItems = [];
       this.collectionName = 'Default';
+      this.collectionTotal = null;
       this.itemsPagination = null;
       this.itemsHasMore = false;
       this.itemsLoadingMore = false;
@@ -307,7 +311,7 @@ class CollectionStore {
         : null;
       if (loadId !== this.#loadId) return; // stale
 
-      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
         loadsItems(view)
           ? this.#fetchMainItems(
               wsId,
@@ -329,6 +333,7 @@ class CollectionStore {
         loadsItems(view)
           ? this.#fetchBoardDeferredItems(wsId, colId, boardPartition, collection)
           : Promise.resolve(null),
+        this.#refreshCollectionTotal(),
       ]);
 
       if (loadId !== this.#loadId) return; // stale
@@ -369,7 +374,12 @@ class CollectionStore {
             collection?.is_public && collection?.public_slug ? collection.public_slug : null;
         }
       }
-      this.#changesWatermark = snapshotWatermark(itemsResult, backlogResult, deferredResult);
+      this.#changesWatermark = snapshotWatermark(
+        itemsResult,
+        backlogResult,
+        deferredResult,
+        countResult
+      );
       if (itemsResult && BOARD_VIEWS.has(view)) {
         void this.#loadRemainingBoardItems({
           first: itemsResult,
@@ -386,6 +396,26 @@ class CollectionStore {
     } finally {
       if (loadId === this.#loadId) {
         this.loading = false;
+      }
+    }
+  }
+
+  async #refreshCollectionTotal() {
+    if (!this.#wsId && !this.#colId) return null;
+    const requestId = ++this.#countRequestId;
+    const loadId = this.#loadId;
+    try {
+      const result = await fetchCollectionTotal(this.#wsId, this.#colId);
+      if (requestId === this.#countRequestId && loadId === this.#loadId) {
+        this.collectionTotal = result.total;
+        this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark);
+      }
+      return result;
+    } catch (error) {
+      if (requestId !== this.#countRequestId || loadId !== this.#loadId) return;
+      this.collectionTotal = null;
+      if (!isExpectedBackgroundSyncError(error)) {
+        console.error('[collectionStore] Count refresh failed:', error);
       }
     }
   }
@@ -819,12 +849,15 @@ class CollectionStore {
     const loadId = ++this.#loadId;
 
     try {
-      const result = await fetchCollectionItems(this.#wsId, this.#colId, {
-        page,
-        limit,
-        sub_ql: this.effectiveSubFilterQL || undefined,
-        ...this.#itemSortOptions(),
-      });
+      const [result] = await Promise.all([
+        fetchCollectionItems(this.#wsId, this.#colId, {
+          page,
+          limit,
+          sub_ql: this.effectiveSubFilterQL || undefined,
+          ...this.#itemSortOptions(),
+        }),
+        this.#refreshCollectionTotal(),
+      ]);
 
       if (loadId !== this.#loadId) return;
 
@@ -878,7 +911,7 @@ class CollectionStore {
       if (loadId !== this.#loadId) return;
 
       const deferredLoadedCount = this.items.length - this.mainItemsLoadedCount;
-      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
         loadsItems(this.#currentView)
           ? this.#fetchCompleteMainItems(
               this.#wsId,
@@ -907,6 +940,7 @@ class CollectionStore {
               deferredLoadedCount
             )
           : Promise.resolve(null),
+        this.#refreshCollectionTotal(),
       ]);
       if (loadId !== this.#loadId) return;
 
@@ -938,7 +972,12 @@ class CollectionStore {
         this.backlogPagination = backlogResult.pagination;
         this.backlogHasMore = calcHasMore(backlogResult.pagination);
       }
-      this.#changesWatermark = snapshotWatermark(itemsResult, backlogResult, deferredResult);
+      this.#changesWatermark = snapshotWatermark(
+        itemsResult,
+        backlogResult,
+        deferredResult,
+        countResult
+      );
     } catch (error) {
       if (loadId !== this.#loadId) return;
       if (!isExpectedBackgroundSyncError(error)) {
@@ -1015,6 +1054,7 @@ class CollectionStore {
     try {
       const updated = await api.items.get(itemId);
       this.#applyUpdatedItem(updated);
+      await this.#refreshCollectionTotal();
     } catch (e) {
       console.error('[collectionStore] refreshItem failed:', e);
     }
@@ -1022,6 +1062,7 @@ class CollectionStore {
 
   applyItem(item) {
     if (!item?.id) return;
+    void this.#refreshCollectionTotal();
     if (this.#hideCompletedItem(item)) return;
     const index = this.items.findIndex((current) => current.id === item.id);
     if (index === -1) {
@@ -1061,7 +1102,9 @@ class CollectionStore {
 
       const removedIds = new Set(changes?.removed_item_ids ?? []);
       if (removedIds.size > 0) {
-        this.#removeItemsById(removedIds);
+        // Removed IDs may be off-page or outside the saved query altogether.
+        await this.refresh();
+        return;
       }
 
       const changedIds = [...new Set(changes?.changed_item_ids ?? [])].filter(
@@ -1094,6 +1137,7 @@ class CollectionStore {
       // object identity for rows/cards that were patched in place.
       this.items = [...this.items];
       this.backlogItems = [...this.backlogItems];
+      await this.#refreshCollectionTotal();
     } catch (error) {
       if (!isExpectedBackgroundSyncError(error)) {
         console.error('[collectionStore] Delta refresh failed:', error);

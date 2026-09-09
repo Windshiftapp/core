@@ -525,7 +525,8 @@ export default {
     confirmDeleteCollection: 'هل أنت متأكد أنك تريد حذف المجموعة "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmDeleteItem: 'هل أنت متأكد أنك تريد حذف "{title}"؟ لا يمكن التراجع عن هذا الإجراء.',
     noQueryToSave: 'لا يوجد استعلام للحفظ. يرجى إعداد بعض الفلاتر أو إدخال استعلام QL أولًا.',
-    boardSummary: 'المجموع: {itemCount} عنصر عمل عبر {columnCount} أعمدة',
+    itemsShown: '{count} معروضة',
+    boardSummary: 'عرض {itemCount} عنصر عمل عبر {columnCount} أعمدة',
     allItems: 'جميع العناصر',
     // Board card dependency hover summary
     blockedBy: 'محظور بواسطة',

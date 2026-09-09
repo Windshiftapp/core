@@ -525,7 +525,8 @@ export default {
     confirmDeleteCollection: '¿Está seguro de que desea eliminar la colección "{name}"? Esta acción no se puede deshacer.',
     confirmDeleteItem: '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
     noQueryToSave: 'No hay consulta para guardar. Por favor configure algunos filtros o ingrese una consulta QL primero.',
-    boardSummary: 'Total: {itemCount} elementos de trabajo en {columnCount} columnas',
+    itemsShown: '{count} mostrados',
+    boardSummary: 'Mostrando {itemCount} elementos de trabajo en {columnCount} columnas',
     allItems: 'Todos los elementos',
     // Board card dependency hover summary
     blockedBy: 'Bloqueado por',

@@ -240,8 +240,11 @@
     }
   }
 
-  // Total item count across all sections
-  let totalItemCount = $derived(collectionStore.backlogPagination?.total_items ?? backlogItems.length);
+  let shownItemCount = $derived(
+    iterationSections.reduce((count, section) => count + (
+      collapsedSections.has(section.iteration.id) ? 0 : section.items.length
+    ), collapsedSections.has('unassigned') ? 0 : unassignedItems.length)
+  );
 
   // Centralized gradient styling
   const styles = useGradientStyles();
@@ -713,7 +716,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Backlog"
-          itemCount={totalItemCount}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : shownItemCount}
         >
           {#snippet actions()}
             <div class="flex items-center gap-2">

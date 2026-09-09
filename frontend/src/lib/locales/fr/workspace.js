@@ -674,7 +674,8 @@ export default {
     noQueryToSave: 'Aucune requête à enregistrer. Veuillez d’abord configurer des filtres ou entrer une requête QL.',
 
     // Board view
-    boardSummary: 'Total : {itemCount} éléments de travail dans {columnCount} colonnes',
+    itemsShown: '{count} affichés',
+    boardSummary: '{itemCount} éléments de travail affichés dans {columnCount} colonnes',
     allItems: 'Tous les éléments',
     transition_failed: 'Échec de la transition de statut. Le tableau a été rafraîchi.',
     anotherWorkspace: 'un autre espace de travail',

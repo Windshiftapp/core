@@ -530,7 +530,8 @@ export default {
     confirmDeleteCollection: '确定要删除集合「{name}」吗？此操作无法撤销。',
     confirmDeleteItem: '确定要删除「{title}」吗？此操作无法撤销。',
     noQueryToSave: '没有可保存的查询。请先设置一些筛选器或输入 QL 查询。',
-    boardSummary: '共 {itemCount} 个工作项，分布在 {columnCount} 列',
+    itemsShown: '已显示 {count} 项',
+    boardSummary: '已显示 {itemCount} 个工作项，分布在 {columnCount} 列',
     allItems: '全部事项',
     // Board card dependency hover summary
     blockedBy: '被阻塞',
