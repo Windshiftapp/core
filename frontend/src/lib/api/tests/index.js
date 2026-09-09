@@ -1,7 +1,6 @@
 // Test management API - barrel export
 
 import { coverage } from './coverage.js';
-import { defects } from './defects.js';
 import { reports } from './reports.js';
 import { testCases } from './testCases.js';
 import { testFolders } from './testFolders.js';
@@ -20,6 +19,5 @@ export const tests = {
   testRuns,
   testResults,
   reports,
-  defects,
   coverage,
 };

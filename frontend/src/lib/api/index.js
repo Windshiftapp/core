@@ -45,7 +45,6 @@ import {
   links,
   linkTypes,
   priorities,
-  projectFieldRequirements,
   screens,
 } from './configuration.js';
 import { del, fetchAPI, get, post, put } from './core.js';
@@ -78,7 +77,6 @@ import {
   jiraImport,
   labels,
   personalLabels,
-  projects,
   reviews,
   search,
   updateComment,
@@ -155,9 +153,7 @@ export const api = {
   delete: del,
 
   // Domain objects
-  projects,
   customFields,
-  projectFieldRequirements,
   workspaces,
   workspaceRoles,
   screens,

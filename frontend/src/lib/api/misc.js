@@ -1,12 +1,6 @@
 import { API_BASE, fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
-export const projects = {
-  ...createCrudClient('/projects'),
-  getByWorkspace: (workspaceId) => fetchAPI(`/projects?workspace_id=${workspaceId}`),
-  getMilestones: (id) => fetchAPI(`/projects/${id}/milestones`),
-};
-
 export const search = {
   items: (params = {}) => {
     const searchParams = new URLSearchParams();

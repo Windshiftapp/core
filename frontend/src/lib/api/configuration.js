@@ -88,20 +88,6 @@ export const customFields = {
     }),
 };
 
-export const projectFieldRequirements = {
-  getByProject: (id) => fetchAPI(`/projects/${id}/field-requirements`),
-  setRequirement: (projectId, data) =>
-    fetchAPI(`/projects/${projectId}/field-requirements`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  removeRequirement: (projectId, fieldId) =>
-    fetchAPI(`/projects/${projectId}/field-requirements/${fieldId}`, {
-      method: 'DELETE',
-    }),
-  getAvailableFields: (id) => fetchAPI(`/projects/${id}/available-fields`),
-};
-
 export const itemTypes = createCrudClient('/item-types', { v2: true });
 
 export const itemTemplates = createCrudClient('/item-templates', {
