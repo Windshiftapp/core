@@ -225,17 +225,21 @@
   const effectiveView = $derived(
     resolveEffectiveMainAppView($currentRoute, $workspacesStore.personalWorkspace?.id)
   );
-  const showWorkspaceNav = $derived(
-    !$uiStore.reviewFullscreen &&
-      $currentRoute.view !== 'workspaces' &&
-      !!$currentWorkspace &&
+  // Route-only predicate for surfaces that frame workspace content. The
+  // breadcrumb bar must not wait for workspace hydration: mounting it late
+  // shifts the whole app content down and breaks scroll positions.
+  const onWorkspaceSurfaceRoute = $derived(
+    $currentRoute.view !== 'workspaces' &&
       (isWorkspaceRoute($currentRoute.view) ||
         effectiveView === 'personal-task-detail' ||
         MAIN_APP_TEST_VIEWS.has($currentRoute.view))
   );
+  const showWorkspaceNav = $derived(
+    !$uiStore.reviewFullscreen && !!$currentWorkspace && onWorkspaceSurfaceRoute
+  );
   const showWorkspaceBreadcrumbs = $derived(
     !$uiStore.reviewFullscreen &&
-      (showWorkspaceNav || ['homepage', 'workspaces'].includes($currentRoute.view))
+      (onWorkspaceSurfaceRoute || ['homepage', 'workspaces'].includes($currentRoute.view))
   );
   const showCollectionNav = $derived(
     !$uiStore.reviewFullscreen && GLOBAL_COLLECTION_VIEWS.has($currentRoute.view)
