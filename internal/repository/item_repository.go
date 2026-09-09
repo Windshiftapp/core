@@ -1230,13 +1230,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 	if len(workspaceIDs) == 0 {
 		return []models.LinkableItem{}, nil
 	}
-	wsPlaceholders := make([]string, len(workspaceIDs))
-	args := []any{}
-	args = append(args, "%"+query+"%", "%"+query+"%")
-	for i, id := range workspaceIDs {
-		wsPlaceholders[i] = "?"
-		args = append(args, id)
-	}
+	whereClause, args := r.buildWhereClause(ItemListParams{
+		WorkspaceIDs: workspaceIDs,
+		Filters:      itemSearchFilters(query),
+	})
 
 	itemTypeFilter := ""
 	if len(itemTypeIDs) > 0 {
@@ -1269,11 +1266,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE (i.title LIKE ? OR i.description LIKE ?)
-		  AND i.workspace_id IN (%s)%s
+		%s%s
 		ORDER BY i.title
 		LIMIT ?
-	`, strings.Join(wsPlaceholders, ","), itemTypeFilter)
+	`, whereClause, itemTypeFilter)
 
 	rows, err := r.db.Query(sqlQuery, args...)
 	if err != nil {

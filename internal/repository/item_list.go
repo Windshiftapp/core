@@ -581,8 +581,7 @@ func (r *ItemRepository) FindDistinctWorkspaceIDsContext(ctx context.Context, pa
 	return workspaceIDs, nil
 }
 
-// Search searches items by title and description with text matching.
-// It delegates to FindAllWithDetails using TextQuery/ItemKeyQuery filters.
+// Search matches complete item keys or searches title and description text.
 func (r *ItemRepository) Search(query string, workspaceIDs []int, pagination PaginationParams) ([]models.Item, int, error) {
 	return r.SearchContext(context.Background(), query, workspaceIDs, pagination)
 }
@@ -593,25 +592,23 @@ func (r *ItemRepository) SearchContext(ctx context.Context, query string, worksp
 		return []models.Item{}, 0, nil
 	}
 
-	filters := ItemFilters{}
-	parts := strings.Split(strings.ToUpper(query), "-")
-	isKeyPattern := len(parts) == 2 && parts[0] != "" && parts[1] != ""
-	if isKeyPattern {
-		if _, err := strconv.Atoi(parts[1]); err == nil {
-			filters.ItemKeyQuery = query
-		} else {
-			filters.TextQuery = query
-		}
-	} else {
-		filters.TextQuery = query
-	}
-
 	return r.FindAllWithDetailsContext(ctx, ItemListParams{
 		WorkspaceIDs: workspaceIDs,
-		Filters:      filters,
+		Filters:      itemSearchFilters(query),
 		Pagination:   pagination,
 		SortBy:       "updated_at",
 	})
+}
+
+func itemSearchFilters(query string) ItemFilters {
+	query = strings.TrimSpace(query)
+	key, number, found := strings.Cut(query, "-")
+	if found && key != "" {
+		if num, err := strconv.Atoi(number); err == nil && num > 0 {
+			return ItemFilters{ItemKeyQuery: query}
+		}
+	}
+	return ItemFilters{TextQuery: query}
 }
 
 // buildWhereClause constructs the WHERE clause and arguments for item queries
