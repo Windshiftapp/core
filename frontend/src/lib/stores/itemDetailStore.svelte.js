@@ -643,7 +643,9 @@ class ItemDetailStore {
         return this.diagrams;
       })
       .catch((err) => {
-        if (isAbortError(err)) return this.diagrams;
+        if (isAbortError(err) || controller.signal.aborted || this.item?.id !== itemId) {
+          return this.diagrams;
+        }
         if (err?.status === 404) {
           this.markDeleted();
           return this.diagrams;
