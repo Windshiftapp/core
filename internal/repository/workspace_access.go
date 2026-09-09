@@ -41,10 +41,8 @@ func GetAccessibleWorkspaceIDs(db database.Database, userID int) ([]int, error) 
 	return ids, rows.Err()
 }
 
-// FilterSharedWorkspaceIDs returns ids with personal workspaces removed.
-// Backs the v1 API's exclude_personal query parameter: integration surfaces
-// (e.g. embedding items in shared documents) must not expose the caller's
-// personal-workspace items even though the caller themselves can see them.
+// FilterSharedWorkspaceIDs removes personal workspaces from accessible IDs
+// when integrations opt out of personal items with exclude_personal.
 func FilterSharedWorkspaceIDs(db database.Database, ids []int) ([]int, error) {
 	if len(ids) == 0 {
 		return ids, nil

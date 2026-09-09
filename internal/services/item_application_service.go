@@ -42,6 +42,7 @@ type ItemListRequest struct {
 	SortAsc          bool
 	OmitDescriptions bool
 	IncludeWatermark bool
+	ExcludePersonal  bool
 }
 
 type ItemListResult struct {
@@ -216,6 +217,12 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
 		return ItemListResult{}, err
+	}
+	if request.ExcludePersonal {
+		workspaceIDs, err = repository.FilterSharedWorkspaceIDs(s.db, workspaceIDs)
+		if err != nil {
+			return ItemListResult{}, err
+		}
 	}
 	if len(workspaceIDs) == 0 {
 		return ItemListResult{Items: []models.Item{}, SortableFields: repository.SystemSortableFieldKeys()}, nil
@@ -443,7 +450,16 @@ func (s *ItemApplicationService) RoadmapHierarchyDates(ctx context.Context, user
 	return RoadmapHierarchyDatesResult{Items: filtered, Truncated: truncated}, nil
 }
 
+type ItemReadOptions struct {
+	TrackView       bool
+	ExcludePersonal bool
+}
+
 func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, trackView bool) (*models.Item, error) {
+	return s.GetWithOptions(ctx, userID, itemID, ItemReadOptions{TrackView: trackView})
+}
+
+func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, itemID int, options ItemReadOptions) (*models.Item, error) {
 	result, err := s.crud.GetByIDWithWorkspaceStatus(itemID)
 	if err != nil {
 		return nil, err
@@ -465,6 +481,16 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 		}
 	}
 
+	if options.ExcludePersonal {
+		personal, err := repository.IsPersonalWorkspace(s.db, result.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if personal {
+			return nil, repository.ErrNotFound
+		}
+	}
+
 	item, err := s.crud.GetWithEffectiveProject(itemID)
 	if err != nil {
 		return nil, err
@@ -478,18 +504,22 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 	if err != nil {
 		return nil, fmt.Errorf("render item description: %w", err)
 	}
-	if trackView && s.activity != nil {
+	if options.TrackView && s.activity != nil {
 		_ = s.activity.TrackItemActivity(userID, itemID, ActivityView)
 	}
 	return item, nil
 }
 
 func (s *ItemApplicationService) GetByKey(ctx context.Context, userID int, workspaceKey string, itemNumber int) (*models.Item, error) {
+	return s.GetByKeyWithOptions(ctx, userID, workspaceKey, itemNumber, ItemReadOptions{TrackView: true})
+}
+
+func (s *ItemApplicationService) GetByKeyWithOptions(ctx context.Context, userID int, workspaceKey string, itemNumber int, options ItemReadOptions) (*models.Item, error) {
 	id, err := s.items.FindIDByKeyAndNumber(workspaceKey, itemNumber)
 	if err != nil {
 		return nil, err
 	}
-	return s.Get(ctx, userID, id, true)
+	return s.GetWithOptions(ctx, userID, id, options)
 }
 
 func (s *ItemApplicationService) Batch(ctx context.Context, userID int, ids []int) ([]models.Item, error) {

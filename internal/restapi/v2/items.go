@@ -171,7 +171,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		if err != nil {
 			return nil, err
 		}
-		result, err := app.GetByKey(r.Context(), user.ID, strings.TrimSpace(r.PathValue("workspace_key")), number)
+		result, err := app.GetByKeyWithOptions(r.Context(), user.ID, strings.TrimSpace(r.PathValue("workspace_key")), number, itemReadOptions(r))
 		return result, itemError(err)
 	})
 	builder.Read("/workspaces/{workspace_key}/items/{item_number}/detail-summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (services.ItemDetailSummary, error) {
@@ -205,9 +205,9 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		}
 		var result *models.Item
 		if reference.ID > 0 {
-			result, err = app.Get(r.Context(), user.ID, reference.ID, true)
+			result, err = app.GetWithOptions(r.Context(), user.ID, reference.ID, itemReadOptions(r))
 		} else {
-			result, err = app.GetByKey(r.Context(), user.ID, reference.WorkspaceKey, reference.ItemNumber)
+			result, err = app.GetByKeyWithOptions(r.Context(), user.ID, reference.WorkspaceKey, reference.ItemNumber, itemReadOptions(r))
 		}
 		return result, itemError(err)
 	})
@@ -642,6 +642,15 @@ func invalidItemReference(message string) error {
 	return err
 }
 
+func excludePersonal(r *http.Request) bool {
+	value := r.URL.Query().Get("exclude_personal")
+	return value == "true" || value == "1"
+}
+
+func itemReadOptions(r *http.Request) services.ItemReadOptions {
+	return services.ItemReadOptions{TrackView: true, ExcludePersonal: excludePersonal(r)}
+}
+
 func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRequest, error) {
 	return parseItemListAt(r, userID, time.Now().UTC())
 }
@@ -657,6 +666,7 @@ func parseItemListAt(r *http.Request, userID int, now time.Time) (Pagination, se
 		Pagination:       services.PaginationParams{Limit: page.PageSize, Offset: page.Offset, Cursor: query.Get("cursor"), CursorMode: query.Get("cursor") != ""},
 		OmitDescriptions: query.Get("fields") == "summary",
 		IncludeWatermark: query.Get("include_watermark") == "true",
+		ExcludePersonal:  excludePersonal(r),
 	}
 	for name, target := range map[string]*int{"workspace_id": &request.WorkspaceID, "collection_id": &request.CollectionID} {
 		if query.Get(name) == "" {

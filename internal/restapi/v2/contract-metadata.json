@@ -3813,6 +3813,16 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "Name": "exclude_personal",
+            "In": "query",
+            "Description": "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4164,6 +4174,16 @@
                   "type": "string"
                 }
               ]
+            }
+          },
+          {
+            "Name": "exclude_personal",
+            "In": "query",
+            "Description": "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -13902,6 +13922,16 @@
             "Schema": {
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "Name": "exclude_personal",
+            "In": "query",
+            "Description": "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],

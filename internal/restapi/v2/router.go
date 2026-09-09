@@ -1003,6 +1003,7 @@ func applyParameterCorrections(route *Route) {
 	case "GET /items/changes":
 		route.Description = "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow."
 	case "GET /items":
+		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
 	case "POST /milestones/{milestone_id}/release":
 		upsertParameter(route, ParameterMetadata{Name: "Idempotency-Key", In: "header", Description: "Caller-generated key that makes retries return the original release result.", Schema: map[string]any{"type": "string", "minLength": 1}})
@@ -1012,7 +1013,10 @@ func applyParameterCorrections(route *Route) {
 
 	switch route.Method + " " + route.Path {
 	case "GET /items/{item_id}":
+		upsertParameter(route, booleanQuery("exclude_personal", "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		route.Description = "Returns one authorization-checked item. A positive integer path value is resolved as the immutable item ID; only a non-numeric KEY-NUMBER value falls back to case-insensitive workspace-key lookup. Malformed references return 400, while missing or inaccessible items return the same 404 contract."
+	case "GET /workspaces/{workspace_key}/items/{item_number}":
+		upsertParameter(route, booleanQuery("exclude_personal", "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 	case "POST /items/batch", "POST /assets/summaries", "POST /milestones/test-statistics", "POST /iterations/progress":
 		route.Description = "Returns a bounded projection for up to 500 IDs. IDs are deduplicated by first occurrence; visible matches preserve request order, and missing or unauthorized resources are omitted without revealing which case applied. Results reflect committed state at request time and are all-or-nothing on computation failure."
 	case "GET /links/batch":
