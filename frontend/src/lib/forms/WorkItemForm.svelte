@@ -213,6 +213,10 @@
   <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
     <!-- Item Type Chip -->
     {#if store.availableItemTypes.length >= 1}
+      <!-- Keep the picker inert until the workspace's config set resolves:
+           applying its item-type restrictions late re-renders the option list
+           (and can switch the selection), which hijacks an in-flight click
+           onto the wrong option. -->
       <ChipPicker
         value={store.formData.item_type_id}
         items={store.availableItemTypes}
@@ -221,6 +225,7 @@
         icon={Layers}
         placeholder={t('createModal.type')}
         testId="create-item-type-chip"
+        disabled={!!store.formData.workspace_id && store.configSetLoadedForWorkspace !== store.formData.workspace_id}
         onSelect={(itemType) => store.setItemType(itemType.id)}
       >
         {#snippet triggerSnippet({ item })}

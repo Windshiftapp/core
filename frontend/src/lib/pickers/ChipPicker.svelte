@@ -224,7 +224,7 @@
           {t('pickers.noItemsFound')}
         </div>
       {:else}
-        {#each filteredItems as item, index}
+        {#each filteredItems as item, index (getValue(item))}
           {@const itemValue = getValue(item)}
           {@const isSelected = itemValue === value}
           {@const isHighlighted = highlightedIndex === index}
