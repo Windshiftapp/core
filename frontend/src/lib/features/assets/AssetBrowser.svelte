@@ -698,7 +698,7 @@
   </div>
 
   <!-- Main content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 min-w-0 min-h-0 flex flex-col">
     <!-- Header with search -->
     <div class="px-4 h-[80px] flex items-center gap-4" style="border-bottom: 1px solid var(--ds-border);">
       <div class="flex-1 min-w-0 relative flex items-center gap-2">
@@ -867,7 +867,7 @@
 
   <!-- Right sidebar: Asset detail (when selected) -->
   {#if selectedAsset}
-    <div class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
+    <div data-testid="asset-detail-pane" class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
       <SidebarResizeHandle
         width={assetPanelWidth}
         minWidth={280}

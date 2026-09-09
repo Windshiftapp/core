@@ -51,6 +51,7 @@
     variant={activeFilterCount > 0 ? 'selected' : 'ghost'}
     size="medium"
     icon={Filter}
+    dataTestid="dynamic-filter-toggle"
     onclick={toggleFilters}
   >
     <span>{t('common.filter')}</span>
@@ -63,6 +64,7 @@
 
   {#if showFilters}
     <div
+      data-testid="dynamic-filter-panel"
       class="absolute left-0 top-full mt-2 z-20 rounded-lg border shadow-lg p-3"
       style="min-width: {panelMinWidth}; background-color: var(--ds-surface-overlay); border-color: var(--ds-border);"
     >
@@ -89,7 +91,7 @@
               {t('common.clear')}
             </Button>
           {/if}
-          <Button variant="primary" size="sm" onclick={applyFilters}>
+          <Button dataTestid="dynamic-filter-apply" variant="primary" size="sm" onclick={applyFilters}>
             {t('common.apply')}
           </Button>
         </div>
