@@ -447,6 +447,7 @@ type pageAttachmentApplication interface {
 type collectionApplication interface {
 	List(services.CollectionListParams) ([]models.Collection, int, error)
 	Get(int, int) (*models.Collection, error)
+	GetBySlug(int, string) (*models.Collection, error)
 	Create(services.AuditActor, models.Collection) (*models.Collection, error)
 	Update(services.AuditActor, int, services.CollectionUpdate) (*models.Collection, error)
 	UpdateSharing(services.AuditActor, int, services.CollectionSharingUpdate) (*models.Collection, error)
@@ -985,8 +986,11 @@ func applyParameterCorrections(route *Route) {
 	case "POST /agent-runs/{run_id}/cancel":
 		upsertParameter(route, booleanQuery("force", "Whether to force the persisted run into the canceled state when cooperative cancellation cannot reach the worker.", false))
 	case "GET /collections":
+		upsertParameter(route, stringQuery("q", "Case-insensitive collection name substring. Surrounding whitespace is ignored; filtering and visibility checks precede pagination and totals."))
 		upsertParameter(route, positiveIDQuery("workspace_id", "Restricts collections to one workspace."))
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts collections to one category."))
+	case "GET /collections/{collection_id}":
+		upsertParameter(route, ParameterMetadata{Name: "collection_id", In: "path", Required: true, Description: "Positive numeric collection ID or public_slug. Numeric keys resolve as IDs. Both forms enforce the same visibility checks and return 404 when inaccessible or missing.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /collections/{collection_id}/board-configuration/bootstrap":
 		upsertParameter(route, positiveIDQuery("workspace_id", "Workspace used for defaults when the collection has no saved board configuration."))
 	case "GET /condition-sets", "GET /approval-sets":

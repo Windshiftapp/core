@@ -2559,6 +2559,15 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive collection name substring. Surrounding whitespace is ignored; filtering and visibility checks precede pagination and totals.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2623,11 +2632,11 @@
           {
             "Name": "collection_id",
             "In": "path",
-            "Description": "The collection identifier.",
+            "Description": "Positive numeric collection ID or public_slug. Numeric keys resolve as IDs. Both forms enforce the same visibility checks and return 404 when inaccessible or missing.",
             "Required": true,
             "Schema": {
-              "minimum": 1,
-              "type": "integer"
+              "minLength": 1,
+              "type": "string"
             }
           }
         ],
