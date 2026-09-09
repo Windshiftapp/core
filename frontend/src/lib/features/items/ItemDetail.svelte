@@ -1180,48 +1180,24 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     loadRecurrence();
   }
 
-  // Sub-issue creation function
   function startCreateSubIssue() {
     if (itemDetailStore.availableSubIssueTypes.length === 0) {
       showError(t('items.noSubIssueTypes'), t('items.cannotCreateChildItems'));
       return;
     }
 
-    // Set up for sub-issue creation and open the global create modal
-
-    // First, trigger loading the CreateModal component
-    window.dispatchEvent(new CustomEvent('show-create-modal'));
-
-    // Small delay to let the modal load, then configure it
-    setTimeout(() => {
-      // Set the type first
-      window.dispatchEvent(new CustomEvent('set-create-type', {
-        detail: { type: 'work-item' }
-      }));
-
-      // Set the parent
-      window.dispatchEvent(new CustomEvent('set-create-parent', {
-        detail: {
-          parentId: itemDetailStore.item.id,
-          parentTitle: itemDetailStore.item.title,
-          availableItemTypes: itemDetailStore.availableSubIssueTypes
-        }
-      }));
-
-      // Open the modal (this will load workspaces)
-      window.dispatchEvent(new CustomEvent('open-create-modal'));
-
-      // After modal is open and workspaces are loaded, set the workspace
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('set-create-workspace', {
-          detail: {
-            workspaceId: workspaceId,
-            workspaceName: itemDetailStore.workspace?.name
-          }
-        }));
-      }, 200);
-    }, 150);
+    window.dispatchEvent(new CustomEvent('show-create-modal', {
+      detail: {
+        type: 'work-item',
+        workspaceId,
+        parentContext: {
+          parent: { id: itemDetailStore.item.id, title: itemDetailStore.item.title },
+          allowedItemTypes: itemDetailStore.availableSubIssueTypes,
+        },
+      },
+    }));
   }
+
 </script>
 
 {#snippet contentSnippet()}

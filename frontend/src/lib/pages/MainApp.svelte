@@ -52,6 +52,7 @@
   let createModalInitialType = $state('work-item');
   let createModalSkipNavigate = $state(false);
   let createModalWorkspaceId = $state(null);
+  let createModalParentContext = $state(null);
   let showEmailVerificationBanner = $state(false);
   let mobileWorkspaceNavOpen = $state(false);
 
@@ -146,6 +147,7 @@
     createModalInitialType = 'work-item';
     createModalSkipNavigate = false;
     createModalWorkspaceId = null;
+    createModalParentContext = null;
   }
 
   function closeAllSidebarSurfaces() {
@@ -156,6 +158,7 @@
     createModalInitialType = 'work-item';
     createModalSkipNavigate = false;
     createModalWorkspaceId = null;
+    createModalParentContext = null;
   }
 
   function activateSidebarSurface(surface) {
@@ -192,6 +195,7 @@
   function showCreateDropdown() {
     closeAllSidebarSurfaces();
     createModalWorkspaceId = null;
+    createModalParentContext = null;
     const currentWorkspaceId = $currentRoute.params?.id;
     if (currentWorkspaceId && CREATE_MODAL_WORKSPACE_VIEWS.has($currentRoute.view)) {
       createModalWorkspaceId = Number.parseInt(currentWorkspaceId, 10);
@@ -204,6 +208,7 @@
     closeAllSidebarSurfaces();
     if (detail.type) createModalInitialType = detail.type;
     createModalSkipNavigate = detail.skipNavigate || false;
+    createModalParentContext = detail.parentContext ?? null;
     createModalWorkspaceId = detail.workspaceId
       ? Number.parseInt(String(detail.workspaceId), 10)
       : null;
@@ -404,6 +409,7 @@
   bind:showChatPanel
   {createModalInitialType}
   {createModalWorkspaceId}
+  {createModalParentContext}
   {createModalSkipNavigate}
   onclosecreate={closeCreateModal}
   onclosecommand={closeCommandPalette}

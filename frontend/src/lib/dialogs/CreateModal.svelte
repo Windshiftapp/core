@@ -63,6 +63,7 @@
     compactMode = false,
     initialType = 'work-item',
     initialWorkspaceId = null,
+    initialParentContext = null,
     skipNavigate = false,
     onclose = null,
     oncreated = null
@@ -375,6 +376,15 @@
     }
   });
 
+  $effect(() => {
+    if (isOpen && initialParentContext) {
+      untrack(() => workItemFormStore.setParentItem(
+        initialParentContext.parent,
+        initialParentContext.allowedItemTypes,
+      ));
+    }
+  });
+
   // Force work-item type when compact mode is enabled
   $effect(() => {
     if (compactMode && selectedType !== 'work-item') {
@@ -509,7 +519,7 @@
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
-        <span class="font-medium" style="color: var(--ds-text);">
+        <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
           {#if workItemFormStore.parentItem}
             {t('createModal.newChildItem')}
           {:else}
