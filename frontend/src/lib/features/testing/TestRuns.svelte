@@ -55,7 +55,7 @@
         api.tests.testPlans.getAll(workspaceId),
         api.tests.testRuns.getAll(workspaceId, params),
         api.milestones.getAll(),
-        api.getUsers()
+        api.getAssignableUsers(workspaceId)
       ]);
       const safeSets = sets || [];
       const safeRuns = runs || [];
