@@ -16,6 +16,218 @@
         ]
       }
     },
+    "/admin/api-tokens": {
+      "get": {
+        "description": "List API tokens. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "parameters": [
+          {
+            "Name": "user_id",
+            "In": "query",
+            "Description": "Filter by user ID.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List API tokens",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/api-tokens/{token_id}": {
+      "delete": {
+        "description": "Revoke an API token. The server verifies resource ownership and deletion preconditions before removing the resource. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "parameters": [
+          {
+            "Name": "token_id",
+            "In": "path",
+            "Description": "Token id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Revoke an API token",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/audit-logs": {
+      "get": {
+        "description": "List audit log entries. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "parameters": [
+          {
+            "Name": "user_id",
+            "In": "query",
+            "Description": "Filter by user ID.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "action_type",
+            "In": "query",
+            "Description": "Exact match filter.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "resource_type",
+            "In": "query",
+            "Description": "Exact match filter.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "from",
+            "In": "query",
+            "Description": "Inclusive RFC3339 timestamp bound.",
+            "Required": false,
+            "Schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "to",
+            "In": "query",
+            "Description": "Inclusive RFC3339 timestamp bound.",
+            "Required": false,
+            "Schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List audit log entries",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/audit-logs/since": {
+      "get": {
+        "description": "Requires system administrator permission and admin:audit-logs:read. Returns entries with ID greater than after_id in ascending order inside the v2 data envelope. Persist next_after_id for the next call. Defaults to 500 entries, clamps limit to 1000, and sets has_more when the batch fills the limit. An empty batch preserves after_id.",
+        "parameters": [
+          {
+            "Name": "after_id",
+            "In": "query",
+            "Description": "Exclusive ID cursor. Entries are ordered by ascending ID.",
+            "Required": false,
+            "Schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum entries; values above 1000 are clamped to 1000.",
+            "Required": false,
+            "Schema": {
+              "default": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Stream audit log entries",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/admin/groups": {
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -120,6 +332,230 @@
         "summary": "",
         "tags": [
           ""
+        ]
+      }
+    },
+    "/admin/object-translations/canonical-differences": {
+      "get": {
+        "description": "Find canonical translation differences. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Find canonical translation differences",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/object-translations/definitions": {
+      "get": {
+        "description": "List object translation definitions. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List object translation definitions",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/object-translations/orphans": {
+      "get": {
+        "description": "Find orphaned object translations. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Find orphaned object translations",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/object-translations/resolve": {
+      "post": {
+        "description": "Resolve object translations. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Resolve object translations",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/object-translations/{object_type}/{object_id}": {
+      "get": {
+        "description": "List object translations. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [
+          {
+            "Name": "object_type",
+            "In": "path",
+            "Description": "Object type.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "object_id",
+            "In": "path",
+            "Description": "Object id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List object translations",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/object-translations/{object_type}/{object_id}/{field}/{locale}": {
+      "delete": {
+        "description": "Delete an instance translation. The server verifies resource ownership and deletion preconditions before removing the resource. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [
+          {
+            "Name": "object_type",
+            "In": "path",
+            "Description": "Object type.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "object_id",
+            "In": "path",
+            "Description": "Object id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "field",
+            "In": "path",
+            "Description": "Field.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "locale",
+            "In": "path",
+            "Description": "Locale.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Delete an instance translation",
+        "tags": [
+          "Administration"
+        ]
+      },
+      "put": {
+        "description": "Create or replace an instance translation. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "parameters": [
+          {
+            "Name": "object_type",
+            "In": "path",
+            "Description": "Object type.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "object_id",
+            "In": "path",
+            "Description": "Object id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "field",
+            "In": "path",
+            "Description": "Field.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "locale",
+            "In": "path",
+            "Description": "Locale.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Create or replace an instance translation",
+        "tags": [
+          "Administration"
         ]
       }
     },

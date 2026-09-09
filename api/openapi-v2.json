@@ -1470,6 +1470,489 @@
         ],
         "type": "object"
       },
+      "GetAdminApiTokensResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "description": "The expires at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "is_temporary": {
+                  "description": "The is temporary value.",
+                  "type": "boolean"
+                },
+                "last_used_at": {
+                  "description": "The last used at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "permissions": {
+                  "description": "The permissions value.",
+                  "type": "string"
+                },
+                "token_prefix": {
+                  "description": "The token prefix value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "user_email": {
+                  "description": "The user email value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "user_name": {
+                  "description": "The user name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "created_at",
+                "id",
+                "is_temporary",
+                "name",
+                "permissions",
+                "token_prefix",
+                "updated_at",
+                "user_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "GetAdminAuditLogsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action_type": {
+                  "description": "The action type value.",
+                  "type": "string"
+                },
+                "details": {
+                  "additionalProperties": {
+                    "description": "Arbitrary JSON extension value."
+                  },
+                  "description": "The details value.",
+                  "type": "object"
+                },
+                "error_message": {
+                  "description": "The error message value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "ip_address": {
+                  "description": "The ip address value.",
+                  "type": "string"
+                },
+                "resource_id": {
+                  "description": "The resource id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "resource_name": {
+                  "description": "The resource name value.",
+                  "type": "string"
+                },
+                "resource_type": {
+                  "description": "The resource type value.",
+                  "type": "string"
+                },
+                "success": {
+                  "description": "The success value.",
+                  "type": "boolean"
+                },
+                "timestamp": {
+                  "description": "The timestamp value.",
+                  "type": "string"
+                },
+                "user_agent": {
+                  "description": "The user agent value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action_type",
+                "id",
+                "resource_type",
+                "success",
+                "timestamp",
+                "username"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "GetAdminAuditLogsSinceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "entries": {
+                "description": "The entries value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action_type": {
+                      "description": "The action type value.",
+                      "type": "string"
+                    },
+                    "details": {
+                      "additionalProperties": {
+                        "description": "Arbitrary JSON extension value."
+                      },
+                      "description": "The details value.",
+                      "type": "object"
+                    },
+                    "error_message": {
+                      "description": "The error message value.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "ip_address": {
+                      "description": "The ip address value.",
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "description": "The resource id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "resource_name": {
+                      "description": "The resource name value.",
+                      "type": "string"
+                    },
+                    "resource_type": {
+                      "description": "The resource type value.",
+                      "type": "string"
+                    },
+                    "success": {
+                      "description": "The success value.",
+                      "type": "boolean"
+                    },
+                    "timestamp": {
+                      "description": "The timestamp value.",
+                      "type": "string"
+                    },
+                    "user_agent": {
+                      "description": "The user agent value.",
+                      "type": "string"
+                    },
+                    "user_id": {
+                      "description": "The user id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "username": {
+                      "description": "The username value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action_type",
+                    "id",
+                    "resource_type",
+                    "success",
+                    "timestamp",
+                    "username"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "has_more": {
+                "description": "The has more value.",
+                "type": "boolean"
+              },
+              "next_after_id": {
+                "description": "The next after id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "entries",
+              "has_more",
+              "next_after_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetAdminObjectTranslationsCanonicalDifferencesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "builtin_key": {
+                  "description": "The builtin key value.",
+                  "type": "string"
+                },
+                "canonical": {
+                  "description": "The canonical value.",
+                  "type": "string"
+                },
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                },
+                "object_id": {
+                  "description": "The object id value.",
+                  "type": "integer"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                },
+                "system": {
+                  "description": "The system value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "builtin_key",
+                "canonical",
+                "field",
+                "object_id",
+                "object_type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetAdminObjectTranslationsDefinitionsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "fields": {
+                  "description": "The fields value.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fields",
+                "object_type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetAdminObjectTranslationsObjectTypeObjectIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                },
+                "locale": {
+                  "description": "The locale value.",
+                  "type": "string"
+                },
+                "object_id": {
+                  "description": "The object id value.",
+                  "type": "integer"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "created_at",
+                "field",
+                "locale",
+                "object_id",
+                "object_type",
+                "source",
+                "updated_at",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetAdminObjectTranslationsOrphansResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                },
+                "locale": {
+                  "description": "The locale value.",
+                  "type": "string"
+                },
+                "object_id": {
+                  "description": "The object id value.",
+                  "type": "integer"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "created_at",
+                "field",
+                "locale",
+                "object_id",
+                "object_type",
+                "source",
+                "updated_at",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetAgentRunsRunIdEventsResult": {
         "additionalProperties": false,
         "properties": {
@@ -46747,6 +47230,101 @@
         ],
         "type": "object"
       },
+      "PostAdminObjectTranslationsResolvePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "description": "The locale value.",
+            "type": "string"
+          },
+          "targets": {
+            "description": "The targets value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "fallback": {
+                  "description": "The fallback value.",
+                  "type": "string"
+                },
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                },
+                "object_id": {
+                  "description": "The object id value.",
+                  "type": "integer"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fallback",
+                "field",
+                "object_id",
+                "object_type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "locale",
+          "targets"
+        ],
+        "type": "object"
+      },
+      "PostAdminObjectTranslationsResolveResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                },
+                "locale": {
+                  "description": "The locale value.",
+                  "type": "string"
+                },
+                "object_id": {
+                  "description": "The object id value.",
+                  "type": "integer"
+                },
+                "object_type": {
+                  "description": "The object type value.",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field",
+                "object_id",
+                "object_type",
+                "source",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostAgentRunsRunIdCancelResult": {
         "additionalProperties": false,
         "properties": {
@@ -65588,6 +66166,78 @@
         ],
         "type": "object"
       },
+      "PutAdminObjectTranslationsObjectTypeObjectIdFieldLocalePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "description": "The value value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "PutAdminObjectTranslationsObjectTypeObjectIdFieldLocaleResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "field": {
+                "description": "The field value.",
+                "type": "string"
+              },
+              "locale": {
+                "description": "The locale value.",
+                "type": "string"
+              },
+              "object_id": {
+                "description": "The object id value.",
+                "type": "integer"
+              },
+              "object_type": {
+                "description": "The object type value.",
+                "type": "string"
+              },
+              "source": {
+                "description": "The source value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "value": {
+                "description": "The value value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "field",
+              "locale",
+              "object_id",
+              "object_type",
+              "source",
+              "updated_at",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PutCollectionsCollectionIdBoardConfigurationPayload": {
         "additionalProperties": false,
         "properties": {
@@ -67322,6 +67972,803 @@
         ],
         "x-required-scopes": [
           "actions:read"
+        ]
+      }
+    },
+    "/admin/api-tokens": {
+      "get": {
+        "description": "List API tokens. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "operationId": "getAdminApiTokens",
+        "parameters": [
+          {
+            "description": "Filter by user ID.",
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminApiTokensResult"
+                }
+              }
+            },
+            "description": "List API tokens response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List API tokens",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:api-tokens:read"
+        ]
+      }
+    },
+    "/admin/api-tokens/{token_id}": {
+      "delete": {
+        "description": "Revoke an API token. The server verifies resource ownership and deletion preconditions before removing the resource. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "operationId": "deleteAdminApiTokensTokenId",
+        "parameters": [
+          {
+            "description": "Token id.",
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Revoke an API token",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:api-tokens:write"
+        ]
+      }
+    },
+    "/admin/audit-logs": {
+      "get": {
+        "description": "List audit log entries. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope.",
+        "operationId": "getAdminAuditLogs",
+        "parameters": [
+          {
+            "description": "Filter by user ID.",
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Exact match filter.",
+            "in": "query",
+            "name": "action_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact match filter.",
+            "in": "query",
+            "name": "resource_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive RFC3339 timestamp bound.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive RFC3339 timestamp bound.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminAuditLogsResult"
+                }
+              }
+            },
+            "description": "List audit log entries response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List audit log entries",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:audit-logs:read"
+        ]
+      }
+    },
+    "/admin/audit-logs/since": {
+      "get": {
+        "description": "Requires system administrator permission and admin:audit-logs:read. Returns entries with ID greater than after_id in ascending order inside the v2 data envelope. Persist next_after_id for the next call. Defaults to 500 entries, clamps limit to 1000, and sets has_more when the batch fills the limit. An empty batch preserves after_id.",
+        "operationId": "getAdminAuditLogsSince",
+        "parameters": [
+          {
+            "description": "Exclusive ID cursor. Entries are ordered by ascending ID.",
+            "in": "query",
+            "name": "after_id",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum entries; values above 1000 are clamped to 1000.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminAuditLogsSinceResult"
+                }
+              }
+            },
+            "description": "Stream audit log entries response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Stream audit log entries",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:audit-logs:read"
+        ]
+      }
+    },
+    "/admin/object-translations/canonical-differences": {
+      "get": {
+        "description": "Find canonical translation differences. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "getAdminObjectTranslationsCanonicalDifferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminObjectTranslationsCanonicalDifferencesResult"
+                }
+              }
+            },
+            "description": "Find canonical translation differences response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Find canonical translation differences",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:read"
+        ]
+      }
+    },
+    "/admin/object-translations/definitions": {
+      "get": {
+        "description": "List object translation definitions. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "getAdminObjectTranslationsDefinitions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminObjectTranslationsDefinitionsResult"
+                }
+              }
+            },
+            "description": "List object translation definitions response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List object translation definitions",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:read"
+        ]
+      }
+    },
+    "/admin/object-translations/orphans": {
+      "get": {
+        "description": "Find orphaned object translations. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "getAdminObjectTranslationsOrphans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminObjectTranslationsOrphansResult"
+                }
+              }
+            },
+            "description": "Find orphaned object translations response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Find orphaned object translations",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:read"
+        ]
+      }
+    },
+    "/admin/object-translations/resolve": {
+      "post": {
+        "description": "Resolve object translations. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "postAdminObjectTranslationsResolve",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostAdminObjectTranslationsResolvePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostAdminObjectTranslationsResolveResult"
+                }
+              }
+            },
+            "description": "Resolve object translations response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Resolve object translations",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:read"
+        ]
+      }
+    },
+    "/admin/object-translations/{object_type}/{object_id}": {
+      "get": {
+        "description": "List object translations. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "getAdminObjectTranslationsObjectTypeObjectId",
+        "parameters": [
+          {
+            "description": "Object type.",
+            "in": "path",
+            "name": "object_type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object id.",
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminObjectTranslationsObjectTypeObjectIdResult"
+                }
+              }
+            },
+            "description": "List object translations response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List object translations",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:read"
+        ]
+      }
+    },
+    "/admin/object-translations/{object_type}/{object_id}/{field}/{locale}": {
+      "delete": {
+        "description": "Delete an instance translation. The server verifies resource ownership and deletion preconditions before removing the resource. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "deleteAdminObjectTranslationsObjectTypeObjectIdFieldLocale",
+        "parameters": [
+          {
+            "description": "Object type.",
+            "in": "path",
+            "name": "object_type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object id.",
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Field.",
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Locale.",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete an instance translation",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:write"
+        ]
+      },
+      "put": {
+        "description": "Create or replace an instance translation. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
+        "operationId": "putAdminObjectTranslationsObjectTypeObjectIdFieldLocale",
+        "parameters": [
+          {
+            "description": "Object type.",
+            "in": "path",
+            "name": "object_type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Object id.",
+            "in": "path",
+            "name": "object_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Field.",
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Locale.",
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutAdminObjectTranslationsObjectTypeObjectIdFieldLocalePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutAdminObjectTranslationsObjectTypeObjectIdFieldLocaleResult"
+                }
+              }
+            },
+            "description": "Create or replace an instance translation response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create or replace an instance translation",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:object-translations:write"
         ]
       }
     },
@@ -93811,6 +95258,10 @@
     {
       "description": "Conditions, approvals, and workflow governance.",
       "name": "Governance"
+    },
+    {
+      "description": "System administrator operations for audit logs, API tokens, and configurable object translations.",
+      "name": "Administration"
     }
   ]
 }

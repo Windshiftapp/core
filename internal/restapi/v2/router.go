@@ -17,7 +17,9 @@ import (
 	apispec "windshift/api"
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
@@ -551,6 +553,10 @@ type Deps struct {
 	GlobalPermission   globalPermissionReader
 	Groups             groupApplication
 	AdminUsers         adminUserApplication
+	AuditLogs          auditLogReader
+	AdminTokens        adminTokenManager
+	AdminAuditor       *logger.Auditor
+	AdminTranslations  *objecttranslation.Service
 	Comments           commentApplication
 	CommentAccess      commentAccess
 	Attachments        attachmentApplication
@@ -661,6 +667,18 @@ func RegisterRoutes(deps Deps) error {
 	if deps.AdminUsers == nil {
 		return errors.New("v2: AdminUsers is required")
 	}
+	if deps.AuditLogs == nil {
+		return errors.New("v2: AuditLogs is required")
+	}
+	if deps.AdminTokens == nil {
+		return errors.New("v2: AdminTokens is required")
+	}
+	if deps.AdminAuditor == nil {
+		return errors.New("v2: AdminAuditor is required")
+	}
+	if deps.AdminTranslations == nil {
+		return errors.New("v2: AdminTranslations is required")
+	}
 	if deps.Comments == nil {
 		return errors.New("v2: Comments is required")
 	}
@@ -766,6 +784,7 @@ func buildRoutes(deps Deps) []route {
 	registerWorklogRoutes(&builder, deps)
 	registerTimeRoutes(&builder, deps)
 	registerAdminRoutes(&builder, deps)
+	registerAdminIntegrationRoutes(&builder, deps)
 	registerPageRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
@@ -868,6 +887,15 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 }
 
 func applyParameterCorrections(route *Route) {
+	if strings.HasPrefix(route.Path, "/admin/") && route.Exposure == ExposureBoth {
+		route.Description += " Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope."
+		if route.Path == "/admin/audit-logs/since" {
+			route.Description = "Requires system administrator permission and admin:audit-logs:read. Returns entries with ID greater than after_id in ascending order inside the v2 data envelope. Persist next_after_id for the next call. Defaults to 500 entries, clamps limit to 1000, and sets has_more when the batch fills the limit. An empty batch preserves after_id."
+		}
+		if strings.HasPrefix(route.Path, "/admin/object-translations/") {
+			route.Description += " Writes and deletes affect instance translations only; shipped system translations are preserved."
+		}
+	}
 	if route.ResponseShape == ResponsePage || route.ResponseShape == ResponsePageMetadata {
 		upsertParameter(route, integerQuery("page", "One-based page number.", 0, defaultPage))
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
