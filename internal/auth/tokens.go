@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"windshift/internal/cacheutil"
@@ -57,6 +58,19 @@ type TokenManager struct {
 	db           database.Database
 	tokenTracker TokenUsageRecorder
 	cache        *bigcache.BigCache
+	closeOnce    sync.Once
+	closeErr     error
+}
+
+// Close stops the validation cache's background worker. It does not close the
+// shared database or token tracker, and may be called more than once.
+func (tm *TokenManager) Close() error {
+	tm.closeOnce.Do(func() {
+		if tm.cache != nil {
+			tm.closeErr = tm.cache.Close()
+		}
+	})
+	return tm.closeErr
 }
 
 // NewTokenManager creates a new token manager

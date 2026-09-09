@@ -26,6 +26,8 @@ type PermissionService struct {
 	cacheCommitMu   sync.RWMutex
 	cacheGeneration atomic.Uint64
 	workspaceAccess *workspaceAccessCache
+	closeOnce       sync.Once
+	closeErr        error
 
 	hits                      int64
 	misses                    int64
@@ -968,7 +970,13 @@ func (ps *PermissionService) getRecentlyActiveUsers(duration time.Duration) ([]i
 	return scanIntColumn(rows)
 }
 
-// Close gracefully shuts down the permission service
+// Close stops the cache worker without closing the shared database.
+// Repeated calls are safe, including when no cache was initialized.
 func (ps *PermissionService) Close() error {
-	return ps.cache.Close()
+	ps.closeOnce.Do(func() {
+		if ps.cache != nil {
+			ps.closeErr = ps.cache.Close()
+		}
+	})
+	return ps.closeErr
 }
