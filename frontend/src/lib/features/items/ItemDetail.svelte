@@ -757,6 +757,10 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 
   function handleDeleteComplete(result) {
     showDeletionFeedback();
+    // Do not let the next detail briefly render the deleted shared-store item.
+    itemDetailStore.reset();
+    // Reparent navigation can reuse this component; allow its next item load.
+    itemDetailStore.loading = false;
     const collectionId = $currentRoute.params?.collectionId;
     // Navigate based on deletion result
     if (result?.mode === 'reparent' && result?.newParentId) {
