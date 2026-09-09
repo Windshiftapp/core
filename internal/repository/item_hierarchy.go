@@ -677,3 +677,63 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 
 	return &item, nil
 }
+
+// FindChildrenForUpdateContext locks children of already-locked parents.
+// PostgreSQL's parent foreign key makes concurrent attachments wait for those
+// parent locks; SQLite serializes writers for the enclosing transaction.
+func (r *ItemRepository) FindChildrenForUpdateContext(ctx context.Context, tx database.Tx, parentIDs []int) ([]*models.Item, error) {
+	if len(parentIDs) == 0 {
+		return []*models.Item{}, nil
+	}
+	placeholders, args := inPlaceholders(parentIDs)
+	query := `SELECT ` + itemBaseColumns + ` FROM items WHERE parent_id IN (` + placeholders + `) ORDER BY id`
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("lock child items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var items []*models.Item
+	for rows.Next() {
+		item, err := scanItemBase(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan locked child: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate locked children: %w", err)
+	}
+	return items, nil
+}
+
+// FindSubtreeForUpdateContext locks each generation before discovering its
+// children, so hierarchy changes cannot add unexamined rows to the deletion.
+func (r *ItemRepository) FindSubtreeForUpdateContext(ctx context.Context, tx database.Tx, rootID int) ([]*models.Item, error) {
+	root, err := r.FindByIDForUpdate(tx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	items := []*models.Item{root}
+	seen := map[int]bool{root.ID: true}
+	pending := []int{root.ID}
+	for len(pending) > 0 {
+		batchSize := min(len(pending), 500)
+		children, err := r.FindChildrenForUpdateContext(ctx, tx, pending[:batchSize])
+		if err != nil {
+			return nil, err
+		}
+		pending = pending[batchSize:]
+		for _, child := range children {
+			if seen[child.ID] {
+				continue
+			}
+			seen[child.ID] = true
+			items = append(items, child)
+			pending = append(pending, child.ID)
+		}
+	}
+	return items, nil
+}

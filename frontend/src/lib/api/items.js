@@ -223,8 +223,8 @@ export const items = {
   getDeleteInfo: (id) => fetchV2Data(`/items/${id}/delete-info`),
   deleteCascade: withCrossTabNotice(
     (id) =>
-      fetchV2Data(`/items/${id}/cascade-deletion`, {
-        method: 'POST',
+      fetchAPIV2(`/items/${id}?cascade=true`, {
+        method: 'DELETE',
       }),
     'delete'
   ),

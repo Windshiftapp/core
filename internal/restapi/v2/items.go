@@ -224,6 +224,17 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		if err != nil {
 			return err
 		}
+		cascade := false
+		if values, present := r.URL.Query()["cascade"]; present {
+			if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
+				return invalidQuery("cascade")
+			}
+			cascade = values[0] == "true"
+		}
+		if cascade {
+			_, err := app.DeleteCascade(auditActor(r, user), id)
+			return itemError(err)
+		}
 		return itemError(app.Delete(auditActor(r, user), id))
 	})
 	registerItemReadRoutes(builder, app)
@@ -435,14 +446,6 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 			return services.ItemDeleteInfo{}, err
 		}
 		result, err := app.DeleteInfo(user.ID, id)
-		return result, itemError(err)
-	})
-	builder.Action(http.MethodPost, path+"/cascade-deletion", http.StatusOK, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) (services.ItemMutationCount, error) {
-		user, id, err := itemTarget(r)
-		if err != nil {
-			return services.ItemMutationCount{}, err
-		}
-		result, err := app.DeleteCascade(auditActor(r, user), id)
 		return result, itemError(err)
 	})
 	builder.JSON(http.MethodPost, path+"/reparent-children", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemReparentRequest) (services.ItemMutationCount, error) {
@@ -852,6 +855,9 @@ func optionalItemQueryID(r *http.Request, field string) (int, error) {
 func itemError(err error) error {
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, services.ErrItemCascadeForbidden) {
+		return newError(http.StatusForbidden, "forbidden", "This item can be deleted on its own, but cascade deletion is not permitted.")
 	}
 	if errors.Is(err, repository.ErrNotFound) || errors.Is(err, services.ErrItemForbidden) || errors.Is(err, services.ErrItemDeletionForbidden) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")

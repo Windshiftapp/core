@@ -3597,7 +3597,7 @@
           {
             "Name": "ql",
             "In": "query",
-            "Description": "QL expression used as the primary item filter. When present, structured filters other than search and status inclusion/exclusion are ignored.",
+            "Description": "QL expression used as the primary item filter. For example, creator = 5 returns items created by user 5 (URL-encoded: ?ql=creator%20%3D%205). The v1 creator_id query parameter is not supported in v2 and is ignored; it does not filter results. This read filter does not change the item's creator. When ql is present, structured filters other than search and status inclusion/exclusion are ignored; express additional conditions in QL, for example creator = 5 AND assignee = 7.",
             "Required": false,
             "Schema": {
               "minLength": 1,
@@ -4099,7 +4099,7 @@
     },
     "/items/{item_id}": {
       "delete": {
-        "description": "Delete item. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "description": "Deletes only the item by default, detaching direct children so descendants survive. Set cascade=true to delete the entire subtree, including descendants in other workspaces. Requires item.delete in every workspace containing an item to delete; if the parent is deletable but the cascade is forbidden, returns 403 with \"This item can be deleted on its own, but cascade deletion is not permitted.\" and changes nothing. No blocking relationship details are disclosed. The operation locks the affected tree before authorization and deletion. Both modes return 204 with no response body. Unlike v1, cascading must be requested explicitly.",
         "parameters": [
           {
             "Name": "item_id",
@@ -4109,6 +4109,16 @@
             "Schema": {
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "Name": "cascade",
+            "In": "query",
+            "Description": "Delete the item and all descendants. Must be true or false; defaults to false.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -4449,34 +4459,6 @@
           "500": {}
         },
         "summary": "Get item available transitions",
-        "tags": [
-          "Work items"
-        ]
-      }
-    },
-    "/items/{item_id}/cascade-deletion": {
-      "post": {
-        "description": "Execute item cascade deletion. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
-        "parameters": [
-          {
-            "Name": "item_id",
-            "In": "path",
-            "Description": "The item identifier.",
-            "Required": true,
-            "Schema": {
-              "minimum": 1,
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "401": {},
-          "403": {},
-          "404": {},
-          "429": {},
-          "500": {}
-        },
-        "summary": "Execute item cascade deletion",
         "tags": [
           "Work items"
         ]
@@ -7465,7 +7447,7 @@
     },
     "/time/projects/{project_id}/managers": {
       "get": {
-        "description": "List time project managers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "List time project managers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "parameters": [
           {
             "Name": "project_id",
@@ -7491,7 +7473,7 @@
         ]
       },
       "post": {
-        "description": "Add time project manager. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "description": "Add time project manager. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "parameters": [
           {
             "Name": "project_id",
@@ -7560,7 +7542,7 @@
     },
     "/time/projects/{project_id}/members": {
       "get": {
-        "description": "List time project members. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "List time project members. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "parameters": [
           {
             "Name": "project_id",
@@ -7586,7 +7568,7 @@
         ]
       },
       "post": {
-        "description": "Add time project member. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "description": "Add time project member. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "parameters": [
           {
             "Name": "project_id",

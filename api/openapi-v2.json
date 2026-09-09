@@ -21543,7 +21543,6 @@
                 }
               },
               "required": [
-                "email",
                 "granted_at",
                 "id",
                 "name",
@@ -21603,7 +21602,6 @@
                 }
               },
               "required": [
-                "email",
                 "granted_at",
                 "id",
                 "name",
@@ -51570,28 +51568,6 @@
         ],
         "type": "object"
       },
-      "PostItemsItemIdCascadeDeletionResult": {
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "additionalProperties": false,
-            "properties": {
-              "count": {
-                "description": "The count value.",
-                "type": "integer"
-              }
-            },
-            "required": [
-              "count"
-            ],
-            "type": "object"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
       "PostItemsItemIdChangeTypePayload": {
         "additionalProperties": false,
         "properties": {
@@ -59668,7 +59644,6 @@
               }
             },
             "required": [
-              "email",
               "granted_at",
               "id",
               "name",
@@ -59743,7 +59718,6 @@
               }
             },
             "required": [
-              "email",
               "granted_at",
               "id",
               "name",
@@ -71538,7 +71512,7 @@
             }
           },
           {
-            "description": "QL expression used as the primary item filter. When present, structured filters other than search and status inclusion/exclusion are ignored.",
+            "description": "QL expression used as the primary item filter. For example, creator = 5 returns items created by user 5 (URL-encoded: ?ql=creator%20%3D%205). The v1 creator_id query parameter is not supported in v2 and is ignored; it does not filter results. This read filter does not change the item's creator. When ql is present, structured filters other than search and status inclusion/exclusion are ignored; express additional conditions in QL, for example creator = 5 AND assignee = 7.",
             "in": "query",
             "name": "ql",
             "required": false,
@@ -72343,7 +72317,7 @@
     },
     "/items/{item_id}": {
       "delete": {
-        "description": "Delete item. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "description": "Deletes only the item by default, detaching direct children so descendants survive. Set cascade=true to delete the entire subtree, including descendants in other workspaces. Requires item.delete in every workspace containing an item to delete; if the parent is deletable but the cascade is forbidden, returns 403 with \"This item can be deleted on its own, but cascade deletion is not permitted.\" and changes nothing. No blocking relationship details are disclosed. The operation locks the affected tree before authorization and deletion. Both modes return 204 with no response body. Unlike v1, cascading must be requested explicitly.",
         "operationId": "deleteItemsItemId",
         "parameters": [
           {
@@ -72354,6 +72328,16 @@
             "schema": {
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Delete the item and all descendants. Must be true or false; defaults to false.",
+            "in": "query",
+            "name": "cascade",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -73015,63 +72999,7 @@
         ]
       }
     },
-    "/items/{item_id}/cascade-deletion": {
-      "post": {
-        "description": "Execute item cascade deletion. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
-        "operationId": "postItemsItemIdCascadeDeletion",
-        "parameters": [
-          {
-            "description": "The item identifier.",
-            "in": "path",
-            "name": "item_id",
-            "required": true,
-            "schema": {
-              "minimum": 1,
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostItemsItemIdCascadeDeletionResult"
-                }
-              }
-            },
-            "description": "Execute item cascade deletion response."
-          },
-          "401": {
-            "$ref": "#/components/responses/AuthenticationError"
-          },
-          "403": {
-            "$ref": "#/components/responses/PermissionError"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFoundError"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimitError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "summary": "Execute item cascade deletion",
-        "tags": [
-          "Work items"
-        ],
-        "x-required-scopes": [
-          "items:delete"
-        ]
-      }
-    },
+    "/items/{item_id}/cascade-deletion": {},
     "/items/{item_id}/change-type": {
       "post": {
         "description": "Change item type. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -79353,7 +79281,7 @@
     },
     "/time/projects/{project_id}/managers": {
       "get": {
-        "description": "List time project managers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "List time project managers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "operationId": "getTimeProjectsProjectIdManagers",
         "parameters": [
           {
@@ -79408,7 +79336,7 @@
         ]
       },
       "post": {
-        "description": "Add time project manager. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "description": "Add time project manager. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "operationId": "postTimeProjectsProjectIdManagers",
         "parameters": [
           {
@@ -79544,7 +79472,7 @@
     },
     "/time/projects/{project_id}/members": {
       "get": {
-        "description": "List time project members. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "List time project members. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "operationId": "getTimeProjectsProjectIdMembers",
         "parameters": [
           {
@@ -79599,7 +79527,7 @@
         ]
       },
       "post": {
-        "description": "Add time project member. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "description": "Add time project member. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body. Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility.",
         "operationId": "postTimeProjectsProjectIdMembers",
         "parameters": [
           {

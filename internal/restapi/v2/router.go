@@ -892,6 +892,12 @@ func applyParameterCorrections(route *Route) {
 	}
 
 	switch route.Method + " " + route.Path {
+	case "GET /time/projects/{project_id}/members", "POST /time/projects/{project_id}/members",
+		"GET /time/projects/{project_id}/managers", "POST /time/projects/{project_id}/managers":
+		route.Description += " Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility."
+	case "DELETE /items/{item_id}":
+		upsertParameter(route, ParameterMetadata{Name: "cascade", In: "query", Description: "Delete the item and all descendants. Must be true or false; defaults to false.", Schema: map[string]any{"type": "boolean", "default": false}})
+		route.Description = "Deletes only the item by default, detaching direct children so descendants survive. Set cascade=true to delete the entire subtree, including descendants in other workspaces. Requires item.delete in every workspace containing an item to delete; if the parent is deletable but the cascade is forbidden, returns 403 with \"This item can be deleted on its own, but cascade deletion is not permitted.\" and changes nothing. No blocking relationship details are disclosed. The operation locks the affected tree before authorization and deletion. Both modes return 204 with no response body. Unlike v1, cascading must be requested explicitly."
 	case "GET /items/{item_id}":
 		if !slices.Contains(route.DocumentedErrors, http.StatusBadRequest) {
 			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusBadRequest)

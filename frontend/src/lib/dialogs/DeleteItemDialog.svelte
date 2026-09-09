@@ -139,14 +139,13 @@
 
     try {
       if (selectedMode === 'reparent') {
-        // First reparent children to the selected new parent, then delete the item
+        // Move children before deleting their parent.
         await api.items.reparentChildren(item.id, selectedNewParentId);
         await api.items.delete(item.id);
         ondeleted?.({ mode: 'reparent', deletedCount: 1, newParentId: selectedNewParentId });
       } else {
-        // Cascade delete
-        const result = await api.items.deleteCascade(item.id);
-        ondeleted?.({ mode: 'deleteAll', deletedCount: result.count });
+        await api.items.deleteCascade(item.id);
+        ondeleted?.({ mode: 'deleteAll' });
       }
       show = false;
     } catch (err) {
