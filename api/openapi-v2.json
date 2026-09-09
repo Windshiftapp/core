@@ -18164,6 +18164,747 @@
         ],
         "type": "object"
       },
+      "GetItemsSearchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "assignee_avatar": {
+                  "description": "The assignee avatar value.",
+                  "type": "string"
+                },
+                "assignee_email": {
+                  "description": "The assignee email value.",
+                  "type": "string"
+                },
+                "assignee_id": {
+                  "description": "The assignee id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "assignee_name": {
+                  "description": "The assignee name value.",
+                  "type": "string"
+                },
+                "calendar_data": {
+                  "description": "The calendar data value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "created_at": {
+                        "description": "The created at value.",
+                        "type": "string"
+                      },
+                      "duration_minutes": {
+                        "description": "The duration minutes value.",
+                        "type": "integer"
+                      },
+                      "notes": {
+                        "description": "The notes value.",
+                        "type": "string"
+                      },
+                      "scheduled_date": {
+                        "description": "The scheduled date value.",
+                        "type": "string"
+                      },
+                      "scheduled_time": {
+                        "description": "The scheduled time value.",
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "description": "The user id value.",
+                        "type": "integer"
+                      },
+                      "workspace_id": {
+                        "description": "The workspace id value.",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "created_at",
+                      "scheduled_date",
+                      "user_id",
+                      "workspace_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "channel_id": {
+                  "description": "The channel id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "channel_name": {
+                  "description": "The channel name value.",
+                  "type": "string"
+                },
+                "children": {
+                  "description": "The children value.",
+                  "items": {
+                    "description": "Nested resource reference.",
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "completed_at": {
+                  "description": "The completed at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "creator_email": {
+                  "description": "The creator email value.",
+                  "type": "string"
+                },
+                "creator_id": {
+                  "description": "The creator id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "creator_name": {
+                  "description": "The creator name value.",
+                  "type": "string"
+                },
+                "creator_portal_customer_email": {
+                  "description": "The creator portal customer email value.",
+                  "type": "string"
+                },
+                "creator_portal_customer_id": {
+                  "description": "The creator portal customer id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "creator_portal_customer_name": {
+                  "description": "The creator portal customer name value.",
+                  "type": "string"
+                },
+                "custom_field_values": {
+                  "additionalProperties": {
+                    "description": "Arbitrary JSON extension value."
+                  },
+                  "description": "The custom field values value.",
+                  "type": "object"
+                },
+                "description": {
+                  "description": "The description value.",
+                  "type": "string"
+                },
+                "description_html": {
+                  "description": "The description html value.",
+                  "type": "string"
+                },
+                "due_date": {
+                  "description": "The due date value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "effective_project_id": {
+                  "description": "The effective project id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "effective_project_name": {
+                  "description": "The effective project name value.",
+                  "type": "string"
+                },
+                "end_date": {
+                  "description": "The end date value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "estimate_minutes": {
+                  "description": "The estimate minutes value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "frac_index": {
+                  "description": "The frac index value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "inherit_project": {
+                  "description": "The inherit project value.",
+                  "type": "boolean"
+                },
+                "is_task": {
+                  "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
+                  "type": "boolean"
+                },
+                "item_type_builtin_key": {
+                  "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_id": {
+                  "description": "The item type id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "item_type_name": {
+                  "description": "The item type name value.",
+                  "type": "string"
+                },
+                "iteration_end_date": {
+                  "description": "The iteration end date value.",
+                  "type": "string"
+                },
+                "iteration_id": {
+                  "description": "The iteration id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "iteration_name": {
+                  "description": "The iteration name value.",
+                  "type": "string"
+                },
+                "key": {
+                  "description": "The key value.",
+                  "type": "string"
+                },
+                "labels": {
+                  "description": "The labels value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "color": {
+                        "description": "The color value.",
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "The created at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "description": "The updated at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "color",
+                      "created_at",
+                      "id",
+                      "name",
+                      "updated_at"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "last_active_at": {
+                  "description": "The last active at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "milestones": {
+                  "description": "The milestones value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "category_color": {
+                        "description": "The category color value.",
+                        "type": "string"
+                      },
+                      "category_id": {
+                        "description": "The category id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "category_name": {
+                        "description": "The category name value.",
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "The created at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "description": {
+                        "description": "The description value.",
+                        "type": "string"
+                      },
+                      "external_key": {
+                        "description": "The external key value.",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "is_global": {
+                        "description": "The is global value.",
+                        "type": "boolean"
+                      },
+                      "latest_release": {
+                        "additionalProperties": false,
+                        "description": "The latest release value.",
+                        "nullable": true,
+                        "properties": {
+                          "body": {
+                            "description": "The body value.",
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "description": "The created at value.",
+                            "type": "string"
+                          },
+                          "created_by": {
+                            "description": "The created by value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "is_draft": {
+                            "description": "The is draft value.",
+                            "type": "boolean"
+                          },
+                          "is_prerelease": {
+                            "description": "The is prerelease value.",
+                            "type": "boolean"
+                          },
+                          "milestone_id": {
+                            "description": "The milestone id value.",
+                            "type": "integer"
+                          },
+                          "name": {
+                            "description": "The name value.",
+                            "type": "string"
+                          },
+                          "scm_connection_id": {
+                            "description": "The scm connection id value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "scm_release_id": {
+                            "description": "The scm release id value.",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "scm_release_url": {
+                            "description": "The scm release url value.",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "scm_repository": {
+                            "description": "The scm repository value.",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "tag_name": {
+                            "description": "The tag name value.",
+                            "type": "string"
+                          },
+                          "target_commitish": {
+                            "description": "The target commitish value.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "created_at",
+                          "id",
+                          "is_draft",
+                          "is_prerelease",
+                          "milestone_id",
+                          "tag_name"
+                        ],
+                        "type": "object"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      },
+                      "position": {
+                        "description": "The position value.",
+                        "type": "integer"
+                      },
+                      "releases": {
+                        "description": "The releases value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "body": {
+                              "description": "The body value.",
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "description": "The created at value.",
+                              "type": "string"
+                            },
+                            "created_by": {
+                              "description": "The created by value.",
+                              "nullable": true,
+                              "type": "integer"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "is_draft": {
+                              "description": "The is draft value.",
+                              "type": "boolean"
+                            },
+                            "is_prerelease": {
+                              "description": "The is prerelease value.",
+                              "type": "boolean"
+                            },
+                            "milestone_id": {
+                              "description": "The milestone id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "scm_connection_id": {
+                              "description": "The scm connection id value.",
+                              "nullable": true,
+                              "type": "integer"
+                            },
+                            "scm_release_id": {
+                              "description": "The scm release id value.",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "scm_release_url": {
+                              "description": "The scm release url value.",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "scm_repository": {
+                              "description": "The scm repository value.",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "tag_name": {
+                              "description": "The tag name value.",
+                              "type": "string"
+                            },
+                            "target_commitish": {
+                              "description": "The target commitish value.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "created_at",
+                            "id",
+                            "is_draft",
+                            "is_prerelease",
+                            "milestone_id",
+                            "tag_name"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "status": {
+                        "description": "The status value.",
+                        "type": "string"
+                      },
+                      "target_date": {
+                        "description": "The target date value.",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "description": "The updated at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "workspace_id": {
+                        "description": "The workspace id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "workspace_name": {
+                        "description": "The workspace name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "created_at",
+                      "description",
+                      "id",
+                      "is_global",
+                      "name",
+                      "position",
+                      "status",
+                      "updated_at"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "parent_id": {
+                  "description": "The parent id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "parent_key": {
+                  "description": "The parent key value.",
+                  "type": "string"
+                },
+                "parent_title": {
+                  "description": "The parent title value.",
+                  "type": "string"
+                },
+                "parent_workspace_item_number": {
+                  "description": "The parent workspace item number value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "personal_labels": {
+                  "description": "The personal labels value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "color": {
+                        "description": "The color value.",
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "The created at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "description": "The updated at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "description": "The user id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "color",
+                      "created_at",
+                      "id",
+                      "name",
+                      "updated_at"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "priority_builtin_key": {
+                  "description": "The priority builtin key value.",
+                  "type": "string"
+                },
+                "priority_color": {
+                  "description": "The priority color value.",
+                  "type": "string"
+                },
+                "priority_icon": {
+                  "description": "The priority icon value.",
+                  "type": "string"
+                },
+                "priority_id": {
+                  "description": "The priority id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "priority_name": {
+                  "description": "The priority name value.",
+                  "type": "string"
+                },
+                "project_id": {
+                  "description": "The project id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "project_inheritance_mode": {
+                  "description": "The project inheritance mode value.",
+                  "type": "string"
+                },
+                "project_name": {
+                  "description": "The project name value.",
+                  "type": "string"
+                },
+                "related_work_item_id": {
+                  "description": "The related work item id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "related_work_item_number": {
+                  "description": "The related work item number value.",
+                  "type": "integer"
+                },
+                "related_work_item_title": {
+                  "description": "The related work item title value.",
+                  "type": "string"
+                },
+                "related_work_item_workspace_id": {
+                  "description": "The related work item workspace id value.",
+                  "type": "integer"
+                },
+                "related_work_item_workspace_key": {
+                  "description": "The related work item workspace key value.",
+                  "type": "string"
+                },
+                "reporter_avatar": {
+                  "description": "The reporter avatar value.",
+                  "type": "string"
+                },
+                "reporter_email": {
+                  "description": "The reporter email value.",
+                  "type": "string"
+                },
+                "reporter_id": {
+                  "description": "The reporter id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "reporter_name": {
+                  "description": "The reporter name value.",
+                  "type": "string"
+                },
+                "request_type_id": {
+                  "description": "The request type id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "request_type_name": {
+                  "description": "The request type name value.",
+                  "type": "string"
+                },
+                "start_date": {
+                  "description": "The start date value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "status_builtin_key": {
+                  "description": "The status builtin key value.",
+                  "type": "string"
+                },
+                "status_color": {
+                  "description": "The status color value.",
+                  "type": "string"
+                },
+                "status_id": {
+                  "description": "The status id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "status_name": {
+                  "description": "The status name value.",
+                  "type": "string"
+                },
+                "status_since": {
+                  "description": "The status since value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "story_points": {
+                  "description": "The story points value.",
+                  "nullable": true,
+                  "type": "number"
+                },
+                "time_project_id": {
+                  "description": "The time project id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "time_project_name": {
+                  "description": "The time project name value.",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "The title value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "virtual_field_data": {
+                  "additionalProperties": {
+                    "description": "Arbitrary JSON extension value."
+                  },
+                  "description": "The virtual field data value.",
+                  "type": "object"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                },
+                "workspace_item_number": {
+                  "description": "The workspace item number value.",
+                  "type": "integer"
+                },
+                "workspace_key": {
+                  "description": "The workspace key value.",
+                  "type": "string"
+                },
+                "workspace_name": {
+                  "description": "The workspace name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "created_at",
+                "description",
+                "id",
+                "inherit_project",
+                "is_task",
+                "last_active_at",
+                "title",
+                "updated_at",
+                "workspace_id",
+                "workspace_item_number"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "GetIterationsIterationIdBurndownResult": {
         "additionalProperties": false,
         "properties": {
@@ -73101,6 +73842,156 @@
           }
         ],
         "summary": "Get item roadmap hierarchy dates",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/items/search": {
+      "get": {
+        "description": "Searches caller-visible items by case-insensitive title/description substring or exact KEY-NUMBER. A structured q is interpreted as CQL; explicit ql takes precedence. Empty queries list visible items. Repeated workspace_id, status and priority filters intersect with visibility before pagination and totals. Results are ordered by updated_at descending, then ID ascending.",
+        "operationId": "getItemsSearch",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Text, exact item key or CQL; at most 500 bytes.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Explicit CQL, taking precedence over q; at most 500 bytes.",
+            "in": "query",
+            "name": "ql",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exclude personal-workspace items before pagination and totals. Values true and 1 enable exclusion.",
+            "in": "query",
+            "name": "exclude_personal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Repeated positive IDs to include.",
+            "in": "query",
+            "name": "workspace_id",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 50,
+              "type": "array"
+            }
+          },
+          {
+            "description": "Repeated positive IDs to include.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 20,
+              "type": "array"
+            }
+          },
+          {
+            "description": "Repeated positive IDs to include.",
+            "in": "query",
+            "name": "priority",
+            "required": false,
+            "schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetItemsSearchResult"
+                }
+              }
+            },
+            "description": "Search items response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDocument"
+                }
+              }
+            },
+            "description": "Gateway Timeout."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Search items",
         "tags": [
           "Work items"
         ],

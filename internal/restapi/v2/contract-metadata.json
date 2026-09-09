@@ -4116,6 +4116,118 @@
         ]
       }
     },
+    "/items/search": {
+      "get": {
+        "description": "Searches caller-visible items by case-insensitive title/description substring or exact KEY-NUMBER. A structured q is interpreted as CQL; explicit ql takes precedence. Empty queries list visible items. Repeated workspace_id, status and priority filters intersect with visibility before pagination and totals. Results are ordered by updated_at descending, then ID ascending.",
+        "parameters": [
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Text, exact item key or CQL; at most 500 bytes.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "ql",
+            "In": "query",
+            "Description": "Explicit CQL, taking precedence over q; at most 500 bytes.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "exclude_personal",
+            "In": "query",
+            "Description": "Exclude personal-workspace items before pagination and totals. Values true and 1 enable exclusion.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "workspace_id",
+            "In": "query",
+            "Description": "Repeated positive IDs to include.",
+            "Required": false,
+            "Schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 50,
+              "type": "array"
+            }
+          },
+          {
+            "Name": "status",
+            "In": "query",
+            "Description": "Repeated positive IDs to include.",
+            "Required": false,
+            "Schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 20,
+              "type": "array"
+            }
+          },
+          {
+            "Name": "priority",
+            "In": "query",
+            "Description": "Repeated positive IDs to include.",
+            "Required": false,
+            "Schema": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {},
+          "504": {}
+        },
+        "summary": "Search items",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/items/{item_id}": {
       "delete": {
         "description": "Deletes only the item by default, detaching direct children so descendants survive. Set cascade=true to delete the entire subtree, including descendants in other workspaces. Requires item.delete in every workspace containing an item to delete; if the parent is deletable but the cascade is forbidden, returns 403 with \"This item can be deleted on its own, but cascade deletion is not permitted.\" and changes nothing. No blocking relationship details are disclosed. The operation locks the affected tree before authorization and deletion. Both modes return 204 with no response body. Unlike v1, cascading must be requested explicitly.",

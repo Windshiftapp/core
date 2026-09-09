@@ -110,26 +110,22 @@ func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []s
 	return rl
 }
 
-// Limit is the middleware function that enforces rate limiting
-func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
+// AllowRequest consumes one token unless rate limiting is disabled for this request.
+func (rl *RateLimiter) AllowRequest(r *http.Request) bool {
 	if e2eRateLimitsDisabled() {
-		return next
+		return true
 	}
+	key := rl.getRateLimitKey(r)
+	return key == "" || rl.getVisitor(key).Allow()
+}
+
+// Limit enforces rate limiting on an HTTP handler.
+func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := rl.getRateLimitKey(r)
-		if key == "" {
-			// Empty key means skip limiting (e.g., disableIPLimit with no user context)
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		limiter := rl.getVisitor(key)
-
-		if !limiter.Allow() {
+		if !rl.AllowRequest(r) {
 			http.Error(w, "Too many requests. Please try again later.", http.StatusTooManyRequests)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }

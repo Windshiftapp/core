@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	apispec "windshift/api"
 	tokenauth "windshift/internal/auth"
@@ -567,6 +568,8 @@ type Deps struct {
 	ItemApplication    *services.ItemApplicationService
 	ItemDetail         *services.ItemDetailApplicationService
 	SessionMiddleware  func(http.Handler) http.Handler
+	SearchAllowed      func(*http.Request) bool
+	DBRequestTimeout   time.Duration
 	CORS               Middleware
 	CSRF               csrfValidator
 	Concurrency        concurrencyLimiter
@@ -775,7 +778,7 @@ func buildRoutes(deps Deps) []route {
 	registerActionRoutes(&builder, deps.Actions)
 	registerTestManagementRoutes(&builder, deps.TestManagement)
 	registerAssetRoutes(&builder, deps.Assets)
-	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail)
+	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.DBRequestTimeout)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	return builder.routes
 }
@@ -1002,6 +1005,25 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
 	case "GET /items/changes":
 		route.Description = "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow."
+	case "GET /items/search":
+		route.Tag = "Work items"
+		route.Summary = "Search items"
+		for _, code := range []int{http.StatusBadRequest, http.StatusGatewayTimeout} {
+			if !slices.Contains(route.DocumentedErrors, code) {
+				route.DocumentedErrors = append(route.DocumentedErrors, code)
+			}
+		}
+		slices.Sort(route.DocumentedErrors)
+		route.Description = "Searches caller-visible items by case-insensitive title/description substring or exact KEY-NUMBER. A structured q is interpreted as CQL; explicit ql takes precedence. Empty queries list visible items. Repeated workspace_id, status and priority filters intersect with visibility before pagination and totals. Results are ordered by updated_at descending, then ID ascending."
+		upsertParameter(route, stringQuery("q", "Text, exact item key or CQL; at most 500 bytes."))
+		upsertParameter(route, stringQuery("ql", "Explicit CQL, taking precedence over q; at most 500 bytes."))
+		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals. Values true and 1 enable exclusion.", false))
+		for _, filter := range []struct {
+			name string
+			max  int
+		}{{"workspace_id", 50}, {"status", 20}, {"priority", 10}} {
+			upsertParameter(route, ParameterMetadata{Name: filter.name, In: "query", Description: "Repeated positive IDs to include.", Schema: map[string]any{"type": "array", "maxItems": filter.max, "items": map[string]any{"type": "integer", "minimum": 1}}})
+		}
 	case "GET /items":
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
@@ -1181,6 +1203,15 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 				r.SetPathValue(name, value)
 			}
 			handler := selected.handler
+			if selected.Path == "/items/search" && deps.SearchAllowed != nil {
+				search := handler
+				handler = func(w http.ResponseWriter, r *http.Request) error {
+					if !deps.SearchAllowed(r) {
+						return newError(http.StatusTooManyRequests, "rate_limited", "Too many search requests. Please try again later.")
+					}
+					return search(w, r)
+				}
+			}
 			if selected.Auth == AuthAuthenticated {
 				if session {
 					handler = limitConcurrency(deps.Concurrency)(handler)

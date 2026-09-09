@@ -138,6 +138,7 @@
         tooltipSuffix=" ({getShortcutDisplay('global', 'create')})"
       />
       <NavLink
+        id="global-search-button"
         icon={IconSearch}
         label={t('nav.search')}
         onclick={onShowCommandPalette}

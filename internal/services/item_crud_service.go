@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
@@ -414,54 +413,6 @@ func (s *ItemCRUDService) Search(query string, workspaceIDs []int, pagination Pa
 // SearchContext is the request-aware form of Search.
 func (s *ItemCRUDService) SearchContext(ctx context.Context, query string, workspaceIDs []int, pagination PaginationParams) ([]models.Item, int, error) {
 	return s.repo.SearchContext(ctx, query, workspaceIDs, pagination)
-}
-
-// SearchParams contains parameters for the advanced Search handler
-type SearchParams struct {
-	TextQuery    string
-	WorkspaceIDs []int
-	StatusIDs    []int
-	PriorityIDs  []int
-	Pagination   PaginationParams
-}
-
-// SearchWithFilters searches items with multiple filter criteria
-func (s *ItemCRUDService) SearchWithFilters(params SearchParams) ([]models.Item, int, error) {
-	return s.SearchWithFiltersContext(context.Background(), params)
-}
-
-// SearchWithFiltersContext is the request-aware form of SearchWithFilters.
-func (s *ItemCRUDService) SearchWithFiltersContext(ctx context.Context, params SearchParams) ([]models.Item, int, error) {
-	if len(params.WorkspaceIDs) == 0 {
-		return []models.Item{}, 0, nil
-	}
-
-	filters := ItemFilters{
-		StatusIDs:   params.StatusIDs,
-		PriorityIDs: params.PriorityIDs,
-	}
-
-	// Detect workspace key pattern (e.g. "OK-40")
-	if params.TextQuery != "" {
-		parts := strings.Split(strings.ToUpper(params.TextQuery), "-")
-		isKeyPattern := len(parts) == 2 && parts[0] != "" && parts[1] != ""
-		if isKeyPattern {
-			if _, err := strconv.Atoi(parts[1]); err == nil {
-				filters.ItemKeyQuery = params.TextQuery
-			} else {
-				filters.TextQuery = params.TextQuery
-			}
-		} else {
-			filters.TextQuery = params.TextQuery
-		}
-	}
-
-	return s.repo.FindAllWithDetailsContext(ctx, ItemListParams{
-		WorkspaceIDs: params.WorkspaceIDs,
-		Filters:      filters,
-		Pagination:   params.Pagination,
-		SortBy:       "updated_at",
-	})
 }
 
 func (s *ItemCRUDService) resolveCollectionQLContext(ctx context.Context, qlQuery string, collectionID int) (resolvedQL string, isCollection bool, err error) {

@@ -31,6 +31,7 @@ type ItemIssueSync interface {
 }
 
 type ItemListRequest struct {
+	WorkspaceIDs     []int
 	UserID           int
 	WorkspaceID      int
 	CollectionID     int
@@ -217,6 +218,11 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
 		return ItemListResult{}, err
+	}
+	if len(request.WorkspaceIDs) > 0 {
+		workspaceIDs = slices.DeleteFunc(workspaceIDs, func(id int) bool {
+			return !slices.Contains(request.WorkspaceIDs, id)
+		})
 	}
 	if request.ExcludePersonal {
 		workspaceIDs, err = repository.FilterSharedWorkspaceIDs(s.db, workspaceIDs)

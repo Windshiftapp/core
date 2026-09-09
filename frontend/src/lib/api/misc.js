@@ -30,9 +30,9 @@ export const search = {
     }
 
     // Limit
-    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.limit) searchParams.append('page_size', Math.min(Number(params.limit), 100));
 
-    return fetchAPI(`/items/search?${searchParams.toString()}`);
+    return fetchV2Data(`/items/search?${searchParams.toString()}`);
   },
 };
 

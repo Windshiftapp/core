@@ -116,8 +116,9 @@ type roadmapHierarchyDatesRequest struct {
 	RootIDs []int `json:"root_ids"`
 }
 
-func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService) {
+func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, requestTimeout time.Duration) {
 	collection := "/items"
+	builder.Page("/items/search", AuthAuthenticated, []string{"items:read"}, searchItems(app, requestTimeout))
 	builder.PageMetadata(collection, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, Pagination, int, itemListMeta, error) {
 		user, err := principal(r)
 		if err != nil {

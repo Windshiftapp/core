@@ -532,7 +532,6 @@ func (s *Server) initialize() error {
 	bulkOperationMetrics := services.NewBulkOperationMetrics()
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService, s.memoryBudget.ItemCacheMB)
 	s.itemCache = itemHandler.ItemCacheService()
-	itemHandler.SetDBRequestTimeout(s.config.DB.RequestTimeout)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache, authorizationCacheInvalidator)
 	screenHandler := handlers.NewScreenHandler(s.db).WithObjectTranslations(objectTranslationService)
@@ -1409,7 +1408,6 @@ func (s *Server) initialize() error {
 		AIRateLimiter:         s.aiRateLimiter,
 		UploadLimiter:         s.uploadLimiter,
 		WebhookLimiter:        s.webhookLimiter,
-		SearchLimiter:         s.searchLimiter,
 		CalendarFeedLimiter:   s.calendarFeedLimiter,
 		PublicBoardLimiter:    s.publicBoardLimiter,
 
@@ -1706,6 +1704,8 @@ func (s *Server) initialize() error {
 		ItemApplication:    itemApplication,
 		ItemDetail:         itemDetailApplication,
 		SessionMiddleware:  authMiddleware.OptionalAuth,
+		SearchAllowed:      s.searchLimiter.AllowRequest,
+		DBRequestTimeout:   s.config.DB.RequestTimeout,
 		CORS:               v2.NewCORS(csrfOrigins, cfg.DisableCSRF, !cfg.DisableCSRF),
 		CSRF:               v2CSRF,
 		Concurrency:        s.userConcurrency,
