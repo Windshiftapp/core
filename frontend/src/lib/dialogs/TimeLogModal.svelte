@@ -1,4 +1,6 @@
 <script>
+  import { onDestroy } from 'svelte';
+  import { api } from '../api.js';
   import { BasePicker } from '../pickers';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
@@ -97,8 +99,46 @@
       };
     }));
 
-  // Prepare work items for combobox with workspace info
-  const workItemOptions = $derived(workItems.map(item => ({
+  let workItemResults = $state(null);
+  let searchingWorkItems = $state(false);
+  let selectedWorkItem = $state(null);
+  let workItemSearchVersion = 0;
+
+  function resetWorkItemSearch() {
+    workItemSearchVersion += 1;
+    workItemResults = null;
+    searchingWorkItems = false;
+  }
+
+  onDestroy(() => { workItemSearchVersion += 1; });
+
+  async function searchWorkItems(query) {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      resetWorkItemSearch();
+      return;
+    }
+    const version = ++workItemSearchVersion;
+    searchingWorkItems = true;
+    workItemResults = [];
+    try {
+      const results = await api.links.search(trimmedQuery, 'item', 20);
+      if (version !== workItemSearchVersion) return;
+      workItemResults = Array.isArray(results) ? results : [];
+    } catch (error) {
+      if (version !== workItemSearchVersion) return;
+      console.error('Work item search failed:', error);
+      workItemResults = [];
+    } finally {
+      if (version === workItemSearchVersion) searchingWorkItems = false;
+    }
+  }
+
+  // Keep a remotely selected item available after the search closes.
+  const initialWorkItems = $derived(selectedWorkItem && !workItems.some(item => item.id === selectedWorkItem.id)
+    ? [selectedWorkItem, ...workItems]
+    : workItems);
+  const workItemOptions = $derived((workItemResults ?? initialWorkItems).map(item => ({
     id: item.id,
     title: item.title,
     subtitle: item.workspace_name || 'Unknown Workspace',
@@ -232,14 +272,20 @@
       <div>
         <Label color="default" class="mb-2">{t('time.workItemOptional')}</Label>
         <BasePicker
+          id="time-log-work-item"
           bind:value={formData.item_id}
           items={workItemOptions}
           placeholder={t('placeholders.searchWorkItems')}
           allowClear={true}
-          searchFields={['title', 'subtitle']}
+          serverSearch={true}
+          loading={searchingWorkItems}
+          onSearchChange={searchWorkItems}
+          onClose={resetWorkItemSearch}
+          optionTestid={(option) => `time-log-work-item-option-${option.value}`}
           getValue={(item) => item?.id}
           getLabel={(item) => item?.title ?? ''}
           onSelect={(item) => {
+            selectedWorkItem = item?.item ?? null;
             if (item && !formData.description.trim()) {
               formData.description = item.title;
             }
