@@ -48,7 +48,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -167,7 +167,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -250,7 +250,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -581,7 +581,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -800,7 +800,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -950,7 +950,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -1348,7 +1348,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -1522,7 +1522,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -1657,7 +1657,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -2115,7 +2115,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -2218,7 +2218,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -2831,7 +2831,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -2971,7 +2971,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -3437,7 +3437,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -3621,7 +3621,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -4014,7 +4014,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -4313,7 +4313,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -4574,7 +4574,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -4914,7 +4914,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -4965,7 +4965,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -5914,7 +5914,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -6247,7 +6247,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -6317,7 +6317,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -6751,7 +6751,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -6930,7 +6930,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -8244,7 +8244,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -8367,7 +8367,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -8576,7 +8576,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -8956,7 +8956,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -9410,7 +9410,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -10028,7 +10028,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -10433,7 +10433,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -11342,7 +11342,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -11993,7 +11993,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -12809,7 +12809,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -12920,7 +12920,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -13278,7 +13278,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -13809,7 +13809,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -14088,7 +14088,7 @@
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }

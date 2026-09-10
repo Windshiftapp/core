@@ -18,7 +18,9 @@ function itemMutationBody(data) {
 
 function itemListQuery(/** @type {Record<string, any>} */ filters = {}) {
   const { limit, omit_descriptions, order_by, sort_direction, ...canonical } = filters;
-  if (limit != null) canonical.page_size = Math.min(Number(limit), 100);
+  // Must stay aligned with the v2 server page cap; boards re-sync accumulated
+  // rows in one request sized to what the user has loaded.
+  if (limit != null) canonical.page_size = Math.min(Number(limit), 1000);
   if (omit_descriptions) canonical.fields = 'summary';
   if (order_by) canonical.sort = sort_direction === 'desc' ? `-${order_by}` : order_by;
   return buildQueryString(canonical);
