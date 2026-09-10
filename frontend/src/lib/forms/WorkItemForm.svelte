@@ -362,7 +362,6 @@
             aria-label={t('createModal.dueDate')}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            onchange={() => $dueDateOpen = false}
           />
         </div>
       {/if}
@@ -391,12 +390,12 @@
         >
           <input
             type="date"
+            data-testid="create-start-date-input"
             bind:value={store.formData.start_date}
             use:focusAndShowDatePicker
             aria-label={t('common.startDate')}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            onchange={() => $startDateOpen = false}
           />
         </div>
       {/if}
@@ -425,12 +424,12 @@
         >
           <input
             type="date"
+            data-testid="create-end-date-input"
             bind:value={store.formData.end_date}
             use:focusAndShowDatePicker
             aria-label={t('common.endDate')}
             class="w-full px-3 py-2 rounded border text-sm"
             style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-            onchange={() => $endDateOpen = false}
           />
         </div>
       {/if}
