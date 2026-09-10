@@ -20,6 +20,7 @@
     triggerGap = 'gap-2',
     items = [],
     maxWidth = 'max-w-3xl',
+    matchTriggerWidth = false,
     /** @type {'bottom' | 'bottom-start' | 'bottom-end' | 'top' | 'top-start' | 'top-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end'} */
     placement = 'bottom',
     align = undefined,
@@ -57,6 +58,8 @@
     positioning: {
       strategy: 'fixed',
       fitViewport: true,
+      // svelte-ignore state_referenced_locally
+      sameWidth: matchTriggerWidth,
       // svelte-ignore state_referenced_locally
       placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },

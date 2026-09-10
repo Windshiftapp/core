@@ -433,8 +433,10 @@
     <Tooltip content={t('collections.collection')} placement="right">
       <DropdownMenu
         triggerText={collectionDisplayName}
+        triggerTestid="workspace-collection-select"
         items={collectionDropdownItems}
         maxWidth="max-w-full"
+        matchTriggerWidth={true}
         showChevron={true}
         placement="bottom-start"
         triggerClass="w-full text-left font-medium rounded !px-3 !py-2.5 !text-sm transition-colors"
