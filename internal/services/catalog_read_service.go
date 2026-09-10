@@ -240,12 +240,14 @@ func (s *CatalogReadService) ListUsers(userID int, page CatalogPageParams) ([]mo
 }
 
 func (s *CatalogReadService) GetUser(userID, targetID int) (*models.User, error) {
-	allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
-	if err != nil {
-		return nil, err
-	}
-	if !allowed {
-		return nil, ErrCatalogForbidden
+	if userID != targetID {
+		allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, ErrCatalogForbidden
+		}
 	}
 	user, err := s.users.GetByID(targetID)
 	if err != nil {

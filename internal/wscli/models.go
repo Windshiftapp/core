@@ -86,7 +86,7 @@ type Item struct {
 	DueDate             *time.Time     `json:"due_date,omitempty"`
 	StartDate           *time.Time     `json:"start_date,omitempty"`
 	EndDate             *time.Time     `json:"end_date,omitempty"`
-	CustomFields        map[string]any `json:"custom_fields,omitempty"`
+	CustomFields        map[string]any `json:"custom_field_values,omitempty"`
 
 	// Hierarchy. ParentKey/ParentTitle are populated by the server on
 	// permission-checked single-item reads (omitted when the caller may not
@@ -157,7 +157,7 @@ type ItemCreateRequest struct {
 	StartDate    *time.Time     `json:"start_date,omitempty"`
 	EndDate      *time.Time     `json:"end_date,omitempty"`
 	IsTask       bool           `json:"is_task,omitempty"`
-	CustomFields map[string]any `json:"custom_fields,omitempty"`
+	CustomFields map[string]any `json:"custom_field_values,omitempty"`
 }
 
 // ItemUpdateRequest is the merge patch for /rest/api/v2/items/{id}. It does not
@@ -178,7 +178,7 @@ type ItemUpdateRequest struct {
 	StartDate    *time.Time     `json:"start_date,omitempty"`
 	EndDate      *time.Time     `json:"end_date,omitempty"`
 	IsTask       *bool          `json:"is_task,omitempty"`
-	CustomFields map[string]any `json:"custom_fields,omitempty"`
+	CustomFields map[string]any `json:"custom_field_values,omitempty"`
 }
 
 // TransitionRequest is the body for POST /rest/api/v2/items/{id}/transition.

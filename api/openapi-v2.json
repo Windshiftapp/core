@@ -24769,21 +24769,10 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "time_project_categories": {
-                  "description": "The time project categories value.",
-                  "items": {
-                    "type": "integer"
-                  },
-                  "type": "array"
-                },
                 "time_project_id": {
                   "description": "The time project id value.",
                   "nullable": true,
                   "type": "integer"
-                },
-                "time_project_name": {
-                  "description": "The time project name value.",
-                  "type": "string"
                 },
                 "updated_at": {
                   "description": "The updated at value.",
@@ -24803,8 +24792,6 @@
                 "is_template",
                 "key",
                 "name",
-                "time_project_categories",
-                "time_project_name",
                 "updated_at"
               ],
               "type": "object"
@@ -29083,21 +29070,10 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "time_project_categories": {
-                "description": "The time project categories value.",
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
               "time_project_id": {
                 "description": "The time project id value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "time_project_name": {
-                "description": "The time project name value.",
-                "type": "string"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -29117,8 +29093,6 @@
               "is_template",
               "key",
               "name",
-              "time_project_categories",
-              "time_project_name",
               "updated_at"
             ],
             "type": "object"
@@ -46045,30 +46019,15 @@
             "nullable": true,
             "type": "boolean"
           },
-          "is_personal": {
-            "description": "The is personal value.",
-            "nullable": true,
-            "type": "boolean"
-          },
           "is_template": {
             "description": "The is template value.",
             "nullable": true,
             "type": "boolean"
           },
-          "key": {
-            "description": "The key value.",
-            "nullable": true,
-            "type": "string"
-          },
           "name": {
             "description": "The name value.",
             "nullable": true,
             "type": "string"
-          },
-          "owner_id": {
-            "description": "The owner id value.",
-            "nullable": true,
-            "type": "integer"
           },
           "time_project_categories": {
             "description": "The time project categories value.",
@@ -46155,21 +46114,10 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "time_project_categories": {
-                "description": "The time project categories value.",
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
               "time_project_id": {
                 "description": "The time project id value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "time_project_name": {
-                "description": "The time project name value.",
-                "type": "string"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -46189,8 +46137,6 @@
               "is_template",
               "key",
               "name",
-              "time_project_categories",
-              "time_project_name",
               "updated_at"
             ],
             "type": "object"
@@ -62577,21 +62523,10 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "time_project_categories": {
-                "description": "The time project categories value.",
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
               "time_project_id": {
                 "description": "The time project id value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "time_project_name": {
-                "description": "The time project name value.",
-                "type": "string"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -62611,8 +62546,6 @@
               "is_template",
               "key",
               "name",
-              "time_project_categories",
-              "time_project_name",
               "updated_at"
             ],
             "type": "object"
@@ -63024,6 +62957,193 @@
               "trigger_type",
               "updated_at",
               "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdActionsValidatePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_user_id": {
+            "description": "The actor user id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "allowed_role_ids": {
+            "description": "The allowed role ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "The description value.",
+            "type": "string"
+          },
+          "edges": {
+            "description": "The edges value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action_id": {
+                  "description": "The action id value.",
+                  "type": "integer"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "edge_type": {
+                  "description": "The edge type value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "source_handle": {
+                  "description": "The source handle value.",
+                  "type": "string"
+                },
+                "source_node_id": {
+                  "description": "The source node id value.",
+                  "type": "integer"
+                },
+                "target_handle": {
+                  "description": "The target handle value.",
+                  "type": "string"
+                },
+                "target_node_id": {
+                  "description": "The target node id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "action_id",
+                "created_at",
+                "edge_type",
+                "id",
+                "source_node_id",
+                "target_node_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "The name value.",
+            "type": "string"
+          },
+          "nodes": {
+            "description": "The nodes value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action_id": {
+                  "description": "The action id value.",
+                  "type": "integer"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "node_config": {
+                  "description": "The node config value.",
+                  "type": "string"
+                },
+                "node_type": {
+                  "description": "The node type value.",
+                  "type": "string"
+                },
+                "position_x": {
+                  "description": "The position x value.",
+                  "type": "number"
+                },
+                "position_y": {
+                  "description": "The position y value.",
+                  "type": "number"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action_id",
+                "created_at",
+                "id",
+                "node_config",
+                "node_type",
+                "position_x",
+                "position_y",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "trigger_config": {
+            "description": "The trigger config value.",
+            "type": "string"
+          },
+          "trigger_type": {
+            "description": "The trigger type value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "trigger_type"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdActionsValidateResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "errors": {
+                "description": "The errors value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "description": "The code value.",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "The message value.",
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "The path value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "errors"
             ],
             "type": "object"
           }
@@ -84904,6 +85024,82 @@
           }
         ],
         "summary": "Create action",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "actions:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/actions/validate": {
+      "post": {
+        "description": "Validate action. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdActionsValidate",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdActionsValidatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdActionsValidateResult"
+                }
+              }
+            },
+            "description": "Validate action response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Validate action",
         "tags": [
           "Automation"
         ],

@@ -119,10 +119,10 @@ display name and doubles as an auth check.
 `windshift-tasks` adds one item query. `windshift-summary` adds three: the
 backlog it computes from, a closed-today count, and today's activity across
 every workspace the token can see. The two count-only queries use `page_size=1`
-and read just `pagination.total`, so they stay cheap regardless of backlog
+and read just `pagination.total_items`, so they stay cheap regardless of backlog
 size.
 
-Counts that come from `pagination.total` (open, closed today, moved today) are
+Counts that come from `pagination.total_items` (open, closed today, moved today) are
 exact at any size. Due-today and overdue are counted in Liquid from a 100-item
 window, so they are exact as long as the scope query returns 100 items or
 fewer — which the default per-assignee query will.

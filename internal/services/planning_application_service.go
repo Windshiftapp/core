@@ -53,6 +53,13 @@ func (s *PlanningApplicationService) ListMilestones(userID int, params Milestone
 		return nil, 0, err
 	}
 	params.IncludeGlobal = params.WorkspaceID == nil
+	if params.WorkspaceID == nil {
+		workspaceIDs, err := s.permission.AccessibleWorkspaceIDs(userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		params.WorkspaceIDs = workspaceIDs
+	}
 	return s.planning.ListMilestones(params)
 }
 
@@ -269,6 +276,13 @@ func (s *PlanningApplicationService) ListIterations(userID int, params Iteration
 		return nil, 0, err
 	}
 	params.IncludeGlobal = params.WorkspaceID == nil
+	if params.WorkspaceID == nil {
+		workspaceIDs, err := s.permission.AccessibleWorkspaceIDs(userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		params.WorkspaceIDs = workspaceIDs
+	}
 	return s.planning.ListIterations(params)
 }
 

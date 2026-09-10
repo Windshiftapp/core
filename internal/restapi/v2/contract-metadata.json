@@ -9214,6 +9214,37 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/actions/validate": {
+      "post": {
+        "description": "Validate action. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Validate action",
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/actions/{action_id}": {
       "delete": {
         "description": "Delete action. The server verifies resource ownership and deletion preconditions before removing the resource.",

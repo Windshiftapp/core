@@ -22,6 +22,7 @@ import (
 	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/services/actioncatalog"
 )
 
 const (
@@ -512,6 +513,7 @@ type actionApplication interface {
 	ListTemplates() []services.ActionTemplateSummary
 	ApplyTemplate(context.Context, int, int, services.AuditActor, string) (*services.ApplyToWorkspaceResult, error)
 	Catalog(int, int) (services.ActionCatalog, error)
+	Validate(int, int, models.CreateActionRequest) (actioncatalog.ValidationErrors, error)
 	List(int, int) ([]*models.Action, error)
 	Get(int, int, int) (*models.Action, error)
 	Create(int, int, services.AuditActor, models.CreateActionRequest) (*models.Action, error)
@@ -830,6 +832,11 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		routes[index].Summary = operation.Summary
 		routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		routes[index].Parameters = contractParameters(item["parameters"], operation.Parameters, spec.Components.Parameters)
+		if routes[index].Path == "/workspaces/{workspace_id}/actions/validate" && routes[index].Tag == "" {
+			routes[index].Tag = "Automation"
+			routes[index].Summary = "Validate action"
+			routes[index].Description = "Dry-run validation for an action definition."
+		}
 		for status := range operation.Responses {
 			code, err := strconv.Atoi(status)
 			if err == nil && code >= 400 {
@@ -901,6 +908,8 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
 	}
 	switch route.Method + " " + route.Path {
+	case "POST /workspaces/{workspace_id}/actions/validate":
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
 	case "GET /items/changes":
 		upsertParameter(route, ParameterMetadata{Name: "since", In: "query", Description: "Exclusive change cursor. Omit to obtain a stable watermark before a full load.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
 		upsertParameter(route, ParameterMetadata{Name: "through", In: "query", Description: "Inclusive fixed watermark from the first page. Must be greater than or equal to since.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})

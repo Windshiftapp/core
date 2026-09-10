@@ -167,6 +167,27 @@ func (s *ActionApplicationService) Get(userID, workspaceID, actionID int) (*mode
 	return s.actionInWorkspace(actionID, workspaceID)
 }
 
+func (s *ActionApplicationService) Validate(userID, workspaceID int, input models.CreateActionRequest) (actioncatalog.ValidationErrors, error) {
+	if err := s.requireManage(userID, workspaceID); err != nil {
+		return nil, err
+	}
+	if input.ActorUserID != nil {
+		if err := s.requireSetActor(userID); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := s.validateRoles(input.TriggerType, input.AllowedRoleIDs); err != nil {
+		return nil, err
+	}
+	input.Name = sanitize.PlainTextField.Sanitize(input.Name)
+	input.Description = sanitize.RichText.Sanitize(input.Description)
+	errs, err := s.definitions.Validate(workspaceID, actioncatalog.FromCreateRequest(&input))
+	if err != nil {
+		return nil, err
+	}
+	return errs, nil
+}
+
 func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditActor, input models.CreateActionRequest) (*models.Action, error) {
 	if err := s.requireManage(userID, workspaceID); err != nil {
 		return nil, err
