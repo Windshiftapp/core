@@ -6363,6 +6363,16 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "Name": "is_global",
+            "In": "query",
+            "Description": "Restricts results to global iterations instead of global and accessible-workspace iterations.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6975,6 +6985,16 @@
                 "-updated_at"
               ],
               "type": "string"
+            }
+          },
+          {
+            "Name": "is_global",
+            "In": "query",
+            "Description": "Restricts results to global milestones instead of global and accessible-workspace milestones.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -10105,6 +10125,16 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "Name": "include_global",
+            "In": "query",
+            "Description": "Includes global iterations alongside the workspace's own.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -10509,6 +10539,16 @@
                 "-updated_at"
               ],
               "type": "string"
+            }
+          },
+          {
+            "Name": "include_global",
+            "In": "query",
+            "Description": "Includes global milestones alongside the workspace's own.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],

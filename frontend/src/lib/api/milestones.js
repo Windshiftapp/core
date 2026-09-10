@@ -6,41 +6,33 @@ export const milestoneCategories = createCrudClient('/milestone-categories');
 function planningQuery(filters = {}) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (
-      !['workspace_id', 'include_global', 'is_global'].includes(key) &&
-      value != null &&
-      value !== ''
-    ) {
-      params.set(key, String(value));
-    }
+    if (key === 'workspace_id') continue;
+    if (value == null || value === '') continue;
+    // include_global defaults to false server-side; only send explicit opt-ins.
+    if (key === 'include_global' && value === false) continue;
+    params.set(key, String(value));
   }
   return params.toString();
 }
 
+/**
+ * List planning resources without merging scopes client-side. Workspace-scoped
+ * requests return the workspace's rows plus global rows in one server-side
+ * response (include_global); unscoped requests return global and
+ * accessible-workspace rows, optionally narrowed with is_global. Mixing the
+ * two sources client-side would duplicate rows and break keyed renders.
+ */
 async function listPlanning(path, filters = {}, requestOptions = {}) {
   const query = planningQuery(filters);
   const globalPath = `${path}${query ? `?${query}` : ''}`;
   if (filters.workspace_id == null) {
-    if (filters.is_global === true) return fetchAllV2Pages(globalPath, requestOptions);
-    const workspaces = await fetchAllV2Pages('/workspaces', requestOptions);
-    const rows =
-      filters.include_global === false || filters.is_global === false
-        ? []
-        : await fetchAllV2Pages(globalPath, requestOptions);
-    for (const workspace of workspaces) {
-      const workspacePath = `/workspaces/${workspace.id}${path}${query ? `?${query}` : ''}`;
-      rows.push(...(await fetchAllV2Pages(workspacePath, requestOptions)));
-    }
-    return rows;
+    return fetchAllV2Pages(globalPath, requestOptions);
   }
-  const workspacePath = `/workspaces/${filters.workspace_id}${path}${query ? `?${query}` : ''}`;
-  const local = fetchAllV2Pages(workspacePath, requestOptions);
-  if (filters.include_global === false) return local;
-  const [localRows, globalRows] = await Promise.all([
-    local,
-    fetchAllV2Pages(globalPath, requestOptions),
-  ]);
-  return [...localRows, ...globalRows];
+  const effective =
+    filters.include_global === undefined ? { ...filters, include_global: true } : filters;
+  const scopedQuery = planningQuery(effective);
+  const workspacePath = `/workspaces/${filters.workspace_id}${path}${scopedQuery ? `?${scopedQuery}` : ''}`;
+  return fetchAllV2Pages(workspacePath, requestOptions);
 }
 
 function planningCreate(path, data) {

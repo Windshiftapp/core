@@ -117,6 +117,7 @@ type IterationListParams struct {
 	TypeID        *int   // Filter by type
 	Status        string // Filter by status
 	IncludeGlobal bool   // Include global iterations
+	IsGlobal      bool   // Restricts an unscoped list to global iterations only
 	SortBy        string
 	SortOrder     string
 }

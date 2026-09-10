@@ -967,10 +967,20 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts results to one milestone category."))
 		upsertParameter(route, stringQuery("status", "Restricts results to a milestone status."))
 		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.", "position", "-position", "name", "-name", "target_date", "-target_date", "status", "-status", "created_at", "-created_at", "updated_at", "-updated_at"))
+		if route.Path == "/milestones" {
+			upsertParameter(route, booleanQuery("is_global", "Restricts results to global milestones instead of global and accessible-workspace milestones.", false))
+		} else {
+			upsertParameter(route, booleanQuery("include_global", "Includes global milestones alongside the workspace's own.", false))
+		}
 	case "GET /iterations", "GET /workspaces/{workspace_id}/iterations":
 		upsertParameter(route, positiveIDQuery("type_id", "Restricts results to one iteration type."))
 		upsertParameter(route, stringQuery("status", "Restricts results to an iteration status."))
 		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.", "start_date", "-start_date", "end_date", "-end_date", "name", "-name", "status", "-status", "created_at", "-created_at", "updated_at", "-updated_at"))
+		if route.Path == "/iterations" {
+			upsertParameter(route, booleanQuery("is_global", "Restricts results to global iterations instead of global and accessible-workspace iterations.", false))
+		} else {
+			upsertParameter(route, booleanQuery("include_global", "Includes global iterations alongside the workspace's own.", false))
+		}
 	case "GET /time/worklogs":
 		upsertParameter(route, positiveIDQuery("project_id", "Restricts worklogs to one time project."))
 		fallthrough

@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -178,9 +179,14 @@ func listMilestones(planning planningApplication, workspaceScoped bool) pageOper
 		if err != nil {
 			return nil, page, 0, err
 		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
 		rows, total, err := planning.ListMilestones(user.ID, services.MilestoneListParams{
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, CategoryID: categoryID,
 			Status: r.URL.Query().Get("status"), SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
 		})
 		return mapMilestones(rows), page, total, planningError(err)
 	}
@@ -327,9 +333,14 @@ func listIterations(planning planningApplication, workspaceScoped bool) pageOper
 		if err != nil {
 			return nil, page, 0, err
 		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
 		rows, total, err := planning.ListIterations(user.ID, services.IterationListParams{
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, TypeID: typeID, Status: r.URL.Query().Get("status"),
 			SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
 		})
 		return mapIterations(rows), page, total, planningError(err)
 	}
@@ -460,6 +471,30 @@ func planningWorkspaceID(r *http.Request, workspaceScoped bool) (*int, error) {
 		return nil, err
 	}
 	return &workspaceID, nil
+}
+
+// planningScopeQueryFlags parses the list-scope filters: workspace-scoped
+// routes take include_global (workspace rows plus global rows in one page),
+// unscoped routes take is_global (global rows only).
+func planningScopeQueryFlags(r *http.Request, workspaceScoped bool) (isGlobal, includeGlobal bool, err error) {
+	if workspaceScoped {
+		includeGlobal, err = optionalBoolQuery(r, "include_global")
+		return false, includeGlobal, err
+	}
+	isGlobal, err = optionalBoolQuery(r, "is_global")
+	return isGlobal, false, err
+}
+
+func optionalBoolQuery(r *http.Request, name string) (bool, error) {
+	value := r.URL.Query().Get(name)
+	if value == "" {
+		return false, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, newError(http.StatusBadRequest, "invalid_request", name+" must be a boolean")
+	}
+	return parsed, nil
 }
 
 func planningTarget(r *http.Request, name string) (*models.User, int, error) {

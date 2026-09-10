@@ -52,8 +52,12 @@ func (s *PlanningApplicationService) ListMilestones(userID int, params Milestone
 	if err := s.requireListScope(userID, params.WorkspaceID); err != nil {
 		return nil, 0, err
 	}
-	params.IncludeGlobal = params.WorkspaceID == nil
-	if params.WorkspaceID == nil {
+	params.IncludeGlobal = params.WorkspaceID == nil || params.IncludeGlobal
+	if params.IsGlobal {
+		params.WorkspaceID = nil
+		params.WorkspaceIDs = nil
+	}
+	if params.WorkspaceID == nil && !params.IsGlobal {
 		workspaceIDs, err := s.permission.AccessibleWorkspaceIDs(userID)
 		if err != nil {
 			return nil, 0, err
@@ -275,8 +279,12 @@ func (s *PlanningApplicationService) ListIterations(userID int, params Iteration
 	if err := s.requireListScope(userID, params.WorkspaceID); err != nil {
 		return nil, 0, err
 	}
-	params.IncludeGlobal = params.WorkspaceID == nil
-	if params.WorkspaceID == nil {
+	params.IncludeGlobal = params.WorkspaceID == nil || params.IncludeGlobal
+	if params.IsGlobal {
+		params.WorkspaceID = nil
+		params.WorkspaceIDs = nil
+	}
+	if params.WorkspaceID == nil && !params.IsGlobal {
 		workspaceIDs, err := s.permission.AccessibleWorkspaceIDs(userID)
 		if err != nil {
 			return nil, 0, err
