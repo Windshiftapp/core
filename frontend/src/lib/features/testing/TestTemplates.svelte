@@ -78,7 +78,7 @@
       const [sets, templates, milestonesData] = await Promise.all([
         api.tests.testPlans.getAll(workspaceId),
         api.tests.testRunTemplates.getAll(workspaceId),
-        api.milestones.getAll()
+        api.milestones.getAll({ workspace_id: workspaceId })
       ]);
 
       testSets.set(sets || []);
@@ -213,6 +213,7 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
+    {workspaceId}
     title={t('testing.testRunTemplates')}
     subtitle={t('testing.testRunTemplatesSubtitle')}
     bind:milestoneFilter={selectedMilestoneFilter}

@@ -110,6 +110,7 @@
     if (isOpen && modalContentElement && backdropElement) {
       const timer = setTimeout(() => {
         detectTextarea();
+        if (modalContentElement.contains(document.activeElement)) return;
         backdropElement.focus();
         if (autoFocus) {
           const focusable = modalContentElement.querySelector(

@@ -181,7 +181,7 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 	connectionString := dataSourceName +
 		separator + "_busy_timeout=5000" +
 		"&_journal_mode=WAL" +
-		"&_foreign_keys=on" +
+		"&_pragma=foreign_keys(ON)" +
 		"&_txlock=immediate" +
 		// Use SQLite-parsable UTC timestamps; startup repairs legacy rows.
 		"&_time_format=sqlite" +

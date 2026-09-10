@@ -110,7 +110,7 @@
     try {
       const [sets, milestonesData] = await Promise.all([
         api.tests.testPlans.getAll(workspaceId),
-        api.milestones.getAll() // Get all milestones
+        api.milestones.getAll({ workspace_id: workspaceId })
       ]);
       testSets.set(sets || []);
       milestones.set(milestonesData || []);
@@ -316,6 +316,7 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
+    {workspaceId}
     title={t('testing.testPlans')}
     subtitle={t('testing.testPlansSubtitle')}
     bind:milestoneFilter={selectedMilestoneFilter}
@@ -373,6 +374,7 @@
 
         <FormField label={t('testing.milestoneOptional')}>
           <MilestoneCombobox
+            {workspaceId}
             bind:value={formData.milestone_id}
             placeholder={t('testing.noMilestone')}
           />
