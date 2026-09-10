@@ -19,6 +19,27 @@ let conversationLoading = $state(false);
 let workspaceOptionsKey = '';
 let historyLoaded = $state(false);
 let historyPromise = null;
+let historyAfterMessageId = $state(0);
+
+function messageID(messagesToInspect) {
+  return messagesToInspect.reduce(
+    (highest, message) => Math.max(highest, Number(message.id) || 0),
+    0
+  );
+}
+
+function applyGeneralSession(session, storedMessages, afterMessageId = 0) {
+  sessionId = session?.id || 0;
+  sessionType = 'general';
+  sessionWorkspaceId = 0;
+  agentProfileId = 0;
+  messages = (Array.isArray(storedMessages) ? storedMessages : []).map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  }));
+  historyAfterMessageId = afterMessageId;
+}
 
 async function loadGeneralHistory() {
   if (historyLoaded && sessionType === 'general') return;
@@ -26,18 +47,11 @@ async function loadGeneralHistory() {
   historyPromise = (async () => {
     try {
       const session = await api.ai.getGeneralSession();
-      sessionId = session?.id || 0;
-      sessionType = 'general';
-      sessionWorkspaceId = 0;
-      agentProfileId = 0;
-      if (sessionId) {
-        const stored = await api.ai.getSessionMessages(sessionId);
-        messages = (Array.isArray(stored) ? stored : []).map((message) => ({
-          id: message.id,
-          role: message.role,
-          content: message.content,
-        }));
+      let stored = [];
+      if (session?.id) {
+        stored = await api.ai.getSessionMessages(session.id);
       }
+      applyGeneralSession(session, stored);
       historyLoaded = true;
     } catch (err) {
       console.error('Failed to load agent conversation:', err);
@@ -46,6 +60,24 @@ async function loadGeneralHistory() {
     }
   })();
   return historyPromise;
+}
+
+async function startNewGeneralChat() {
+  if (conversationLoading) return;
+  conversationLoading = true;
+  try {
+    const session = await api.ai.getGeneralSession();
+    const stored = session?.id ? await api.ai.getSessionMessages(session.id) : [];
+    applyGeneralSession(session, stored, messageID(Array.isArray(stored) ? stored : []));
+    messages = [];
+    error = '';
+    itemKeyMap = {};
+    historyLoaded = true;
+  } catch (err) {
+    error = err.message || 'Conversation could not be started';
+  } finally {
+    conversationLoading = false;
+  }
 }
 
 async function loadSession(session) {
@@ -58,6 +90,7 @@ async function loadSession(session) {
     sessionType = session.session_type || 'standard';
     sessionWorkspaceId = session.workspace_id || 0;
     agentProfileId = session.agent_profile_id || 0;
+    historyAfterMessageId = 0;
     messages = (Array.isArray(stored) ? stored : []).map((message) => ({
       id: message.id,
       role: message.role,
@@ -207,12 +240,16 @@ async function sendMessage(text, context) {
   error = '';
 
   try {
-    const result = await api.ai.chat(
-      text,
-      sessionType === 'general' ? connectionId || undefined : undefined,
-      sessionId || undefined,
-      context
-    );
+    const result =
+      sessionType === 'general'
+        ? await api.ai.chat(
+            text,
+            connectionId || undefined,
+            sessionId || undefined,
+            context,
+            historyAfterMessageId
+          )
+        : await api.ai.chat(text, undefined, sessionId || undefined, context);
     sessionId = result.session_id || sessionId;
     const assistantMsg = {
       id: result.message_id,
@@ -286,10 +323,15 @@ function retryLastMessage() {
 }
 
 function clearHistory() {
+  if (sessionType === 'general') {
+    historyAfterMessageId = Math.max(historyAfterMessageId, messageID(messages));
+    historyLoaded = true;
+  } else {
+    historyLoaded = false;
+  }
   messages = [];
   error = '';
   itemKeyMap = {};
-  historyLoaded = false;
 }
 
 export const chatStore = {
@@ -346,6 +388,7 @@ export const chatStore = {
   clearHistory,
   loadConnections,
   loadGeneralHistory,
+  startNewGeneralChat,
   prepareWorkspaceOptions,
   selectConversation,
   startStandardConversation,
