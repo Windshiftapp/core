@@ -22,6 +22,7 @@
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
+  import { formatItemCount } from '../../utils/itemCount.js';
   import { isSystemFieldAvailableForItem } from '../../utils/screenFields.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -246,6 +247,11 @@
     ), collapsedSections.has('unassigned') ? 0 : unassignedItems.length)
   );
 
+  let backlogTotal = $derived(collectionStore.backlogPagination?.total_items ?? backlogItems.length);
+  let backlogShownCount = $derived(collectionStore.loading ? null : shownItemCount);
+  let backlogRemaining = $derived(Math.max(0, backlogTotal - backlogItems.length));
+  let backlogCountSummary = $derived(formatItemCount(backlogTotal, backlogShownCount, t));
+
   // Centralized gradient styling
   const styles = useGradientStyles();
 
@@ -297,7 +303,7 @@
 
   // Keep backlog count in sync
   $effect(() => {
-    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total_items ?? collectionStore.backlogItems.length);
+    backlogStore.setCount(workspaceId, backlogTotal);
   });
 
   // Adaptive polling for backlog items: use cheap deltas, falling back to full refresh only when needed.
@@ -716,8 +722,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Backlog"
-          itemCount={collectionStore.collectionTotal}
-          shownCount={collectionStore.loading ? null : shownItemCount}
+          itemCount={backlogTotal}
+          shownCount={backlogShownCount}
         >
           {#snippet actions()}
             <div class="flex items-center gap-2">
@@ -836,7 +842,7 @@
               >
                 {collectionStore.backlogLoadingMore ? t('common.loading') : t('common.loadMore')}
                 {#if collectionStore.backlogPagination?.total_items}
-                  ({collectionStore.backlogPagination.total_items - collectionStore.backlogItems.length} {t('common.remaining')})
+                  ({backlogRemaining} {t('common.remaining')})
                 {/if}
               </button>
             </div>
@@ -844,8 +850,8 @@
 
           <!-- Summary -->
           <div class="mt-8 text-center">
-            <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
-              {t('collections.showingItemsFromBacklog', { count: collectionStore.backlogPagination?.total_items ?? backlogItems.length })}
+            <p data-testid="backlog-count-summary" class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
+              {backlogCountSummary}
             </p>
           </div>
         </div>

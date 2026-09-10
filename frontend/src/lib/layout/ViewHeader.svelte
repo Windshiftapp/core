@@ -1,5 +1,6 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
+  import { formatItemCount } from '../utils/itemCount.js';
   import BaseHeader from './BaseHeader.svelte';
 
   let {
@@ -15,11 +16,7 @@
     actions = null,
   } = $props();
 
-  let countText = $derived([
-    itemCount !== null ? `${itemCount} ${t('layout.items')}` : '',
-    shownCount !== null && shownCount !== itemCount
-      ? t('collections.itemsShown', { count: shownCount }) : '',
-  ].filter(Boolean).join(' · '));
+  let countText = $derived(formatItemCount(itemCount, shownCount, t));
   let subtitle = $derived([workspaceName, countText].filter(Boolean).join(' • '));
 </script>
 
