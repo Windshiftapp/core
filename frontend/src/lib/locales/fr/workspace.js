@@ -758,6 +758,7 @@ export default {
     workspaceKey: 'Clé de l’espace de travail',
     workspaceKeyPlaceholder: 'ex. DEV, TEST, PROD',
     workspaceKeyHelp: 'Utilisé comme préfixe pour les éléments (ex. DEV-123). Lettres majuscules et chiffres uniquement.',
+    workspaceKeyImmutable: 'Utilisé comme préfixe pour les éléments (ex. DEV-123). Non modifiable après la création.',
     description: 'Description',
     descriptionPlaceholder: 'Description optionnelle pour cet espace de travail',
     defaultTimeProject: 'Projet de suivi du temps par défaut',

@@ -575,6 +575,7 @@ export default {
     workspaceKey: 'Arbeitsbereichsschlüssel',
     workspaceKeyPlaceholder: 'z.B. DEV, TEST, PROD',
     workspaceKeyHelp: 'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.',
+    workspaceKeyImmutable: 'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nach dem Anlegen nicht änderbar.',
     description: 'Beschreibung',
     descriptionPlaceholder: 'Optionale Beschreibung für diesen Arbeitsbereich',
     defaultTimeProject: 'Standard-Zeiterfassungsprojekt',

@@ -578,6 +578,7 @@ export default {
     workspaceKey: '工作区键',
     workspaceKeyPlaceholder: '例如，DEV、TEST、PROD',
     workspaceKeyHelp: '用于事项前缀（如 DEV-123）。仅限大写字母和数字。',
+    workspaceKeyImmutable: '用于事项前缀（如 DEV-123）。创建后不可更改。',
     description: '描述',
     descriptionPlaceholder: '此工作区的可选描述',
     defaultTimeProject: '默认时间跟踪项目',

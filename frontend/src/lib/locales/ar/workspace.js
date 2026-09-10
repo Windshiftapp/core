@@ -571,6 +571,7 @@ export default {
     workspaceKey: 'مفتاح مساحة العمل',
     workspaceKeyPlaceholder: 'مثال: DEV, TEST, PROD',
     workspaceKeyHelp: 'يُستخدم كبادئة للعناصر (مثال: DEV-123). أحرف كبيرة وأرقام فقط.',
+    workspaceKeyImmutable: 'يُستخدم كبادئة للعناصر (مثال: DEV-123). لا يمكن تغييره بعد الإنشاء.',
     description: 'الوصف',
     descriptionPlaceholder: 'وصف اختياري لمساحة العمل هذه',
     defaultTimeProject: 'مشروع تتبع الوقت الافتراضي',

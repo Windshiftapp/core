@@ -197,18 +197,15 @@
       return;
     }
 
-    if (!formData.key.trim()) {
-      errorToast(t('workspaceSettings.workspaceKeyRequired'));
-      return;
-    }
-
     // The workspace can change under the component while the request is in
     // flight, so pin what this save is about before awaiting. Effects then
     // split: what the server actually changed is applied unconditionally,
     // what describes the view is applied only if we are still on that target.
+    // The API treats the workspace key as immutable; PATCH rejects it.
     const targetId = workspaceId;
+    const { key: _key, ...patchFields } = formData;
     const payload = {
-      ...formData,
+      ...patchFields,
       time_project_id: formData.time_project_id ? parseInt(formData.time_project_id, 10) : null,
       time_project_categories: selectedTimeProjectCategories
     };
@@ -327,15 +324,16 @@
           </div>
 
           <div>
-            <Label for="workspace-key" required class="mb-2">{t('workspaceSettings.workspaceKey')}</Label>
+            <Label for="workspace-key" class="mb-2">{t('workspaceSettings.workspaceKey')}</Label>
             <Input
               id="workspace-key"
               bind:value={formData.key}
               placeholder={t('workspaceSettings.workspaceKeyPlaceholder')}
-              required
+              disabled
+              dataTestid="workspace-key-input"
             />
             <DescriptionText>
-              {t('workspaceSettings.workspaceKeyHelp')}
+              {t('workspaceSettings.workspaceKeyImmutable')}
             </DescriptionText>
           </div>
         </div>
@@ -427,7 +425,7 @@
           variant="primary"
           size="medium"
           onclick={saveWorkspace}
-          disabled={saving || !formData.name.trim() || !formData.key.trim()}
+          disabled={saving || !formData.name.trim()}
           dataTestid="workspace-settings-save"
         >
           {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
@@ -464,7 +462,7 @@
             variant="primary"
             size="medium"
             onclick={saveWorkspace}
-            disabled={saving || !formData.name.trim() || !formData.key.trim()}
+            disabled={saving || !formData.name.trim()}
             dataTestid="workspace-settings-save"
           >
             {#if saving}{t('workspaceSettings.saving')}{:else}{t('workspaceSettings.saveChanges')}{/if}
