@@ -308,6 +308,19 @@
     }
   });
 
+  // The create form defaults to the set's first asset type. If the form
+  // opened while the set's types were still loading after a set switch,
+  // that default can be a stale type from the previously selected set —
+  // the API rejects foreign asset_type_ids, so re-default once the real
+  // list arrives.
+  $effect(() => {
+    if (!showAssetForm || editingAsset) return;
+    const types = assetTypes;
+    if (types.some(t => t.id === assetFormData.asset_type_id)) return;
+    if (types.length === 0 && assetFormData.asset_type_id === null) return;
+    assetFormData = { ...assetFormData, asset_type_id: types.length > 0 ? types[0].id : null };
+  });
+
   async function loadTypeFields(typeId) {
     const requestSeq = ++selectedTypeFieldsRequestSeq;
     try {
@@ -357,11 +370,15 @@
     editingAsset = null;
     // Find default status
     const defaultStatus = statuses.find(s => s.is_default);
+    // Never seed the type from a possibly-stale list: after a set switch the
+    // loaded types can belong to the previous set, and the API rejects
+    // foreign asset_type_ids. The re-default effect picks types[0] once the
+    // current set's types arrive.
     assetFormData = {
       title: '',
       description: '',
       asset_tag: '',
-      asset_type_id: assetTypes.length > 0 ? assetTypes[0].id : null,
+      asset_type_id: null,
       category_id: selectedCategoryId ?? null,
       status_id: defaultStatus?.id ?? null,
       custom_field_values: {}
@@ -927,7 +944,7 @@
 <Modal
   isOpen={showAssetForm}
   preventClose={savingAsset}
-  submitDisabled={savingAsset}
+  submitDisabled={savingAsset || (!editingAsset && !assetFormData.asset_type_id)}
   onclose={() => showAssetForm = false}
   onSubmit={handleAssetSubmit}
 >
@@ -963,7 +980,7 @@
       </div>
       <div>
         <Label color="default" class="mb-1">Asset Type</Label>
-        <Select bind:value={assetFormData.asset_type_id} options={[{ value: null, label: 'No Type' }, ...assetTypes.map(type => ({ value: type.id, label: type.name }))]} />
+        <Select id="asset-type-select" bind:value={assetFormData.asset_type_id} options={[{ value: null, label: 'No Type' }, ...assetTypes.map(type => ({ value: type.id, label: type.name }))]} />
       </div>
       <div>
         <Label color="default" class="mb-1">Category</Label>
@@ -1006,7 +1023,7 @@
       <Button
         dataTestid="asset-submit"
         type="submit"
-        disabled={savingAsset}
+        disabled={savingAsset || (!editingAsset && !assetFormData.asset_type_id)}
         loading={savingAsset}
         keyboardHint="↵"
       >{editingAsset ? t('common.save') : t('common.create')}</Button>
