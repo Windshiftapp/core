@@ -87,7 +87,7 @@ for (const relativeFile of guardedFiles) {
   // Script blocks contain operators such as `=>` that look like HTML text to
   // the lightweight regex guard. UI copy lives in the component markup.
   const source = readFileSync(path.join(root, relativeFile), 'utf8').replace(
-    /<script\b[^>]*>[\s\S]*?<\/script>/g,
+    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
     (script) => '\n'.repeat(script.split('\n').length - 1)
   );
   for (const rule of rules) {
