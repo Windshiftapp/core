@@ -418,7 +418,7 @@ func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListP
 	}
 	defer func() { _ = rows.Close() }()
 
-	ids := make([]int, 0, min(limit, total))
+	ids := make([]int, 0, limit)
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
