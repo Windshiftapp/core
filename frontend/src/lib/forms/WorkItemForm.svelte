@@ -4,7 +4,7 @@
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
-  import { formatDueDate } from '../utils/dateFormatter.js';
+  import { formatDateOnly, formatDueDate } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
@@ -372,13 +372,14 @@
     {#if store.isFieldConfigured('start_date') && !store.isFieldRequired('start_date')}
       <button
         use:melt={$startDateTrigger}
+        data-testid="create-start-date-chip"
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.start_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
         onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-        <span class="truncate max-w-[120px]">{store.formData.start_date ? formatDueDate(store.formData.start_date) : t('common.startDate')}</span>
+        <span class="truncate max-w-[120px]">{store.formData.start_date ? formatDateOnly(store.formData.start_date) : t('common.startDate')}</span>
         <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
       </button>
 
@@ -405,13 +406,14 @@
     {#if store.isFieldConfigured('end_date') && !store.isFieldRequired('end_date')}
       <button
         use:melt={$endDateTrigger}
+        data-testid="create-end-date-chip"
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.end_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
         onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-        <span class="truncate max-w-[120px]">{store.formData.end_date ? formatDueDate(store.formData.end_date) : t('common.endDate')}</span>
+        <span class="truncate max-w-[120px]">{store.formData.end_date ? formatDateOnly(store.formData.end_date) : t('common.endDate')}</span>
         <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
       </button>
 
