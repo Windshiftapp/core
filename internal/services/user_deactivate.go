@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // AgentDeactivationResult captures the side-effects of deactivating an owner
@@ -48,6 +49,16 @@ func (s *UserDeactivationService) DeactivateUser(ownerID int) (AgentDeactivation
 		return result, err
 	}
 
+	s.InvalidateDeprovisionCaches(result, ownerID)
+	return result, nil
+}
+
+// InvalidateDeprovisionCaches evicts the security caches touched by a
+// committed deprovisioning: the validation-cache entries of every revoked
+// token, the owner's and agents' session validations, and the owner's
+// permission cache. Best-effort by construction — the invalidators log their
+// own failures; the authoritative revocation lives in the database.
+func (s *UserDeactivationService) InvalidateDeprovisionCaches(result AgentDeactivationResult, ownerID int) {
 	if s.invalidators.Tokens != nil {
 		s.invalidators.Tokens(result.RevokedAPITokens)
 	}
@@ -60,8 +71,6 @@ func (s *UserDeactivationService) DeactivateUser(ownerID int) (AgentDeactivation
 	if s.invalidators.Permissions != nil {
 		s.invalidators.Permissions(ownerID)
 	}
-
-	return result, nil
 }
 
 // ActiveSystemAdminIDs returns the user IDs of every active user who holds the
@@ -123,66 +132,13 @@ func deactivateUserAndOwnedAgentsAndTokens(
 		}
 	}
 
-	// Collect every owned agent so token revocation also covers agents that
-	// were already inactive. Only newly deactivated agents are returned for
-	// auditing and session invalidation.
-	agentRows, err := tx.Query(`SELECT id, is_active FROM users WHERE agent_owner_user_id = ?`, ownerID)
+	cascade, err := repository.DeactivateOwnedAgentsAndTokensTx(tx, ownerID)
 	if err != nil {
-		return result, fmt.Errorf("failed to load owned agents: %w", err)
+		return result, err
 	}
-	var allAgentIDs []int
-	for agentRows.Next() {
-		var id int
-		var active bool
-		if scanErr := agentRows.Scan(&id, &active); scanErr != nil {
-			_ = agentRows.Close()
-			return result, fmt.Errorf("failed to scan owned agent: %w", scanErr)
-		}
-		allAgentIDs = append(allAgentIDs, id)
-		result.OwnedAgentIDs = append(result.OwnedAgentIDs, id)
-		if active {
-			result.AgentIDs = append(result.AgentIDs, id)
-		}
-	}
-	if err := agentRows.Err(); err != nil {
-		_ = agentRows.Close()
-		return result, fmt.Errorf("failed to iterate owned agents: %w", err)
-	}
-	_ = agentRows.Close()
-
-	// Flip active agents inactive.
-	if len(result.AgentIDs) > 0 {
-		if _, err = tx.Exec(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE agent_owner_user_id = ? AND is_active = true`, ownerID); err != nil {
-			return result, fmt.Errorf("failed to deactivate owned agents: %w", err)
-		}
-	}
-
-	// Collect api_tokens row IDs before we delete them (for audit).
-	// api_tokens has no is_active column, so revocation is a hard DELETE.
-	userIDs := append([]int{ownerID}, allAgentIDs...)
-	apiTokenRows, err := tx.Query(inClauseQuery(`SELECT id FROM api_tokens WHERE user_id IN (`, len(userIDs)), toIfaceSlice(userIDs)...)
-	if err != nil {
-		return result, fmt.Errorf("failed to load api_tokens: %w", err)
-	}
-	for apiTokenRows.Next() {
-		var id int
-		if scanErr := apiTokenRows.Scan(&id); scanErr != nil {
-			_ = apiTokenRows.Close()
-			return result, fmt.Errorf("failed to scan api_token: %w", scanErr)
-		}
-		result.RevokedAPITokens = append(result.RevokedAPITokens, id)
-	}
-	if err := apiTokenRows.Err(); err != nil {
-		_ = apiTokenRows.Close()
-		return result, fmt.Errorf("failed to iterate api_tokens: %w", err)
-	}
-	_ = apiTokenRows.Close()
-
-	if len(result.RevokedAPITokens) > 0 {
-		if _, err = tx.Exec(inClauseQuery(`DELETE FROM api_tokens WHERE user_id IN (`, len(userIDs)), toIfaceSlice(userIDs)...); err != nil {
-			return result, fmt.Errorf("failed to revoke api_tokens: %w", err)
-		}
-	}
+	result.AgentIDs = cascade.DeactivatedAgentIDs
+	result.OwnedAgentIDs = cascade.OwnedAgentIDs
+	result.RevokedAPITokens = cascade.RevokedAPITokenIDs
 
 	if err = tx.Commit(); err != nil {
 		return result, fmt.Errorf("failed to commit cascade: %w", err)

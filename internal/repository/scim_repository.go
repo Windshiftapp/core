@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -170,38 +171,127 @@ func (r *SCIMRepository) CreateUser(email, username, firstName, lastName string,
 }
 
 // ReplaceUser fully replaces the SCIM-managed attributes of a user.
-func (r *SCIMRepository) ReplaceUser(id int, email, username, firstName, lastName string, isActive bool, externalID string) error {
-	_, err := r.db.ExecWrite(`
-		UPDATE users SET email = ?, username = ?, first_name = ?, last_name = ?,
-		                 is_active = ?, scim_external_id = ?, scim_managed = true,
-		                 updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, email, username, firstName, lastName, isActive, scimNullIfEmpty(externalID), id)
-	return err
+func (r *SCIMRepository) ReplaceUser(id int, email, username, firstName, lastName string, isActive bool, externalID string) (DeprovisionCascade, error) {
+	var cascade DeprovisionCascade
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		var wasActive bool
+		if err := tx.QueryRow(`SELECT COALESCE(is_active, false) FROM users WHERE id = ?`, id).Scan(&wasActive); err != nil {
+			return fmt.Errorf("failed to load user state: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE users SET email = ?, username = ?, first_name = ?, last_name = ?,
+			                 is_active = ?, scim_external_id = ?, scim_managed = true,
+			                 updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, email, username, firstName, lastName, isActive, scimNullIfEmpty(externalID), id); err != nil {
+			return fmt.Errorf("failed to replace user: %w", err)
+		}
+		if wasActive && !isActive {
+			var err error
+			cascade, err = DeactivateOwnedAgentsAndTokensTx(tx, id)
+			return err
+		}
+		return nil
+	})
+	return cascade, err
+}
+
+// SCIMUserPatch carries the final column writes for one PATCH request. Fields
+// are nil when the request leaves the attribute unchanged; the handler
+// resolves multiple operations down to one value per column before the
+// transaction runs, so a partial application is impossible.
+type SCIMUserPatch struct {
+	SetActive       *bool
+	SetUsername     *string
+	SetFirstName    *string
+	SetLastName     *string
+	SetExternalID   *string
+	ClearExternalID bool
+}
+
+// ApplyUserPatch applies the resolved patch columns in one transaction. When
+// the patch deactivates the user, the owned-agent and API-token cascade
+// commits with it, so a deactivation can never succeed with live credentials
+// left behind. Returns the cascade executed, if any.
+func (r *SCIMRepository) ApplyUserPatch(id int, patch SCIMUserPatch) (DeprovisionCascade, error) {
+	var cascade DeprovisionCascade
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		var wasActive bool
+		if err := tx.QueryRow(`SELECT COALESCE(is_active, false) FROM users WHERE id = ?`, id).Scan(&wasActive); err != nil {
+			return fmt.Errorf("failed to load user state: %w", err)
+		}
+
+		sets := []string{"updated_at = CURRENT_TIMESTAMP"}
+		args := []any{}
+		addColumn := func(column string, value any) {
+			sets = append(sets, column+" = ?")
+			args = append(args, value)
+		}
+		if patch.SetActive != nil {
+			addColumn("is_active", *patch.SetActive)
+		}
+		if patch.SetUsername != nil {
+			addColumn("username", *patch.SetUsername)
+		}
+		if patch.SetFirstName != nil {
+			addColumn("first_name", *patch.SetFirstName)
+		}
+		if patch.SetLastName != nil {
+			addColumn("last_name", *patch.SetLastName)
+		}
+		if patch.SetExternalID != nil {
+			addColumn("scim_external_id", scimNullIfEmpty(*patch.SetExternalID))
+		}
+		if patch.ClearExternalID {
+			addColumn("scim_external_id", nil)
+		}
+
+		args = append(args, id)
+		if _, err := tx.Exec(`UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...); err != nil {
+			return fmt.Errorf("failed to apply user patch: %w", err)
+		}
+
+		if wasActive && patch.SetActive != nil && !*patch.SetActive {
+			var err error
+			cascade, err = DeactivateOwnedAgentsAndTokensTx(tx, id)
+			return err
+		}
+		return nil
+	})
+	return cascade, err
 }
 
 // TombstoneUser applies an RFC 7644 §3.6 SCIM DELETE: the user is deactivated
 // and marked deprovisioned so every SCIM query hides the resource, while the
-// row itself is retained for historical references. SCIM-managed group
-// memberships are removed so group projections cannot expose the deleted
-// user. Runs in one transaction — a partial delete must never leave a visible
-// membership on a tombstoned user.
-func (r *SCIMRepository) TombstoneUser(id int) error {
-	return database.WithTx(r.db, func(tx database.Tx) error {
-		if _, err := tx.Exec(`
+// row itself is retained for historical references. The full security cascade
+// commits in the same transaction — SCIM-managed group memberships are
+// removed, owned agents are deactivated, and their API tokens are revoked —
+// so a deprovisioned account can never leave active agents or live tokens
+// behind. Idempotent: repeated calls make no further changes.
+func (r *SCIMRepository) TombstoneUser(id int) (DeprovisionCascade, error) {
+	var cascade DeprovisionCascade
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		res, err := tx.Exec(`
 			UPDATE users
 			SET is_active = false, scim_deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ? AND scim_deleted_at IS NULL
-		`, id); err != nil {
+		`, id)
+		if err != nil {
 			return fmt.Errorf("failed to tombstone user: %w", err)
+		}
+		if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+			// Already tombstoned — nothing left to do.
+			return nil
 		}
 		if _, err := tx.Exec(`
 			DELETE FROM group_members WHERE user_id = ? AND scim_managed = true
 		`, id); err != nil {
 			return fmt.Errorf("failed to remove SCIM group memberships: %w", err)
 		}
-		return nil
+		cascade, err = DeactivateOwnedAgentsAndTokensTx(tx, id)
+		return err
 	})
+	return cascade, err
 }
 
 // IsUserSCIMDeleted reports whether the user row carries the SCIM
@@ -213,42 +303,6 @@ func (r *SCIMRepository) IsUserSCIMDeleted(id int) bool {
 		`SELECT scim_deleted_at IS NOT NULL FROM users WHERE id = ?`, id,
 	).Scan(&deleted)
 	return err == nil && deleted
-}
-
-// SetUserActive applies a SCIM PATCH to the active flag.
-func (r *SCIMRepository) SetUserActive(id int, active bool) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, active, id)
-	return err
-}
-
-// SetUserUsername applies a SCIM PATCH to the username.
-func (r *SCIMRepository) SetUserUsername(id int, username string) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, username, id)
-	return err
-}
-
-// SetUserFirstName applies a SCIM PATCH to name.givenName.
-func (r *SCIMRepository) SetUserFirstName(id int, firstName string) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET first_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, firstName, id)
-	return err
-}
-
-// SetUserLastName applies a SCIM PATCH to name.familyName.
-func (r *SCIMRepository) SetUserLastName(id int, lastName string) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET last_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, lastName, id)
-	return err
-}
-
-// SetUserExternalID applies a SCIM PATCH to externalId.
-func (r *SCIMRepository) SetUserExternalID(id int, externalID string) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET scim_external_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, externalID, id)
-	return err
-}
-
-// ClearUserExternalID applies a SCIM PATCH remove of externalId.
-func (r *SCIMRepository) ClearUserExternalID(id int) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET scim_external_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	return err
 }
 
 // IsUserSCIMVisible reports whether a user ID can be referenced as a SCIM

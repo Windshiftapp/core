@@ -621,7 +621,7 @@ func (s *Server) initialize() error {
 		baseURL,
 		permService,
 		logger.NewAuditor(s.db),
-		userDeactivationService.DeactivateUser,
+		userDeactivationService.InvalidateDeprovisionCaches,
 		func() ([]int, error) {
 			return services.ActiveSystemAdminIDs(s.db)
 		},

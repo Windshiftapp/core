@@ -52,13 +52,13 @@ type SCIMHandler struct {
 	permissionService *services.PermissionService
 	cacheInvalidator  *services.AuthorizationCacheInvalidator
 	auditor           *logger.Auditor
-	// deactivateCascade and activeSystemAdminIDs are dependency-injected
-	// closures over services.DeactivateOwnedAgentsAndTokens and
+	// invalidateDeprovision and activeSystemAdminIDs are dependency-injected
+	// closures over the deactivation service's post-commit cache eviction and
 	// services.ActiveSystemAdminIDs; injecting them at construction lets the
 	// handler stay free of the database import (same pattern as UserHandler).
-	deactivateCascade    func(ownerID int) (services.AgentDeactivationResult, error)
-	activeSystemAdminIDs func() ([]int, error)
-	notificationService  *services.NotificationService
+	invalidateDeprovision func(cascade services.AgentDeactivationResult, ownerID int)
+	activeSystemAdminIDs  func() ([]int, error)
+	notificationService   *services.NotificationService
 }
 
 func NewSCIMHandler(
@@ -66,7 +66,7 @@ func NewSCIMHandler(
 	baseURL string,
 	permissionService *services.PermissionService,
 	auditor *logger.Auditor,
-	deactivateCascade func(ownerID int) (services.AgentDeactivationResult, error),
+	invalidateDeprovision func(cascade services.AgentDeactivationResult, ownerID int),
 	activeSystemAdminIDs func() ([]int, error),
 	notificationService *services.NotificationService,
 	invalidators ...*services.AuthorizationCacheInvalidator,
@@ -76,14 +76,14 @@ func NewSCIMHandler(
 		cacheInvalidator = invalidators[0]
 	}
 	return &SCIMHandler{
-		repo:                 repo,
-		baseURL:              baseURL,
-		permissionService:    permissionService,
-		cacheInvalidator:     cacheInvalidator,
-		auditor:              auditor,
-		deactivateCascade:    deactivateCascade,
-		activeSystemAdminIDs: activeSystemAdminIDs,
-		notificationService:  notificationService,
+		repo:                  repo,
+		baseURL:               baseURL,
+		permissionService:     permissionService,
+		cacheInvalidator:      cacheInvalidator,
+		auditor:               auditor,
+		invalidateDeprovision: invalidateDeprovision,
+		activeSystemAdminIDs:  activeSystemAdminIDs,
+		notificationService:   notificationService,
 	}
 }
 
@@ -535,7 +535,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		isActive = *scimUser.Active
 	}
 
-	err = h.repo.ReplaceUser(id, email, scimUser.UserName, firstName, lastName, isActive, scimUser.ExternalID)
+	cascade, err := h.repo.ReplaceUser(id, email, scimUser.UserName, firstName, lastName, isActive, scimUser.ExternalID)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update user", "")
 		return
@@ -557,7 +557,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		}, true, "")
 
 	if existingUser.IsActive && !isActive {
-		h.handleSCIMUserDeactivation(r, id, existingUser.Username, "scim_replace", existingUser.SCIMManaged)
+		h.finalizeUserDeprovisioning(r, id, existingUser.Username, "scim_replace", existingUser.SCIMManaged, cascade)
 	}
 
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
@@ -601,14 +601,24 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var changes []attrChange
+	acc := &userPatchAccumulator{}
 	for _, op := range patchReq.Operations {
-		opChanges, opErr := h.applyUserPatchOp(snapshot, op)
+		opChanges, opErr := acc.apply(snapshot, op)
 		if opErr != nil {
 			h.logPatchOpError(r, "user", id, op, opErr)
 			respondSCIMErrorMsg(w, http.StatusBadRequest, "Patch operation failed", "invalidValue")
 			return
 		}
 		changes = append(changes, opChanges...)
+	}
+
+	// Everything validated — apply the resolved columns in one transaction.
+	// The owned-agent/token cascade commits with the write when the patch
+	// deactivates the user, so no partial state can survive a failure.
+	cascade, err := h.repo.ApplyUserPatch(id, acc.patch)
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update user", "")
+		return
 	}
 
 	user, err := h.repo.GetUserByID(id)
@@ -623,16 +633,8 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 			"changes":         changes,
 		}, true, "")
 
-	for _, c := range changes {
-		if c.Path != "active" {
-			continue
-		}
-		oldActive, _ := c.OldValue.(bool)
-		newActive, _ := c.NewValue.(bool)
-		if oldActive && !newActive {
-			h.handleSCIMUserDeactivation(r, id, user.Username, "scim_patch", user.SCIMManaged)
-			break
-		}
+	if acc.deactivating {
+		h.finalizeUserDeprovisioning(r, id, user.Username, "scim_patch", user.SCIMManaged, cascade)
 	}
 
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
@@ -665,7 +667,7 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repo.TombstoneUser(id)
+	cascade, err := h.repo.TombstoneUser(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete user", "")
 		return
@@ -674,7 +676,7 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	h.logSCIMAuditEvent(r, logger.ActionSCIMUserDelete, logger.ResourceUser, &id, user.Email,
 		map[string]any{"username": user.Username, "email": user.Email}, true, "")
 
-	h.handleSCIMUserDeactivation(r, id, user.Username, "scim_delete", user.SCIMManaged)
+	h.finalizeUserDeprovisioning(r, id, user.Username, "scim_delete", user.SCIMManaged, cascade)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1487,10 +1489,19 @@ func (h *SCIMHandler) groupToSCIM(group *models.TeamGroup, members []models.SCIM
 }
 
 // applyUserPatchOp mutates the snapshot for subsequent operations and returns audit changes.
+// userPatchAccumulator resolves PATCH operations into the final column write
+// set without touching the database. Operations are validated, sanitized, and
+// folded in request order (last write wins per attribute); the resulting
+// repository.SCIMUserPatch is applied in one transaction, so a failure
+// anywhere leaves the resource untouched (RFC 7644 §3.5.2 all-or-none).
+type userPatchAccumulator struct {
+	patch        repository.SCIMUserPatch
+	deactivating bool // an active true→false transition occurred in the op sequence
+}
+
 // Unsupported attributes succeed as audited no-ops rather than failing the complete PATCH.
-func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatchOp) ([]attrChange, error) {
+func (a *userPatchAccumulator) apply(snapshot *models.User, op models.SCIMPatchOp) ([]attrChange, error) {
 	opLower := strings.ToLower(op.Op)
-	userID := snapshot.ID
 
 	switch opLower {
 	case "replace", "add":
@@ -1504,22 +1515,19 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 					active = strings.EqualFold(strVal, "true")
 				}
 			}
-			err := h.repo.SetUserActive(userID, active)
-			if err != nil {
-				return nil, err
-			}
 			change := attrChange{Op: opLower, Path: "active", OldValue: snapshot.IsActive, NewValue: active}
+			if snapshot.IsActive && !active {
+				a.deactivating = true
+			}
+			a.patch.SetActive = &active
 			snapshot.IsActive = active
 			return []attrChange{change}, nil
 
 		case "username":
 			if strVal, ok := op.Value.(string); ok {
 				sanitize.Apply(&strVal, sanitize.ShortIdentifier)
-				err := h.repo.SetUserUsername(userID, strVal)
-				if err != nil {
-					return nil, err
-				}
 				change := attrChange{Op: opLower, Path: "userName", OldValue: snapshot.Username, NewValue: strVal}
+				a.patch.SetUsername = &strVal
 				snapshot.Username = strVal
 				return []attrChange{change}, nil
 			}
@@ -1527,11 +1535,8 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 		case "name.givenname":
 			if strVal, ok := op.Value.(string); ok {
 				sanitize.Apply(&strVal, sanitize.PlainTextField)
-				err := h.repo.SetUserFirstName(userID, strVal)
-				if err != nil {
-					return nil, err
-				}
 				change := attrChange{Op: opLower, Path: "name.givenName", OldValue: snapshot.FirstName, NewValue: strVal}
+				a.patch.SetFirstName = &strVal
 				snapshot.FirstName = strVal
 				return []attrChange{change}, nil
 			}
@@ -1539,11 +1544,8 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 		case "name.familyname":
 			if strVal, ok := op.Value.(string); ok {
 				sanitize.Apply(&strVal, sanitize.PlainTextField)
-				err := h.repo.SetUserLastName(userID, strVal)
-				if err != nil {
-					return nil, err
-				}
 				change := attrChange{Op: opLower, Path: "name.familyName", OldValue: snapshot.LastName, NewValue: strVal}
+				a.patch.SetLastName = &strVal
 				snapshot.LastName = strVal
 				return []attrChange{change}, nil
 			}
@@ -1551,11 +1553,8 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 		case "externalid":
 			if strVal, ok := op.Value.(string); ok {
 				sanitize.Apply(&strVal, sanitize.ShortIdentifier)
-				err := h.repo.SetUserExternalID(userID, strVal)
-				if err != nil {
-					return nil, err
-				}
 				change := attrChange{Op: opLower, Path: "externalId", OldValue: snapshot.SCIMExternalID, NewValue: strVal}
+				a.patch.SetExternalID = &strVal
 				snapshot.SCIMExternalID = strVal
 				return []attrChange{change}, nil
 			}
@@ -1566,7 +1565,7 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 				var changes []attrChange
 				for key, val := range valueMap {
 					subOp := models.SCIMPatchOp{Op: op.Op, Path: key, Value: val}
-					subChanges, err := h.applyUserPatchOp(snapshot, subOp)
+					subChanges, err := a.apply(snapshot, subOp)
 					if err != nil {
 						return changes, err
 					}
@@ -1578,11 +1577,8 @@ func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatc
 
 	case "remove":
 		if strings.EqualFold(op.Path, "externalId") {
-			err := h.repo.ClearUserExternalID(userID)
-			if err != nil {
-				return nil, err
-			}
 			change := attrChange{Op: opLower, Path: "externalId", OldValue: snapshot.SCIMExternalID, NewValue: nil}
+			a.patch.ClearExternalID = true
 			snapshot.SCIMExternalID = ""
 			return []attrChange{change}, nil
 		}
@@ -1693,40 +1689,36 @@ func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGr
 	return []attrChange{{Op: opLower, Path: op.Path, NewValue: "<unsupported>"}}, nil
 }
 
-// handleSCIMUserDeactivation deactivates owned agents, revokes related tokens,
-// and records the offboarding impact. trigger identifies the IdP operation;
-// scimManaged flags unexpected deactivation of a locally managed user.
-func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, username, trigger string, scimManaged bool) {
-	cascade, err := h.deactivateCascade(userID)
-	if err != nil {
-		slog.Error("scim: offboarding cascade failed",
-			slog.Int("owner_id", userID),
-			slog.String("trigger", trigger),
-			slog.Any("error", err))
-		h.logSCIMAuditEvent(r, logger.ActionSCIMUserAgentImpact, logger.ResourceUser, &userID, username,
-			map[string]any{"trigger": trigger}, false, err.Error())
+// finalizeUserDeprovisioning records the audit trail for a committed
+// deprovisioning cascade and runs the post-commit side effects: cache
+// eviction and admin notifications. Both are best-effort by design — the
+// authoritative revocation (agents deactivated, tokens deleted) already
+// committed atomically with the resource write, so a cache or notification
+// failure never fails the SCIM response; a missed cache entry self-heals
+// when the validation-cache TTL expires.
+func (h *SCIMHandler) finalizeUserDeprovisioning(r *http.Request, userID int, username, trigger string, scimManaged bool, cascade repository.DeprovisionCascade) {
+	if !cascade.HasImpact() {
 		return
 	}
-	if len(cascade.AgentIDs) == 0 && len(cascade.RevokedAPITokens) == 0 {
-		return
-	}
+
+	result := toAgentDeactivationResult(cascade)
 
 	slog.Warn("scim: offboarding cascaded to agent users and tokens",
 		slog.Int("owner_id", userID),
 		slog.String("owner_username", username),
 		slog.String("trigger", trigger),
-		slog.Any("deactivated_agent_ids", cascade.AgentIDs),
-		slog.Int("revoked_api_tokens", len(cascade.RevokedAPITokens)))
+		slog.Any("deactivated_agent_ids", result.AgentIDs),
+		slog.Int("revoked_api_tokens", len(result.RevokedAPITokens)))
 
 	h.logSCIMAuditEvent(r, logger.ActionSCIMUserAgentImpact, logger.ResourceUser, &userID, username,
 		map[string]any{
 			"trigger":               trigger,
-			"deactivated_agent_ids": cascade.AgentIDs,
-			"revoked_api_tokens":    len(cascade.RevokedAPITokens),
+			"deactivated_agent_ids": result.AgentIDs,
+			"revoked_api_tokens":    len(result.RevokedAPITokens),
 		}, true, "")
 
 	// Per-resource audit rows preserve the offboarding trail.
-	for _, aid := range cascade.AgentIDs {
+	for _, aid := range result.AgentIDs {
 		agentID := aid
 		h.logSCIMAuditEvent(r, logger.ActionAgentDeactivate, logger.ResourceUser, &agentID, "",
 			map[string]any{
@@ -1735,7 +1727,7 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 				"trigger":  trigger,
 			}, true, "")
 	}
-	for _, tid := range cascade.RevokedAPITokens {
+	for _, tid := range result.RevokedAPITokens {
 		tokenID := tid
 		h.logSCIMAuditEvent(r, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "",
 			map[string]any{
@@ -1746,7 +1738,21 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 			}, true, "")
 	}
 
-	h.notifyAdminsOfSCIMCascade(userID, username, trigger, scimManaged, cascade)
+	if h.invalidateDeprovision != nil {
+		h.invalidateDeprovision(result, userID)
+	}
+
+	h.notifyAdminsOfSCIMCascade(userID, username, trigger, scimManaged, result)
+}
+
+// toAgentDeactivationResult maps the repository cascade report onto the
+// service-level result shape shared with the audit helpers.
+func toAgentDeactivationResult(cascade repository.DeprovisionCascade) services.AgentDeactivationResult {
+	return services.AgentDeactivationResult{
+		AgentIDs:         cascade.DeactivatedAgentIDs,
+		OwnedAgentIDs:    cascade.OwnedAgentIDs,
+		RevokedAPITokens: cascade.RevokedAPITokenIDs,
+	}
 }
 
 // notifyAdminsOfSCIMCascade inserts a single notification row per active
