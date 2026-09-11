@@ -540,7 +540,7 @@
 
         {#if !showDeleteConfirm}
           <Button
-            data-testid="delete-workspace-open"
+            dataTestid="delete-workspace-open"
             onclick={() => showDeleteConfirm = true}
             variant="danger"
             icon={Trash2}
@@ -565,7 +565,7 @@
 
             <div class="flex items-center gap-3">
               <Button
-                data-testid="delete-workspace-confirm"
+                dataTestid="delete-workspace-confirm"
                 onclick={deleteWorkspace}
                 disabled={deleteConfirmText !== workspace.name}
                 variant="danger"
@@ -574,7 +574,7 @@
               </Button>
               <Button
                 onclick={cancelDeleteWorkspace}
-                data-testid="cancel-delete-workspace"
+                dataTestid="cancel-delete-workspace"
                 variant="default"
               >
                 {t('workspaceSettings.cancel')}

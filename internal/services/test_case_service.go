@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/gherkin"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -12,15 +13,17 @@ import (
 
 // TestCaseService handles test case business logic
 type TestCaseService struct {
-	db   database.Database
-	repo *repository.TestCaseRepository
+	db      database.Database
+	repo    *repository.TestCaseRepository
+	bddRepo *repository.TestCaseBDDRepository
 }
 
 // NewTestCaseService creates a new test case service
 func NewTestCaseService(db database.Database) *TestCaseService {
 	return &TestCaseService{
-		db:   db,
-		repo: repository.NewTestCaseRepository(db),
+		db:      db,
+		repo:    repository.NewTestCaseRepository(db),
+		bddRepo: repository.NewTestCaseBDDRepository(db),
 	}
 }
 
@@ -78,7 +81,8 @@ func (s *TestCaseService) GetByID(id, workspaceID int) (*models.TestCase, error)
 	return s.repo.FindByID(id, workspaceID)
 }
 
-// TestCaseCreateRequest contains data for creating a test case
+// TestCaseCreateRequest contains data for creating a test case.
+// Format defaults to steps; "bdd" requires Gherkin and validates it.
 type TestCaseCreateRequest struct {
 	Title             string
 	Preconditions     string
@@ -86,6 +90,8 @@ type TestCaseCreateRequest struct {
 	Status            string
 	EstimatedDuration int
 	FolderID          *int
+	Format            string
+	Gherkin           string
 }
 
 // Create creates a new test case
@@ -93,6 +99,31 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 	// Sanitize input
 	req.Title = sanitize.PlainTextField.Sanitize(req.Title)
 	req.Preconditions = sanitize.Comment.Sanitize(req.Preconditions)
+
+	// Resolve and validate the format before anything else: a BDD case's
+	// title comes from its scenario name.
+	if req.Format == "" {
+		req.Format = TestFormatSteps
+	}
+	if req.Format != TestFormatSteps && req.Format != TestFormatBDD {
+		return nil, &TestManagementValidationError{Msg: "invalid format: must be steps or bdd"}
+	}
+	var bddSpec *gherkin.ScenarioSpec
+	if req.Format == TestFormatBDD {
+		source, err := capGherkin(req.Gherkin)
+		if err != nil {
+			return nil, err
+		}
+		spec, errs := BuildScenarioSpec(source)
+		if !errs.Empty() {
+			return nil, &TestBDDValidationError{Errors: errs.Errors}
+		}
+		bddSpec = spec
+		req.Gherkin = source
+		if req.Title == "" {
+			req.Title = spec.ScenarioName
+		}
+	}
 
 	if req.Title == "" {
 		return nil, &TestManagementValidationError{Msg: "test case title is required"}
@@ -136,6 +167,7 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 		WorkspaceID:       workspaceID,
 		FolderID:          req.FolderID,
 		Title:             req.Title,
+		Format:            req.Format,
 		Preconditions:     req.Preconditions,
 		Priority:          req.Priority,
 		Status:            req.Status,
@@ -151,6 +183,25 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 			return nil, err
 		}
 		tc.ID = id
+		if bddSpec != nil {
+			encoded, err := encodeScenarioSpec(bddSpec)
+			if err != nil {
+				return nil, err
+			}
+			keyword := bddSpec.ScenarioKeyword
+			if keyword == "" {
+				keyword = "Scenario"
+			}
+			if err := s.bddRepo.Upsert(tx, &models.TestCaseBDD{
+				TestCaseID:      id,
+				Gherkin:         req.Gherkin,
+				FeatureName:     bddSpec.FeatureName,
+				ScenarioKeyword: keyword,
+				Spec:            encoded,
+			}); err != nil {
+				return nil, err
+			}
+		}
 		return tc, nil
 	})
 }

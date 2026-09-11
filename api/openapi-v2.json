@@ -29225,6 +29225,53 @@
               "additionalProperties": false,
               "nullable": true,
               "properties": {
+                "bdd": {
+                  "additionalProperties": false,
+                  "description": "The bdd value.",
+                  "nullable": true,
+                  "properties": {
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "feature_name": {
+                      "description": "The feature name value.",
+                      "type": "string"
+                    },
+                    "gherkin": {
+                      "description": "The gherkin value.",
+                      "type": "string"
+                    },
+                    "scenario_keyword": {
+                      "description": "The scenario keyword value.",
+                      "type": "string"
+                    },
+                    "spec": {
+                      "description": "The spec value.",
+                      "type": "string"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "feature_name",
+                    "gherkin",
+                    "scenario_keyword",
+                    "spec",
+                    "test_case_id",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -29241,6 +29288,10 @@
                 },
                 "folder_name": {
                   "description": "The folder name value.",
+                  "type": "string"
+                },
+                "format": {
+                  "description": "The format value.",
                   "type": "string"
                 },
                 "id": {
@@ -29387,6 +29438,7 @@
               "required": [
                 "created_at",
                 "estimated_duration",
+                "format",
                 "id",
                 "name",
                 "preconditions",
@@ -29553,6 +29605,10 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdTestCasesTestCaseIdFeatureResult": {
+        "format": "byte",
+        "type": "string"
+      },
       "GetWorkspacesWorkspaceIdTestCasesTestCaseIdLabelsResult": {
         "additionalProperties": false,
         "properties": {
@@ -29617,6 +29673,53 @@
             "additionalProperties": false,
             "nullable": true,
             "properties": {
+              "bdd": {
+                "additionalProperties": false,
+                "description": "The bdd value.",
+                "nullable": true,
+                "properties": {
+                  "created_at": {
+                    "description": "The created at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "feature_name": {
+                    "description": "The feature name value.",
+                    "type": "string"
+                  },
+                  "gherkin": {
+                    "description": "The gherkin value.",
+                    "type": "string"
+                  },
+                  "scenario_keyword": {
+                    "description": "The scenario keyword value.",
+                    "type": "string"
+                  },
+                  "spec": {
+                    "description": "The spec value.",
+                    "type": "string"
+                  },
+                  "test_case_id": {
+                    "description": "The test case id value.",
+                    "type": "integer"
+                  },
+                  "updated_at": {
+                    "description": "The updated at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "feature_name",
+                  "gherkin",
+                  "scenario_keyword",
+                  "spec",
+                  "test_case_id",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -29633,6 +29736,10 @@
               },
               "folder_name": {
                 "description": "The folder name value.",
+                "type": "string"
+              },
+              "format": {
+                "description": "The format value.",
                 "type": "string"
               },
               "id": {
@@ -29779,6 +29886,7 @@
             "required": [
               "created_at",
               "estimated_duration",
+              "format",
               "id",
               "name",
               "preconditions",
@@ -30434,6 +30542,53 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "bdd": {
+                  "additionalProperties": false,
+                  "description": "The bdd value.",
+                  "nullable": true,
+                  "properties": {
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "feature_name": {
+                      "description": "The feature name value.",
+                      "type": "string"
+                    },
+                    "gherkin": {
+                      "description": "The gherkin value.",
+                      "type": "string"
+                    },
+                    "scenario_keyword": {
+                      "description": "The scenario keyword value.",
+                      "type": "string"
+                    },
+                    "spec": {
+                      "description": "The spec value.",
+                      "type": "string"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "feature_name",
+                    "gherkin",
+                    "scenario_keyword",
+                    "spec",
+                    "test_case_id",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -30450,6 +30605,10 @@
                 },
                 "folder_name": {
                   "description": "The folder name value.",
+                  "type": "string"
+                },
+                "format": {
+                  "description": "The format value.",
                   "type": "string"
                 },
                 "id": {
@@ -30596,6 +30755,7 @@
               "required": [
                 "created_at",
                 "estimated_duration",
+                "format",
                 "id",
                 "name",
                 "preconditions",
@@ -31918,6 +32078,185 @@
             "additionalProperties": false,
             "nullable": true,
             "properties": {
+              "bdd_snapshots": {
+                "description": "The bdd snapshots value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "gherkin": {
+                      "description": "The gherkin value.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "preconditions": {
+                      "description": "The preconditions value.",
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "description": "The run id value.",
+                      "type": "integer"
+                    },
+                    "spec": {
+                      "description": "The spec value.",
+                      "type": "string"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "gherkin",
+                    "id",
+                    "preconditions",
+                    "run_id",
+                    "spec",
+                    "test_case_id",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "example_results": {
+                "description": "The example results value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actual_result": {
+                      "description": "The actual result value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "example_index": {
+                      "description": "The example index value.",
+                      "type": "integer"
+                    },
+                    "executed_at": {
+                      "description": "The executed at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "notes": {
+                      "description": "The notes value.",
+                      "type": "string"
+                    },
+                    "row_values": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "The row values value.",
+                      "type": "object"
+                    },
+                    "run_id": {
+                      "description": "The run id value.",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    },
+                    "step_results": {
+                      "description": "The step results value.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "actual_result": {
+                            "description": "The actual result value.",
+                            "type": "string"
+                          },
+                          "example_result_id": {
+                            "description": "The example result id value.",
+                            "type": "integer"
+                          },
+                          "executed_at": {
+                            "description": "The executed at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "item_id": {
+                            "description": "The item id value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "notes": {
+                            "description": "The notes value.",
+                            "type": "string"
+                          },
+                          "status": {
+                            "description": "The status value.",
+                            "type": "string"
+                          },
+                          "step_number": {
+                            "description": "The step number value.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "actual_result",
+                          "example_result_id",
+                          "id",
+                          "notes",
+                          "status",
+                          "step_number"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actual_result",
+                    "created_at",
+                    "example_index",
+                    "id",
+                    "notes",
+                    "row_values",
+                    "run_id",
+                    "status",
+                    "test_case_id",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "results": {
                 "description": "The results value.",
                 "items": {
@@ -32105,6 +32444,53 @@
                 "items": {
                   "additionalProperties": false,
                   "properties": {
+                    "bdd": {
+                      "additionalProperties": false,
+                      "description": "The bdd value.",
+                      "nullable": true,
+                      "properties": {
+                        "created_at": {
+                          "description": "The created at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "feature_name": {
+                          "description": "The feature name value.",
+                          "type": "string"
+                        },
+                        "gherkin": {
+                          "description": "The gherkin value.",
+                          "type": "string"
+                        },
+                        "scenario_keyword": {
+                          "description": "The scenario keyword value.",
+                          "type": "string"
+                        },
+                        "spec": {
+                          "description": "The spec value.",
+                          "type": "string"
+                        },
+                        "test_case_id": {
+                          "description": "The test case id value.",
+                          "type": "integer"
+                        },
+                        "updated_at": {
+                          "description": "The updated at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "created_at",
+                        "feature_name",
+                        "gherkin",
+                        "scenario_keyword",
+                        "spec",
+                        "test_case_id",
+                        "updated_at"
+                      ],
+                      "type": "object"
+                    },
                     "created_at": {
                       "description": "The created at value.",
                       "format": "date-time",
@@ -32121,6 +32507,10 @@
                     },
                     "folder_name": {
                       "description": "The folder name value.",
+                      "type": "string"
+                    },
+                    "format": {
+                      "description": "The format value.",
                       "type": "string"
                     },
                     "id": {
@@ -32267,6 +32657,7 @@
                   "required": [
                     "created_at",
                     "estimated_duration",
+                    "format",
                     "id",
                     "name",
                     "preconditions",
@@ -32283,11 +32674,147 @@
               }
             },
             "required": [
+              "bdd_snapshots",
+              "example_results",
               "results",
               "step_results",
               "test_cases"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdTestRunsRunIdExampleResultsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "actual_result": {
+                  "description": "The actual result value.",
+                  "type": "string"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "example_index": {
+                  "description": "The example index value.",
+                  "type": "integer"
+                },
+                "executed_at": {
+                  "description": "The executed at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "notes": {
+                  "description": "The notes value.",
+                  "type": "string"
+                },
+                "row_values": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "The row values value.",
+                  "type": "object"
+                },
+                "run_id": {
+                  "description": "The run id value.",
+                  "type": "integer"
+                },
+                "status": {
+                  "description": "The status value.",
+                  "type": "string"
+                },
+                "step_results": {
+                  "description": "The step results value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "actual_result": {
+                        "description": "The actual result value.",
+                        "type": "string"
+                      },
+                      "example_result_id": {
+                        "description": "The example result id value.",
+                        "type": "integer"
+                      },
+                      "executed_at": {
+                        "description": "The executed at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "item_id": {
+                        "description": "The item id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "notes": {
+                        "description": "The notes value.",
+                        "type": "string"
+                      },
+                      "status": {
+                        "description": "The status value.",
+                        "type": "string"
+                      },
+                      "step_number": {
+                        "description": "The step number value.",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "actual_result",
+                      "example_result_id",
+                      "id",
+                      "notes",
+                      "status",
+                      "step_number"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "test_case_id": {
+                  "description": "The test case id value.",
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "actual_result",
+                "created_at",
+                "example_index",
+                "id",
+                "notes",
+                "row_values",
+                "run_id",
+                "status",
+                "test_case_id",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -46168,6 +46695,11 @@
             "nullable": true,
             "type": "integer"
           },
+          "gherkin": {
+            "description": "The gherkin value.",
+            "nullable": true,
+            "type": "string"
+          },
           "preconditions": {
             "description": "The preconditions value.",
             "nullable": true,
@@ -46203,6 +46735,53 @@
             "additionalProperties": false,
             "nullable": true,
             "properties": {
+              "bdd": {
+                "additionalProperties": false,
+                "description": "The bdd value.",
+                "nullable": true,
+                "properties": {
+                  "created_at": {
+                    "description": "The created at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "feature_name": {
+                    "description": "The feature name value.",
+                    "type": "string"
+                  },
+                  "gherkin": {
+                    "description": "The gherkin value.",
+                    "type": "string"
+                  },
+                  "scenario_keyword": {
+                    "description": "The scenario keyword value.",
+                    "type": "string"
+                  },
+                  "spec": {
+                    "description": "The spec value.",
+                    "type": "string"
+                  },
+                  "test_case_id": {
+                    "description": "The test case id value.",
+                    "type": "integer"
+                  },
+                  "updated_at": {
+                    "description": "The updated at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "feature_name",
+                  "gherkin",
+                  "scenario_keyword",
+                  "spec",
+                  "test_case_id",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -46219,6 +46798,10 @@
               },
               "folder_name": {
                 "description": "The folder name value.",
+                "type": "string"
+              },
+              "format": {
+                "description": "The format value.",
                 "type": "string"
               },
               "id": {
@@ -46365,6 +46948,7 @@
             "required": [
               "created_at",
               "estimated_duration",
+              "format",
               "id",
               "name",
               "preconditions",
@@ -47096,6 +47680,211 @@
         "type": "object"
       },
       "PatchWorkspacesWorkspaceIdTestRunsRunIdStepsStepIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "updated": {
+                "description": "The updated value.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "updated"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_result": {
+            "description": "The actual result value.",
+            "type": "string"
+          },
+          "notes": {
+            "description": "The notes value.",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actual_result",
+          "notes",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "actual_result": {
+                "description": "The actual result value.",
+                "type": "string"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "example_index": {
+                "description": "The example index value.",
+                "type": "integer"
+              },
+              "executed_at": {
+                "description": "The executed at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "notes": {
+                "description": "The notes value.",
+                "type": "string"
+              },
+              "row_values": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "The row values value.",
+                "type": "object"
+              },
+              "run_id": {
+                "description": "The run id value.",
+                "type": "integer"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "step_results": {
+                "description": "The step results value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actual_result": {
+                      "description": "The actual result value.",
+                      "type": "string"
+                    },
+                    "example_result_id": {
+                      "description": "The example result id value.",
+                      "type": "integer"
+                    },
+                    "executed_at": {
+                      "description": "The executed at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "item_id": {
+                      "description": "The item id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "notes": {
+                      "description": "The notes value.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    },
+                    "step_number": {
+                      "description": "The step number value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "actual_result",
+                    "example_result_id",
+                    "id",
+                    "notes",
+                    "status",
+                    "step_number"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "test_case_id": {
+                "description": "The test case id value.",
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "actual_result",
+              "created_at",
+              "example_index",
+              "id",
+              "notes",
+              "row_values",
+              "run_id",
+              "status",
+              "test_case_id",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexStepsStepNumberPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_result": {
+            "description": "The actual result value.",
+            "type": "string"
+          },
+          "item_id": {
+            "description": "The item id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "notes": {
+            "description": "The notes value.",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actual_result",
+          "notes",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexStepsStepNumberResult": {
         "additionalProperties": false,
         "properties": {
           "data": {
@@ -66000,6 +66789,260 @@
         ],
         "type": "object"
       },
+      "PostWorkspacesWorkspaceIdTestCasesImportFeaturePayload": {
+        "type": "string"
+      },
+      "PostWorkspacesWorkspaceIdTestCasesImportFeatureResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "cases": {
+                "description": "The cases value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bdd": {
+                      "additionalProperties": false,
+                      "description": "The bdd value.",
+                      "nullable": true,
+                      "properties": {
+                        "created_at": {
+                          "description": "The created at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "feature_name": {
+                          "description": "The feature name value.",
+                          "type": "string"
+                        },
+                        "gherkin": {
+                          "description": "The gherkin value.",
+                          "type": "string"
+                        },
+                        "scenario_keyword": {
+                          "description": "The scenario keyword value.",
+                          "type": "string"
+                        },
+                        "spec": {
+                          "description": "The spec value.",
+                          "type": "string"
+                        },
+                        "test_case_id": {
+                          "description": "The test case id value.",
+                          "type": "integer"
+                        },
+                        "updated_at": {
+                          "description": "The updated at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "created_at",
+                        "feature_name",
+                        "gherkin",
+                        "scenario_keyword",
+                        "spec",
+                        "test_case_id",
+                        "updated_at"
+                      ],
+                      "type": "object"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "estimated_duration": {
+                      "description": "The estimated duration value.",
+                      "type": "integer"
+                    },
+                    "folder_id": {
+                      "description": "The folder id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "folder_name": {
+                      "description": "The folder name value.",
+                      "type": "string"
+                    },
+                    "format": {
+                      "description": "The format value.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "labels": {
+                      "description": "The labels value.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "color": {
+                            "description": "The color value.",
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "description": "The created at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "description": {
+                            "description": "The description value.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "name": {
+                            "description": "The name value.",
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "description": "The updated at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "workspace_id": {
+                            "description": "The workspace id value.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "color",
+                          "created_at",
+                          "description",
+                          "id",
+                          "name",
+                          "updated_at",
+                          "workspace_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "preconditions": {
+                      "description": "The preconditions value.",
+                      "type": "string"
+                    },
+                    "priority": {
+                      "description": "The priority value.",
+                      "type": "string"
+                    },
+                    "sort_order": {
+                      "description": "The sort order value.",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    },
+                    "test_steps": {
+                      "description": "The test steps value.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action": {
+                            "description": "The action value.",
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "description": "The created at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "data": {
+                            "description": "The data value.",
+                            "type": "string"
+                          },
+                          "expected": {
+                            "description": "The expected value.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "step_number": {
+                            "description": "The step number value.",
+                            "type": "integer"
+                          },
+                          "test_case_id": {
+                            "description": "The test case id value.",
+                            "type": "integer"
+                          },
+                          "updated_at": {
+                            "description": "The updated at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "created_at",
+                          "data",
+                          "expected",
+                          "id",
+                          "step_number",
+                          "test_case_id",
+                          "updated_at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "workspace_id": {
+                      "description": "The workspace id value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "created_at",
+                    "estimated_duration",
+                    "format",
+                    "id",
+                    "name",
+                    "preconditions",
+                    "priority",
+                    "sort_order",
+                    "status",
+                    "title",
+                    "updated_at",
+                    "workspace_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "cases"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostWorkspacesWorkspaceIdTestCasesPayload": {
         "additionalProperties": false,
         "properties": {
@@ -66011,6 +67054,14 @@
             "description": "The folder id value.",
             "nullable": true,
             "type": "integer"
+          },
+          "format": {
+            "description": "The format value.",
+            "type": "string"
+          },
+          "gherkin": {
+            "description": "The gherkin value.",
+            "type": "string"
           },
           "preconditions": {
             "description": "The preconditions value.",
@@ -66031,6 +67082,8 @@
         },
         "required": [
           "estimated_duration",
+          "format",
+          "gherkin",
           "preconditions",
           "priority",
           "status",
@@ -66083,6 +67136,53 @@
             "additionalProperties": false,
             "nullable": true,
             "properties": {
+              "bdd": {
+                "additionalProperties": false,
+                "description": "The bdd value.",
+                "nullable": true,
+                "properties": {
+                  "created_at": {
+                    "description": "The created at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "feature_name": {
+                    "description": "The feature name value.",
+                    "type": "string"
+                  },
+                  "gherkin": {
+                    "description": "The gherkin value.",
+                    "type": "string"
+                  },
+                  "scenario_keyword": {
+                    "description": "The scenario keyword value.",
+                    "type": "string"
+                  },
+                  "spec": {
+                    "description": "The spec value.",
+                    "type": "string"
+                  },
+                  "test_case_id": {
+                    "description": "The test case id value.",
+                    "type": "integer"
+                  },
+                  "updated_at": {
+                    "description": "The updated at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "feature_name",
+                  "gherkin",
+                  "scenario_keyword",
+                  "spec",
+                  "test_case_id",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -66099,6 +67199,10 @@
               },
               "folder_name": {
                 "description": "The folder name value.",
+                "type": "string"
+              },
+              "format": {
+                "description": "The format value.",
                 "type": "string"
               },
               "id": {
@@ -66245,6 +67349,7 @@
             "required": [
               "created_at",
               "estimated_duration",
+              "format",
               "id",
               "name",
               "preconditions",
@@ -66450,6 +67555,302 @@
               "step_number",
               "test_case_id",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdTestCasesValidateFeaturePayload": {
+        "type": "string"
+      },
+      "PostWorkspacesWorkspaceIdTestCasesValidateFeatureResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "document": {
+                "additionalProperties": false,
+                "description": "The document value.",
+                "nullable": true,
+                "properties": {
+                  "background": {
+                    "description": "The background value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "data_table": {
+                          "additionalProperties": false,
+                          "description": "The data table value.",
+                          "nullable": true,
+                          "properties": {
+                            "rows": {
+                              "description": "The rows value.",
+                              "items": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "rows"
+                          ],
+                          "type": "object"
+                        },
+                        "doc_string": {
+                          "additionalProperties": false,
+                          "description": "The doc string value.",
+                          "nullable": true,
+                          "properties": {
+                            "content": {
+                              "description": "The content value.",
+                              "type": "string"
+                            },
+                            "content_type": {
+                              "description": "The content type value.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "content"
+                          ],
+                          "type": "object"
+                        },
+                        "keyword": {
+                          "description": "The keyword value.",
+                          "type": "string"
+                        },
+                        "line": {
+                          "description": "The line value.",
+                          "type": "integer"
+                        },
+                        "text": {
+                          "description": "The text value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "keyword",
+                        "text"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "feature_description": {
+                    "description": "The feature description value.",
+                    "type": "string"
+                  },
+                  "feature_name": {
+                    "description": "The feature name value.",
+                    "type": "string"
+                  },
+                  "feature_tags": {
+                    "description": "The feature tags value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "scenarios": {
+                    "description": "The scenarios value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "examples": {
+                          "description": "The examples value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "header": {
+                                "description": "The header value.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "line": {
+                                "description": "The line value.",
+                                "type": "integer"
+                              },
+                              "name": {
+                                "description": "The name value.",
+                                "type": "string"
+                              },
+                              "rows": {
+                                "description": "The rows value.",
+                                "items": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "type": "array"
+                              },
+                              "tags": {
+                                "description": "The tags value.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "header",
+                              "rows"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "keyword": {
+                          "description": "The keyword value.",
+                          "type": "string"
+                        },
+                        "line": {
+                          "description": "The line value.",
+                          "type": "integer"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "steps": {
+                          "description": "The steps value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "data_table": {
+                                "additionalProperties": false,
+                                "description": "The data table value.",
+                                "nullable": true,
+                                "properties": {
+                                  "rows": {
+                                    "description": "The rows value.",
+                                    "items": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "rows"
+                                ],
+                                "type": "object"
+                              },
+                              "doc_string": {
+                                "additionalProperties": false,
+                                "description": "The doc string value.",
+                                "nullable": true,
+                                "properties": {
+                                  "content": {
+                                    "description": "The content value.",
+                                    "type": "string"
+                                  },
+                                  "content_type": {
+                                    "description": "The content type value.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "content"
+                                ],
+                                "type": "object"
+                              },
+                              "keyword": {
+                                "description": "The keyword value.",
+                                "type": "string"
+                              },
+                              "line": {
+                                "description": "The line value.",
+                                "type": "integer"
+                              },
+                              "text": {
+                                "description": "The text value.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "keyword",
+                              "text"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "tags": {
+                          "description": "The tags value.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "keyword",
+                        "name",
+                        "steps"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "feature_name",
+                  "scenarios"
+                ],
+                "type": "object"
+              },
+              "errors": {
+                "description": "The errors value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "column": {
+                      "description": "The column value.",
+                      "type": "integer"
+                    },
+                    "line": {
+                      "description": "The line value.",
+                      "type": "integer"
+                    },
+                    "message": {
+                      "description": "The message value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "column",
+                    "line",
+                    "message"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "valid": {
+                "description": "The valid value.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "errors",
+              "valid"
             ],
             "type": "object"
           }
@@ -91528,6 +92929,82 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/test-cases/import-feature": {
+      "post": {
+        "description": "Import a Gherkin feature file. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdTestCasesImportFeature",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/x-gherkin": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesImportFeaturePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesImportFeatureResult"
+                }
+              }
+            },
+            "description": "Import a Gherkin feature file response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Import a Gherkin feature file",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:write"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/test-cases/reorder": {
       "post": {
         "description": "Reorder test cases. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -91596,6 +93073,82 @@
           }
         ],
         "summary": "Reorder test cases",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-cases/validate-feature": {
+      "post": {
+        "description": "Validate a Gherkin feature file. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdTestCasesValidateFeature",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/x-gherkin": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesValidateFeaturePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesValidateFeatureResult"
+                }
+              }
+            },
+            "description": "Validate a Gherkin feature file response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Validate a Gherkin feature file",
         "tags": [
           "Test management"
         ],
@@ -91872,6 +93425,73 @@
           }
         ],
         "summary": "Get test case connections",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-cases/{test_case_id}/feature": {
+      "get": {
+        "description": "Export a BDD test case as a feature file. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdTestCasesTestCaseIdFeature",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The test case identifier.",
+            "in": "path",
+            "name": "test_case_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/x-gherkin; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdTestCasesTestCaseIdFeatureResult"
+                }
+              }
+            },
+            "description": "Export a BDD test case as a feature file response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Export a BDD test case as a feature file",
         "tags": [
           "Test management"
         ],
@@ -95741,6 +97361,73 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/example-results": {
+      "get": {
+        "description": "List BDD example execution results. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdTestRunsRunIdExampleResults",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The run identifier.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdTestRunsRunIdExampleResultsResult"
+                }
+              }
+            },
+            "description": "List BDD example execution results response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List BDD example execution results",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:read"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/test-runs/{run_id}/results": {
       "get": {
         "description": "List test run results. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -96131,6 +97818,228 @@
         ],
         "x-required-scopes": [
           "tests:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/test-cases/{test_case_id}/examples/{example_index}": {
+      "patch": {
+        "description": "Update a BDD example execution result. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndex",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The run identifier.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The test case identifier.",
+            "in": "path",
+            "name": "test_case_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The 0-based Examples row index.",
+            "in": "path",
+            "name": "example_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexResult"
+                }
+              }
+            },
+            "description": "Update a BDD example execution result response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update a BDD example execution result",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/test-cases/{test_case_id}/examples/{example_index}/steps/{step_number}": {
+      "patch": {
+        "description": "Update a BDD example step result. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexStepsStepNumber",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The run identifier.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The test case identifier.",
+            "in": "path",
+            "name": "test_case_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The 0-based Examples row index.",
+            "in": "path",
+            "name": "example_index",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The 1-based step position in the expanded scenario steps.",
+            "in": "path",
+            "name": "step_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexStepsStepNumberPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdTestRunsRunIdTestCasesTestCaseIdExamplesExampleIndexStepsStepNumberResult"
+                }
+              }
+            },
+            "description": "Update a BDD example step result response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update a BDD example step result",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:write"
         ]
       }
     },

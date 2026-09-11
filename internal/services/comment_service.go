@@ -795,7 +795,9 @@ func (s *CommentService) GetFeedByItemID(itemID int, includeAgentOwner bool, opt
 // ordering truncated to limit. asc sorts oldest-first for since cursors;
 // the default is newest-first.
 func mergeCommentFeed(human, approval []models.Comment, limit int, asc bool) *CommentFeedPage {
-	comments := append(human, approval...)
+	comments := make([]models.Comment, 0, len(human)+len(approval))
+	comments = append(comments, human...)
+	comments = append(comments, approval...)
 	sort.SliceStable(comments, func(i, j int) bool {
 		if comments[i].CreatedAt.Equal(comments[j].CreatedAt) {
 			if asc {

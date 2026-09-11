@@ -119,6 +119,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 	query := `
 			SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title,
 			       COALESCE(tc.preconditions, '') as preconditions,
+			       COALESCE(tc.format, 'steps') as format,
 			       COALESCE(tc.priority, 'medium') as priority,
 			       COALESCE(tc.status, 'active') as status,
 			       COALESCE(tc.estimated_duration, 0) as estimated_duration,
@@ -152,7 +153,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 
 		err := rows.Scan(
 			&tc.ID, &tc.WorkspaceID, &tc.FolderID, &tc.Title, &tc.Preconditions,
-			&tc.Priority, &tc.Status, &tc.EstimatedDuration,
+			&tc.Format, &tc.Priority, &tc.Status, &tc.EstimatedDuration,
 			&tc.SortOrder, &tc.CreatedAt, &tc.UpdatedAt, &folderName,
 		)
 		if err != nil {
@@ -239,6 +240,7 @@ func (r *TestCaseRepository) FindByID(id, workspaceID int) (*models.TestCase, er
 	query := `
 		SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title,
 		       COALESCE(tc.preconditions, '') as preconditions,
+		       COALESCE(tc.format, 'steps') as format,
 		       COALESCE(tc.priority, 'medium') as priority,
 		       COALESCE(tc.status, 'active') as status,
 		       COALESCE(tc.estimated_duration, 0) as estimated_duration,
@@ -253,7 +255,7 @@ func (r *TestCaseRepository) FindByID(id, workspaceID int) (*models.TestCase, er
 
 	err := r.db.QueryRow(query, id, workspaceID).Scan(
 		&tc.ID, &tc.WorkspaceID, &tc.FolderID, &tc.Title, &tc.Preconditions,
-		&tc.Priority, &tc.Status, &tc.EstimatedDuration,
+		&tc.Format, &tc.Priority, &tc.Status, &tc.EstimatedDuration,
 		&tc.SortOrder, &tc.CreatedAt, &tc.UpdatedAt, &folderName,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -319,13 +321,17 @@ func (r *TestCaseRepository) GetMaxSortOrderTx(tx database.Tx, workspaceID int, 
 
 // Create inserts a new test case and returns its ID
 func (r *TestCaseRepository) Create(tx database.Tx, tc *models.TestCase) (int, error) {
+	format := tc.Format
+	if format == "" {
+		format = "steps"
+	}
 	query := `
-		INSERT INTO test_cases (workspace_id, folder_id, title, preconditions, priority, status, estimated_duration, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO test_cases (workspace_id, folder_id, title, format, preconditions, priority, status, estimated_duration, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`
 
 	var id int64
-	err := tx.QueryRow(query, tc.WorkspaceID, tc.FolderID, tc.Title, tc.Preconditions,
+	err := tx.QueryRow(query, tc.WorkspaceID, tc.FolderID, tc.Title, format, tc.Preconditions,
 		tc.Priority, tc.Status, tc.EstimatedDuration,
 		tc.SortOrder, tc.CreatedAt, tc.UpdatedAt).Scan(&id)
 	if err != nil {

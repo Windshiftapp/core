@@ -417,23 +417,84 @@ type TestFolder struct {
 	TestCaseCount int       `json:"test_case_count,omitempty"`
 }
 
-// TestCase represents a test case
+// TestCase represents a test case.
+// Format is "steps" (default) or "bdd"; it is fixed at creation time.
 type TestCase struct {
-	ID                int         `json:"id"`
-	WorkspaceID       int         `json:"workspace_id"`
-	FolderID          *int        `json:"folder_id,omitempty"`
-	Title             string      `json:"title"`
-	Name              string      `json:"name"`
-	Priority          string      `json:"priority"`           // low, medium, high, critical
-	Status            string      `json:"status"`             // active, inactive, draft
-	EstimatedDuration int         `json:"estimated_duration"` // in seconds
-	Preconditions     string      `json:"preconditions"`
-	SortOrder         int         `json:"sort_order"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
-	FolderName        string      `json:"folder_name,omitempty"`
-	TestSteps         []TestStep  `json:"test_steps,omitempty"`
-	Labels            []TestLabel `json:"labels,omitempty"`
+	ID                int          `json:"id"`
+	WorkspaceID       int          `json:"workspace_id"`
+	FolderID          *int         `json:"folder_id,omitempty"`
+	Title             string       `json:"title"`
+	Name              string       `json:"name"`
+	Format            string       `json:"format"`
+	Priority          string       `json:"priority"`           // low, medium, high, critical
+	Status            string       `json:"status"`             // active, inactive, draft
+	EstimatedDuration int          `json:"estimated_duration"` // in seconds
+	Preconditions     string       `json:"preconditions"`
+	SortOrder         int          `json:"sort_order"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
+	FolderName        string       `json:"folder_name,omitempty"`
+	TestSteps         []TestStep   `json:"test_steps,omitempty"`
+	Labels            []TestLabel  `json:"labels,omitempty"`
+	BDD               *TestCaseBDD `json:"bdd,omitempty"`
+}
+
+// TestCaseBDD holds the authored Gherkin source (authoritative) and the
+// derived structure persisted alongside a BDD-format test case.
+type TestCaseBDD struct {
+	TestCaseID      int    `json:"test_case_id"`
+	Gherkin         string `json:"gherkin"`
+	FeatureName     string `json:"feature_name"`
+	ScenarioKeyword string `json:"scenario_keyword"`
+	// Spec is the JSON-encoded gherkin.ScenarioSpec derived from Gherkin.
+	Spec      string    `json:"spec"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TestRunCaseSnapshot is the run-scoped copy of a BDD case's specification.
+// It is written when a case enters a run; later case edits do not touch it.
+type TestRunCaseSnapshot struct {
+	ID            int       `json:"id"`
+	RunID         int       `json:"run_id"`
+	TestCaseID    int       `json:"test_case_id"`
+	Title         string    `json:"title"`
+	Preconditions string    `json:"preconditions"`
+	Gherkin       string    `json:"gherkin"`
+	Spec          string    `json:"spec"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// TestExampleResult is the manual-execution result of one Examples row of a
+// BDD case within a run. ExampleIndex and RowValues preserve the row's
+// identity and input values with its result.
+type TestExampleResult struct {
+	ID           int                     `json:"id"`
+	RunID        int                     `json:"run_id"`
+	TestCaseID   int                     `json:"test_case_id"`
+	ExampleIndex int                     `json:"example_index"`
+	RowValues    map[string]string       `json:"row_values"`
+	Status       string                  `json:"status"`
+	ActualResult string                  `json:"actual_result"`
+	Notes        string                  `json:"notes"`
+	ExecutedAt   *time.Time              `json:"executed_at"`
+	CreatedAt    time.Time               `json:"created_at"`
+	UpdatedAt    time.Time               `json:"updated_at"`
+	StepResults  []TestExampleStepResult `json:"step_results,omitempty"`
+}
+
+// TestExampleStepResult is a step-level result within one example execution.
+// StepNumber is the 1-based position in the expanded step list (Background
+// steps first, then the scenario's own steps).
+type TestExampleStepResult struct {
+	ID              int        `json:"id"`
+	ExampleResultID int        `json:"example_result_id"`
+	StepNumber      int        `json:"step_number"`
+	Status          string     `json:"status"`
+	ActualResult    string     `json:"actual_result"`
+	Notes           string     `json:"notes"`
+	ItemID          *int       `json:"item_id"`
+	ExecutedAt      *time.Time `json:"executed_at"`
 }
 
 // TestSet represents a collection of test cases

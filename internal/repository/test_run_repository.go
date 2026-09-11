@@ -368,6 +368,7 @@ func (r *TestRunRepository) FindResultsWithTestCase(runID, workspaceID int) ([]T
 func (r *TestRunRepository) FindCasesWithStepsForRun(runID, workspaceID int) ([]models.TestCase, error) {
 	rows, err := r.db.Query(`
 		SELECT tc.id, tc.workspace_id, tc.folder_id, tc.title, tc.name,
+		       COALESCE(tc.format, 'steps'),
 		       tc.priority, tc.status, tc.estimated_duration, tc.preconditions,
 		       tc.sort_order, tc.created_at, tc.updated_at
 		FROM test_results tr
@@ -386,7 +387,7 @@ func (r *TestRunRepository) FindCasesWithStepsForRun(runID, workspaceID int) ([]
 		var testCase models.TestCase
 		if scanErr := rows.Scan(
 			&testCase.ID, &testCase.WorkspaceID, &testCase.FolderID,
-			&testCase.Title, &testCase.Name, &testCase.Priority, &testCase.Status,
+			&testCase.Title, &testCase.Name, &testCase.Format, &testCase.Priority, &testCase.Status,
 			&testCase.EstimatedDuration, &testCase.Preconditions, &testCase.SortOrder,
 			&testCase.CreatedAt, &testCase.UpdatedAt,
 		); scanErr != nil {

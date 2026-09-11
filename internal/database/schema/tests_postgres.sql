@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS test_cases (
 	folder_id INTEGER REFERENCES test_folders(id) ON DELETE SET NULL,
 	title TEXT NOT NULL,
 	name TEXT NOT NULL DEFAULT '',
+	format TEXT NOT NULL DEFAULT 'steps',
 	priority TEXT NOT NULL DEFAULT 'medium',
 	status TEXT NOT NULL DEFAULT 'active',
 	estimated_duration INTEGER DEFAULT 0,
@@ -26,6 +27,70 @@ CREATE TABLE IF NOT EXISTS test_cases (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+-- Authored Gherkin source and derived structure for BDD-format test cases
+CREATE TABLE IF NOT EXISTS test_case_bdd (
+	id SERIAL PRIMARY KEY,
+	test_case_id INTEGER NOT NULL UNIQUE,
+	gherkin TEXT NOT NULL,
+	feature_name TEXT NOT NULL DEFAULT '',
+	scenario_keyword TEXT NOT NULL DEFAULT 'Scenario',
+	spec TEXT NOT NULL DEFAULT '{}',
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+);
+
+-- Run-scoped snapshot of a BDD case's specification, written when the case
+-- enters a run. Later case edits must not rewrite an existing run.
+CREATE TABLE IF NOT EXISTS test_run_case_snapshots (
+	id SERIAL PRIMARY KEY,
+	run_id INTEGER NOT NULL,
+	test_case_id INTEGER NOT NULL,
+	title TEXT NOT NULL,
+	preconditions TEXT DEFAULT '',
+	gherkin TEXT NOT NULL,
+	spec TEXT NOT NULL DEFAULT '{}',
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+	FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+	UNIQUE(run_id, test_case_id)
+);
+
+-- Manual-execution result for one Examples row of a BDD case in a run
+CREATE TABLE IF NOT EXISTS test_example_results (
+	id SERIAL PRIMARY KEY,
+	run_id INTEGER NOT NULL,
+	test_case_id INTEGER NOT NULL,
+	example_index INTEGER NOT NULL,
+	row_values TEXT NOT NULL DEFAULT '{}',
+	status TEXT NOT NULL DEFAULT 'not_run',
+	actual_result TEXT DEFAULT '',
+	notes TEXT DEFAULT '',
+	executed_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+	FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+	UNIQUE(run_id, test_case_id, example_index)
+);
+
+-- Step-level results within one example execution
+CREATE TABLE IF NOT EXISTS test_example_step_results (
+	id SERIAL PRIMARY KEY,
+	example_result_id INTEGER NOT NULL,
+	step_number INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'not_run',
+	actual_result TEXT DEFAULT '',
+	notes TEXT DEFAULT '',
+	item_id INTEGER,
+	executed_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (example_result_id) REFERENCES test_example_results(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+	UNIQUE(example_result_id, step_number)
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_folders_workspace_id ON test_folders(workspace_id);
@@ -185,3 +250,5 @@ CREATE INDEX IF NOT EXISTS idx_test_steps_test_case_id ON test_steps(test_case_i
 CREATE INDEX IF NOT EXISTS idx_test_step_results_test_result_id ON test_step_results(test_result_id);
 CREATE INDEX IF NOT EXISTS idx_test_step_results_test_step_id ON test_step_results(test_step_id);
 CREATE INDEX IF NOT EXISTS idx_test_sets_milestone_id ON test_sets(milestone_id);
+CREATE INDEX IF NOT EXISTS idx_test_example_results_run_id ON test_example_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_test_example_step_results_result_id ON test_example_step_results(example_result_id);

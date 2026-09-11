@@ -2,12 +2,16 @@ package v2
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
+	"windshift/internal/fileserve"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -79,8 +83,22 @@ func registerTestManagementRoutes(builder *routeBuilder, application *services.T
 	registerTestPlanRoutes(builder, application)
 	registerTestRunTemplateRoutes(builder, application)
 	registerTestRunRoutes(builder, application)
+	registerBDDRunRoutes(builder, application)
 	registerTestReportRoutes(builder, application)
 	registerTestCoverageRoutes(builder, application)
+}
+
+type testExampleResultPatch struct {
+	Status       string `json:"status"`
+	ActualResult string `json:"actual_result"`
+	Notes        string `json:"notes"`
+}
+
+type testExampleStepResultPatch struct {
+	Status       string `json:"status"`
+	ActualResult string `json:"actual_result"`
+	Notes        string `json:"notes"`
+	ItemID       *int   `json:"item_id"`
 }
 
 type testFolderCreate struct {
@@ -224,6 +242,9 @@ type testCaseCreate struct {
 	Status            string `json:"status"`
 	EstimatedDuration int    `json:"estimated_duration"`
 	FolderID          *int   `json:"folder_id"`
+	// Format defaults to steps; "bdd" requires gherkin and validates it.
+	Format  string `json:"format"`
+	Gherkin string `json:"gherkin"`
 }
 
 type testCasePatch struct {
@@ -234,6 +255,8 @@ type testCasePatch struct {
 	EstimatedDuration *int          `json:"estimated_duration"`
 	FolderID          Optional[int] `json:"folder_id"`
 	SortOrder         *int          `json:"sort_order"`
+	// Gherkin replaces the authored source of a BDD-format case.
+	Gherkin *string `json:"gherkin"`
 }
 
 type moveTestCaseRequest struct {
@@ -288,18 +311,20 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 			return pointerSlice(items), total, err
 		},
 		get: func(_ *http.Request, userID, workspaceID, id int) (*models.TestCase, error) {
-			return app.GetCase(userID, workspaceID, id)
+			return app.GetCaseDetail(userID, workspaceID, id)
 		},
 		create: func(r *http.Request, userID, workspaceID int, input testCaseCreate) (*models.TestCase, error) {
 			return app.CreateCase(userID, workspaceID, auditActor(r, mustPrincipal(r)), services.TestCaseCreateRequest{
 				Title: input.Title, Preconditions: input.Preconditions, Priority: input.Priority, Status: input.Status,
 				EstimatedDuration: input.EstimatedDuration, FolderID: input.FolderID,
+				Format: input.Format, Gherkin: input.Gherkin,
 			})
 		},
 		patch: func(r *http.Request, userID, workspaceID, id int, input testCasePatch) (*models.TestCase, error) {
 			return app.UpdateCase(userID, workspaceID, id, auditActor(r, mustPrincipal(r)), services.TestCasePatch{
 				Title: input.Title, Preconditions: input.Preconditions, Priority: input.Priority, Status: input.Status,
 				EstimatedDuration: input.EstimatedDuration, FolderID: optionalInt(input.FolderID), FolderIDSet: input.FolderID.Set, SortOrder: input.SortOrder,
+				Gherkin: input.Gherkin,
 			})
 		},
 		delete: func(r *http.Request, userID, workspaceID, id int) error {
@@ -332,6 +357,188 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 	})
 	registerTestStepRoutes(builder, app, path+"/{test_case_id}/steps")
 	registerTestLabelRoutes(builder, app, path)
+	registerBDDTestCaseRoutes(builder, app, path)
+}
+
+// registerBDDTestCaseRoutes adds the v2-only BDD authoring and feature-file
+// surfaces: validation, import, and per-case export.
+func registerBDDTestCaseRoutes(builder *routeBuilder, app *services.TestManagementApplicationService, casesPath string) {
+	builder.RawDocument[string, services.GherkinDocumentResponse](http.MethodPost, casesPath+"/validate-feature", http.StatusOK, "text/x-gherkin", AuthAuthenticated, []string{"tests:write"},
+		func(w http.ResponseWriter, r *http.Request) error {
+			user, err := principal(r)
+			if err != nil {
+				return err
+			}
+			workspaceID, err := pathID(r, "workspace_id")
+			if err != nil {
+				return err
+			}
+			content, err := readGherkinBody(r)
+			if err != nil {
+				return err
+			}
+			result, err := app.ValidateFeature(user.ID, workspaceID, content)
+			if err != nil {
+				return testManagementError(err)
+			}
+			return respondDocument(w, http.StatusOK, result)
+		})
+	builder.RawDocument[string, services.ImportFeatureResult](http.MethodPost, casesPath+"/import-feature", http.StatusCreated, "text/x-gherkin", AuthAuthenticated, []string{"tests:write"},
+		func(w http.ResponseWriter, r *http.Request) error {
+			user, err := principal(r)
+			if err != nil {
+				return err
+			}
+			workspaceID, err := pathID(r, "workspace_id")
+			if err != nil {
+				return err
+			}
+			folderID, err := optionalFolderQuery(r)
+			if err != nil {
+				return err
+			}
+			content, err := readGherkinBody(r)
+			if err != nil {
+				return err
+			}
+			created, err := app.ImportFeature(user.ID, workspaceID, auditActor(r, user), folderID, content)
+			if err != nil {
+				return testManagementError(err)
+			}
+			return respondDocument(w, http.StatusCreated, services.ImportFeatureResult{Cases: created})
+		})
+	builder.RawResponse[[]byte](http.MethodGet, casesPath+"/{test_case_id}/feature", http.StatusOK, "text/x-gherkin; charset=utf-8", AuthAuthenticated, []string{"tests:read"},
+		func(w http.ResponseWriter, r *http.Request) error {
+			user, err := principal(r)
+			if err != nil {
+				return err
+			}
+			workspaceID, err := pathID(r, "workspace_id")
+			if err != nil {
+				return err
+			}
+			caseID, err := pathID(r, "test_case_id")
+			if err != nil {
+				return err
+			}
+			content, filename, err := app.ExportFeature(user.ID, workspaceID, caseID)
+			if err != nil {
+				return testManagementError(err)
+			}
+			w.Header().Set("Content-Type", "text/x-gherkin; charset=utf-8")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Content-Disposition", fileserve.ContentDisposition("attachment", filename))
+			http.ServeContent(w, r, filename, time.Now(), strings.NewReader(content))
+			return nil
+		})
+}
+
+// registerBDDRunRoutes adds the per-example execution surfaces for BDD
+// cases inside a run.
+func registerBDDRunRoutes(builder *routeBuilder, app *services.TestManagementApplicationService) {
+	runsPath := "/workspaces/{workspace_id}/test-runs"
+	builder.Read(runsPath+"/{run_id}/example-results", AuthAuthenticated, []string{"tests:read"}, func(r *http.Request) ([]models.TestExampleResult, error) {
+		user, workspaceID, runID, err := testTarget(r, "run_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.ListRunExamples(user.ID, workspaceID, runID)
+		return result, testManagementError(err)
+	})
+	builder.JSON(http.MethodPatch, runsPath+"/{run_id}/test-cases/{test_case_id}/examples/{example_index}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"},
+		func(r *http.Request, input testExampleResultPatch) (*models.TestExampleResult, error) {
+			user, workspaceID, runID, err := testTarget(r, "run_id")
+			if err != nil {
+				return nil, err
+			}
+			caseID, err := pathID(r, "test_case_id")
+			if err != nil {
+				return nil, err
+			}
+			exampleIndex, err := exampleIndexParam(r)
+			if err != nil {
+				return nil, err
+			}
+			result, err := app.UpdateRunExample(user.ID, workspaceID, runID, caseID, exampleIndex, services.TestExampleResultUpdateRequest{
+				Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes,
+			})
+			return result, testManagementError(err)
+		})
+	builder.JSON(http.MethodPatch, runsPath+"/{run_id}/test-cases/{test_case_id}/examples/{example_index}/steps/{step_number}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"},
+		func(r *http.Request, input testExampleStepResultPatch) (updatedResponse, error) {
+			user, workspaceID, runID, err := testTarget(r, "run_id")
+			if err != nil {
+				return updatedResponse{}, err
+			}
+			caseID, err := pathID(r, "test_case_id")
+			if err != nil {
+				return updatedResponse{}, err
+			}
+			exampleIndex, err := exampleIndexParam(r)
+			if err != nil {
+				return updatedResponse{}, err
+			}
+			stepNumber, err := pathID(r, "step_number")
+			if err != nil {
+				return updatedResponse{}, err
+			}
+			err = app.UpdateRunExampleStep(user.ID, workspaceID, runID, caseID, exampleIndex, stepNumber, services.TestExampleStepResultUpdateRequest{
+				Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes, ItemID: input.ItemID,
+			})
+			err = testManagementError(err)
+			return updatedResponse{Updated: err == nil}, err
+		})
+}
+
+// exampleIndexParam parses the 0-based example row index; unlike entity IDs
+// the first example row is index 0.
+func exampleIndexParam(r *http.Request) (int, error) {
+	raw := r.PathValue("example_index")
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		apiErr := newError(http.StatusBadRequest, "invalid_request", "example_index must be a non-negative integer")
+		apiErr.Details = map[string]any{"field": "example_index"}
+		return 0, apiErr
+	}
+	return value, nil
+}
+
+// readGherkinBody reads the authored feature text from the request body with
+// a bounded size.
+func readGherkinBody(r *http.Request) (string, error) {
+	limited := http.MaxBytesReader(nil, r.Body, maxGherkinBodyBytes+1)
+	content, err := io.ReadAll(limited)
+	if err != nil {
+		return "", newError(http.StatusBadRequest, "invalid_request", "feature file body is missing or too large")
+	}
+	if len(content) > maxGherkinBodyBytes {
+		return "", newError(http.StatusBadRequest, "invalid_request", "feature file body is too large")
+	}
+	return string(content), nil
+}
+
+// maxGherkinBodyBytes bounds the import/validate body; 1 MiB comfortably
+// covers the 256 KiB rune cap on authored Gherkin with multi-byte content.
+const maxGherkinBodyBytes = 1 << 20
+
+// optionalFolderQuery reads the optional ?folder_id= import target.
+func optionalFolderQuery(r *http.Request) (*int, error) {
+	raw := r.URL.Query().Get("folder_id")
+	if raw == "" {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(raw)
+	if err != nil || id <= 0 {
+		return nil, newError(http.StatusBadRequest, "invalid_request", "folder_id must be a positive integer")
+	}
+	return &id, nil
+}
+
+// respondDocument writes the standard data envelope from a raw handler.
+func respondDocument(w http.ResponseWriter, status int, payload any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(map[string]any{"data": payload})
 }
 
 func registerTestStepRoutes(builder *routeBuilder, app *services.TestManagementApplicationService, path string) {
@@ -625,10 +832,12 @@ type testRunResponse struct {
 }
 
 type testRunDetailResponse struct {
-	Run         *testRunResponse                      `json:"run"`
-	TestCases   []models.TestCase                     `json:"test_cases"`
-	Results     []services.TestRunResultWithCaseTitle `json:"results"`
-	StepResults []services.TestRunStepResult          `json:"step_results"`
+	Run            *testRunResponse                      `json:"run"`
+	TestCases      []models.TestCase                     `json:"test_cases"`
+	Results        []services.TestRunResultWithCaseTitle `json:"results"`
+	StepResults    []services.TestRunStepResult          `json:"step_results"`
+	BDDSnapshots   []models.TestRunCaseSnapshot          `json:"bdd_snapshots"`
+	ExampleResults []models.TestExampleResult            `json:"example_results"`
 }
 
 func mapTestRunStepResults(values map[string]services.TestRunStepResult) []services.TestRunStepResult {
@@ -683,7 +892,11 @@ func registerTestRunRoutes(builder *routeBuilder, app *services.TestManagementAp
 		if result == nil || err != nil {
 			return nil, testManagementError(err)
 		}
-		return &testRunDetailResponse{Run: mapTestRun(result.Run), TestCases: result.TestCases, Results: result.Results, StepResults: mapTestRunStepResults(result.StepResults)}, nil
+		return &testRunDetailResponse{
+			Run: mapTestRun(result.Run), TestCases: result.TestCases, Results: result.Results,
+			StepResults: mapTestRunStepResults(result.StepResults), BDDSnapshots: result.BDDSnapshots,
+			ExampleResults: result.ExampleResults,
+		}, nil
 	})
 	builder.Action(http.MethodPost, item+"/end", http.StatusOK, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) (endedResponse, error) {
 		user, ws, id, err := testTarget(r, "run_id")
@@ -1022,7 +1235,12 @@ func testManagementError(err error) error {
 		return nil
 	}
 	var validation *services.TestManagementValidationError
+	var bddValidation *services.TestBDDValidationError
 	switch {
+	case errors.As(err, &bddValidation):
+		e := newError(http.StatusBadRequest, "invalid_request", bddValidation.Error())
+		e.Details = map[string]any{"errors": bddValidation.Errors}
+		return e
 	case errors.Is(err, services.ErrTestManagementForbidden):
 		return newError(http.StatusNotFound, "not_found", "Test resource was not found")
 	case errors.Is(err, repository.ErrNotFound), errors.Is(err, services.ErrTestRunItemNotFound), errors.Is(err, services.ErrTestSetCaseNotFound), errors.Is(err, services.ErrTestSetMilestoneNotFound), errors.Is(err, services.ErrTestRunTemplateSetNotFound):

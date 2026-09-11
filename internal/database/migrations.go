@@ -1044,6 +1044,132 @@ var Catalog = []Migration{
 			ALTER TABLE themes ADD COLUMN logo_url TEXT;
 		`,
 	},
+	{
+		Version:       "20260911_bdd_test_case_format",
+		Name:          "Add BDD test case format storage",
+		CheckSQLite:   sqliteColumnCheck("test_cases", "format"),
+		CheckPostgres: pgColumnCheck("test_cases", "format"),
+		SQLite: `
+			ALTER TABLE test_cases ADD COLUMN format TEXT NOT NULL DEFAULT 'steps';
+			CREATE TABLE IF NOT EXISTS test_case_bdd (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				test_case_id INTEGER NOT NULL UNIQUE,
+				gherkin TEXT NOT NULL,
+				feature_name TEXT NOT NULL DEFAULT '',
+				scenario_keyword TEXT NOT NULL DEFAULT 'Scenario',
+				spec TEXT NOT NULL DEFAULT '{}',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+			);
+			CREATE TABLE IF NOT EXISTS test_run_case_snapshots (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				run_id INTEGER NOT NULL,
+				test_case_id INTEGER NOT NULL,
+				title TEXT NOT NULL,
+				preconditions TEXT DEFAULT '',
+				gherkin TEXT NOT NULL,
+				spec TEXT NOT NULL DEFAULT '{}',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+				UNIQUE(run_id, test_case_id)
+			);
+			CREATE TABLE IF NOT EXISTS test_example_results (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				run_id INTEGER NOT NULL,
+				test_case_id INTEGER NOT NULL,
+				example_index INTEGER NOT NULL,
+				row_values TEXT NOT NULL DEFAULT '{}',
+				status TEXT NOT NULL DEFAULT 'not_run',
+				actual_result TEXT DEFAULT '',
+				notes TEXT DEFAULT '',
+				executed_at DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+				UNIQUE(run_id, test_case_id, example_index)
+			);
+			CREATE TABLE IF NOT EXISTS test_example_step_results (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				example_result_id INTEGER NOT NULL,
+				step_number INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'not_run',
+				actual_result TEXT DEFAULT '',
+				notes TEXT DEFAULT '',
+				item_id INTEGER,
+				executed_at DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (example_result_id) REFERENCES test_example_results(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+				UNIQUE(example_result_id, step_number)
+			);
+			CREATE INDEX IF NOT EXISTS idx_test_example_results_run_id ON test_example_results(run_id);
+			CREATE INDEX IF NOT EXISTS idx_test_example_step_results_result_id ON test_example_step_results(example_result_id);
+		`,
+		Postgres: `
+			ALTER TABLE test_cases ADD COLUMN format TEXT NOT NULL DEFAULT 'steps';
+			CREATE TABLE IF NOT EXISTS test_case_bdd (
+				id SERIAL PRIMARY KEY,
+				test_case_id INTEGER NOT NULL UNIQUE,
+				gherkin TEXT NOT NULL,
+				feature_name TEXT NOT NULL DEFAULT '',
+				scenario_keyword TEXT NOT NULL DEFAULT 'Scenario',
+				spec TEXT NOT NULL DEFAULT '{}',
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+			);
+			CREATE TABLE IF NOT EXISTS test_run_case_snapshots (
+				id SERIAL PRIMARY KEY,
+				run_id INTEGER NOT NULL,
+				test_case_id INTEGER NOT NULL,
+				title TEXT NOT NULL,
+				preconditions TEXT DEFAULT '',
+				gherkin TEXT NOT NULL,
+				spec TEXT NOT NULL DEFAULT '{}',
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+				UNIQUE(run_id, test_case_id)
+			);
+			CREATE TABLE IF NOT EXISTS test_example_results (
+				id SERIAL PRIMARY KEY,
+				run_id INTEGER NOT NULL,
+				test_case_id INTEGER NOT NULL,
+				example_index INTEGER NOT NULL,
+				row_values TEXT NOT NULL DEFAULT '{}',
+				status TEXT NOT NULL DEFAULT 'not_run',
+				actual_result TEXT DEFAULT '',
+				notes TEXT DEFAULT '',
+				executed_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+				FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+				UNIQUE(run_id, test_case_id, example_index)
+			);
+			CREATE TABLE IF NOT EXISTS test_example_step_results (
+				id SERIAL PRIMARY KEY,
+				example_result_id INTEGER NOT NULL,
+				step_number INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'not_run',
+				actual_result TEXT DEFAULT '',
+				notes TEXT DEFAULT '',
+				item_id INTEGER,
+				executed_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (example_result_id) REFERENCES test_example_results(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+				UNIQUE(example_result_id, step_number)
+			);
+			CREATE INDEX IF NOT EXISTS idx_test_example_results_run_id ON test_example_results(run_id);
+			CREATE INDEX IF NOT EXISTS idx_test_example_step_results_result_id ON test_example_step_results(example_result_id);
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {

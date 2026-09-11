@@ -32,6 +32,9 @@ type TestCasePatch struct {
 	EstimatedDuration, SortOrder           *int
 	FolderID                               *int
 	FolderIDSet                            bool
+	// Gherkin replaces the authored source of a BDD-format case. It is
+	// rejected for step-based cases; the format itself is immutable.
+	Gherkin *string
 }
 
 type TestStepPatch struct {
@@ -432,6 +435,16 @@ func (s *TestManagementApplicationService) UpdateCase(userID, workspaceID, id in
 	existing, err := s.cases.GetByID(id, workspaceID)
 	if err != nil {
 		return nil, err
+	}
+	if patch.Gherkin != nil {
+		// Updating the source also syncs the case title with the scenario
+		// name; later explicit patch fields still win.
+		updated, err := s.cases.UpdateBDDContent(id, workspaceID, *patch.Gherkin)
+		if err != nil {
+			return nil, err
+		}
+		existing = updated
+		emitServiceAudit(s.db, actor, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &updated.ID, updated.Title, nil)
 	}
 	if patch.Title != nil {
 		existing.Title = *patch.Title

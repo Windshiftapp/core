@@ -12189,6 +12189,37 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/test-cases/import-feature": {
+      "post": {
+        "description": "Import a Gherkin feature file. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Import a Gherkin feature file",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/test-cases/reorder": {
       "post": {
         "description": "Reorder test cases. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -12215,6 +12246,37 @@
           "500": {}
         },
         "summary": "Reorder test cases",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-cases/validate-feature": {
+      "post": {
+        "description": "Validate a Gherkin feature file. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Validate a Gherkin feature file",
         "tags": [
           "Test management"
         ]
@@ -12366,6 +12428,44 @@
           "500": {}
         },
         "summary": "Get test case connections",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-cases/{test_case_id}/feature": {
+      "get": {
+        "description": "Export a BDD test case as a feature file. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "test_case_id",
+            "In": "path",
+            "Description": "The test case identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Export a BDD test case as a feature file",
         "tags": [
           "Test management"
         ]
@@ -14474,6 +14574,44 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/example-results": {
+      "get": {
+        "description": "List BDD example execution results. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "run_id",
+            "In": "path",
+            "Description": "The run identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List BDD example execution results",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/test-runs/{run_id}/results": {
       "get": {
         "description": "List test run results. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -14685,6 +14823,138 @@
           "500": {}
         },
         "summary": "Get test run summary",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/test-cases/{test_case_id}/examples/{example_index}": {
+      "patch": {
+        "description": "Update a BDD example execution result. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "run_id",
+            "In": "path",
+            "Description": "The run identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "test_case_id",
+            "In": "path",
+            "Description": "The test case identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "example_index",
+            "In": "path",
+            "Description": "The 0-based Examples row index.",
+            "Required": true,
+            "Schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update a BDD example execution result",
+        "tags": [
+          "Test management"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-runs/{run_id}/test-cases/{test_case_id}/examples/{example_index}/steps/{step_number}": {
+      "patch": {
+        "description": "Update a BDD example step result. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "run_id",
+            "In": "path",
+            "Description": "The run identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "test_case_id",
+            "In": "path",
+            "Description": "The test case identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "example_index",
+            "In": "path",
+            "Description": "The 0-based Examples row index.",
+            "Required": true,
+            "Schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "step_number",
+            "In": "path",
+            "Description": "The 1-based step position in the expanded scenario steps.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update a BDD example step result",
         "tags": [
           "Test management"
         ]
