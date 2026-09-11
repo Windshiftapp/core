@@ -33,6 +33,7 @@
   let nameInput = $state(null);
   let editingObject = $state(null);
   let translationEditor = $state(null);
+  let saving = $state(false);
 
   // Form state
   let newWorkflow = $state({
@@ -97,11 +98,13 @@
   }
 
   async function createWorkflow() {
+    if (saving) return;
     if (!newWorkflow.name.trim()) {
       errorToast(t('workflows.enterWorkflowName'));
       return;
     }
 
+    saving = true;
     try {
       const created = await api.workflows.create(newWorkflow);
       workflows = [...workflows, created];
@@ -111,6 +114,8 @@
     } catch (error) {
       console.error('Failed to create workflow:', error);
       errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
+    } finally {
+      saving = false;
     }
   }
 
@@ -130,11 +135,13 @@
   }
 
   async function updateWorkflow() {
+    if (saving) return;
     if (!editWorkflow.name.trim()) {
       errorToast(t('workflows.enterWorkflowName'));
       return;
     }
 
+    saving = true;
     try {
       translationEditor?.validate();
       await api.workflows.update(editingId, editWorkflow);
@@ -145,6 +152,8 @@
     } catch (error) {
       console.error('Failed to update workflow:', error);
       errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+    } finally {
+      saving = false;
     }
   }
 
@@ -298,7 +307,7 @@
 </div>
 
 <!-- Create Workflow Modal -->
-<Modal isOpen={creating} onclose={cancelCreate} onSubmit={createWorkflow} maxWidth="max-w-lg">
+<Modal isOpen={creating} onclose={cancelCreate} onSubmit={createWorkflow} submitDisabled={saving} maxWidth="max-w-lg">
   {#snippet children(submitHint)}
   <ModalHeader title={t('workflows.createWorkflow')} showCloseButton={false} />
 
@@ -337,7 +346,7 @@
         <Button type="button" onclick={cancelCreate}>
           {t('common.cancel')}
         </Button>
-        <Button variant="primary" type="submit" keyboardHint={submitHint}>
+        <Button variant="primary" type="submit" keyboardHint={submitHint} loading={saving}>
           {t('workflows.createWorkflow')}
         </Button>
       </div>
@@ -347,7 +356,7 @@
 </Modal>
 
 <!-- Edit Workflow Modal -->
-<Modal isOpen={editingId !== null} onclose={cancelEdit} onSubmit={updateWorkflow} maxWidth="max-w-lg">
+<Modal isOpen={editingId !== null} onclose={cancelEdit} onSubmit={updateWorkflow} submitDisabled={saving} maxWidth="max-w-lg">
   {#snippet children(submitHint)}
   <ModalHeader title={t('workflows.editWorkflow')} showCloseButton={false} />
 
@@ -377,7 +386,7 @@
         <Button type="button" onclick={cancelEdit}>
           {t('common.cancel')}
         </Button>
-        <Button variant="primary" type="submit" keyboardHint={submitHint}>
+        <Button variant="primary" type="submit" keyboardHint={submitHint} loading={saving}>
           {t('common.saveChanges')}
         </Button>
       </div>

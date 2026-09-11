@@ -117,8 +117,6 @@ func (s *ItemCreationService) create(
 		Title:             input.Title,
 		ItemTypeID:        input.ItemTypeID,
 		ParentID:          input.ParentID,
-		StatusID:          input.StatusID,
-		IsTask:            input.IsTask,
 		RelatedWorkItemID: input.RelatedWorkItemID,
 		UserID:            actorUserID,
 		PermService:       s.perm,

@@ -12,7 +12,11 @@ export async function loadTestRunDetail(apiClient, workspaceId, runId) {
         }))
       : [],
     results: Array.isArray(detail.results) ? detail.results : [],
-    stepResults:
-      detail.step_results && typeof detail.step_results === 'object' ? detail.step_results : {},
+    stepResults: Object.fromEntries(
+      (Array.isArray(detail.step_results) ? detail.step_results : []).map((result) => [
+        `${result.test_case_id}_${result.step_id}`,
+        result,
+      ])
+    ),
   };
 }

@@ -1,7 +1,7 @@
 <script>
   import { Plus, X } from '@lucide/svelte';
   import { APP_NAME } from '../constants.js';
-  import { portalStore } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import Input from '../components/Input.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { safeHref } from '../utils/sanitize';

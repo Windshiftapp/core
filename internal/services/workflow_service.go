@@ -15,6 +15,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/validation"
 )
 
 // initialStatusCacheEntry holds a cached initial status ID with expiry
@@ -454,6 +455,9 @@ func (s *WorkflowService) PerformTransition(
 	if err != nil {
 		return nil, err
 	}
+	if err := validation.ValidateTaskState(s.db, item.WorkspaceID, req.ActorUserID, item.IsTask, &req.ToStatusID); err != nil {
+		return nil, err
+	}
 
 	missingStatus := item.StatusID == nil
 	oldStatusID := constants.StatusIDOpen
@@ -603,6 +607,13 @@ func (s *WorkflowService) CommitTransition(
 	itemID, oldStatusID, newStatusID, actorUserID int,
 	metadata itemevents.Metadata,
 ) error {
+	item, err := itemRepo.FindByIDForUpdate(tx, itemID)
+	if err != nil {
+		return err
+	}
+	if err := validation.ValidateTaskState(tx, item.WorkspaceID, actorUserID, item.IsTask, &newStatusID); err != nil {
+		return err
+	}
 	changedAt := time.Now()
 	if err := itemRepo.UpdateFields(tx, itemID, map[string]any{
 		"status_id": newStatusID,
@@ -620,7 +631,7 @@ func (s *WorkflowService) CommitTransition(
 	}); err != nil {
 		return fmt.Errorf("record transition history: %w", err)
 	}
-	item, err := itemRepo.FindByIDForUpdate(tx, itemID)
+	item, err = itemRepo.FindByIDForUpdate(tx, itemID)
 	if err != nil {
 		return err
 	}

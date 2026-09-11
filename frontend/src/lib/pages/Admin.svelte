@@ -2,44 +2,8 @@
   import { onMount, tick } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import Input from '../components/Input.svelte';
+  import LazyRootView from '../components/LazyRootView.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import CustomFields from '../settings/CustomFields.svelte';
-  import Workspaces from '../workspaces/Workspaces.svelte';
-  import Screens from './Screens.svelte';
-  import StatusContainer from '../features/workflows/StatusContainer.svelte';
-  import WorkflowBuilder from '../features/workflows/WorkflowBuilder.svelte';
-  import ConfigurationSetManager from '../settings/ConfigurationSetManager.svelte';
-  import LinkTypeManager from '../settings/LinkTypeManager.svelte';
-  import UserManager from '../settings/UserManager.svelte';
-  import GroupManager from '../settings/GroupManager.svelte';
-  import PermissionsContainer from '../layout/PermissionsContainer.svelte';
-  import RoleManager from '../settings/RoleManager.svelte';
-  import AttachmentSettings from '../settings/AttachmentSettings.svelte';
-  import ModuleSettings from '../settings/ModuleSettings.svelte';
-  import HierarchyLevelManager from '../settings/HierarchyLevelManager.svelte';
-  import ItemTypeManager from '../settings/ItemTypeManager.svelte';
-  import PriorityManager from '../settings/PriorityManager.svelte';
-  import NotificationSettings from '../settings/NotificationSettings.svelte';
-  import EmailTemplateManager from '../settings/EmailTemplateManager.svelte';
-  import ThemeManager from '../settings/ThemeManager.svelte';
-  import SSOContainer from '../settings/SSOContainer.svelte';
-  import SCMProviderManager from '../settings/SCMProviderManager.svelte';
-  import IntegrationsManager from '../settings/IntegrationsManager.svelte';
-  import SecuritySettings from '../settings/SecuritySettings.svelte';
-  import AIContainer from '../settings/AIContainer.svelte';
-  import ActionCapabilitiesManager from '../settings/ActionCapabilitiesManager.svelte';
-  import AssetManager from '../features/assets/AssetManager.svelte';
-  import Channels from '../features/channels/Channels.svelte';
-  import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
-  import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
-  import ConditionSetManager from '../settings/ConditionSetManager.svelte';
-  import ConditionSetDetail from '../settings/ConditionSetDetail.svelte';
-  import ApprovalSetManager from '../settings/ApprovalSetManager.svelte';
-  import ApprovalSetDetail from '../settings/ApprovalSetDetail.svelte';
-  import FormChannelPage from '../features/channels/FormChannelPage.svelte';
-  import PortalChannelPage from '../features/channels/PortalChannelPage.svelte';
-  import SystemImportPage from '../jira-import/SystemImportPage.svelte';
-  import Diagnostics from '../settings/Diagnostics.svelte';
   import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
   import { resolvePluginIcon } from '../utils/pluginIcons.js';
@@ -49,16 +13,19 @@
   import ScrollableSidebar from '../layout/ScrollableSidebar.svelte';
   import { IconFileText, IconMenu2, IconPuzzle, IconSearch, IconX } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
-  import PermissionGuard from '../layout/PermissionGuard.svelte';
+  import {
+    ADMIN_COMPONENT_LOADERS,
+    getAdminComponentProps,
+  } from '../admin/adminComponentRoutes.js';
   import { resolveAdminGroups } from '../admin/adminNavigation.js';
   import { isTypingInField } from '../utils/keyboardShortcuts.js';
   import { isSystemAdmin } from '../stores/permissions.svelte.js';
 
   const ADMIN_DETAIL_ROUTES = [
-    { prefix: '/admin/permission-sets/',    tabId: 'permissions',         component: PermissionSetEdit },
-    { prefix: '/admin/configuration-sets/', tabId: 'configuration-sets',  component: ConfigurationSetDetail },
-    { prefix: '/admin/condition-sets/',     tabId: 'condition-sets',      component: ConditionSetDetail },
-    { prefix: '/admin/approval-sets/',      tabId: 'approval-sets',       component: ApprovalSetDetail },
+    { prefix: '/admin/permission-sets/', tabId: 'permissions', componentKey: 'permission-set-detail' },
+    { prefix: '/admin/configuration-sets/', tabId: 'configuration-sets', componentKey: 'configuration-set-detail' },
+    { prefix: '/admin/condition-sets/', tabId: 'condition-sets', componentKey: 'condition-set-detail' },
+    { prefix: '/admin/approval-sets/', tabId: 'approval-sets', componentKey: 'approval-set-detail' },
   ];
 
   const isFormChannelRoute = $derived(/^\/admin\/channels\/\d+\/forms$/.test($currentRoute.path));
@@ -136,6 +103,19 @@
   // Create flat list of all items for search
   const allAdminItems = $derived(adminGroupsWithPlugins.flatMap(group => group.items));
   const activeAdminItem = $derived(allAdminItems.find(item => item.id === activeTab));
+  const activePluginItem = $derived(activeAdminItem?.isPlugin ? activeAdminItem : null);
+  const adminComponentKey = $derived(
+    isFormChannelRoute
+      ? 'form-channel'
+      : isPortalChannelRoute
+        ? 'portal-channel'
+        : matchedDetailRoute?.componentKey || activeTab
+  );
+  const adminComponentLoader = $derived(ADMIN_COMPONENT_LOADERS[adminComponentKey]);
+  const adminComponentProps = $derived(getAdminComponentProps(adminComponentKey, loadedExtensions));
+  const isNestedComponent = $derived(
+    isFormChannelRoute || isPortalChannelRoute || !!matchedDetailRoute
+  );
 
   // Filter groups and items based on search
   const filteredGroups = $derived(
@@ -298,6 +278,16 @@
     navigate(`/admin/${tab}`);
   }
 </script>
+
+{#snippet activeAdminComponent()}
+  {#key adminComponentKey}
+    <LazyRootView
+      loader={adminComponentLoader}
+      componentProps={adminComponentProps}
+      label={activeAdminItem?.label || adminComponentKey}
+    />
+  {/key}
+{/snippet}
 
 {#snippet adminSidebarHeader()}
   <div class="p-6 pb-3">
@@ -463,188 +453,24 @@
         </div>
       </header>
     {/if}
-    <!-- Nested detail routes (no padding) -->
-    {#if isFormChannelRoute}
-      <FormChannelPage />
-    {:else if isPortalChannelRoute}
-      <PortalChannelPage />
-    {:else if matchedDetailRoute}
-      {@const DetailComponent = matchedDetailRoute.component}
-      <DetailComponent />
-    {:else}
-    <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
-      <div class="min-w-0 pr-0 pl-0">
-      <!-- Custom Fields Tab -->
-  {#if activeTab === 'custom-fields'}
-    <CustomFields />
-  {/if}
-
-  <!-- Workspaces Tab -->
-  {#if activeTab === 'workspaces'}
-    <Workspaces noPadding />
-  {/if}
-
-  <!-- Screens Tab -->
-  {#if activeTab === 'screens'}
-    <Screens />
-  {/if}
-
-  <!-- Statuses (Categories & Individual) Tab -->
-  {#if activeTab === 'statuses'}
-    <StatusContainer />
-  {/if}
-
-  <!-- Workflows Tab -->
-  {#if activeTab === 'workflows'}
-    <WorkflowBuilder />
-  {/if}
-
-  <!-- Configuration Sets Tab -->
-  {#if activeTab === 'configuration-sets'}
-    <ConfigurationSetManager />
-  {/if}
-
-  <!-- Condition Sets Tab -->
-  {#if activeTab === 'condition-sets'}
-    <ConditionSetManager />
-  {/if}
-
-  <!-- Approval Sets Tab -->
-  {#if activeTab === 'approval-sets'}
-    <ApprovalSetManager />
-  {/if}
-
-  <!-- Notification Settings Tab -->
-  {#if activeTab === 'notification-settings'}
-    <NotificationSettings />
-  {/if}
-
-  <!-- Email Templates Tab -->
-  {#if activeTab === 'email-templates'}
-    <EmailTemplateManager />
-  {/if}
-
-  <!-- Channels Tab -->
-  {#if activeTab === 'channels'}
-    <Channels embedded={true} />
-  {/if}
-
-  <!-- Link Types Tab -->
-  {#if activeTab === 'link-types'}
-    <LinkTypeManager />
-  {/if}
-
-  <!-- User Management Tab -->
-  {#if activeTab === 'users'}
-    <UserManager />
-  {/if}
-
-  <!-- Group Management Tab -->
-  {#if activeTab === 'groups'}
-    <GroupManager />
-  {/if}
-
-  <!-- Permissions & Permission Sets Tab -->
-  {#if activeTab === 'permissions'}
-    <PermissionsContainer />
-  {/if}
-
-  <!-- Workspace Roles Tab -->
-  {#if activeTab === 'workspace-roles'}
-    <RoleManager />
-  {/if}
-
-  <!-- Attachment Settings Tab -->
-  {#if activeTab === 'attachments'}
-    <AttachmentSettings />
-  {/if}
-
-  <!-- Module Settings Tab -->
-  {#if activeTab === 'modules'}
-    <ModuleSettings />
-  {/if}
-
-  <!-- Theme Settings Tab -->
-  {#if activeTab === 'themes'}
-    <ThemeManager />
-  {/if}
-
-  <!-- Hierarchy Levels Tab -->
-  {#if activeTab === 'hierarchy-levels'}
-    <HierarchyLevelManager />
-  {/if}
-
-  <!-- Item Types Tab -->
-  {#if activeTab === 'item-types'}
-    <ItemTypeManager />
-  {/if}
-
-  <!-- Priorities Tab -->
-  {#if activeTab === 'priorities'}
-    <PriorityManager />
-  {/if}
-
-  <!-- SSO Settings Tab -->
-  {#if activeTab === 'sso'}
-    <SSOContainer extensions={loadedExtensions} />
-  {/if}
-
-  <!-- SCM Providers Tab -->
-  {#if activeTab === 'scm-providers'}
-    <SCMProviderManager />
-  {/if}
-
-  {#if activeTab === 'integration-providers'}
-    <IntegrationsManager />
-  {/if}
-
-  <!-- AI Connections Tab (with sub-tabs for Connections + Features + Agent Templates) -->
-  {#if activeTab === 'llm-connections'}
-    <AIContainer />
-  {/if}
-
-  <!-- Action Capabilities Tab -->
-  {#if activeTab === 'action-capabilities'}
-    <ActionCapabilitiesManager />
-  {/if}
-
-  <!-- System Import Tab -->
-  {#if activeTab === 'system-import'}
-    <SystemImportPage />
-  {/if}
-
-  <!-- Security Settings Tab -->
-  {#if activeTab === 'security'}
-    <SecuritySettings />
-  {/if}
-
-  <!-- Asset Management Tab -->
-  {#if activeTab === 'assets'}
-    <AssetManager />
-  {/if}
-
-  <!-- System Diagnostics Tab -->
-  {#if activeTab === 'diagnostics'}
-    <Diagnostics />
-  {/if}
-
-  <!-- Plugin Components -->
-  {#each allAdminItems.filter(item => item.isPlugin) as pluginItem (pluginItem.id)}
-    {#if activeTab === pluginItem.id}
-      {@const pluginName = pluginItem.pluginData?.pluginName || 'unknown'}
-      {@const iframeSrc = `/api/plugins/${pluginName}/assets/${pluginItem.pluginData?.component || 'index.html'}`}
-
-      <div class="plugin-component-container">
-        <!-- All plugins use iframe mode -->
-        <IframePluginLoader
-          pluginName={pluginItem.label}
-          src={iframeSrc}
-        />
+    {#if activePluginItem}
+      {@const pluginName = activePluginItem.pluginData?.pluginName || 'unknown'}
+      {@const iframeSrc = `/api/plugins/${pluginName}/assets/${activePluginItem.pluginData?.component || 'index.html'}`}
+      <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+        <div class="plugin-component-container">
+          <IframePluginLoader pluginName={activePluginItem.label} src={iframeSrc} />
+        </div>
       </div>
-    {/if}
-  {/each}
-      </div>
-    </div>
+    {:else if adminComponentLoader}
+      {#if isNestedComponent}
+        {@render activeAdminComponent()}
+      {:else}
+        <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+          <div class="min-w-0 pr-0 pl-0">
+            {@render activeAdminComponent()}
+          </div>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>

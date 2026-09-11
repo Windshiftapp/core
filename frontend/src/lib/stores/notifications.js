@@ -23,11 +23,30 @@ const TOASTABLE_TYPES = new Set(['mention', 'assignment']);
 
 const ACTIVE_POLL_MS = 30_000;
 const IDLE_POLL_MS = 5 * 60_000;
+const NOTIFICATION_PAGE_SIZE = 100;
 
 // Load notifications from API
 let loadPromise = null;
-let initialLoadSettled = false;
 let pollerGeneration = 0;
+
+async function loadNotificationPages(generation) {
+  const allNotifications = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await api.notifications.getAll({ limit: NOTIFICATION_PAGE_SIZE, offset });
+    if (generation !== pollerGeneration) return [];
+    if (!page || !Array.isArray(page)) {
+      if (offset === 0) return [];
+      throw new Error(`Invalid notification page at offset ${offset}`);
+    }
+
+    allNotifications.push(...page);
+    if (page.length < NOTIFICATION_PAGE_SIZE) return allNotifications;
+    offset += page.length;
+  }
+}
+
 function loadNotifications() {
   if (loadPromise) return loadPromise;
 
@@ -38,20 +57,12 @@ function loadNotifications() {
   // startNotificationPoller owns the first load after auth is established.
   if (typeof api?.notifications?.getAll !== 'function') {
     notifications.set([]);
-    initialLoadSettled = true;
     return Promise.resolve([]);
   }
 
-  const request = api.notifications
-    .getAll()
+  const request = loadNotificationPages(generation)
     .then((data) => {
       if (generation !== pollerGeneration) return [];
-      // Handle null response (no notifications)
-      if (!data || !Array.isArray(data)) {
-        notifications.set([]);
-        return [];
-      }
-
       // Convert timestamp strings to Date objects
       const processedNotifications = data.map((notification) => ({
         ...notification,
@@ -70,7 +81,6 @@ function loadNotifications() {
       return get(notifications);
     })
     .finally(() => {
-      if (generation === pollerGeneration) initialLoadSettled = true;
       if (loadPromise === request) loadPromise = null;
     });
 
@@ -113,8 +123,6 @@ export const notificationActions = {
 
   // Mark all as read
   markAllAsRead: async () => {
-    if (!get(notifications).some((item) => !item.read)) return;
-
     try {
       await api.notifications.markAllAsRead();
       notifications.update((items) =>
@@ -150,13 +158,6 @@ export const notificationActions = {
     if (itemId == null) return;
 
     const itemIdString = String(itemId);
-    const hasUnreadMatch = get(notifications).some(
-      (item) => !item.read && itemIdFromActionUrl(item.actionUrl) === itemIdString
-    );
-    // Before the authenticated poller finishes its first load, the empty local
-    // list cannot prove there is nothing to mark on the server.
-    if (initialLoadSettled && !loadPromise && !hasUnreadMatch) return;
-
     try {
       await api.notifications.markItemAsRead(itemId);
       // If the initial inbox request was already in flight, let it settle before
@@ -360,7 +361,6 @@ export function stopNotificationPoller() {
   _stopReconnectListener?.();
   _stopReconnectListener = null;
   loadPromise = null;
-  initialLoadSettled = false;
   _seeded = false;
   _seenIds.clear();
   notifications.set([]);

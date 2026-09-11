@@ -260,12 +260,13 @@ type webPushSender func(context.Context, []byte, *webpush.Subscription, *webpush
 // push messages when notifications are created. It is a no-op when VAPID keys
 // are not configured (Enabled() == false).
 type PushService struct {
-	db          database.Database
-	cfg         config.PushConfig
-	serviceCfg  PushServiceConfig
-	httpClient  *http.Client
-	send        webPushSender
-	permService *PermissionService
+	db               database.Database
+	cfg              config.PushConfig
+	serviceCfg       PushServiceConfig
+	httpClient       *http.Client
+	send             webPushSender
+	permService      *PermissionService
+	notificationAuth *NotificationAuthorizer
 
 	queue        chan pushJob
 	enqueueMu    sync.RWMutex
@@ -348,6 +349,7 @@ func newPushService(db database.Database, cfg config.PushConfig, serviceCfg Push
 	if len(permissionServices) > 0 {
 		service.permService = permissionServices[0]
 	}
+	service.notificationAuth = NewNotificationAuthorizer(db, service.permService, nil)
 	if service.Enabled() {
 		service.wg.Add(serviceCfg.Workers)
 		for workerID := 0; workerID < serviceCfg.Workers; workerID++ {
@@ -355,6 +357,14 @@ func newPushService(db database.Database, cfg config.PushConfig, serviceCfg Push
 		}
 	}
 	return service
+}
+
+// SetNotificationAuthorizer wires current workspace and asset authorization
+// checks into queued push delivery.
+func (s *PushService) SetNotificationAuthorizer(authorizer *NotificationAuthorizer) {
+	if authorizer != nil {
+		s.notificationAuth = authorizer
+	}
 }
 
 // Enabled reports whether Web Push is configured.
@@ -535,26 +545,11 @@ func (s *PushService) dispatch(ctx context.Context, notification models.Notifica
 }
 
 func (s *PushService) notificationVisible(notification models.Notification) (bool, error) {
-	switch notification.AuthorizationScope {
-	case models.NotificationScopeSystem, models.NotificationScopeAsset:
-		return true, nil
-	case models.NotificationScopeWorkspace:
-		if notification.WorkspaceID == nil || s.permService == nil {
-			return false, nil
-		}
-		workspaceIDs, err := s.permService.AccessibleWorkspaceIDs(notification.UserID)
-		if err != nil {
-			return false, fmt.Errorf("resolve push notification workspace scope: %w", err)
-		}
-		for _, workspaceID := range workspaceIDs {
-			if workspaceID == *notification.WorkspaceID {
-				return true, nil
-			}
-		}
-		return false, nil
-	default:
-		return false, nil
+	snapshot, err := s.notificationAuth.Snapshot(notification.UserID)
+	if err != nil {
+		return false, err
 	}
+	return snapshot.Visible(notification)
 }
 
 // deliver loads the user's active subscriptions and sends one push each,

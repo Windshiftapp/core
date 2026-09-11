@@ -536,6 +536,9 @@ type ChatRequest struct {
 	Message      string `json:"message"`
 	ConnectionID int    `json:"connection_id,omitempty"`
 	SessionID    int    `json:"session_id,omitempty"`
+	// HistoryAfterMessageID starts a fresh client conversation within the
+	// durable General session without deleting its transcript.
+	HistoryAfterMessageID int `json:"history_after_message_id,omitempty"`
 	// History is accepted for one compatibility release but ignored. The
 	// server-owned session transcript is authoritative.
 	History []ChatMessage `json:"history,omitempty"`
@@ -785,8 +788,12 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 			chatNow.Format("2006-01-02"), user.FullName, user.ID, user.ID,
 		) + buildChatContextHint(req.Context)
 	}
-	priorMessages, err := h.conversations.ListMessagesForParticipant(
-		r.Context(), session.ID, user.ID, begun.MessageID, 200)
+	historyAfterMessageID := 0
+	if session.SessionType == models.AgentSessionGeneral {
+		historyAfterMessageID = req.HistoryAfterMessageID
+	}
+	priorMessages, err := h.conversations.ListMessagesForParticipantAfter(
+		r.Context(), session.ID, user.ID, historyAfterMessageID, begun.MessageID, 200)
 	if err != nil {
 		_ = runRepo.Finalize(r.Context(), begun.RunID, models.AgentRunStatusFailed,
 			"Agent chat history could not be loaded", time.Now().UTC())

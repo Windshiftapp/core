@@ -16,7 +16,11 @@
   import LogoUploader from '../components/LogoUploader.svelte';
   import Label from '../components/Label.svelte';
   import Input from '../components/Input.svelte';
-  import { portalStore, gradients, iconMap } from '../stores/portal.svelte.js';
+  import {
+    portalCatalogStore,
+    portalCustomizationStore as portalStore,
+  } from '../stores/portal.svelte.js';
+  import { gradients, iconMap } from '../stores/portalPresentation.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -60,7 +64,7 @@
   }
 
   async function handleVisibilitySaved() {
-    await portalStore.loadRequestTypes();
+    await portalCatalogStore.loadRequestTypes();
   }
 
   function hasVisibilityRestrictions(requestType) {
@@ -82,7 +86,7 @@
   }
 
   async function handleAssetReportVisibilitySaved() {
-    await portalStore.loadAssetReports();
+    await portalCatalogStore.loadAssetReports();
   }
 
   function hasAssetReportVisibilityRestrictions(report) {
@@ -101,7 +105,7 @@
 
     try {
       await api.assetReports.delete(portalStore.portalData?.channel_id, id);
-      await portalStore.loadAssetReports();
+      await portalCatalogStore.loadAssetReports();
     } catch (err) {
       console.error('Failed to delete asset report:', err);
     }
@@ -121,7 +125,7 @@
 
     try {
       await api.requestTypes.delete(portalStore.portalData?.channel_id, id);
-      await portalStore.loadRequestTypes();
+      await portalCatalogStore.loadRequestTypes();
     } catch (err) {
       console.error('Failed to delete request type:', err);
     }
@@ -139,7 +143,7 @@
       cards.forEach(/** @param {HTMLElement} card */ (card) => {
         const dragHandle = card.querySelector('[data-drag-handle]');
         const requestTypeId = card.dataset.requestTypeId;
-        const requestType = portalStore.requestTypes.find(rt => String(rt.id) === String(requestTypeId));
+        const requestType = portalCatalogStore.requestTypes.find(rt => String(rt.id) === String(requestTypeId));
 
         if (!requestType || !dragHandle) return;
 
@@ -151,11 +155,11 @@
             requestType
           }),
           onDragStart: () => {
-            portalStore.draggedRequestType = requestType;
+            portalCatalogStore.draggedRequestType = requestType;
             card.style.opacity = '0.5';
           },
           onDrop: () => {
-            portalStore.draggedRequestType = null;
+            portalCatalogStore.draggedRequestType = null;
             card.style.opacity = '';
           }
         });
@@ -169,7 +173,7 @@
       cards.forEach(/** @param {HTMLElement} card */ (card) => {
         const dragHandle = card.querySelector('[data-drag-handle]');
         const reportId = card.dataset.assetReportId;
-        const report = portalStore.assetReports.find(ar => String(ar.id) === String(reportId));
+        const report = portalCatalogStore.assetReports.find(ar => String(ar.id) === String(reportId));
 
         if (!report || !dragHandle) return;
 
@@ -181,11 +185,11 @@
             assetReport: report
           }),
           onDragStart: () => {
-            portalStore.draggedAssetReport = report;
+            portalCatalogStore.draggedAssetReport = report;
             card.style.opacity = '0.5';
           },
           onDrop: () => {
-            portalStore.draggedAssetReport = null;
+            portalCatalogStore.draggedAssetReport = null;
             card.style.opacity = '';
           }
         });
@@ -207,8 +211,8 @@
   // Re-setup when request types or asset reports change or section changes
   $effect(() => {
     // Track dependencies
-    const currentRequestTypeIds = portalStore.requestTypes.map(rt => rt.id).join(',');
-    const currentAssetReportIds = portalStore.assetReports.map(ar => ar.id).join(',');
+    const currentRequestTypeIds = portalCatalogStore.requestTypes.map(rt => rt.id).join(',');
+    const currentAssetReportIds = portalCatalogStore.assetReports.map(ar => ar.id).join(',');
     const isRequestTypesSection = portalStore.activeSection === 'request-types';
     const isAssetReportsSection = portalStore.activeSection === 'asset-reports';
 
@@ -272,13 +276,20 @@
 />
 
 <!-- Customization Panel - Slides from Left.
+     In edit mode, leave room for Portal's edit bar above the fixed panels.
      The full-bleed shadow is only applied when the inline fields builder
      is closed, otherwise it casts a visible seam between the two panels. -->
 <div
-  class="fixed top-0 left-0 h-full flex z-50 transform transition-transform duration-300 ease-in-out"
-  style="background-color: var(--ds-surface-card); box-shadow: {expandedRequestTypeForFields ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'};"
+  class="fixed left-0 flex z-50 transform transition-transform duration-300 ease-in-out"
+  style="
+    top: {portalStore.isEditing ? '2.5rem' : '0'};
+    height: {portalStore.isEditing ? 'calc(100% - 2.5rem)' : '100%'};
+    background-color: var(--ds-surface-card);
+    box-shadow: {expandedRequestTypeForFields ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'};
+  "
   class:translate-x-0={portalStore.showCustomizePanel}
   class:-translate-x-full={!portalStore.showCustomizePanel}
+  data-testid="portal-customize-panel"
 >
   <!-- Vertical Navigation Sidebar -->
   <div class="w-16 border-r flex flex-col items-center py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -289,6 +300,7 @@
           onclick={() => portalStore.toggleEditing()}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all"
           style="background-color: {portalStore.isEditing ? 'var(--ds-background-neutral)' : 'transparent'};"
+          data-testid="portal-edit-mode-toggle"
         >
           <Edit3 class="w-5 h-5" style="color: {portalStore.isEditing ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-text-subtle)'};" />
         </button>
@@ -338,7 +350,7 @@
     </Tooltip>
 
     <!-- Asset Reports Section (only show if asset sets exist) -->
-    {#if portalStore.hasAssetSets}
+    {#if portalCatalogStore.hasAssetSets}
       <Tooltip content={t('portal.customize.assetReports')} placement="right">
         {#snippet children()}
           <button
@@ -462,14 +474,14 @@
           </p>
         </div>
 
-        {#if portalStore.loadingRequestTypes}
+        {#if portalCatalogStore.loadingRequestTypes}
           <div class="flex items-center justify-center py-8">
             <Spinner />
           </div>
         {:else}
           <!-- Request Types List -->
           <div class="space-y-2 mb-4">
-            {#each portalStore.requestTypes as requestType}
+            {#each portalCatalogStore.requestTypes as requestType}
               {@const hasNoFields = requestType.field_count === 0}
               {@const isExpanded = expandedRequestTypeForFields?.id === requestType.id}
               {@const RequestTypeIcon = iconMap[requestType.icon] || Package}
@@ -556,7 +568,7 @@
               </div>
             {/each}
 
-            {#if portalStore.requestTypes.length === 0}
+            {#if portalCatalogStore.requestTypes.length === 0}
               <div class="text-center py-8">
                 <p class="text-sm mb-4" style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};">
                   {t('portal.customize.noRequestTypes')}
@@ -584,14 +596,14 @@
           </p>
         </div>
 
-        {#if portalStore.loadingAssetReports}
+        {#if portalCatalogStore.loadingAssetReports}
           <div class="flex items-center justify-center py-8">
             <Spinner />
           </div>
         {:else}
           <!-- Asset Reports List -->
           <div class="space-y-2 mb-4">
-            {#each portalStore.assetReports as report}
+            {#each portalCatalogStore.assetReports as report}
               {@const ReportIcon = iconMap[report.icon] || Table2}
               <div
                 class="p-3 rounded border"
@@ -666,7 +678,7 @@
               </div>
             {/each}
 
-            {#if portalStore.assetReports.length === 0}
+            {#if portalCatalogStore.assetReports.length === 0}
               <div class="text-center py-8">
                 <p class="text-sm mb-4" style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};">
                   {t('portal.customize.noAssetReports')}
@@ -772,8 +784,15 @@
      clean. -->
 {#if portalStore.showCustomizePanel && expandedRequestTypeForFields}
   <div
-    class="fixed top-0 left-[28rem] h-full w-[30rem] z-40 flex flex-col border-l"
-    style="background-color: var(--ds-surface-card); border-color: var(--ds-border); box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.25);"
+    class="fixed left-[28rem] w-[30rem] z-40 flex flex-col border-l"
+    style="
+      top: {portalStore.isEditing ? '2.5rem' : '0'};
+      height: {portalStore.isEditing ? 'calc(100% - 2.5rem)' : '100%'};
+      background-color: var(--ds-surface-card);
+      border-color: var(--ds-border);
+      box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.25);
+    "
+    data-testid="portal-fields-builder"
     transition:fly={{ x: -240, duration: 220 }}
   >
     <RequestTypeFieldsBuilder
@@ -781,7 +800,7 @@
       requestTypeName={expandedRequestTypeForFields.name}
       channelId={portalStore.portalData?.channel_id}
       isDarkMode={portalStore.isDarkMode}
-      onsaved={() => portalStore.loadRequestTypes()}
+      onsaved={() => portalCatalogStore.loadRequestTypes()}
       onclose={() => expandedRequestTypeForFields = null}
     />
   </div>

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"windshift/internal/contextkeys"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
@@ -39,9 +40,16 @@ type configurationReader interface {
 }
 
 func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
+	builder.Read("/query-language/catalog", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionCatalog(deps.Configuration))
+	builder.Read("/query-language/values", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionValues(queryLanguageValueLoader{
+		configuration: deps.Configuration,
+		statuses:      deps.Statuses,
+		catalog:       deps.Catalog,
+		planning:      deps.Planning,
+		timeProjects:  deps.TimeProjects,
+	}, deps.ObjectTranslations))
 	builder.Read("/statuses", AuthAuthenticated, []string{"statuses:read"}, listStatuses(deps.Statuses, deps.ObjectTranslations))
 	builder.JSON(http.MethodPost, "/statuses", http.StatusCreated, false, AuthAuthenticated, []string{"statuses:write"}, createStatus(deps.CatalogMutations))
-	builder.Read("/statuses/non-completed-ids", AuthAuthenticated, []string{"statuses:read"}, listNonDoneStatusIDs(deps.CatalogMutations))
 	builder.Read("/statuses/{status_id}", AuthAuthenticated, []string{"statuses:read"}, getStatus(deps.Statuses, deps.ObjectTranslations))
 	builder.JSON(http.MethodPatch, "/statuses/{status_id}", http.StatusOK, true, AuthAuthenticated, []string{"statuses:write"}, patchStatus(deps.CatalogMutations))
 	builder.Command(http.MethodDelete, "/statuses/{status_id}", AuthAuthenticated, []string{"statuses:write"}, deleteStatus(deps.CatalogMutations))
@@ -57,7 +65,6 @@ func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Command(http.MethodDelete, "/workflows/{workflow_id}", AuthAuthenticated, []string{"workflows:write"}, deleteWorkflow(deps.CatalogMutations))
 	builder.Read("/workflows/{workflow_id}/transitions", AuthAuthenticated, []string{"workflows:read"}, listWorkflowTransitions(deps.Workflows))
 	builder.JSON(http.MethodPut, "/workflows/{workflow_id}/transitions", http.StatusOK, false, AuthAuthenticated, []string{"workflows:write"}, replaceWorkflowTransitions(deps.CatalogMutations))
-	builder.Read("/workflows/{workflow_id}/statuses/{status_id}/transitions", AuthAuthenticated, []string{"workflows:read"}, listAvailableWorkflowTransitions(deps.CatalogMutations))
 	builder.Read("/item-types", AuthAuthenticated, []string{"item-types:read"}, listItemTypes(deps.Configuration, deps.ObjectTranslations))
 	builder.JSON(http.MethodPost, "/item-types", http.StatusCreated, false, AuthAuthenticated, []string{"item-types:write"}, createItemType(deps.CatalogMutations))
 	builder.Read("/item-types/{item_type_id}", AuthAuthenticated, []string{"item-types:read"}, getItemType(deps.Configuration, deps.ObjectTranslations))
@@ -68,7 +75,7 @@ func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/priorities/{priority_id}", AuthAuthenticated, []string{"priorities:read"}, getPriority(deps.Configuration, deps.ObjectTranslations))
 	builder.JSON(http.MethodPatch, "/priorities/{priority_id}", http.StatusOK, true, AuthAuthenticated, []string{"priorities:write"}, patchPriority(deps.CatalogMutations))
 	builder.Command(http.MethodDelete, "/priorities/{priority_id}", AuthAuthenticated, []string{"priorities:write"}, deletePriority(deps.CatalogMutations))
-	builder.Metadata("/custom-fields", AuthAuthenticated, []string{"custom-fields:read"}, listCustomFields(deps.Configuration))
+	builder.Metadata("/custom-fields", AuthAuthenticated, []string{"custom-fields:read"}, listCustomFields(deps))
 	builder.Read("/custom-fields/{custom_field_id}", AuthAuthenticated, []string{"custom-fields:read"}, getCustomField(deps.Configuration))
 }
 
@@ -418,17 +425,46 @@ type customFieldDTO struct {
 	Indexed                        models.CustomFieldIndexInfo      `json:"indexed"`
 }
 
-func listCustomFields(reader configurationReader) metadataOperation[[]customFieldDTO, services.CustomFieldCatalogMeta] {
-	return func(*http.Request) ([]customFieldDTO, services.CustomFieldCatalogMeta, error) {
-		results, meta, err := reader.ListCustomFieldsWithMeta()
+func listCustomFields(deps Deps) metadataOperation[[]customFieldDTO, services.CustomFieldCatalogMeta] {
+	return func(r *http.Request) ([]customFieldDTO, services.CustomFieldCatalogMeta, error) {
+		results, meta, err := deps.Configuration.ListCustomFieldsWithMeta()
 		if err != nil {
 			return nil, services.CustomFieldCatalogMeta{}, internalError(err)
 		}
 		items := make([]customFieldDTO, len(results))
+		visibleSets := make(map[int]bool)
+		hasAssetUsages := false
+		for _, result := range results {
+			for _, usage := range result.AssetTypeUsages {
+				if usage.SetID > 0 {
+					hasAssetUsages = true
+				}
+			}
+		}
+		token, _ := r.Context().Value(contextkeys.APIToken).(*models.APIToken)
+		if hasAssetUsages && (token == nil || deps.Tokens.CheckTokenPermissions(token, []string{"assets:read"})) {
+			user, authErr := principal(r)
+			if authErr != nil {
+				return nil, meta, authErr
+			}
+			sets, setErr := deps.Assets.ListSets(user.ID)
+			if setErr != nil {
+				return nil, meta, internalError(setErr)
+			}
+			for _, set := range sets {
+				visibleSets[set.ID] = true
+			}
+		}
 		for i := range results {
 			items[i], err = customFieldFromResult(results[i])
 			if err != nil {
 				return nil, services.CustomFieldCatalogMeta{}, internalError(err)
+			}
+			items[i].AssetTypeUsages = []services.CustomFieldAssetUsage{}
+			for _, usage := range results[i].AssetTypeUsages {
+				if visibleSets[usage.SetID] {
+					items[i].AssetTypeUsages = append(items[i].AssetTypeUsages, usage)
+				}
 			}
 		}
 		return items, meta, nil

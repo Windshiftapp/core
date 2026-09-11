@@ -1,4 +1,4 @@
-import { fetchV2Data } from './core.js';
+import { fetchAllV2Pages, fetchV2Data } from './core.js';
 
 function actionMutationData(data) {
   const {
@@ -50,18 +50,13 @@ export const actions = {
     fetchV2Data(`/workspaces/${workspaceId}/actions/${id}`, {
       method: 'DELETE',
     }),
-  toggle: (workspaceId, id, isEnabled) =>
-    fetchV2Data(`/workspaces/${workspaceId}/actions/${id}/toggle`, {
-      method: 'POST',
-      body: JSON.stringify({ is_enabled: isEnabled }),
-    }),
   execute: (workspaceId, actionId, itemId) =>
     fetchV2Data(`/workspaces/${workspaceId}/actions/${actionId}/execute`, {
       method: 'POST',
       body: JSON.stringify({ item_id: itemId }),
     }),
   getLogs: (workspaceId, actionId) =>
-    fetchV2Data(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
+    fetchAllV2Pages(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
 };
 
 // Action templates: read-only registry shipped with the binary, plus

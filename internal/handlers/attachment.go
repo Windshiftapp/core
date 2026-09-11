@@ -318,9 +318,10 @@ func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http
 		respondNotFound(w, r, "channel")
 		return false
 
-	case "hub_logo":
-		// Hub config is system-admin-only; keep its public logo upload aligned
-		// with PUT /api/hub/config.
+	case "hub_logo", "theme_logo":
+		// Hub and theme branding are system-admin surfaces (PUT /api/hub/config
+		// and the admin-only theme routes); keep their public logo uploads
+		// aligned with those authorization contracts.
 		user, ok := RequireAuth(w, r)
 		if !ok {
 			return false
@@ -403,6 +404,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			entityType = "portal_logo"
 		case "hub_logo":
 			entityType = "hub_logo"
+		case "theme_logo":
+			entityType = "theme_logo"
 		default:
 			entityType = "item" // Default to item for backwards compatibility
 		}
@@ -419,7 +422,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	isPortalBackground := entityType == "portal_background"
 	isPortalLogo := entityType == "portal_logo"
 	isHubLogo := entityType == "hub_logo"
-	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo
+	isThemeLogo := entityType == "theme_logo"
+	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo
 
 	// category is an older image-asset discriminator used by /api/portal-assets.
 	// Keep it in lockstep with entity_type so callers cannot make an item/test
@@ -436,9 +440,11 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// (item, test_case, test_result, workspace/team/customer scoped image
 	// assets). Portal logo/background uploads use entity_id as the owning
 	// channel id so public URLs cannot be minted by arbitrary users. The truly
-	// global uploads — user avatar and hub logo — need no owner id here.
+	// global uploads — user avatar, hub logo, and theme logo — need no owner
+	// id here.
 	entityIDRequired := entityType != "avatar" &&
-		entityType != "hub_logo"
+		entityType != "hub_logo" &&
+		entityType != "theme_logo"
 	if entityIDStr == "" && entityIDRequired {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		respondValidationError(w, r, "entity_id is required")
@@ -579,6 +585,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "portal_logos")
 	case "hub_logo":
 		itemDir = filepath.Join(h.attachmentPath, "hub_logos")
+	case "theme_logo":
+		itemDir = filepath.Join(h.attachmentPath, "theme_logos")
 	case "test_case":
 		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
 	case "test_result":
@@ -685,7 +693,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if isImageEntityType {
 		// Image uploads use public or authenticated download URLs by entity type.
 		var downloadURL string
-		if isPortalBackground || isPortalLogo || isHubLogo {
+		if isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo {
 			// Public endpoint for portal branding (no auth required)
 			downloadURL = fmt.Sprintf("/api/portal-assets/%d", attachmentID)
 		} else {
@@ -712,6 +720,9 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			urlKey = "logo_url"
 		case isHubLogo:
 			message = "Hub logo uploaded successfully"
+			urlKey = "logo_url"
+		case isThemeLogo:
+			message = "Theme logo uploaded successfully"
 			urlKey = "logo_url"
 		}
 		response := map[string]any{
@@ -1215,10 +1226,10 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		// workspace_avatar, workspace_background, team_avatar,
-		// customer_avatar, portal_background, portal_logo, hub_logo, and
-		// any unknown entity_type. Refuse — the parent entity owns the
-		// lifecycle. Unknown types likewise default-deny so a future
-		// entity_type can't accidentally land in a permissive branch.
+		// customer_avatar, portal_background, portal_logo, hub_logo,
+		// theme_logo, and any unknown entity_type. Refuse — the parent
+		// entity owns the lifecycle. Unknown types likewise default-deny so a
+		// future entity_type can't accidentally land in a permissive branch.
 		respondNotFound(w, r, "attachment")
 		return
 	}

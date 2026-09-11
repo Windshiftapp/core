@@ -128,6 +128,7 @@ type CustomFieldResult struct {
 }
 
 type CustomFieldAssetUsage struct {
+	SetID         int    `json:"-"`
 	AssetTypeName string `json:"asset_type_name"`
 	SetName       string `json:"set_name"`
 }
@@ -176,7 +177,7 @@ func (s *ConfigReadService) ListCustomFieldsWithMeta() ([]CustomFieldResult, Cus
 	for _, usage := range usages {
 		if index, ok := byID[usage.CustomFieldID]; ok {
 			items[index].AssetTypeUsages = append(items[index].AssetTypeUsages, CustomFieldAssetUsage{
-				AssetTypeName: usage.AssetTypeName, SetName: usage.SetName,
+				SetID: usage.SetID, AssetTypeName: usage.AssetTypeName, SetName: usage.SetName,
 			})
 		}
 	}

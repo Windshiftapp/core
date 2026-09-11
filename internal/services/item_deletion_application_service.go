@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
@@ -14,6 +15,7 @@ var (
 	// HTTP surfaces existence-mask it; tools may report permission denied after
 	// independently confirming workspace visibility.
 	ErrItemDeletionForbidden = errors.New("item deletion forbidden")
+	ErrItemCascadeForbidden  = fmt.Errorf("%w: cascade deletion forbidden", ErrItemDeletionForbidden)
 	ErrItemDeletionMode      = errors.New("invalid item deletion mode")
 )
 
@@ -103,17 +105,51 @@ func (s *ItemDeletionApplicationService) Delete(req ItemDeletionRequest) (*ItemD
 		return nil, ErrItemDeletionForbidden
 	}
 
+	authorize := func(items []*models.Item) error {
+		checked := make(map[int]bool)
+		for _, target := range items {
+			if checked[target.WorkspaceID] {
+				continue
+			}
+			if req.CanAccessWorkspace != nil {
+				allowed, err := req.CanAccessWorkspace(target.WorkspaceID)
+				if err != nil {
+					return err
+				}
+				if !allowed {
+					if target.ID == item.ID {
+						return ErrItemDeletionForbidden
+					}
+					return ErrItemCascadeForbidden
+				}
+			}
+			allowed, err := s.perm.HasWorkspacePermission(req.ActorUserID, target.WorkspaceID, models.PermissionItemDelete)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				if target.ID == item.ID {
+					return ErrItemDeletionForbidden
+				}
+				return ErrItemCascadeForbidden
+			}
+			checked[target.WorkspaceID] = true
+		}
+		item = items[0]
+		return nil
+	}
 	ancestorIDs := s.loadAncestorIDs(item.ID)
 	metadata := itemevents.User(req.ActorUserID, "application")
 	deletedCount := 1
 	var descendantIDs []int
 	switch req.Mode {
 	case ItemDeletionSingle:
-		if err := s.crud.DeleteSingleWithMetadata(item.ID, metadata); err != nil {
+		descendantIDs, err = s.crud.deleteSingleWithAuthorization(item.ID, metadata, authorize)
+		if err != nil {
 			return nil, err
 		}
 	case ItemDeletionCascade:
-		result, err := s.crud.DeleteWithMetadata(item.ID, metadata)
+		result, err := s.crud.deleteWithAuthorization(item.ID, metadata, authorize)
 		if err != nil {
 			return nil, err
 		}

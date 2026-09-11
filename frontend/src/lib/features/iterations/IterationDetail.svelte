@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { IconArrowLeft, IconCalendar, IconTarget, IconEdit, IconTrash, IconDots, IconWorld, IconBuilding, IconSparkles, IconCircleCheck } from '@tabler/icons-svelte-runes';
-  import Chart from '../../widgets/Chart.svelte';
+  import IterationBurndown from './IterationBurndown.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -13,12 +13,7 @@
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { formatDateShort, daysUntil } from '../../utils/dateFormatter.js';
-  import {
-    PROGRESS_CHART_CIRCUMFERENCE,
-    PROGRESS_CHART_RADIUS,
-    buildProgressSegments,
-    calculatePercentComplete,
-  } from '../../utils/progressChart.js';
+  import ProgressSummary from '../../components/ProgressSummary.svelte';
   import ItemsByStatusCategory from '../../components/ItemsByStatusCategory.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
@@ -29,7 +24,6 @@
   import { aiStore } from '../../stores/aiStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   let { iterationId, workspaceId = null } = $props();
 
@@ -75,8 +69,6 @@
     { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red' }
   ]);
 
-  const radius = PROGRESS_CHART_RADIUS;
-  const circumference = PROGRESS_CHART_CIRCUMFERENCE;
 
   onMount(async () => {
     await loadProgress();
@@ -119,8 +111,6 @@
   function getStatusInfo(status) {
     return statusOptions.find(s => s.value === status) || statusOptions[0];
   }
-
-  const buildSegments = buildProgressSegments;
 
   function toggleCategory(categoryName) {
     expandedCategories[categoryName] = !expandedCategories[categoryName];
@@ -200,7 +190,6 @@
     }
   }
 
-  const segments = $derived(progress ? buildSegments(progress.status_breakdown, progress.total_items) : []);
   const daysInfo = $derived(progress?.end_date ? daysUntil(progress.end_date, {
     overdue: (n) => t('iterations.daysOverdue', { count: n }),
     today: t('iterations.endsToday'),
@@ -345,132 +334,20 @@
         </div>
       </div>
 
-      <!-- Progress Section -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <!-- Circular Progress Chart -->
-        <div class="rounded-xl border p-6 flex flex-col items-center" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <div class="relative">
-            {#if progress.total_items > 0}
-              <svg viewBox="0 0 140 140" class="w-36 h-36" role="img" aria-label="Iteration progress">
-                <circle
-                  cx="70"
-                  cy="70"
-                  r={radius}
-                  fill="transparent"
-                  stroke="var(--ds-border)"
-                  stroke-width="16"
-                />
-                {#each segments as segment (segment.category_name)}
-                  <circle
-                    cx="70"
-                    cy="70"
-                    r={radius}
-                    fill="transparent"
-                    stroke={segment.color}
-                    stroke-width="16"
-                    stroke-linecap="butt"
-                    stroke-dasharray={segment.dasharray}
-                    stroke-dashoffset={segment.offset}
-                    transform="rotate(-90 70 70)"
-                  />
-                {/each}
-                <text class="text-2xl font-bold" x="70" y="68" text-anchor="middle" fill="var(--ds-text)">
-                  {calculatePercentComplete(progress.completed_items, progress.total_items, progress.percent_complete)}%
-                </text>
-                <text class="text-xs uppercase" x="70" y="86" text-anchor="middle" fill="var(--ds-text-subtle)">
-                  {t('iterations.complete')}
-                </text>
-              </svg>
-            {:else}
-              <div class="w-36 h-36 rounded-full border-2 border-dashed flex items-center justify-center" style="border-color: var(--ds-border);">
-                <span class="text-sm" style="color: var(--ds-text-subtlest);">{t('iterations.noItems')}</span>
-              </div>
-            {/if}
-          </div>
-        </div>
+      <ProgressSummary
+        {progress}
+        ariaLabel="Iteration progress"
+        completeLabel={t('iterations.complete')}
+        noItemsLabel={t('iterations.noItems')}
+        summaryLabel={t('iterations.summary')}
+        totalLabel={t('iterations.totalItems')}
+        completedLabel={t('iterations.completed')}
+        remainingLabel={t('iterations.remaining')}
+        statusLabel={t('iterations.byStatusCategory')}
+        noStatusDataLabel={t('iterations.noStatusData')}
+      />
 
-        <!-- Summary Stats -->
-        <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('iterations.summary')}</h3>
-          <div class="space-y-3">
-            <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">{t('iterations.totalItems')}</span>
-              <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">{t('iterations.completed')}</span>
-              <span class="font-semibold" style="color: var(--ds-text-success);">{progress.completed_items}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span style="color: var(--ds-text-subtle);">{t('iterations.remaining')}</span>
-              <span class="font-semibold" style="color: var(--ds-text);">{progress.total_items - progress.completed_items}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Status Breakdown Legend -->
-        <div class="rounded-xl border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text-subtle);">{t('iterations.byStatusCategory')}</h3>
-          <div class="space-y-2">
-            {#if progress.status_breakdown && progress.status_breakdown.length > 0}
-              {#each progress.status_breakdown as breakdown}
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <div
-                      class="w-3 h-3 rounded-full"
-                      style="background-color: {breakdown.category_color || '#9ca3af'};"
-                    ></div>
-                    <span class="text-sm" style="color: var(--ds-text);">
-                      {objectDisplayName({
-                        name: breakdown.category_name,
-                        builtin_key: breakdown.category_builtin_key,
-                      }, 'status_category')}
-                    </span>
-                  </div>
-                  <span class="text-sm font-medium" style="color: var(--ds-text-subtle);">{breakdown.item_count}</span>
-                </div>
-              {/each}
-            {:else}
-              <p class="text-sm" style="color: var(--ds-text-subtlest);">{t('iterations.noStatusData')}</p>
-            {/if}
-          </div>
-        </div>
-      </div>
-
-      <!-- Burndown Chart -->
-      {#if burndownData && burndownData.data_points?.length > 1}
-        {@const pts = burndownData.data_points}
-        {@const fmtD = (s) => { const d = new Date(s); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }}
-        <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('iterations.burndownChart')}</h3>
-          <Chart
-            type="line"
-            series={[
-              { key: 'remaining', label: t('iterations.remaining'), color: '#3b82f6', values: pts.map(d => d.remaining), smooth: false, showArea: true, showPoints: true, strokeWidth: 2.5 },
-              { key: 'ideal', label: t('iterations.idealProgress'), color: '#9ca3af', values: pts.map(d => d.ideal), smooth: false, showArea: false, showPoints: true, pointRadius: 3, strokeWidth: 2, dashed: true }
-            ]}
-            categories={pts.map(d => fmtD(d.date))}
-            maxValue={burndownData.total_items}
-            emptyMessage={t('iterations.noBurndownData')}
-          >
-            {#snippet tooltipContent({ index, category, seriesValues })}
-              <div style="font-weight:600;margin-bottom:0.25rem;border-bottom:1px solid var(--ds-border);padding-bottom:0.25rem;">{category}</div>
-              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;">
-                <span style="color:var(--ds-text-subtle);">{t('iterations.remaining')}:</span>
-                <span style="font-weight:500;color:#3b82f6;">{seriesValues[0].value}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;">
-                <span style="color:var(--ds-text-subtle);">{t('iterations.completed')}:</span>
-                <span style="font-weight:500;color:#22c55e;">{pts[index].completed}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;color:var(--ds-text-subtle);font-size:0.7rem;">
-                <span>{t('iterations.ideal')}:</span>
-                <span>{seriesValues[1].value}</span>
-              </div>
-            {/snippet}
-          </Chart>
-        </div>
-      {/if}
+      <IterationBurndown data={burndownData} />
 
       <!-- Items Grouped by Category -->
       <ItemsByStatusCategory

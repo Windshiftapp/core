@@ -11,8 +11,9 @@ import (
 	"windshift/internal/services"
 )
 
-func registerPageRoutes(builder *routeBuilder, pages pageApplication) {
-	builder.Read("/workspaces/{workspace_id}/pages/tree", AuthAuthenticated, []string{"pages:read"}, listPageTree(pages))
+func registerPageRoutes(builder *routeBuilder, deps Deps) {
+	pages := deps.PageApplication
+	builder.Read("/workspaces/{workspace_id}/pages", AuthAuthenticated, []string{"pages:read"}, listPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/archived", AuthAuthenticated, []string{"pages:read"}, listArchivedPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/search", AuthAuthenticated, []string{"pages:read"}, searchPages(pages))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/pages", http.StatusCreated, false, AuthAuthenticated, []string{"pages:write"}, createPage(pages))
@@ -21,7 +22,7 @@ func registerPageRoutes(builder *routeBuilder, pages pageApplication) {
 	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/pages/{page_id}", AuthAuthenticated, []string{"pages:delete"}, archivePage(pages))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/move", http.StatusOK, false, AuthAuthenticated, []string{"pages:write"}, movePage(pages))
 	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/unarchive", http.StatusOK, AuthAuthenticated, []string{"pages:write"}, unarchivePage(pages))
-	builder.Page("/workspaces/{workspace_id}/pages/{page_id}/history", AuthAuthenticated, []string{"pages:read"}, listPageHistory(pages))
+	builder.Page("/workspaces/{workspace_id}/pages/{page_id}/history", AuthAuthenticated, []string{"pages:read"}, listPageHistory(deps))
 	builder.Read("/workspaces/{workspace_id}/pages/{page_id}/history/{revision_id}", AuthAuthenticated, []string{"pages:read"}, getPageRevision(pages))
 	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/history/{revision_id}/restore", http.StatusOK, AuthAuthenticated, []string{"pages:write"}, restorePageRevision(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/{page_id}/permissions", AuthAuthenticated, []string{"pages:read"}, getPagePermissions(pages))
@@ -73,13 +74,13 @@ type archivedPageDTO struct {
 	ArchivedByName string    `json:"archived_by_name"`
 }
 
-func listPageTree(pages pageApplication) readOperation[services.PageTreeResult] {
-	return func(r *http.Request) (services.PageTreeResult, error) {
+func listPages(pages pageApplication) readOperation[[]models.Page] {
+	return func(r *http.Request) ([]models.Page, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
-			return services.PageTreeResult{}, err
+			return nil, err
 		}
-		result, err := pages.ListTree(user.ID, workspaceID)
+		result, err := pages.List(user.ID, workspaceID)
 		return result, pageError(err)
 	}
 }
@@ -186,7 +187,7 @@ func unarchivePage(pages pageApplication) actionOperation[models.Page] {
 	}
 }
 
-func listPageHistory(pages pageApplication) pageOperation[models.PageRevision] {
+func listPageHistory(deps Deps) pageOperation[models.PageRevision] {
 	return func(r *http.Request) ([]models.PageRevision, Pagination, int, error) {
 		user, workspaceID, pageID, err := pageTarget(r)
 		if err != nil {
@@ -196,8 +197,27 @@ func listPageHistory(pages pageApplication) pageOperation[models.PageRevision] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		revisions, total, err := pages.ListHistory(user.ID, workspaceID, pageID, page.PageSize, page.Offset)
-		return revisions, page, total, pageError(err)
+		revisions, total, err := deps.PageApplication.ListHistory(user.ID, workspaceID, pageID, page.PageSize, page.Offset)
+		if err != nil {
+			return nil, page, total, pageError(err)
+		}
+		// Revision authors are identities: hide everyone except the viewer,
+		// admins, and viewers with the user-directory permission (legacy
+		// filterPageRevisionAuthors).
+		isAdmin, _ := deps.SystemAdmins.IsSystemAdmin(user.ID)
+		hasListPermission, _ := deps.GlobalPermission.HasGlobalPermission(user.ID, models.PermissionUserList)
+		filterPageRevisionAuthors(revisions, user.ID, isAdmin, hasListPermission)
+		return revisions, page, total, nil
+	}
+}
+
+func filterPageRevisionAuthors(revisions []models.PageRevision, userID int, isAdmin, hasListPermission bool) {
+	for i := range revisions {
+		author := revisions[i].Author
+		if author == nil || author.ID == userID || isAdmin || (hasListPermission && author.IsActive) {
+			continue
+		}
+		revisions[i].Author = nil
 	}
 }
 

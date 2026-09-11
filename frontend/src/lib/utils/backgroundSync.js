@@ -33,6 +33,10 @@ export function isExpectedBackgroundSyncError(error) {
  * Invoke a refresh callback as soon as a hidden/offline page is usable again.
  * The callback owns its own in-flight de-duplication.
  *
+ * Only pages that were actually suspended (hidden or offline) refresh on
+ * recovery: browsers deliver spurious `online`/`visibilitychange` events, and
+ * re-fetching full workspace data on those would waste traffic for nothing.
+ *
  * @param {() => void} callback
  * @param {{ document?: Document, navigator?: Navigator, window?: Window }} [environment]
  * @returns {() => void}
@@ -42,15 +46,29 @@ export function onBackgroundSyncAvailable(callback, environment = {}) {
   const navigatorRef = environment.navigator ?? globalThis.navigator;
   const windowRef = environment.window ?? globalThis.window;
 
+  let suspended = !canRunBackgroundSync({ document: documentRef, navigator: navigatorRef });
+  const markSuspended = () => {
+    if (!canRunBackgroundSync({ document: documentRef, navigator: navigatorRef })) {
+      suspended = true;
+    }
+  };
   const refreshIfAvailable = () => {
-    if (canRunBackgroundSync({ document: documentRef, navigator: navigatorRef })) callback();
+    if (!suspended) return;
+    if (canRunBackgroundSync({ document: documentRef, navigator: navigatorRef })) {
+      suspended = false;
+      callback();
+    }
   };
 
-  windowRef?.addEventListener('online', refreshIfAvailable);
+  documentRef?.addEventListener('visibilitychange', markSuspended);
   documentRef?.addEventListener('visibilitychange', refreshIfAvailable);
+  windowRef?.addEventListener('online', markSuspended);
+  windowRef?.addEventListener('online', refreshIfAvailable);
 
   return () => {
-    windowRef?.removeEventListener('online', refreshIfAvailable);
+    documentRef?.removeEventListener('visibilitychange', markSuspended);
     documentRef?.removeEventListener('visibilitychange', refreshIfAvailable);
+    windowRef?.removeEventListener('online', markSuspended);
+    windowRef?.removeEventListener('online', refreshIfAvailable);
   };
 }

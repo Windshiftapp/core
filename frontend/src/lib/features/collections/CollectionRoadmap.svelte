@@ -7,6 +7,7 @@
   import { resolveScreenId } from '../../utils/screenResolution.js';
   import { navigate } from '../../router.js';
   import { collectionStore, reloadCollection, refreshCollectionItem } from '../../stores/collectionContext.js';
+  import { indexCollectionHierarchy } from './collectionHierarchy.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
@@ -18,6 +19,7 @@
   import ItemDetail from '../items/ItemDetail.svelte';
   import RoadmapItemPreview from './RoadmapItemPreview.svelte';
   import { buildHierarchyDatePatches, projectHierarchyDates } from './roadmapHierarchyDates.js';
+  import { boardColumnsForSave } from '../../utils/workItemListColumns.js';
   import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, CalendarClock, RotateCcw } from '@lucide/svelte';
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
@@ -433,18 +435,18 @@
     if (collectionStore.loading) return [];
     return [...collectionStore.items].sort((a, b) => (a.level || 0) - (b.level || 0) || a.id - b.id);
   });
+  let hierarchyIndex = $derived(indexCollectionHierarchy(allItemsSorted));
 
   function getRootItems() {
-    const itemIds = new Set(allItemsSorted.map(i => i.id));
-    return allItemsSorted.filter(item => item.parent_id === null || !itemIds.has(item.parent_id));
+    return hierarchyIndex.roots;
   }
 
   function getItemsByParent(parentId) {
-    return allItemsSorted.filter(item => item.parent_id === parentId);
+    return hierarchyIndex.childrenByParent.get(parentId) || [];
   }
 
   function hasChildren(itemId) {
-    return allItemsSorted.some(item => item.parent_id === itemId);
+    return hierarchyIndex.childrenByParent.has(itemId);
   }
 
   function toggleExpanded(itemId) {
@@ -729,7 +731,7 @@
   // Save roadmap config
   async function saveConfig() {
     const payload = {
-      columns: boardConfig?.columns || [],
+      columns: boardColumnsForSave(boardConfig?.columns),
       backlog_status_ids: boardConfig?.backlog_status_ids || [],
       list_columns: boardConfig?.list_columns || [],
       card_fields: boardConfig?.card_fields || [],
@@ -1100,7 +1102,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('collections.roadmap')}
-          itemCount={treeData.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : treeData.length}
         >
           {#snippet actions()}
             <div class="relative flex rounded" style="background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);">
@@ -1358,6 +1361,7 @@
                         <span
                           class="shrink-0 flex items-center justify-center w-4 h-4 rounded transition-colors"
                           style="color: var(--ds-text-subtle);"
+                          data-testid="roadmap-toggle-{item.id}"
                           role="button"
                           tabindex="-1"
                           onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}

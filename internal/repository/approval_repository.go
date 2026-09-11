@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"windshift/internal/database"
@@ -165,12 +166,63 @@ func (r *ApprovalRepository) FindRequestIDsForItem(ctx context.Context, itemID i
 	return scanIntList(rows)
 }
 
+// FindRequestIDsForItemPage returns a newest-first bounded timeline page.
+func (r *ApprovalRepository) FindRequestIDsForItemPage(ctx context.Context, itemID, limit, offset int) (ids []int, total int, err error) {
+	if limit <= 0 {
+		return nil, 0, errors.New("approval page limit must be positive")
+	}
+	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM approval_requests WHERE item_id = ?", itemID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count item approvals: %w", err)
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id FROM approval_requests
+		WHERE item_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT ? OFFSET ?`, itemID, limit, max(offset, 0))
+	if err != nil {
+		return nil, 0, fmt.Errorf("query item approval page: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	ids, err = scanIntList(rows)
+	return ids, total, err
+}
+
 // FindRequestIDsForActor returns request ids where the actor (user or portal
 // customer) is in the active approver pool of any pending step. actorColumn
 // must be exactly "user_id" or "portal_customer_id" — the literal is
 // concatenated into the query, callers cannot pass arbitrary strings.
 func (r *ApprovalRepository) FindRequestIDsForActor(ctx context.Context, actorColumn string, actorID int, status string) ([]int, error) {
 	return r.findRequestIDsForActor(ctx, actorColumn, actorID, status, nil)
+}
+
+// FindRequestIDsForActorPage returns a stable bounded page for an approver.
+func (r *ApprovalRepository) FindRequestIDsForActorPage(ctx context.Context, actorColumn string, actorID int, status string, limit, offset int) (ids []int, total int, err error) {
+	if actorColumn != "user_id" && actorColumn != "portal_customer_id" {
+		return nil, 0, fmt.Errorf("invalid actor column %q", actorColumn)
+	}
+	if limit <= 0 {
+		return nil, 0, errors.New("approval page limit must be positive")
+	}
+	if status == "" {
+		status = models.ApprovalRequestStatusPending
+	}
+	base := fmt.Sprintf(`
+		FROM approval_requests ar
+		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
+		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true
+		WHERE ar.status = ? AND asa.%s = ?`, actorColumn)
+	args := []any{status, actorID}
+	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT ar.id) "+base, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count approvals for actor: %w", err)
+	}
+	pageArgs := append(slices.Clone(args), limit, max(offset, 0))
+	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT ar.id "+base+" ORDER BY ar.id DESC LIMIT ? OFFSET ?", pageArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query approval page for actor: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	ids, err = scanIntList(rows)
+	return ids, total, err
 }
 
 // FindRequestIDsForActorInChannel is the portal-scoped counterpart to

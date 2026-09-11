@@ -136,7 +136,7 @@
 
   async function handleToggle(action) {
     try {
-      await api.actions.toggle(workspaceId, action.id, !action.is_enabled);
+      await api.actions.update(workspaceId, action.id, { is_enabled: !action.is_enabled });
       await loadActions();
       successToast(action.is_enabled ? t('actions.disabled') : t('actions.enabled'));
     } catch (error) {

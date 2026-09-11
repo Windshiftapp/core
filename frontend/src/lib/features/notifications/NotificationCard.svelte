@@ -60,6 +60,8 @@
 </script>
 
 <div
+  data-testid={`notification-card-${notification.id}`}
+  data-read={notification.read}
   class="notification-card p-4 cursor-pointer transition-colors relative group"
   class:unread={!notification.read}
   style="border-bottom: 1px solid var(--ds-border);"

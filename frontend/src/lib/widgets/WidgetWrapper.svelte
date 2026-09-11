@@ -9,7 +9,7 @@
   } from './dashboard/taskWidgetState.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { useEventListener } from 'runed';
-  import { ChevronDown, Check } from '@lucide/svelte';
+  import { MoreHorizontal } from '@lucide/svelte';
 
   let {
     title = '',
@@ -77,8 +77,7 @@
     title: p.label,
     testid: `widget-width-preset-${p.value}`,
     onClick: () => setWidth(p.value),
-    icon: width === p.value ? Check : null,
-    iconClass: '',
+    selected: width === p.value,
   })));
 
   const supportsRowCount = $derived(shouldShowRowControls(widgetType, config));
@@ -99,8 +98,7 @@
     title: n === 'all' ? t('widgets.rowCountAll') : t(`widgets.rowCount${n}`),
     testid: `widget-row-count-${n}`,
     onClick: () => setRowCount(n),
-    icon: currentRowCount === n ? Check : null,
-    iconClass: '',
+    selected: currentRowCount === n,
   })));
 
   const densityItems = $derived([
@@ -108,15 +106,13 @@
       title: t('widgets.densityComfortable'),
       testid: 'widget-density-comfortable',
       onClick: () => setDensity('comfortable'),
-      icon: currentDensity === 'comfortable' ? Check : null,
-      iconClass: '',
+      selected: currentDensity === 'comfortable',
     },
     {
       title: t('widgets.densityCompact'),
       testid: 'widget-density-compact',
       onClick: () => setDensity('compact'),
-      icon: currentDensity === 'compact' ? Check : null,
-      iconClass: '',
+      selected: currentDensity === 'compact',
     },
   ]);
 
@@ -238,9 +234,10 @@
     <div class="flex items-center gap-1 flex-shrink-0">
       <!-- Width presets menu (available outside edit mode too) -->
       <DropdownMenu
-        triggerIcon={ChevronDown}
+        triggerIcon={MoreHorizontal}
         triggerIconBgColor="transparent"
         iconOnly={true}
+        showChevron={false}
         triggerLabel={t('widgets.resizeAriaLabel')}
         triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hover rounded"
         triggerTestid="widget-width-menu"

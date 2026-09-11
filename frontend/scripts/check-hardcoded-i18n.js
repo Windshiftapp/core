@@ -7,6 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // This list is an incremental ratchet: once a user-facing screen has been
 // migrated, literal English UI copy must not return to it.
 const guardedFiles = [
+  'src/lib/dialogs/PomodoroSettingsModal.svelte',
   'src/lib/layout/DashboardCustomizationSidebar.svelte',
   'src/lib/pages/Homepage.svelte',
   'src/lib/features/workflows/WorkflowBuilder.svelte',
@@ -86,7 +87,7 @@ for (const relativeFile of guardedFiles) {
   // Script blocks contain operators such as `=>` that look like HTML text to
   // the lightweight regex guard. UI copy lives in the component markup.
   const source = readFileSync(path.join(root, relativeFile), 'utf8').replace(
-    /<script\b[^>]*>[\s\S]*?<\/script>/g,
+    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
     (script) => '\n'.repeat(script.split('\n').length - 1)
   );
   for (const rule of rules) {

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconX, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots, IconListCheck } from '@tabler/icons-svelte-runes';
+  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots, IconListCheck } from '@tabler/icons-svelte-runes';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { api } from '../../api.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -12,7 +12,13 @@
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
+  import FormField from '../../components/FormField.svelte';
+  import Card from '../../components/Card.svelte';
+  import Panel from '../../components/Panel.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -796,7 +802,7 @@
   }
 </script>
 
-<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface-raised);">
+<div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <PageHeader
     title={t('testing.testCases')}
     subtitle={folderSubtitle}
@@ -957,6 +963,7 @@
         on_input={handleTestCaseSearchInput}
       />
     </div>
+    <Card variant="flat" padding="none" class="overflow-hidden">
     <table class="min-w-full text-sm">
       <thead style="border-bottom: 1px solid var(--ds-border);">
             <tr>
@@ -969,7 +976,7 @@
           <tbody>
             {#each visibleTestCases as testCase, index}
               <tr
-                class="hover:bg-[var(--ds-surface)] transition-colors draggable-test-case"
+                class="hover:bg-[var(--ds-surface-raised-hovered)] transition-colors draggable-test-case"
                 style="border-top: 1px solid var(--ds-border);"
                 data-test-case-id={testCase.id}
                 data-testid={`test-case-row-${testCase.id}`}
@@ -984,17 +991,10 @@
                 <td class="px-4 py-3 text-sm font-medium" style="color: {testCase.status === 'inactive' ? 'var(--ds-text-disabled)' : 'var(--ds-text)'};">
                   <div class="flex items-center gap-2">
                     <!-- Priority badge -->
-                    <span
-                      class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded text-white capitalize"
-                      style="background-color: {getPriorityColor(testCase.priority || 'medium')};"
-                    >
-                      {testCase.priority || 'medium'}
-                    </span>
+                    <Lozenge customBg={getPriorityColor(testCase.priority || 'medium')} text={testCase.priority || 'medium'} />
                     <!-- Status badge for draft -->
                     {#if testCase.status === 'draft'}
-                      <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                        {t('testing.draft')}
-                      </span>
+                      <Lozenge color="gray" text={t('testing.draft')} />
                     {/if}
                     <span class={testCase.status === 'inactive' ? 'line-through' : ''}>{testCase.title}</span>
                     <!-- Duration badge -->
@@ -1014,12 +1014,7 @@
                   <div class="flex flex-wrap gap-1">
                     {#if testCase.labels && testCase.labels.length > 0}
                       {#each testCase.labels as label}
-                        <span
-                          class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full text-white"
-                          style="background-color: {label.color};"
-                        >
-                          {label.name}
-                        </span>
+                        <Lozenge customBg={label.color} text={label.name} rounded="rounded-full" />
                       {/each}
                     {:else}
                       <span class="text-xs" style="color: var(--ds-text-subtle);">{t('testing.noLabels')}</span>
@@ -1076,10 +1071,11 @@
             {/each}
       </tbody>
     </table>
+    </Card>
     {#if hasMoreTestCases}
       <div class="flex justify-center py-6">
         <Button
-          variant="outline"
+          variant="default"
           size="small"
           disabled={loadingMoreTestCases}
           onclick={() => loadTestCases(selectedFolder, { append: true })}
@@ -1107,54 +1103,40 @@
   maxWidth="max-w-md"
   closeOnBackdropClick={false}
 >
-  <div class="p-6">
-    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
-      {editingFolder ? t('testing.editFolder') : t('testing.addFolder')}
-    </h3>
-    <form onsubmit={(e) => { e.preventDefault(); handleFolderSubmit(); }}>
-      <div class="mb-4">
-        <Label color="default" class="mb-2">{t('common.name')}</Label>
+  <ModalHeader
+    title={editingFolder ? t('testing.editFolder') : t('testing.addFolder')}
+    showCloseButton={false}
+  />
+  <form onsubmit={(e) => { e.preventDefault(); handleFolderSubmit(); }}>
+    <div class="p-6 pb-2">
+      <FormField label={t('common.name')} required>
         <Input
           bind:value={folderFormData.name}
           required
           size="small"
         />
-      </div>
-      <div class="mb-4">
-        <Label color="default" class="mb-2">{t('testing.parentFolderOptional')}</Label>
+      </FormField>
+      <FormField label={t('testing.parentFolderOptional')} helper={t('testing.subfoldersNestingNote')}>
         <Select bind:value={folderFormData.parent_id} size="small" options={[{ value: '', label: t('testing.topLevelFolder') }, ...rootFolderOptions.map(option => ({ value: option.id, label: option.name, disabled: editingFolder && option.id === editingFolder.id }))]} />
-        <DescriptionText>
-          {t('testing.subfoldersNestingNote')}
-        </DescriptionText>
-      </div>
-      <div class="mb-6">
-        <Label color="default" class="mb-2">{t('common.description')}</Label>
+      </FormField>
+      <FormField label={t('common.description')}>
         <Textarea
           bind:value={folderFormData.description}
           rows={3}
           size="small"
         />
-      </div>
-      <div class="flex gap-2 justify-end">
-        <Button
-          type="button"
-          onclick={() => showFolderForm = false}
-          variant="default"
-          keyboardHint={getShortcutDisplay('testCases', 'cancelForm')}
-        >
-          {t('common.cancel')}
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="medium"
-          keyboardHint={getShortcutDisplay('testCases', 'submitForm')}
-        >
-          {t('common.save')}
-        </Button>
-      </div>
-    </form>
-  </div>
+      </FormField>
+    </div>
+    <DialogFooter
+      cancelLabel={t('common.cancel')}
+      confirmLabel={t('common.save')}
+      onCancel={() => showFolderForm = false}
+      onConfirm={handleFolderSubmit}
+      showKeyboardHint={true}
+      cancelKeyboardHint={getShortcutDisplay('testCases', 'cancelForm')}
+      confirmKeyboardHint={getShortcutDisplay('testCases', 'submitForm')}
+    />
+  </form>
 </Modal>
 
 <!-- Test Case Form Modal -->
@@ -1164,33 +1146,30 @@
   onSubmit={handleCaseSubmit}
   onclose={() => showCaseForm = false}
 >
-  <div class="p-6">
-    <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">
-      {editingCase ? t('testing.editTestCase') : t('testing.addTestCase')}
-    </h3>
-    <form onsubmit={(e) => { e.preventDefault(); handleCaseSubmit(); }}>
-      <div class="mb-4">
-        <Label color="default" class="mb-2">{t('common.title')}</Label>
+  <ModalHeader
+    title={editingCase ? t('testing.editTestCase') : t('testing.addTestCase')}
+    showCloseButton={false}
+  />
+  <form onsubmit={(e) => { e.preventDefault(); handleCaseSubmit(); }}>
+    <div class="p-6 pb-2">
+      <FormField label={t('common.title')} required>
         <Input
           bind:value={caseFormData.title}
           required
           size="small"
           dataTestid="test-case-title"
         />
-      </div>
+      </FormField>
 
       <!-- Priority, Status, and Duration row -->
       <div class="grid grid-cols-3 gap-4 mb-4">
-        <div>
-          <Label color="default" class="mb-2">{t('common.priority')}</Label>
+        <FormField label={t('common.priority')} class="mb-0">
           <Select bind:value={caseFormData.priority} size="small" options={priorityOptions} />
-        </div>
-        <div>
-          <Label color="default" class="mb-2">{t('common.status')}</Label>
+        </FormField>
+        <FormField label={t('common.status')} class="mb-0">
           <Select bind:value={caseFormData.status} size="small" options={statusOptions} />
-        </div>
-        <div>
-          <Label color="default" class="mb-2">{t('testing.estimatedDuration')}</Label>
+        </FormField>
+        <FormField label={t('testing.estimatedDuration')} class="mb-0">
           <div class="flex items-center gap-2">
             <Input
               type="number"
@@ -1210,11 +1189,10 @@
             />
             <span class="text-sm" style="color: var(--ds-text-subtle);">m</span>
           </div>
-        </div>
+        </FormField>
       </div>
 
-      <div class="mb-6">
-        <Label color="default" class="mb-2">{t('testing.preconditions')}</Label>
+      <FormField label={t('testing.preconditions')}>
         <Textarea
           bind:value={caseFormData.preconditions}
           rows={3}
@@ -1222,7 +1200,7 @@
           size="small"
           data-testid="test-case-preconditions"
         />
-      </div>
+      </FormField>
 
       <!-- Information for new test cases -->
       {#if !editingCase}
@@ -1232,26 +1210,16 @@
           </p>
         </div>
       {/if}
-      <div class="flex gap-2 justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onclick={() => showCaseForm = false}
-          keyboardHint="Esc"
-        >
-          {t('common.cancel')}
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          keyboardHint="↵"
-          dataTestid="test-case-submit"
-        >
-          {editingCase ? t('common.save') : t('common.create')}
-        </Button>
-      </div>
-    </form>
-  </div>
+    </div>
+    <DialogFooter
+      cancelLabel={t('common.cancel')}
+      confirmLabel={editingCase ? t('common.save') : t('common.create')}
+      onCancel={() => showCaseForm = false}
+      onConfirm={handleCaseSubmit}
+      showKeyboardHint={true}
+      confirmTestid="test-case-submit"
+    />
+  </form>
 </Modal>
 
 
@@ -1264,23 +1232,11 @@
 >
   <div class="max-h-[80vh] flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between p-6 border-b shrink-0" style="border-color: var(--ds-border);">
-      <div>
-        <h3 class="text-xl font-semibold" style="color: var(--ds-text);">
-          {t('testing.manageLabels')}: {selectedTestCase?.title}
-        </h3>
-        <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-          {t('testing.clickLabelsToAssign')}
-        </div>
-      </div>
-      <button
-        onclick={closeLabelsModal}
-        class="p-2 hover:bg-[var(--ds-background-neutral-hovered)] rounded-full transition-colors"
-        aria-label={t('testing.closeLabelsModal')}
-      >
-        <IconX class="w-6 h-6" style="color: var(--ds-text-subtle);" />
-      </button>
-    </div>
+    <ModalHeader
+      title={`${t('testing.manageLabels')}: ${selectedTestCase?.title || ''}`}
+      subtitle={t('testing.clickLabelsToAssign')}
+      onClose={closeLabelsModal}
+    />
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto p-6">
@@ -1311,7 +1267,7 @@
 
           <!-- Create New Label Form -->
           {#if showCreateLabelForm}
-            <div class="bg-gray-50 rounded p-4 border" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
+            <Panel padding="default" rounded="md">
               <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('testing.createNewLabel')}</h4>
               <form onsubmit={(e) => { e.preventDefault(); handleCreateLabel(); }} class="space-y-3">
                 <div>
@@ -1388,7 +1344,7 @@
                   </Button>
                 </div>
               </form>
-            </div>
+            </Panel>
           {/if}
 
           <!-- Labels List -->
@@ -1447,19 +1403,16 @@
       </div>
 
     <!-- Footer -->
-    <div class="border-t p-4 shrink-0" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);">
-      <div class="flex justify-between items-center">
+    <DialogFooter
+      cancelLabel={t('common.done')}
+      onCancel={closeLabelsModal}
+      class="shrink-0"
+    >
+      {#snippet extra()}
         <div class="text-sm" style="color: var(--ds-text-subtle);">
           {t('testing.labelsAssigned', { count: selectedTestCaseLabels.length })}
         </div>
-        <Button
-          onclick={closeLabelsModal}
-          variant="primary"
-          size="medium"
-        >
-          {t('common.done')}
-        </Button>
-      </div>
-    </div>
+      {/snippet}
+    </DialogFooter>
   </div>
 </Modal>

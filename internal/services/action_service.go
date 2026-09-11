@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -490,10 +491,16 @@ func matchesSCMActionTrigger(config models.ActionTriggerConfig, newValues map[st
 
 // executeAction executes an action's flow
 func (as *ActionService) executeAction(action *models.Action, event *models.ActionEvent, chain *ExecutionChain) error {
-	return as.executeActionForEvent(action, event, chain, "")
+	return as.executeActionForEvent(context.Background(), action, event, chain, "")
 }
 
-func (as *ActionService) executeActionForEvent(action *models.Action, event *models.ActionEvent, chain *ExecutionChain, durableEventKey string) error {
+func (as *ActionService) executeActionForEvent(executionCtx context.Context, action *models.Action, event *models.ActionEvent, chain *ExecutionChain, durableEventKey string) error {
+	if executionCtx == nil {
+		executionCtx = context.Background()
+	}
+	if err := executionCtx.Err(); err != nil {
+		return err
+	}
 	if action == nil {
 		return errors.New("action is required")
 	}
@@ -588,6 +595,8 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 	}
 
 	ctx := &models.ExecutionContext{
+		Context:          executionCtx,
+		DurableEventKey:  durableEventKey,
 		Action:           action,
 		Event:            event,
 		EffectiveActorID: effectiveActorID,
@@ -676,6 +685,22 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 		}
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
+		if contextErr := executionCtx.Err(); contextErr != nil {
+			stepResult.Status = models.ActionStatusFailed
+			stepResult.ErrorMessage = contextErr.Error()
+			ctx.StepResults = append(ctx.StepResults, stepResult)
+			as.cleanupActionContainers(ctx.StepResults)
+			log.Status = models.ActionStatusFailed
+			log.ErrorMessage = contextErr.Error()
+			log.CompletedAt = &completedAt
+			if trace, marshalErr := json.Marshal(ctx.StepResults); marshalErr == nil {
+				log.ExecutionTrace = string(trace)
+			}
+			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+				slog.Error("failed to cancel action execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+			}
+			return contextErr
+		}
 
 		if err != nil {
 			stepResult.Status = models.ActionStatusFailed
@@ -732,6 +757,13 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 		return fmt.Errorf("%w: action %d", ErrActionCompletedWithFailedSteps, action.ID)
 	}
 	return nil
+}
+
+func actionRequestContext(ctx *models.ExecutionContext) context.Context {
+	if ctx != nil && ctx.Context != nil {
+		return ctx.Context
+	}
+	return context.Background()
 }
 
 // topologicalSort sorts nodes in execution order using Kahn's algorithm
@@ -1367,7 +1399,7 @@ func (as *ActionService) executeSetStatusID(statusID int, ctx *models.ExecutionC
 	}
 
 	workflowService := NewWorkflowService(as.db)
-	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+	result, err := workflowService.PerformTransition(actionRequestContext(ctx), PerformTransitionRequest{
 		ItemID:        itemID,
 		ToStatusID:    statusID,
 		ActorUserID:   ctx.EffectiveActorID,
@@ -1502,7 +1534,7 @@ func (as *ActionService) executeTransitionItem(node *models.ActionNode, ctx *mod
 	}
 
 	workflowService := NewWorkflowService(as.db)
-	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+	result, err := workflowService.PerformTransition(actionRequestContext(ctx), PerformTransitionRequest{
 		ItemID:        item.ID,
 		ToStatusID:    targetStatusID,
 		ActorUserID:   ctx.EffectiveActorID,
@@ -2177,7 +2209,7 @@ func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.E
 
 	// Run sandboxed analysis (no tools, structured output only)
 	result, err := llm.RunSandboxedAnalysis[map[string]any](
-		context.Background(),
+		actionRequestContext(ctx),
 		client,
 		llm.SandboxedAnalysisRequest{
 			SystemPrompt: config.Prompt,
@@ -2255,7 +2287,7 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 	// is workspace-scoped — capabilities not available to the action's workspace
 	// are filtered out before reaching the agent.
 	var tools []llm.ToolDefinition
-	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools)
+	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools, node.ID)
 
 	for _, toolCapID := range config.Tools {
 		toolDefs := as.buildToolDefinitions(ctx.Event.WorkspaceID, toolCapID)
@@ -2275,7 +2307,7 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 
 	// Run agent loop
 	agentResult, err := llm.RunAgent(
-		context.Background(),
+		actionRequestContext(ctx),
 		client,
 		llm.AgentConfig{
 			SystemPrompt:     systemPrompt,
@@ -2370,7 +2402,7 @@ func (as *ActionService) buildToolDefinitions(workspaceID int, capIDStr string) 
 // Captures the action's workspace ID so the agent's tool calls re-validate
 // capability scope at execution time (defense in depth: tools were already
 // scope-filtered in buildToolDefinitions).
-func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string, nodeID int) llm.ToolExecutorFunc {
 	workspaceID := 0
 	if ctx != nil && ctx.Event != nil {
 		workspaceID = ctx.Event.WorkspaceID
@@ -2396,7 +2428,7 @@ func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, to
 				return "", fmt.Errorf("capability %d not in allowed tools", capID)
 			}
 
-			return as.executeAgentHTTPRequest(execCtx, workspaceID, capID, arguments)
+			return as.executeAgentHTTPRequest(execCtx, workspaceID, capID, arguments, durableActionIdempotencyKey(ctx, nodeID))
 		}
 
 		return "", fmt.Errorf("unknown tool: %s", name)
@@ -2404,7 +2436,7 @@ func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, to
 }
 
 // executeAgentHTTPRequest executes an HTTP request from within an agent tool call.
-func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceID, capID int, arguments string) (string, error) {
+func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceID, capID int, arguments, idempotencyKey string) (string, error) {
 	capability, err := as.resolveCapability(workspaceID, capID, models.CapabilityHTTPClient)
 	if err != nil {
 		return "", err
@@ -2437,6 +2469,9 @@ func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceI
 	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(ctx, &httpConfig, args.Headers, workspaceID, capID)
 	if err != nil {
 		return "", err
+	}
+	if method != "GET" && idempotencyKey != "" {
+		mergedHeaders["Idempotency-Key"] = idempotencyKey
 	}
 	return doHTTPRequest(ctx, method, args.URL, args.Body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 }
@@ -2494,7 +2529,7 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 			return fmt.Errorf("container_run pool dispatch: %w", err)
 		}
 		pool := config.PoolCapabilityID
-		runID, derr := as.agentRuns.Insert(context.Background(), &models.AgentRun{
+		runID, derr := as.agentRuns.Insert(actionRequestContext(ctx), &models.AgentRun{
 			WorkspaceID:  ctx.Event.WorkspaceID,
 			Status:       models.AgentRunStatusQueued,
 			JobKind:      models.JobKindActionContainer,
@@ -2521,7 +2556,7 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 	if as.containerService == nil {
 		return fmt.Errorf("container service not configured")
 	}
-	containerInfo, err := as.containerService.StartContainer(context.Background(), envConfig, config.TimeoutSecs)
+	containerInfo, err := as.containerService.StartContainer(actionRequestContext(ctx), envConfig, config.TimeoutSecs)
 	if err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
@@ -2590,12 +2625,18 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 		return fmt.Errorf("URL %q not allowed by capability %d", redactHTTPURLForDiagnostics(targetURL), config.CapabilityID)
 	}
 
-	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(context.Background(), &httpConfig, headers, ctx.Event.WorkspaceID, config.CapabilityID)
+	requestCtx := actionRequestContext(ctx)
+	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(requestCtx, &httpConfig, headers, ctx.Event.WorkspaceID, config.CapabilityID)
 	if err != nil {
 		return fmt.Errorf("http_request: %w", err)
 	}
+	if method != "GET" {
+		if idempotencyKey := durableActionIdempotencyKey(ctx, node.ID); idempotencyKey != "" {
+			mergedHeaders["Idempotency-Key"] = idempotencyKey
+		}
+	}
 
-	result, err := doHTTPRequest(context.Background(), method, targetURL, body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
+	result, err := doHTTPRequest(requestCtx, method, targetURL, body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 	if err != nil {
 		return fmt.Errorf("http_request failed: %w", err)
 	}
@@ -2617,6 +2658,14 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 	)
 
 	return nil
+}
+
+func durableActionIdempotencyKey(ctx *models.ExecutionContext, nodeID int) string {
+	if ctx == nil || ctx.Action == nil || ctx.DurableEventKey == "" || nodeID <= 0 {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", ctx.DurableEventKey, ctx.Action.ID, nodeID)))
+	return fmt.Sprintf("windshift-%x", sum[:])
 }
 
 // buildHTTPHeadersWithCredentials merges defaults, auth, credential references,

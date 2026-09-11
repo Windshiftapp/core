@@ -769,11 +769,14 @@ func (s *RunService) PrepareRemoteClaim(ctx context.Context, run *models.AgentRu
 		inputs = &RunInputs{}
 	}
 	spec.InitialPrompt += inputs.PromptSuffix
-	env := inputs.Env
-	if env == nil {
-		env = map[string]string{}
+	env := make(map[string]string, len(inputs.Env)+3)
+	for key, value := range inputs.Env {
+		env[key] = value
 	}
 	env["AGENT_RUN_ID"] = fmt.Sprintf("%d", run.ID)
+	if err := pinSandboxWSEnvironment(env); err != nil {
+		return JobSpec{}, fmt.Errorf("remote claim: pin ws destination: %w", err)
+	}
 	if inputs.Token != nil {
 		tokenSpec := *inputs.Token
 		if run.IsEphemeral {

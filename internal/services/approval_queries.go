@@ -91,6 +91,16 @@ func (s *ApprovalService) GetTimelineForItem(ctx context.Context, itemID int) ([
 	return s.loadRequests(ctx, ids)
 }
 
+// GetTimelineForItemPage hydrates only a repository-bounded timeline page.
+func (s *ApprovalService) GetTimelineForItemPage(ctx context.Context, itemID, limit, offset int) ([]*models.ApprovalRequest, int, error) {
+	ids, total, err := s.runtimeRepo.FindRequestIDsForItemPage(ctx, itemID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.loadRequests(ctx, ids)
+	return items, total, err
+}
+
 // GetDecisionCommentsForItem returns a cursor-filtered, bounded page of
 // comment-bearing approval decisions shaped like feed comment rows.
 func (s *ApprovalService) GetDecisionCommentsForItem(itemID int, includeAgentOwner bool, options CommentFeedOptions) ([]models.Comment, error) {
@@ -174,6 +184,16 @@ func (s *ApprovalService) CountDecisionCommentsForItem(itemID int) (int, error) 
 // pool of any pending step. status filters request status (empty = "pending").
 func (s *ApprovalService) GetForUser(ctx context.Context, userID int, status string) ([]*models.ApprovalRequest, error) {
 	return s.getForActor(ctx, "user_id", userID, status, nil)
+}
+
+// GetForUserPage hydrates only the requested repository-bounded approver page.
+func (s *ApprovalService) GetForUserPage(ctx context.Context, userID int, status string, limit, offset int) ([]*models.ApprovalRequest, int, error) {
+	ids, total, err := s.runtimeRepo.FindRequestIDsForActorPage(ctx, "user_id", userID, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.loadRequests(ctx, ids)
+	return items, total, err
 }
 
 // GetForUserInChannel restricts the user's active approval pool to items that

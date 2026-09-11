@@ -551,7 +551,7 @@ func (c *Client) UpdateTestResult(workspaceID, runID, resultID int, req TestResu
 
 func (c *Client) ListTestSets(workspaceID int) ([]TestSet, error) {
 	var sets []TestSet
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets", workspaceID), &sets); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans", workspaceID), &sets); err != nil {
 		return nil, err
 	}
 	return sets, nil
@@ -559,7 +559,7 @@ func (c *Client) ListTestSets(workspaceID int) ([]TestSet, error) {
 
 func (c *Client) GetTestSet(workspaceID, id int) (*TestSet, error) {
 	var set TestSet
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets/%d", workspaceID, id), &set); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans/%d", workspaceID, id), &set); err != nil {
 		return nil, err
 	}
 	return &set, nil
@@ -567,7 +567,7 @@ func (c *Client) GetTestSet(workspaceID, id int) (*TestSet, error) {
 
 func (c *Client) GetTestSetTestCases(workspaceID, setID int) ([]TestCase, error) {
 	var cases []TestCase
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-sets/%d/test-cases", workspaceID, setID), &cases); err != nil {
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/test-plans/%d/test-cases", workspaceID, setID), &cases); err != nil {
 		return nil, err
 	}
 	return cases, nil
@@ -589,18 +589,18 @@ func (c *Client) GetComments(itemID int) ([]Comment, error) {
 	path := fmt.Sprintf("/rest/api/v2/items/%d/comments?page_size=%d", itemID, pageSize)
 	for {
 		var response struct {
-			Comments []Comment `json:"comments"`
-			HasMore  bool      `json:"has_more"`
+			Comments   []Comment `json:"comments"`
+			NextCursor string    `json:"next_cursor"`
+			HasMore    bool      `json:"has_more"`
 		}
 		if err := c.GET(path, &response); err != nil {
 			return nil, err
 		}
 		comments = append(comments, response.Comments...)
-		if !response.HasMore || len(response.Comments) == 0 {
+		if !response.HasMore || response.NextCursor == "" || len(response.Comments) == 0 {
 			break
 		}
-		last := response.Comments[len(response.Comments)-1]
-		path = fmt.Sprintf("/rest/api/v2/items/%d/comments?page_size=%d&before=%s&before_id=%d", itemID, pageSize, url.QueryEscape(last.CreatedAt.Format(time.RFC3339Nano)), last.ID)
+		path = fmt.Sprintf("/rest/api/v2/items/%d/comments?page_size=%d&cursor=%s", itemID, pageSize, url.QueryEscape(response.NextCursor))
 	}
 	return comments, nil
 }
@@ -810,9 +810,9 @@ func parseContentDispositionFilename(header string) string {
 // Milestone API methods.
 
 func (c *Client) ListMilestones(filters map[string]string) (*PaginatedResponse[Milestone], error) {
-	path := "/rest/api/v2/milestones?scope=global"
+	path := "/rest/api/v2/milestones"
 	if len(filters) > 0 {
-		params := url.Values{"scope": {"global"}}
+		params := url.Values{}
 		for k, v := range filters {
 			params.Set(v2QueryName(k), v)
 		}
@@ -843,7 +843,6 @@ func (c *Client) GetMilestoneProgress(id int) (*MilestoneProgress, error) {
 }
 
 func (c *Client) CreateMilestone(req MilestoneCreateRequest) (*Milestone, error) {
-	req.Scope = "global"
 	var milestone Milestone
 	if err := c.POST("/rest/api/v2/milestones", req, &milestone); err != nil {
 		return nil, err
@@ -863,16 +862,19 @@ func (c *Client) DeleteMilestone(id int) error {
 	return c.DELETE(fmt.Sprintf("/rest/api/v2/milestones/%d", id))
 }
 
-// Workspace milestone helpers use the canonical workspace_id scope.
+// Workspace milestone helpers use the workspace-owned collection.
 
 func (c *Client) ListMilestonesInWorkspace(workspaceID int, filters map[string]string) (*PaginatedResponse[Milestone], error) {
-	params := url.Values{"workspace_id": {strconv.Itoa(workspaceID)}}
+	params := url.Values{}
 	if len(filters) > 0 {
 		for k, v := range filters {
 			params.Set(v2QueryName(k), v)
 		}
 	}
-	path := "/rest/api/v2/milestones?" + params.Encode()
+	path := fmt.Sprintf("/rest/api/v2/workspaces/%d/milestones", workspaceID)
+	if query := params.Encode(); query != "" {
+		path += "?" + query
+	}
 
 	var resp PaginatedResponse[Milestone]
 	if err := c.GET(path, &resp); err != nil {
@@ -898,10 +900,8 @@ func (c *Client) GetMilestoneProgressInWorkspace(_, milestoneID int) (*Milestone
 }
 
 func (c *Client) CreateMilestoneInWorkspace(workspaceID int, req MilestoneCreateRequest) (*Milestone, error) {
-	req.WorkspaceID = &workspaceID
-	req.Scope = ""
 	var milestone Milestone
-	if err := c.POST("/rest/api/v2/milestones", req, &milestone); err != nil {
+	if err := c.POST(fmt.Sprintf("/rest/api/v2/workspaces/%d/milestones", workspaceID), req, &milestone); err != nil {
 		return nil, err
 	}
 	return &milestone, nil
@@ -1077,9 +1077,9 @@ func (c *Client) ListCustomFields() ([]CustomField, error) {
 
 // ListIterations requires the iterations:read scope.
 func (c *Client) ListIterations(filters map[string]string) (*PaginatedResponse[Iteration], error) {
-	path := "/rest/api/v2/iterations?scope=global"
+	path := "/rest/api/v2/iterations"
 	if len(filters) > 0 {
-		params := url.Values{"scope": {"global"}}
+		params := url.Values{}
 		for k, v := range filters {
 			params.Set(v2QueryName(k), v)
 		}
@@ -1094,13 +1094,16 @@ func (c *Client) ListIterations(filters map[string]string) (*PaginatedResponse[I
 }
 
 func (c *Client) ListIterationsInWorkspace(workspaceID int, filters map[string]string) (*PaginatedResponse[Iteration], error) {
-	params := url.Values{"workspace_id": {strconv.Itoa(workspaceID)}}
+	params := url.Values{}
 	if len(filters) > 0 {
 		for k, v := range filters {
 			params.Set(v2QueryName(k), v)
 		}
 	}
-	path := "/rest/api/v2/iterations?" + params.Encode()
+	path := fmt.Sprintf("/rest/api/v2/workspaces/%d/iterations", workspaceID)
+	if query := params.Encode(); query != "" {
+		path += "?" + query
+	}
 
 	var resp PaginatedResponse[Iteration]
 	if err := c.GET(path, &resp); err != nil {
@@ -1238,13 +1241,11 @@ func (c *Client) GetAgentSkill(workspaceID, skillID int) (*AgentSkill, error) {
 
 // ListPages returns every visible page in server sort order.
 func (c *Client) ListPages(workspaceID int) ([]Page, error) {
-	var response struct {
-		Pages []Page `json:"pages"`
-	}
-	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/pages/tree", workspaceID), &response); err != nil {
+	var pages []Page
+	if err := c.GET(fmt.Sprintf("/rest/api/v2/workspaces/%d/pages", workspaceID), &pages); err != nil {
 		return nil, err
 	}
-	return response.Pages, nil
+	return pages, nil
 }
 
 // SearchPages searches visible page titles and content. Results omit bodies.
@@ -1791,7 +1792,7 @@ func (c *Client) DeleteTimeWorklog(id int) error {
 
 func (c *Client) StartTimer(req TimerStartRequest) (map[string]any, error) {
 	var out map[string]any
-	if err := c.POST("/rest/api/v2/timer/start", req, &out); err != nil {
+	if err := c.POST("/rest/api/v2/time/timers", req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1799,7 +1800,7 @@ func (c *Client) StartTimer(req TimerStartRequest) (map[string]any, error) {
 
 func (c *Client) GetActiveTimer() (map[string]any, error) {
 	var out map[string]any
-	if err := c.GET("/rest/api/v2/timer/active", &out); err != nil {
+	if err := c.GET("/rest/api/v2/time/timers/active", &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1807,9 +1808,7 @@ func (c *Client) GetActiveTimer() (map[string]any, error) {
 
 func (c *Client) StopTimer() (map[string]any, error) {
 	var out map[string]any
-	// DELETE on /timer/stop returns a JSON body; use a custom request so we
-	// can pass a result target (the convenience Delete method discards the body).
-	if err := c.doRequest("DELETE", "/rest/api/v2/timer/stop", nil, &out); err != nil {
+	if err := c.POST("/rest/api/v2/time/timers/active/stop", nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

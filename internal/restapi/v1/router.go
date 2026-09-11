@@ -124,7 +124,6 @@ func RegisterRoutes(deps restapi.Deps) {
 		rateLimiter.Middleware,
 	)
 	publicV1.Handle("GET /openapi.json", handlers.OpenAPISpecJSON)
-	publicV1.Handle("GET /openapi.yaml", handlers.OpenAPISpecYAML)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter

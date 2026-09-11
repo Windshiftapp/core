@@ -150,6 +150,7 @@ func listCollections(collections collectionApplication) pageOperation[models.Col
 			return nil, Pagination{}, 0, err
 		}
 		result, total, err := collections.List(services.CollectionListParams{
+			Query:  r.URL.Query().Get("q"),
 			UserID: user.ID, WorkspaceID: workspaceID, CategoryID: categoryID, Limit: page.PageSize, Offset: page.Offset,
 		})
 		return result, page, total, collectionError(err)
@@ -162,11 +163,17 @@ func getCollection(collections collectionApplication) readOperation[models.Colle
 		if err != nil {
 			return models.Collection{}, err
 		}
-		id, err := pathID(r, "collection_id")
-		if err != nil {
-			return models.Collection{}, err
+		key := r.PathValue("collection_id")
+		var collection *models.Collection
+		if _, parseErr := strconv.Atoi(key); parseErr == nil {
+			id, idErr := pathID(r, "collection_id")
+			if idErr != nil {
+				return models.Collection{}, idErr
+			}
+			collection, err = collections.Get(user.ID, id)
+		} else {
+			collection, err = collections.GetBySlug(user.ID, key)
 		}
-		collection, err := collections.Get(user.ID, id)
 		if collection == nil {
 			return models.Collection{}, collectionError(err)
 		}

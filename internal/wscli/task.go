@@ -73,7 +73,9 @@ Examples:
 			return err
 		}
 
-		applyStatusFilter(filters, statusFilter, client)
+		if err := applyStatusFilter(filters, statusFilter, client); err != nil {
+			return err
+		}
 
 		// Add date filters
 		if err := applyDateFilters(filters, createdFilter, updatedFilter); err != nil {
@@ -130,7 +132,11 @@ var taskListCmd = &cobra.Command{
 	Long: `List tasks with optional filtering.
 
 Examples:
-  ws task ls                              # List all accessible tasks
+  ws task ls                             # First page of accessible tasks
+  ws task ls --all                        # Load all matching pages
+  ws task ls --page 2 --limit 25           # Select a page
+  ws task ls -w PROJ -s "In Progress"      # Workspace status name
+  ws task ls -w PROJ --milestone "Q4"      # Exact milestone name or ID
   ws task ls -s 1                         # Filter by status ID
   ws task ls -s ~done                     # Exclude done status (negation)
   ws task ls --assignee 5                 # Filter by assignee ID
@@ -148,7 +154,23 @@ Examples:
 			return err
 		}
 
-		applyStatusFilter(filters, statusFilter, client)
+		if err := applyStatusFilter(filters, statusFilter, client); err != nil {
+			return err
+		}
+		if taskListMilestone != "" {
+			workspaceID, err := resolveOptionalWorkspace(client)
+			if err != nil {
+				return err
+			}
+			id, err := resolveTaskMilestone(client, taskListMilestone, workspaceID)
+			if err != nil {
+				return err
+			}
+			if id <= 0 {
+				return fmt.Errorf("milestone ID must be positive")
+			}
+			filters["milestone_id"] = strconv.Itoa(id)
+		}
 
 		if assigneeFilter != "" {
 			filters["assignee_id"] = assigneeFilter
@@ -165,7 +187,7 @@ Examples:
 			return err
 		}
 
-		items, err := client.ListItems(filters)
+		items, err := listTaskPage(client, filters, taskListPage, taskListLimit, taskListAll)
 		if err != nil {
 			return fmt.Errorf("failed to list items: %w", err)
 		}
@@ -308,8 +330,14 @@ Examples:
 		if createAssigneeID > 0 {
 			req.AssigneeID = &createAssigneeID
 		}
-		if createParentID > 0 {
-			req.ParentID = &createParentID
+		if cmd.Flags().Changed("parent") {
+			parentID, err := resolveParentID(client, createParent)
+			if err != nil {
+				return err
+			}
+			if parentID > 0 {
+				req.ParentID = &parentID
+			}
 		}
 		if createDueDate != "" {
 			d, err := parseDateFlag("due-date", createDueDate)
@@ -646,7 +674,9 @@ Examples:
 			return err
 		}
 
-		applyStatusFilter(filters, childStatusFilter, client)
+		if err := applyStatusFilter(filters, childStatusFilter, client); err != nil {
+			return err
+		}
 		if childTypeFilter != "" {
 			filters["item_type_id"] = childTypeFilter
 		}
@@ -766,7 +796,15 @@ Examples:
 			hasChanges = true
 		}
 		if cmd.Flags().Changed("parent") {
-			req.ParentID = &editParentID
+			parentID, err := resolveParentID(client, editParent)
+			if err != nil {
+				return err
+			}
+			var parent *int
+			if parentID > 0 {
+				parent = &parentID
+			}
+			req.ParentID = &parent
 			hasChanges = true
 		}
 		if cmd.Flags().Changed("due-date") {
@@ -1054,7 +1092,7 @@ var (
 	createPriorityID   int
 	createStatusID     int
 	createAssigneeID   int
-	createParentID     int
+	createParent       string
 	createDueDate      string
 	createStartDate    string
 	createEndDate      string
@@ -1068,7 +1106,7 @@ var (
 	editTypeStatusID int
 	editPriorityID   int
 	editAssigneeID   int
-	editParentID     int
+	editParent       string
 	editDueDate      string
 	editStartDate    string
 	editEndDate      string
@@ -1093,6 +1131,11 @@ func init() {
 	taskCmd.AddCommand(taskHistoryCmd)
 
 	// List filters
+	taskListCmd.Flags().IntVar(&taskListPage, "page", 1, "result page (starts at 1)")
+	taskListCmd.Flags().IntVar(&taskListLimit, "limit", 50, "results per page (1-100)")
+	taskListCmd.Flags().BoolVar(&taskListAll, "all", false, "fetch every result page")
+	taskListCmd.Flags().StringVar(&taskListMilestone, "milestone", "", "filter by milestone name or ID")
+	taskListCmd.MarkFlagsMutuallyExclusive("all", "page")
 	taskMineCmd.Flags().StringVarP(&statusFilter, "status", "s", "", "filter by status (use ~status to exclude)")
 	taskMineCmd.Flags().StringVar(&createdFilter, "created", "", "filter by creation date (today, week, month, year, or -Nd)")
 	taskMineCmd.Flags().StringVar(&updatedFilter, "updated", "", "filter by update date (today, week, month, year, or -Nd)")
@@ -1128,7 +1171,7 @@ func init() {
 	taskEditCmd.Flags().IntVar(&editTypeStatusID, "type-status", 0, "target status ID when changing to a type with a different workflow")
 	taskEditCmd.Flags().IntVar(&editPriorityID, "priority", 0, "priority ID")
 	taskEditCmd.Flags().IntVar(&editAssigneeID, "assignee", 0, "assignee user ID")
-	taskEditCmd.Flags().IntVar(&editParentID, "parent", 0, "parent item ID")
+	taskEditCmd.Flags().StringVar(&editParent, "parent", "", "parent item key or ID (0 clears parent)")
 	taskEditCmd.Flags().StringVar(&editDueDate, "due-date", "", "due date (YYYY-MM-DD)")
 	taskEditCmd.Flags().StringVar(&editStartDate, "start-date", "", "start date (YYYY-MM-DD)")
 	taskEditCmd.Flags().StringVar(&editEndDate, "end-date", "", "end date (YYYY-MM-DD)")
@@ -1144,7 +1187,7 @@ func init() {
 	taskCreateCmd.Flags().IntVar(&createPriorityID, "priority", 0, "priority ID")
 	taskCreateCmd.Flags().IntVar(&createStatusID, "status", 0, "status ID")
 	taskCreateCmd.Flags().IntVar(&createAssigneeID, "assignee", 0, "assignee user ID")
-	taskCreateCmd.Flags().IntVar(&createParentID, "parent", 0, "parent item ID")
+	taskCreateCmd.Flags().StringVar(&createParent, "parent", "", "parent item key or ID")
 	taskCreateCmd.Flags().StringVar(&createDueDate, "due-date", "", "due date (YYYY-MM-DD)")
 	taskCreateCmd.Flags().StringVar(&createStartDate, "start-date", "", "start date (YYYY-MM-DD)")
 	taskCreateCmd.Flags().StringVar(&createEndDate, "end-date", "", "end date (YYYY-MM-DD)")

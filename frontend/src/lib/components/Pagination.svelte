@@ -102,6 +102,7 @@
           variant="default"
           size="small"
           icon={ChevronLeft}
+          dataTestid="pagination-previous"
           onclick={() => goToPage(currentPage - 1)}
           disabled={isFirstPage}
           class="px-2"
@@ -134,6 +135,7 @@
           variant="default"
           size="small"
           icon={ChevronRight}
+          dataTestid="pagination-next"
           onclick={() => goToPage(currentPage + 1)}
           disabled={isLastPage}
           class="px-2"

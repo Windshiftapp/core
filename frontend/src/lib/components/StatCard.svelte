@@ -11,7 +11,8 @@
     label,
     value,
     color = 'blue', // 'blue', 'green', 'orange', 'purple'
-    href = null
+    href = null,
+    dataTestid = undefined
   } = $props();
 
   // Gradient background colors (subtle tint towards the accent color)
@@ -53,7 +54,7 @@
     <div class="ml-3 w-0 flex-1">
       <dl>
         <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{label}</dt>
-        <dd class="text-xl font-semibold truncate" style="color: var(--ds-text);" title={typeof value === 'string' ? value : undefined}>{value}</dd>
+        <dd data-testid={dataTestid} class="text-xl font-semibold truncate" style="color: var(--ds-text);" title={typeof value === 'string' ? value : undefined}>{value}</dd>
       </dl>
     </div>
   </div>

@@ -24,8 +24,8 @@ type governanceApplication interface {
 	CreateApprovalSet(context.Context, services.AuditActor, models.ApprovalSet) (*models.ApprovalSet, error)
 	PatchApprovalSet(context.Context, services.AuditActor, int, services.ApprovalSetPatch) (*models.ApprovalSet, error)
 	DeleteApprovalSet(context.Context, services.AuditActor, int) error
-	ListItemApprovals(context.Context, int, int) ([]*models.ApprovalRequest, error)
-	ListMyApprovals(context.Context, int, string) ([]*models.ApprovalRequest, error)
+	ListItemApprovals(context.Context, int, int, int, int) ([]*models.ApprovalRequest, int, error)
+	ListMyApprovals(context.Context, int, string, int, int) ([]*models.ApprovalRequest, int, error)
 	GetApproval(context.Context, int, int) (*models.ApprovalRequest, error)
 	DecideApproval(context.Context, services.AuditActor, int, string, string) (*services.ApprovalDecisionResult, error)
 	CancelApproval(context.Context, services.AuditActor, int, string) (*models.ApprovalRequest, error)
@@ -245,12 +245,11 @@ func listItemApprovals(app governanceApplication) pageOperation[*models.Approval
 		if err != nil {
 			return nil, page, 0, err
 		}
-		items, err := app.ListItemApprovals(r.Context(), user.ID, id)
+		items, total, err := app.ListItemApprovals(r.Context(), user.ID, id, page.PageSize, page.Offset)
 		if err != nil {
 			return nil, page, 0, governanceError(err)
 		}
-		slice, total := paginate(items, page)
-		return slice, page, total, nil
+		return items, page, total, nil
 	}
 }
 func listMyApprovals(app governanceApplication) pageOperation[*models.ApprovalRequest] {
@@ -263,12 +262,11 @@ func listMyApprovals(app governanceApplication) pageOperation[*models.ApprovalRe
 		if err != nil {
 			return nil, page, 0, err
 		}
-		items, err := app.ListMyApprovals(r.Context(), user.ID, r.URL.Query().Get("status"))
+		items, total, err := app.ListMyApprovals(r.Context(), user.ID, r.URL.Query().Get("status"), page.PageSize, page.Offset)
 		if err != nil {
 			return nil, page, 0, governanceError(err)
 		}
-		slice, total := paginate(items, page)
-		return slice, page, total, nil
+		return items, page, total, nil
 	}
 }
 func getApproval(app governanceApplication) readOperation[models.ApprovalRequest] {

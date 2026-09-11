@@ -929,8 +929,7 @@ func (s *PageService) SearchByKeyword(workspaceID int, query string, limit int) 
 }
 
 // BuildPageTree turns a flat ordered page list (typically from ListTree)
-// into a nested PageNode tree suitable for direct rendering in the
-// frontend.
+// into a nested PageNode tree suitable for direct rendering in internal tools.
 func BuildPageTree(pages []models.Page) []*models.PageNode {
 	byID := make(map[int]*models.PageNode, len(pages))
 	for i := range pages {
@@ -946,9 +945,7 @@ func BuildPageTree(pages []models.Page) []*models.PageNode {
 		}
 		parent, ok := byID[*pages[i].ParentID]
 		if !ok {
-			// Orphaned (e.g., parent was archived but this page wasn't —
-			// shouldn't happen in normal flow). Promote to a root so the UI
-			// still renders it instead of dropping it silently.
+			// Promote orphans so callers do not silently drop visible pages.
 			roots = append(roots, node)
 			continue
 		}

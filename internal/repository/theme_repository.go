@@ -23,7 +23,7 @@ func NewThemeRepository(db database.Database) *ThemeRepository {
 const themeColumns = `id, COALESCE(builtin_key, ''), name, description, is_default, is_active,
 	nav_background_color_light, nav_text_color_light,
 	nav_background_color_dark, nav_text_color_dark,
-	created_at, updated_at`
+	COALESCE(logo_url, ''), created_at, updated_at`
 
 type themeScanner interface {
 	Scan(dest ...any) error
@@ -35,6 +35,7 @@ func scanTheme(s themeScanner, t *models.Theme) error {
 		&t.IsDefault, &t.IsActive,
 		&t.NavBackgroundColorLight, &t.NavTextColorLight,
 		&t.NavBackgroundColorDark, &t.NavTextColorDark,
+		&t.LogoURL,
 		&t.CreatedAt, &t.UpdatedAt,
 	)
 }
@@ -90,11 +91,11 @@ func (r *ThemeRepository) GetActive() (models.Theme, error) {
 // Create inserts a new theme and returns its id.
 func (r *ThemeRepository) Create(req models.ThemeCreateRequest, now time.Time) (int, error) {
 	query := `
-		INSERT INTO themes (name, description, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO themes (name, description, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark, logo_url, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`
 	var id int
-	if err := r.db.QueryRow(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, now, now).Scan(&id); err != nil {
+	if err := r.db.QueryRow(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.LogoURL, now, now).Scan(&id); err != nil {
 		return 0, fmt.Errorf("create theme: %w", err)
 	}
 	return id, nil
@@ -105,10 +106,10 @@ func (r *ThemeRepository) Update(id int, req models.ThemeUpdateRequest, now time
 	query := `
 		UPDATE themes
 		SET name = ?, description = ?, nav_background_color_light = ?, nav_text_color_light = ?,
-		    nav_background_color_dark = ?, nav_text_color_dark = ?, is_active = ?, updated_at = ?
+		    nav_background_color_dark = ?, nav_text_color_dark = ?, logo_url = ?, is_active = ?, updated_at = ?
 		WHERE id = ?
 	`
-	res, err := r.db.ExecWrite(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.IsActive, now, id)
+	res, err := r.db.ExecWrite(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.LogoURL, req.IsActive, now, id)
 	if err != nil {
 		return fmt.Errorf("update theme %d: %w", id, err)
 	}

@@ -36,7 +36,7 @@
     states: { open },
   } = createPopover({
     forceVisible: true,
-    positioning: { placement: 'bottom-start' },
+    positioning: { strategy: 'fixed', placement: 'bottom-start', fitViewport: true },
     portal: 'body',
   });
 
@@ -173,7 +173,7 @@
     {:else if filtered.length === 0 && !canCreate}
       <p class="status">{t('pages.labelsEmpty')}</p>
     {:else}
-      <ul class="list" role="listbox" aria-multiselectable="true">
+      <ul class="list" data-testid="page-label-picker-list" role="listbox" aria-multiselectable="true">
         {#each filtered as label (label.id)}
           {@const checked = selectedIds.has(label.id)}
           <li>
@@ -286,6 +286,7 @@
   }
 
   .search-row {
+    flex-shrink: 0;
     padding: 0.5rem;
     border-bottom: 1px solid var(--ds-border);
   }
@@ -314,6 +315,8 @@
   }
 
   .list {
+    min-height: 0;
+    overscroll-behavior: contain;
     list-style: none;
     padding: 0.25rem;
     margin: 0;

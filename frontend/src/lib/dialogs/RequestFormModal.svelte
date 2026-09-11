@@ -2,7 +2,8 @@
   import { api } from '../api.js';
   import { authStore } from '../stores';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
@@ -46,11 +47,7 @@
   });
   let customFieldValues = $state({});
 
-  // Draft state — only used on the portal path (portalSlug truthy).
-  // resumedDraft tracks the most recently loaded draft so we can show the
-  // "Resuming draft" banner; cleared once the user opts to start fresh.
-  // savingDraft is shown briefly while the auto-save fetch is in flight so
-  // users get feedback that progress is persisted.
+  // Show the resume banner only for a draft loaded when the portal form opens.
   let resumedDraft = $state(null);
   let savingDraft = $state(false);
   let draftJustSaved = $state(false);
@@ -191,7 +188,6 @@
     try {
       const saved = await api.portal.drafts.save(portalSlug, buildDraftPayload());
       if (saved) {
-        resumedDraft = saved;
         draftJustSaved = true;
         if (draftSavedTimer) clearTimeout(draftSavedTimer);
         draftSavedTimer = setTimeout(() => {

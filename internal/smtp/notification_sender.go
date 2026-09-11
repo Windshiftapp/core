@@ -3,6 +3,7 @@
 package smtp
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -197,7 +198,7 @@ func (s *NotificationSMTPSender) SetEncryption(enc Encryptor) {
 func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (subject, htmlBody, textBody string, err error) {
 	subjectSrc, htmlSrc, textSrc := s.resolveTemplate(templateName)
 
-	subject, _, err = emailutil.RenderTemplates(subjectSrc, subjectSrc, data)
+	_, subject, err = emailutil.RenderTemplates(subjectSrc, subjectSrc, data)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -281,8 +282,17 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 
 // SendBatchedNotifications sends a batch of notifications to a user via email
 func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName string, notifications []models.Notification) error {
+	return s.SendBatchedNotificationsContext(context.Background(), userEmail, userName, notifications)
+}
+
+// SendBatchedNotificationsContext sends a batch with cancellation propagated
+// through SMTP dialing, handshake, commands, and DATA completion.
+func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Context, userEmail, userName string, notifications []models.Notification) error {
 	if len(notifications) == 0 {
 		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	config, err := s.getSMTPConfig()
@@ -295,7 +305,7 @@ func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName st
 		return fmt.Errorf("failed to render notification email: %w", err)
 	}
 
-	return s.sendEmail(config, userEmail, subject, htmlBody, textBody)
+	return s.sendEmailContext(ctx, config, userEmail, subject, htmlBody, textBody)
 }
 
 // notificationBatchEntry mirrors the per-row data exposed to the
@@ -438,6 +448,13 @@ func formatMessageIDHeader(value string) string {
 // through the encryption-aware sender, even the channel-test path that loads
 // raw config from the DB on its own.
 func (s *NotificationSMTPSender) dispatch(config *models.ChannelConfig, toEmail, message string) error {
+	return s.dispatchContext(context.Background(), config, toEmail, message)
+}
+
+func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *models.ChannelConfig, toEmail, message string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if config == nil {
 		return fmt.Errorf("SMTP config is required")
 	}
@@ -469,11 +486,11 @@ func (s *NotificationSMTPSender) dispatch(config *models.ChannelConfig, toEmail,
 
 	switch strings.ToLower(strings.TrimSpace(config.SMTPEncryption)) {
 	case "tls", "starttls":
-		return sendWithStartTLS(addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
+		return sendWithStartTLSContext(ctx, addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
 	case "ssl":
-		return sendWithSSL(addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
+		return sendWithSSLContext(ctx, addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
 	case "none":
-		return sendPlaintext(addr, fromEmail, toEmail, message)
+		return sendPlaintextContext(ctx, addr, fromEmail, toEmail, message)
 	default:
 		return fmt.Errorf("SMTP encryption %q not allowed", config.SMTPEncryption)
 	}
@@ -481,7 +498,11 @@ func (s *NotificationSMTPSender) dispatch(config *models.ChannelConfig, toEmail,
 
 // sendEmail sends a transactional (non-threaded) email using the SMTP config.
 func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
-	return s.dispatch(config, toEmail, buildMime(mimeOptions{
+	return s.sendEmailContext(context.Background(), config, toEmail, subject, htmlBody, textBody)
+}
+
+func (s *NotificationSMTPSender) sendEmailContext(ctx context.Context, config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
+	return s.dispatchContext(ctx, config, toEmail, buildMime(mimeOptions{
 		FromEmail: config.SMTPFromEmail,
 		FromName:  config.SMTPFromName,
 		ToEmail:   toEmail,
@@ -494,15 +515,17 @@ func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail
 // sendWithStartTLS sends email using STARTTLS encryption. The dial goes
 // through utils.SafeNetDialer so a maliciously-configured SMTPHost cannot
 // reach loopback / private-IP / link-local / CGNAT targets.
-func sendWithStartTLS(addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
-	conn, err := utils.SafeNetDialer(smtpDialTimeout).Dial("tcp", addr)
+func sendWithStartTLSContext(ctx context.Context, addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
+	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
-	if err := conn.SetDeadline(time.Now().Add(smtpOperationTimeout)); err != nil {
+	if err := setSMTPDeadline(ctx, conn); err != nil {
 		_ = conn.Close()
 		return err
 	}
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
 	client, err := smtp.NewClient(conn, hostFromAddr(addr))
 	if err != nil {
 		_ = conn.Close()
@@ -516,19 +539,25 @@ func sendWithStartTLS(addr string, auth smtp.Auth, from, to, message string, ski
 		return err
 	}
 
-	return sendWithClient(client, auth, from, to, message)
+	return sendWithClientContext(ctx, client, auth, from, to, message)
 }
 
 // sendWithSSL sends email using SSL/TLS encryption. SafeNetDialer enforces
 // the SSRF reject list before the TLS handshake.
-func sendWithSSL(addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
+func sendWithSSLContext(ctx context.Context, addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
 	tlsConfig := smtpTLSConfig(addr, skipTLSVerify)
-
-	conn, err := tls.DialWithDialer(utils.SafeNetDialer(smtpDialTimeout), "tcp", addr, tlsConfig)
+	rawConn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
-	if err := conn.SetDeadline(time.Now().Add(smtpOperationTimeout)); err != nil {
+	if err := setSMTPDeadline(ctx, rawConn); err != nil {
+		_ = rawConn.Close()
+		return err
+	}
+	stopCancellation := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
+	defer stopCancellation()
+	conn := tls.Client(rawConn, tlsConfig)
+	if err := conn.HandshakeContext(ctx); err != nil {
 		_ = conn.Close()
 		return err
 	}
@@ -540,7 +569,7 @@ func sendWithSSL(addr string, auth smtp.Auth, from, to, message string, skipTLSV
 	}
 	defer func() { _ = client.Close() }()
 
-	return sendWithClient(client, auth, from, to, message)
+	return sendWithClientContext(ctx, client, auth, from, to, message)
 }
 
 func smtpTLSConfig(addr string, skipTLSVerify bool) *tls.Config {
@@ -552,15 +581,17 @@ func smtpTLSConfig(addr string, skipTLSVerify bool) *tls.Config {
 // sendPlaintext sends unauthenticated email over an unencrypted connection.
 // SafeNetDialer keeps the process-wide local-connection policy effective for
 // this transport just as it is for TLS SMTP.
-func sendPlaintext(addr, from, to, message string) error {
-	conn, err := utils.SafeNetDialer(smtpDialTimeout).Dial("tcp", addr)
+func sendPlaintextContext(ctx context.Context, addr, from, to, message string) error {
+	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
-	if err := conn.SetDeadline(time.Now().Add(smtpOperationTimeout)); err != nil {
+	if err := setSMTPDeadline(ctx, conn); err != nil {
 		_ = conn.Close()
 		return err
 	}
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
 	client, err := smtp.NewClient(conn, hostFromAddr(addr))
 	if err != nil {
 		_ = conn.Close()
@@ -568,25 +599,37 @@ func sendPlaintext(addr, from, to, message string) error {
 	}
 	defer func() { _ = client.Close() }()
 
-	return sendWithClient(client, nil, from, to, message)
+	return sendWithClientContext(ctx, client, nil, from, to, message)
 }
 
 // sendWithClient performs authentication, addressing, and message delivery on an established SMTP client.
-func sendWithClient(client *smtp.Client, auth smtp.Auth, from, to, message string) error {
+func sendWithClientContext(ctx context.Context, client *smtp.Client, auth smtp.Auth, from, to, message string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if auth != nil {
 		if err := client.Auth(auth); err != nil { //nolint:gocritic
 			return err
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := client.Mail(from); err != nil { //nolint:gocritic
 		return err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := client.Rcpt(to); err != nil { //nolint:gocritic
 		return err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	writer, err := client.Data()
 	if err != nil {
 		return err
@@ -599,6 +642,14 @@ func sendWithClient(client *smtp.Client, auth smtp.Auth, from, to, message strin
 	// policy/recipient failures (for example 550) here. Discarding this error
 	// falsely reported rejected mail as delivered.
 	return writer.Close()
+}
+
+func setSMTPDeadline(ctx context.Context, conn net.Conn) error {
+	deadline := time.Now().Add(smtpOperationTimeout)
+	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
+		deadline = contextDeadline
+	}
+	return conn.SetDeadline(deadline)
 }
 
 // SendCustomEmail sends a custom email with the provided subject and body

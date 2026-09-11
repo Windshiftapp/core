@@ -1,5 +1,27 @@
 import { api } from '../../api.js';
 
+function collectionPagination(pagination) {
+  if (!pagination) return null;
+  // Store continuations use limit; v2 responses name the effective size page_size.
+  return { ...pagination, limit: pagination.page_size };
+}
+
+// Use the authorized item query without view filters, fetching only one summary.
+export async function fetchCollectionTotal(workspaceId, collectionId) {
+  const scope = collectionId ? { collection_id: collectionId } : { workspace_id: workspaceId };
+  const response = await api.items.getAll({
+    ...scope,
+    page: 1,
+    limit: 1,
+    omit_descriptions: true,
+    include_watermark: true,
+  });
+  return {
+    total: response?.pagination?.total_items ?? null,
+    watermark: response?.meta?.watermark ?? 0,
+  };
+}
+
 /**
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.
@@ -42,7 +64,7 @@ export async function fetchCollectionItems(
 
   const response = await api.items.getAll(filters);
   const items = response?.data ?? [];
-  const pagination = response?.pagination ?? null;
+  const pagination = collectionPagination(response?.pagination);
   const sortableFields = response?.meta?.sortable_fields ?? [];
   const watermark = response?.meta?.watermark ?? 0;
 
@@ -80,7 +102,7 @@ export async function fetchCollectionBacklog(
     include_watermark: true,
   });
   const items = response?.data ?? [];
-  const pagination = response?.pagination ?? null;
+  const pagination = collectionPagination(response?.pagination);
   const watermark = response?.meta?.watermark ?? 0;
   return { items, collectionName, pagination, watermark };
 }

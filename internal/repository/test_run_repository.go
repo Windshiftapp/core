@@ -46,6 +46,8 @@ type TestRunFilters struct {
 	TemplateID   *int // Filter by template
 	SetID        *int // Filter by test set
 	IncludeEnded bool // Include ended runs
+	Limit        int
+	Offset       int
 }
 
 // FindAll returns test runs for a workspace with optional filters
@@ -58,32 +60,12 @@ func (r *TestRunRepository) FindAll(workspaceID int, filters TestRunFilters) ([]
 		       COALESCE(u.avatar_url, '') as assignee_avatar
 		FROM test_runs tr
 		LEFT JOIN users u ON tr.assignee_id = u.id
-		WHERE tr.workspace_id = ?
-	`
-	args := []any{workspaceID}
-
-	if filters.Unassigned {
-		query += " AND tr.assignee_id IS NULL"
-	} else if filters.AssigneeID != nil {
-		query += " AND tr.assignee_id = ?"
-		args = append(args, *filters.AssigneeID)
+	` + testRunWhere(filters) + " ORDER BY tr.id DESC"
+	args := testRunArgs(workspaceID, filters)
+	if filters.Limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		args = append(args, filters.Limit, max(filters.Offset, 0))
 	}
-
-	if filters.TemplateID != nil {
-		query += " AND tr.template_id = ?"
-		args = append(args, *filters.TemplateID)
-	}
-
-	if filters.SetID != nil {
-		query += " AND tr.set_id = ?"
-		args = append(args, *filters.SetID)
-	}
-
-	if !filters.IncludeEnded {
-		query += " AND tr.ended_at IS NULL"
-	}
-
-	query += " ORDER BY tr.id DESC"
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -101,6 +83,52 @@ func (r *TestRunRepository) FindAll(workspaceID int, filters TestRunFilters) ([]
 	}
 
 	return runs, nil
+}
+
+// FindPage returns a stable newest-first page and the total matching rows.
+func (r *TestRunRepository) FindPage(workspaceID int, filters TestRunFilters) ([]models.TestRun, int, error) {
+	if filters.Limit <= 0 {
+		return nil, 0, errors.New("test run page limit must be positive")
+	}
+	var total int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM test_runs tr "+testRunWhere(filters), testRunArgs(workspaceID, filters)...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count test runs: %w", err)
+	}
+	items, err := r.FindAll(workspaceID, filters)
+	return items, total, err
+}
+
+func testRunWhere(filters TestRunFilters) string {
+	query := "WHERE tr.workspace_id = ?"
+	if filters.Unassigned {
+		query += " AND tr.assignee_id IS NULL"
+	} else if filters.AssigneeID != nil {
+		query += " AND tr.assignee_id = ?"
+	}
+	if filters.TemplateID != nil {
+		query += " AND tr.template_id = ?"
+	}
+	if filters.SetID != nil {
+		query += " AND tr.set_id = ?"
+	}
+	if !filters.IncludeEnded {
+		query += " AND tr.ended_at IS NULL"
+	}
+	return query
+}
+
+func testRunArgs(workspaceID int, filters TestRunFilters) []any {
+	args := []any{workspaceID}
+	if !filters.Unassigned && filters.AssigneeID != nil {
+		args = append(args, *filters.AssigneeID)
+	}
+	if filters.TemplateID != nil {
+		args = append(args, *filters.TemplateID)
+	}
+	if filters.SetID != nil {
+		args = append(args, *filters.SetID)
+	}
+	return args
 }
 
 // FindByID retrieves a single test run by ID

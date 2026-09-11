@@ -562,33 +562,6 @@ func (r *AssetRepository) UpdateSetAndPromotion(set *models.AssetManagementSet) 
 	})
 }
 
-func (r *AssetRepository) DeleteSet(setID int) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	deletions := []string{
-		"DELETE FROM assets WHERE set_id = ?",
-		"DELETE FROM asset_categories WHERE set_id = ?",
-		"DELETE FROM asset_types WHERE set_id = ?",
-		"DELETE FROM asset_statuses WHERE set_id = ?",
-		"DELETE FROM user_asset_set_roles WHERE set_id = ?",
-		"DELETE FROM group_asset_set_roles WHERE set_id = ?",
-		"DELETE FROM asset_set_everyone_roles WHERE set_id = ?",
-		"DELETE FROM asset_management_sets WHERE id = ?",
-	}
-
-	for _, query := range deletions {
-		if _, err := tx.Exec(query, setID); err != nil {
-			return fmt.Errorf("failed to delete asset set data: %w", err)
-		}
-	}
-
-	return tx.Commit()
-}
-
 // HardDeleteSet deletes a set and relies on foreign-key cascades for its owned
 // rows. Polymorphic item_links cannot carry an asset foreign key, so links in
 // either direction are removed explicitly in the same transaction first.
@@ -2275,18 +2248,38 @@ type AssetUpdateSnapshot struct {
 	StatusID              sql.NullInt64
 	AssetTypeID           int
 	CustomFieldValuesJSON sql.NullString
+	UpdatedAt             time.Time
+}
+
+func (row AssetRow) UpdateSnapshot() AssetUpdateSnapshot {
+	return AssetUpdateSnapshot{SetID: row.SetID, StatusID: row.StatusID, AssetTypeID: row.AssetTypeID,
+		CustomFieldValuesJSON: row.CustomFieldValues, UpdatedAt: row.UpdatedAt}
 }
 
 func (r *AssetRepository) GetAssetUpdateSnapshot(assetID int) (*AssetUpdateSnapshot, error) {
 	var snap AssetUpdateSnapshot
 	err := r.db.QueryRow(
-		`SELECT set_id, status_id, asset_type_id, custom_field_values FROM assets WHERE id = ?`,
+		`SELECT set_id, status_id, asset_type_id, custom_field_values, updated_at FROM assets WHERE id = ?`,
 		assetID,
-	).Scan(&snap.SetID, &snap.StatusID, &snap.AssetTypeID, &snap.CustomFieldValuesJSON)
+	).Scan(&snap.SetID, &snap.StatusID, &snap.AssetTypeID, &snap.CustomFieldValuesJSON, &snap.UpdatedAt)
 	if err != nil {
 		return nil, notFoundOrWrap(err, "failed to fetch asset snapshot")
 	}
 	return &snap, nil
+}
+
+// LockAssetVersion holds the row until the transaction ends. SQLite transactions
+// already hold the write lock; PostgreSQL requires an explicit row lock.
+func (r *AssetRepository) LockAssetVersion(tx database.Tx, assetID int) (time.Time, error) {
+	query := "SELECT updated_at FROM assets WHERE id = ?"
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	var updatedAt time.Time
+	if err := tx.QueryRow(query, assetID).Scan(&updatedAt); err != nil {
+		return time.Time{}, notFoundOrWrap(err, "lock asset version")
+	}
+	return updatedAt, nil
 }
 
 func (r *AssetRepository) GetAssetSetAndTitle(assetID int) (setID int, title string, err error) {
@@ -2498,9 +2491,9 @@ type ImportJobRow struct {
 
 func (r *AssetRepository) CreateImportJob(jobID string, setID int, filePath, configJSON string, createdBy int, createdAt time.Time) error {
 	_, err := r.db.ExecWrite(`
-		INSERT INTO asset_import_jobs (id, set_id, status, phase, file_path, config_json, created_by, created_at)
-		VALUES (?, ?, 'queued', 'initializing', ?, ?, ?, ?)
-	`, jobID, setID, filePath, configJSON, createdBy, createdAt)
+		INSERT INTO asset_import_jobs (id, set_id, status, phase, file_path, config_json, created_by, created_at, lease_expires_at)
+		VALUES (?, ?, 'queued', 'initializing', ?, ?, ?, ?, ?)
+	`, jobID, setID, filePath, configJSON, createdBy, createdAt, createdAt.Add(assetImportLeaseDuration).Unix())
 	if err != nil {
 		return fmt.Errorf("failed to create import job: %w", err)
 	}
@@ -2546,33 +2539,7 @@ func (r *AssetRepository) ListImportJobs(setID, limit int) ([]ImportJobRow, erro
 	return jobs, nil
 }
 
-func (r *AssetRepository) ListInterruptedImportJobIDs() ([]string, error) {
-	rows, err := r.db.Query(`SELECT id FROM asset_import_jobs WHERE status IN ('running', 'queued')`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list interrupted import jobs: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan interrupted import job id: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate interrupted import job ids: %w", err)
-	}
-	return ids, nil
-}
-
-func (r *AssetRepository) DeleteAssetsFromImportJob(jobID string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin asset import rollback: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
+func (r *AssetRepository) deleteAssetsFromImportJobInTx(tx database.Tx, jobID string) error {
 	rows, err := tx.Query("SELECT id FROM assets WHERE import_job_id = ? ORDER BY id", jobID)
 	if err != nil {
 		return fmt.Errorf("load asset import links: %w", err)
@@ -2596,26 +2563,15 @@ func (r *AssetRepository) DeleteAssetsFromImportJob(jobID string) error {
 	if err := itemevents.NewRecorder(r.db).RemovedLinks(context.Background(), tx, "asset", assetIDs, itemevents.Import(jobID)); err != nil {
 		return err
 	}
+	if _, err := tx.ExecWrite(`DELETE FROM item_links
+        WHERE (source_type = 'asset' AND source_id IN (SELECT id FROM assets WHERE import_job_id = ?))
+           OR (target_type = 'asset' AND target_id IN (SELECT id FROM assets WHERE import_job_id = ?))`, jobID, jobID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecWrite(`DELETE FROM assets WHERE import_job_id = ?`, jobID); err != nil {
 		return fmt.Errorf("failed to delete assets for job %s: %w", jobID, err)
 	}
-	return tx.Commit()
-}
-
-func (r *AssetRepository) MarkInterruptedImportsFailed(completedAt time.Time) (int, error) {
-	result, err := r.db.ExecWrite(`
-		UPDATE asset_import_jobs
-		SET status = 'failed',
-		    phase = '',
-		    error_message = 'Import interrupted by server restart',
-		    completed_at = ?
-		WHERE status IN ('running', 'queued')
-	`, completedAt)
-	if err != nil {
-		return 0, fmt.Errorf("failed to mark interrupted imports: %w", err)
-	}
-	n, _ := result.RowsAffected()
-	return int(n), nil
+	return nil
 }
 
 type ImportAssetRowInput struct {
@@ -2715,47 +2671,35 @@ func (r *AssetRepository) GetCustomFieldTypeAndOptions(fieldID int) (fieldType s
 }
 
 func (r *AssetRepository) StartImportJobRunning(jobID, phase, progressJSON string) error {
-	_, err := r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = 'running', phase = ?, progress_json = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		phase, progressJSON, jobID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start import job: %w", err)
-	}
-	return nil
+	now := time.Now().UTC()
+	return assetImportWriteResult(r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = 'running', phase = ?, progress_json = ?, started_at = ?, lease_expires_at = ?
+         WHERE id = ? AND status = 'queued' AND lease_expires_at > ?`,
+		phase, progressJSON, now, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
 }
 
 func (r *AssetRepository) FinishImportJob(jobID, status, phase, progressJSON, errorMessage string) error {
-	_, err := r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		status, phase, progressJSON, errorMessage, jobID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to finish import job: %w", err)
-	}
-	return nil
+	now := time.Now().UTC()
+	return assetImportWriteResult(r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = ?
+         WHERE id = ? AND status IN ('queued', 'running') AND lease_expires_at > ?`,
+		status, phase, progressJSON, errorMessage, now, jobID, now.Unix()))
 }
 
 func (r *AssetRepository) UpdateImportJobStatus(jobID, status, phase, progressJSON string) error {
-	_, err := r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ? WHERE id = ?`,
-		status, phase, progressJSON, jobID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update import job status: %w", err)
-	}
-	return nil
+	now := time.Now().UTC()
+	return assetImportWriteResult(r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, lease_expires_at = ?
+         WHERE id = ? AND status IN ('queued', 'running') AND lease_expires_at > ?`,
+		status, phase, progressJSON, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
 }
 
 func (r *AssetRepository) UpdateImportJobProgress(jobID, phase, progressJSON string) error {
-	_, err := r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET phase = ?, progress_json = ? WHERE id = ?`,
-		phase, progressJSON, jobID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update import job progress: %w", err)
-	}
-	return nil
+	now := time.Now().UTC()
+	return assetImportWriteResult(r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET phase = ?, progress_json = ?, lease_expires_at = ?
+         WHERE id = ? AND status = 'running' AND lease_expires_at > ?`,
+		phase, progressJSON, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
 }
 
 type ImportTypeFieldInput struct {

@@ -35,7 +35,15 @@ export const workspaces = {
   // Allowed status transitions for every (item_type_id, status_id) pair in the
   // workspace, keyed "<itemTypeId>:<statusId>". One request replaces the
   // board's per-pair /items/{id}/available-status-transitions preload.
-  getTransitionMatrix: (id) => fetchV2Data(`/workspaces/${id}/transition-matrix`),
+  getTransitionMatrix: async (id) => {
+    const entries = await fetchV2Data(`/workspaces/${id}/transition-matrix`);
+    return Object.fromEntries(
+      (entries || []).map(({ item_type_id: itemTypeId, status_id: statusId, transitions }) => [
+        `${itemTypeId}:${statusId}`,
+        transitions,
+      ])
+    );
+  },
 };
 
 // `create` and `delete` here go to the new admin endpoints

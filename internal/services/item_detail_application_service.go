@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -29,6 +30,11 @@ type ItemDetailScreenContext struct {
 	View *models.Screen `json:"view"`
 }
 
+type ItemDetailSectionError struct {
+	Section string `json:"section"`
+	Code    string `json:"code"`
+}
+
 type ItemDetailSummary struct {
 	Item                   *models.Item              `json:"item"`
 	Links                  EntityLinks               `json:"links"`
@@ -47,6 +53,7 @@ type ItemDetailSummary struct {
 	PersonalTaskCount      int                       `json:"personal_task_count"`
 	SCMAvailable           bool                      `json:"scm_available"`
 	HasAgentRuns           bool                      `json:"has_agent_runs"`
+	SectionErrors          []ItemDetailSectionError  `json:"section_errors"`
 }
 
 type ItemDetailApplicationService struct {
@@ -91,6 +98,7 @@ func (s *ItemDetailApplicationService) load(ctx context.Context, userID int, ite
 		Transitions: ItemTransitionSummary{AvailableTransitions: []ItemTransitionOption{}},
 		Children:    []models.Item{}, Ancestors: []models.Item{}, AvailableSubIssueTypes: []ItemTypeResult{},
 		Priorities: []models.PriorityDisplay{}, ManualActions: []*models.Action{},
+		SectionErrors: []ItemDetailSectionError{},
 	}
 	canView, err := s.permissions.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
 	if err != nil || !canView {
@@ -98,11 +106,15 @@ func (s *ItemDetailApplicationService) load(ctx context.Context, userID int, ite
 	}
 	mobile := strings.EqualFold(surface, "mobile")
 	var wait sync.WaitGroup
+	var errorMu sync.Mutex
 	run := func(section string, load func() error) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
 			if err := load(); err != nil {
+				errorMu.Lock()
+				result.SectionErrors = append(result.SectionErrors, ItemDetailSectionError{Section: section, Code: "unavailable"})
+				errorMu.Unlock()
 				slog.Warn("item detail section unavailable", "section", section, "item_id", item.ID, "error", err)
 			}
 		}()
@@ -202,6 +214,7 @@ func (s *ItemDetailApplicationService) load(ctx context.Context, userID int, ite
 		}
 	}
 	wait.Wait()
+	sort.Slice(result.SectionErrors, func(i, j int) bool { return result.SectionErrors[i].Section < result.SectionErrors[j].Section })
 	return result
 }
 

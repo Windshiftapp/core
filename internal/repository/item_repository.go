@@ -837,13 +837,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
-		    due_date = ?, start_date = ?, end_date = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
+		    due_date = ?, start_date = ?, end_date = ?, is_task = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
 		    time_project_id = ?, assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, story_points = ?, estimate_minutes = ?, updated_at = ?, last_active_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
-		item.DueDate, item.StartDate, item.EndDate, item.IterationID, item.ProjectID, item.InheritProject,
+		item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
 		item.TimeProjectID, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, item.StoryPoints, item.EstimateMinutes, now, now, item.ID,
 	)
@@ -1256,13 +1256,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 	if len(workspaceIDs) == 0 {
 		return []models.LinkableItem{}, nil
 	}
-	wsPlaceholders := make([]string, len(workspaceIDs))
-	args := []any{}
-	args = append(args, "%"+query+"%", "%"+query+"%")
-	for i, id := range workspaceIDs {
-		wsPlaceholders[i] = "?"
-		args = append(args, id)
-	}
+	whereClause, args := r.buildWhereClause(ItemListParams{
+		WorkspaceIDs: workspaceIDs,
+		Filters:      itemSearchFilters(query),
+	})
 
 	itemTypeFilter := ""
 	if len(itemTypeIDs) > 0 {
@@ -1295,11 +1292,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE (i.title LIKE ? OR i.description LIKE ?)
-		  AND i.workspace_id IN (%s)%s
+		%s%s
 		ORDER BY i.title
 		LIMIT ?
-	`, strings.Join(wsPlaceholders, ","), itemTypeFilter)
+	`, whereClause, itemTypeFilter)
 
 	rows, err := r.db.Query(sqlQuery, args...)
 	if err != nil {

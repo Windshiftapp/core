@@ -15,7 +15,7 @@ dark_mode: 'no'
 # Four requests per refresh, exposed as IDX_0..IDX_3:
 #   IDX_0 -> the token owner
 #   IDX_1 -> the open items the summary is computed from
-#   IDX_2 -> count of items the owner closed today (pagination.total only)
+#   IDX_2 -> count of items the owner closed today (pagination.total_items only)
 #   IDX_3 -> everything that moved today, across every workspace the token sees
 #
 # The date-dependent queries are pre-URL-encoded so that only the date itself

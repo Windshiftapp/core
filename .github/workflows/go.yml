@@ -91,6 +91,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+
       - name: Verify handler annotations parse and produce valid OpenAPI 3.0
         run: make openapi-check
         # Fails when swag can't parse an annotation, or when the resulting

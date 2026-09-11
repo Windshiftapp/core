@@ -1,4 +1,4 @@
-import { fetchV2Data } from './core.js';
+import { fetchAPI, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
 export const statusCategories = createCrudClient('/status-categories', { v2: true });
@@ -30,7 +30,6 @@ export const statuses = {
   get: async (...args) => normalizeStatus(await statusCRUD.get(...args)),
   create: async (...args) => normalizeStatus(await statusCRUD.create(...args)),
   update: async (...args) => normalizeStatus(await statusCRUD.update(...args)),
-  getNonDoneIds: () => fetchV2Data('/statuses/non-completed-ids'),
 };
 
 const workflowCRUD = createCrudClient('/workflows', { v2: true });
@@ -57,10 +56,7 @@ async function getWorkflow(id, requestOptions = {}) {
 }
 
 async function getAllWithTransitions() {
-  const items = (await workflowCRUD.getAll()) ?? [];
-  return Promise.all(
-    items.map(async (workflow) => ({ ...workflow, transitions: await getTransitions(workflow.id) }))
-  );
+  return fetchAPI('/workflows?include_transitions=true');
 }
 
 export const workflows = {
@@ -73,6 +69,4 @@ export const workflows = {
       method: 'PUT',
       body: JSON.stringify({ transitions: data }),
     }),
-  getAvailableTransitions: (id, statusId) =>
-    fetchV2Data(`/workflows/${id}/statuses/${statusId}/transitions`),
 };

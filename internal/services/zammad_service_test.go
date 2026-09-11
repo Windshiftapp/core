@@ -990,6 +990,22 @@ func TestZammadLinkedPersonalWorkspaceBlocksUserOffboardingBeforeMutation(t *tes
 	if _, err := f.service.GetTicketLink(link.ID); err != nil {
 		t.Fatalf("blocked offboarding removed Zammad link: %v", err)
 	}
+	var offboarded bool
+	if err := f.db.QueryRow("SELECT offboarded_at IS NOT NULL FROM users WHERE id = ?", f.actorID).Scan(&offboarded); err != nil || offboarded {
+		t.Fatalf("blocked offboarding marked user offboarded: value=%t err=%v", offboarded, err)
+	}
+	if _, err := f.service.UnlinkTicket(context.Background(), link.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OffboardUser(f.db, f.actorID, nil); err != nil {
+		t.Fatalf("offboarding after explicit unlink failed: %v", err)
+	}
+	if err := f.db.QueryRow("SELECT offboarded_at IS NOT NULL FROM users WHERE id = ?", f.actorID).Scan(&offboarded); err != nil || !offboarded {
+		t.Fatalf("successful offboarding did not mark user offboarded: value=%t err=%v", offboarded, err)
+	}
+	if exists, err := repository.NewWorkspaceRepository(f.db).Exists(f.workspace1); err != nil || exists {
+		t.Fatalf("successful offboarding retained personal workspace: exists=%t err=%v", exists, err)
+	}
 }
 
 func TestZammadUnlinkUpstreamFailurePreservesLocalLink(t *testing.T) {

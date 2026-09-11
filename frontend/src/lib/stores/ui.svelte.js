@@ -4,7 +4,7 @@ import { derived, writable } from 'svelte/store';
 const NAV_EXPANDED_STORAGE_KEY = 'windshift-nav-expanded';
 const WS_SIDEBAR_WIDTH_STORAGE_KEY = 'windshift-ws-sidebar-width';
 const WS_SIDEBAR_COLLAPSED_STORAGE_KEY = 'windshift-ws-sidebar-collapsed';
-const WS_SIDEBAR_DEFAULT_WIDTH = 256;
+export const WS_SIDEBAR_DEFAULT_WIDTH = 256;
 const WS_SIDEBAR_LEGACY_DEFAULT_WIDTH = 192;
 export const WS_SIDEBAR_MIN_WIDTH = 180;
 export const WS_SIDEBAR_MAX_WIDTH = 520;

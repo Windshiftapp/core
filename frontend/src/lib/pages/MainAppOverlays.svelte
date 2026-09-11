@@ -17,6 +17,7 @@
     showChatPanel = $bindable(false),
     createModalInitialType = 'work-item',
     createModalWorkspaceId = null,
+    createModalParentContext = null,
     createModalSkipNavigate = false,
     onclosecreate,
     onclosecommand = () => {},
@@ -115,6 +116,7 @@
     bind:isOpen={showCreateModal}
     initialType={createModalInitialType}
     initialWorkspaceId={createModalWorkspaceId}
+    initialParentContext={createModalParentContext}
     skipNavigate={createModalSkipNavigate}
     onclose={onclosecreate}
   />

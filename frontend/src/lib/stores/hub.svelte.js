@@ -8,8 +8,7 @@ import { authStore } from '../stores';
 import { createFooterLinkHelpers } from './footerLinks.js';
 
 export { WINDSHIFT_GRADIENT } from '../utils/gradients.js';
-// Import gradients from portal store for sharing
-export { gradients, iconMap } from './portal.svelte.js';
+export { gradients, iconMap } from './portalPresentation.js';
 
 // Core state
 let hubConfig = $state(null);

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"windshift/internal/constants"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -18,8 +17,6 @@ type ItemValidationParams struct {
 	Title             string
 	ItemTypeID        *int
 	ParentID          *int
-	StatusID          *int
-	IsTask            bool
 	RelatedWorkItemID *int
 	UserID            int // User creating the item (for personal workspace validation)
 	// PermService, when set, enforces that the caller has view permission on a
@@ -71,14 +68,6 @@ func ValidateItemCreation(db database.Database, params ItemValidationParams) *It
 	}
 	if !workspaceExists {
 		return &ItemValidationResult{Valid: false, Error: "Workspace not found"}
-	}
-
-	// Task-specific validation
-	if params.IsTask {
-		// Tasks can only have status_id Open or Done
-		if params.StatusID != nil && *params.StatusID != constants.StatusIDOpen && *params.StatusID != constants.StatusIDDone {
-			return &ItemValidationResult{Valid: false, Error: "Tasks can only have status 'Open' or 'Done'"}
-		}
 	}
 
 	// Validate parent item if specified

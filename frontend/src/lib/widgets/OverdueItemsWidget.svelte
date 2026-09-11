@@ -14,7 +14,6 @@
   let loading = $state(false);
   let error = $state(null);
   let currentWorkspaceId = $state(null);
-  let refreshInFlight = $state(false);
   let activeFetchId = $state(0);
   let currentCollectionFilter = $state(null);
 
@@ -27,7 +26,6 @@
     const fetchId = ++activeFetchId;
     loading = true;
     error = null;
-    refreshInFlight = true;
 
     try {
       const trimmedFilter = (collectionFilter || '').trim();
@@ -77,7 +75,6 @@
     } finally {
       if (fetchId === activeFetchId) {
         loading = false;
-        refreshInFlight = false;
       }
     }
   }
@@ -90,7 +87,7 @@
   }
 
   function handleRefresh() {
-    if (!refreshInFlight) {
+    if (!loading) {
       loadOverdueItems();
     }
   }

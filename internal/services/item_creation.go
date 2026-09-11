@@ -46,6 +46,9 @@ func prepareItemCreation(ctx context.Context, db database.Database, params ItemC
 	if err := creation.resolveStatus(); err != nil {
 		return nil, err
 	}
+	if err := validation.ValidateTaskState(db, creation.params.WorkspaceID, creation.params.ValidatingUserID, creation.params.IsTask, creation.statusID); err != nil {
+		return nil, err
+	}
 	if err := creation.resolvePriority(); err != nil {
 		return nil, err
 	}

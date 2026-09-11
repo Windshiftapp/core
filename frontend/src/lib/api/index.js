@@ -45,7 +45,6 @@ import {
   links,
   linkTypes,
   priorities,
-  projectFieldRequirements,
   screens,
 } from './configuration.js';
 import { del, fetchAPI, get, post, put } from './core.js';
@@ -80,7 +79,6 @@ import {
   jiraImport,
   labels,
   personalLabels,
-  projects,
   reviews,
   search,
   updateComment,
@@ -104,6 +102,7 @@ import {
   portalCustomers,
   portalPasskey,
 } from './portal.js';
+import { queryLanguage } from './queryLanguage.js';
 import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
@@ -156,9 +155,7 @@ export const api = {
   delete: del,
 
   // Domain objects
-  projects,
   customFields,
-  projectFieldRequirements,
   workspaces,
   workspaceRoles,
   screens,
@@ -241,6 +238,9 @@ export const api = {
 
   // Search
   search,
+
+  // Query language metadata and value help
+  queryLanguage,
 
   // Milestone Categories
   milestoneCategories,

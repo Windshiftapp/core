@@ -22,6 +22,7 @@
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
+  import { formatItemCount } from '../../utils/itemCount.js';
   import { isSystemFieldAvailableForItem } from '../../utils/screenFields.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -240,8 +241,16 @@
     }
   }
 
-  // Total item count across all sections
-  let totalItemCount = $derived(collectionStore.backlogPagination?.total_items ?? backlogItems.length);
+  let shownItemCount = $derived(
+    iterationSections.reduce((count, section) => count + (
+      collapsedSections.has(section.iteration.id) ? 0 : section.items.length
+    ), collapsedSections.has('unassigned') ? 0 : unassignedItems.length)
+  );
+
+  let backlogTotal = $derived(collectionStore.backlogPagination?.total_items ?? backlogItems.length);
+  let backlogShownCount = $derived(collectionStore.loading ? null : shownItemCount);
+  let backlogRemaining = $derived(Math.max(0, backlogTotal - backlogItems.length));
+  let backlogCountSummary = $derived(formatItemCount(backlogTotal, backlogShownCount, t));
 
   // Centralized gradient styling
   const styles = useGradientStyles();
@@ -250,7 +259,7 @@
   async function handleRefreshWorkItems(event) {
     if (event.detail?.itemId) {
       try {
-        const newItem = await api.items.get(event.detail.itemId);
+        const newItem = event.detail.item ?? await api.items.get(event.detail.itemId);
         // When viewing a collection, accept items from any workspace (the collection defines scope).
         // Otherwise fall back to current-workspace check.
         const belongsToView = collectionId
@@ -294,7 +303,7 @@
 
   // Keep backlog count in sync
   $effect(() => {
-    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total_items ?? collectionStore.backlogItems.length);
+    backlogStore.setCount(workspaceId, backlogTotal);
   });
 
   // Adaptive polling for backlog items: use cheap deltas, falling back to full refresh only when needed.
@@ -410,7 +419,7 @@
       const boundaryItem = await api.items.getBacklogBoundary(
         workspaceId,
         collectionId,
-        collectionStore.subFilterQL,
+        collectionStore.effectiveSubFilterQL,
         boundary,
       );
       if (!boundaryItem || boundaryItem.id === item.id) return;
@@ -713,7 +722,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Backlog"
-          itemCount={totalItemCount}
+          itemCount={backlogTotal}
+          shownCount={backlogShownCount}
         >
           {#snippet actions()}
             <div class="flex items-center gap-2">
@@ -751,7 +761,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mb-6">
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}
@@ -832,7 +842,7 @@
               >
                 {collectionStore.backlogLoadingMore ? t('common.loading') : t('common.loadMore')}
                 {#if collectionStore.backlogPagination?.total_items}
-                  ({collectionStore.backlogPagination.total - collectionStore.backlogItems.length} {t('common.remaining')})
+                  ({backlogRemaining} {t('common.remaining')})
                 {/if}
               </button>
             </div>
@@ -840,8 +850,8 @@
 
           <!-- Summary -->
           <div class="mt-8 text-center">
-            <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
-              {t('collections.showingItemsFromBacklog', { count: collectionStore.backlogPagination?.total_items ?? backlogItems.length })}
+            <p data-testid="backlog-count-summary" class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
+              {backlogCountSummary}
             </p>
           </div>
         </div>

@@ -165,7 +165,7 @@ func (c *DurableAssetActionConsumer) Handle(ctx context.Context, event events.Ev
 					if err != nil {
 						return errors.Is(err, repository.ErrNotFound), fmt.Errorf("load frozen asset action %d: %w", actionID, err)
 					}
-					result, err := c.actions.executeActionWithResultForEvent(action, actionEvent, nil, event.Key)
+					result, err := c.actions.executeActionWithResultForEvent(ctx, action, actionEvent, nil, event.Key)
 					if err == nil && result.Status == models.ActionStatusFailed {
 						err = fmt.Errorf("asset action %d completed with failed steps: %s", action.ID, result.ErrorMessage)
 					}

@@ -19,7 +19,7 @@ LDFLAGS=-ldflags="-s -w"
 # Directories
 FRONTEND_DIR=frontend
 
-.PHONY: all build build-linux build-windows build-windows-arm64 clean deps frontend help hooks lint dev-build release openapi openapi-check openapi-v2-check coding-agent-image dev-tools install-golangci-lint install-govulncheck install-deadcode ci-tools-check ci-go ci-frontend ci
+.PHONY: all build build-linux build-windows build-windows-arm64 clean deps frontend help hooks lint dev-build release openapi openapi-v2 openapi-check openapi-v2-check openapi-v2-client-smoke coding-agent-image dev-tools install-golangci-lint install-govulncheck install-deadcode ci-tools-check ci-go ci-frontend ci
 
 # Tooling. swag is a tool dependency tracked in go.mod (see `tool` directive),
 # so the version is pinned and CI / dev installs always agree. `go tool swag`
@@ -29,6 +29,8 @@ OPENAPI_DIR = api
 GOLANGCI_LINT_VERSION := 2.13.1
 GOVULNCHECK_VERSION := 1.3.0
 DEADCODE_VERSION := 0.45.0
+OAPI_CODEGEN_VERSION := 2.5.0
+OAPI_RUNTIME_VERSION := 1.1.1
 NODE_VERSION := 24.18.0
 NPM_VERSION := 11.16.0
 
@@ -125,26 +127,30 @@ ci: ci-go ci-frontend
 
 # Regenerate the OpenAPI v1 spec from handler annotations.
 # Pipeline: swag emits Swagger 2.0 (JSON) -> openapi-convert produces
-# OpenAPI 3.0 yaml/json -> intermediate Swagger 2.0 file is removed.
-# Only api/openapi.{yaml,json} is committed.
+# OpenAPI 3.0 JSON -> intermediate Swagger 2.0 file is removed.
+# Only api/openapi.json is committed.
 openapi:
 	@echo "Regenerating OpenAPI spec..."
 	@$(SWAG) init -g internal/restapi/v1/doc.go -d ./,internal/restapi --parseInternal -o $(OPENAPI_DIR) --outputTypes json -q
 	@go run ./scripts/openapi-convert -in $(OPENAPI_DIR)/swagger.json \
-		-out-yaml $(OPENAPI_DIR)/openapi.yaml \
 		-out-json $(OPENAPI_DIR)/openapi.json
 	@rm -f $(OPENAPI_DIR)/swagger.json
-	@echo "Spec written to $(OPENAPI_DIR)/openapi.{yaml,json}"
+	@echo "Spec written to $(OPENAPI_DIR)/openapi.json"
+
+# Regenerate the public v2 schemas and shared responses from canonical route
+# request, response, media-type, envelope, and success-status metadata.
+openapi-v2:
+	@go run ./scripts/openapi-v2-generate -spec $(OPENAPI_DIR)/openapi-v2.json
 
 # Verify that handler annotations parse cleanly under swag and the generated
 # spec is valid OpenAPI 3.0. Does NOT compare against the committed
-# api/openapi.{json,yaml} — that byte-equality check was a continuous source
+# api/openapi.json — that byte-equality check was a continuous source
 # of host-environment-dependent CI noise (swag's output differed between CI
 # and local in ways we couldn't isolate over multiple cycles).
 #
 # The canonical contract test is core-tests/TestAPIOpenAPIContract, which runs
 # the actual server and validates response shapes against the spec. The
-# committed api/openapi.{json,yaml} is best-effort up-to-date; run
+# committed api/openapi.json is best-effort up-to-date; run
 # `make openapi` locally to refresh it (e.g., before a release).
 #
 # This target writes to a tempdir so it doesn't touch the committed spec.
@@ -157,13 +163,24 @@ openapi-check:
 	@tmpdir=$$(mktemp -d) && trap "rm -rf $$tmpdir" EXIT && \
 		$(SWAG) init -g internal/restapi/v1/doc.go -d ./,internal/restapi --parseInternal -o $$tmpdir --outputTypes json -q && \
 		go run ./scripts/openapi-convert -in $$tmpdir/swagger.json \
-			-out-yaml $$tmpdir/openapi.yaml \
 			-out-json $$tmpdir/openapi.json && \
 		echo "OpenAPI spec generates cleanly and validates as OpenAPI 3.0."
 	@$(MAKE) --no-print-directory openapi-v2-check
 
 openapi-v2-check:
+	@go run ./scripts/openapi-v2-metadata -check
+	@go run ./scripts/openapi-v2-generate -spec api/openapi-v2.json -check
 	@go run ./scripts/openapi-v2-check -spec api/openapi-v2.json
+	@$(MAKE) --no-print-directory openapi-v2-client-smoke
+	@node scripts/check-frontend-v2-fields.mjs
+
+openapi-v2-client-smoke:
+	@tmpdir=$$(mktemp -d /tmp/windshift-v2-client.XXXXXX) && trap 'rm -rf "$$tmpdir"' EXIT && \
+		go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v$(OAPI_CODEGEN_VERSION) \
+			-generate types,client -package v2client -o "$$tmpdir/client.gen.go" api/openapi-v2.json && \
+		cd "$$tmpdir" && go mod init windshift-v2-client-smoke >/dev/null && \
+		go get github.com/oapi-codegen/runtime@v$(OAPI_RUNTIME_VERSION) >/dev/null && \
+		go test ./...
 
 # Run static analysis
 lint:
@@ -219,7 +236,9 @@ help:
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make dev-tools      - Install pinned Go tools used by CI"
 	@echo "  make hooks          - Install git pre-commit hook"
-	@echo "  make openapi        - Regenerate api/openapi.{yaml,json} from handler annotations"
+	@echo "  make openapi        - Regenerate api/openapi.json from handler annotations"
+	@echo "  make openapi-v2     - Regenerate typed v2 schemas from canonical route metadata"
+	@echo "  make openapi-v2-client-smoke - Generate and compile a pinned Go v2 client"
 	@echo "  make openapi-check  - Validate v1 generation and v2 route/spec parity (used by hooks/CI)"
 	@echo "  make coding-agent-image - Build the thin ws-carrier image (WS_IMAGE for windshift-agent)"
 	@echo "  make help           - Show this help message"

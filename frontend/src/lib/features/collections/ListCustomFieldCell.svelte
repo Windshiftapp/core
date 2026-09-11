@@ -3,12 +3,11 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
-  import ColorDot from '../../components/ColorDot.svelte';
-  import { Calendar, User, Target, Globe, Building2 } from '@lucide/svelte';
-  import {
-    milestonePickerConfig as milestoneConfig,
-    iterationPickerConfig as iterationConfig,
-  } from '../../pickers/pickerConfigs.js';
+  import { User, Target } from '@lucide/svelte';
+  import { milestonePickerConfig as milestoneConfig } from '../../pickers/pickerConfigs.js';
+  import UserCellValue from './UserCellValue.svelte';
+  import IterationCellEditor from './IterationCellEditor.svelte';
+  import MilestoneCellValue from './MilestoneCellValue.svelte';
 
   let {
     field,
@@ -44,10 +43,7 @@
     >
       {#snippet children()}
         {#if milestone}
-          <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-            <ColorDot color={milestone.category_color || '#9CA3AF'} />
-            {milestone.name}
-          </span>
+          <MilestoneCellValue {milestone} interactive />
         {:else}
           <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
             <Target class="w-4 h-4" />
@@ -58,10 +54,7 @@
     </ItemPicker>
   {:else}
     {#if milestone}
-      <span class="flex items-center gap-2 text-sm" style="color: var(--ds-text);">
-        <ColorDot color={milestone.category_color || '#9CA3AF'} />
-        {milestone.name}
-      </span>
+      <MilestoneCellValue {milestone} />
     {:else}
       <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
     {/if}
@@ -69,51 +62,18 @@
 
 {:else if field.field_type === 'iteration'}
   {@const iteration = value ? [...(editorOptions?.iterations ?? []), ...iterations].find(i => i.id === parseInt(value)) : null}
-  {#if canEdit}
-    <ItemPicker
-      {value}
-      items={editorOptions?.iterations ?? iterations}
-      config={iterationConfig}
-      placeholder={field.name}
-      showUnassigned={true}
-      unassignedLabel="No {field.name.toLowerCase()}"
-      allowClear={true}
-      loading={editorOptions?.loading?.iterations ?? false}
-      onOpen={() => editorOptions && collectionEditorOptions.load(workspaceId, 'iterations')}
-      onSelect={(item) => onChange(item?.id || null)}
-    >
-      {#snippet children()}
-        {#if iteration}
-          <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-            {#if iteration.is_global}
-              <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-            {:else}
-              <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-            {/if}
-            {iteration.name}
-          </span>
-        {:else}
-          <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
-            <Calendar class="w-4 h-4" />
-            {field.name}
-          </span>
-        {/if}
-      {/snippet}
-    </ItemPicker>
-  {:else}
-    {#if iteration}
-      <span class="flex items-center gap-2 text-sm" style="color: var(--ds-text);">
-        {#if iteration.is_global}
-          <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        {:else}
-          <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        {/if}
-        {iteration.name}
-      </span>
-    {:else}
-      <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
-    {/if}
-  {/if}
+  <IterationCellEditor
+    {canEdit}
+    {value}
+    {iteration}
+    items={editorOptions?.iterations ?? iterations}
+    loading={editorOptions?.loading?.iterations ?? false}
+    placeholder={field.name}
+    unassignedLabel="No {field.name.toLowerCase()}"
+    selectPrompt={field.name}
+    onOpen={() => editorOptions && collectionEditorOptions.load(workspaceId, 'iterations')}
+    onSelect={(item) => onChange(item?.id || null)}
+  />
 
 {:else if field.field_type === 'user'}
   {@const userValue = value && typeof value === 'object' ? value.id : value}
@@ -135,23 +95,9 @@
     >
       {#snippet children()}
         {#if assignee}
-          <div class="flex items-center gap-2 cursor-pointer">
-            <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-              {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '') || assignee.username?.[0]?.toUpperCase() || '?'}
-            </div>
-            <span class="text-sm truncate" style="color: var(--ds-text);">
-              {assignee.first_name} {assignee.last_name}
-            </span>
-          </div>
+          <UserCellValue user={assignee} interactive />
         {:else if value && typeof value === 'object' && value.name}
-          <div class="flex items-center gap-2 cursor-pointer">
-            <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-              {value.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </div>
-            <span class="text-sm truncate" style="color: var(--ds-text);">
-              {value.name}
-            </span>
-          </div>
+          <UserCellValue fallbackName={value.name} fallbackAvatar interactive />
         {:else}
           <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
             <User class="w-4 h-4" />
@@ -162,23 +108,9 @@
     </UserPicker>
   {:else}
     {#if assignee}
-      <div class="flex items-center gap-2">
-        <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-          {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '') || assignee.username?.[0]?.toUpperCase() || '?'}
-        </div>
-        <span class="text-sm truncate" style="color: var(--ds-text);">
-          {assignee.first_name} {assignee.last_name}
-        </span>
-      </div>
+      <UserCellValue user={assignee} />
     {:else if value && typeof value === 'object' && value.name}
-      <div class="flex items-center gap-2">
-        <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-          {value.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-        </div>
-        <span class="text-sm truncate" style="color: var(--ds-text);">
-          {value.name}
-        </span>
-      </div>
+      <UserCellValue fallbackName={value.name} fallbackAvatar />
     {:else}
       <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
     {/if}

@@ -69,19 +69,19 @@ export const time = {
       }),
     delete: (id) => fetchV2Data(`/time/worklogs/${id}`, { method: 'DELETE' }),
     getByItem: (itemId, requestOptions = {}) =>
-      fetchV2Data(`/items/${itemId}/worklogs`, requestOptions),
+      fetchAllV2Pages(`/items/${itemId}/worklogs`, requestOptions),
   },
 };
 
 export const timer = {
   start: (data) =>
-    fetchV2Data('/timer/start', {
+    fetchV2Data('/time/timers', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  getActive: () => fetchV2Data('/timer/active'),
+  getActive: () => fetchV2Data('/time/timers/active'),
   stop: () =>
-    fetchV2Data('/timer/stop', {
-      method: 'DELETE',
+    fetchV2Data('/time/timers/active/stop', {
+      method: 'POST',
     }),
 };

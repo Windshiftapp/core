@@ -28,11 +28,11 @@ func New(s *styles.Styles, placeholder string, charLimit int) textinput.Model {
 // edit and comment dialogs.
 func TextareaStyles(s *styles.Styles) textarea.Styles {
 	st := textarea.DefaultDarkStyles()
-	st.Focused.Base = lipgloss.NewStyle().Foreground(s.Palette.FgBase).Background(s.Palette.BgSurfaceHovered)
+	st.Focused.Base = lipgloss.NewStyle().Foreground(s.Palette.FgBase).Background(s.Palette.BgSurface)
 	st.Focused.Text = lipgloss.NewStyle().Foreground(s.Palette.FgBase)
 	st.Focused.Placeholder = lipgloss.NewStyle().Foreground(s.Palette.FgMuted)
-	st.Focused.CursorLine = lipgloss.NewStyle().Background(s.Palette.BgSurfaceHovered)
-	st.Focused.EndOfBuffer = lipgloss.NewStyle().Foreground(s.Palette.BgSurfaceHovered)
+	st.Focused.CursorLine = lipgloss.NewStyle().Background(s.Palette.BgSurface)
+	st.Focused.EndOfBuffer = lipgloss.NewStyle().Foreground(s.Palette.BgSurface)
 	st.Focused.Prompt = lipgloss.NewStyle().Foreground(s.Palette.Primary)
 	st.Blurred.Base = lipgloss.NewStyle().Foreground(s.Palette.FgBase).Background(s.Palette.BgSurface)
 	st.Blurred.Text = lipgloss.NewStyle().Foreground(s.Palette.FgBase)
@@ -47,8 +47,7 @@ func TextareaStyles(s *styles.Styles) textarea.Styles {
 }
 
 // Styles configures textinput.Styles for both focused and blurred states.
-// The cursor color is brand primary; focused text gets a soft
-// surface-hovered background to make the active field obvious.
+// The cursor uses the theme accent; the frame marks the active field.
 func Styles(s *styles.Styles) textinput.Styles {
 	style := textinput.Styles{}
 	style.Focused.Text = lipgloss.NewStyle().Foreground(s.Palette.FgBase)
@@ -68,7 +67,7 @@ func Styles(s *styles.Styles) textinput.Styles {
 }
 
 // Render wraps a textinput's view in the form input frame. When the field is
-// "selected but not editing" we still show the focused background so the
+// "selected but not editing" we still show the focus border so the
 // user knows which row is active; the cursor disappears because
 // textinput.Blur was called.
 func Render(s *styles.Styles, in textinput.Model, selected, editing bool, width int) string {

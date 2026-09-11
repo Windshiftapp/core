@@ -86,7 +86,7 @@ type Item struct {
 	DueDate             *time.Time     `json:"due_date,omitempty"`
 	StartDate           *time.Time     `json:"start_date,omitempty"`
 	EndDate             *time.Time     `json:"end_date,omitempty"`
-	CustomFields        map[string]any `json:"custom_fields,omitempty"`
+	CustomFields        map[string]any `json:"custom_field_values,omitempty"`
 
 	// Hierarchy. ParentKey/ParentTitle are populated by the server on
 	// permission-checked single-item reads (omitted when the caller may not
@@ -157,19 +157,20 @@ type ItemCreateRequest struct {
 	StartDate    *time.Time     `json:"start_date,omitempty"`
 	EndDate      *time.Time     `json:"end_date,omitempty"`
 	IsTask       bool           `json:"is_task,omitempty"`
-	CustomFields map[string]any `json:"custom_fields,omitempty"`
+	CustomFields map[string]any `json:"custom_field_values,omitempty"`
 }
 
 // ItemUpdateRequest is the merge patch for /rest/api/v2/items/{id}. It does not
 // carry status_id — status changes go through TransitionRequest on a
 // dedicated endpoint so workflow and condition rules are enforced.
 type ItemUpdateRequest struct {
-	Title        *string        `json:"title,omitempty"`
-	Description  *string        `json:"description,omitempty"`
-	PriorityID   *int           `json:"priority_id,omitempty"`
-	ItemTypeID   *int           `json:"item_type_id,omitempty"`
-	AssigneeID   *int           `json:"assignee_id,omitempty"`
-	ParentID     *int           `json:"parent_id,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	PriorityID  *int    `json:"priority_id,omitempty"`
+	ItemTypeID  *int    `json:"item_type_id,omitempty"`
+	AssigneeID  *int    `json:"assignee_id,omitempty"`
+	// nil omits the field; a pointer to nil clears it with JSON null.
+	ParentID     **int          `json:"parent_id,omitempty"`
 	MilestoneIDs *[]int         `json:"milestone_ids,omitempty"`
 	IterationID  *int           `json:"iteration_id,omitempty"`
 	ProjectID    *int           `json:"project_id,omitempty"`
@@ -177,7 +178,7 @@ type ItemUpdateRequest struct {
 	StartDate    *time.Time     `json:"start_date,omitempty"`
 	EndDate      *time.Time     `json:"end_date,omitempty"`
 	IsTask       *bool          `json:"is_task,omitempty"`
-	CustomFields map[string]any `json:"custom_fields,omitempty"`
+	CustomFields map[string]any `json:"custom_field_values,omitempty"`
 }
 
 // TransitionRequest is the body for POST /rest/api/v2/items/{id}/transition.
@@ -332,8 +333,6 @@ type MilestoneCreateRequest struct {
 	Description string `json:"description,omitempty"`
 	TargetDate  string `json:"target_date,omitempty"`
 	Status      string `json:"status,omitempty"`
-	Scope       string `json:"scope,omitempty"`
-	WorkspaceID *int   `json:"workspace_id,omitempty"`
 }
 
 type MilestoneUpdateRequest struct {
@@ -597,7 +596,7 @@ type TestRun struct {
 	ID             int        `json:"id"`
 	WorkspaceID    int        `json:"workspace_id"`
 	TemplateID     int        `json:"template_id,omitempty"`
-	SetID          int        `json:"set_id"`
+	PlanID         int        `json:"plan_id"`
 	Name           string     `json:"name"`
 	AssigneeID     *int       `json:"assignee_id,omitempty"`
 	AssigneeName   string     `json:"assignee_name,omitempty"`
@@ -609,7 +608,7 @@ type TestRun struct {
 }
 
 type TestRunCreateRequest struct {
-	SetID      int    `json:"set_id"`
+	PlanID     int    `json:"plan_id"`
 	Name       string `json:"name"`
 	TemplateID int    `json:"template_id,omitempty"`
 	AssigneeID *int   `json:"assignee_id,omitempty"`
@@ -1082,7 +1081,6 @@ type TimeWorklogCreateRequest struct {
 	StartTime       string `json:"start_time,omitempty"`
 	EndTime         string `json:"end_time,omitempty"`
 	ItemID          *int   `json:"item_id,omitempty"`
-	ItemKey         string `json:"item_key,omitempty"`
 }
 
 // TimerStartRequest is the v2 start-timer request body.

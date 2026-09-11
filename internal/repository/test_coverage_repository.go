@@ -268,19 +268,9 @@ func (r *TestCoverageRepository) CountRequirements(params RequirementListParams)
 		return 0, nil
 	}
 
-	whereClause, havingClause, args := buildRequirementFilters(params)
+	whereClause, args := buildRequirementFilters(params)
 
-	query := `
-		SELECT COUNT(*) FROM (
-			SELECT
-				i.id,
-				(` + coverageLinkedCountSubquery + `) as linked_count
-			FROM items i
-			` + whereClause + `
-			GROUP BY i.id
-			` + havingClause + `
-		) sub
-	`
+	query := `SELECT COUNT(*) FROM items i ` + whereClause
 
 	var total int
 	if err := r.db.QueryRow(query, args...).Scan(&total); err != nil {
@@ -295,7 +285,7 @@ func (r *TestCoverageRepository) ListRequirements(params RequirementListParams) 
 		return []models.RequirementCoverageItem{}, nil
 	}
 
-	whereClause, havingClause, args := buildRequirementFilters(params)
+	whereClause, args := buildRequirementFilters(params)
 	args = append(args, params.Limit, params.Offset)
 
 	query := `
@@ -316,8 +306,6 @@ func (r *TestCoverageRepository) ListRequirements(params RequirementListParams) 
 		JOIN item_types it ON i.item_type_id = it.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		` + whereClause + `
-		GROUP BY i.id
-		` + havingClause + `
 		ORDER BY i.created_at DESC
 		LIMIT ? OFFSET ?
 	`
@@ -361,13 +349,15 @@ func (r *TestCoverageRepository) ListRequirements(params RequirementListParams) 
 }
 
 // coverageLinkedCountSubquery counts item_links that connect an item to a test_case
-// in either direction via the "tests" link type (link_type_id = 1).
+// in either direction via the system Tests link type.
 const coverageLinkedCountSubquery = `
-	SELECT COUNT(*) FROM item_links il
-	WHERE (
-		(il.source_type = 'item' AND il.source_id = i.id AND il.target_type = 'test_case' AND il.link_type_id = 1)
+	SELECT COUNT(*)
+	FROM item_links il
+	JOIN link_types lt ON lt.id = il.link_type_id
+	WHERE lt.builtin_key = 'tests' AND (
+		(il.source_type = 'item' AND il.source_id = i.id AND il.target_type = 'test_case')
 		OR
-		(il.target_type = 'item' AND il.target_id = i.id AND il.source_type = 'test_case' AND il.link_type_id = 1)
+		(il.target_type = 'item' AND il.target_id = i.id AND il.source_type = 'test_case')
 	)
 `
 
@@ -411,7 +401,7 @@ func coverageWhereArgs(workspaceID int, typeIDs []int) (placeholders string, arg
 	return strings.Join(slots, ","), args
 }
 
-func buildRequirementFilters(params RequirementListParams) (where, having string, args []any) {
+func buildRequirementFilters(params RequirementListParams) (where string, args []any) {
 	placeholders, filterArgs := coverageWhereArgs(params.WorkspaceID, params.TypeIDs)
 	args = filterArgs
 	where = "WHERE i.workspace_id = ? AND i.item_type_id IN (" + placeholders + ")"
@@ -423,9 +413,9 @@ func buildRequirementFilters(params RequirementListParams) (where, having string
 
 	switch params.CoveredFilter {
 	case "true":
-		having = " HAVING linked_count > 0"
+		where += " AND (" + coverageLinkedCountSubquery + ") > 0"
 	case "false":
-		having = " HAVING linked_count = 0"
+		where += " AND (" + coverageLinkedCountSubquery + ") = 0"
 	}
-	return where, having, args
+	return where, args
 }

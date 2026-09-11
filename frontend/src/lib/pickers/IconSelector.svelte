@@ -50,6 +50,8 @@
     states: { open }
   } = createPopover({
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
       placement: 'bottom-start',
       gutter: 8
     },
@@ -111,6 +113,7 @@
     {:else if triggerVariant === 'badge'}
       <button
         use:melt={$trigger}
+        data-testid={dataTestid ? `${dataTestid}-trigger` : undefined}
         type="button"
         class="icon-badge-trigger"
         style="--icon-selector-color: {selectedColor};"
@@ -148,6 +151,7 @@
     {#if $open}
       <div
         use:melt={$content}
+        data-testid={dataTestid ? `${dataTestid}-menu` : undefined}
         class="popover-content"
         class:popover-content-color-only={colorOnly}
         style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
@@ -197,6 +201,7 @@
               <button
                 type="button"
                 class="popover-color-option"
+                data-testid={dataTestid ? `${dataTestid}-color` : undefined}
                 class:selected={selectedColor === color}
                 style="background-color: {color}"
                 onclick={() => selectColor(color)}
@@ -535,7 +540,8 @@
     z-index: 50;
     border-radius: 8px;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     width: 320px;
   }
 
@@ -574,8 +580,6 @@
 
   .popover-icons {
     padding: 8px;
-    max-height: 180px;
-    overflow-y: auto;
   }
 
   .popover-section-header {

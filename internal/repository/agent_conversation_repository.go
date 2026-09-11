@@ -251,17 +251,24 @@ func (r *AgentConversationRepository) ListMessagesForParticipant(ctx context.Con
 	if _, err := r.GetForParticipant(ctx, sessionID, userID); err != nil {
 		return nil, err
 	}
-	return r.listMessages(ctx, sessionID, beforeID, limit)
+	return r.listMessages(ctx, sessionID, 0, beforeID, limit)
+}
+
+func (r *AgentConversationRepository) ListMessagesForParticipantAfter(ctx context.Context, sessionID, userID, afterID, beforeID, limit int) ([]models.AgentMessage, error) {
+	if _, err := r.GetForParticipant(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
+	return r.listMessages(ctx, sessionID, afterID, beforeID, limit)
 }
 
 func (r *AgentConversationRepository) ListMessages(ctx context.Context, sessionID, beforeID, limit int) ([]models.AgentMessage, error) {
 	if _, err := r.Get(ctx, sessionID); err != nil {
 		return nil, err
 	}
-	return r.listMessages(ctx, sessionID, beforeID, limit)
+	return r.listMessages(ctx, sessionID, 0, beforeID, limit)
 }
 
-func (r *AgentConversationRepository) listMessages(ctx context.Context, sessionID, beforeID, limit int) ([]models.AgentMessage, error) {
+func (r *AgentConversationRepository) listMessages(ctx context.Context, sessionID, afterID, beforeID, limit int) ([]models.AgentMessage, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
@@ -272,6 +279,10 @@ func (r *AgentConversationRepository) listMessages(ctx context.Context, sessionI
 		WHERE session_id = ?
 	`
 	args := []any{sessionID}
+	if afterID > 0 {
+		query += " AND id > ?"
+		args = append(args, afterID)
+	}
 	if beforeID > 0 {
 		query += " AND id < ?"
 		args = append(args, beforeID)

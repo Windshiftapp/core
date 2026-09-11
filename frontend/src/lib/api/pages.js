@@ -7,8 +7,8 @@ import { buildQueryString } from './utils.js';
  * (core.js sets credentials: 'same-origin').
  */
 export const pages = {
-  /** Fetch the workspace page tree + flat list. */
-  getTree: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/pages/tree`),
+  /** Fetch every visible page as an ordered, flat metadata list. */
+  getAll: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/pages`),
 
   /** Fetch a single page (404 on missing or no view permission). */
   getPage: (workspaceId, pageId) => fetchV2Data(`/workspaces/${workspaceId}/pages/${pageId}`),

@@ -38,6 +38,8 @@
   } = createPopover({
     forceVisible: true,
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
       placement: 'bottom-end'
     },
     portal: 'body'
@@ -233,11 +235,12 @@
 {#if $open}
   <div
     use:melt={$content}
-    class="w-80 rounded-lg shadow-xl border z-[60]"
+    data-testid="column-selector-menu"
+    class="w-80 rounded-lg shadow-xl border z-[60] flex flex-col overflow-hidden"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
   >
     <!-- Header -->
-    <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
+    <div class="px-4 py-3 border-b shrink-0 flex items-center justify-between" style="border-color: var(--ds-border);">
       <span class="font-medium text-sm" style="color: var(--ds-text);">Configure Columns</span>
       <button
         onclick={cancelChanges}
@@ -249,7 +252,7 @@
     </div>
 
     <!-- Column List -->
-    <div class="p-2 max-h-80 overflow-y-auto">
+    <div data-testid="column-selector-scroll" class="p-2 min-h-0 max-h-80 overflow-y-auto overscroll-contain">
       <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--ds-text-subtle);">
         Visible Columns
       </div>
@@ -371,7 +374,7 @@
     </div>
 
     <!-- Footer -->
-    <div class="px-4 py-3 border-t flex items-center justify-end gap-2" style="border-color: var(--ds-border);">
+    <div class="px-4 py-3 border-t shrink-0 flex items-center justify-end gap-2" style="border-color: var(--ds-border);">
       <button
         onclick={cancelChanges}
         class="px-3 py-1.5 text-sm rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"

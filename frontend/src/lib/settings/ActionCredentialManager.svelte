@@ -13,7 +13,7 @@
 -->
 <script>
   import { onMount } from 'svelte';
-  import { Plus, Edit, Trash2, KeyRound, Power, PowerOff } from '@lucide/svelte';
+  import { Plus, Edit, Trash2, KeyRound } from '@lucide/svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
@@ -21,8 +21,6 @@
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Select from '../components/Select.svelte';
@@ -31,6 +29,9 @@
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import EnabledStatus from './EnabledStatus.svelte';
+  import EntityFormModal from './EntityFormModal.svelte';
+  import EntityRowActions from './EntityRowActions.svelte';
 
   const CREDENTIAL_TYPES = $derived([
     { value: 'bearer_token', label: t('settings.adminOperations.actionCredentials.bearerToken') },
@@ -318,45 +319,14 @@
         {/if}
       {/snippet}
       {#snippet status(cred)}
-        {#if cred.is_enabled}
-          <div class="flex items-center gap-1">
-            <Power size={14} style="color: var(--ds-icon-success);" />
-            <span class="text-xs" style="color: var(--ds-text-success);">{t('common.enabled')}</span>
-          </div>
-        {:else}
-          <div class="flex items-center gap-1">
-            <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.disabled')}</span>
-          </div>
-        {/if}
+        <EnabledStatus enabled={cred.is_enabled} />
       {/snippet}
       {#snippet actions(cred)}
-        <div class="flex items-center justify-end gap-1">
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-subtle);"
-            title={t('settings.adminOperations.actionCredentials.rotateSecret')}
-            onclick={() => openRotate(cred)}
-          >
-            <KeyRound size={14} />
-          </button>
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-subtle);"
-            title={t('common.edit')}
-            onclick={() => openEdit(cred)}
-          >
-            <Edit size={14} />
-          </button>
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-danger);"
-            title={t('common.delete')}
-            onclick={() => deleteCredential(cred)}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        <EntityRowActions actions={[
+          { id: 'rotate', icon: KeyRound, title: t('settings.adminOperations.actionCredentials.rotateSecret'), onclick: () => openRotate(cred) },
+          { id: 'edit', icon: Edit, title: t('common.edit'), onclick: () => openEdit(cred) },
+          { id: 'delete', icon: Trash2, title: t('common.delete'), danger: true, onclick: () => deleteCredential(cred) },
+        ]} />
       {/snippet}
     </DataTable>
   {/if}
@@ -411,10 +381,15 @@
 
 <!-- Create modal -->
 {#if showCreateModal}
-  <Modal isOpen={true} onclose={closeAndClearSecret} onSubmit={handleCreate} submitDisabled={saving || !form.name || !form.secret || workspaceScopeInvalid()}>
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.adminOperations.actionCredentials.add')} onclose={closeAndClearSecret} />
-      <div class="p-4 space-y-4">
+  <EntityFormModal
+    title={t('settings.adminOperations.actionCredentials.add')}
+    onclose={closeAndClearSecret}
+    onsubmit={handleCreate}
+    disabled={!form.name || !form.secret || workspaceScopeInvalid()}
+    {saving}
+    confirmLabel={t('common.create')}
+  >
+    {#snippet fields()}
         <label class="block">
           <span class="text-sm font-medium" style="color: var(--ds-text);">{t('common.name')}</span>
           <Input
@@ -458,29 +433,20 @@
         </label>
         <Checkbox bind:checked={form.is_enabled} label={t('common.enabled')} />
         {@render scopeFields()}
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={closeAndClearSecret} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            onclick={handleCreate}
-            loading={saving}
-            disabled={saving || !form.name || !form.secret || workspaceScopeInvalid()}
-            keyboardHint={submitHint}
-          >
-            {t('common.create')}
-          </Button>
-        </div>
-      </div>
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 <!-- Edit (metadata only) modal -->
 {#if showEditModal && editing}
-  <Modal isOpen={true} onclose={closeAndClearSecret} onSubmit={handleUpdate} submitDisabled={saving || !form.name || workspaceScopeInvalid()}>
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.adminOperations.actionCredentials.edit')} onclose={closeAndClearSecret} />
-      <div class="p-4 space-y-4">
+  <EntityFormModal
+    title={t('settings.adminOperations.actionCredentials.edit')}
+    onclose={closeAndClearSecret}
+    onsubmit={handleUpdate}
+    disabled={!form.name || workspaceScopeInvalid()}
+    {saving}
+  >
+    {#snippet fields()}
         <label class="block">
           <span class="text-sm font-medium" style="color: var(--ds-text);">{t('common.name')}</span>
           <Input
@@ -506,23 +472,21 @@
         </label>
         <Checkbox bind:checked={form.is_enabled} label={t('common.enabled')} />
         {@render scopeFields()}
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={closeAndClearSecret} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={saving || workspaceScopeInvalid()} keyboardHint={submitHint}>
-            {t('common.save')}
-          </Button>
-        </div>
-      </div>
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 <!-- Rotate modal -->
 {#if showRotateModal && rotating}
-  <Modal isOpen={true} onclose={closeAndClearSecret} onSubmit={handleRotate} submitDisabled={saving || !form.secret}>
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.adminOperations.actionCredentials.rotateTitle', { name: rotating.name })} onclose={closeAndClearSecret} />
-      <div class="p-4 space-y-4">
+  <EntityFormModal
+    title={t('settings.adminOperations.actionCredentials.rotateTitle', { name: rotating.name })}
+    onclose={closeAndClearSecret}
+    onsubmit={handleRotate}
+    disabled={!form.secret}
+    {saving}
+    confirmLabel={t('settings.adminOperations.actionCredentials.rotate')}
+  >
+    {#snippet fields()}
         <p class="text-sm" style="color: var(--ds-text-subtle);">
           {t('settings.adminOperations.actionCredentials.rotateHelp')}
         </p>
@@ -536,13 +500,6 @@
             required
           />
         </label>
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={closeAndClearSecret} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button variant="primary" onclick={handleRotate} loading={saving} disabled={saving || !form.secret} keyboardHint={submitHint}>
-            {t('settings.adminOperations.actionCredentials.rotate')}
-          </Button>
-        </div>
-      </div>
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}

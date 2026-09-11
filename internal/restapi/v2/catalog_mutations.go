@@ -22,12 +22,10 @@ type catalogMutationApplication interface {
 	CreateStatusCategory(services.AuditActor, models.StatusCategory) (*models.StatusCategory, error)
 	PatchStatusCategory(services.AuditActor, int, services.StatusCategoryPatch) (*models.StatusCategory, error)
 	DeleteStatusCategory(services.AuditActor, int) error
-	NonDoneStatusIDs() ([]int, error)
 	CreateWorkflow(services.AuditActor, models.Workflow) (*services.WorkflowResult, error)
 	PatchWorkflow(services.AuditActor, int, services.WorkflowPatch) (*services.WorkflowResult, error)
 	DeleteWorkflow(services.AuditActor, int) error
 	ReplaceWorkflowTransitions(services.AuditActor, int, []models.WorkflowTransition) ([]services.WorkflowTransitionResult, error)
-	AvailableWorkflowTransitions(int, int) ([]models.WorkflowTransition, error)
 	ListLinkTypes(bool) ([]models.LinkType, error)
 	GetLinkType(int) (*models.LinkType, error)
 	CreateLinkType(services.AuditActor, models.LinkType) (*models.LinkType, error)
@@ -230,16 +228,6 @@ func deleteStatusCategory(app catalogMutationApplication) commandOperation {
 	})
 }
 
-func listNonDoneStatusIDs(app catalogMutationApplication) readOperation[[]int] {
-	return func(*http.Request) ([]int, error) {
-		ids, err := app.NonDoneStatusIDs()
-		if err != nil {
-			return nil, internalError(err)
-		}
-		return ids, nil
-	}
-}
-
 func createWorkflow(app catalogMutationApplication) jsonOperation[models.Workflow, workflowDTO] {
 	return func(r *http.Request, input models.Workflow) (workflowDTO, error) {
 		user, err := principal(r)
@@ -285,21 +273,6 @@ func replaceWorkflowTransitions(app catalogMutationApplication) jsonOperation[wo
 			return nil, catalogMutationError(err)
 		}
 		return workflowTransitionsFromResults(items), nil
-	}
-}
-
-func listAvailableWorkflowTransitions(app catalogMutationApplication) readOperation[[]models.WorkflowTransition] {
-	return func(r *http.Request) ([]models.WorkflowTransition, error) {
-		workflowID, err := pathID(r, "workflow_id")
-		if err != nil {
-			return nil, err
-		}
-		statusID, err := pathID(r, "status_id")
-		if err != nil {
-			return nil, err
-		}
-		items, err := app.AvailableWorkflowTransitions(workflowID, statusID)
-		return items, catalogMutationError(err)
 	}
 }
 

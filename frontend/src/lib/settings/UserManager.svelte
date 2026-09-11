@@ -20,6 +20,7 @@
 	import Radio from '../components/Radio.svelte';
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
+	import { scopeCatalogStore } from '../stores/scopeCatalog.svelte.js';
 	import { formatDateSimple } from '../utils/dateFormatter.js';
 	import { confirm } from '../composables/useConfirm.js';
 	import { publicBaseURL } from '../runtime/contextPath.js';
@@ -68,24 +69,14 @@
 	// Grantable scopes come from the server catalog (auth.ScopeCatalog) rather
 	// than a list maintained here, which had silently fallen behind and left
 	// time:*, tests:*, assets:* and actions:* impossible to grant to an agent.
-	let scopeCatalog = $state([]);
 	// Non-admin only: minting an admin-scoped token for an agent is not something
 	// this modal offers, and the server rejects it for non-admin callers anyway.
-	let agentScopeOptions = $derived(scopeCatalog.filter((s) => !s.admin));
+	let agentScopeOptions = $derived(scopeCatalogStore.catalog.filter((s) => !s.admin));
 	// The default selection mirrors the server's DefaultAgentScopes, so a token
 	// minted here matches one minted by `ws init` or the MCP OAuth flow.
 	let defaultAgentTokenScopes = $derived(
-		scopeCatalog.filter((s) => s.agent_default).map((s) => s.scope)
+		scopeCatalogStore.catalog.filter((s) => s.agent_default).map((s) => s.scope)
 	);
-
-	async function loadScopeCatalog() {
-		try {
-			scopeCatalog = (await api.getScopeCatalog()) || [];
-		} catch (err) {
-			console.warn('Failed to load scope catalog:', err);
-			scopeCatalog = [];
-		}
-	}
 
 	async function loadUsers() {
 		loading = true;
@@ -434,7 +425,7 @@
 
 	onMount(() => {
 		loadUsers();
-		loadScopeCatalog();
+		scopeCatalogStore.load();
 	});
 </script>
 

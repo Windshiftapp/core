@@ -12,14 +12,14 @@ import (
 )
 
 func registerAdminRoutes(builder *routeBuilder, deps Deps) {
-	builder.Page("/admin/groups", AuthAuthenticated, []string{"admin:groups:read"}, listAdminGroups(deps))
-	builder.Read("/admin/groups/{group_id}", AuthAuthenticated, []string{"admin:groups:read"}, getAdminGroup(deps))
-	builder.JSON(http.MethodPost, "/admin/groups", http.StatusCreated, false, AuthAuthenticated, []string{"admin:groups:write"}, createAdminGroup(deps))
-	builder.JSON(http.MethodPatch, "/admin/groups/{group_id}", http.StatusOK, true, AuthAuthenticated, []string{"admin:groups:write"}, updateAdminGroup(deps))
-	builder.Command(http.MethodDelete, "/admin/groups/{group_id}", AuthAuthenticated, []string{"admin:groups:write"}, deleteAdminGroup(deps))
-	builder.Page("/admin/users", AuthAuthenticated, []string{"admin:users:read"}, listAdminUsers(deps))
-	builder.Read("/admin/users/{user_id}", AuthAuthenticated, []string{"admin:users:read"}, getAdminUser(deps))
-	builder.JSON(http.MethodPatch, "/admin/users/{user_id}", http.StatusOK, true, AuthAuthenticated, []string{"admin:users:write"}, updateAdminUser(deps))
+	builder.SessionPage("/admin/groups", listAdminGroups(deps))
+	builder.SessionRead("/admin/groups/{group_id}", getAdminGroup(deps))
+	builder.SessionJSON(http.MethodPost, "/admin/groups", http.StatusCreated, false, createAdminGroup(deps))
+	builder.SessionJSON(http.MethodPatch, "/admin/groups/{group_id}", http.StatusOK, true, updateAdminGroup(deps))
+	builder.SessionCommand(http.MethodDelete, "/admin/groups/{group_id}", deleteAdminGroup(deps))
+	builder.SessionPage("/admin/users", listAdminUsers(deps))
+	builder.SessionRead("/admin/users/{user_id}", getAdminUser(deps))
+	builder.SessionJSON(http.MethodPatch, "/admin/users/{user_id}", http.StatusOK, true, updateAdminUser(deps))
 }
 
 type adminGroupCreateRequest struct {

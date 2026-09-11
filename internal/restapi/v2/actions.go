@@ -8,20 +8,21 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/services/actioncatalog"
 )
 
 func registerActionRoutes(builder *routeBuilder, actions actionApplication) {
-	builder.Read("/action-templates", AuthAuthenticated, []string{"items:read"}, listActionTemplates(actions))
-	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/action-templates/{template_key}/apply", http.StatusCreated, AuthAuthenticated, []string{"items:write"}, applyActionTemplate(actions))
-	builder.Read("/workspaces/{workspace_id}/action-catalog", AuthAuthenticated, []string{"items:read"}, actionCatalog(actions))
-	builder.Read("/workspaces/{workspace_id}/actions", AuthAuthenticated, []string{"items:read"}, listActions(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createAction(actions))
-	builder.Read("/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"items:read"}, getAction(actions))
-	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/actions/{action_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, updateAction(actions))
-	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"items:write"}, deleteAction(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/toggle", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, toggleAction(actions))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/execute", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, executeAction(actions))
-	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/logs", AuthAuthenticated, []string{"items:read"}, actionLogs(actions))
+	builder.Read("/action-templates", AuthAuthenticated, []string{"actions:read"}, listActionTemplates(actions))
+	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/action-templates/{template_key}/apply", http.StatusCreated, AuthAuthenticated, []string{"actions:write"}, applyActionTemplate(actions))
+	builder.Read("/workspaces/{workspace_id}/action-catalog", AuthAuthenticated, []string{"actions:read"}, actionCatalog(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/validate", http.StatusOK, false, AuthAuthenticated, []string{"actions:write"}, validateAction(actions))
+	builder.Read("/workspaces/{workspace_id}/actions", AuthAuthenticated, []string{"actions:read"}, listActions(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions", http.StatusCreated, false, AuthAuthenticated, []string{"actions:write"}, createAction(actions))
+	builder.Read("/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:read"}, getAction(actions))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/actions/{action_id}", http.StatusOK, true, AuthAuthenticated, []string{"actions:write"}, updateAction(actions))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:write"}, deleteAction(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/execute", http.StatusOK, false, AuthAuthenticated, []string{"actions:write"}, executeAction(actions))
+	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/logs", AuthAuthenticated, []string{"actions:read"}, actionLogs(actions))
 }
 
 func listActionTemplates(actions actionApplication) readOperation[[]services.ActionTemplateSummary] {
@@ -45,12 +46,16 @@ func applyActionTemplate(actions actionApplication) actionOperation[*services.Ap
 	}
 }
 
-type actionToggleRequest struct {
-	IsEnabled bool `json:"is_enabled"`
+type actionValidationResponse struct {
+	Errors actioncatalog.ValidationErrors `json:"errors"`
 }
 
 type actionExecuteRequest struct {
 	ItemID int `json:"item_id"`
+}
+
+type actionExecuteResponse struct {
+	Status models.ActionExecutionStatus `json:"status"`
 }
 
 func actionCatalog(actions actionApplication) readOperation[services.ActionCatalog] {
@@ -61,6 +66,23 @@ func actionCatalog(actions actionApplication) readOperation[services.ActionCatal
 		}
 		result, err := actions.Catalog(user.ID, workspaceID)
 		return result, actionError(err)
+	}
+}
+
+func validateAction(actions actionApplication) jsonOperation[models.CreateActionRequest, actionValidationResponse] {
+	return func(r *http.Request, input models.CreateActionRequest) (actionValidationResponse, error) {
+		user, workspaceID, _, err := actionTarget(r, false)
+		if err != nil {
+			return actionValidationResponse{}, err
+		}
+		errs, err := actions.Validate(user.ID, workspaceID, input)
+		if err != nil {
+			return actionValidationResponse{}, actionError(err)
+		}
+		if errs == nil {
+			errs = actioncatalog.ValidationErrors{}
+		}
+		return actionValidationResponse{Errors: errs}, nil
 	}
 }
 
@@ -118,28 +140,17 @@ func deleteAction(actions actionApplication) commandOperation {
 	}
 }
 
-func toggleAction(actions actionApplication) jsonOperation[actionToggleRequest, *models.Action] {
-	return func(r *http.Request, input actionToggleRequest) (*models.Action, error) {
+func executeAction(actions actionApplication) jsonOperation[actionExecuteRequest, actionExecuteResponse] {
+	return func(r *http.Request, input actionExecuteRequest) (actionExecuteResponse, error) {
 		user, workspaceID, actionID, err := actionTarget(r, true)
 		if err != nil {
-			return nil, err
-		}
-		result, err := actions.Toggle(user.ID, workspaceID, actionID, auditActor(r, user), &input.IsEnabled)
-		return result, actionError(err)
-	}
-}
-
-func executeAction(actions actionApplication) jsonOperation[actionExecuteRequest, map[string]models.ActionExecutionStatus] {
-	return func(r *http.Request, input actionExecuteRequest) (map[string]models.ActionExecutionStatus, error) {
-		user, workspaceID, actionID, err := actionTarget(r, true)
-		if err != nil {
-			return nil, err
+			return actionExecuteResponse{}, err
 		}
 		if input.ItemID <= 0 {
-			return nil, newError(http.StatusBadRequest, "invalid_request", "item_id is required")
+			return actionExecuteResponse{}, newError(http.StatusBadRequest, "invalid_request", "item_id is required")
 		}
 		status, err := actions.Execute(user.ID, workspaceID, actionID, input.ItemID)
-		return map[string]models.ActionExecutionStatus{"status": status}, actionError(err)
+		return actionExecuteResponse{Status: status}, actionError(err)
 	}
 }
 
@@ -179,10 +190,11 @@ func actionError(err error) error {
 		return nil
 	}
 	var validation *services.ActionValidationError
+	var invalidRequest *services.InvalidRequestError
 	switch {
 	case errors.Is(err, services.ErrActionNotVisible), errors.Is(err, repository.ErrNotFound):
 		return newError(http.StatusNotFound, "not_found", "Action was not found")
-	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), strings.Contains(err.Error(), "allowed_role_ids"):
+	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), errors.As(err, &invalidRequest):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		return internalError(err)

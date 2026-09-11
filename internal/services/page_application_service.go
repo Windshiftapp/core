@@ -42,11 +42,6 @@ type PageApplicationService struct {
 	pageAuth *PagePermissionService
 }
 
-type PageTreeResult struct {
-	Pages []models.Page      `json:"pages"`
-	Tree  []*models.PageNode `json:"tree"`
-}
-
 type PagePermissionsResult struct {
 	PageID             int                     `json:"page_id"`
 	InheritPermissions bool                    `json:"inherit_permissions"`
@@ -54,10 +49,10 @@ type PagePermissionsResult struct {
 	ACL                []models.PagePermission `json:"acl"`
 }
 
-func (s *PageApplicationService) ListTree(userID, workspaceID int) (PageTreeResult, error) {
+func (s *PageApplicationService) List(userID, workspaceID int) ([]models.Page, error) {
 	pages, err := s.pages.ListTreeMeta(workspaceID, false)
 	if err != nil {
-		return PageTreeResult{}, err
+		return nil, err
 	}
 	ids := make([]int, len(pages))
 	for i := range pages {
@@ -65,7 +60,7 @@ func (s *PageApplicationService) ListTree(userID, workspaceID int) (PageTreeResu
 	}
 	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
 	if err != nil {
-		return PageTreeResult{}, err
+		return nil, err
 	}
 	filtered := make([]models.Page, 0, len(pages))
 	for i := range pages {
@@ -74,9 +69,9 @@ func (s *PageApplicationService) ListTree(userID, workspaceID int) (PageTreeResu
 		}
 	}
 	if err := s.pages.PreloadLabels(filtered); err != nil {
-		return PageTreeResult{}, err
+		return nil, err
 	}
-	return PageTreeResult{Pages: filtered, Tree: BuildPageTree(filtered)}, nil
+	return filtered, nil
 }
 
 func (s *PageApplicationService) Get(userID, workspaceID, pageID int) (*models.Page, error) {

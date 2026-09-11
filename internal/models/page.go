@@ -39,7 +39,7 @@ type Page struct {
 }
 
 // PageNode is a tree-rendering projection of Page with computed children.
-// Used by the page tree API; not persisted directly.
+// Used by internal tree projections; not persisted directly.
 type PageNode struct {
 	Page
 	Children []*PageNode `json:"children,omitempty"`

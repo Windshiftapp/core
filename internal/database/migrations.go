@@ -930,6 +930,120 @@ var Catalog = []Migration{
 		SQLite:        "ALTER TABLE daily_briefings ADD COLUMN source_workspace_ids TEXT",
 		Postgres:      "ALTER TABLE daily_briefings ADD COLUMN source_workspace_ids TEXT",
 	},
+	{
+		Version:       "20260905_asset_import_leases",
+		Name:          "Fence asset import workers and recovery with expiring leases",
+		CheckSQLite:   sqliteColumnCheck("asset_import_jobs", "lease_expires_at"),
+		CheckPostgres: pgColumnCheck("asset_import_jobs", "lease_expires_at"),
+		SQLite:        "ALTER TABLE asset_import_jobs ADD COLUMN lease_expires_at BIGINT",
+		Postgres:      "ALTER TABLE asset_import_jobs ADD COLUMN lease_expires_at BIGINT",
+	},
+	{
+		Version:       "20260905_asset_import_upload_ownership",
+		Name:          "Bind asset import uploads to their uploader and set",
+		CheckSQLite:   sqliteTableCheck("asset_import_uploads"),
+		CheckPostgres: pgTableCheck("asset_import_uploads"),
+		SQLite: `CREATE TABLE IF NOT EXISTS asset_import_uploads (
+ id TEXT PRIMARY KEY,
+ set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at BIGINT NOT NULL
+);`,
+		Postgres: `CREATE TABLE IF NOT EXISTS asset_import_uploads (
+ id TEXT PRIMARY KEY,
+ set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at BIGINT NOT NULL
+);`,
+	},
+	{
+		Version:       "20260905_notification_reference_provenance",
+		Name:          "Preserve referenced notification authorization",
+		CheckSQLite:   sqliteColumnCheck("notifications", "referenced_entity_type"),
+		CheckPostgres: pgColumnCheck("notifications", "referenced_entity_type"),
+		SQLite: `
+			ALTER TABLE notifications ADD COLUMN referenced_entity_type TEXT;
+			ALTER TABLE notifications ADD COLUMN referenced_entity_id INTEGER;
+			ALTER TABLE notifications ADD COLUMN referenced_workspace_id INTEGER;
+			ALTER TABLE notifications ADD COLUMN referenced_workspace_permission TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE notifications ADD COLUMN referenced_entity_type TEXT;
+			ALTER TABLE notifications ADD COLUMN referenced_entity_id INTEGER;
+			ALTER TABLE notifications ADD COLUMN referenced_workspace_id INTEGER;
+			ALTER TABLE notifications ADD COLUMN referenced_workspace_permission TEXT;
+		`,
+	},
+	{
+		Version:       "20260911_users_offboarded_at",
+		Name:          "Add irreversible offboarded lifecycle state to users",
+		CheckSQLite:   sqliteColumnCheck("users", "offboarded_at"),
+		CheckPostgres: pgColumnCheck("users", "offboarded_at"),
+		SQLite:        `ALTER TABLE users ADD COLUMN offboarded_at DATETIME`,
+		Postgres:      `ALTER TABLE users ADD COLUMN IF NOT EXISTS offboarded_at TIMESTAMPTZ`,
+	},
+	{
+		Version:       "20260911_users_scim_deleted_at",
+		Name:          "Add hidden SCIM deprovisioning tombstone state to users",
+		CheckSQLite:   sqliteColumnCheck("users", "scim_deleted_at"),
+		CheckPostgres: pgColumnCheck("users", "scim_deleted_at"),
+		SQLite:        `ALTER TABLE users ADD COLUMN scim_deleted_at DATETIME`,
+		Postgres:      `ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_deleted_at TIMESTAMPTZ`,
+	},
+	{
+		Version:       "20260905_notification_email_claims",
+		Name:          "Add recoverable notification email claims",
+		CheckSQLite:   sqliteColumnCheck("notifications", "email_delivery_state"),
+		CheckPostgres: pgColumnCheck("notifications", "email_delivery_state"),
+		SQLite: `
+			ALTER TABLE notifications ADD COLUMN email_delivery_state TEXT NOT NULL DEFAULT 'pending';
+			ALTER TABLE notifications ADD COLUMN email_claim_owner TEXT;
+			ALTER TABLE notifications ADD COLUMN email_claim_token TEXT;
+			ALTER TABLE notifications ADD COLUMN email_claim_expires_at DATETIME;
+			ALTER TABLE notifications ADD COLUMN email_delivery_attempts INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE notifications ADD COLUMN email_last_error TEXT;
+			CREATE INDEX idx_notifications_email_delivery ON notifications(email_delivery_state, email_claim_expires_at);
+		`,
+		Postgres: `
+			ALTER TABLE notifications ADD COLUMN email_delivery_state TEXT NOT NULL DEFAULT 'pending';
+			ALTER TABLE notifications ADD COLUMN email_claim_owner TEXT;
+			ALTER TABLE notifications ADD COLUMN email_claim_token TEXT;
+			ALTER TABLE notifications ADD COLUMN email_claim_expires_at TIMESTAMPTZ;
+			ALTER TABLE notifications ADD COLUMN email_delivery_attempts INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE notifications ADD COLUMN email_last_error TEXT;
+			CREATE INDEX idx_notifications_email_delivery ON notifications(email_delivery_state, email_claim_expires_at);
+		`,
+	},
+	{
+		Version:       "20260905_notification_delivery_keys",
+		Name:          "Deduplicate durable notification deliveries",
+		CheckSQLite:   sqliteIndexCheck("uq_notifications_delivery_key"),
+		CheckPostgres: pgIndexCheck("uq_notifications_delivery_key"),
+		SQLite: `
+			ALTER TABLE notifications ADD COLUMN delivery_key TEXT;
+			CREATE UNIQUE INDEX uq_notifications_delivery_key ON notifications(delivery_key) WHERE delivery_key IS NOT NULL;
+		`,
+		Postgres: `
+			ALTER TABLE notifications ADD COLUMN delivery_key TEXT;
+			CREATE UNIQUE INDEX uq_notifications_delivery_key ON notifications(delivery_key) WHERE delivery_key IS NOT NULL;
+		`,
+	},
+	{
+		Version: "20260911_theme_logo_url",
+		Name:    "Add an optional company logo URL to themes",
+		CheckSQLite: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM pragma_table_info('themes') WHERE name='logo_url') = 1
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='themes' AND column_name='logo_url') = 1
+		THEN 1 ELSE 0 END`,
+		SQLite: `
+			ALTER TABLE themes ADD COLUMN logo_url TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE themes ADD COLUMN logo_url TEXT;
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {

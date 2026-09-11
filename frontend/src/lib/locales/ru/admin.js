@@ -22,7 +22,7 @@ export default {
       background: 'Фон', text: 'Текст',
       failedToLoad: 'Не удалось загрузить темы.', failedToCreate: 'Не удалось создать тему.',
       failedToUpdate: 'Не удалось обновить тему.', failedToDelete: 'Не удалось удалить тему.',
-      failedToActivate: 'Не удалось включить тему.',
+      failedToActivate: 'Не удалось включить тему.', failedToUploadLogo: 'Не удалось загрузить логотип.',
       defaults: {
         default: { name: 'Стандартная', description: 'Лаконичная тема со стандартными цветами навигации' },
         ocean: { name: 'Океан', description: 'Профессиональная тема навигации в синих тонах' },

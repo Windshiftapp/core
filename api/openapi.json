@@ -14992,27 +14992,6 @@
         ]
       }
     },
-    "/openapi.yaml": {
-      "get": {
-        "description": "Returns the OpenAPI 3.0 description of this API. Public; no auth required.",
-        "responses": {
-          "200": {
-            "content": {
-              "application/yaml": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "OpenAPI 3.0 document"
-          }
-        },
-        "summary": "OpenAPI 3.0 spec (YAML)",
-        "tags": [
-          "meta"
-        ]
-      }
-    },
     "/pages/{id}/links": {
       "get": {
         "description": "Returns outgoing and incoming links for the given entity. The URL prefix (items / pages / test-cases) selects the entity type. Required scope depends on the route: items:read for items/test-cases, pages:read for pages.",

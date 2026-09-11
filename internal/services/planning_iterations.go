@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/logger"
@@ -115,6 +117,9 @@ type IterationListParams struct {
 	TypeID        *int   // Filter by type
 	Status        string // Filter by status
 	IncludeGlobal bool   // Include global iterations
+	IsGlobal      bool   // Restricts an unscoped list to global iterations only
+	SortBy        string
+	SortOrder     string
 }
 
 // FindIterationByName returns a local workspace iteration by exact name.
@@ -139,7 +144,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	list.addWorkspaceScope("i.workspace_id", "i.is_global", params.WorkspaceID, params.WorkspaceIDs, params.IncludeGlobal)
 	list.addNullableIDFilter("i.type_id", params.TypeID)
 	list.addStringFilter("i.status", params.Status)
-	query, args := list.paginated(" ORDER BY i.start_date DESC, i.name", params.Limit, params.Offset)
+	query, args := list.paginated(iterationOrderByClause(params.SortBy, params.SortOrder), params.Limit, params.Offset)
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -155,6 +160,19 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 
 	return iterations, total, nil
+}
+
+func iterationOrderByClause(sortBy, sortOrder string) string {
+	direction := "ASC"
+	if strings.EqualFold(sortOrder, "desc") {
+		direction = "DESC"
+	}
+	switch sortBy {
+	case "start_date", "end_date", "name", "status", "created_at", "updated_at":
+		return " ORDER BY i." + sortBy + " " + direction + ", i.name ASC, i.id ASC"
+	default:
+		return " ORDER BY i.start_date DESC, i.name ASC, i.id ASC"
+	}
 }
 
 // GetIteration retrieves an iteration by ID.
@@ -447,10 +465,13 @@ func (s *PlanningService) GetIterationProgress(iterationID int, workspaceIDs []i
 
 // BurndownDataPoint represents a single day's burndown data.
 type BurndownDataPoint struct {
-	Date      string `json:"date"`
-	Remaining int    `json:"remaining"`
-	Completed int    `json:"completed"`
-	Ideal     int    `json:"ideal"`
+	RemainingPoints float64 `json:"remaining_points"`
+	CompletedPoints float64 `json:"completed_points"`
+	IdealPoints     float64 `json:"ideal_points"`
+	Date            string  `json:"date"`
+	Remaining       int     `json:"remaining"`
+	Completed       int     `json:"completed"`
+	Ideal           int     `json:"ideal"`
 }
 
 // IterationBurndownData represents the full burndown chart data.
@@ -462,7 +483,8 @@ type IterationBurndownData struct {
 	DataPoints  []BurndownDataPoint `json:"data_points"`
 }
 
-// GetIterationBurndown reconstructs daily membership and status from history.
+// GetIterationBurndown reconstructs daily membership, status, and estimates from history.
+// Unestimated items contribute zero story points.
 // TotalItems is the number of distinct visible items that belonged to the
 // iteration on at least one reported day. The ideal line is based on the
 // end-of-first-day commitment and is intentionally unaffected by later scope
@@ -483,6 +505,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 	}
 
 	type historicalItemState struct {
+		storyPoints float64
 		createdAt   time.Time
 		iterationID sql.NullInt64
 		statusID    sql.NullInt64
@@ -493,7 +516,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 	itemArgs = append(itemArgs, iterationID, iterationValue, iterationValue)
 	itemArgs = append(itemArgs, workspaceArgs...)
 	rows, err := s.db.Query(`
-		SELECT i.id, i.iteration_id, i.status_id, i.created_at
+		SELECT i.id, i.iteration_id, i.status_id, i.created_at, COALESCE(i.story_points, 0)
 		FROM items i
 		WHERE (
 			i.iteration_id = ?
@@ -517,7 +540,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 			createdValue any
 			state        historicalItemState
 		)
-		if err := rows.Scan(&itemID, &state.iterationID, &state.statusID, &createdValue); err != nil {
+		if err := rows.Scan(&itemID, &state.iterationID, &state.statusID, &createdValue, &state.storyPoints); err != nil {
 			return nil, fmt.Errorf("failed to scan historical iteration item: %w", err)
 		}
 		createdAt, ok := analyticsDBTime(createdValue)
@@ -553,7 +576,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 		SELECT ih.item_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value
 		FROM item_history ih
 		JOIN items i ON i.id = ih.item_id
-		WHERE ih.field_name IN ('iteration_id', 'status_id')
+		WHERE ih.field_name IN ('iteration_id', 'status_id', 'story_points')
 		  AND ih.changed_at >= ?
 		  AND (
 			i.iteration_id = ?
@@ -607,6 +630,8 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 			state.iterationID = parseNullableID(value)
 		case "status_id":
 			state.statusID = parseNullableID(value)
+		case "story_points":
+			state.storyPoints, _ = strconv.ParseFloat(value.String, 64)
 		}
 	}
 
@@ -669,6 +694,7 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 		}
 
 		remaining, completed := 0, 0
+		remainingPoints, completedPoints := 0.0, 0.0
 		for itemID, state := range itemStates {
 			if !state.createdAt.Before(dayEnd) ||
 				!state.iterationID.Valid ||
@@ -678,14 +704,18 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 			everMembers[itemID] = struct{}{}
 			if state.statusID.Valid && statusCompleted[state.statusID.Int64] {
 				completed++
+				completedPoints += state.storyPoints
 			} else {
 				remaining++
+				remainingPoints += state.storyPoints
 			}
 		}
 		dataPoints = append(dataPoints, BurndownDataPoint{
-			Date:      day.Format("2006-01-02"),
-			Remaining: remaining,
-			Completed: completed,
+			Date:            day.Format("2006-01-02"),
+			RemainingPoints: remainingPoints,
+			CompletedPoints: completedPoints,
+			Remaining:       remaining,
+			Completed:       completed,
 		})
 	}
 
@@ -703,6 +733,11 @@ func (s *PlanningService) GetIterationBurndown(iterationID int, workspaceIDs []i
 			}
 		}
 		dataPoints[i].Ideal = ideal
+		committedPoints := dataPoints[0].RemainingPoints + dataPoints[0].CompletedPoints
+		dataPoints[i].IdealPoints = committedPoints
+		if totalDays > 1 {
+			dataPoints[i].IdealPoints = committedPoints * float64(totalDays-1-i) / float64(totalDays-1)
+		}
 	}
 
 	return &IterationBurndownData{

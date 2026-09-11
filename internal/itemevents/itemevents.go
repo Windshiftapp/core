@@ -256,12 +256,13 @@ type DeletedV1 struct {
 }
 
 type CommentCreatedV1 struct {
-	ItemID           int                `json:"item_id"`
-	CommentID        int64              `json:"comment_id"`
-	AuthorID         *int               `json:"author_id,omitempty"`
-	PortalCustomerID *int               `json:"portal_customer_id,omitempty"`
-	IsPrivate        bool               `json:"is_private"`
-	Automation       *AutomationContext `json:"automation,omitempty"`
+	ItemID              int                `json:"item_id"`
+	CommentID           int64              `json:"comment_id"`
+	AuthorID            *int               `json:"author_id,omitempty"`
+	PortalCustomerID    *int               `json:"portal_customer_id,omitempty"`
+	IsPrivate           bool               `json:"is_private"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
 }
 
 type LinkChangedV1 struct {

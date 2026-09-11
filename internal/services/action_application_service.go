@@ -167,6 +167,27 @@ func (s *ActionApplicationService) Get(userID, workspaceID, actionID int) (*mode
 	return s.actionInWorkspace(actionID, workspaceID)
 }
 
+func (s *ActionApplicationService) Validate(userID, workspaceID int, input models.CreateActionRequest) (actioncatalog.ValidationErrors, error) {
+	if err := s.requireManage(userID, workspaceID); err != nil {
+		return nil, err
+	}
+	if input.ActorUserID != nil {
+		if err := s.requireSetActor(userID); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := s.validateRoles(input.TriggerType, input.AllowedRoleIDs); err != nil {
+		return nil, err
+	}
+	input.Name = sanitize.PlainTextField.Sanitize(input.Name)
+	input.Description = sanitize.RichText.Sanitize(input.Description)
+	errs, err := s.definitions.Validate(workspaceID, actioncatalog.FromCreateRequest(&input))
+	if err != nil {
+		return nil, err
+	}
+	return errs, nil
+}
+
 func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditActor, input models.CreateActionRequest) (*models.Action, error) {
 	if err := s.requireManage(userID, workspaceID); err != nil {
 		return nil, err
@@ -289,31 +310,6 @@ func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, act
 	return nil
 }
 
-func (s *ActionApplicationService) Toggle(userID, workspaceID, actionID int, actor AuditActor, enabled *bool) (*models.Action, error) {
-	if err := s.requireManage(userID, workspaceID); err != nil {
-		return nil, err
-	}
-	action, err := s.actionInWorkspace(actionID, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	value := !action.IsEnabled
-	if enabled != nil {
-		value = *enabled
-	}
-	if err := s.repo.SetEnabled(action.ID, value); err != nil {
-		return nil, err
-	}
-	if s.runtime != nil {
-		s.runtime.InvalidateWorkspaceCache(workspaceID)
-	}
-	updated, err := s.repo.GetByID(action.ID)
-	if err == nil {
-		emitServiceAudit(s.db, actor, "automation.toggle", "automation", &updated.ID, updated.Name, nil)
-	}
-	return updated, err
-}
-
 func (s *ActionApplicationService) Logs(userID, workspaceID, actionID, limit, offset int) ([]*models.ActionExecutionLog, int, error) {
 	if _, err := s.Get(userID, workspaceID, actionID); err != nil {
 		return nil, 0, err
@@ -402,7 +398,7 @@ func (s *ActionApplicationService) requireSetActor(userID int) error {
 func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerType, roleIDs []int) ([]int, error) {
 	if trigger != models.ActionTriggerManual {
 		if len(roleIDs) > 0 {
-			return nil, errors.New("allowed_role_ids can only be set on manual actions")
+			return nil, &InvalidRequestError{Message: "allowed_role_ids can only be set on manual actions"}
 		}
 		return []int{}, nil
 	}
@@ -410,7 +406,7 @@ func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerTyp
 	result := make([]int, 0, len(roleIDs))
 	for _, id := range roleIDs {
 		if id <= 0 {
-			return nil, errors.New("allowed_role_ids must contain positive role IDs")
+			return nil, &InvalidRequestError{Message: "allowed_role_ids must contain positive role IDs"}
 		}
 		if _, ok := seen[id]; !ok {
 			seen[id] = struct{}{}
@@ -423,7 +419,7 @@ func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerTyp
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.New("allowed_role_ids contains an unknown workspace role")
+		return nil, &InvalidRequestError{Message: "allowed_role_ids contains an unknown workspace role"}
 	}
 	return result, nil
 }

@@ -15,20 +15,14 @@
   import EmptyState from '../components/EmptyState.svelte';
   import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import MigrationAssistant from '../pages/MigrationAssistant.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Pagination from '../components/Pagination.svelte';
-  import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import BasePicker from '../pickers/BasePicker.svelte';
-  import Label from '../components/Label.svelte';
-  import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import Input from '../components/Input.svelte';
   import FileInput from '../components/FileInput.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import DescriptionText from '../components/DescriptionText.svelte';
   import { objectDisplayName, objectDisplayValue } from '../utils/systemLabels.js';
 
   let configurationSets = $state([]);
@@ -37,9 +31,6 @@
   let screens = $state([]);
   let notificationSettings = $state([]);
   let loading = $state(true);
-  let creating = $state(false);
-  let editingId = $state(null);
-  let showEditModal = $state(false);
 
   // Search and pagination state
   let searchQuery = $state('');
@@ -55,20 +46,6 @@
   let unresolvedRefs = $state(null);
   let unresolvedHeading = $state('');
 
-  // Migration assistant state
-  let showMigrationAssistant = $state(false);
-  let migrationConfigSet = $state(null);
-  // Pre-supplied analysis from a 409 (intra-set workflow change) — when set,
-  // the assistant skips its own analyze call and uses this directly.
-  let migrationPreloadedAnalysis = $state(null);
-  // When set, the assistant will request that the server atomically update
-  // the target configuration set's workflow_id inside the migration tx.
-  let migrationApplyWorkflowId = $state(null);
-  // The PUT payload that triggered the 409, replayed after the migration
-  // completes so the rest of the configuration-set fields (name, screens,
-  // assignments, etc.) get persisted.
-  let pendingWorkflowChangePayload = $state(null);
-  let pendingWorkflowChangeId = $state(null);
 
   function getConfigurationSetDisplayValue(configSet, field) {
     return objectDisplayValue(configSet, field);
@@ -85,31 +62,6 @@
       ? objectDisplayName(screen)
       : (fallbackName || t('settings.configSets.none'));
   }
-
-  // Form state
-  let newConfigSet = $state({
-    name: '',
-    description: '',
-    workspace_ids: [],
-    workflow_id: null,
-    create_screen_id: null,
-    edit_screen_id: null,
-    view_screen_id: null,
-    notification_setting_id: null,
-    is_default: false
-  });
-
-  let editConfigSet = $state({
-    name: '',
-    description: '',
-    workspace_ids: [],
-    workflow_id: null,
-    create_screen_id: null,
-    edit_screen_id: null,
-    view_screen_id: null,
-    notification_setting_id: null,
-    is_default: false
-  });
 
   onMount(async () => {
     await loadData(currentPage, itemsPerPage, searchQuery);
@@ -168,50 +120,6 @@
     navigate('/admin/configuration-sets/new');
   }
 
-  function cancelCreating() {
-    creating = false;
-    newConfigSet = {
-      name: '',
-      description: '',
-      workspace_ids: [],
-      workflow_id: null,
-      create_screen_id: null,
-      edit_screen_id: null,
-      view_screen_id: null,
-      notification_setting_id: null,
-      is_default: false
-    };
-  }
-
-  async function createConfigurationSet() {
-    try {
-      if (!newConfigSet.name.trim()) {
-        errorToast(t('dialogs.alerts.nameRequired'));
-        return;
-      }
-
-      const payload = {
-        ...newConfigSet,
-        workspace_ids: newConfigSet.workspace_ids.map(id => parseInt(id)),
-        workflow_id: newConfigSet.workflow_id ? parseInt(newConfigSet.workflow_id) : null
-      };
-
-      const created = await api.configurationSets.create(payload);
-      
-      // If the API doesn't return the created item, reload the data
-      if (created && created.id) {
-        configurationSets = [...configurationSets, created];
-      } else {
-        // Reload all data if create response is incomplete
-        await loadData();
-      }
-      cancelCreating();
-    } catch (error) {
-      console.error('Failed to create configuration set:', error);
-      errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
-    }
-  }
-
   function startEditing(configSet) {
     if (!configSet) {
       console.error('startEditing called with null/undefined configuration set');
@@ -220,83 +128,6 @@
     navigate(`/admin/configuration-sets/${configSet.id}`);
   }
 
-  function cancelEditing() {
-    editingId = null;
-    showEditModal = false;
-    editConfigSet = {
-      name: '',
-      description: '',
-      workspace_ids: [],
-      workflow_id: null,
-      create_screen_id: null,
-      edit_screen_id: null,
-      view_screen_id: null,
-      notification_setting_id: null,
-      is_default: false
-    };
-  }
-
-  async function updateConfigurationSet() {
-    try {
-      if (!editConfigSet.name.trim()) {
-        errorToast(t('dialogs.alerts.nameRequired'));
-        return;
-      }
-
-      // Check if workflow has changed
-      const originalConfigSet = configurationSets.find(cs => cs.id === editingId);
-      const oldWorkflowId = originalConfigSet ? originalConfigSet.workflow_id : null;
-      const newWorkflowId = editConfigSet.workflow_id ? parseInt(editConfigSet.workflow_id) : null;
-      const workflowChanged = oldWorkflowId !== newWorkflowId;
-
-      const payload = {
-        ...editConfigSet,
-        workspace_ids: editConfigSet.workspace_ids.map(id => parseInt(id)),
-        workflow_id: newWorkflowId
-      };
-
-      let updated;
-      try {
-        updated = await api.configurationSets.update(editingId, payload);
-      } catch (error) {
-        // The server returns 409 with { error: 'migration_required', analysis }
-        // when an intra-set workflow change would orphan items. Replay the
-        // PUT after the user completes the migration assistant.
-        if (isMigrationRequired(error)) {
-          pendingWorkflowChangeId = editingId;
-          pendingWorkflowChangePayload = payload;
-          migrationConfigSet = originalConfigSet;
-          migrationPreloadedAnalysis = error.body.analysis;
-          migrationApplyWorkflowId = newWorkflowId;
-          showMigrationAssistant = true;
-          return;
-        }
-        throw error;
-      }
-
-      // If the API doesn't return the updated item, reload the data
-      if (updated && updated.id) {
-        configurationSets = configurationSets.map(cs =>
-          cs.id === editingId ? updated : cs
-        );
-      } else {
-        // Reload all data if update response is incomplete
-        await loadData();
-      }
-
-      cancelEditing();
-    } catch (error) {
-      console.error('Failed to update configuration set:', error);
-      errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
-    }
-  }
-
-  // Recognize the server's 409 migration-required response. fetchAPI is
-  // expected to have parsed the JSON body onto error.body — any error that
-  // doesn't match this shape is treated as a real error.
-  function isMigrationRequired(error) {
-    return error && error.status === 409 && error.body && error.body.error === 'migration_required';
-  }
 
   async function deleteConfigurationSet(configSet) {
     if (!configSet) {
@@ -322,44 +153,6 @@
     }
   }
 
-  async function handleMigrationAssistantClose(data) {
-    const { success, cancelled } = data || {};
-    showMigrationAssistant = false;
-    migrationConfigSet = null;
-    migrationPreloadedAnalysis = null;
-    migrationApplyWorkflowId = null;
-
-    if (cancelled || !success) {
-      pendingWorkflowChangePayload = null;
-      pendingWorkflowChangeId = null;
-      return;
-    }
-
-    // After a successful intra-set workflow migration, the server has already
-    // applied the new workflow_id. Reload data so the FE reflects the change.
-    // If a PUT was pending (other fields the user changed in the same edit),
-    // replay it now — the migration check will pass because items match.
-    if (pendingWorkflowChangePayload && pendingWorkflowChangeId) {
-      const id = pendingWorkflowChangeId;
-      const payload = pendingWorkflowChangePayload;
-      pendingWorkflowChangeId = null;
-      pendingWorkflowChangePayload = null;
-      try {
-        await api.configurationSets.update(id, payload);
-      } catch (error) {
-        console.error('Failed to apply pending update after migration:', error);
-        errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
-      }
-    }
-    await loadData(currentPage, itemsPerPage, searchQuery);
-    cancelEditing();
-  }
-
-  function showMigrationAssistantForConfigSet(configSet) {
-    migrationConfigSet = configSet;
-    showMigrationAssistant = true;
-  }
-
   function getWorkspaceName(workspaceId) {
     const workspace = workspaces.find(w => w.id === workspaceId);
     return workspace ? workspace.name : t('common.unknown');
@@ -377,32 +170,6 @@
     const setting = notificationSettings.find(s => s.id === notificationSettingId);
     if (!setting) return t('common.unknown');
     return setting.builtin_key ? t('settings.configSets.defaults.notifications.name') : setting.name;
-  }
-
-  // Helper functions for workspace selection
-  function toggleWorkspaceSelection(workspaceId, isEditing = false) {
-    const targetConfig = isEditing ? editConfigSet : newConfigSet;
-    const currentIds = targetConfig.workspace_ids || [];
-    
-    if (currentIds.includes(workspaceId)) {
-      // Remove workspace
-      targetConfig.workspace_ids = currentIds.filter(id => id !== workspaceId);
-    } else {
-      // Add workspace
-      targetConfig.workspace_ids = [...currentIds, workspaceId];
-    }
-    
-    // Trigger reactivity
-    if (isEditing) {
-      editConfigSet = { ...editConfigSet };
-    } else {
-      newConfigSet = { ...newConfigSet };
-    }
-  }
-
-  function isWorkspaceSelected(workspaceId, isEditing = false) {
-    const targetConfig = isEditing ? editConfigSet : newConfigSet;
-    return (targetConfig.workspace_ids || []).includes(workspaceId);
   }
 
   // Pagination handlers
@@ -504,7 +271,7 @@
   <Button variant="default" icon={Upload} onclick={pickImportFile} disabled={importing}>
     {importing ? t('settings.configSets.importing') : t('settings.configSets.import')}
   </Button>
-  <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('configurationSets', 'add'), guard: () => !creating }}>
+  <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('configurationSets', 'add') }}>
     {t('settings.configSets.addConfigSet')}
   </Button>
 {/snippet}
@@ -543,144 +310,6 @@
       <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
     </Panel>
   {:else}
-    <!-- Create Form -->
-    <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet}>
-      {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.configSets.createConfigSet')} showCloseButton={false} />
-
-      <!-- Modal content -->
-      <div class="px-6 py-4">
-        <form onsubmit={(e) => { e.preventDefault(); createConfigurationSet(); }}>
-          <div class="space-y-4">
-            <div>
-              <Label color="default" required class="mb-2">{t('settings.configSets.name')}</Label>
-              <Input
-                type="text"
-                bind:value={newConfigSet.name}
-                placeholder={t('settings.configSets.namePlaceholder')}
-                size="small"
-              />
-            </div>
-
-            <div>
-              <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
-              <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
-                {#each workspaces as workspace}
-                  <div class="p-2 rounded workspace-option">
-                    <Checkbox
-                      checked={isWorkspaceSelected(workspace.id, false)}
-                      onchange={() => toggleWorkspaceSelection(workspace.id, false)}
-                      label={workspace.name}
-                      size="small"
-                    />
-                  </div>
-                {/each}
-                {#if workspaces.length === 0}
-                  <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
-                {/if}
-              </div>
-              {#if newConfigSet.workspace_ids && newConfigSet.workspace_ids.length > 0}
-                <DescriptionText>
-                  {newConfigSet.workspace_ids.length} workspace{newConfigSet.workspace_ids.length === 1 ? '' : 's'} selected
-                </DescriptionText>
-              {/if}
-            </div>
-
-            <div>
-              <Label color="default" class="mb-2">{t('settings.configSets.workflow')}</Label>
-              <BasePicker
-                bind:value={newConfigSet.workflow_id}
-                items={workflows}
-                placeholder={t('settings.configSets.noWorkflow')}
-                showUnassigned={true}
-                unassignedLabel={t('settings.configSets.noWorkflow')}
-                getValue={(item) => item.id}
-                getLabel={(item) => item.name}
-              />
-            </div>
-
-            <div>
-              <Label color="default" class="mb-2">{t('settings.configSets.notificationSettings')}</Label>
-              <BasePicker
-                bind:value={newConfigSet.notification_setting_id}
-                items={notificationSettings.filter(s => s.is_active)}
-                placeholder={t('settings.configSets.notificationSettings')}
-                showUnassigned={true}
-                unassignedLabel={t('settings.configSets.notificationSettings')}
-                getValue={(item) => item.id}
-                getLabel={(item) => item.name}
-              />
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label color="default" class="mb-2">{t('settings.configSets.createScreen')}</Label>
-                <BasePicker
-                  bind:value={newConfigSet.create_screen_id}
-                  items={screens}
-                  placeholder={t('settings.configSets.none')}
-                  showUnassigned={true}
-                  unassignedLabel={t('settings.configSets.none')}
-                  getValue={(item) => item.id}
-                  getLabel={(item) => item.name}
-                />
-              </div>
-
-              <div>
-                <Label color="default" class="mb-2">{t('settings.configSets.editScreen')}</Label>
-                <BasePicker
-                  bind:value={newConfigSet.edit_screen_id}
-                  items={screens}
-                  placeholder={t('settings.configSets.none')}
-                  showUnassigned={true}
-                  unassignedLabel={t('settings.configSets.none')}
-                  getValue={(item) => item.id}
-                  getLabel={(item) => item.name}
-                />
-              </div>
-
-              <div>
-                <Label color="default" class="mb-2">{t('settings.configSets.viewScreen')}</Label>
-                <BasePicker
-                  bind:value={newConfigSet.view_screen_id}
-                  items={screens}
-                  placeholder={t('settings.configSets.none')}
-                  showUnassigned={true}
-                  unassignedLabel={t('settings.configSets.none')}
-                  getValue={(item) => item.id}
-                  getLabel={(item) => item.name}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label color="default" class="mb-2">{t('settings.configSets.description')}</Label>
-              <Textarea
-                bind:value={newConfigSet.description}
-                placeholder={t('settings.configSets.description')}
-                rows={2}
-              />
-            </div>
-
-            <Checkbox
-              bind:checked={newConfigSet.is_default}
-              label={t('settings.configSets.setAsDefault')}
-              size="small"
-            />
-          </div>
-        </form>
-      </div>
-
-      <DialogFooter
-        onCancel={cancelCreating}
-        onConfirm={createConfigurationSet}
-        confirmLabel={t('settings.configSets.createConfigSet')}
-        showKeyboardHint={true}
-        confirmKeyboardHint={submitHint}
-      />
-      {/snippet}
-    </Modal>
-
     <!-- Configuration Sets List -->
     {#if configurationSets.filter(cs => cs && cs.id && cs.name !== 'Personal Tasks Configuration').length === 0}
       <Panel padding="spacious">
@@ -858,142 +487,6 @@
     {/if}
   {/if}
 
-<!-- Edit Modal -->
-<Modal isOpen={showEditModal} onclose={cancelEditing} maxWidth="max-w-2xl" onSubmit={updateConfigurationSet}>
-  {#snippet children(submitHint)}
-  <ModalHeader title={t('settings.configSets.editConfigSet')} showCloseButton={false} />
-
-  <!-- Modal content -->
-  <div class="px-6 py-4">
-    <form onsubmit={(e) => { e.preventDefault(); updateConfigurationSet(); }}>
-      <div class="space-y-4">
-        <div>
-          <Label color="default" required class="mb-2">{t('settings.configSets.name')}</Label>
-          <Input
-            type="text"
-            bind:value={editConfigSet.name}
-            size="small"
-          />
-        </div>
-
-        <div>
-          <Label color="default" class="mb-3">{t('settings.configSets.workspaces')}</Label>
-          <div class="space-y-2 max-h-48 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
-            {#each workspaces as workspace}
-              <div class="p-2 rounded workspace-option">
-                <Checkbox
-                  checked={isWorkspaceSelected(workspace.id, true)}
-                  onchange={() => toggleWorkspaceSelection(workspace.id, true)}
-                  label={workspace.name}
-                  size="small"
-                />
-              </div>
-            {/each}
-            {#if workspaces.length === 0}
-              <p class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.configSets.noWorkspacesAvailable')}</p>
-            {/if}
-          </div>
-          {#if editConfigSet.workspace_ids && editConfigSet.workspace_ids.length > 0}
-            <DescriptionText>
-              {editConfigSet.workspace_ids.length} workspace{editConfigSet.workspace_ids.length === 1 ? '' : 's'} selected
-            </DescriptionText>
-          {/if}
-        </div>
-
-        <div>
-          <Label color="default" class="mb-2">{t('settings.configSets.workflow')}</Label>
-          <BasePicker
-            bind:value={editConfigSet.workflow_id}
-            items={workflows}
-            placeholder={t('settings.configSets.noWorkflow')}
-            showUnassigned={true}
-            unassignedLabel={t('settings.configSets.noWorkflow')}
-            getValue={(item) => item.id}
-            getLabel={(item) => item.name}
-          />
-        </div>
-
-        <div>
-          <Label color="default" class="mb-2">{t('settings.configSets.notificationSettings')}</Label>
-          <BasePicker
-            bind:value={editConfigSet.notification_setting_id}
-            items={notificationSettings.filter(s => s.is_active)}
-            placeholder={t('settings.configSets.notificationSettings')}
-            showUnassigned={true}
-            unassignedLabel={t('settings.configSets.notificationSettings')}
-            getValue={(item) => item.id}
-            getLabel={(item) => item.name}
-          />
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Label color="default" class="mb-2">{t('settings.configSets.createScreen')}</Label>
-            <BasePicker
-              bind:value={editConfigSet.create_screen_id}
-              items={screens}
-              placeholder={t('settings.configSets.none')}
-              showUnassigned={true}
-              unassignedLabel={t('settings.configSets.none')}
-              getValue={(item) => item.id}
-              getLabel={(item) => item.name}
-            />
-          </div>
-
-          <div>
-            <Label color="default" class="mb-2">{t('settings.configSets.editScreen')}</Label>
-            <BasePicker
-              bind:value={editConfigSet.edit_screen_id}
-              items={screens}
-              placeholder={t('settings.configSets.none')}
-              showUnassigned={true}
-              unassignedLabel={t('settings.configSets.none')}
-              getValue={(item) => item.id}
-              getLabel={(item) => item.name}
-            />
-          </div>
-
-          <div>
-            <Label color="default" class="mb-2">{t('settings.configSets.viewScreen')}</Label>
-            <BasePicker
-              bind:value={editConfigSet.view_screen_id}
-              items={screens}
-              placeholder={t('settings.configSets.none')}
-              showUnassigned={true}
-              unassignedLabel={t('settings.configSets.none')}
-              getValue={(item) => item.id}
-              getLabel={(item) => item.name}
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label color="default" class="mb-2">{t('settings.configSets.description')}</Label>
-          <Textarea
-            bind:value={editConfigSet.description}
-            rows={2}
-          />
-        </div>
-
-        <Checkbox
-          bind:checked={editConfigSet.is_default}
-          label={t('settings.configSets.setAsDefault')}
-          size="small"
-        />
-      </div>
-    </form>
-  </div>
-
-  <DialogFooter
-    onCancel={cancelEditing}
-    onConfirm={updateConfigurationSet}
-    confirmLabel={t('common.saveChanges')}
-    showKeyboardHint={true}
-    confirmKeyboardHint={submitHint}
-  />
-  {/snippet}
-</Modal>
-
 <!-- Unresolved References Modal — surfaces 422 from /configuration-sets/import.
      Lists every role/group/user/status_category the bundle expected and the
      target instance does not have, so the operator can fix the source bundle
@@ -1026,21 +519,3 @@
   />
   {/snippet}
 </Modal>
-
-<!-- Migration Assistant -->
-<MigrationAssistant
-  configurationSet={migrationConfigSet}
-  targetConfigurationSet={migrationConfigSet}
-  isVisible={showMigrationAssistant}
-  workspaceId={migrationPreloadedAnalysis?.affected_workspaces?.[0] ?? null}
-  comprehensive={!!migrationPreloadedAnalysis}
-  preloadedAnalysis={migrationPreloadedAnalysis}
-  applyWorkflowId={migrationApplyWorkflowId}
-  onclose={handleMigrationAssistantClose}
-/>
-
-<style>
-  .workspace-option:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-</style>

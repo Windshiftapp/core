@@ -89,6 +89,9 @@ func (t *TriageRunner) Run(ctx context.Context, input RunInput, emit EventSink) 
 			t.logf("triage runner: cleanup %s: %v", prep.CheckoutPath, rmErr)
 		}
 	}()
+	if err := writeSandboxWSConfig(prep.CheckoutPath, input.Env); err != nil {
+		return RunnerResult{Status: models.AgentRunStatusFailed, Error: fmt.Sprintf("triage pin ws config: %v", err)}
+	}
 
 	input.WorkspacePath = prep.CheckoutPath
 	_ = emit("lifecycle", fmt.Sprintf(
@@ -162,10 +165,16 @@ func (t *TriageRunner) runMulti(ctx context.Context, input RunInput, emit EventS
 		if perr != nil {
 			return RunnerResult{Status: models.AgentRunStatusFailed, Error: fmt.Sprintf("triage prepare %s: %v", jr.Slug, perr)}
 		}
+		if perr := writeSandboxWSConfig(prep.CheckoutPath, input.Env); perr != nil {
+			return RunnerResult{Status: models.AgentRunStatusFailed, Error: fmt.Sprintf("triage pin ws config %s: %v", jr.Slug, perr)}
+		}
 		_ = emit("lifecycle", fmt.Sprintf(
 			`{"phase":"worktree_ready","repo":%q,"path":%q,"branch":%q,"base_commit":%q}`,
 			jr.Slug, prep.CheckoutPath, prep.Branch, prep.BaseCommit))
 		preps = append(preps, preparedRepo{jr: jr, out: prep, proxyURL: proxyURL})
+	}
+	if err := writeSandboxWSConfig(workspaceRoot, input.Env); err != nil {
+		return RunnerResult{Status: models.AgentRunStatusFailed, Error: fmt.Sprintf("triage pin workspace ws config: %v", err)}
 	}
 
 	input.WorkspacePath = workspaceRoot

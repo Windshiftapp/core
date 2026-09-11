@@ -18,6 +18,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/aitools"
@@ -50,6 +51,7 @@ import (
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/smtp"
+	"windshift/internal/sso"
 	"windshift/internal/standardagent"
 	"windshift/internal/utils"
 	"windshift/internal/webauthn"
@@ -100,6 +102,12 @@ type Server struct {
 	db         database.Database
 	listener   net.Listener
 
+	permissionService *services.PermissionService
+	sessionManager    *auth.SessionManager
+	tokenManager      *auth.TokenManager
+	scimTokenManager  *auth.SCIMTokenManager
+	itemCache         *services.ItemCacheService
+
 	ldapHandler                  *handlers.LDAPHandler
 	notificationManager          *handlers.NotificationManager
 	notificationService          *services.NotificationService
@@ -125,17 +133,21 @@ type Server struct {
 	tokenTracker                 *services.TokenTracker
 	webhookSender                *webhook.WebhookSender
 	scmSyncStopChan              chan struct{}
-	issueSyncStopChan            chan struct{}
-	magicLinkStopChan            chan struct{}
-	cleanupStopChan              chan struct{}
-	jiraHostStopChan             chan struct{}
-	cleanupTicker                *time.Ticker
-	pluginManager                *plugins.Manager
-	databaseDiagRepo             *repository.DatabaseDiagnosticsRepository
-	databasePoolMonitor          *services.DatabasePoolMonitor
-	channelService               *services.ChannelService
-	memoryBudget                 config.MemoryBudget
-	metrics                      *appmetrics.Metrics
+	// secretEncryption is the at-rest secret cipher shared by the SCM and
+	// integration OAuth surfaces; set during wiring, used to revoke provider
+	// grants when a user is offboarded.
+	secretEncryption    *sso.SecretEncryption
+	issueSyncStopChan   chan struct{}
+	magicLinkStopChan   chan struct{}
+	cleanupStopChan     chan struct{}
+	jiraHostStopChan    chan struct{}
+	cleanupTicker       *time.Ticker
+	pluginManager       *plugins.Manager
+	databaseDiagRepo    *repository.DatabaseDiagnosticsRepository
+	databasePoolMonitor *services.DatabasePoolMonitor
+	channelService      *services.ChannelService
+	memoryBudget        config.MemoryBudget
+	metrics             *appmetrics.Metrics
 
 	loginRateLimiter      *middleware.RateLimiter
 	runnerRegisterLimiter *middleware.RateLimiter
@@ -157,9 +169,10 @@ type Server struct {
 	publicBoardLimiter    *middleware.RateLimiter
 	userConcurrency       *middleware.UserConcurrencyLimiter
 
-	actualPort   int
-	started      bool
-	shuttingDown bool
+	actualPort         int
+	started            bool
+	shuttingDown       bool
+	backgroundStopOnce sync.Once
 }
 
 // New creates a new Server instance with the given configuration.
@@ -286,6 +299,7 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize permission service: %w", err)
 	}
+	s.permissionService = permService
 
 	// Shared channel service used by ChannelHandler, WebhookHandler,
 	// FormHandler, RequestTypeHandler, and AssetReportHandler for the
@@ -323,6 +337,7 @@ func (s *Server) initialize() error {
 		cfg.Auth.SessionValidationCacheTTL,
 		primarySessionCacheMB,
 	)
+	s.sessionManager = sessionManager
 
 	effectivePort := cfg.Port
 	if cfg.AllowedPort != "" {
@@ -380,6 +395,7 @@ func (s *Server) initialize() error {
 
 	apiTokenCacheMB, _ := config.SplitSSHCacheBudget(s.memoryBudget.APITokenCacheMB, cfg.SSH.Enabled)
 	tokenManager := auth.NewTokenManager(s.db, s.tokenTracker, apiTokenCacheMB)
+	s.tokenManager = tokenManager
 	if cleaned, cleanupErr := tokenManager.CleanupExpiredTokens(); cleanupErr != nil {
 		slog.Warn("failed to cleanup expired api tokens on startup", "error", cleanupErr)
 	} else if cleaned > 0 {
@@ -431,13 +447,19 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to create notification manager: %w", err)
 	}
+	notificationAssetPermissions := services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)
+	notificationAuthorizer := services.NewNotificationAuthorizer(s.db, permService, notificationAssetPermissions)
 
 	s.notificationService = services.NewNotificationService(
 		s.db,
 		s.notificationManager,
 		permService,
 		services.DefaultNotificationServiceConfig(),
+		notificationAssetPermissions,
 	)
+	if err := services.PrepareDurableNotificationEngine(context.Background(), s.eventEngine, s.notificationService); err != nil {
+		return fmt.Errorf("prepare durable notification consumers: %w", err)
+	}
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
@@ -515,7 +537,7 @@ func (s *Server) initialize() error {
 	transitionMatrixService := services.NewTransitionMatrixService(s.db)
 	bulkOperationMetrics := services.NewBulkOperationMetrics()
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService, s.memoryBudget.ItemCacheMB)
-	itemHandler.SetDBRequestTimeout(s.config.DB.RequestTimeout)
+	s.itemCache = itemHandler.ItemCacheService()
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache, authorizationCacheInvalidator)
 	screenHandler := handlers.NewScreenHandler(s.db).WithObjectTranslations(objectTranslationService)
@@ -561,9 +583,14 @@ func (s *Server) initialize() error {
 		invitationService,
 		services.NewUserReadService(s.db),
 		func(id int) error {
-			tokenIDs, err := services.OffboardUser(s.db, id, s.notificationService, authorizationCacheInvalidator)
-			tokenManager.InvalidateTokens(tokenIDs)
+			result, err := services.OffboardUser(s.db, id, s.notificationService, authorizationCacheInvalidator)
+			if len(result.RevokedAPITokenIDs) > 0 {
+				tokenManager.InvalidateTokens(result.RevokedAPITokenIDs)
+			}
 			sessionManager.InvalidateUserSessionValidation(id)
+			if err == nil {
+				s.revokeUserRemoteGrants(result.RemoteRevocations)
+			}
 			return err
 		},
 		userDeactivationService.DeactivateUser,
@@ -587,6 +614,7 @@ func (s *Server) initialize() error {
 	agentHandler := handlers.NewAgentHandler(s.db, permService)
 
 	scimTokenManager := auth.NewSCIMTokenManager(s.db, s.memoryBudget.SCIMTokenCacheMB)
+	s.scimTokenManager = scimTokenManager
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
 	scimHandler := handlers.NewSCIMHandler(
 		repository.NewSCIMRepository(s.db),
@@ -732,12 +760,14 @@ func (s *Server) initialize() error {
 	)
 
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService, permService)
+	notificationHandler.SetNotificationAuthorizer(notificationAuthorizer)
 	emailTemplateHandler := handlers.NewEmailTemplateHandler(repository.NewEmailTemplateRepository(s.db), logger.NewAuditor(s.db))
 
 	// Push dispatches every notification; VAPID config resolves env, persisted,
 	// then generated keys.
 	pushCfg := services.ResolveVAPIDConfig(s.db, cfg.Push, slog.Default())
 	pushService := services.NewPushService(s.db, pushCfg, permService)
+	pushService.SetNotificationAuthorizer(notificationAuthorizer)
 	pushHandler := handlers.NewPushHandler(pushService)
 	s.notificationManager.SetPushDispatcher(pushService)
 	if pushService.Enabled() {
@@ -751,6 +781,7 @@ func (s *Server) initialize() error {
 	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL)
+	s.secretEncryption = scmProviderHandler.GetEncryption()
 	scmWorkspaceRepo := repository.NewSCMWorkspaceRepository(s.db)
 	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), permService, baseURL)
 	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
@@ -882,6 +913,7 @@ func (s *Server) initialize() error {
 	} else if n > 0 {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
+	go s.runAssetImportRecovery(assetApplication)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -976,6 +1008,9 @@ func (s *Server) initialize() error {
 
 	// Wire email reply service for bidirectional email threading
 	emailReplyService := services.NewEmailReplyService(s.db, smtpSender)
+	if err := services.PrepareDurableEmailReplyEngine(context.Background(), s.eventEngine, emailReplyService); err != nil {
+		return fmt.Errorf("prepare durable email reply consumer: %w", err)
+	}
 	commentService.SetEmailReplyService(emailReplyService)
 	s.notificationScheduler.SetEmailReplyOutbox(emailReplyService)
 
@@ -1398,7 +1433,6 @@ func (s *Server) initialize() error {
 		AIRateLimiter:         s.aiRateLimiter,
 		UploadLimiter:         s.uploadLimiter,
 		WebhookLimiter:        s.webhookLimiter,
-		SearchLimiter:         s.searchLimiter,
 		CalendarFeedLimiter:   s.calendarFeedLimiter,
 		PublicBoardLimiter:    s.publicBoardLimiter,
 
@@ -1676,8 +1710,13 @@ func (s *Server) initialize() error {
 		TimeProjects:       services.NewTimeProjectApplicationService(s.db, timePermissionService, v2Access),
 		Timers:             timerService,
 		SystemAdmins:       permService,
+		GlobalPermission:   permService,
 		Groups:             groupHandler.Application(),
 		AdminUsers:         services.NewUserReadService(s.db),
+		AuditLogs:          repository.NewAuditLogRepository(s.db),
+		AdminTokens:        tokenManager,
+		AdminAuditor:       logger.NewAuditor(s.db),
+		AdminTranslations:  objectTranslationService,
 		Comments:           commentService,
 		CommentAccess:      permService,
 		Attachments:        services.NewItemAttachmentService(s.db, cfg.AttachmentPath, permService),
@@ -1695,6 +1734,8 @@ func (s *Server) initialize() error {
 		ItemApplication:    itemApplication,
 		ItemDetail:         itemDetailApplication,
 		SessionMiddleware:  authMiddleware.OptionalAuth,
+		SearchAllowed:      s.searchLimiter.AllowRequest,
+		DBRequestTimeout:   s.config.DB.RequestTimeout,
 		CORS:               v2.NewCORS(csrfOrigins, cfg.DisableCSRF, !cfg.DisableCSRF),
 		CSRF:               v2CSRF,
 		Concurrency:        s.userConcurrency,
@@ -1907,11 +1948,18 @@ func (s *Server) recoverUser(username string) {
 	var id int
 	var userEmail string
 	var isActive bool
+	var offboarded bool
 	err := s.db.QueryRow(
-		`SELECT id, email, is_active FROM users WHERE username = ?`, username,
-	).Scan(&id, &userEmail, &isActive)
+		`SELECT id, email, is_active, offboarded_at IS NOT NULL FROM users WHERE username = ?`, username,
+	).Scan(&id, &userEmail, &isActive, &offboarded)
 	if err != nil {
 		slog.Error("RECOVER_USER: user not found", "username", username)
+		return
+	}
+	if offboarded {
+		// Offboarding is irreversible; the recovery tool must not resurrect
+		// an anonymized account.
+		slog.Error("RECOVER_USER: refusing to re-enable offboarded user", "username", username, "id", id)
 		return
 	}
 	if isActive {
@@ -1982,29 +2030,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.databasePoolMonitor.Stop()
 	}
 
-	// Stop schedulers first - use safeClose helper to avoid panics on already-closed channels
-	safeClose := func(ch chan struct{}) {
-		if ch != nil {
-			defer func() { recover() }() //nolint:errcheck // Intentionally ignoring recover() return; used to suppress panics from closing already-closed channels
-			close(ch)
-		}
-	}
-
-	// Close, but do NOT nil, the stop channels: background schedulers select
-	// on these fields in a loop, so the nil-write races with their reads (and
-	// a select on a nil channel blocks forever, leaking the goroutine).
-	// Double-close safety comes from safeClose's recover, not from nil-ing.
-	safeClose(s.scmSyncStopChan)
-	safeClose(s.issueSyncStopChan)
-	safeClose(s.magicLinkStopChan)
-
-	if s.cleanupTicker != nil {
-		// Stop, but do NOT nil: runActivityCleanup selects on cleanupTicker.C
-		// in a loop and the nil-write races with that read.
-		s.cleanupTicker.Stop()
-	}
-	safeClose(s.cleanupStopChan)
-	safeClose(s.jiraHostStopChan)
+	s.stopBackgroundLoops()
 
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")
@@ -2149,6 +2175,9 @@ func isAPIPath(p string) bool {
 
 // cleanup releases all resources.
 func (s *Server) cleanup() {
+	// New also calls cleanup after a partially completed initialize. Signal any
+	// loops already started there, even when Shutdown was never reachable.
+	s.stopBackgroundLoops()
 	if s.databasePoolMonitor != nil {
 		s.databasePoolMonitor.Stop()
 	}
@@ -2239,10 +2268,45 @@ func (s *Server) cleanup() {
 		_ = s.tokenTracker.Close()
 	}
 
+	// These caches are owned by this HTTP server, including on partial startup.
+	// Close them after consumers have stopped, before releasing the shared DB.
+	if s.permissionService != nil {
+		_ = s.permissionService.Close()
+	}
+	if s.sessionManager != nil {
+		_ = s.sessionManager.Close()
+	}
+	if s.tokenManager != nil {
+		_ = s.tokenManager.Close()
+	}
+	if s.scimTokenManager != nil {
+		_ = s.scimTokenManager.Close()
+	}
+	if s.itemCache != nil {
+		_ = s.itemCache.Close()
+	}
+
 	// Close database
 	if s.db != nil {
 		_ = s.db.Close()
 	}
+}
+
+func (s *Server) stopBackgroundLoops() {
+	s.backgroundStopOnce.Do(func() {
+		// Do not nil these fields: workers read them concurrently.
+		if s.cleanupTicker != nil {
+			s.cleanupTicker.Stop()
+		}
+		for _, ch := range []chan struct{}{
+			s.scmSyncStopChan, s.issueSyncStopChan, s.magicLinkStopChan,
+			s.cleanupStopChan, s.jiraHostStopChan,
+		} {
+			if ch != nil {
+				close(ch)
+			}
+		}
+	})
 }
 
 // RegisterDatabasePool makes a process-local auxiliary SQL pool visible to
@@ -2340,6 +2404,21 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 		case <-s.magicLinkStopChan:
 			slog.Info("magic link cleanup scheduler stopped")
 			return
+		}
+	}
+}
+
+func (s *Server) runAssetImportRecovery(assets *services.AssetApplicationService) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.cleanupStopChan:
+			return
+		case <-ticker.C:
+			if _, err := assets.ReconcileInterruptedImports(); err != nil {
+				slog.Error("asset import recovery failed", "error", err)
+			}
 		}
 	}
 }

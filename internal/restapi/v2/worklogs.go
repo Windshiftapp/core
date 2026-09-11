@@ -17,7 +17,7 @@ func registerWorklogRoutes(builder *routeBuilder, deps Deps) {
 	builder.JSON(http.MethodPost, "/time/worklogs", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, createWorklog(deps))
 	builder.JSON(http.MethodPatch, "/time/worklogs/{worklog_id}", http.StatusOK, true, AuthAuthenticated, []string{"time:write"}, updateWorklog(deps))
 	builder.Command(http.MethodDelete, "/time/worklogs/{worklog_id}", AuthAuthenticated, []string{"time:delete"}, deleteWorklog(deps))
-	builder.Read("/items/{item_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listItemWorklogs(deps))
+	builder.Page("/items/{item_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listItemWorklogs(deps))
 	builder.Page("/time/projects/{project_id}/worklogs", AuthAuthenticated, []string{"time:read"}, listProjectWorklogs(deps))
 }
 
@@ -80,11 +80,21 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		filter := repository.WorklogListFilter{UserID: user.ID, Limit: page.PageSize, Offset: page.Offset}
-		if err := applyWorklogFilters(r, &filter); err != nil {
+		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
+		if err != nil {
+			return nil, Pagination{}, 0, internalError(err)
+		}
+		if accessible != nil && len(accessible) == 0 {
+			return []worklogDTO{}, page, 0, nil
+		}
+		filter := repository.WorklogDetailFilter{AccessibleProjectIDs: accessible, Limit: page.PageSize, Offset: page.Offset}
+		if err := applyWorklogFilters(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		worklogs, total, err := deps.Worklogs.ListMine(filter)
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
+		}
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
@@ -99,7 +109,7 @@ func getWorklog(deps Deps) readOperation[worklogDTO] {
 		if err != nil {
 			return worklogDTO{}, err
 		}
-		allowed, err := deps.TimeAccess.CanEditWorklog(user.ID, worklog.ID)
+		allowed, err := deps.TimeAccess.CanViewWorklog(user.ID, worklog.ID)
 		if err != nil {
 			return worklogDTO{}, internalError(err)
 		}
@@ -117,7 +127,7 @@ func createWorklog(deps Deps) jsonOperation[worklogCreateRequest, worklogDTO] {
 		if err != nil {
 			return worklogDTO{}, err
 		}
-		if err := requireWorklogProject(deps, user.ID, input.ProjectID, false); err != nil {
+		if err := requireWorklogBooking(deps, user.ID, input.ProjectID); err != nil {
 			return worklogDTO{}, err
 		}
 		if err := requireWorklogItem(r, deps, input.ItemID); err != nil {
@@ -148,7 +158,7 @@ func updateWorklog(deps Deps) jsonOperation[worklogPatchRequest, worklogDTO] {
 			return worklogDTO{}, newError(http.StatusNotFound, "not_found", "Worklog was not found")
 		}
 		input := mergeWorklogPatch(current, patch, user.Timezone)
-		if err := requireWorklogProject(deps, user.ID, input.ProjectID, false); err != nil {
+		if err := requireWorklogBooking(deps, user.ID, input.ProjectID); err != nil {
 			return worklogDTO{}, err
 		}
 		if err := requireWorklogItem(r, deps, input.ItemID); err != nil {
@@ -179,28 +189,33 @@ func deleteWorklog(deps Deps) commandOperation {
 	}
 }
 
-func listItemWorklogs(deps Deps) readOperation[[]worklogDTO] {
-	return func(r *http.Request) ([]worklogDTO, error) {
+func listItemWorklogs(deps Deps) pageOperation[worklogDTO] {
+	return func(r *http.Request) ([]worklogDTO, Pagination, int, error) {
 		item, err := requireItem(r, deps, deps.Access.CanViewWorkspace)
 		if err != nil {
-			return nil, err
+			return nil, Pagination{}, 0, err
 		}
-		worklogs, err := deps.Worklogs.List(repository.WorklogDetailFilter{ItemID: &item.ID})
+		page, err := ParsePage(r)
 		if err != nil {
-			return nil, internalError(err)
+			return nil, Pagination{}, 0, err
 		}
-		visible := make([]models.Worklog, 0, len(worklogs))
-		user, _ := principal(r)
-		for _, worklog := range worklogs {
-			allowed, accessErr := deps.TimeAccess.CanViewProject(user.ID, worklog.ProjectID)
-			if accessErr != nil {
-				return nil, internalError(accessErr)
-			}
-			if allowed {
-				visible = append(visible, worklog)
-			}
+		user, err := principal(r)
+		if err != nil {
+			return nil, page, 0, err
 		}
-		return mapWorklogs(visible), nil
+		projectIDs, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
+		if err != nil {
+			return nil, page, 0, internalError(err)
+		}
+		filter := repository.WorklogDetailFilter{ItemID: &item.ID, AccessibleProjectIDs: projectIDs, Limit: page.PageSize, Offset: page.Offset}
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
+		}
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
+		if err != nil {
+			return nil, page, 0, internalError(err)
+		}
+		return mapWorklogs(worklogs), page, total, nil
 	}
 }
 
@@ -214,26 +229,44 @@ func listProjectWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		if err := requireWorklogProject(deps, user.ID, projectID, true); err != nil {
-			return nil, Pagination{}, 0, err
+		allowed, err := deps.TimeAccess.CanViewProject(user.ID, projectID)
+		if err != nil {
+			return nil, Pagination{}, 0, internalError(err)
+		}
+		if !allowed {
+			return nil, Pagination{}, 0, newError(http.StatusNotFound, "not_found", "Time project was not found")
 		}
 		page, err := ParsePage(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		filter := repository.WorklogDetailFilter{ProjectID: &projectID}
-		if err := applyWorklogDetailDates(r, &filter); err != nil {
+		filter := repository.WorklogDetailFilter{ProjectID: &projectID, Limit: page.PageSize, Offset: page.Offset}
+		if err := applyWorklogDetailDates(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		worklogs, err := deps.Worklogs.List(filter)
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return nil, page, 0, err
+		}
+		worklogs, total, err := deps.Worklogs.ListPage(filter)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
 		}
-		total := len(worklogs)
-		start := min(page.Offset, total)
-		end := min(start+page.PageSize, total)
-		return mapWorklogs(worklogs[start:end]), page, total, nil
+		worklogs = redactWorklogs(r, deps, worklogs)
+		return mapWorklogs(worklogs), page, total, nil
 	}
+}
+
+// scopeWorklogReader applies ownership filtering before pagination and totals.
+func scopeWorklogReader(deps Deps, userID int, filter *repository.WorklogDetailFilter) error {
+	managed, err := deps.TimeAccess.GetManagedProjects(userID)
+	if err != nil {
+		return internalError(err)
+	}
+	if managed != nil {
+		filter.ViewerID = &userID
+		filter.ManagedProjectIDs = managed
+	}
+	return nil
 }
 
 func requireWorklog(r *http.Request, deps Deps) (*models.User, *models.Worklog, error) {
@@ -252,17 +285,11 @@ func requireWorklog(r *http.Request, deps Deps) (*models.User, *models.Worklog, 
 	return user, worklog, nil
 }
 
-func requireWorklogProject(deps Deps, userID, projectID int, manager bool) error {
+func requireWorklogBooking(deps Deps, userID, projectID int) error {
 	if projectID <= 0 {
 		return newError(http.StatusBadRequest, "invalid_request", "project_id is required")
 	}
-	var allowed bool
-	var err error
-	if manager {
-		allowed, err = deps.TimeAccess.IsTimeProjectManager(userID, projectID)
-	} else {
-		allowed, err = deps.TimeAccess.CanBookTimeOnProject(userID, projectID)
-	}
+	allowed, err := deps.TimeAccess.CanBookTimeOnProject(userID, projectID)
 	if err != nil {
 		return internalError(err)
 	}
@@ -283,8 +310,8 @@ func requireWorklogItem(r *http.Request, deps Deps, itemID *int) error {
 	return err
 }
 
-func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) error {
-	if err := applyWorklogDateRange(r, &filter.DateFromUnix, &filter.DateToExclusiveUnix); err != nil {
+func applyWorklogFilters(r *http.Request, user *models.User, filter *repository.WorklogDetailFilter) error {
+	if err := applyWorklogDateRange(r, user, &filter.DateFromUnix, &filter.DateToExclusiveUnix); err != nil {
 		return err
 	}
 	if raw := r.URL.Query().Get("project_id"); raw != "" {
@@ -294,16 +321,42 @@ func applyWorklogFilters(r *http.Request, filter *repository.WorklogListFilter) 
 		}
 		filter.ProjectID = &id
 	}
+	if raw := r.URL.Query().Get("customer_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil || id <= 0 {
+			return newError(http.StatusBadRequest, "invalid_request", "customer_id is invalid")
+		}
+		filter.CustomerID = &id
+	}
 	return nil
 }
 
-func applyWorklogDetailDates(r *http.Request, filter *repository.WorklogDetailFilter) error {
-	return applyWorklogDateRange(r, &filter.DateFromUnix, &filter.DateToExclusiveUnix)
+func applyWorklogDetailDates(r *http.Request, user *models.User, filter *repository.WorklogDetailFilter) error {
+	return applyWorklogDateRange(r, user, &filter.DateFromUnix, &filter.DateToExclusiveUnix)
 }
 
-func applyWorklogDateRange(r *http.Request, from, to **int64) error {
+// reportTimezone resolves the optional timezone query parameter used to
+// interpret civil date filters, falling back to the acting user's profile
+// timezone so client-side grouping and server-side inclusion agree.
+func reportTimezone(r *http.Request, user *models.User) (*time.Location, error) {
+	raw := r.URL.Query().Get("timezone")
+	if raw == "" {
+		raw = user.Timezone
+	}
+	_, location, err := services.ResolveTimezone(raw)
+	if err != nil {
+		return nil, newError(http.StatusBadRequest, "invalid_request", err.Error())
+	}
+	return location, nil
+}
+
+func applyWorklogDateRange(r *http.Request, user *models.User, from, to **int64) error {
 	if raw := r.URL.Query().Get("from"); raw != "" {
-		start, _, err := services.CivilDateRangeUTC(raw, raw, time.UTC)
+		location, err := reportTimezone(r, user)
+		if err != nil {
+			return err
+		}
+		start, _, err := services.CivilDateRangeUTC(raw, raw, location)
 		if err != nil {
 			return newError(http.StatusBadRequest, "invalid_request", "from must use YYYY-MM-DD")
 		}
@@ -311,7 +364,11 @@ func applyWorklogDateRange(r *http.Request, from, to **int64) error {
 		*from = &value
 	}
 	if raw := r.URL.Query().Get("to"); raw != "" {
-		_, end, err := services.CivilDateRangeUTC(raw, raw, time.UTC)
+		location, err := reportTimezone(r, user)
+		if err != nil {
+			return err
+		}
+		_, end, err := services.CivilDateRangeUTC(raw, raw, location)
 		if err != nil {
 			return newError(http.StatusBadRequest, "invalid_request", "to must use YYYY-MM-DD")
 		}
@@ -335,6 +392,7 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 		ProjectID: current.ProjectID, ItemID: current.ItemID, Description: current.Description,
 		Date:            time.Unix(current.Date, 0).UTC().Format("2006-01-02"),
 		DurationMinutes: current.DurationMins, UserTimezone: userTimezone,
+		StoredStartUnix: current.StartTime, StoredEndUnix: current.EndTime,
 	}
 	if patch.ProjectID.Set {
 		input.ProjectID = patch.ProjectID.Value
@@ -351,27 +409,32 @@ func mergeWorklogPatch(current *models.Worklog, patch worklogPatchRequest, userT
 	if patch.Timezone.Set {
 		input.Timezone = patch.Timezone.Value
 	}
-	if patch.Duration.Set || patch.DurationMinutes.Set {
+	if patch.StartTime.Set {
+		input.StartTime = patch.StartTime.Value
+	}
+	if patch.EndTime.Set {
+		input.EndTime = patch.EndTime.Value
+	}
+	switch {
+	case patch.Duration.Set || patch.DurationMinutes.Set:
+		// Duration-only input restarts from local midnight on the entry date.
+		// Supplied clocks keep precedence and are cross-checked in the service.
+		if !patch.StartTime.Set && !patch.EndTime.Set {
+			input.StoredStartUnix = 0
+			input.StoredEndUnix = 0
+		}
 		input.DurationMinutes = 0
 		if patch.Duration.Set {
 			input.Duration = patch.Duration.Value
 		} else {
 			input.DurationMinutes = patch.DurationMinutes.Value
 		}
-	} else if patch.StartTime.Set || patch.EndTime.Set {
-		location, err := time.LoadLocation(userTimezone)
-		if err != nil {
-			location = time.UTC
-		}
+	case patch.Date.Set || patch.StartTime.Set || patch.EndTime.Set:
+		// Date or clock edits reconstruct the interval from the patched or
+		// stored civil clocks resolved on the selected day.
 		input.DurationMinutes = 0
-		input.StartTime = time.Unix(current.StartTime, 0).In(location).Format("15:04")
-		input.EndTime = time.Unix(current.EndTime, 0).In(location).Format("15:04")
-		if patch.StartTime.Set {
-			input.StartTime = patch.StartTime.Value
-		}
-		if patch.EndTime.Set {
-			input.EndTime = patch.EndTime.Value
-		}
+	default:
+		input.PreserveStored = true
 	}
 	return input
 }

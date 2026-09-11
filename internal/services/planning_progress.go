@@ -1,7 +1,9 @@
 package services
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 
 	"windshift/internal/models"
@@ -157,10 +159,34 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 	for _, b := range breakdownMap {
 		acc.StatusBreakdown = append(acc.StatusBreakdown, *b)
 	}
+	slices.SortFunc(acc.StatusBreakdown, func(a, b StatusBreakdown) int {
+		if order := cmp.Compare(progressCategoryOrder(a), progressCategoryOrder(b)); order != 0 {
+			return order
+		}
+		return strings.Compare(a.CategoryName, b.CategoryName)
+	})
 
 	if acc.TotalItems > 0 {
 		acc.PercentComplete = float64(acc.CompletedItems) / float64(acc.TotalItems) * 100.0
 	}
 
 	return acc, nil
+}
+
+func progressCategoryOrder(category StatusBreakdown) int {
+	switch category.CategoryBuiltinKey {
+	case "to_do":
+		return 0
+	case "in_progress":
+		return 1
+	case "done":
+		return 3
+	}
+	if category.IsCompleted {
+		return 3
+	}
+	if category.CategoryName == "No Status" {
+		return 4
+	}
+	return 2
 }

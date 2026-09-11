@@ -482,7 +482,7 @@ export default {
     collapseAll: 'Collapse All',
     showTests: 'Show Tests',
     hideTests: 'Hide Tests',
-    showingRootItems: 'Showing {start}-{end} of {total} root items',
+    showingRootItems: 'Top-level items {start}-{end} of {total}',
     page: 'Page',
     pageOfTotal: 'Page {current} of {total}',
     itemKey: 'Item Key',
@@ -674,7 +674,8 @@ export default {
     noQueryToSave: 'No query to save. Please set up some filters or enter a QL query first.',
 
     // Board view
-    boardSummary: 'Total: {itemCount} work items across {columnCount} columns',
+    itemsShown: '{count} shown',
+    boardSummary: 'Showing {itemCount} work items across {columnCount} columns',
     allItems: 'All Items',
     transition_failed: 'Status transition failed. The board has been refreshed.',
     anotherWorkspace: 'another workspace',
@@ -757,6 +758,7 @@ export default {
     workspaceKey: 'Workspace Key',
     workspaceKeyPlaceholder: 'e.g., DEV, TEST, PROD',
     workspaceKeyHelp: 'Used for item prefixes (e.g., DEV-123). Uppercase letters and numbers only.',
+    workspaceKeyImmutable: 'Used for item prefixes (e.g., DEV-123). Cannot be changed after creation.',
     description: 'Description',
     descriptionPlaceholder: 'Optional description for this workspace',
     defaultTimeProject: 'Default Time Tracking Project',

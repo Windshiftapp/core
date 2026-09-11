@@ -1,4 +1,4 @@
-import { fetchAllV2Pages, fetchV2Data } from '../core.js';
+import { fetchAllV2Pages, fetchAPIV2, fetchV2Data } from '../core.js';
 import { createCrudClient } from '../createCrudClient.js';
 
 export const testCases = {
@@ -21,9 +21,14 @@ export const testCases = {
     if (params.label_id) queryParams.append('label_id', params.label_id);
     const queryString = queryParams.toString();
     const endpoint = `/workspaces/${workspaceId}/test-cases${queryString ? `?${queryString}` : ''}`;
-    return params.all ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
+    return params.all && !params.limit ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
   },
-  count: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/test-cases/count`),
+  count: async (workspaceId) => {
+    const document = await fetchAPIV2(
+      `/workspaces/${workspaceId}/test-cases?all=true&page=1&page_size=1`
+    );
+    return { count: document?.pagination?.total_items ?? 0 };
+  },
   move: (workspaceId, id, data) =>
     fetchV2Data(`/workspaces/${workspaceId}/test-cases/${id}/move`, {
       method: 'POST',

@@ -367,7 +367,7 @@ func (s *CommentService) CreateInTx(ctx context.Context, tx database.Tx, itemID,
 		authorIDPtr = &authorID
 	}
 	_, err = itemevents.NewRecorder(s.db).CommentCreated(ctx, tx, workspaceID, itemevents.CommentCreatedV1{
-		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr,
+		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr, SuppressSideEffects: true,
 	}, metadata)
 	return id, err
 }
@@ -462,6 +462,7 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 	if _, err := itemevents.NewRecorder(s.db).CommentCreated(context.Background(), tx, item.WorkspaceID, itemevents.CommentCreatedV1{
 		ItemID: params.ItemID, CommentID: commentID, AuthorID: authorID,
 		PortalCustomerID: params.PortalCustomerID, IsPrivate: params.IsPrivate,
+		SuppressSideEffects: params.SuppressNotifications,
 	}, metadata); err != nil {
 		return nil, err
 	}

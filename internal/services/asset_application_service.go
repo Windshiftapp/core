@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,8 +17,9 @@ import (
 )
 
 var (
-	ErrAssetForbidden = errors.New("asset access forbidden")
-	ErrAssetConflict  = errors.New("asset conflict")
+	ErrAssetForbidden       = errors.New("asset access forbidden")
+	ErrAssetConflict        = errors.New("asset conflict")
+	ErrAssetVersionConflict = errors.New("asset changed during update; reload and try again")
 )
 
 type AssetSetPatch struct {
@@ -158,7 +160,7 @@ func (s *AssetApplicationService) CreateSet(userID int, actor AuditActor, input 
 	input.Name = sanitize.PlainTextField.Sanitize(input.Name)
 	input.Description = sanitize.RichText.Sanitize(input.Description)
 	if strings.TrimSpace(input.Name) == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	input.CreatedBy = &userID
 	id, err := s.repo.CreateSetAndInitialize(&input, userID)
@@ -194,7 +196,7 @@ func (s *AssetApplicationService) UpdateSet(userID, id int, actor AuditActor, pa
 	current.Name = sanitize.PlainTextField.Sanitize(current.Name)
 	current.Description = sanitize.RichText.Sanitize(current.Description)
 	if strings.TrimSpace(current.Name) == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if err := s.repo.UpdateSetAndPromotion(current); err != nil {
 		return nil, err
@@ -220,7 +222,7 @@ func (s *AssetApplicationService) DeleteSet(userID, id int, actor AuditActor) er
 	if err != nil {
 		return err
 	}
-	if err := s.repo.DeleteSet(id); err != nil {
+	if err := s.repo.HardDeleteSet(id, itemEventMetadata(userID, "application", nil)); err != nil {
 		return err
 	}
 	emitServiceAudit(s.db, actor, logger.ActionAssetSetDelete, logger.ResourceAssetSet, &id, set.Name, nil)
@@ -279,7 +281,7 @@ func (s *AssetApplicationService) AssignRole(userID, setID int, actor AuditActor
 		return repository.ErrNotFound
 	}
 	if (input.UserID == nil) == (input.GroupID == nil) {
-		return fmt.Errorf("exactly one of user_id or group_id is required")
+		return &AssetValidationError{Msg: "exactly one of user_id or group_id is required"}
 	}
 	kind, principalID := "user", 0
 	if input.UserID != nil {
@@ -476,7 +478,7 @@ func (s *AssetApplicationService) CreateType(userID, setID int, actor AuditActor
 	input.SetID = setID
 	sanitizeAssetType(&input)
 	if input.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if input.Icon == "" {
 		input.Icon = "Box"
@@ -519,7 +521,7 @@ func (s *AssetApplicationService) UpdateType(userID, id int, actor AuditActor, p
 	}
 	sanitizeAssetType(current)
 	if current.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if err := s.repo.UpdateAssetType(id, repository.AssetTypeUpdate{Name: current.Name, Description: current.Description, Icon: current.Icon, Color: current.Color, DisplayOrder: patch.DisplayOrder, IsActive: patch.IsActive}); err != nil {
 		return nil, err
@@ -611,12 +613,15 @@ func (s *AssetApplicationService) CreateCategory(userID, setID int, actor AuditA
 	input.Name = sanitize.PlainTextField.Sanitize(input.Name)
 	input.Description = sanitize.RichText.Sanitize(input.Description)
 	if input.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if input.ParentID != nil {
 		parentSet, err := s.repo.GetAssetCategorySetID(*input.ParentID)
-		if err != nil || parentSet != setID {
-			return nil, fmt.Errorf("parent category must belong to same set")
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+		if errors.Is(err, repository.ErrNotFound) || parentSet != setID {
+			return nil, &AssetValidationError{Msg: "parent category must belong to same set"}
 		}
 	}
 	id, createdAt, err := s.repo.CreateAssetCategory(repository.CreateAssetCategoryInput{SetID: setID, Name: input.Name, Description: input.Description, ParentID: input.ParentID})
@@ -648,7 +653,7 @@ func (s *AssetApplicationService) UpdateCategory(userID, id int, actor AuditActo
 	current.Name = sanitize.PlainTextField.Sanitize(current.Name)
 	current.Description = sanitize.RichText.Sanitize(current.Description)
 	if current.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if err := s.repo.UpdateAssetCategoryNameDescription(id, current.Name, current.Description); err != nil {
 		return nil, err
@@ -693,18 +698,21 @@ func (s *AssetApplicationService) MoveCategory(userID, id int, parentID *int) (*
 	}
 	if parentID != nil {
 		if *parentID == id {
-			return nil, fmt.Errorf("category cannot be its own parent")
+			return nil, &AssetValidationError{Msg: "category cannot be its own parent"}
 		}
 		parentSet, err := s.repo.GetAssetCategorySetID(*parentID)
-		if err != nil || parentSet != setID {
-			return nil, fmt.Errorf("parent category must belong to same set")
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+		if errors.Is(err, repository.ErrNotFound) || parentSet != setID {
+			return nil, &AssetValidationError{Msg: "parent category must belong to same set"}
 		}
 		descendant, err := s.repo.IsAssetCategoryDescendantOf(*parentID, id)
 		if err != nil {
 			return nil, err
 		}
 		if descendant {
-			return nil, fmt.Errorf("category cannot move below its descendant")
+			return nil, &AssetValidationError{Msg: "category cannot move below its descendant"}
 		}
 	}
 	if err := s.repo.MoveAssetCategory(id, oldParent, parentID); err != nil {
@@ -764,7 +772,7 @@ func (s *AssetApplicationService) CreateStatus(userID, setID int, actor AuditAct
 	input.SetID = setID
 	sanitizeAssetStatus(&input)
 	if input.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	if input.Color == "" {
 		input.Color = "#6b7280"
@@ -798,7 +806,7 @@ func (s *AssetApplicationService) UpdateStatus(userID, id int, actor AuditActor,
 	}
 	sanitizeAssetStatus(current)
 	if current.Name == "" {
-		return nil, fmt.Errorf("name is required")
+		return nil, &AssetValidationError{Msg: "name is required"}
 	}
 	display := current.DisplayOrder
 	if patch.DisplayOrder != nil {
@@ -863,11 +871,15 @@ func (s *AssetApplicationService) ListAssets(userID, setID int, filter repositor
 		if err != nil {
 			return nil, 0, err
 		}
-		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, assetFields, itemFields, s.db.GetDriverName())
+		workspaceIDs, err := s.permissions.AccessibleWorkspaceIDs(userID)
+		if err != nil {
+			return nil, 0, err
+		}
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, assetFields, itemFields, s.db.GetDriverName()).WithItemWorkspaceScope(workspaceIDs)
 		resolved := cql.SubstituteFunctions(ql, cql.UserContext(userID))
 		filter.CQLSQL, filter.CQLArgs, err = evaluator.EvaluateToSQL(resolved)
 		if err != nil {
-			return nil, 0, fmt.Errorf("CQL query error: %w", err)
+			return nil, 0, &AssetValidationError{Msg: fmt.Sprintf("CQL query error: %v", err)}
 		}
 	}
 	total, err := s.repo.CountAssets(filter)
@@ -906,7 +918,7 @@ func (s *AssetApplicationService) CreateAsset(userID, setID int, actor AuditActo
 	if input.StatusID == nil {
 		input.StatusID, _ = s.repo.GetDefaultStatus(setID)
 	}
-	if err := s.validateAssetTaxonomy(setID, input); err != nil {
+	if err := s.normalizeUserFieldValues(input.CustomFieldValues, input.AssetTypeID); err != nil {
 		return nil, err
 	}
 	encoded, err := json.Marshal(input.CustomFieldValues)
@@ -917,17 +929,14 @@ func (s *AssetApplicationService) CreateAsset(userID, setID int, actor AuditActo
 	return s.assets.CreateAsset(actor, repository.CreateAssetInput{SetID: setID, AssetTypeID: input.AssetTypeID, CategoryID: input.CategoryID, StatusID: input.StatusID, Title: input.Title, Description: input.Description, AssetTag: input.AssetTag, CustomFieldValuesJSON: &encodedString, CreatedBy: userID, CreatedAt: time.Now()}, input.CustomFieldValues)
 }
 func (s *AssetApplicationService) UpdateAsset(userID, id int, actor AuditActor, patch AssetPatchInput) (*models.Asset, error) {
-	snapshot, err := s.repo.GetAssetUpdateSnapshot(id)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.require(userID, snapshot.SetID, AssetPermissionKeyEdit); err != nil {
-		return nil, err
-	}
 	row, err := s.repo.FindAssetFullByID(id)
 	if err != nil {
 		return nil, err
 	}
+	if err := s.require(userID, row.SetID, AssetPermissionKeyEdit); err != nil {
+		return nil, err
+	}
+	snapshot := row.UpdateSnapshot()
 	current := repository.AssetRowToModel(*row)
 	input := AssetMutationInput{AssetTypeID: current.AssetTypeID, CategoryID: current.CategoryID, StatusID: current.StatusID, Title: current.Title, Description: current.Description, AssetTag: current.AssetTag, CustomFieldValues: current.CustomFieldValues}
 	if patch.AssetTypeID != nil {
@@ -951,7 +960,7 @@ func (s *AssetApplicationService) UpdateAsset(userID, id int, actor AuditActor, 
 	if patch.CustomFieldValues != nil {
 		input.CustomFieldValues = *patch.CustomFieldValues
 	}
-	if err := s.validateAssetTaxonomy(snapshot.SetID, input); err != nil {
+	if err := s.normalizeUserFieldValues(input.CustomFieldValues, input.AssetTypeID); err != nil {
 		return nil, err
 	}
 	encoded, err := json.Marshal(input.CustomFieldValues)
@@ -959,8 +968,57 @@ func (s *AssetApplicationService) UpdateAsset(userID, id int, actor AuditActor, 
 		return nil, err
 	}
 	encodedString := string(encoded)
-	return s.assets.UpdateAsset(actor, id, *snapshot, repository.UpdateAssetInput{AssetTypeID: input.AssetTypeID, CategoryID: input.CategoryID, StatusID: input.StatusID, Title: input.Title, Description: input.Description, AssetTag: input.AssetTag, CustomFieldValuesJSON: &encodedString}, input.CustomFieldValues)
+	return s.assets.UpdateAsset(actor, id, snapshot, repository.UpdateAssetInput{AssetTypeID: input.AssetTypeID, CategoryID: input.CategoryID, StatusID: input.StatusID, Title: input.Title, Description: input.Description, AssetTag: input.AssetTag, CustomFieldValuesJSON: &encodedString}, input.CustomFieldValues)
 }
+
+// normalizeUserFieldValues stores bare user IDs for user-typed custom fields.
+// The UI sends {id, name} selections; persisting the object breaks CQL
+// user-field filters against these rows.
+func (s *AssetApplicationService) normalizeUserFieldValues(customFieldValues map[string]any, assetTypeID int) error {
+	if len(customFieldValues) == 0 {
+		return nil
+	}
+	userFieldIDs, err := s.repo.FindCustomFieldIDsByType(assetTypeID, "user")
+	if err != nil {
+		return err
+	}
+	for fieldID := range userFieldIDs {
+		fieldKey := strconv.Itoa(fieldID)
+		value, ok := customFieldValues[fieldKey]
+		if !ok || value == nil {
+			continue
+		}
+		if userID := extractAssetRefID(value); userID > 0 {
+			customFieldValues[fieldKey] = userID
+		} else {
+			delete(customFieldValues, fieldKey)
+		}
+	}
+	return nil
+}
+
+// extractAssetRefID pulls the bare integer ID from either a numeric value or
+// the {id, ...} object shape the reference pickers produce.
+func extractAssetRefID(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		if id, err := v.Int64(); err == nil {
+			return int(id)
+		}
+	case map[string]any:
+		if id, ok := v["id"]; ok {
+			return extractAssetRefID(id)
+		}
+	}
+	return 0
+}
+
 func (s *AssetApplicationService) DeleteAsset(userID, id int, actor AuditActor) error {
 	setID, err := s.repo.GetAssetSetID(id)
 	if err != nil {
@@ -972,14 +1030,17 @@ func (s *AssetApplicationService) DeleteAsset(userID, id int, actor AuditActor) 
 	return s.assets.DeleteAsset(actor, id)
 }
 func (s *AssetApplicationService) AssetSummaries(userID int, ids []int) ([]models.AssetSummary, error) {
-	if len(ids) == 0 || len(ids) > 500 {
-		return nil, fmt.Errorf("ids must contain between 1 and 500 values")
+	if len(ids) == 0 {
+		return []models.AssetSummary{}, nil
+	}
+	if len(ids) > 500 {
+		return nil, &AssetValidationError{Msg: "ids must contain at most 500 values"}
 	}
 	items, err := s.repo.FindAssetSummariesByIDs(ids)
 	if err != nil {
 		return nil, err
 	}
-	result := items[:0]
+	visible := make(map[int]models.AssetSummary, len(items))
 	access := map[int]bool{}
 	for _, item := range items {
 		allowed, ok := access[item.SetID]
@@ -988,6 +1049,12 @@ func (s *AssetApplicationService) AssetSummaries(userID int, ids []int) ([]model
 			access[item.SetID] = allowed
 		}
 		if allowed {
+			visible[item.ID] = item
+		}
+	}
+	result := make([]models.AssetSummary, 0, len(visible))
+	for _, id := range ids {
+		if item, ok := visible[id]; ok {
 			result = append(result, item)
 		}
 	}
@@ -1043,23 +1110,4 @@ func (s *AssetApplicationService) LinkedToItem(userID, itemID int) ([]models.Lin
 		}
 	}
 	return result, nil
-}
-func (s *AssetApplicationService) validateAssetTaxonomy(setID int, input AssetMutationInput) error {
-	if input.AssetTypeID <= 0 {
-		return fmt.Errorf("asset_type_id is required")
-	}
-	if ok, err := s.repo.AssetTypeBelongsToSet(input.AssetTypeID, setID); err != nil || !ok {
-		return fmt.Errorf("asset type must belong to set")
-	}
-	if input.CategoryID != nil {
-		if ok, err := s.repo.CategoryBelongsToSet(*input.CategoryID, setID); err != nil || !ok {
-			return fmt.Errorf("category must belong to set")
-		}
-	}
-	if input.StatusID != nil {
-		if ok, err := s.repo.StatusBelongsToSet(*input.StatusID, setID); err != nil || !ok {
-			return fmt.Errorf("status must belong to set")
-		}
-	}
-	return nil
 }

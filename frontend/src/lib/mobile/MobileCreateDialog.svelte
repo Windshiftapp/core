@@ -334,10 +334,19 @@
       const customIds = fields
         .filter((field) => field.field_type === 'custom')
         .map((field) => parseInt(field.field_identifier, 10));
+      // Preserve entered values for fields that remain configured across the
+      // workspace/type change; only fields new to the screen get defaults.
+      const previousValues = customFieldValues;
       customFieldValues = {};
       for (const field of allCustomFields) {
         if (customIds.includes(field.id)) {
-          customFieldValues[field.id] = isBooleanCustomFieldType(field.field_type) ? false : '';
+          const previous = previousValues[field.id];
+          customFieldValues[field.id] =
+            previous !== undefined && previous !== null && previous !== ''
+              ? previous
+              : isBooleanCustomFieldType(field.field_type)
+                ? false
+                : '';
         }
       }
       screenFieldsLoadedForKey = key;
