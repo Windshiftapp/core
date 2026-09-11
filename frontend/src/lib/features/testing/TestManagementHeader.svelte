@@ -7,6 +7,7 @@
   let {
     title,
     subtitle,
+    workspaceId = null,
     milestoneFilter = $bindable(null),
     oncreate,
     createEvent = '',
@@ -56,6 +57,7 @@
       {/if}
       <div class="min-w-48">
         <MilestoneCombobox
+          {workspaceId}
           bind:value={milestoneFilter}
           placeholder={t('milestones.allMilestones')}
           onSelect={handleMilestoneSelect}

@@ -10,7 +10,6 @@ func RegisterItemRoutes(deps *Deps) {
 
 	// Session-only item endpoints. Canonical item CRUD and related operations
 	// are mounted at /api/v2 by the shared v2 router.
-	api.HandleH("GET /items/search", auth(deps.SearchLimiter.Limit(http.HandlerFunc(deps.Items.Item.Search))))
 	api.HandleH("GET /items/cache-stats", auth(http.HandlerFunc(deps.Items.Item.GetCacheStats)))
 	// Item live-update stream (WI-484). Item-view gated (404 on no view); the
 	// path ends in /events so it is exempt from per-user concurrency slots.

@@ -43,7 +43,6 @@ type Deps struct {
 	AIRateLimiter         RateLimiter // Rate limiter for AI/LLM endpoints (5 req/min per IP)
 	UploadLimiter         RateLimiter // Rate limiter for file uploads (10 req/min per IP)
 	WebhookLimiter        RateLimiter // Rate limiter for webhook triggers (10 req/min per IP)
-	SearchLimiter         RateLimiter // Rate limiter for full-text search (20 req/min per IP)
 	CalendarFeedLimiter   RateLimiter // Rate limiter for public calendar feeds (10 req/min per IP)
 	PublicBoardLimiter    RateLimiter // Shared IP limiter for public board, item, and attachment reads
 

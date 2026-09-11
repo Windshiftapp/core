@@ -79,7 +79,7 @@
 
   // Load reparent candidates when reparent mode is selected and we have children
   $effect(() => {
-    if (selectedMode === 'reparent' && hasChildren && deleteInfo?.hierarchyLevel != null) {
+    if (selectedMode === 'reparent' && hasChildren && deleteInfo?.hierarchy_level != null) {
       loadReparentCandidates();
     }
   });
@@ -139,14 +139,13 @@
 
     try {
       if (selectedMode === 'reparent') {
-        // First reparent children to the selected new parent, then delete the item
+        // Move children before deleting their parent.
         await api.items.reparentChildren(item.id, selectedNewParentId);
         await api.items.delete(item.id);
         ondeleted?.({ mode: 'reparent', deletedCount: 1, newParentId: selectedNewParentId });
       } else {
-        // Cascade delete
-        const result = await api.items.deleteCascade(item.id);
-        ondeleted?.({ mode: 'deleteAll', deletedCount: result.count });
+        await api.items.deleteCascade(item.id);
+        ondeleted?.({ mode: 'deleteAll' });
       }
       show = false;
     } catch (err) {
@@ -254,6 +253,7 @@
               <Radio
                 name="deleteMode"
                 value="reparent"
+                dataTestid="item-delete-reparent"
                 bind:groupValue={selectedMode}
                 disabled={loading}
                 class="mt-1"

@@ -25,11 +25,11 @@ func registerTimeRoutes(builder *routeBuilder, deps Deps) {
 	builder.JSON(http.MethodPatch, "/time/projects/{project_id}", http.StatusOK, true, AuthAuthenticated, []string{"time:write"}, patchTimeProject(projects))
 	builder.Command(http.MethodDelete, "/time/projects/{project_id}", AuthAuthenticated, []string{"time:write"}, deleteTimeProject(projects))
 	builder.Read("/workspaces/{workspace_id}/time-projects", AuthAuthenticated, []string{"time:read"}, listWorkspaceTimeProjects(projects))
-	builder.Read("/time/projects/{project_id}/managers", AuthAuthenticated, []string{"time:read"}, listTimeProjectManagers(projects))
-	builder.JSON(http.MethodPost, "/time/projects/{project_id}/managers", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, addTimeProjectManager(projects))
+	builder.Read("/time/projects/{project_id}/managers", AuthAuthenticated, []string{"time:read"}, listTimeProjectManagers(deps))
+	builder.JSON(http.MethodPost, "/time/projects/{project_id}/managers", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, addTimeProjectManager(deps))
 	builder.Command(http.MethodDelete, "/time/projects/{project_id}/managers/{assignment_id}", AuthAuthenticated, []string{"time:write"}, removeTimeProjectManager(projects))
-	builder.Read("/time/projects/{project_id}/members", AuthAuthenticated, []string{"time:read"}, listTimeProjectMembers(projects))
-	builder.JSON(http.MethodPost, "/time/projects/{project_id}/members", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, addTimeProjectMember(projects))
+	builder.Read("/time/projects/{project_id}/members", AuthAuthenticated, []string{"time:read"}, listTimeProjectMembers(deps))
+	builder.JSON(http.MethodPost, "/time/projects/{project_id}/members", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, addTimeProjectMember(deps))
 	builder.Command(http.MethodDelete, "/time/projects/{project_id}/members/{assignment_id}", AuthAuthenticated, []string{"time:write"}, removeTimeProjectMember(projects))
 	builder.JSON(http.MethodPost, "/time/timers", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, startTimer(deps.Timers))
 	builder.Read("/time/timers/active", AuthAuthenticated, []string{"time:read"}, getActiveTimer(deps.Timers))
@@ -142,7 +142,7 @@ type timeProjectManagerDTO struct {
 	GrantedBy     *int   `json:"granted_by"`
 	GrantedAt     string `json:"granted_at"`
 	Name          string `json:"name"`
-	Email         string `json:"email"`
+	Email         string `json:"email,omitempty"`
 }
 
 type timeProjectMemberDTO struct {
@@ -153,7 +153,7 @@ type timeProjectMemberDTO struct {
 	GrantedBy     *int   `json:"granted_by"`
 	GrantedAt     string `json:"granted_at"`
 	Name          string `json:"name"`
-	Email         string `json:"email"`
+	Email         string `json:"email,omitempty"`
 }
 
 type timePrincipalRequest struct {
@@ -388,35 +388,36 @@ func reorderTimeProjectCategories(projects timeProjectApplication) jsonOperation
 	}
 }
 
-func listTimeProjectManagers(projects timeProjectApplication) readOperation[[]timeProjectManagerDTO] {
+func listTimeProjectManagers(deps Deps) readOperation[[]timeProjectManagerDTO] {
 	return func(r *http.Request) ([]timeProjectManagerDTO, error) {
 		user, projectID, err := timeProjectPrincipalAndID(r)
 		if err != nil {
 			return nil, err
 		}
-		items, err := projects.ListManagers(user.ID, projectID)
+		items, err := deps.TimeProjects.ListManagers(user.ID, projectID)
 		if err != nil {
 			return nil, timeProjectError(err)
 		}
+		includeEmail := canReadTimeProjectEmails(deps, user.ID)
 		result := make([]timeProjectManagerDTO, len(items))
 		for i, item := range items {
-			result[i] = timeProjectManagerFromModel(item)
+			result[i] = timeProjectManagerFromModel(item, includeEmail)
 		}
 		return result, nil
 	}
 }
 
-func addTimeProjectManager(projects timeProjectApplication) jsonOperation[timePrincipalRequest, timeProjectManagerDTO] {
+func addTimeProjectManager(deps Deps) jsonOperation[timePrincipalRequest, timeProjectManagerDTO] {
 	return func(r *http.Request, input timePrincipalRequest) (timeProjectManagerDTO, error) {
 		user, projectID, err := timeProjectPrincipalAndID(r)
 		if err != nil {
 			return timeProjectManagerDTO{}, err
 		}
-		item, err := projects.AddManager(auditActor(r, user), projectID, models.TimeProjectManagerRequest{ManagerType: input.PrincipalType, ManagerID: input.PrincipalID})
+		item, err := deps.TimeProjects.AddManager(auditActor(r, user), projectID, models.TimeProjectManagerRequest{ManagerType: input.PrincipalType, ManagerID: input.PrincipalID})
 		if err != nil {
 			return timeProjectManagerDTO{}, timeProjectError(err)
 		}
-		return timeProjectManagerFromModel(*item), nil
+		return timeProjectManagerFromModel(*item, canReadTimeProjectEmails(deps, user.ID)), nil
 	}
 }
 
@@ -434,35 +435,36 @@ func removeTimeProjectManager(projects timeProjectApplication) commandOperation 
 	}
 }
 
-func listTimeProjectMembers(projects timeProjectApplication) readOperation[[]timeProjectMemberDTO] {
+func listTimeProjectMembers(deps Deps) readOperation[[]timeProjectMemberDTO] {
 	return func(r *http.Request) ([]timeProjectMemberDTO, error) {
 		user, projectID, err := timeProjectPrincipalAndID(r)
 		if err != nil {
 			return nil, err
 		}
-		items, err := projects.ListMembers(user.ID, projectID)
+		items, err := deps.TimeProjects.ListMembers(user.ID, projectID)
 		if err != nil {
 			return nil, timeProjectError(err)
 		}
+		includeEmail := canReadTimeProjectEmails(deps, user.ID)
 		result := make([]timeProjectMemberDTO, len(items))
 		for i, item := range items {
-			result[i] = timeProjectMemberFromModel(item)
+			result[i] = timeProjectMemberFromModel(item, includeEmail)
 		}
 		return result, nil
 	}
 }
 
-func addTimeProjectMember(projects timeProjectApplication) jsonOperation[timePrincipalRequest, timeProjectMemberDTO] {
+func addTimeProjectMember(deps Deps) jsonOperation[timePrincipalRequest, timeProjectMemberDTO] {
 	return func(r *http.Request, input timePrincipalRequest) (timeProjectMemberDTO, error) {
 		user, projectID, err := timeProjectPrincipalAndID(r)
 		if err != nil {
 			return timeProjectMemberDTO{}, err
 		}
-		item, err := projects.AddMember(auditActor(r, user), projectID, models.TimeProjectMemberRequest{MemberType: input.PrincipalType, MemberID: input.PrincipalID})
+		item, err := deps.TimeProjects.AddMember(auditActor(r, user), projectID, models.TimeProjectMemberRequest{MemberType: input.PrincipalType, MemberID: input.PrincipalID})
 		if err != nil {
 			return timeProjectMemberDTO{}, timeProjectError(err)
 		}
-		return timeProjectMemberFromModel(*item), nil
+		return timeProjectMemberFromModel(*item, canReadTimeProjectEmails(deps, user.ID)), nil
 	}
 }
 
@@ -568,19 +570,41 @@ func timeProjectCategoryFromModel(item models.TimeProjectCategory) timeProjectCa
 	}
 }
 
-func timeProjectManagerFromModel(item models.TimeProjectManager) timeProjectManagerDTO {
+// Project access does not grant access to user-directory emails.
+func canReadTimeProjectEmails(deps Deps, userID int) bool {
+	if deps.SystemAdmins != nil {
+		if allowed, err := deps.SystemAdmins.IsSystemAdmin(userID); err == nil && allowed {
+			return true
+		}
+	}
+	if deps.GlobalPermission != nil {
+		allowed, err := deps.GlobalPermission.HasGlobalPermission(userID, models.PermissionUserList)
+		return err == nil && allowed
+	}
+	return false
+}
+
+func timeProjectManagerFromModel(item models.TimeProjectManager, includeEmail bool) timeProjectManagerDTO {
+	email := ""
+	if includeEmail {
+		email = item.ManagerEmail
+	}
 	return timeProjectManagerDTO{
 		ID: item.ID, ProjectID: item.ProjectID, PrincipalType: item.ManagerType,
 		PrincipalID: item.ManagerID, GrantedBy: item.GrantedBy,
-		GrantedAt: item.GrantedAt.UTC().Format(time.RFC3339), Name: item.ManagerName, Email: item.ManagerEmail,
+		GrantedAt: item.GrantedAt.UTC().Format(time.RFC3339), Name: item.ManagerName, Email: email,
 	}
 }
 
-func timeProjectMemberFromModel(item models.TimeProjectMember) timeProjectMemberDTO {
+func timeProjectMemberFromModel(item models.TimeProjectMember, includeEmail bool) timeProjectMemberDTO {
+	email := ""
+	if includeEmail {
+		email = item.MemberEmail
+	}
 	return timeProjectMemberDTO{
 		ID: item.ID, ProjectID: item.ProjectID, PrincipalType: item.MemberType,
 		PrincipalID: item.MemberID, GrantedBy: item.GrantedBy,
-		GrantedAt: item.GrantedAt.UTC().Format(time.RFC3339), Name: item.MemberName, Email: item.MemberEmail,
+		GrantedAt: item.GrantedAt.UTC().Format(time.RFC3339), Name: item.MemberName, Email: email,
 	}
 }
 

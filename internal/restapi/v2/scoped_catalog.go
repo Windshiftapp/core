@@ -73,8 +73,6 @@ type workspaceDTO struct {
 	Description             string  `json:"description"`
 	Active                  bool    `json:"active"`
 	TimeProjectID           *int    `json:"time_project_id"`
-	TimeProjectName         string  `json:"time_project_name"`
-	TimeProjectCategories   []int   `json:"time_project_categories"`
 	IsPersonal              bool    `json:"is_personal"`
 	OwnerID                 *int    `json:"owner_id"`
 	IsTemplate              bool    `json:"is_template"`
@@ -116,12 +114,9 @@ type workspaceCreateRequest struct {
 
 type workspacePatchRequest struct {
 	Name                    Optional[string] `json:"name"`
-	Key                     Optional[string] `json:"key"`
 	Description             Optional[string] `json:"description"`
 	Active                  Optional[bool]   `json:"active"`
 	TimeProjectID           Optional[int]    `json:"time_project_id"`
-	IsPersonal              Optional[bool]   `json:"is_personal"`
-	OwnerID                 Optional[int]    `json:"owner_id"`
 	Icon                    Optional[string] `json:"icon"`
 	Color                   Optional[string] `json:"color"`
 	AvatarURL               Optional[string] `json:"avatar_url"`
@@ -214,11 +209,9 @@ func updateWorkspace(workspaces workspaceApplication) jsonOperation[workspacePat
 			return workspaceDTO{}, newError(http.StatusBadRequest, "invalid_request", "Only nullable workspace fields may be null")
 		}
 		params := services.UpdateWorkspaceParams{
-			ID: workspaceID, Name: optionalValue(input.Name), Key: optionalValue(input.Key),
+			ID: workspaceID, Name: optionalValue(input.Name),
 			Description: optionalValue(input.Description), Active: optionalValue(input.Active),
 			TimeProjectID: services.NullableUpdate[int]{Present: input.TimeProjectID.Set, Value: optionalNullableValue(input.TimeProjectID)},
-			IsPersonal:    optionalValue(input.IsPersonal),
-			OwnerID:       services.NullableUpdate[int]{Present: input.OwnerID.Set, Value: optionalNullableValue(input.OwnerID)},
 			Icon:          optionalValue(input.Icon), Color: optionalValue(input.Color),
 			AvatarURL:   services.NullableUpdate[string]{Present: input.AvatarURL.Set, Value: optionalNullableValue(input.AvatarURL)},
 			DefaultView: optionalValue(input.DefaultView), InternalCommentsEnabled: optionalValue(input.InternalCommentsEnabled),
@@ -243,8 +236,8 @@ func deleteWorkspace(workspaces workspaceApplication) commandOperation {
 }
 
 func workspacePatchHasInvalidNull(input workspacePatchRequest) bool {
-	return input.Name.Null || input.Key.Null || input.Description.Null || input.Active.Null ||
-		input.IsPersonal.Null || input.Icon.Null || input.Color.Null || input.DefaultView.Null ||
+	return input.Name.Null || input.Description.Null || input.Active.Null ||
+		input.Icon.Null || input.Color.Null || input.DefaultView.Null ||
 		input.InternalCommentsEnabled.Null || input.TimeProjectCategories.Null || input.IsTemplate.Null
 }
 
@@ -601,14 +594,9 @@ func itemTemplateMutationError(err error) error {
 }
 
 func workspaceFromModel(workspace *models.Workspace) workspaceDTO {
-	categories := workspace.TimeProjectCategories
-	if categories == nil {
-		categories = []int{}
-	}
 	return workspaceDTO{
 		ID: workspace.ID, Name: workspace.Name, Key: workspace.Key, Description: workspace.Description,
 		Active: workspace.Active, TimeProjectID: workspace.TimeProjectID, IsPersonal: workspace.IsPersonal,
-		TimeProjectName: workspace.TimeProjectName, TimeProjectCategories: categories,
 		OwnerID: workspace.OwnerID, IsTemplate: workspace.IsTemplate,
 		InternalCommentsEnabled: workspace.InternalCommentsEnabled, Icon: workspace.Icon, Color: workspace.Color,
 		AvatarURL: workspace.AvatarURL, DefaultView: workspace.DefaultView, ConfigurationSetID: workspace.ConfigurationSetID,

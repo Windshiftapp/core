@@ -67,6 +67,9 @@ type itemPatchRequest struct {
 	ParentID          Optional[int]            `json:"parent_id"`
 	IterationID       Optional[int]            `json:"iteration_id"`
 	ProjectID         Optional[int]            `json:"project_id"`
+	InheritProject    Optional[bool]           `json:"inherit_project"`
+	StoryPoints       Optional[float64]        `json:"story_points"`
+	EstimateMinutes   Optional[int]            `json:"estimate_minutes"`
 	MilestoneIDs      Optional[[]int]          `json:"milestone_ids"`
 	DueDate           Optional[time.Time]      `json:"due_date"`
 	StartDate         Optional[time.Time]      `json:"start_date"`
@@ -113,8 +116,9 @@ type roadmapHierarchyDatesRequest struct {
 	RootIDs []int `json:"root_ids"`
 }
 
-func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService) {
+func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, requestTimeout time.Duration) {
 	collection := "/items"
+	builder.Page("/items/search", AuthAuthenticated, []string{"items:read"}, searchItems(app, requestTimeout))
 	builder.PageMetadata(collection, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, Pagination, int, itemListMeta, error) {
 		user, err := principal(r)
 		if err != nil {
@@ -159,6 +163,18 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		result, err := app.Batch(r.Context(), user.ID, ids)
 		return result, itemError(err)
 	})
+	builder.JSON(http.MethodPost, collection+"/batch-ancestors", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, func(r *http.Request, input idBatchRequest) ([]services.ItemAncestorsBatchEntry, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := normalizeBatchIDs(input.IDs)
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.BatchAncestors(r.Context(), user.ID, ids)
+		return result, itemError(err)
+	})
 	builder.Read("/workspaces/{workspace_key}/items/{item_number}", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.Item, error) {
 		user, err := principal(r)
 		if err != nil {
@@ -168,7 +184,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		if err != nil {
 			return nil, err
 		}
-		result, err := app.GetByKey(r.Context(), user.ID, strings.TrimSpace(r.PathValue("workspace_key")), number)
+		result, err := app.GetByKeyWithOptions(r.Context(), user.ID, strings.TrimSpace(r.PathValue("workspace_key")), number, itemReadOptions(r))
 		return result, itemError(err)
 	})
 	builder.Read("/workspaces/{workspace_key}/items/{item_number}/detail-summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (services.ItemDetailSummary, error) {
@@ -202,9 +218,9 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		}
 		var result *models.Item
 		if reference.ID > 0 {
-			result, err = app.Get(r.Context(), user.ID, reference.ID, true)
+			result, err = app.GetWithOptions(r.Context(), user.ID, reference.ID, itemReadOptions(r))
 		} else {
-			result, err = app.GetByKey(r.Context(), user.ID, reference.WorkspaceKey, reference.ItemNumber)
+			result, err = app.GetByKeyWithOptions(r.Context(), user.ID, reference.WorkspaceKey, reference.ItemNumber, itemReadOptions(r))
 		}
 		return result, itemError(err)
 	})
@@ -220,6 +236,17 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		user, id, err := itemTarget(r)
 		if err != nil {
 			return err
+		}
+		cascade := false
+		if values, present := r.URL.Query()["cascade"]; present {
+			if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
+				return invalidQuery("cascade")
+			}
+			cascade = values[0] == "true"
+		}
+		if cascade {
+			_, err := app.DeleteCascade(auditActor(r, user), id)
+			return itemError(err)
 		}
 		return itemError(app.Delete(auditActor(r, user), id))
 	})
@@ -277,8 +304,24 @@ func registerItemSetRoutes(builder *routeBuilder, app *services.ItemApplicationS
 				return services.ItemChangesResult{}, invalidQuery("since")
 			}
 		}
+		throughRaw := strings.TrimSpace(r.URL.Query().Get("through"))
+		var through int64
+		if throughRaw != "" {
+			through, err = strconv.ParseInt(throughRaw, 10, 64)
+			if err != nil || through < 0 || through < since {
+				return services.ItemChangesResult{}, invalidQuery("through")
+			}
+		}
+		var limit int
+		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+			limit, err = strconv.Atoi(raw)
+			if err != nil || limit < 1 || limit > 500 {
+				return services.ItemChangesResult{}, invalidQuery("limit")
+			}
+		}
 		result, err := app.Changes(r.Context(), services.ItemChangesRequest{
 			UserID: user.ID, WorkspaceID: workspaceID, CollectionID: collectionID,
+			Through: through, ThroughProvided: throughRaw != "", Limit: limit,
 			Since: since, SinceProvided: sinceRaw != "", SubQL: r.URL.Query().Get("sub_ql"),
 		})
 		return result, itemError(err)
@@ -416,14 +459,6 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 			return services.ItemDeleteInfo{}, err
 		}
 		result, err := app.DeleteInfo(user.ID, id)
-		return result, itemError(err)
-	})
-	builder.Action(http.MethodPost, path+"/cascade-deletion", http.StatusOK, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request) (services.ItemMutationCount, error) {
-		user, id, err := itemTarget(r)
-		if err != nil {
-			return services.ItemMutationCount{}, err
-		}
-		result, err := app.DeleteCascade(auditActor(r, user), id)
 		return result, itemError(err)
 	})
 	builder.JSON(http.MethodPost, path+"/reparent-children", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemReparentRequest) (services.ItemMutationCount, error) {
@@ -620,7 +655,20 @@ func invalidItemReference(message string) error {
 	return err
 }
 
+func excludePersonal(r *http.Request) bool {
+	value := r.URL.Query().Get("exclude_personal")
+	return value == "true" || value == "1"
+}
+
+func itemReadOptions(r *http.Request) services.ItemReadOptions {
+	return services.ItemReadOptions{TrackView: true, ExcludePersonal: excludePersonal(r)}
+}
+
 func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRequest, error) {
+	return parseItemListAt(r, userID, time.Now().UTC())
+}
+
+func parseItemListAt(r *http.Request, userID int, now time.Time) (Pagination, services.ItemListRequest, error) {
 	page, err := ParsePage(r)
 	if err != nil {
 		return Pagination{}, services.ItemListRequest{}, err
@@ -631,6 +679,7 @@ func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRe
 		Pagination:       services.PaginationParams{Limit: page.PageSize, Offset: page.Offset, Cursor: query.Get("cursor"), CursorMode: query.Get("cursor") != ""},
 		OmitDescriptions: query.Get("fields") == "summary",
 		IncludeWatermark: query.Get("include_watermark") == "true",
+		ExcludePersonal:  excludePersonal(r),
 	}
 	for name, target := range map[string]*int{"workspace_id": &request.WorkspaceID, "collection_id": &request.CollectionID} {
 		if query.Get(name) == "" {
@@ -645,10 +694,8 @@ func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRe
 	if request.CollectionID > 0 {
 		request.WorkspaceID = 0
 	}
-	if request.QL == "" && request.CollectionID == 0 {
-		if err := parseItemFilters(r, &request.Filters); err != nil {
-			return Pagination{}, services.ItemListRequest{}, err
-		}
+	if err := parseItemFilters(r, &request.Filters); err != nil {
+		return Pagination{}, services.ItemListRequest{}, err
 	}
 	request.Filters.TextQuery = strings.TrimSpace(query.Get("search"))
 	if request.Filters.TextQuery == "" {
@@ -663,6 +710,14 @@ func parseItemList(r *http.Request, userID int) (Pagination, services.ItemListRe
 		return Pagination{}, services.ItemListRequest{}, invalidQuery("status_id_not")
 	}
 	request.Filters.CompletedSince = stringPointer(query.Get("completed_since"))
+	if query.Has("completed_activity_days") {
+		days, err := parsePositiveInt(r, "completed_activity_days", 0, 3650)
+		if err != nil || days == 0 {
+			return Pagination{}, services.ItemListRequest{}, invalidQuery("completed_activity_days")
+		}
+		cutoff := now.UTC().AddDate(0, 0, -days)
+		request.Filters.CompletedActivitySince = &cutoff
+	}
 
 	sort := query.Get("sort")
 	if strings.HasPrefix(sort, "-") {
@@ -717,6 +772,9 @@ func itemPatchFields(input itemPatchRequest) map[string]json.RawMessage {
 	putOptional(fields, "parent_id", input.ParentID)
 	putOptional(fields, "iteration_id", input.IterationID)
 	putOptional(fields, "project_id", input.ProjectID)
+	putOptional(fields, "inherit_project", input.InheritProject)
+	putOptional(fields, "story_points", input.StoryPoints)
+	putOptional(fields, "estimate_minutes", input.EstimateMinutes)
 	putOptional(fields, "milestone_ids", input.MilestoneIDs)
 	putOptional(fields, "due_date", input.DueDate)
 	putOptional(fields, "start_date", input.StartDate)
@@ -821,10 +879,16 @@ func itemError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, services.ErrItemCascadeForbidden) {
+		return newError(http.StatusForbidden, "forbidden", "This item can be deleted on its own, but cascade deletion is not permitted.")
+	}
 	if errors.Is(err, repository.ErrNotFound) || errors.Is(err, services.ErrItemForbidden) || errors.Is(err, services.ErrItemDeletionForbidden) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
 	}
-	if errors.Is(err, services.ErrQLQuery) || errors.Is(err, services.ErrCollectionNotFound) || errors.Is(err, repository.ErrInvalidItemListCursor) {
+	if errors.Is(err, services.ErrCollectionNotFound) {
+		return collectionError(err)
+	}
+	if errors.Is(err, services.ErrQLQuery) || errors.Is(err, repository.ErrInvalidItemListCursor) {
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	}
 	if errors.Is(err, services.ErrItemConflict) {

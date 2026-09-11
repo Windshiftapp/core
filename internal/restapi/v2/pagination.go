@@ -9,7 +9,7 @@ import (
 const (
 	defaultPage     = 1
 	defaultPageSize = 50
-	maxPageSize     = 100
+	maxPageSize     = 1000
 )
 
 // Pagination is the canonical v2 page request.

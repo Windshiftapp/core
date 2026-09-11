@@ -206,7 +206,14 @@ func (s *CatalogReadService) ListAssignableUsers(ctx context.Context, userID, wo
 	return s.workspaceUsers.List(ctx, workspaceID)
 }
 
-func (s *CatalogReadService) ListUsers(_ int, page CatalogPageParams) ([]models.User, int, error) {
+func (s *CatalogReadService) ListUsers(userID int, page CatalogPageParams) ([]models.User, int, error) {
+	allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !allowed {
+		return nil, 0, ErrCatalogForbidden
+	}
 	users, err := s.users.ListAll()
 	if err != nil {
 		return nil, 0, err
@@ -233,12 +240,14 @@ func (s *CatalogReadService) ListUsers(_ int, page CatalogPageParams) ([]models.
 }
 
 func (s *CatalogReadService) GetUser(userID, targetID int) (*models.User, error) {
-	allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
-	if err != nil {
-		return nil, err
-	}
-	if !allowed {
-		return nil, ErrCatalogForbidden
+	if userID != targetID {
+		allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, ErrCatalogForbidden
+		}
 	}
 	user, err := s.users.GetByID(targetID)
 	if err != nil {

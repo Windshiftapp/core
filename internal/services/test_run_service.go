@@ -17,7 +17,7 @@ import (
 var ErrTestRunItemNotFound = errors.New("test run item not found")
 
 // ErrInvalidTestResultStatus identifies an unsupported case or step status.
-var ErrInvalidTestResultStatus = errors.New("invalid status: must be passed, failed, blocked, skipped, or not_run")
+var ErrInvalidTestResultStatus = &TestManagementValidationError{Msg: "invalid status: must be passed, failed, blocked, skipped, or not_run"}
 
 // TestRunService handles test run business logic
 type TestRunService struct {
@@ -132,8 +132,11 @@ func (s *TestRunService) validateAssignee(assigneeID *int) error {
 	}
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ? AND is_active = true`, *assigneeID).Scan(&count)
-	if err != nil || count == 0 {
-		return fmt.Errorf("assignee not found")
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return &TestManagementValidationError{Msg: "assignee not found"}
 	}
 	return nil
 }
@@ -145,8 +148,11 @@ func (s *TestRunService) Create(workspaceID int, req TestRunCreateRequest) (*mod
 	if req.SetID > 0 {
 		var count int
 		err := s.db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", req.SetID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			return nil, fmt.Errorf("test set not found in workspace")
+		if err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, &TestManagementValidationError{Msg: "test set not found in workspace"}
 		}
 	}
 
@@ -159,8 +165,11 @@ func (s *TestRunService) Create(workspaceID int, req TestRunCreateRequest) (*mod
 			"SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?",
 			req.TemplateID, workspaceID,
 		).Scan(&count)
-		if err != nil || count == 0 {
-			return nil, fmt.Errorf("test run template not found in workspace")
+		if err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, &TestManagementValidationError{Msg: "test run template not found in workspace"}
 		}
 	}
 

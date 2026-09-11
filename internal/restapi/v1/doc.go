@@ -2,7 +2,7 @@
 //
 // This file hosts swaggo directives for the API as a whole. Route annotations
 // live beside the v1, health, and metrics handlers. The generated spec is
-// committed to core/api/openapi.{yaml,json} and re-emitted by `make openapi`.
+// committed to core/api/openapi.json and re-emitted by `make openapi`.
 
 // @title                       Windshift HTTP API
 // @version                     1

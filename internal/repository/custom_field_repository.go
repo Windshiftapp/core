@@ -382,6 +382,7 @@ func isCustomFieldConfigIdentifier(identifier string, fieldID int) bool {
 // type (and which management set) references which custom_field_id.
 type AssetTypeUsageRow struct {
 	CustomFieldID int
+	SetID         int
 	AssetTypeName string
 	SetName       string
 }
@@ -390,7 +391,7 @@ type AssetTypeUsageRow struct {
 // ordered by custom_field_id, set name, asset type name.
 func (r *CustomFieldRepository) ListAssetTypeUsages() ([]AssetTypeUsageRow, error) {
 	rows, err := r.db.Query(`
-		SELECT atf.custom_field_id, at.name, s.name
+		SELECT atf.custom_field_id, s.id, at.name, s.name
 		FROM asset_type_fields atf
 		JOIN asset_types at ON atf.asset_type_id = at.id
 		JOIN asset_management_sets s ON at.set_id = s.id
@@ -403,7 +404,7 @@ func (r *CustomFieldRepository) ListAssetTypeUsages() ([]AssetTypeUsageRow, erro
 	var results []AssetTypeUsageRow
 	for rows.Next() {
 		var row AssetTypeUsageRow
-		if err := rows.Scan(&row.CustomFieldID, &row.AssetTypeName, &row.SetName); err != nil {
+		if err := rows.Scan(&row.CustomFieldID, &row.SetID, &row.AssetTypeName, &row.SetName); err != nil {
 			return nil, fmt.Errorf("scan asset type usage: %w", err)
 		}
 		results = append(results, row)

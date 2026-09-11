@@ -21,7 +21,7 @@ export const testCases = {
     if (params.label_id) queryParams.append('label_id', params.label_id);
     const queryString = queryParams.toString();
     const endpoint = `/workspaces/${workspaceId}/test-cases${queryString ? `?${queryString}` : ''}`;
-    return params.all ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
+    return params.all && !params.limit ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
   },
   count: async (workspaceId) => {
     const document = await fetchAPIV2(

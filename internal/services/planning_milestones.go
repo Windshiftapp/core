@@ -247,6 +247,7 @@ type MilestoneListParams struct {
 	CategoryID    *int   // Filter by category
 	Status        string // Filter by status
 	IncludeGlobal bool   // Include global milestones
+	IsGlobal      bool   // Restricts an unscoped list to global milestones only
 	// SortBy overrides the default manual-position ordering. When empty,
 	// results are ordered by position then name (the drag-and-drop order).
 	// When set (e.g. "name", "target_date", "status"), the client sort wins.

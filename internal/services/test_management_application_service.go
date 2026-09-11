@@ -11,6 +11,13 @@ import (
 	"windshift/internal/testsummary"
 )
 
+// TestManagementValidationError contains a safe message for invalid test input.
+type TestManagementValidationError struct {
+	Msg string
+}
+
+func (e *TestManagementValidationError) Error() string { return e.Msg }
+
 var ErrTestManagementForbidden = errors.New("test management access forbidden")
 
 type TestFolderPatch struct {

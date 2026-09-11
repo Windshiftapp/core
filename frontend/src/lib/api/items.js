@@ -18,7 +18,9 @@ function itemMutationBody(data) {
 
 function itemListQuery(/** @type {Record<string, any>} */ filters = {}) {
   const { limit, omit_descriptions, order_by, sort_direction, ...canonical } = filters;
-  if (limit != null) canonical.page_size = Math.min(Number(limit), 100);
+  // Must stay aligned with the v2 server page cap; boards re-sync accumulated
+  // rows in one request sized to what the user has loaded.
+  if (limit != null) canonical.page_size = Math.min(Number(limit), 1000);
   if (omit_descriptions) canonical.fields = 'summary';
   if (order_by) canonical.sort = sort_direction === 'desc' ? `-${order_by}` : order_by;
   return buildQueryString(canonical);
@@ -223,14 +225,14 @@ export const items = {
   getDeleteInfo: (id) => fetchV2Data(`/items/${id}/delete-info`),
   deleteCascade: withCrossTabNotice(
     (id) =>
-      fetchV2Data(`/items/${id}/cascade-deletion`, {
-        method: 'POST',
+      fetchAPIV2(`/items/${id}?cascade=true`, {
+        method: 'DELETE',
       }),
     'delete'
   ),
   reparentChildren: (id, newParentId) =>
     fetchV2Data(`/items/${id}/reparent-children`, {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ parent_id: newParentId }),
     }),
   copy: withCrossTabNotice(
@@ -268,6 +270,30 @@ export const items = {
     fetchV2Data(`/items/${itemId}/children`, requestOptions),
   getAncestors: (itemId, requestOptions = {}) =>
     fetchV2Data(`/items/${itemId}/ancestors`, requestOptions),
+  /**
+   * Fetch ancestor chains for many items in one (or a few) batch requests.
+   * Returns an array of { item_id, ancestors } entries — ancestors ordered
+   * root -> parent and excluding the item itself. Ids the caller can't view or
+   * that don't exist are silently omitted, matching getMany. Chunked under
+   * the server's 500-id cap.
+   */
+  getManyAncestors: async (ids = []) => {
+    const unique = [...new Set(ids)].filter((id) => id != null);
+    if (unique.length === 0) return [];
+    const chunks = [];
+    for (let i = 0; i < unique.length; i += ITEM_BATCH_CHUNK) {
+      chunks.push(unique.slice(i, i + ITEM_BATCH_CHUNK));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        fetchV2Data('/items/batch-ancestors', {
+          method: 'POST',
+          body: JSON.stringify({ ids: chunk }),
+        })
+      )
+    );
+    return results.flat();
+  },
   getDescendants: (itemId, maxDepth = null) => {
     const params = maxDepth ? `?max_depth=${maxDepth}` : '';
     return fetchV2Data(`/items/${itemId}/descendants${params}`);
@@ -307,7 +333,7 @@ export const items = {
   // Watch/unwatch items
   addWatch: (id) =>
     fetchV2Data(`/items/${id}/watch`, {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify({}),
     }),
   removeWatch: (id) =>

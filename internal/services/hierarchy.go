@@ -101,6 +101,12 @@ func (h *HierarchyService) GetAncestorsContext(ctx context.Context, itemID int) 
 	return repository.NewItemRepository(h.db).GetAncestorsForHierarchyContext(ctx, itemID, maxHierarchyDepth)
 }
 
+// GetAncestorsForItemsContext resolves ancestor chains for many items in one
+// recursive walk. Chains exclude the items themselves.
+func (h *HierarchyService) GetAncestorsForItemsContext(ctx context.Context, itemIDs []int) (map[int][]models.Item, error) {
+	return repository.NewItemRepository(h.db).GetAncestorsForItemsContext(ctx, itemIDs, maxHierarchyDepth)
+}
+
 // GetDescendants returns all descendants of an item
 func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, error) {
 	return h.GetDescendantsContext(context.Background(), itemID, maxDepth)

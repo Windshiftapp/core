@@ -88,20 +88,6 @@ export const customFields = {
     }),
 };
 
-export const projectFieldRequirements = {
-  getByProject: (id) => fetchAPI(`/projects/${id}/field-requirements`),
-  setRequirement: (projectId, data) =>
-    fetchAPI(`/projects/${projectId}/field-requirements`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  removeRequirement: (projectId, fieldId) =>
-    fetchAPI(`/projects/${projectId}/field-requirements/${fieldId}`, {
-      method: 'DELETE',
-    }),
-  getAvailableFields: (id) => fetchAPI(`/projects/${id}/available-fields`),
-};
-
 export const itemTypes = createCrudClient('/item-types', { v2: true });
 
 export const itemTemplates = createCrudClient('/item-templates', {
@@ -126,7 +112,7 @@ export const links = {
   // Batch variant of getForItem('items', ...): returns links keyed by item id
   // ({ "<id>": { outgoing, incoming } }) for many items in one request. Used by
   // board/roadmap dependency badges so a board render is one request instead of
-  // one per card. Callers chunk to the canonical 100-anchor cap.
+  // one per card. Callers chunk to the 200-item cap; the server accepts up to 500.
   getForItems: async (ids, { includeCustomFields = false } = {}) => {
     const customFields = includeCustomFields ? '&include_custom_fields=true' : '';
     const document = await fetchAPIV2(

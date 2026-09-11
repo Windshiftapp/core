@@ -123,7 +123,8 @@ export default {
       noBudgetSet: 'Aucun budget défini',
       noProjectSelected: 'Sélectionnez un projet pour afficher son rapport',
       printLoading: 'Préparation du rapport de temps pour l’impression…',
-      printUnavailable: 'Ce rapport de temps n’est plus disponible. Retournez aux rapports et exportez-le à nouveau.',
+      printUnavailable:
+        'Ce rapport de temps n’est plus disponible. Retournez aux rapports et exportez-le à nouveau.',
       backToReports: 'Retour aux rapports',
     },
 
@@ -147,7 +148,8 @@ export default {
       allCategories: 'Toutes les catégories',
       allStatuses: 'Tous les statuts',
       statusCount: '{count} statuts',
-      noProjects: 'Aucun projet trouvé. Créez votre premier projet pour commencer à suivre votre temps.',
+      noProjects:
+        'Aucun projet trouvé. Créez votre premier projet pour commencer à suivre votre temps.',
       noProjectsInCategory: 'Aucun projet dans cette catégorie.',
       failedToSave: 'Échec de l’enregistrement du projet',
       deleteProject: 'Supprimer le projet',
@@ -157,7 +159,7 @@ export default {
       customer: 'Client',
       rate: 'Taux',
       projectName: 'Nom du projet',
-      descriptionOptional: 'Description (optionnel)',
+      descriptionOptional: 'Description (facultative)',
       hourlyRateOptional: 'Taux horaire (optionnel)',
     },
 
@@ -169,7 +171,8 @@ export default {
       myWorkItems: 'Mes éléments de travail',
       dragToSchedule: 'Faites glisser les éléments pour les planifier',
       noWorkItems: 'Aucun élément de travail assigné',
-      workItemsWillAppear: 'Les éléments de travail apparaîtront ici lorsqu’ils vous seront assignés',
+      workItemsWillAppear:
+        'Les éléments de travail apparaîtront ici lorsqu’ils vous seront assignés',
       itemsCompleted: '{completed} sur {total} éléments terminés',
       previousWeek: 'Semaine précédente',
       thisWeek: 'cette semaine',
@@ -183,14 +186,16 @@ export default {
       title: 'Saisie de temps',
       subtitle: 'Enregistrer vos heures de travail et gérer les saisies de temps',
       addTimeEntry: 'Ajouter une nouvelle saisie de temps',
-      failedToSave: 'Échec de l’enregistrement de la saisie de temps. Veuillez vérifier votre saisie.',
+      failedToSave:
+        'Échec de l’enregistrement de la saisie de temps. Veuillez vérifier votre saisie.',
       confirmDelete: 'Voulez-vous vraiment supprimer cette saisie de temps ?',
       needProjects: 'Vous devez créer des projets actifs avant d’enregistrer du temps.',
       goToProjects: 'Aller aux projets',
       startSetupWizard: 'démarrer l’assistant de configuration',
       applyFiltersTitle: 'Appliquer les filtres sélectionnés à la liste des saisies de temps',
       clearFiltersTitle: 'Effacer tous les filtres et afficher toutes les saisies de temps',
-      noEntries: 'Aucune saisie de temps trouvée. Enregistrez votre première saisie de temps pour commencer.',
+      noEntries:
+        'Aucune saisie de temps trouvée. Enregistrez votre première saisie de temps pour commencer.',
       clickToView: 'Cliquer pour afficher {key}-{number}',
       budgetExceeded: '- budget dépassé',
       submitted: 'Soumis',
@@ -201,10 +206,11 @@ export default {
       title: 'Organisations',
       subtitle: 'Gérer vos organisations clientes',
       addOrganization: 'Ajouter une organisation',
-      noOrganizations: 'Aucune organisation trouvée. Créez votre première organisation pour commencer.',
+      noOrganizations:
+        'Aucune organisation trouvée. Créez votre première organisation pour commencer.',
       name: 'Nom de l’organisation',
       emailOptional: 'E-mail (optionnel)',
-      contactPersonOptional: 'Personne de contact (optionnel)',
+      contactPersonOptional: 'Personne de contact (facultative)',
       failedToSave: 'Échec de l’enregistrement de l’organisation',
       deleteOrganization: 'Supprimer l’organisation',
       confirmDelete: 'Voulez-vous vraiment supprimer « {name} » ?',
@@ -221,9 +227,11 @@ export default {
       removeManager: 'Retirer le responsable',
       removeMember: 'Retirer le membre',
       noManagers: 'Aucun responsable assigné',
-      noManagersHint: 'Lorsqu’aucun responsable n’est assigné, n’importe qui peut gérer ce projet',
+      noManagersHint:
+        'Sans responsable assigné, seuls les administrateurs globaux et les utilisateurs autorisés à gérer tous les projets de temps et relevés peuvent gérer ce projet',
       noMembers: 'Aucun membre assigné',
-      noMembersHint: 'Lorsqu’aucun membre n’est assigné, n’importe qui peut imputer du temps sur ce projet',
+      noMembersHint:
+        'Lorsqu’aucun membre n’est assigné, n’importe qui peut imputer du temps sur ce projet',
       grantedAt: 'Ajouté',
       confirmRemove: 'Voulez-vous vraiment retirer {name} ?',
       failedToAdd: 'Échec de l’ajout',
@@ -232,7 +240,8 @@ export default {
       managersNoteText:
         'Peuvent modifier les paramètres du projet, gérer les membres et voir toutes les saisies de temps pour ce projet.',
       membersNote: 'Membres :',
-      membersNoteText: 'Peuvent imputer du temps sur ce projet et voir leurs propres saisies de temps.',
+      membersNoteText:
+        'Peuvent imputer du temps sur ce projet et voir leurs propres saisies de temps.',
     },
   },
 
@@ -243,7 +252,7 @@ export default {
     status: 'Statut',
     customerOptional: 'Client (optionnel)',
     none: 'Aucun',
-    categoryOptional: 'Catégorie (optionnel)',
+    categoryOptional: 'Catégorie (facultative)',
     hourlyRate: 'Taux horaire ($)',
     maxHours: 'Heures max',
     maxHoursPlaceholder: 'Aucune limite',

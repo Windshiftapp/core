@@ -34,7 +34,7 @@
   let { collectionId = null } = $props();
 
   // Each Collections instance owns a fresh search store — no cross-page leakage.
-  const store = createWorkItemSearchStore();
+  const store = createWorkItemSearchStore({ allowEmptyQuery: true });
   /** @type {Record<string, any>} */
   let storeState = $state({});
   const unsubscribeStore = store.subscribe((value) => (storeState = value));
@@ -154,7 +154,8 @@
 
   async function loadBoardConfiguration(id) {
     try {
-      const config = await api.collections.getBoardConfiguration(id);
+      const bootstrap = await api.collections.getBoardConfigurationBootstrap(id);
+      const config = bootstrap?.board_configuration ?? null;
       boardConfig = config;
       listColumns = listColumnsFromConfig(config);
     } catch (error) {
@@ -506,12 +507,12 @@
         rowAttrs={(item) => ({ 'data-testid': `collection-result-${item.id}` })}
       />
 
-      {#if itemsPagination && itemsPagination.total > 0}
+      {#if itemsPagination && itemsPagination.total_items > 0}
         <div class="mt-6">
           <Pagination
             currentPage={itemsPagination.page}
-            totalItems={itemsPagination.total}
-            itemsPerPage={itemsPagination.limit}
+            totalItems={itemsPagination.total_items}
+            itemsPerPage={itemsPagination.page_size}
             maxItems={10000}
             onpageChange={handlePageChange}
             onpageSizeChange={handlePageSizeChange}

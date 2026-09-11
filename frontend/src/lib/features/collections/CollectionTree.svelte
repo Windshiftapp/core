@@ -19,12 +19,22 @@
   import { formatDate } from '../../utils/dateFormatter.js';
   import { moduleSettings } from '../../stores/moduleSettings.js';
   import { itemTestCaseLinksStore, workspaceDataStore } from '../../stores/index.js';
-  import { indexCollectionHierarchy } from './collectionHierarchy.js';
+  import {
+    findOrphansByMissingParent,
+    indexCollectionHierarchy,
+    mergeAncestorContext,
+  } from './collectionHierarchy.js';
 
   let { workspaceId, collectionId = null } = $props();
 
   let workspace = $derived(workspaceDataStore.workspace);
-  let allItems = $state([]);
+  // Items as loaded from the collection store, plus fetched ancestor context.
+  let storeItems = $state([]);
+  // Missing parent id -> ancestor chain (root -> parent). Fills gaps left by
+  // pagination and the completed filter so hierarchies stay whole.
+  let ancestorsByParent = $state({});
+  let ancestorsRequestInFlight = false;
+  let ancestorsRerunPending = false;
   let itemTypes = $derived(workspaceDataStore.itemTypes);
   let statuses = $derived(workspaceDataStore.statuses);
   let statusCategories = $derived(workspaceDataStore.statusCategories);
@@ -32,7 +42,16 @@
   let loading = $state(true);
   let currentCollectionName = $state('Default');
   let expandedItems = $state(new Set()); // Track which items are expanded
+  let allItems = $derived(
+    [...mergeAncestorContext(storeItems, ancestorsByParent)].sort(
+      (a, b) => a.level - b.level || a.id - b.id
+    )
+  );
   let hierarchyIndex = $derived(indexCollectionHierarchy(allItems));
+  // Filter-scoped item total from the server: everything the tree contains
+  // across all pages, independent of expansion state or the current page.
+  // Drives the header's "N shown" so it cannot be misread as per-page count.
+  let matchingItemCount = $derived(collectionStore.itemsPagination?.total_items ?? null);
   
   // Pagination state
   let currentPage = $state(1);
@@ -63,19 +82,81 @@
     await loadData();
   });
 
-  // Sync items from central store
+  // Sync items from central store, then reset expansion to the all-roots
+  // default for the new page. Ancestors fetched later expand themselves in
+  // syncAncestorContext so their children stay visible.
   $effect(() => {
     if (!collectionStore.loading && collectionStore.items.length >= 0) {
       currentCollectionName = collectionStore.collectionName;
-      const sorted = [...collectionStore.items].sort((a, b) => a.level - b.level || a.id - b.id);
-      // untrack to avoid tracking reads of allItems/expandedItems via getRootItems/hasChildren
+      storeItems = [...collectionStore.items].sort((a, b) => a.level - b.level || a.id - b.id);
       untrack(() => {
-        allItems = sorted;
         const rootItems = getRootItems();
         expandedItems = new Set(rootItems.filter(i => hasChildren(i.id)).map(i => i.id));
       });
     }
   });
+
+  // Load ancestor chains for items whose parent is not on the loaded page so
+  // filtered or paginated children do not render as stray roots.
+  $effect(() => {
+    const items = storeItems;
+    untrack(() => void syncAncestorContext(items));
+  });
+
+  async function syncAncestorContext(items) {
+    const orphansByParent = findOrphansByMissingParent(items);
+    const neededParents = new Set(orphansByParent.keys());
+
+    // Drop cached chains whose gap the store has since filled itself.
+    const kept = {};
+    let pruned = false;
+    for (const [parentId, chain] of Object.entries(ancestorsByParent)) {
+      if (neededParents.has(Number(parentId))) {
+        kept[parentId] = chain;
+      } else {
+        pruned = true;
+      }
+    }
+    if (pruned) ancestorsByParent = kept;
+
+    const parentByOrphanId = new Map();
+    for (const [parentId, orphans] of orphansByParent) {
+      parentByOrphanId.set(orphans[0].id, parentId);
+    }
+    const orphanIds = [...parentByOrphanId.keys()].filter(
+      (orphanId) => !kept[String(parentByOrphanId.get(orphanId))]
+    );
+    if (orphanIds.length === 0) return;
+    if (ancestorsRequestInFlight) {
+      // A newer page may need different chains; rerun when the current
+      // request settles.
+      ancestorsRerunPending = true;
+      return;
+    }
+    ancestorsRequestInFlight = true;
+    try {
+      const entries = await api.items.getManyAncestors(orphanIds);
+      for (const { item_id: orphanId, ancestors } of entries) {
+        // The gap may have closed while the request was in flight.
+        const parentId = parentByOrphanId.get(orphanId);
+        if (!ancestors?.length || parentId == null || !neededParents.has(parentId)) continue;
+        ancestorsByParent = { ...ancestorsByParent, [String(parentId)]: ancestors };
+        // Keep previously visible children visible under their new parents.
+        for (const ancestor of ancestors) {
+          expandedItems.add(ancestor.id);
+        }
+      }
+      expandedItems = new Set(expandedItems);
+    } catch (error) {
+      console.error('[CollectionTree] Failed to load ancestor context:', error);
+    } finally {
+      ancestorsRequestInFlight = false;
+    }
+    if (ancestorsRerunPending) {
+      ancestorsRerunPending = false;
+      await syncAncestorContext(storeItems);
+    }
+  }
 
   async function loadData() {
     loading = true;
@@ -334,7 +415,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
-          itemCount={allItems.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : matchingItemCount}
         />
       </div>
 

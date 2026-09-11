@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -29,10 +27,7 @@ type ItemHandler struct {
 	webhookSender     *webhook.WebhookSender
 	eventCoordinator  *services.EventCoordinator
 	sseHub            *services.SSEHub
-	dbRequestTimeout  time.Duration
 }
-
-const defaultDBRequestTimeout = 12 * time.Second
 
 func NewItemHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
 	EmitEvent(event *services.NotificationEvent)
@@ -60,34 +55,8 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 		db: db, permissionService: permissionService, authz: authz.New(db, permissionService),
 		itemCache: itemCache, activityTracker: activityTracker,
 		itemCRUD: services.NewItemCRUDService(db), itemCreation: services.NewItemCreationService(db, permissionService),
-		itemUpdate: itemUpdate, itemDeletion: itemDeletion, dbRequestTimeout: defaultDBRequestTimeout,
+		itemUpdate: itemUpdate, itemDeletion: itemDeletion,
 	}
-}
-
-func (h *ItemHandler) SetDBRequestTimeout(timeout time.Duration) {
-	if timeout > 0 {
-		h.dbRequestTimeout = timeout
-	}
-}
-
-func (h *ItemHandler) requestDBContext(r *http.Request) (context.Context, context.CancelFunc) {
-	timeout := h.dbRequestTimeout
-	if timeout <= 0 {
-		timeout = defaultDBRequestTimeout
-	}
-	return context.WithTimeout(r.Context(), timeout)
-}
-
-func (h *ItemHandler) respondItemReadError(w http.ResponseWriter, r *http.Request, err error) {
-	database.ObserveRequestQueryError(err)
-	if errors.Is(err, context.Canceled) || r.Context().Err() != nil {
-		return
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		respondError(w, r, restapi.NewAPIError(http.StatusGatewayTimeout, "DATABASE_DEADLINE_EXCEEDED", "The database request timed out."))
-		return
-	}
-	respondInternalError(w, r, err)
 }
 
 func (h *ItemHandler) SetWebhookSender(sender *webhook.WebhookSender) {
@@ -124,11 +93,6 @@ func (h *ItemHandler) ItemDeletionApplicationService() *services.ItemDeletionApp
 }
 
 func (h *ItemHandler) ItemCacheService() *services.ItemCacheService { return h.itemCache }
-
-func (h *ItemHandler) maskInaccessibleProjectNamesContext(ctx context.Context, userID int, items []models.Item) {
-	services.NewTimePermissionService(h.db, h.permissionService).MaskInaccessibleProjectNamesContext(ctx, userID, items)
-	services.MaskInaccessibleRelatedWorkItems(userID, items, h.permissionService)
-}
 
 func (h *ItemHandler) GetCacheStats(w http.ResponseWriter, r *http.Request) {
 	if h.itemCache == nil {

@@ -13,7 +13,6 @@
     Search,
   } from '@lucide/svelte';
   import {
-    DASHBOARD_GRID_COLUMNS,
     dashboardWidgetCategories,
     getDashboardWidgetsByCategory,
   } from '../services/dashboardWidgetRegistry.js';
@@ -62,11 +61,6 @@
       ...widget,
       name: t(widget.nameKey),
       description: t(widget.descriptionKey),
-      categoryLabel: t(`dashboard.customization.${widget.category}.name`),
-      widthLabel: t('widgets.defaultWidth', {
-        width: widget.defaultWidth,
-        columns: DASHBOARD_GRID_COLUMNS,
-      }),
     })),
   );
 </script>

@@ -73,3 +73,18 @@ func PublishItemChange(itemID int, kind ItemChangeKind) {
 	itemChangePubMu.RUnlock()
 	p.PublishItemChange(itemID, kind)
 }
+
+// PublishItemDeletion preserves the deleted item's workspace for stream authorization.
+func PublishItemDeletion(itemID, workspaceID int) {
+	if itemID <= 0 {
+		return
+	}
+	itemChangePubMu.RLock()
+	p := itemChangePub
+	itemChangePubMu.RUnlock()
+	if publisher, ok := p.(interface{ PublishItemDeletion(int, int) }); ok {
+		publisher.PublishItemDeletion(itemID, workspaceID)
+		return
+	}
+	p.PublishItemChange(itemID, ItemChangeDeleted)
+}

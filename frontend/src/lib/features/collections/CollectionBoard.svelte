@@ -1083,7 +1083,7 @@
     } catch (err) {
       updateLocalItemStatus(item.id, previousStatusId);
       console.error('Status transition failed:', err);
-      warningToast(t('collections.transition_failed'));
+      warningToast(err?.message || t('collections.transition_failed'));
       reloadCollection();
     }
   }
@@ -1236,7 +1236,7 @@
         } catch (err) {
           if (!isSameStatus) updateLocalItemStatus(data.item.id, previousStatusId);
           console.error('Board drop failed:', err);
-          if (!err?.swimlaneMoveFailed) warningToast(t('collections.transition_failed'));
+          if (!err?.swimlaneMoveFailed) warningToast(err?.message || t('collections.transition_failed'));
         }
         reloadCollection();
       }
@@ -1349,7 +1349,7 @@
         } catch (err) {
           updateLocalItemStatus(draggedItem.id, currentStatusId);
           console.error('Status transition failed:', err);
-          warningToast(t('collections.transition_failed'));
+          warningToast(err?.message || t('collections.transition_failed'));
           reloadCollection();
           return;
         }
@@ -1466,7 +1466,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('workspaceSettings.views.board')}
-          itemCount={collectionStore.itemsTotalCount}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : totalVisibleItems}
         >
           {#snippet actions()}
             <div class="flex items-center gap-3">
@@ -1567,7 +1568,7 @@
           placeholder={t('common.search')}
           dataTestid="board-search-input"
         />
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if searchActive && (searchDebouncing || collectionStore.boardSearchLoading)}

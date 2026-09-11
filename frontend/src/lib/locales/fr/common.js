@@ -154,8 +154,8 @@ export default {
     unknown: 'Inconnu',
 
     // Pagination / charger plus
-    loadMore: 'Charger plus',
-    loadingMore: 'Chargement complémentaire…',
+    loadMore: 'Afficher plus',
+    loadingMore: 'Chargement des résultats suivants…',
     remaining: 'restant(s)',
     showingOfTotal: 'Affichage de {count} sur {total}',
     showingXofY: 'Affichage de {from} à {to} sur {total}',
@@ -242,7 +242,7 @@ export default {
     AUTHENTICATION_REQUIRED: 'Authentification requise. Veuillez vous connecter.',
     INVALID_TOKEN: 'Votre session n’est pas valide. Veuillez vous reconnecter.',
     TOKEN_EXPIRED: 'Votre session a expiré. Veuillez vous reconnecter.',
-    INSUFFICIENT_PERMISSION: 'Vous n’avez pas la permission d’effectuer cette action.',
+    INSUFFICIENT_PERMISSION: 'Vous n’avez pas l’autorisation d’effectuer cette action.',
 
     // Erreurs de validation
     VALIDATION_FAILED: 'Veuillez vérifier vos données et réessayer.',
@@ -294,7 +294,7 @@ export default {
     invalidCredentials: 'E-mail ou mot de passe non valide',
     emailTaken: 'Cet e-mail est déjà utilisé',
     usernameTaken: 'Ce nom d’utilisateur est déjà pris',
-    slugInvalid: 'Seuls les lettres minuscules, les chiffres et les traits d’union sont autorisés',
+    slugInvalid: 'Seules les lettres minuscules, les chiffres et les traits d’union sont autorisés',
     nameRequired: 'Le nom est obligatoire',
     fillRequired: 'Veuillez remplir tous les champs obligatoires',
   },
@@ -323,7 +323,7 @@ export default {
     noData: 'Aucune donnée',
     noResults: 'Aucun résultat trouvé',
     noItemsMatch: 'Aucun élément ne correspond au filtre',
-    noFieldChanges: 'Aucu changement de champ détecté',
+    noFieldChanges: 'Aucun changement de champ détecté',
     noRequirements: 'Aucune exigence configurée',
     configureFilter: 'Configurez un filtre pour afficher des éléments',
     createToStart: 'Créez un(e) {item} pour commencer',

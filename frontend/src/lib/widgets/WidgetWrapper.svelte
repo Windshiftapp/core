@@ -9,7 +9,7 @@
   } from './dashboard/taskWidgetState.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { useEventListener } from 'runed';
-  import { ChevronDown, Check } from '@lucide/svelte';
+  import { ChevronDown } from '@lucide/svelte';
 
   let {
     title = '',
@@ -77,8 +77,7 @@
     title: p.label,
     testid: `widget-width-preset-${p.value}`,
     onClick: () => setWidth(p.value),
-    icon: width === p.value ? Check : null,
-    iconClass: '',
+    selected: width === p.value,
   })));
 
   const supportsRowCount = $derived(shouldShowRowControls(widgetType, config));
@@ -99,8 +98,7 @@
     title: n === 'all' ? t('widgets.rowCountAll') : t(`widgets.rowCount${n}`),
     testid: `widget-row-count-${n}`,
     onClick: () => setRowCount(n),
-    icon: currentRowCount === n ? Check : null,
-    iconClass: '',
+    selected: currentRowCount === n,
   })));
 
   const densityItems = $derived([
@@ -108,15 +106,13 @@
       title: t('widgets.densityComfortable'),
       testid: 'widget-density-comfortable',
       onClick: () => setDensity('comfortable'),
-      icon: currentDensity === 'comfortable' ? Check : null,
-      iconClass: '',
+      selected: currentDensity === 'comfortable',
     },
     {
       title: t('widgets.densityCompact'),
       testid: 'widget-density-compact',
       onClick: () => setDensity('compact'),
-      icon: currentDensity === 'compact' ? Check : null,
-      iconClass: '',
+      selected: currentDensity === 'compact',
     },
   ]);
 

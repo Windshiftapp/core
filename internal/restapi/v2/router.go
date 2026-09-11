@@ -12,13 +12,17 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	apispec "windshift/api"
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
+	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/services/actioncatalog"
 )
 
 const (
@@ -385,13 +389,20 @@ type worklogApplication interface {
 type timeAccess interface {
 	CanBookTimeOnProject(int, int) (bool, error)
 	CanEditWorklog(int, int) (bool, error)
+	CanViewWorklog(int, int) (bool, error)
 	CanViewProject(int, int) (bool, error)
 	AccessibleTimeProjectIDs(int) ([]int, error)
+	GetAccessibleProjects(int) ([]int, error)
+	GetManagedProjects(int) ([]int, error)
 	IsTimeProjectManager(int, int) (bool, error)
 }
 
 type systemAdministrator interface {
 	IsSystemAdmin(int) (bool, error)
+}
+
+type globalPermissionReader interface {
+	HasGlobalPermission(int, string) (bool, error)
 }
 
 type groupApplication interface {
@@ -440,6 +451,7 @@ type pageAttachmentApplication interface {
 type collectionApplication interface {
 	List(services.CollectionListParams) ([]models.Collection, int, error)
 	Get(int, int) (*models.Collection, error)
+	GetBySlug(int, string) (*models.Collection, error)
 	Create(services.AuditActor, models.Collection) (*models.Collection, error)
 	Update(services.AuditActor, int, services.CollectionUpdate) (*models.Collection, error)
 	UpdateSharing(services.AuditActor, int, services.CollectionSharingUpdate) (*models.Collection, error)
@@ -501,6 +513,7 @@ type actionApplication interface {
 	ListTemplates() []services.ActionTemplateSummary
 	ApplyTemplate(context.Context, int, int, services.AuditActor, string) (*services.ApplyToWorkspaceResult, error)
 	Catalog(int, int) (services.ActionCatalog, error)
+	Validate(int, int, models.CreateActionRequest) (actioncatalog.ValidationErrors, error)
 	List(int, int) ([]*models.Action, error)
 	Get(int, int, int) (*models.Action, error)
 	Create(int, int, services.AuditActor, models.CreateActionRequest) (*models.Action, error)
@@ -539,8 +552,13 @@ type Deps struct {
 	TimeProjects       timeProjectApplication
 	Timers             timerApplication
 	SystemAdmins       systemAdministrator
+	GlobalPermission   globalPermissionReader
 	Groups             groupApplication
 	AdminUsers         adminUserApplication
+	AuditLogs          auditLogReader
+	AdminTokens        adminTokenManager
+	AdminAuditor       *logger.Auditor
+	AdminTranslations  *objecttranslation.Service
 	Comments           commentApplication
 	CommentAccess      commentAccess
 	Attachments        attachmentApplication
@@ -558,6 +576,8 @@ type Deps struct {
 	ItemApplication    *services.ItemApplicationService
 	ItemDetail         *services.ItemDetailApplicationService
 	SessionMiddleware  func(http.Handler) http.Handler
+	SearchAllowed      func(*http.Request) bool
+	DBRequestTimeout   time.Duration
 	CORS               Middleware
 	CSRF               csrfValidator
 	Concurrency        concurrencyLimiter
@@ -648,6 +668,18 @@ func RegisterRoutes(deps Deps) error {
 	}
 	if deps.AdminUsers == nil {
 		return errors.New("v2: AdminUsers is required")
+	}
+	if deps.AuditLogs == nil {
+		return errors.New("v2: AuditLogs is required")
+	}
+	if deps.AdminTokens == nil {
+		return errors.New("v2: AdminTokens is required")
+	}
+	if deps.AdminAuditor == nil {
+		return errors.New("v2: AdminAuditor is required")
+	}
+	if deps.AdminTranslations == nil {
+		return errors.New("v2: AdminTranslations is required")
 	}
 	if deps.Comments == nil {
 		return errors.New("v2: Comments is required")
@@ -754,7 +786,8 @@ func buildRoutes(deps Deps) []route {
 	registerWorklogRoutes(&builder, deps)
 	registerTimeRoutes(&builder, deps)
 	registerAdminRoutes(&builder, deps)
-	registerPageRoutes(&builder, deps.PageApplication)
+	registerAdminIntegrationRoutes(&builder, deps)
+	registerPageRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
@@ -766,7 +799,7 @@ func buildRoutes(deps Deps) []route {
 	registerActionRoutes(&builder, deps.Actions)
 	registerTestManagementRoutes(&builder, deps.TestManagement)
 	registerAssetRoutes(&builder, deps.Assets)
-	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail)
+	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.DBRequestTimeout)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	return builder.routes
 }
@@ -799,6 +832,11 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		routes[index].Summary = operation.Summary
 		routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		routes[index].Parameters = contractParameters(item["parameters"], operation.Parameters, spec.Components.Parameters)
+		if routes[index].Path == "/workspaces/{workspace_id}/actions/validate" && routes[index].Tag == "" {
+			routes[index].Tag = "Automation"
+			routes[index].Summary = "Validate action"
+			routes[index].Description = "Dry-run validation for an action definition."
+		}
 		for status := range operation.Responses {
 			code, err := strconv.Atoi(status)
 			if err == nil && code >= 400 {
@@ -856,11 +894,26 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 }
 
 func applyParameterCorrections(route *Route) {
+	if strings.HasPrefix(route.Path, "/admin/") && route.Exposure == ExposureBoth {
+		route.Description += " Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope."
+		if route.Path == "/admin/audit-logs/since" {
+			route.Description = "Requires system administrator permission and admin:audit-logs:read. Returns entries with ID greater than after_id in ascending order inside the v2 data envelope. Persist next_after_id for the next call. Defaults to 500 entries, clamps limit to 1000, and sets has_more when the batch fills the limit. An empty batch preserves after_id."
+		}
+		if strings.HasPrefix(route.Path, "/admin/object-translations/") {
+			route.Description += " Writes and deletes affect instance translations only; shipped system translations are preserved."
+		}
+	}
 	if route.ResponseShape == ResponsePage || route.ResponseShape == ResponsePageMetadata {
 		upsertParameter(route, integerQuery("page", "One-based page number.", 0, defaultPage))
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
 	}
 	switch route.Method + " " + route.Path {
+	case "POST /workspaces/{workspace_id}/actions/validate":
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+	case "GET /items/changes":
+		upsertParameter(route, ParameterMetadata{Name: "since", In: "query", Description: "Exclusive change cursor. Omit to obtain a stable watermark before a full load.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
+		upsertParameter(route, ParameterMetadata{Name: "through", In: "query", Description: "Inclusive fixed watermark from the first page. Must be greater than or equal to since.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
+		upsertParameter(route, integerQuery("limit", "Maximum log events per page. Supply explicitly to enable incremental pagination; omitted limits preserve the full-reload fallback on overflow.", 500, 500))
 	case "GET /items/{item_id}/comments", "GET /workspaces/{workspace_id}/agent-runs", "GET /items/{item_id}/agent-runs", "GET /agent-runs/{run_id}/events":
 		filtered := route.Parameters[:0]
 		for _, parameter := range route.Parameters {
@@ -880,6 +933,12 @@ func applyParameterCorrections(route *Route) {
 	}
 
 	switch route.Method + " " + route.Path {
+	case "GET /time/projects/{project_id}/members", "POST /time/projects/{project_id}/members",
+		"GET /time/projects/{project_id}/managers", "POST /time/projects/{project_id}/managers":
+		route.Description += " Email is included only when the caller has user.list permission or is a system administrator; otherwise the email field is omitted. Project access alone does not grant email visibility."
+	case "DELETE /items/{item_id}":
+		upsertParameter(route, ParameterMetadata{Name: "cascade", In: "query", Description: "Delete the item and all descendants. Must be true or false; defaults to false.", Schema: map[string]any{"type": "boolean", "default": false}})
+		route.Description = "Deletes only the item by default, detaching direct children so descendants survive. Set cascade=true to delete the entire subtree, including descendants in other workspaces. Requires item.delete in every workspace containing an item to delete; if the parent is deletable but the cascade is forbidden, returns 403 with \"This item can be deleted on its own, but cascade deletion is not permitted.\" and changes nothing. No blocking relationship details are disclosed. The operation locks the affected tree before authorization and deletion. Both modes return 204 with no response body. Unlike v1, cascading must be requested explicitly."
 	case "GET /items/{item_id}":
 		if !slices.Contains(route.DocumentedErrors, http.StatusBadRequest) {
 			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusBadRequest)
@@ -908,16 +967,27 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts results to one milestone category."))
 		upsertParameter(route, stringQuery("status", "Restricts results to a milestone status."))
 		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.", "position", "-position", "name", "-name", "target_date", "-target_date", "status", "-status", "created_at", "-created_at", "updated_at", "-updated_at"))
+		if route.Path == "/milestones" {
+			upsertParameter(route, booleanQuery("is_global", "Restricts results to global milestones instead of global and accessible-workspace milestones.", false))
+		} else {
+			upsertParameter(route, booleanQuery("include_global", "Includes global milestones alongside the workspace's own.", false))
+		}
 	case "GET /iterations", "GET /workspaces/{workspace_id}/iterations":
 		upsertParameter(route, positiveIDQuery("type_id", "Restricts results to one iteration type."))
 		upsertParameter(route, stringQuery("status", "Restricts results to an iteration status."))
 		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.", "start_date", "-start_date", "end_date", "-end_date", "name", "-name", "status", "-status", "created_at", "-created_at", "updated_at", "-updated_at"))
+		if route.Path == "/iterations" {
+			upsertParameter(route, booleanQuery("is_global", "Restricts results to global iterations instead of global and accessible-workspace iterations.", false))
+		} else {
+			upsertParameter(route, booleanQuery("include_global", "Includes global iterations alongside the workspace's own.", false))
+		}
 	case "GET /time/worklogs":
 		upsertParameter(route, positiveIDQuery("project_id", "Restricts worklogs to one time project."))
 		fallthrough
 	case "GET /items/{item_id}/worklogs", "GET /time/projects/{project_id}/worklogs":
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))
 		upsertParameter(route, dateQuery("to", "Includes worklogs on or before this civil date."))
+		upsertParameter(route, stringQuery("timezone", "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone."))
 	case "GET /asset-sets/{asset_set_id}/assets":
 		for _, name := range []string{"type_id", "category_id", "status_id"} {
 			upsertParameter(route, stringQuery(name, "Restricts assets by "+strings.ReplaceAll(name, "_", " ")+"."))
@@ -966,8 +1036,11 @@ func applyParameterCorrections(route *Route) {
 	case "POST /agent-runs/{run_id}/cancel":
 		upsertParameter(route, booleanQuery("force", "Whether to force the persisted run into the canceled state when cooperative cancellation cannot reach the worker.", false))
 	case "GET /collections":
+		upsertParameter(route, stringQuery("q", "Case-insensitive collection name substring. Surrounding whitespace is ignored; filtering and visibility checks precede pagination and totals."))
 		upsertParameter(route, positiveIDQuery("workspace_id", "Restricts collections to one workspace."))
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts collections to one category."))
+	case "GET /collections/{collection_id}":
+		upsertParameter(route, ParameterMetadata{Name: "collection_id", In: "path", Required: true, Description: "Positive numeric collection ID or public_slug. Numeric keys resolve as IDs. Both forms enforce the same visibility checks and return 404 when inaccessible or missing.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /collections/{collection_id}/board-configuration/bootstrap":
 		upsertParameter(route, positiveIDQuery("workspace_id", "Workspace used for defaults when the collection has no saved board configuration."))
 	case "GET /condition-sets", "GET /approval-sets":
@@ -975,8 +1048,32 @@ func applyParameterCorrections(route *Route) {
 	case "GET /workspaces/{workspace_id}/test-reports/summary":
 		upsertParameter(route, positiveIDQuery("milestone_id", "Restricts the report to one milestone."))
 		upsertParameter(route, integerQuery("days", "Number of recent civil days included in trend calculations.", 365, 30))
-	case "DELETE /asset-management-sets/{asset_set_id}/roles/{assignment_id}":
+	case "DELETE /asset-sets/{asset_set_id}/roles/{assignment_id}":
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
+	case "GET /items/changes":
+		route.Description = "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow."
+	case "GET /items/search":
+		route.Tag = "Work items"
+		route.Summary = "Search items"
+		for _, code := range []int{http.StatusBadRequest, http.StatusGatewayTimeout} {
+			if !slices.Contains(route.DocumentedErrors, code) {
+				route.DocumentedErrors = append(route.DocumentedErrors, code)
+			}
+		}
+		slices.Sort(route.DocumentedErrors)
+		route.Description = "Searches caller-visible items by case-insensitive title/description substring or exact KEY-NUMBER. A structured q is interpreted as CQL; explicit ql takes precedence. Empty queries list visible items. Repeated workspace_id, status and priority filters intersect with visibility before pagination and totals. Results are ordered by updated_at descending, then ID ascending."
+		upsertParameter(route, stringQuery("q", "Text, exact item key or CQL; at most 500 bytes."))
+		upsertParameter(route, stringQuery("ql", "Explicit CQL, taking precedence over q; at most 500 bytes."))
+		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals. Values true and 1 enable exclusion.", false))
+		for _, filter := range []struct {
+			name string
+			max  int
+		}{{"workspace_id", 50}, {"status", 20}, {"priority", 10}} {
+			upsertParameter(route, ParameterMetadata{Name: filter.name, In: "query", Description: "Repeated positive IDs to include.", Schema: map[string]any{"type": "array", "maxItems": filter.max, "items": map[string]any{"type": "integer", "minimum": 1}}})
+		}
+	case "GET /items":
+		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
+		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
 	case "POST /milestones/{milestone_id}/release":
 		upsertParameter(route, ParameterMetadata{Name: "Idempotency-Key", In: "header", Description: "Caller-generated key that makes retries return the original release result.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /openapi.json":
@@ -985,7 +1082,10 @@ func applyParameterCorrections(route *Route) {
 
 	switch route.Method + " " + route.Path {
 	case "GET /items/{item_id}":
+		upsertParameter(route, booleanQuery("exclude_personal", "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		route.Description = "Returns one authorization-checked item. A positive integer path value is resolved as the immutable item ID; only a non-numeric KEY-NUMBER value falls back to case-insensitive workspace-key lookup. Malformed references return 400, while missing or inaccessible items return the same 404 contract."
+	case "GET /workspaces/{workspace_key}/items/{item_number}":
+		upsertParameter(route, booleanQuery("exclude_personal", "Return 404 for personal-workspace items. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 	case "POST /items/batch", "POST /assets/summaries", "POST /milestones/test-statistics", "POST /iterations/progress":
 		route.Description = "Returns a bounded projection for up to 500 IDs. IDs are deduplicated by first occurrence; visible matches preserve request order, and missing or unauthorized resources are omitted without revealing which case applied. Results reflect committed state at request time and are all-or-nothing on computation failure."
 	case "GET /links/batch":
@@ -1150,6 +1250,15 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 				r.SetPathValue(name, value)
 			}
 			handler := selected.handler
+			if selected.Path == "/items/search" && deps.SearchAllowed != nil {
+				search := handler
+				handler = func(w http.ResponseWriter, r *http.Request) error {
+					if !deps.SearchAllowed(r) {
+						return newError(http.StatusTooManyRequests, "rate_limited", "Too many search requests. Please try again later.")
+					}
+					return search(w, r)
+				}
+			}
 			if selected.Auth == AuthAuthenticated {
 				if session {
 					handler = limitConcurrency(deps.Concurrency)(handler)

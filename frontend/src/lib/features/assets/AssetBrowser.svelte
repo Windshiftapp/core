@@ -21,6 +21,8 @@
   import { permissionStore } from '../../stores/permissions.svelte.js';
   import AssetRelationshipGraph from './AssetRelationshipGraph.svelte';
   import AssetImportWizard from './import/AssetImportWizard.svelte';
+  import QlQueryBar from '../shared/QlQueryBar.svelte';
+  import { buildAssetQlCatalog } from './assetQlCompletion.js';
   import AssetSubFilterBar from './AssetSubFilterBar.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import AssetDetailContent from './AssetDetailContent.svelte';
@@ -80,6 +82,10 @@
   let activeQuery = $state(''); // The committed query that triggers API calls
   let filterBarQL = $state(''); // QL from the visual filter bar
   let allCustomFields = $state([]); // Aggregated custom fields from all asset types
+
+  let completionCatalog = $derived(buildAssetQlCatalog({
+    statuses, assetTypes, categories: assetCategories, customFields: allCustomFields,
+  }));
 
   // Pagination state
   let currentPage = $derived(parseInt($currentRoute.query?.page) || 1);
@@ -302,6 +308,19 @@
     }
   });
 
+  // The create form defaults to the set's first asset type. If the form
+  // opened while the set's types were still loading after a set switch,
+  // that default can be a stale type from the previously selected set —
+  // the API rejects foreign asset_type_ids, so re-default once the real
+  // list arrives.
+  $effect(() => {
+    if (!showAssetForm || editingAsset) return;
+    const types = assetTypes;
+    if (types.some(t => t.id === assetFormData.asset_type_id)) return;
+    if (types.length === 0 && assetFormData.asset_type_id === null) return;
+    assetFormData = { ...assetFormData, asset_type_id: types.length > 0 ? types[0].id : null };
+  });
+
   async function loadTypeFields(typeId) {
     const requestSeq = ++selectedTypeFieldsRequestSeq;
     try {
@@ -351,11 +370,15 @@
     editingAsset = null;
     // Find default status
     const defaultStatus = statuses.find(s => s.is_default);
+    // Never seed the type from a possibly-stale list: after a set switch the
+    // loaded types can belong to the previous set, and the API rejects
+    // foreign asset_type_ids. The re-default effect picks types[0] once the
+    // current set's types arrive.
     assetFormData = {
       title: '',
       description: '',
       asset_tag: '',
-      asset_type_id: assetTypes.length > 0 ? assetTypes[0].id : null,
+      asset_type_id: null,
       category_id: selectedCategoryId ?? null,
       status_id: defaultStatus?.id ?? null,
       custom_field_values: {}
@@ -692,24 +715,39 @@
   </div>
 
   <!-- Main content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 min-w-0 min-h-0 flex flex-col">
     <!-- Header with search -->
     <div class="px-4 h-[80px] flex items-center gap-4" style="border-bottom: 1px solid var(--ds-border);">
       <div class="flex-1 min-w-0 relative flex items-center gap-2">
         <div class="flex-1 relative">
-          <IconSearch class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-icon);" />
-          <Input
-            dataTestid="asset-search"
-            type="text"
-            placeholder={searchMode === 'ql' ? 'Query: status = "Active" (press Enter)' : 'Search by name...'}
-            bind:value={searchInput}
-            onkeydown={(e) => { if (searchMode === 'ql' && e.key === 'Enter') activeQuery = searchInput; }}
-            class={`pl-9 ${searchMode === 'ql' ? 'font-mono' : ''}`}
-            size="small"
-            title={searchMode === 'ql' ? 'QL Query - Press Enter to search. Examples: status = "Active", type IN ("Laptop", "Desktop"), title ~ "server"' : 'Search by title or description'}
-          />
+          {#if searchMode === 'ql'}
+            {#key selectedSetId}
+              <QlQueryBar
+                compact
+                mode="raw"
+                editorTestId="asset-search"
+                placeholder={'Query: status = "Active" (press Enter)'}
+                query={searchInput}
+                {completionCatalog}
+                onquerychange={(query) => { searchInput = query; }}
+                onexecute={() => { activeQuery = searchInput; }}
+              />
+            {/key}
+          {:else}
+            <IconSearch class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-icon);" />
+            <Input
+              dataTestid="asset-search"
+              type="text"
+              placeholder="Search by name..."
+              bind:value={searchInput}
+              class="pl-9"
+              size="small"
+              title="Search by title or description"
+            />
+          {/if}
         </div>
         <button
+          data-testid="asset-search-toggle-ql"
           onclick={() => {
             searchMode = searchMode === 'simple' ? 'ql' : 'simple';
             searchInput = '';
@@ -846,7 +884,7 @@
 
   <!-- Right sidebar: Asset detail (when selected) -->
   {#if selectedAsset}
-    <div class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
+    <div data-testid="asset-detail-pane" class="flex-shrink-0 flex flex-col relative" style="width: {assetPanelWidth}px; min-width: 280px; max-width: 600px; border-left: 1px solid var(--ds-border);">
       <SidebarResizeHandle
         width={assetPanelWidth}
         minWidth={280}
@@ -906,7 +944,7 @@
 <Modal
   isOpen={showAssetForm}
   preventClose={savingAsset}
-  submitDisabled={savingAsset}
+  submitDisabled={savingAsset || (!editingAsset && !assetFormData.asset_type_id)}
   onclose={() => showAssetForm = false}
   onSubmit={handleAssetSubmit}
 >
@@ -942,7 +980,7 @@
       </div>
       <div>
         <Label color="default" class="mb-1">Asset Type</Label>
-        <Select bind:value={assetFormData.asset_type_id} options={[{ value: null, label: 'No Type' }, ...assetTypes.map(type => ({ value: type.id, label: type.name }))]} />
+        <Select id="asset-type-select" bind:value={assetFormData.asset_type_id} options={[{ value: null, label: 'No Type' }, ...assetTypes.map(type => ({ value: type.id, label: type.name }))]} />
       </div>
       <div>
         <Label color="default" class="mb-1">Category</Label>
@@ -985,7 +1023,7 @@
       <Button
         dataTestid="asset-submit"
         type="submit"
-        disabled={savingAsset}
+        disabled={savingAsset || (!editingAsset && !assetFormData.asset_type_id)}
         loading={savingAsset}
         keyboardHint="↵"
       >{editingAsset ? t('common.save') : t('common.create')}</Button>

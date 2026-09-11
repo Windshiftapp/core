@@ -19,6 +19,7 @@
   import ItemDetail from '../items/ItemDetail.svelte';
   import RoadmapItemPreview from './RoadmapItemPreview.svelte';
   import { buildHierarchyDatePatches, projectHierarchyDates } from './roadmapHierarchyDates.js';
+  import { boardColumnsForSave } from '../../utils/workItemListColumns.js';
   import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, CalendarClock, RotateCcw } from '@lucide/svelte';
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
@@ -730,7 +731,7 @@
   // Save roadmap config
   async function saveConfig() {
     const payload = {
-      columns: boardConfig?.columns || [],
+      columns: boardColumnsForSave(boardConfig?.columns),
       backlog_status_ids: boardConfig?.backlog_status_ids || [],
       list_columns: boardConfig?.list_columns || [],
       card_fields: boardConfig?.card_fields || [],
@@ -1101,7 +1102,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('collections.roadmap')}
-          itemCount={treeData.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : treeData.length}
         >
           {#snippet actions()}
             <div class="relative flex rounded" style="background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);">
@@ -1359,6 +1361,7 @@
                         <span
                           class="shrink-0 flex items-center justify-center w-4 h-4 rounded transition-colors"
                           style="color: var(--ds-text-subtle);"
+                          data-testid="roadmap-toggle-{item.id}"
                           role="button"
                           tabindex="-1"
                           onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}

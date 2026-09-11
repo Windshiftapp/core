@@ -14,7 +14,7 @@ dark_mode: 'no'
 
 # Two requests per refresh. The poller exposes them as IDX_0 and IDX_1:
 #   IDX_0 -> the token owner (used for the greeting and to prove auth works)
-#   IDX_1 -> the item page  { data: [...], pagination: { total, ... } }
+#   IDX_1 -> the item page  { data: [...], pagination: { total_items, ... } }
 #
 # The `append` then `replace` pair tolerates a trailing slash on the entered
 # URL: it only collapses a doubled slash immediately before /rest/, so the

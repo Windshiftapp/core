@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -12,8 +13,11 @@ import (
 func registerPlanningRoutes(builder *routeBuilder, planning planningApplication) {
 	builder.Page("/milestones", AuthAuthenticated, []string{"milestones:read"}, listMilestones(planning, false))
 	builder.JSON(http.MethodPost, "/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"milestones:write"}, createMilestone(planning, false))
-	builder.Page("/workspaces/{workspace_id}/milestones", AuthAuthenticated, []string{"milestones:read"}, listMilestones(planning, true))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"milestones:write"}, createMilestone(planning, true))
+	builder.Page("/workspaces/{workspace_id}/milestones", AuthAuthenticated, []string{"items:read"}, listMilestones(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createMilestone(planning, true))
+	builder.Read("/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:read"}, getMilestone(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchMilestone(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:delete"}, deleteMilestone(planning))
 	builder.Read("/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:read"}, getMilestone(planning))
 	builder.JSON(http.MethodPatch, "/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"milestones:write"}, patchMilestone(planning))
 	builder.Command(http.MethodDelete, "/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:delete"}, deleteMilestone(planning))
@@ -22,12 +26,15 @@ func registerPlanningRoutes(builder *routeBuilder, planning planningApplication)
 	builder.Read("/milestones/{milestone_id}/test-statistics", AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatistics(planning))
 	builder.JSON(http.MethodPost, "/milestones/test-statistics", http.StatusOK, false, AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatisticsBatch(planning))
 	builder.JSON(http.MethodPost, "/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, reorderMilestones(planning, false))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, reorderMilestones(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, reorderMilestones(planning, true))
 
 	builder.Page("/iterations", AuthAuthenticated, []string{"iterations:read"}, listIterations(planning, false))
 	builder.JSON(http.MethodPost, "/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"iterations:write"}, createIteration(planning, false))
-	builder.Page("/workspaces/{workspace_id}/iterations", AuthAuthenticated, []string{"iterations:read"}, listIterations(planning, true))
-	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"iterations:write"}, createIteration(planning, true))
+	builder.Page("/workspaces/{workspace_id}/iterations", AuthAuthenticated, []string{"items:read"}, listIterations(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createIteration(planning, true))
+	builder.Read("/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:read"}, getIteration(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchIteration(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:delete"}, deleteIteration(planning))
 	builder.Read("/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:read"}, getIteration(planning))
 	builder.JSON(http.MethodPatch, "/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"iterations:write"}, patchIteration(planning))
 	builder.Command(http.MethodDelete, "/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:delete"}, deleteIteration(planning))
@@ -172,9 +179,14 @@ func listMilestones(planning planningApplication, workspaceScoped bool) pageOper
 		if err != nil {
 			return nil, page, 0, err
 		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
 		rows, total, err := planning.ListMilestones(user.ID, services.MilestoneListParams{
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, CategoryID: categoryID,
 			Status: r.URL.Query().Get("status"), SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
 		})
 		return mapMilestones(rows), page, total, planningError(err)
 	}
@@ -187,7 +199,13 @@ func getMilestone(planning planningApplication) readOperation[models.Milestone] 
 			return models.Milestone{}, err
 		}
 		result, err := planning.GetMilestone(user.ID, id)
-		return milestoneModel(result), planningError(err)
+		if err != nil {
+			return models.Milestone{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
+		return milestoneModel(result), nil
 	}
 }
 
@@ -219,6 +237,9 @@ func patchMilestone(planning planningApplication) jsonOperation[models.Milestone
 		if err != nil {
 			return models.Milestone{}, planningError(err)
 		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
 		merged := patch.Apply(milestoneModel(existing))
 		result, err := planning.UpdateMilestone(user.ID, auditActor(r, user), services.UpdateMilestoneParams{
 			ID: id, Name: merged.Name, Description: merged.Description, TargetDate: merged.TargetDate,
@@ -233,6 +254,15 @@ func deleteMilestone(planning planningApplication) commandOperation {
 		user, id, err := planningTarget(r, "milestone_id")
 		if err != nil {
 			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetMilestone(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
 		}
 		return planningError(planning.DeleteMilestone(user.ID, auditActor(r, user), id))
 	}
@@ -303,9 +333,14 @@ func listIterations(planning planningApplication, workspaceScoped bool) pageOper
 		if err != nil {
 			return nil, page, 0, err
 		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
 		rows, total, err := planning.ListIterations(user.ID, services.IterationListParams{
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, TypeID: typeID, Status: r.URL.Query().Get("status"),
 			SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
 		})
 		return mapIterations(rows), page, total, planningError(err)
 	}
@@ -325,7 +360,13 @@ func getIteration(planning planningApplication) readOperation[models.Iteration] 
 			return models.Iteration{}, err
 		}
 		result, err := planning.GetIteration(user.ID, id)
-		return iterationModel(result), planningError(err)
+		if err != nil {
+			return models.Iteration{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
+		return iterationModel(result), nil
 	}
 }
 
@@ -357,6 +398,9 @@ func patchIteration(planning planningApplication) jsonOperation[models.Iteration
 		if err != nil {
 			return models.Iteration{}, planningError(err)
 		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
 		merged := patch.Apply(iterationModel(existing))
 		result, err := planning.UpdateIteration(user.ID, auditActor(r, user), services.UpdateIterationParams{
 			ID: id, Name: merged.Name, Description: merged.Description, StartDate: merged.StartDate,
@@ -371,6 +415,15 @@ func deleteIteration(planning planningApplication) commandOperation {
 		user, id, err := planningTarget(r, "iteration_id")
 		if err != nil {
 			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetIteration(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
 		}
 		return planningError(planning.DeleteIteration(user.ID, auditActor(r, user), id))
 	}
@@ -418,6 +471,30 @@ func planningWorkspaceID(r *http.Request, workspaceScoped bool) (*int, error) {
 		return nil, err
 	}
 	return &workspaceID, nil
+}
+
+// planningScopeQueryFlags parses the list-scope filters: workspace-scoped
+// routes take include_global (workspace rows plus global rows in one page),
+// unscoped routes take is_global (global rows only).
+func planningScopeQueryFlags(r *http.Request, workspaceScoped bool) (isGlobal, includeGlobal bool, err error) {
+	if workspaceScoped {
+		includeGlobal, err = optionalBoolQuery(r, "include_global")
+		return false, includeGlobal, err
+	}
+	isGlobal, err = optionalBoolQuery(r, "is_global")
+	return isGlobal, false, err
+}
+
+func optionalBoolQuery(r *http.Request, name string) (bool, error) {
+	value := r.URL.Query().Get(name)
+	if value == "" {
+		return false, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, newError(http.StatusBadRequest, "invalid_request", name+" must be a boolean")
+	}
+	return parsed, nil
 }
 
 func planningTarget(r *http.Request, name string) (*models.User, int, error) {
@@ -490,4 +567,19 @@ func planningError(err error) error {
 	default:
 		return internalError(err)
 	}
+}
+
+// requirePlanningWorkspace binds nested routes to the object's owning workspace.
+func requirePlanningWorkspace(r *http.Request, global bool, workspaceID *int) error {
+	if r.PathValue("workspace_id") == "" {
+		return nil
+	}
+	id, err := pathID(r, "workspace_id")
+	if err != nil {
+		return err
+	}
+	if global || workspaceID == nil || *workspaceID != id {
+		return planningError(services.ErrPlanningForbidden)
+	}
+	return nil
 }

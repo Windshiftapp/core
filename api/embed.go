@@ -10,11 +10,6 @@ import _ "embed"
 //go:embed openapi.json
 var SpecJSON []byte
 
-// SpecYAML is the OpenAPI 3.0 spec serialized as YAML.
-//
-//go:embed openapi.yaml
-var SpecYAML []byte
-
 // V2SpecJSON is the canonical dual-mount API v2 contract.
 //
 //go:embed openapi-v2.json

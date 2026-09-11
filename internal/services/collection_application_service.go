@@ -31,6 +31,7 @@ func (e *CollectionValidationError) Error() string { return e.Message }
 
 type CollectionListParams struct {
 	UserID      int
+	Query       string
 	WorkspaceID *int
 	CategoryID  *int
 	Limit       int
@@ -206,7 +207,11 @@ func (s *CollectionApplicationService) List(params CollectionListParams) ([]mode
 	for _, id := range workspaceIDs {
 		accessible[id] = struct{}{}
 	}
+	query := strings.ToLower(strings.TrimSpace(params.Query))
 	collections = slices.DeleteFunc(collections, func(collection models.Collection) bool {
+		if !strings.Contains(strings.ToLower(collection.Name), query) {
+			return true
+		}
 		if collection.WorkspaceID == nil {
 			return false
 		}
@@ -231,6 +236,17 @@ func (s *CollectionApplicationService) Get(userID, id int) (*models.Collection, 
 		return nil, err
 	}
 	return collection, nil
+}
+
+func (s *CollectionApplicationService) GetBySlug(userID int, slug string) (*models.Collection, error) {
+	collection, err := s.repository.GetBySlug(slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrCollectionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.Get(userID, collection.ID)
 }
 
 func (s *CollectionApplicationService) Create(actor AuditActor, collection models.Collection) (*models.Collection, error) {
@@ -541,13 +557,10 @@ func (s *CollectionApplicationService) GetBoardConfigurationBootstrap(ctx contex
 	if err != nil {
 		return nil, err
 	}
-	referencedWorkspaceIDs := []int{}
-	if collection.QLQuery != "" {
-		referencedWorkspaceIDs, err = s.items.ListDistinctWorkspaceIDsWithQLContext(ctx, collection.QLQuery, accessibleWorkspaceIDs, userID)
-		if err != nil {
-			slog.Warn("board configuration bootstrap: collection CQL workspace projection failed", "collection_id", collection.ID, "error", err)
-			referencedWorkspaceIDs = []int{}
-		}
+	referencedWorkspaceIDs, err := s.items.ListDistinctWorkspaceIDsWithQLContext(ctx, collection.QLQuery, accessibleWorkspaceIDs, userID)
+	if err != nil {
+		slog.Warn("board configuration bootstrap: collection CQL workspace projection failed", "collection_id", collection.ID, "error", err)
+		referencedWorkspaceIDs = []int{}
 	}
 	if len(referencedWorkspaceIDs) == 0 {
 		candidate := fallbackWorkspaceID

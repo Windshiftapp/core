@@ -48,7 +48,12 @@ export const workspaceViewItems = [
     icon: SquareKanban,
     testId: 'workspace-nav-board',
   },
-  { id: 'list', labelKey: 'workspaceSettings.views.list', icon: List },
+  {
+    id: 'list',
+    labelKey: 'workspaceSettings.views.list',
+    icon: List,
+    testId: 'workspace-nav-list',
+  },
   { id: 'tree', labelKey: 'workspaceSettings.views.tree', icon: ListTree },
   { id: 'map', labelKey: 'workspaceSettings.views.map', icon: MapPin },
   {

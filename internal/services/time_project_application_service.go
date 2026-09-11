@@ -241,7 +241,7 @@ func (s *TimeProjectApplicationService) CreateProject(actor AuditActor, project 
 	if err := s.prepareProject(&project); err != nil {
 		return nil, err
 	}
-	if err := s.projects.Create(&project); err != nil {
+	if err := s.projects.CreateWithManager(&project, actor.UserID); err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return nil, ErrTimeProjectConflict
 		}

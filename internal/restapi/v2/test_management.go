@@ -87,6 +87,9 @@ type testFolderCreate struct {
 	ParentID    *int   `json:"parent_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	// Accepted for parity with the folder PATCH payload; create ignores the
+	// value and assigns max sort order plus the standard step.
+	SortOrder *int `json:"sort_order"`
 }
 
 type testFolderPatch struct {
@@ -979,7 +982,9 @@ func testRunFilters(r *http.Request) (services.TestRunListFilters, error) {
 	if err != nil {
 		return services.TestRunListFilters{}, err
 	}
-	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: planID, IncludeEnded: r.URL.Query().Get("include_ended") == "true"}, nil
+	// Ended runs are included by default (legacy behavior); the UI never
+	// filters them out, so excluding them made completed runs look deleted.
+	return services.TestRunListFilters{AssigneeID: assigneeID, Unassigned: r.URL.Query().Get("unassigned") == "true", TemplateID: templateID, SetID: planID, IncludeEnded: r.URL.Query().Get("include_ended") != "false"}, nil
 }
 
 func mapTestRunTemplate(item *models.TestRunTemplate) *testRunTemplateResponse {
@@ -1016,12 +1021,15 @@ func testManagementError(err error) error {
 	if err == nil {
 		return nil
 	}
+	var validation *services.TestManagementValidationError
 	switch {
 	case errors.Is(err, services.ErrTestManagementForbidden):
 		return newError(http.StatusNotFound, "not_found", "Test resource was not found")
 	case errors.Is(err, repository.ErrNotFound), errors.Is(err, services.ErrTestRunItemNotFound), errors.Is(err, services.ErrTestSetCaseNotFound), errors.Is(err, services.ErrTestSetMilestoneNotFound), errors.Is(err, services.ErrTestRunTemplateSetNotFound):
 		return newError(http.StatusNotFound, "not_found", "Test resource was not found")
+	case errors.As(err, &validation):
+		return newError(http.StatusBadRequest, "invalid_request", validation.Error())
 	default:
-		return newError(http.StatusBadRequest, "invalid_request", err.Error())
+		return internalError(err)
 	}
 }

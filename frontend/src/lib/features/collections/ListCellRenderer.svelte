@@ -98,15 +98,18 @@
     }
   }
 
-  // Handle task checkbox toggle
+  // Handle task checkbox toggle. Personal tasks are workflow-less, so the
+  // permitted transition endpoint toggles between the globally stable Open and
+  // Done statuses, matching the mobile and personal views.
   async function toggleTaskStatus(isCompleted) {
-    const newStatus = isCompleted ? 'completed' : 'open';
+    const PERSONAL_STATUS_OPEN = 1;
+    const PERSONAL_STATUS_DONE = 3;
     try {
-      await api.items.update(item.id, { status: newStatus });
-      item.status = newStatus;
-      onitemUpdated?.({ item, field: 'status', value: newStatus });
+      const updatedItem = await api.items.transition(item.id, isCompleted ? PERSONAL_STATUS_DONE : PERSONAL_STATUS_OPEN);
+      item = { ...item, status_id: updatedItem.status_id, status_name: updatedItem.status_name };
+      onitemUpdated?.({ item, field: 'status', value: updatedItem.status_id });
     } catch (error) {
-      onupdateError?.({ error: error.message, field: 'status', value: newStatus });
+      onupdateError?.({ error: error.message, field: 'status', value: isCompleted });
     }
   }
 
@@ -162,10 +165,11 @@
   {:else if column.field_identifier === 'status'}
     <!-- Status / Task Checkbox -->
     {#if item.is_task}
+      {@const taskDone = item.status_id === 3 || [...editorOptions.statuses, ...statuses].some((s) => s.id === item.status_id && s.is_completed)}
       <Checkbox
-        checked={item.status === 'completed'}
+        checked={taskDone}
         onchange={(checked) => toggleTaskStatus(checked)}
-        label={item.status === 'completed' ? 'Done' : 'Todo'}
+        label={taskDone ? 'Done' : 'Todo'}
         size="small"
         disabled={!canEdit}
       />

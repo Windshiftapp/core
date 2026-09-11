@@ -333,7 +333,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="List"
-          itemCount={itemsPagination?.total_items ?? workItems.length}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : filteredItems.length}
         />
       </div>
 
@@ -456,11 +457,11 @@
         </div>
 
         <!-- Pagination -->
-        {#if itemsPagination && itemsPagination.total > 0 && workItems.length > 0}
+        {#if itemsPagination && itemsPagination.total_items > 0 && workItems.length > 0}
           <div class="mt-6">
             <Pagination
               currentPage={itemsPagination.page}
-              totalItems={itemsPagination.total}
+              totalItems={itemsPagination.total_items}
               itemsPerPage={itemsPagination.limit}
               maxItems={10000}
               onpageChange={handlePageChange}

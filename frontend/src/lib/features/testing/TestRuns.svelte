@@ -45,15 +45,17 @@
     try {
       // Build query params for assignee filter
       const params = {};
-      if (selectedAssigneeFilter) {
+      if (selectedAssigneeFilter === 'unassigned') {
+        params.unassigned = true;
+      } else if (selectedAssigneeFilter) {
         params.assignee_id = selectedAssigneeFilter;
       }
 
       const [sets, runs, milestonesData, usersData] = await Promise.all([
         api.tests.testPlans.getAll(workspaceId),
         api.tests.testRuns.getAll(workspaceId, params),
-        api.milestones.getAll(),
-        api.getUsers()
+        api.milestones.getAll({ workspace_id: workspaceId }),
+        api.getAssignableUsers(workspaceId)
       ]);
       const safeSets = sets || [];
       const safeRuns = runs || [];
@@ -268,6 +270,7 @@
 
 <div class="min-h-screen flex flex-col p-6" style="background-color: var(--ds-surface);">
   <TestManagementHeader
+    {workspaceId}
     title={t('testing.testRuns')}
     subtitle={t('testing.testRunsSubtitle')}
     bind:milestoneFilter={selectedMilestoneFilter}

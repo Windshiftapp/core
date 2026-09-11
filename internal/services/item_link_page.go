@@ -10,7 +10,9 @@ import (
 
 // MaxOneHopLinksPerItem bounds each anchor's direct-link page. A future
 // traversal layer can call this primitive once per breadth-first frontier.
-const MaxOneHopLinksPerItem = 50
+// Kept at the batch anchor cap so dependency badges are not silently truncated
+// for realistic collections.
+const MaxOneHopLinksPerItem = 500
 
 // OneHopItemLinksPage contains one anchor item's direct visible links.
 type OneHopItemLinksPage struct {
@@ -26,9 +28,8 @@ type itemLinkCandidate struct {
 	outgoing bool
 }
 
-// ListOneHopItemLinksPageWithChecks loads one direct-link page for every
-// anchor in a fixed number of queries. Links to items outside the caller's
-// accessible workspaces are excluded before per-anchor ranking.
+// ListOneHopItemLinksPageWithChecks fills each anchor page with visible links.
+// Denied endpoints do not count toward the limit or continuation cursor.
 func (s *ItemLinkService) ListOneHopItemLinksPageWithChecks(
 	ctx context.Context,
 	userID int,
@@ -65,59 +66,62 @@ func (s *ItemLinkService) ListOneHopItemLinksPageWithChecks(
 		return result, nil
 	}
 
-	candidates, err := s.listOneHopItemLinkCandidates(ctx, ids, workspaceIDs, afterID, limit+1, includeCustomFields)
-	if err != nil {
-		return nil, err
+	cursors := make(map[int]int, len(ids))
+	for _, id := range ids {
+		cursors[id] = afterID
 	}
-
-	returned := make([]itemLinkCandidate, 0, len(candidates))
-	linkIDSet := make(map[int]struct{}, len(candidates))
-	perAnchorCount := make(map[int]int, len(ids))
-	for _, candidate := range candidates {
-		count := perAnchorCount[candidate.anchorID]
-		if count >= limit {
+	pending := ids
+	for len(pending) > 0 {
+		candidates, err := s.listOneHopItemLinkCandidates(ctx, pending, workspaceIDs, cursors, limit+1, includeCustomFields)
+		if err != nil {
+			return nil, err
+		}
+		if len(candidates) == 0 {
+			break
+		}
+		linkIDs := make([]int, 0, len(candidates))
+		for _, candidate := range candidates {
+			linkIDs = append(linkIDs, candidate.linkID)
+		}
+		linkIDs = dedupInts(linkIDs)
+		where := "il.id IN (" + placeholders(len(linkIDs)) + ")"
+		links, err := getLinksWhereContext(ctx, s.db, where, toIfaceSlice(linkIDs)...)
+		if err != nil {
+			return nil, fmt.Errorf("hydrate one-hop item links: %w", err)
+		}
+		visible := s.FilterLinksForUser(userID, links)
+		linksByID := make(map[int]models.ItemLink, len(visible))
+		for _, link := range visible {
+			linksByID[link.ID] = link
+		}
+		counts := make(map[int]int, len(pending))
+		for _, candidate := range candidates {
+			counts[candidate.anchorID]++
+			cursors[candidate.anchorID] = candidate.linkID
+			link, ok := linksByID[candidate.linkID]
+			if !ok {
+				continue
+			}
 			group := result[candidate.anchorID]
-			group.HasMore = true
+			if len(group.Outgoing)+len(group.Incoming) >= limit {
+				group.HasMore = true
+			} else {
+				if candidate.outgoing {
+					group.Outgoing = append(group.Outgoing, link)
+				} else {
+					group.Incoming = append(group.Incoming, link)
+				}
+				group.NextAfterID = candidate.linkID
+			}
 			result[candidate.anchorID] = group
-			continue
 		}
-		perAnchorCount[candidate.anchorID] = count + 1
-		returned = append(returned, candidate)
-		linkIDSet[candidate.linkID] = struct{}{}
-		group := result[candidate.anchorID]
-		group.NextAfterID = candidate.linkID
-		result[candidate.anchorID] = group
-	}
-	if len(returned) == 0 {
-		return result, nil
-	}
-
-	linkIDs := make([]int, 0, len(linkIDSet))
-	for linkID := range linkIDSet {
-		linkIDs = append(linkIDs, linkID)
-	}
-	where := "il.id IN (" + placeholders(len(linkIDs)) + ")"
-	links, err := getLinksWhereContext(ctx, s.db, where, toIfaceSlice(linkIDs)...)
-	if err != nil {
-		return nil, fmt.Errorf("hydrate one-hop item links: %w", err)
-	}
-	linksByID := make(map[int]models.ItemLink, len(links))
-	for _, link := range links {
-		linksByID[link.ID] = link
-	}
-
-	for _, candidate := range returned {
-		link, ok := linksByID[candidate.linkID]
-		if !ok {
-			continue
+		next := make([]int, 0, len(pending))
+		for _, id := range pending {
+			if !result[id].HasMore && counts[id] == limit+1 {
+				next = append(next, id)
+			}
 		}
-		group := result[candidate.anchorID]
-		if candidate.outgoing {
-			group.Outgoing = append(group.Outgoing, link)
-		} else {
-			group.Incoming = append(group.Incoming, link)
-		}
-		result[candidate.anchorID] = group
+		pending = next
 	}
 	return result, nil
 }
@@ -125,7 +129,8 @@ func (s *ItemLinkService) ListOneHopItemLinksPageWithChecks(
 func (s *ItemLinkService) listOneHopItemLinkCandidates(
 	ctx context.Context,
 	itemIDs, workspaceIDs []int,
-	afterID, fetchLimit int,
+	cursors map[int]int,
+	fetchLimit int,
 	includeCustomFields bool,
 ) ([]itemLinkCandidate, error) {
 	itemPH := placeholders(len(itemIDs))
@@ -135,29 +140,37 @@ func (s *ItemLinkService) listOneHopItemLinkCandidates(
 		customFieldFilter = ""
 	}
 
+	cursorCase := "CASE %s"
+	cursorArgs := make([]any, 0, len(itemIDs)*2)
+	for _, id := range itemIDs {
+		cursorCase += " WHEN ? THEN CAST(? AS INTEGER)"
+		cursorArgs = append(cursorArgs, id, cursors[id])
+	}
+	cursorCase += " END"
+
 	query := `
 		WITH candidates AS (
 			SELECT il.source_id AS anchor_id, il.id AS link_id, 1 AS outgoing
 			FROM item_links il
 			JOIN items source_item ON source_item.id = il.source_id
-			JOIN items target_item ON target_item.id = il.target_id
-			WHERE il.source_type = 'item' AND il.target_type = 'item'
+			LEFT JOIN items target_item ON target_item.id = il.target_id AND il.target_type = 'item'
+			WHERE il.source_type = 'item'
 			  AND il.source_id IN (` + itemPH + `)
 			  AND source_item.workspace_id IN (` + workspacePH + `)
-			  AND target_item.workspace_id IN (` + workspacePH + `)
-			  AND il.id > ?` + customFieldFilter + `
+			  AND (il.target_type <> 'item' OR target_item.workspace_id IN (` + workspacePH + `))
+			  AND il.id > ` + fmt.Sprintf(cursorCase, "il.source_id") + customFieldFilter + `
 
 			UNION ALL
 
 			SELECT il.target_id AS anchor_id, il.id AS link_id, 0 AS outgoing
 			FROM item_links il
-			JOIN items source_item ON source_item.id = il.source_id
 			JOIN items target_item ON target_item.id = il.target_id
-			WHERE il.source_type = 'item' AND il.target_type = 'item'
+			LEFT JOIN items source_item ON source_item.id = il.source_id AND il.source_type = 'item'
+			WHERE il.target_type = 'item'
 			  AND il.target_id IN (` + itemPH + `)
-			  AND source_item.workspace_id IN (` + workspacePH + `)
 			  AND target_item.workspace_id IN (` + workspacePH + `)
-			  AND il.id > ?` + customFieldFilter + `
+			  AND (il.source_type <> 'item' OR source_item.workspace_id IN (` + workspacePH + `))
+			  AND il.id > ` + fmt.Sprintf(cursorCase, "il.target_id") + customFieldFilter + `
 		), ranked AS (
 			SELECT anchor_id, link_id, outgoing,
 			       ROW_NUMBER() OVER (PARTITION BY anchor_id ORDER BY link_id ASC) AS row_number
@@ -172,11 +185,12 @@ func (s *ItemLinkService) listOneHopItemLinkCandidates(
 	args = append(args, toIfaceSlice(itemIDs)...)
 	args = append(args, toIfaceSlice(workspaceIDs)...)
 	args = append(args, toIfaceSlice(workspaceIDs)...)
-	args = append(args, afterID)
+	args = append(args, cursorArgs...)
 	args = append(args, toIfaceSlice(itemIDs)...)
 	args = append(args, toIfaceSlice(workspaceIDs)...)
 	args = append(args, toIfaceSlice(workspaceIDs)...)
-	args = append(args, afterID, fetchLimit)
+	args = append(args, cursorArgs...)
+	args = append(args, fetchLimit)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

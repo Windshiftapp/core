@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ type ItemIssueSync interface {
 }
 
 type ItemListRequest struct {
+	WorkspaceIDs     []int
 	UserID           int
 	WorkspaceID      int
 	CollectionID     int
@@ -41,6 +43,7 @@ type ItemListRequest struct {
 	SortAsc          bool
 	OmitDescriptions bool
 	IncludeWatermark bool
+	ExcludePersonal  bool
 }
 
 type ItemListResult struct {
@@ -175,6 +178,9 @@ type ItemChangesRequest struct {
 	UserID, WorkspaceID, CollectionID int
 	Since                             int64
 	SinceProvided                     bool
+	Through                           int64
+	ThroughProvided                   bool
+	Limit                             int
 	SubQL                             string
 }
 
@@ -182,6 +188,9 @@ type ItemChangesResult struct {
 	ChangedItemIDs     []int `json:"changed_item_ids"`
 	RemovedItemIDs     []int `json:"removed_item_ids"`
 	Watermark          int64 `json:"watermark"`
+	NextCursor         int64 `json:"next_cursor"`
+	HasMore            bool  `json:"has_more"`
+	ResetRequired      bool  `json:"reset_required"`
 	RequiresFullReload bool  `json:"requires_full_reload"`
 	MembershipDirty    bool  `json:"membership_dirty"`
 }
@@ -209,6 +218,20 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
 		return ItemListResult{}, err
+	}
+	if len(request.WorkspaceIDs) > 0 {
+		workspaceIDs = slices.DeleteFunc(workspaceIDs, func(id int) bool {
+			return !slices.Contains(request.WorkspaceIDs, id)
+		})
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
+		return ItemListResult{}, err
+	}
+	if request.ExcludePersonal {
+		workspaceIDs, err = repository.FilterSharedWorkspaceIDs(s.db, workspaceIDs)
+		if err != nil {
+			return ItemListResult{}, err
+		}
 	}
 	if len(workspaceIDs) == 0 {
 		return ItemListResult{Items: []models.Item{}, SortableFields: repository.SystemSortableFieldKeys()}, nil
@@ -242,9 +265,35 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	}, nil
 }
 
+func (s *ItemApplicationService) requireCollectionRead(userID, collectionID int, workspaceIDs []int) error {
+	if collectionID <= 0 {
+		return nil
+	}
+	collection, err := repository.NewCollectionRepository(s.db).GetByID(collectionID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrCollectionNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if collection.WorkspaceID != nil {
+		if !slices.Contains(workspaceIDs, *collection.WorkspaceID) {
+			return ErrCollectionNotFound
+		}
+		return nil
+	}
+	if !collection.IsPublic && (collection.CreatedBy == nil || *collection.CreatedBy != userID) {
+		return ErrCollectionNotFound
+	}
+	return nil
+}
+
 func (s *ItemApplicationService) Backlog(ctx context.Context, request ItemBacklogRequest) (ItemListResult, error) {
 	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
 	if err != nil {
+		return ItemListResult{}, err
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
 		return ItemListResult{}, err
 	}
 	items, total, err := s.crud.GetBacklogItemsContext(ctx, BacklogParams{
@@ -273,6 +322,9 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 	if err != nil {
 		return ItemChangesResult{}, err
 	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
+		return ItemChangesResult{}, err
+	}
 	result := ItemChangesResult{ChangedItemIDs: []int{}, RemovedItemIDs: []int{}}
 	if len(workspaceIDs) == 0 {
 		return result, nil
@@ -292,17 +344,42 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			return ItemChangesResult{}, repository.ErrNotFound
 		}
 	}
-	result.Watermark, err = changes.CurrentWatermark(workspaceIDs, request.WorkspaceID)
-	if err != nil || !request.SinceProvided || request.Since >= result.Watermark {
-		return result, err
+	if request.Since < 0 || request.Through < 0 || (request.ThroughProvided && request.Through < request.Since) || request.Limit < 0 || request.Limit > 500 {
+		return ItemChangesResult{}, &validation.ValidationError{Field: "since", Message: "invalid item change window"}
 	}
-	entries, err := changes.QuerySince(workspaceIDs, request.WorkspaceID, request.Since, 501)
+	result.Watermark, err = changes.StableCurrentWatermark(workspaceIDs, request.WorkspaceID)
 	if err != nil {
 		return ItemChangesResult{}, err
 	}
-	if len(entries) > 500 {
-		result.RequiresFullReload, result.MembershipDirty = true, true
+	result.NextCursor = result.Watermark
+	if request.Since > result.Watermark || (request.ThroughProvided && request.Through > result.Watermark) {
+		result.ResetRequired, result.RequiresFullReload, result.MembershipDirty = true, true, true
 		return result, nil
+	}
+	if request.ThroughProvided {
+		result.Watermark = request.Through
+		result.NextCursor = request.Through
+	}
+	if !request.SinceProvided {
+		return result, nil
+	}
+	limit := request.Limit
+	if limit == 0 {
+		limit = 500
+	}
+	entries, err := changes.QueryPage(workspaceIDs, request.WorkspaceID, request.Since, result.Watermark, limit+1)
+	if err != nil {
+		return ItemChangesResult{}, err
+	}
+	if len(entries) > limit {
+		result.HasMore = true
+		entries = entries[:limit]
+		result.NextCursor = entries[len(entries)-1].Cursor
+		// Existing clients omit limit and advance directly to watermark.
+		if request.Limit == 0 {
+			result.RequiresFullReload, result.MembershipDirty = true, true
+			return result, nil
+		}
 	}
 	removed := make(map[int]bool)
 	changed := make(map[int]bool)
@@ -311,8 +388,11 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			result.RequiresFullReload, result.MembershipDirty = true, true
 			return result, nil
 		}
-		if entry.Deleted {
+		if entry.ChangeType == "delete" {
 			removed[entry.ItemID] = true
+			continue
+		}
+		if changed[entry.ItemID] || removed[entry.ItemID] {
 			continue
 		}
 		visible, err := s.itemVisibleInDelta(ctx, request, workspaceIDs, entry.ItemID)
@@ -333,6 +413,8 @@ func (s *ItemApplicationService) Changes(ctx context.Context, request ItemChange
 			result.ChangedItemIDs = append(result.ChangedItemIDs, id)
 		}
 	}
+	slices.Sort(result.ChangedItemIDs)
+	slices.Sort(result.RemovedItemIDs)
 	result.MembershipDirty = len(result.RemovedItemIDs) > 0
 	return result, nil
 }
@@ -406,7 +488,16 @@ func (s *ItemApplicationService) RoadmapHierarchyDates(ctx context.Context, user
 	return RoadmapHierarchyDatesResult{Items: filtered, Truncated: truncated}, nil
 }
 
+type ItemReadOptions struct {
+	TrackView       bool
+	ExcludePersonal bool
+}
+
 func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, trackView bool) (*models.Item, error) {
+	return s.GetWithOptions(ctx, userID, itemID, ItemReadOptions{TrackView: trackView})
+}
+
+func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, itemID int, options ItemReadOptions) (*models.Item, error) {
 	result, err := s.crud.GetByIDWithWorkspaceStatus(itemID)
 	if err != nil {
 		return nil, err
@@ -428,6 +519,16 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 		}
 	}
 
+	if options.ExcludePersonal {
+		personal, err := repository.IsPersonalWorkspace(s.db, result.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if personal {
+			return nil, repository.ErrNotFound
+		}
+	}
+
 	item, err := s.crud.GetWithEffectiveProject(itemID)
 	if err != nil {
 		return nil, err
@@ -441,18 +542,22 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 	if err != nil {
 		return nil, fmt.Errorf("render item description: %w", err)
 	}
-	if trackView && s.activity != nil {
+	if options.TrackView && s.activity != nil {
 		_ = s.activity.TrackItemActivity(userID, itemID, ActivityView)
 	}
 	return item, nil
 }
 
 func (s *ItemApplicationService) GetByKey(ctx context.Context, userID int, workspaceKey string, itemNumber int) (*models.Item, error) {
+	return s.GetByKeyWithOptions(ctx, userID, workspaceKey, itemNumber, ItemReadOptions{TrackView: true})
+}
+
+func (s *ItemApplicationService) GetByKeyWithOptions(ctx context.Context, userID int, workspaceKey string, itemNumber int, options ItemReadOptions) (*models.Item, error) {
 	id, err := s.items.FindIDByKeyAndNumber(workspaceKey, itemNumber)
 	if err != nil {
 		return nil, err
 	}
-	return s.Get(ctx, userID, id, true)
+	return s.GetWithOptions(ctx, userID, id, options)
 }
 
 func (s *ItemApplicationService) Batch(ctx context.Context, userID int, ids []int) ([]models.Item, error) {
@@ -965,6 +1070,81 @@ func (s *ItemApplicationService) Ancestors(ctx context.Context, userID, itemID i
 		return nil, err
 	}
 	return items, nil
+}
+
+// ItemAncestorsBatchEntry pairs one requested item with its ancestor chain
+// (root -> parent, excluding the item itself).
+type ItemAncestorsBatchEntry struct {
+	ItemID    int           `json:"item_id"`
+	Ancestors []models.Item `json:"ancestors"`
+}
+
+// BatchAncestors resolves ancestor chains for many items in one request,
+// backing the tree view's hierarchy-gap filling. Ids the caller cannot view or
+// that don't exist are silently omitted, matching Batch.
+func (s *ItemApplicationService) BatchAncestors(ctx context.Context, userID int, ids []int) ([]ItemAncestorsBatchEntry, error) {
+	loaded, err := s.items.FindByIDsWithDetails(ids)
+	if err != nil {
+		return nil, err
+	}
+	loadedByID := make(map[int]*models.Item, len(loaded))
+	for _, item := range loaded {
+		loadedByID[item.ID] = item
+	}
+	allowed := make([]int, 0, len(ids))
+	permissions := make(map[int]bool)
+	for _, id := range ids {
+		item, exists := loadedByID[id]
+		if !exists {
+			continue
+		}
+		allowedFlag, ok := permissions[item.WorkspaceID]
+		if !ok {
+			allowedFlag, err = s.perm.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
+			if err != nil {
+				return nil, err
+			}
+			permissions[item.WorkspaceID] = allowedFlag
+		}
+		if allowedFlag {
+			allowed = append(allowed, id)
+		}
+	}
+
+	chains, err := s.hierarchy.GetAncestorsForItemsContext(ctx, allowed)
+	if err != nil {
+		return nil, err
+	}
+	// Enrich every distinct ancestor once, then index by id for regrouping.
+	seen := make(map[int]struct{})
+	flat := make([]models.Item, 0)
+	for _, chain := range chains {
+		for _, ancestor := range chain {
+			if _, dup := seen[ancestor.ID]; dup {
+				continue
+			}
+			seen[ancestor.ID] = struct{}{}
+			flat = append(flat, ancestor)
+		}
+	}
+	if err := s.enrich(ctx, userID, flat); err != nil {
+		return nil, err
+	}
+	enrichedByID := make(map[int]models.Item, len(flat))
+	for _, ancestor := range flat {
+		enrichedByID[ancestor.ID] = ancestor
+	}
+
+	entries := make([]ItemAncestorsBatchEntry, 0, len(allowed))
+	for _, id := range allowed {
+		chain := chains[id]
+		enriched := make([]models.Item, len(chain))
+		for i, ancestor := range chain {
+			enriched[i] = enrichedByID[ancestor.ID]
+		}
+		entries = append(entries, ItemAncestorsBatchEntry{ItemID: id, Ancestors: enriched})
+	}
+	return entries, nil
 }
 
 func (s *ItemApplicationService) Descendants(ctx context.Context, userID, itemID, maxDepth int) ([]models.Item, error) {

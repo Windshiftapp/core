@@ -276,13 +276,20 @@
 />
 
 <!-- Customization Panel - Slides from Left.
+     In edit mode, leave room for Portal's edit bar above the fixed panels.
      The full-bleed shadow is only applied when the inline fields builder
      is closed, otherwise it casts a visible seam between the two panels. -->
 <div
-  class="fixed top-0 left-0 h-full flex z-50 transform transition-transform duration-300 ease-in-out"
-  style="background-color: var(--ds-surface-card); box-shadow: {expandedRequestTypeForFields ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'};"
+  class="fixed left-0 flex z-50 transform transition-transform duration-300 ease-in-out"
+  style="
+    top: {portalStore.isEditing ? '2.5rem' : '0'};
+    height: {portalStore.isEditing ? 'calc(100% - 2.5rem)' : '100%'};
+    background-color: var(--ds-surface-card);
+    box-shadow: {expandedRequestTypeForFields ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'};
+  "
   class:translate-x-0={portalStore.showCustomizePanel}
   class:-translate-x-full={!portalStore.showCustomizePanel}
+  data-testid="portal-customize-panel"
 >
   <!-- Vertical Navigation Sidebar -->
   <div class="w-16 border-r flex flex-col items-center py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -293,6 +300,7 @@
           onclick={() => portalStore.toggleEditing()}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all"
           style="background-color: {portalStore.isEditing ? 'var(--ds-background-neutral)' : 'transparent'};"
+          data-testid="portal-edit-mode-toggle"
         >
           <Edit3 class="w-5 h-5" style="color: {portalStore.isEditing ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-text-subtle)'};" />
         </button>
@@ -776,8 +784,15 @@
      clean. -->
 {#if portalStore.showCustomizePanel && expandedRequestTypeForFields}
   <div
-    class="fixed top-0 left-[28rem] h-full w-[30rem] z-40 flex flex-col border-l"
-    style="background-color: var(--ds-surface-card); border-color: var(--ds-border); box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.25);"
+    class="fixed left-[28rem] w-[30rem] z-40 flex flex-col border-l"
+    style="
+      top: {portalStore.isEditing ? '2.5rem' : '0'};
+      height: {portalStore.isEditing ? 'calc(100% - 2.5rem)' : '100%'};
+      background-color: var(--ds-surface-card);
+      border-color: var(--ds-border);
+      box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.25);
+    "
+    data-testid="portal-fields-builder"
     transition:fly={{ x: -240, duration: 220 }}
   >
     <RequestTypeFieldsBuilder

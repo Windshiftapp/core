@@ -27,8 +27,6 @@
       ...widget,
       name: t(widget.nameKey),
       description: t(widget.descriptionKey),
-      categoryLabel: categories.find((category) => category.id === widget.category)?.name || widget.category,
-      widthLabel: t('workspaceDashboard.customization.defaultWidth', { width: widget.defaultWidth }),
     })),
   );
 </script>

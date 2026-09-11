@@ -8,12 +8,14 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/services/actioncatalog"
 )
 
 func registerActionRoutes(builder *routeBuilder, actions actionApplication) {
 	builder.Read("/action-templates", AuthAuthenticated, []string{"actions:read"}, listActionTemplates(actions))
 	builder.Action(http.MethodPost, "/workspaces/{workspace_id}/action-templates/{template_key}/apply", http.StatusCreated, AuthAuthenticated, []string{"actions:write"}, applyActionTemplate(actions))
 	builder.Read("/workspaces/{workspace_id}/action-catalog", AuthAuthenticated, []string{"actions:read"}, actionCatalog(actions))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/validate", http.StatusOK, false, AuthAuthenticated, []string{"actions:write"}, validateAction(actions))
 	builder.Read("/workspaces/{workspace_id}/actions", AuthAuthenticated, []string{"actions:read"}, listActions(actions))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions", http.StatusCreated, false, AuthAuthenticated, []string{"actions:write"}, createAction(actions))
 	builder.Read("/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:read"}, getAction(actions))
@@ -44,6 +46,10 @@ func applyActionTemplate(actions actionApplication) actionOperation[*services.Ap
 	}
 }
 
+type actionValidationResponse struct {
+	Errors actioncatalog.ValidationErrors `json:"errors"`
+}
+
 type actionExecuteRequest struct {
 	ItemID int `json:"item_id"`
 }
@@ -60,6 +66,23 @@ func actionCatalog(actions actionApplication) readOperation[services.ActionCatal
 		}
 		result, err := actions.Catalog(user.ID, workspaceID)
 		return result, actionError(err)
+	}
+}
+
+func validateAction(actions actionApplication) jsonOperation[models.CreateActionRequest, actionValidationResponse] {
+	return func(r *http.Request, input models.CreateActionRequest) (actionValidationResponse, error) {
+		user, workspaceID, _, err := actionTarget(r, false)
+		if err != nil {
+			return actionValidationResponse{}, err
+		}
+		errs, err := actions.Validate(user.ID, workspaceID, input)
+		if err != nil {
+			return actionValidationResponse{}, actionError(err)
+		}
+		if errs == nil {
+			errs = actioncatalog.ValidationErrors{}
+		}
+		return actionValidationResponse{Errors: errs}, nil
 	}
 }
 
@@ -167,10 +190,11 @@ func actionError(err error) error {
 		return nil
 	}
 	var validation *services.ActionValidationError
+	var invalidRequest *services.InvalidRequestError
 	switch {
 	case errors.Is(err, services.ErrActionNotVisible), errors.Is(err, repository.ErrNotFound):
 		return newError(http.StatusNotFound, "not_found", "Action was not found")
-	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), strings.Contains(err.Error(), "allowed_role_ids"):
+	case errors.Is(err, services.ErrActionDisabled), errors.Is(err, services.ErrActionDefinitionInvalid), errors.As(err, &validation), errors.As(err, &invalidRequest):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		return internalError(err)

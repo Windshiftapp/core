@@ -488,6 +488,10 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 			return nil, Pagination{}, 0, err
 		}
 		items, total, err := app.ListAssets(user.ID, setID, repository.AssetListFilter{AssetTypeID: r.URL.Query().Get("type_id"), CategoryID: r.URL.Query().Get("category_id"), IncludeSubcategories: r.URL.Query().Get("include_subcategories") != "false", StatusID: r.URL.Query().Get("status_id"), Search: r.URL.Query().Get("search"), Limit: page.PageSize, Offset: page.Offset}, r.URL.Query().Get("ql"))
+		// ListAssets returns a newly allocated result slice for this request.
+		for i := range items {
+			items[i].CreatorEmail = ""
+		}
 		return items, page, total, assetError(err)
 	})
 	builder.JSON(http.MethodPost, collection, http.StatusCreated, false, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetInput) (*models.Asset, error) {
@@ -496,7 +500,7 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 			return nil, err
 		}
 		result, err := app.CreateAsset(user.ID, setID, auditActor(r, user), assetMutation(input))
-		return result, assetError(err)
+		return assetWithoutCreatorEmail(result), assetError(err)
 	})
 	builder.Read(item, AuthAuthenticated, []string{"assets:read"}, func(r *http.Request) (*models.Asset, error) {
 		user, id, err := assetTarget(r, "asset_id")
@@ -504,7 +508,7 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 			return nil, err
 		}
 		result, err := app.GetAsset(user.ID, id)
-		return result, assetError(err)
+		return assetWithoutCreatorEmail(result), assetError(err)
 	})
 	builder.JSON(http.MethodPatch, item, http.StatusOK, true, AuthAuthenticated, []string{"assets:write"}, func(r *http.Request, input assetPatchInput) (*models.Asset, error) {
 		user, id, err := assetTarget(r, "asset_id")
@@ -516,7 +520,7 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 			return nil, err
 		}
 		result, err := app.UpdateAsset(user.ID, id, auditActor(r, user), patch)
-		return result, assetError(err)
+		return assetWithoutCreatorEmail(result), assetError(err)
 	})
 	builder.Command(http.MethodDelete, item, AuthAuthenticated, []string{"assets:delete"}, func(r *http.Request) error {
 		user, id, err := assetTarget(r, "asset_id")
@@ -573,6 +577,19 @@ func registerAssetCRUDRoutes(builder *routeBuilder, app *services.AssetApplicati
 		result, err := app.CreateAssetLink(user.ID, id, services.CreateItemLinkParams{LinkTypeID: input.LinkTypeID, TargetType: input.TargetType, TargetID: input.TargetID})
 		return result, linkError(err)
 	})
+}
+
+// Asset access does not authorize disclosure of user email addresses. Match
+// the v1 asset contract: callers needing an email must use the user API and its
+// separate permissions. Copy the model so response redaction cannot affect
+// service-owned state; the public and session mounts share this representation.
+func assetWithoutCreatorEmail(asset *models.Asset) *models.Asset {
+	if asset == nil {
+		return nil
+	}
+	result := *asset
+	result.CreatorEmail = ""
+	return &result
 }
 
 func assetMutation(input assetInput) services.AssetMutationInput {

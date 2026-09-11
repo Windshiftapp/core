@@ -22,6 +22,7 @@
   let messagesContainer = $state(null);
   let textareaEl = $state(null);
   let previousFocusEl = $state(null);
+  let initializedForOpen = $state(false);
 
   // Resize state
   let panelWidth = $state(400);
@@ -152,10 +153,17 @@
 
   // Load LLM connections when panel opens
   $effect(() => {
-    if (isOpen) {
-      chatStore.loadConnections();
-      chatStore.prepareWorkspaceOptions(workspaceId, canUseStandard);
+    if (!isOpen) {
+      initializedForOpen = false;
+      return;
     }
+    if (initializedForOpen) return;
+    initializedForOpen = true;
+    chatStore.loadConnections();
+    void (async () => {
+      await chatStore.startNewGeneralChat();
+      await chatStore.prepareWorkspaceOptions(workspaceId, canUseStandard);
+    })();
   });
 
   function handleClose() {

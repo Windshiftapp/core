@@ -83,9 +83,9 @@
   async function loadData() {
     try {
       loading = true;
-      // In global view, load all iterations; in workspace view, filter by workspace
+      // Global lists exclude local iterations; workspace lists include both scopes.
       const filters = isGlobalView
-        ? {}
+        ? { is_global: true }
         : { workspace_id: workspaceId, include_global: true };
       const [iterationsData, typesData] = await Promise.all([
         api.iterations.getAll(filters),

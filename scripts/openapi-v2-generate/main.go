@@ -81,6 +81,16 @@ func generate(data []byte) ([]byte, error) {
 		if route.Tag != "" {
 			operation["tags"] = []any{route.Tag}
 		}
+		if route.Auth == v2.AuthAuthenticated {
+			operation["security"] = []any{map[string]any{"BearerAuth": []any{}}}
+		} else {
+			delete(operation, "security")
+		}
+		if len(route.Scopes) > 0 {
+			operation["x-required-scopes"] = slices.Clone(route.Scopes)
+		} else {
+			delete(operation, "x-required-scopes")
+		}
 		operation["parameters"] = parameterDocuments(route.Parameters)
 		delete(pathItem, "parameters")
 		if route.RequestType != nil {

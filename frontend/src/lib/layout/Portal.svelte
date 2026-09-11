@@ -467,7 +467,11 @@
       <div class="flex-1 flex flex-col">
         <!-- Edit Mode Top Bar -->
         {#if portalStore.isEditing}
-          <div class="relative z-[60] h-10" style="background-color: #fefce8; border-bottom: 1px solid #fde68a;">
+          <div
+            class="relative z-[60] h-10"
+            style="background-color: #fefce8; border-bottom: 1px solid #fde68a;"
+            data-testid="portal-editing-bar"
+          >
             <div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-full">
               <span class="text-sm font-semibold" style="color: #92400e;">Editing portal</span>
               <Button variant="primary" size="small" icon={Check} onclick={() => portalStore.toggleEditing()}>

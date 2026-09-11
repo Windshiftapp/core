@@ -1,12 +1,6 @@
 import { API_BASE, fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
-export const projects = {
-  ...createCrudClient('/projects'),
-  getByWorkspace: (workspaceId) => fetchAPI(`/projects?workspace_id=${workspaceId}`),
-  getMilestones: (id) => fetchAPI(`/projects/${id}/milestones`),
-};
-
 export const search = {
   items: (params = {}) => {
     const searchParams = new URLSearchParams();
@@ -30,9 +24,9 @@ export const search = {
     }
 
     // Limit
-    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.limit) searchParams.append('page_size', String(Math.min(Number(params.limit), 100)));
 
-    return fetchAPI(`/items/search?${searchParams.toString()}`);
+    return fetchV2Data(`/items/search?${searchParams.toString()}`);
   },
 };
 

@@ -393,7 +393,7 @@
   >
     <!-- Project name with color dot and description -->
     {#snippet project(project)}
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2" data-testid={`time-project-${project.id}`}>
         {#if project.color}
           <ColorDot color={project.color} size="md" />
         {/if}

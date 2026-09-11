@@ -13,7 +13,9 @@ import (
 	"windshift/internal/repository"
 )
 
-const MaxBatchLinkItems = 100
+// MaxBatchLinkItems bounds one /links/batch anchor list. Restored to the
+// item-batch cap (500) that the frontend chunks against (200 per request).
+const MaxBatchLinkItems = 500
 
 type BatchItemLinks struct {
 	ItemID          int               `json:"item_id"`
@@ -35,7 +37,7 @@ type BatchLinkParams struct {
 
 func (s *ItemLinkService) ListBatch(ctx context.Context, userID int, params BatchLinkParams) ([]BatchItemLinks, int, error) {
 	if (strings.TrimSpace(params.QLQuery) == "") == (len(params.ItemIDs) == 0) {
-		return nil, 0, fmt.Errorf("exactly one of ql or ids is required")
+		return nil, 0, &InvalidRequestError{Message: "exactly one of ql or ids is required"}
 	}
 	ids := dedupInts(params.ItemIDs)
 	total := len(ids)
@@ -55,12 +57,15 @@ func (s *ItemLinkService) ListBatch(ctx context.Context, userID int, params Batc
 			return nil, 0, err
 		}
 		ids, total = page.IDs, page.Total
+		if len(ids) == 0 {
+			return []BatchItemLinks{}, total, nil
+		}
 	}
 	if len(ids) == 0 || len(ids) > MaxBatchLinkItems {
-		return nil, 0, fmt.Errorf("ids must contain between 1 and %d unique values", MaxBatchLinkItems)
+		return nil, 0, &InvalidRequestError{Message: fmt.Sprintf("ids must contain between 1 and %d unique values", MaxBatchLinkItems)}
 	}
 	if params.AfterID < 0 || (params.AfterID > 0 && (params.QLQuery != "" || len(ids) != 1)) {
-		return nil, 0, fmt.Errorf("after_id requires exactly one explicit item id")
+		return nil, 0, &InvalidRequestError{Message: "after_id requires exactly one explicit item id"}
 	}
 	groups, err := s.ListOneHopItemLinksPageWithChecks(ctx, userID, ids, params.AfterID, MaxOneHopLinksPerItem, params.IncludeCustomFields)
 	if err != nil {
@@ -97,10 +102,10 @@ func (s *ItemLinkService) prepareFieldLink(params CreateItemLinkParams) (CreateI
 	var optionsJSON sql.NullString
 	var fieldType string
 	if err := s.db.QueryRow("SELECT field_type, options FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType, &optionsJSON); err != nil {
-		return params, false, fmt.Errorf("custom field not found")
+		return params, false, &InvalidRequestError{Message: "custom field not found"}
 	}
 	if fieldType != "linking" || !optionsJSON.Valid {
-		return params, false, fmt.Errorf("custom field is not configured for linking")
+		return params, false, &InvalidRequestError{Message: "custom field is not configured for linking"}
 	}
 	var options struct {
 		LinkTypeID         int      `json:"link_type_id"`
@@ -110,30 +115,30 @@ func (s *ItemLinkService) prepareFieldLink(params CreateItemLinkParams) (CreateI
 		MirrorOfFieldID    int      `json:"mirror_of_field_id"`
 	}
 	if err := json.Unmarshal([]byte(optionsJSON.String), &options); err != nil {
-		return params, false, fmt.Errorf("invalid field options")
+		return params, false, &InvalidRequestError{Message: "invalid field options"}
 	}
 	if options.MirrorOfFieldID > 0 {
 		params.SourceType, params.TargetType = params.TargetType, params.SourceType
 		params.SourceID, params.TargetID = params.TargetID, params.SourceID
 		params.CustomFieldID = &options.MirrorOfFieldID
 		if err := s.db.QueryRow("SELECT options FROM custom_field_definitions WHERE id = ?", options.MirrorOfFieldID).Scan(&optionsJSON); err != nil {
-			return params, false, fmt.Errorf("primary field not found")
+			return params, false, &InvalidRequestError{Message: "primary field not found"}
 		}
 		if !optionsJSON.Valid || json.Unmarshal([]byte(optionsJSON.String), &options) != nil {
-			return params, false, fmt.Errorf("invalid primary field options")
+			return params, false, &InvalidRequestError{Message: "invalid primary field options"}
 		}
 	}
 	if params.LinkTypeID != 0 && params.LinkTypeID != options.LinkTypeID {
-		return params, false, fmt.Errorf("link type does not match field configuration")
+		return params, false, &InvalidRequestError{Message: "link type does not match field configuration"}
 	}
 	params.LinkTypeID = options.LinkTypeID
 	if len(options.AllowedEntityTypes) > 0 && !slices.Contains(options.AllowedEntityTypes, params.TargetType) {
-		return params, false, fmt.Errorf("target entity type not allowed for this field")
+		return params, false, &InvalidRequestError{Message: "target entity type not allowed for this field"}
 	}
 	if len(options.AllowedItemTypeIDs) > 0 && params.TargetType == "item" {
 		target, err := repository.NewItemRepository(s.db).FindByID(params.TargetID)
 		if err != nil || target.ItemTypeID == nil || !slices.Contains(options.AllowedItemTypeIDs, *target.ItemTypeID) {
-			return params, false, fmt.Errorf("target item type not allowed for this field")
+			return params, false, &InvalidRequestError{Message: "target item type not allowed for this field"}
 		}
 	}
 	return params, options.Multi, nil
@@ -217,7 +222,7 @@ func (s *ItemLinkService) ListFieldLinks(userID, itemID, fieldID int) ([]models.
 		return nil, err
 	}
 	if fieldType != "linking" {
-		return nil, fmt.Errorf("field is not a linking type")
+		return nil, &InvalidRequestError{Message: "field is not a linking type"}
 	}
 	var options struct {
 		MirrorOfFieldID int `json:"mirror_of_field_id"`
