@@ -687,8 +687,9 @@ func (r *UserRepository) GetDeleteSnapshot(id int) (*DeleteSnapshot, error) {
 
 // PasswordResetTarget is the small subset the password-reset audit needs.
 type PasswordResetTarget struct {
-	Username string
-	Email    string
+	Username   string
+	Email      string
+	Offboarded bool
 }
 
 // GetPasswordResetTarget returns username+email for the reset audit.
@@ -696,9 +697,9 @@ type PasswordResetTarget struct {
 func (r *UserRepository) GetPasswordResetTarget(id int) (*PasswordResetTarget, error) {
 	var t PasswordResetTarget
 	err := r.db.QueryRow(
-		"SELECT username, email FROM users WHERE id = ?",
+		"SELECT username, email, offboarded_at IS NOT NULL FROM users WHERE id = ?",
 		id,
-	).Scan(&t.Username, &t.Email)
+	).Scan(&t.Username, &t.Email, &t.Offboarded)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d for password reset", id))
 	}
@@ -716,11 +717,12 @@ func (r *UserRepository) SetPassword(id int, passwordHash string, requiresReset 
 }
 
 // ActivationTarget carries username/email/is_active for the activate/deactivate
-// audit + idempotence check.
+// audit + idempotence check, plus the irreversible offboarding state.
 type ActivationTarget struct {
-	Username string
-	Email    string
-	IsActive bool
+	Username   string
+	Email      string
+	IsActive   bool
+	Offboarded bool
 }
 
 // GetActivationTarget reads the activate/deactivate audit fields.
@@ -728,9 +730,9 @@ type ActivationTarget struct {
 func (r *UserRepository) GetActivationTarget(id int) (*ActivationTarget, error) {
 	var t ActivationTarget
 	err := r.db.QueryRow(
-		"SELECT username, email, is_active FROM users WHERE id = ?",
+		"SELECT username, email, is_active, offboarded_at IS NOT NULL FROM users WHERE id = ?",
 		id,
-	).Scan(&t.Username, &t.Email, &t.IsActive)
+	).Scan(&t.Username, &t.Email, &t.IsActive, &t.Offboarded)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d activation target", id))
 	}

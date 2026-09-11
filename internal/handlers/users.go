@@ -527,6 +527,13 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Password material on an offboarded account is meaningless state; refuse
+	// instead of writing credentials onto a retired row.
+	if target.Offboarded {
+		respondConflict(w, r, "User has been offboarded and cannot be reactivated")
+		return
+	}
+
 	if err := h.repo.SetPassword(id, string(hashedBytes), requiresReset); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -615,6 +622,13 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 
 	if target.IsActive {
 		respondValidationError(w, r, "User is already active")
+		return
+	}
+
+	// Offboarding is irreversible; activation must never resurrect the
+	// anonymized account.
+	if target.Offboarded {
+		respondConflict(w, r, "User has been offboarded and cannot be reactivated")
 		return
 	}
 

@@ -552,6 +552,14 @@ var Catalog = []Migration{
 		`,
 	},
 	{
+		Version:       "20260911_users_offboarded_at",
+		Name:          "Add irreversible offboarded lifecycle state to users",
+		CheckSQLite:   sqliteColumnCheck("users", "offboarded_at"),
+		CheckPostgres: pgColumnCheck("users", "offboarded_at"),
+		SQLite:        `ALTER TABLE users ADD COLUMN offboarded_at DATETIME`,
+		Postgres:      `ALTER TABLE users ADD COLUMN IF NOT EXISTS offboarded_at TIMESTAMPTZ`,
+	},
+	{
 		Version:       "20260905_notification_email_claims",
 		Name:          "Add recoverable notification email claims",
 		CheckSQLite:   sqliteColumnCheck("notifications", "email_delivery_state"),

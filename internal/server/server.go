@@ -51,6 +51,7 @@ import (
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/smtp"
+	"windshift/internal/sso"
 	"windshift/internal/standardagent"
 	"windshift/internal/utils"
 	"windshift/internal/webauthn"
@@ -131,17 +132,21 @@ type Server struct {
 	tokenTracker                 *services.TokenTracker
 	webhookSender                *webhook.WebhookSender
 	scmSyncStopChan              chan struct{}
-	issueSyncStopChan            chan struct{}
-	magicLinkStopChan            chan struct{}
-	cleanupStopChan              chan struct{}
-	jiraHostStopChan             chan struct{}
-	cleanupTicker                *time.Ticker
-	pluginManager                *plugins.Manager
-	databaseDiagRepo             *repository.DatabaseDiagnosticsRepository
-	databasePoolMonitor          *services.DatabasePoolMonitor
-	channelService               *services.ChannelService
-	memoryBudget                 config.MemoryBudget
-	metrics                      *appmetrics.Metrics
+	// secretEncryption is the at-rest secret cipher shared by the SCM and
+	// integration OAuth surfaces; set during wiring, used to revoke provider
+	// grants when a user is offboarded.
+	secretEncryption    *sso.SecretEncryption
+	issueSyncStopChan   chan struct{}
+	magicLinkStopChan   chan struct{}
+	cleanupStopChan     chan struct{}
+	jiraHostStopChan    chan struct{}
+	cleanupTicker       *time.Ticker
+	pluginManager       *plugins.Manager
+	databaseDiagRepo    *repository.DatabaseDiagnosticsRepository
+	databasePoolMonitor *services.DatabasePoolMonitor
+	channelService      *services.ChannelService
+	memoryBudget        config.MemoryBudget
+	metrics             *appmetrics.Metrics
 
 	loginRateLimiter      *middleware.RateLimiter
 	runnerRegisterLimiter *middleware.RateLimiter
@@ -577,9 +582,14 @@ func (s *Server) initialize() error {
 		invitationService,
 		services.NewUserReadService(s.db),
 		func(id int) error {
-			tokenIDs, err := services.OffboardUser(s.db, id, s.notificationService, authorizationCacheInvalidator)
-			tokenManager.InvalidateTokens(tokenIDs)
+			result, err := services.OffboardUser(s.db, id, s.notificationService, authorizationCacheInvalidator)
+			if len(result.RevokedAPITokenIDs) > 0 {
+				tokenManager.InvalidateTokens(result.RevokedAPITokenIDs)
+			}
 			sessionManager.InvalidateUserSessionValidation(id)
+			if err == nil {
+				s.revokeUserRemoteGrants(result.RemoteRevocations)
+			}
 			return err
 		},
 		userDeactivationService.DeactivateUser,
@@ -774,6 +784,7 @@ func (s *Server) initialize() error {
 	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL)
+	s.secretEncryption = scmProviderHandler.GetEncryption()
 	scmWorkspaceRepo := repository.NewSCMWorkspaceRepository(s.db)
 	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), permService, baseURL)
 	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
@@ -1922,11 +1933,18 @@ func (s *Server) recoverUser(username string) {
 	var id int
 	var userEmail string
 	var isActive bool
+	var offboarded bool
 	err := s.db.QueryRow(
-		`SELECT id, email, is_active FROM users WHERE username = ?`, username,
-	).Scan(&id, &userEmail, &isActive)
+		`SELECT id, email, is_active, offboarded_at IS NOT NULL FROM users WHERE username = ?`, username,
+	).Scan(&id, &userEmail, &isActive, &offboarded)
 	if err != nil {
 		slog.Error("RECOVER_USER: user not found", "username", username)
+		return
+	}
+	if offboarded {
+		// Offboarding is irreversible; the recovery tool must not resurrect
+		// an anonymized account.
+		slog.Error("RECOVER_USER: refusing to re-enable offboarded user", "username", username, "id", id)
 		return
 	}
 	if isActive {

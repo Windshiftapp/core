@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 	email_verification_expires TIMESTAMPTZ, -- Expiry time for verification token
 	scim_external_id TEXT, -- SCIM externalId from identity provider
 	scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
+	offboarded_at TIMESTAMPTZ, -- Set when the account is administratively offboarded; never cleared, every activation path must reject it
 	is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
 	agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent
 	-- Distinguishes how an agent row got created. 'user' covers both the
