@@ -23,7 +23,7 @@ export default {
       background: 'Background', text: 'Text',
       failedToLoad: 'Failed to load themes.', failedToCreate: 'Failed to create theme.',
       failedToUpdate: 'Failed to update theme.', failedToDelete: 'Failed to delete theme.',
-      failedToActivate: 'Failed to activate theme.',
+      failedToActivate: 'Failed to activate theme.', failedToUploadLogo: 'Failed to upload logo.',
       defaults: {
         default: { name: 'Default', description: 'Clean theme with standard navigation colors' },
         ocean: { name: 'Ocean', description: 'Professional blue-tinted navigation theme' },

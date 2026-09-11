@@ -38,7 +38,7 @@
 
   async function loadCustomFields() {
     try {
-      customFields = (await api.customFields.getAll())?.data || [];
+      customFields = await api.customFields.getAll();
       // Filter fields that apply to customer organisations
       customerOrgFields = customFields.filter(f => f.applies_to_customer_organisations);
     } catch (err) {
@@ -229,4 +229,3 @@
       <Lozenge color={customer.active ? 'green' : 'gray'} text={customer.active ? t('common.active') : t('common.inactive')} />
     {/snippet}
   </DataTable>
-

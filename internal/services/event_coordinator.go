@@ -156,98 +156,21 @@ func (ec *EventCoordinator) EmitItemUpdatedWithContext(original, updated *models
 func (ec *EventCoordinator) emitItemUpdatedInternal(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int, fieldChanges []HistoryEntry, actionContext *ActionContext, actorUsername ...string) {
 	actorName := resolveActorName(actorUserID, actorUsername)
 
-	// Construct the item key (e.g., "TST-1")
-	itemKey := fmt.Sprintf("%s-%d", updated.WorkspaceKey, updated.WorkspaceItemNumber)
-
-	// Emit notification events
 	if ec.notificationService != nil {
-		// Get status name if status changed
 		var statusName string
-		if statusChanged && updated.StatusID != nil {
-			_ = ec.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updated.StatusID).Scan(&statusName)
-		}
-
-		// Emit status changed notification
 		if statusChanged {
-			ec.notificationService.EmitEvent(&NotificationEvent{
-				EventType:   models.EventStatusChanged,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Status Changed",
-				TemplateData: map[string]any{
-					"item.title":  updated.Title,
-					"item.key":    itemKey,
-					"item.id":     updated.ID,
-					"status.name": statusName,
-					"user.name":   actorName,
-				},
-			})
+			statusName, _ = itemUpdateStatusName(ec.db, updated.StatusID)
 		}
-
-		// Emit assignee changed notification
-		if assigneeChanged {
-			ec.notificationService.EmitEvent(&NotificationEvent{
-				EventType:   models.EventItemAssigned,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Item Assigned",
-				TemplateData: map[string]any{
-					"item.title": updated.Title,
-					"item.key":   itemKey,
-					"item.id":    updated.ID,
-					"user.name":  actorName,
-				},
-			})
-		}
-
-		// Emit item updated notification (when not status or assignee change)
-		if !statusChanged && !assigneeChanged {
-			ec.notificationService.EmitEvent(&NotificationEvent{
-				EventType:   models.EventItemUpdated,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Item Updated",
-				TemplateData: map[string]any{
-					"item.title": updated.Title,
-					"item.key":   itemKey,
-					"item.id":    updated.ID,
-					"user.name":  actorName,
-				},
-			})
-		}
+		emitItemUpdateNotifications(ec.notificationService.EmitEvent, original, updated,
+			statusChanged, assigneeChanged, actorUserID, actorName, statusName)
 	}
 
-	// Emit action events for automation
 	if ec.actionService != nil {
 		if statusChanged {
-			event := &models.ActionEvent{
-				EventType:   models.ActionTriggerStatusTransition,
-				WorkspaceID: updated.WorkspaceID,
-				ItemID:      updated.ID,
-				ActorUserID: actorUserID,
-				OldValues: map[string]any{
-					"status_id": original.StatusID,
-				},
-				NewValues: map[string]any{
-					"status_id":   updated.StatusID,
-					"title":       updated.Title,
-					"assignee_id": updated.AssigneeID,
-					"creator_id":  updated.CreatorID,
-				},
-			}
+			event := newStatusTransitionActionEvent(original, updated, actorUserID)
 			applyActionContext(event, actionContext)
 			ec.actionService.EmitActionEvent(event)
 		} else {
-			// Build OldValues/NewValues dynamically from field changes
 			oldVals := make(map[string]any)
 			newVals := make(map[string]any)
 			for _, fc := range fieldChanges {
@@ -268,17 +191,7 @@ func (ec *EventCoordinator) emitItemUpdatedInternal(original, updated *models.It
 		}
 	}
 
-	// Dispatch webhook events
-	if ec.webhookDispatcher != nil {
-		if statusChanged {
-			ec.webhookDispatcher.DispatchEvent("status.changed", updated)
-		}
-		if assigneeChanged {
-			ec.webhookDispatcher.DispatchEvent("item.assigned", updated)
-		}
-		// Always dispatch item.updated for any update
-		ec.webhookDispatcher.DispatchEvent("item.updated", updated)
-	}
+	dispatchItemUpdateWebhooks(ec.webhookDispatcher, updated, statusChanged, assigneeChanged)
 }
 
 func actionEventFieldName(historyFieldName string) string {

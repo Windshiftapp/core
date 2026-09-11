@@ -24,6 +24,7 @@ type EmailReplyService struct {
 	smtpSender ThreadedEmailSender
 	idResolver *IDResolverService
 	outboxMu   sync.Mutex
+	canonical  bool
 }
 
 // NewEmailReplyService creates a new EmailReplyService.
@@ -41,6 +42,13 @@ func NewEmailReplyService(db database.Database, smtpSender ThreadedEmailSender) 
 // - The comment is from an internal user (not from a portal customer)
 // - The item was created via an email channel by a portal customer
 func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) error {
+	if s.canonical {
+		return nil
+	}
+	return s.handleCommentCreated(params, true)
+}
+
+func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, deliverImmediately bool) error {
 	// Guard: skip private comments
 	if params.IsPrivate {
 		return nil
@@ -200,7 +208,7 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 
 	// Sending immediately keeps the current low-latency behavior. The durable
 	// row remains pending on failure and is retried by NotificationScheduler.
-	if !s.smtpSender.IsSMTPConfigured() {
+	if !deliverImmediately || !s.smtpSender.IsSMTPConfigured() {
 		return nil
 	}
 	s.outboxMu.Lock()

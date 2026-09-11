@@ -24,7 +24,8 @@ export default {
     start: '开始',
     end: '结束',
     duration: '持续时间',
-    durationHelperText: '输入开始时间 + 持续时间（2h）自动计算结束时间，或输入开始 + 结束时间自动计算持续时间。时间格式：1h、30m、1h30m、2h15m、1d（=8h）',
+    durationHelperText:
+      '输入开始时间 + 持续时间（2h）自动计算结束时间，或输入开始 + 结束时间自动计算持续时间。时间格式：1h、30m、1h30m、2h15m、1d（=8h）',
     timesheet: {
       title: '工时表',
       subtitle: '每周工时概览',
@@ -41,7 +42,8 @@ export default {
       setupProgress: '设置进度',
       stepOf: '第 {current} 步 / 共 {total} 步',
       createCustomerTitle: '创建您的第一个客户组织',
-      createCustomerDescription: '客户组织代表您为其工作的公司或实体。可以是客户组织、您的雇主或您自己的公司。',
+      createCustomerDescription:
+        '客户组织代表您为其工作的公司或实体。可以是客户组织、您的雇主或您自己的公司。',
       createProjectTitle: '创建您的第一个项目',
       createProjectDescription: '项目帮助您在客户内组织工作。您可以跟踪特定项目的时间。',
       organizationNameRequired: '组织名称为必填项',
@@ -192,7 +194,8 @@ export default {
       removeManager: '移除管理员',
       removeMember: '移除成员',
       noManagers: '未分配管理员',
-      noManagersHint: '未分配管理员时，任何人都可以管理此项目',
+      noManagersHint:
+        '未分配管理员时，只有全局管理员和拥有管理所有工时项目及工时记录权限的用户可以管理此项目',
       noMembers: '未分配成员',
       noMembersHint: '未分配成员时，任何人都可以在此项目上记录工时',
       grantedAt: '添加时间',

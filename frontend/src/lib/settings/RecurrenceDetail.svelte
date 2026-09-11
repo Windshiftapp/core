@@ -24,7 +24,7 @@
 
   // Instances
   let instances = $state([]);
-  let instancesPagination = $state({ limit: 20, offset: 0, total: 0 });
+  let instancesPagination = $state({ page: 1, page_size: 20, total_items: 0, total_pages: 0 });
   let loadingInstances = $state(false);
   let generating = $state(false);
 
@@ -37,7 +37,7 @@
     {
       id: 'instances',
       label: t('recurrence.instancesTab'),
-      badge: instancesPagination.total > 0 ? String(instancesPagination.total) : null,
+      badge: instancesPagination.total_items > 0 ? String(instancesPagination.total_items) : null,
       testid: 'recurrence-instances-tab',
     },
   ]);
@@ -66,11 +66,11 @@
     loadingInstances = true;
     try {
       const result = await api.recurrence.getInstances(rule.template_item_id, {
-        limit: instancesPagination.limit,
-        offset: instancesPagination.offset,
+        page: instancesPage,
+        page_size: instancesPagination.page_size,
       });
-      instances = result.instances || [];
-      instancesPagination = { ...instancesPagination, ...result.pagination };
+      instances = result.data || [];
+      instancesPagination = result.pagination;
     } catch (err) {
       console.error('Failed to load instances:', err);
       instances = [];
@@ -85,7 +85,7 @@
     try {
       const result = await api.recurrence.forceGenerate(rule.template_item_id);
       addToast({
-        message: t('recurrence.generated', { count: result.instances_generated }),
+        message: t('recurrence.generated', { count: result.generated_count }),
         variant: 'success',
       });
       await loadInstances();
@@ -151,7 +151,6 @@
 
   function handleInstancePageChange(page) {
     instancesPage = page;
-    instancesPagination.offset = (page - 1) * instancesPagination.limit;
     loadInstances();
   }
 </script>
@@ -226,9 +225,9 @@
               emptyMessage={t('recurrence.noInstances')}
               emptyDescription={t('recurrence.noInstances')}
               pagination
-              pageSize={instancesPagination.limit}
+              pageSize={instancesPagination.page_size}
               bind:currentPage={instancesPage}
-              totalItems={instancesPagination.total}
+              totalItems={instancesPagination.total_items}
               onPageChange={handleInstancePageChange}
             />
           {/if}

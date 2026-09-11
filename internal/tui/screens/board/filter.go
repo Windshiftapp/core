@@ -27,11 +27,7 @@ func (f Filter) Match(it *data.WorkItem, wsKey string) bool {
 	}
 	q := strings.ToLower(strings.TrimSpace(f.Query))
 
-	key := it.WorkspaceKey
-	if key == "" {
-		key = wsKey
-	}
-	hay := strings.ToLower(fmt.Sprintf("%s-%d %s %s", key, it.ID, it.Title, it.AssigneeName))
+	hay := strings.ToLower(fmt.Sprintf("%s %s %s", it.DisplayKey(wsKey), it.Title, it.AssigneeName))
 
 	if strings.Contains(hay, q) {
 		return true

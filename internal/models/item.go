@@ -7,6 +7,7 @@ type Item struct {
 	ID                  int        `json:"id"`
 	WorkspaceID         int        `json:"workspace_id"`
 	WorkspaceItemNumber int        `json:"workspace_item_number"`  // Workspace-specific sequential number for display keys
+	Key                 string     `json:"key,omitempty" db:"-"`   // Ready-to-display workspace key and item number
 	ItemTypeID          *int       `json:"item_type_id,omitempty"` // Optional, defaults to workspace's default item type
 	Title               string     `json:"title"`
 	Description         string     `json:"description"`
@@ -44,7 +45,8 @@ type Item struct {
 	VirtualFieldData  map[string]any          `json:"virtual_field_data,omitempty"`
 	CalendarData      []CalendarScheduleEntry `json:"calendar_data,omitempty"`
 	// Hierarchy fields
-	ParentID *int `json:"parent_id"` // Foreign key to parent item
+	ParentID  *int   `json:"parent_id"` // Foreign key to parent item
+	ParentKey string `json:"parent_key,omitempty" db:"-"`
 	// Personal task relationship (for linking personal workspace tasks to work items)
 	RelatedWorkItemID *int `json:"related_work_item_id,omitempty"` // Link to work item (for personal tasks)
 	// Estimation

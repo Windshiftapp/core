@@ -22,10 +22,7 @@ class BacklogStore {
     try {
       const response = await api.items.getBacklog(workspaceId);
       if (generation !== this.#loadGeneration || this.workspaceId !== workspaceId) return;
-      const count =
-        response?.pagination?.total ??
-        response?.items?.length ??
-        (Array.isArray(response) ? response.length : 0);
+      const count = response?.pagination?.total_items ?? response?.data?.length ?? 0;
       this.count = count;
     } catch (error) {
       if (generation !== this.#loadGeneration || this.workspaceId !== workspaceId) return;

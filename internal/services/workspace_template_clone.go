@@ -15,6 +15,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/validation"
 )
 
 // Errors returned by workspace template operations. Handlers map these to the
@@ -267,6 +268,14 @@ func (c *workspaceTemplateClone) copySeedItems(source *templateSourceWorkspace) 
 
 	omittedValues = 0
 	for i, item := range items {
+		var statusID *int
+		if item.StatusID.Valid {
+			value := int(item.StatusID.Int64)
+			statusID = &value
+		}
+		if err := validation.ValidateTaskState(c.tx, c.destinationID, c.creator, item.IsTask, statusID); err != nil {
+			return 0, 0, fmt.Errorf("validate seed item %d: %w", item.ID, errors.Join(ErrInvalidWorkspaceTemplate, err))
+		}
 		customFields, omitted, err := filterTemplateCustomFieldValues(item.CustomFieldValues, defs)
 		if err != nil {
 			return 0, 0, err

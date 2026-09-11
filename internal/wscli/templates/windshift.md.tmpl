@@ -16,6 +16,21 @@ Use `ws` to manage work in **{{.Workspace.Key}}** ({{.Workspace.Name}}).
 - Record durable decisions, blockers, and completion evidence as item comments.
 - Use `ws <command> --help` for operations not listed here.
 
+## Direct API access
+
+Use the authenticated API escape hatch only when the normal CLI commands do
+not expose an operation. OpenAPI paths default to `/rest/api/v2`; the response
+body is printed unchanged.
+
+```bash
+ws api /items/<item-id>/history
+ws api /items/<item-id> -X PATCH -H 'If-Match: "etag"' -d '{"title":"New"}'
+ws api /items/bulk-update -X POST --input payload.json
+ws api /openapi.json                       # Discover available v2 routes
+```
+
+Use `ws api --help` for stdin, response-header, and full-path syntax.
+
 ## Work items
 
 ```bash

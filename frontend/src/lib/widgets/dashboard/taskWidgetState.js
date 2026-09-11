@@ -101,7 +101,7 @@ export function assignedToMeQuery(userId, limit = 30) {
  */
 export function normalizeTaskResponse(response, maxItems = 6) {
   const wrapped = /** @type {any} */ (response);
-  const raw = Array.isArray(response) ? response : (wrapped?.items ?? []);
+  const raw = wrapped?.data ?? [];
   const active = raw
     .filter((i) => i?.id)
     .map((i) => ({

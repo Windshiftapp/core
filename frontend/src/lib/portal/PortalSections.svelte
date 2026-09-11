@@ -2,7 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { ChevronRight, Plus, Trash2, X, Package } from '@lucide/svelte';
-  import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import {
+    portalCatalogStore,
+    portalCustomizationStore as portalStore,
+  } from '../stores/portal.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import AssetReportTable from './AssetReportTable.svelte';
@@ -24,7 +28,7 @@
   function startEditingSection(sectionId, field) {
     editingSectionId = sectionId;
     editingSectionField = field;
-    const section = portalStore.portalSections.find(s => s.id === sectionId);
+    const section = portalCatalogStore.portalSections.find(s => s.id === sectionId);
     if (section) {
       editingSectionValue = field === 'title' ? section.title : section.subtitle;
     }
@@ -32,7 +36,7 @@
 
   function saveSection() {
     if (editingSectionId && editingSectionField) {
-      portalStore.updateSection(editingSectionId, editingSectionField, editingSectionValue);
+      portalCatalogStore.updateSection(editingSectionId, editingSectionField, editingSectionValue);
       cancelEditingSection();
     }
   }
@@ -44,7 +48,7 @@
   }
 
   function handleAddSection() {
-    const newSectionId = portalStore.addSection();
+    const newSectionId = portalCatalogStore.addSection();
     startEditingSection(newSectionId, 'title');
   }
 
@@ -76,9 +80,9 @@
         },
         onDrop: ({ source }) => {
           if (/** @type {any} */ (source.data).type === 'request-type') {
-            portalStore.addRequestTypeToSection(sectionId, /** @type {any} */ (source.data).requestType.id);
+            portalCatalogStore.addRequestTypeToSection(sectionId, /** @type {any} */ (source.data).requestType.id);
           } else if (/** @type {any} */ (source.data).type === 'asset-report') {
-            portalStore.addAssetReportToSection(sectionId, /** @type {any} */ (source.data).assetReport.id);
+            portalCatalogStore.addAssetReportToSection(sectionId, /** @type {any} */ (source.data).assetReport.id);
           }
           dropZoneStates.set(sectionId, { isOver: false });
           dropZoneStates = new Map(dropZoneStates);
@@ -101,7 +105,7 @@
   // Re-setup when sections change or edit mode changes
   $effect(() => {
     // Track dependencies
-    const currentIds = portalStore.portalSections.map(s => s.id).join(',');
+    const currentIds = portalCatalogStore.portalSections.map(s => s.id).join(',');
     const isActive = portalStore.isEditing ||
       (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'));
 
@@ -136,13 +140,13 @@
 
 <!-- Portal Sections -->
 <div class="space-y-10">
-  {#each portalStore.portalSections as section, sectionIndex}
-    {@const sectionRequestTypes = portalStore.getSectionRequestTypes(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
-    {@const sectionAssetReports = portalStore.getSectionAssetReports(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports'))}
+  {#each portalCatalogStore.portalSections as section, sectionIndex}
+    {@const sectionRequestTypes = portalCatalogStore.getSectionRequestTypes(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
+    {@const sectionAssetReports = portalCatalogStore.getSectionAssetReports(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports'))}
     {@const formAssetReports = sectionAssetReports.filter((r) => r.run_mode === 'form')}
     {@const directAssetReports = sectionAssetReports.filter((r) => r.run_mode !== 'form')}
     {@const gridItems = [...sectionRequestTypes.map((rt) => ({ kind: 'request', item: rt })), ...formAssetReports.map((ar) => ({ kind: 'asset-form', item: ar }))]}
-    {@const isDraggingItem = portalStore.draggedRequestType || portalStore.draggedAssetReport}
+    {@const isDraggingItem = portalCatalogStore.draggedRequestType || portalCatalogStore.draggedAssetReport}
     {@const isDropTarget = portalStore.isEditing || (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'))}
     <!-- Only show section in public view if it has a title, request types, or asset reports -->
     {#if portalStore.isEditing || section.title || gridItems.length > 0 || directAssetReports.length > 0}
@@ -151,7 +155,7 @@
           <!-- Edit Mode: Show section controls -->
           <div class="absolute -left-10 top-6 flex flex-col gap-1">
             <button
-              onclick={() => portalStore.moveSectionUp(sectionIndex)}
+              onclick={() => portalCatalogStore.moveSectionUp(sectionIndex)}
               disabled={sectionIndex === 0}
               class="p-1 rounded transition-all disabled:opacity-30 hover:bg-black/5"
               style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
@@ -162,8 +166,8 @@
               </svg>
             </button>
             <button
-              onclick={() => portalStore.moveSectionDown(sectionIndex)}
-              disabled={sectionIndex === portalStore.portalSections.length - 1}
+              onclick={() => portalCatalogStore.moveSectionDown(sectionIndex)}
+              disabled={sectionIndex === portalCatalogStore.portalSections.length - 1}
               class="p-1 rounded transition-all disabled:opacity-30 hover:bg-black/5"
               style="color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
               title={t('layout.moveDown')}
@@ -181,7 +185,7 @@
                   cancelText: t('common.cancel'),
                   variant: 'danger'
                 });
-                if (confirmed) portalStore.deleteSection(section.id);
+                if (confirmed) portalCatalogStore.deleteSection(section.id);
               }}
               class="p-1 rounded transition-all hover-danger"
               style="color: var(--ds-text-danger);"
@@ -276,18 +280,18 @@
                         onclick={(e) => {
                           e.stopPropagation();
                           if (isAssetForm) {
-                            portalStore.removeAssetReportFromSection(section.id, entry.item.id);
+                            portalCatalogStore.removeAssetReportFromSection(section.id, entry.item.id);
                           } else {
-                            portalStore.removeRequestTypeFromSection(section.id, entry.item.id);
+                            portalCatalogStore.removeRequestTypeFromSection(section.id, entry.item.id);
                           }
                         }}
                         onkeydown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.stopPropagation();
                             if (isAssetForm) {
-                              portalStore.removeAssetReportFromSection(section.id, entry.item.id);
+                              portalCatalogStore.removeAssetReportFromSection(section.id, entry.item.id);
                             } else {
-                              portalStore.removeRequestTypeFromSection(section.id, entry.item.id);
+                              portalCatalogStore.removeRequestTypeFromSection(section.id, entry.item.id);
                             }
                           }
                         }}
@@ -368,7 +372,7 @@
                   slug={portalStore.currentSlug}
                   sectionId={section.id}
                   isEditing={portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports')}
-                  onRemove={(reportId) => portalStore.removeAssetReportFromSection(section.id, reportId)}
+                  onRemove={(reportId) => portalCatalogStore.removeAssetReportFromSection(section.id, reportId)}
                 />
               {/each}
             </div>
@@ -391,7 +395,7 @@
   {/if}
 
   <!-- Empty State (when no sections and not editing) -->
-  {#if portalStore.portalSections.length === 0 && !portalStore.isEditing}
+  {#if portalCatalogStore.portalSections.length === 0 && !portalStore.isEditing}
     <div class="text-center py-16">
       <p class="text-sm" style="color: var(--ds-text-subtle);">
         {t('portal.noContentSections')}

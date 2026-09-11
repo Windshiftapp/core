@@ -30,65 +30,77 @@ var csrfExemptPrefixes = []string{
 	"/api/secrets/",
 }
 
+// CSRFValidator applies the shared browser request-origin policy without
+// taking ownership of an HTTP response.
+type CSRFValidator struct {
+	origins  map[string]bool
+	disabled bool
+}
+
+// NewCSRFValidator builds a reusable validator for the configured origins.
+func NewCSRFValidator(allowedOrigins []string) *CSRFValidator {
+	origins := make(map[string]bool, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		origins[strings.ToLower(origin)] = true
+	}
+	return &CSRFValidator{origins: origins}
+}
+
+// NewDisabledCSRFValidator builds a validator that permits every request.
+func NewDisabledCSRFValidator() *CSRFValidator {
+	return &CSRFValidator{disabled: true}
+}
+
+// Allows reports whether an unsafe browser request passes CSRF validation.
+func (v *CSRFValidator) Allows(r *http.Request) bool {
+	if v.disabled {
+		return true
+	}
+	if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
+		return true
+	}
+	if exempt, ok := r.Context().Value(ContextKeyCSRFExempt).(bool); ok && exempt {
+		return true
+	}
+	if csrfExemptPaths[r.URL.Path] {
+		return true
+	}
+	for _, prefix := range csrfExemptPrefixes {
+		if strings.HasPrefix(r.URL.Path, prefix) {
+			return true
+		}
+	}
+
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	case "":
+		return checkOriginReferer(r, v.origins)
+	default:
+		return false
+	}
+}
+
 // CSRFProtection blocks unsafe browser requests using Sec-Fetch-Site, then
 // Origin or Referer when that header is absent. Non-browser clients use explicit
 // exemptions with independent authentication.
 func CSRFProtection(allowedOrigins []string) func(http.Handler) http.Handler {
-	originSet := make(map[string]bool, len(allowedOrigins))
-	for _, o := range allowedOrigins {
-		originSet[strings.ToLower(o)] = true
-	}
+	validator := NewCSRFValidator(allowedOrigins)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" {
+			if validator.Allows(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
-
-			if exempt, ok := r.Context().Value(ContextKeyCSRFExempt).(bool); ok && exempt {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			if csrfExemptPaths[r.URL.Path] {
-				next.ServeHTTP(w, r)
-				return
-			}
-			for _, prefix := range csrfExemptPrefixes {
-				if strings.HasPrefix(r.URL.Path, prefix) {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-
-			secFetchSite := r.Header.Get("Sec-Fetch-Site")
-
-			switch secFetchSite {
-			case "same-origin", "none":
-				next.ServeHTTP(w, r)
-				return
-			case "":
-				if checkOriginReferer(r, originSet) {
-					slog.Debug("CSRF: Sec-Fetch-Site missing, allowed via Origin/Referer fallback",
-						"method", r.Method,
-						"path", r.URL.Path,
-					)
-					next.ServeHTTP(w, r)
-					return
-				}
-
-				slog.Warn("CSRF: request blocked — Sec-Fetch-Site missing and Origin/Referer validation failed", //nolint:gosec // logging remote address for debugging is intentional
-					"method", r.Method,
-					"path", r.URL.Path,
-					"origin", r.Header.Get("Origin"),
-					"referer", r.Header.Get("Referer"),
-					"remote_addr", r.RemoteAddr,
-				)
-				handleCSRFError(w, r, "Cross-site request blocked")
-			default:
-				handleCSRFError(w, r, "Cross-site request blocked")
-			}
+			slog.Warn("CSRF: request blocked", //nolint:gosec // logging remote address for debugging is intentional
+				"method", r.Method,
+				"path", r.URL.Path,
+				"origin", r.Header.Get("Origin"),
+				"referer", r.Header.Get("Referer"),
+				"remote_addr", r.RemoteAddr,
+			)
+			handleCSRFError(w, r, "Cross-site request blocked")
 		})
 	}
 }

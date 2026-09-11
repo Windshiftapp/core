@@ -1,29 +1,34 @@
 package services
 
 import (
-	"database/sql"
-	"errors"
-	"fmt"
+	"strconv"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
-// ConfigReadService encapsulates business logic for reading configuration entities:
-// item types, priorities, and custom fields.
+const customFieldIndexLimitSetting = "max_custom_field_indexes_per_table"
+
+// ConfigReadService projects canonical configuration repositories for compact catalog consumers.
 type ConfigReadService struct {
-	db database.Database
+	itemTypes    *repository.ItemTypeRepository
+	priorities   *repository.PriorityRepository
+	customFields *repository.CustomFieldRepository
+	settings     *repository.SystemSettingRepository
 }
 
-// NewConfigReadService creates a new ConfigReadService.
+// NewConfigReadService creates a configuration catalog reader.
 func NewConfigReadService(db database.Database) *ConfigReadService {
-	return &ConfigReadService{db: db}
+	return &ConfigReadService{
+		itemTypes:    repository.NewItemTypeRepository(db),
+		priorities:   repository.NewPriorityRepository(db),
+		customFields: repository.NewCustomFieldRepository(db),
+		settings:     repository.NewSystemSettingRepository(db),
+	}
 }
 
-// ========================================
-// Item Types
-// ========================================
-
-// ItemTypeResult represents an item type for API responses.
+// ItemTypeResult is the compact item-type catalog projection.
 type ItemTypeResult struct {
 	ID             int    `json:"id"`
 	BuiltinKey     string `json:"builtin_key,omitempty"`
@@ -36,73 +41,37 @@ type ItemTypeResult struct {
 	IsDefault      bool   `json:"is_default"`
 }
 
-// ScanItemTypes scans rows from an item_types query into a slice of ItemTypeResult.
-// The rows must select: id, builtin_key, name, description, icon, color, hierarchy_level, sort_order, is_default.
-func ScanItemTypes(rows *sql.Rows) ([]ItemTypeResult, error) {
-	defer rows.Close()
-
-	var types []ItemTypeResult
-	for rows.Next() {
-		var t ItemTypeResult
-		var description, icon, color sql.NullString
-		err := rows.Scan(&t.ID, &t.BuiltinKey, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
-		if err != nil {
-			continue
-		}
-		t.Description = description.String
-		t.Icon = icon.String
-		t.Color = color.String
-		types = append(types, t)
-	}
-
-	if types == nil {
-		types = []ItemTypeResult{}
-	}
-
-	return types, nil
-}
-
-// ListItemTypes retrieves all item types ordered by hierarchy and sort order.
+// ListItemTypes returns all item types in catalog order.
 func (s *ConfigReadService) ListItemTypes() ([]ItemTypeResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, hierarchy_level, sort_order, is_default
-		FROM item_types
-		ORDER BY CASE WHEN hierarchy_level = -1 THEN 1 ELSE 0 END, hierarchy_level, sort_order, name
-	`)
+	rows, err := s.itemTypes.List(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list item types: %w", err)
+		return nil, err
 	}
-
-	return ScanItemTypes(rows)
+	result := make([]ItemTypeResult, len(rows))
+	for i, row := range rows {
+		result[i] = ItemTypeResult{
+			ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
+			Icon: row.Icon, Color: row.Color, HierarchyLevel: row.HierarchyLevel,
+			SortOrder: row.SortOrder, IsDefault: row.IsDefault,
+		}
+	}
+	return result, nil
 }
 
-// GetItemType retrieves an item type by ID.
+// GetItemType returns one compact item-type projection.
 func (s *ConfigReadService) GetItemType(id int) (*ItemTypeResult, error) {
-	var t ItemTypeResult
-	var description, icon, color sql.NullString
-	err := s.db.QueryRow(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, hierarchy_level, sort_order, is_default
-		FROM item_types WHERE id = ?
-	`, id).Scan(&t.ID, &t.BuiltinKey, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("item type not found: %d", id)
-	}
+	row, err := s.itemTypes.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get item type: %w", err)
+		return nil, err
 	}
-
-	t.Description = description.String
-	t.Icon = icon.String
-	t.Color = color.String
-	return &t, nil
+	return &ItemTypeResult{
+		ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
+		Icon: row.Icon, Color: row.Color, HierarchyLevel: row.HierarchyLevel,
+		SortOrder: row.SortOrder, IsDefault: row.IsDefault,
+	}, nil
 }
 
-// ========================================
-// Priorities
-// ========================================
-
-// PriorityResult represents a priority for API responses.
+// PriorityResult is the compact priority catalog projection.
 type PriorityResult struct {
 	ID          int
 	BuiltinKey  string
@@ -114,138 +83,146 @@ type PriorityResult struct {
 	IsDefault   bool
 }
 
-// ScanPriorities scans rows from a priorities query into a slice of PriorityResult.
-// The rows must select: id, builtin_key, name, description, icon, color, sort_order, is_default.
-func ScanPriorities(rows *sql.Rows) ([]PriorityResult, error) {
-	defer rows.Close()
-
-	var priorities []PriorityResult
-	for rows.Next() {
-		var p PriorityResult
-		var description, icon, color sql.NullString
-		err := rows.Scan(&p.ID, &p.BuiltinKey, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
-		if err != nil {
-			continue
-		}
-		p.Description = description.String
-		p.Icon = icon.String
-		p.Color = color.String
-		priorities = append(priorities, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate priorities: %w", err)
-	}
-
-	if priorities == nil {
-		priorities = []PriorityResult{}
-	}
-
-	return priorities, nil
-}
-
-// ListPriorities retrieves all priorities ordered by sort order and name.
+// ListPriorities returns all priorities in catalog order.
 func (s *ConfigReadService) ListPriorities() ([]PriorityResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, sort_order, is_default
-		FROM priorities
-		ORDER BY sort_order, name
-	`)
+	rows, err := s.priorities.List(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list priorities: %w", err)
+		return nil, err
 	}
-
-	return ScanPriorities(rows)
+	result := make([]PriorityResult, len(rows))
+	for i, row := range rows {
+		result[i] = PriorityResult{
+			ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
+			Icon: row.Icon, Color: row.Color, SortOrder: row.SortOrder, IsDefault: row.IsDefault,
+		}
+	}
+	return result, nil
 }
 
-// GetPriority retrieves a priority by ID.
+// GetPriority returns one compact priority projection.
 func (s *ConfigReadService) GetPriority(id int) (*PriorityResult, error) {
-	var p PriorityResult
-	var description, icon, color sql.NullString
-	err := s.db.QueryRow(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, icon, color, sort_order, is_default
-		FROM priorities WHERE id = ?
-	`, id).Scan(&p.ID, &p.BuiltinKey, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("priority not found: %d", id)
-	}
+	row, err := s.priorities.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get priority: %w", err)
+		return nil, err
 	}
-
-	p.Description = description.String
-	p.Icon = icon.String
-	p.Color = color.String
-	return &p, nil
+	return &PriorityResult{
+		ID: row.ID, BuiltinKey: row.BuiltinKey, Name: row.Name, Description: row.Description,
+		Icon: row.Icon, Color: row.Color, SortOrder: row.SortOrder, IsDefault: row.IsDefault,
+	}, nil
 }
 
-// ========================================
-// Custom Fields
-// ========================================
-
-// CustomFieldResult represents a custom field definition for API responses.
+// CustomFieldResult is the compact custom-field catalog projection.
 type CustomFieldResult struct {
-	ID           int
-	Name         string
-	FieldType    string
-	Description  string
-	Options      string
-	Required     bool
-	DisplayOrder int
+	ID                             int
+	Name                           string
+	FieldType                      string
+	Description                    string
+	Options                        string
+	Required                       bool
+	DisplayOrder                   int
+	SystemDefault                  bool
+	AppliesToPortalCustomers       bool
+	AppliesToCustomerOrganisations bool
+	AssetTypeUsages                []CustomFieldAssetUsage
+	Indexed                        models.CustomFieldIndexInfo
 }
 
-// ListCustomFields retrieves all custom field definitions ordered by display order and name.
-func (s *ConfigReadService) ListCustomFields() ([]CustomFieldResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, name, field_type, description, options, required, display_order
-		FROM custom_field_definitions
-		ORDER BY display_order, name
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list custom fields: %w", err)
-	}
-	defer rows.Close()
+type CustomFieldAssetUsage struct {
+	SetID         int    `json:"-"`
+	AssetTypeName string `json:"asset_type_name"`
+	SetName       string `json:"set_name"`
+}
 
-	var fields []CustomFieldResult
-	for rows.Next() {
-		var f CustomFieldResult
-		var description, options sql.NullString
-		err := rows.Scan(&f.ID, &f.Name, &f.FieldType, &description, &options, &f.Required, &f.DisplayOrder)
-		if err != nil {
+type CustomFieldIndexCount struct {
+	Current int `json:"current"`
+	Max     int `json:"max"`
+}
+
+type CustomFieldCatalogMeta struct {
+	IndexCounts map[string]CustomFieldIndexCount `json:"index_counts"`
+}
+
+// ListCustomFields returns all custom-field definitions in catalog order.
+func (s *ConfigReadService) ListCustomFields() ([]CustomFieldResult, error) {
+	rows, err := s.customFields.List()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]CustomFieldResult, len(rows))
+	for i, row := range rows {
+		result[i] = CustomFieldResult{
+			ID: row.ID, Name: row.Name, FieldType: row.FieldType, Description: row.Description,
+			Options: row.Options, Required: row.Required, DisplayOrder: row.DisplayOrder,
+			SystemDefault: row.SystemDefault, AppliesToPortalCustomers: row.AppliesToPortalCustomers,
+			AppliesToCustomerOrganisations: row.AppliesToCustomerOrganisations,
+		}
+	}
+	return result, nil
+}
+
+func (s *ConfigReadService) ListCustomFieldsWithMeta() ([]CustomFieldResult, CustomFieldCatalogMeta, error) {
+	items, err := s.ListCustomFields()
+	if err != nil {
+		return nil, CustomFieldCatalogMeta{}, err
+	}
+	byID := make(map[int]int, len(items))
+	for i := range items {
+		byID[items[i].ID] = i
+		items[i].AssetTypeUsages = []CustomFieldAssetUsage{}
+	}
+	usages, err := s.customFields.ListAssetTypeUsages()
+	if err != nil {
+		return nil, CustomFieldCatalogMeta{}, err
+	}
+	for _, usage := range usages {
+		if index, ok := byID[usage.CustomFieldID]; ok {
+			items[index].AssetTypeUsages = append(items[index].AssetTypeUsages, CustomFieldAssetUsage{
+				SetID: usage.SetID, AssetTypeName: usage.AssetTypeName, SetName: usage.SetName,
+			})
+		}
+	}
+
+	counts := map[string]int{"items": 0, "assets": 0}
+	indexes, err := s.customFields.ListIndexes()
+	if err != nil {
+		return nil, CustomFieldCatalogMeta{}, err
+	}
+	for _, index := range indexes {
+		itemIndex, ok := byID[index.CustomFieldID]
+		if !ok {
 			continue
 		}
-		f.Description = description.String
-		f.Options = options.String
-		fields = append(fields, f)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)
-	}
-
-	if fields == nil {
-		fields = []CustomFieldResult{}
+		switch index.TargetTable {
+		case "items":
+			items[itemIndex].Indexed.Items = true
+			counts["items"]++
+		case "assets":
+			items[itemIndex].Indexed.Assets = true
+			counts["assets"]++
+		}
 	}
 
-	return fields, nil
+	limit := 20
+	if value, ok, err := s.settings.GetValue(customFieldIndexLimitSetting); err == nil && ok {
+		if parsed, parseErr := strconv.Atoi(value); parseErr == nil {
+			limit = parsed
+		}
+	}
+	return items, CustomFieldCatalogMeta{IndexCounts: map[string]CustomFieldIndexCount{
+		"items": {Current: counts["items"], Max: limit}, "assets": {Current: counts["assets"], Max: limit},
+	}}, nil
 }
 
-// GetCustomField retrieves a custom field definition by ID.
+// GetCustomField returns one compact custom-field projection.
 func (s *ConfigReadService) GetCustomField(id int) (*CustomFieldResult, error) {
-	var f CustomFieldResult
-	var description, options sql.NullString
-	err := s.db.QueryRow(`
-		SELECT id, name, field_type, description, options, required, display_order
-		FROM custom_field_definitions WHERE id = ?
-	`, id).Scan(&f.ID, &f.Name, &f.FieldType, &description, &options, &f.Required, &f.DisplayOrder)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("custom field not found: %d", id)
-	}
+	row, err := s.customFields.FindByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get custom field: %w", err)
+		return nil, err
 	}
-
-	f.Description = description.String
-	f.Options = options.String
-	return &f, nil
+	return &CustomFieldResult{
+		ID: row.ID, Name: row.Name, FieldType: row.FieldType, Description: row.Description,
+		Options: row.Options, Required: row.Required, DisplayOrder: row.DisplayOrder,
+		SystemDefault: row.SystemDefault, AppliesToPortalCustomers: row.AppliesToPortalCustomers,
+		AppliesToCustomerOrganisations: row.AppliesToCustomerOrganisations,
+	}, nil
 }

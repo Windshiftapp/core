@@ -39,6 +39,8 @@
     forceVisible: true,
     open: controlledOpen,
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
       placement: 'right-start'
     },
     portal: 'body'
@@ -93,6 +95,7 @@
   <!-- Notification Bell Button -->
   <button
     use:melt={$trigger}
+    data-testid="notifications-trigger"
     class="w-full px-3 h-10 rounded flex items-center justify-start cursor-pointer nav-button {$open ? 'nav-button-selected' : ''}"
     title={t('notifications.title')}
     aria-label={t('notifications.title')}
@@ -121,14 +124,15 @@
   {#if $open}
     <div
       use:melt={$content}
+      data-testid="notifications-menu"
       tabindex="-1"
-      class="notification-dropdown z-[60] w-96 rounded shadow-xl max-h-[500px] overflow-hidden"
+      class="notification-dropdown z-[60] w-96 rounded shadow-xl flex flex-col overflow-hidden"
       style="background-color: var(--ds-surface-overlay); border: 1px solid var(--ds-border); color: var(--ds-text);"
       in:fly={{ x: -10, duration: 200, easing: quintOut }}
       out:fly={{ x: -10, duration: 150 }}
     >
       <!-- Header -->
-      <div class="p-4 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border);">
+      <div class="p-4 shrink-0 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('notifications.title')}</h3>
         <div class="flex items-center gap-2">
           {#if unreadCount > 0}
@@ -153,7 +157,7 @@
       </div>
 
       <!-- Notifications List -->
-      <div class="max-h-96 overflow-y-auto">
+      <div data-testid="notifications-scroll" class="min-h-0 max-h-96 overflow-y-auto overscroll-contain">
         {#if $notifications.length === 0}
           <EmptyState
             icon={Bell}
@@ -177,9 +181,10 @@
 
       <!-- Footer -->
       {#if $notifications.length > 0}
-        <div class="p-3 text-center" style="border-top: 1px solid var(--ds-border);">
+        <div class="p-3 shrink-0 text-center" style="border-top: 1px solid var(--ds-border);">
           <button
             class="text-sm font-medium view-all-btn"
+            data-testid="notifications-view-all"
             onclick={() => {
               navigate('/notifications');
               closeDropdown();

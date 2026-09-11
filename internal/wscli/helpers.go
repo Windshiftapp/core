@@ -2,6 +2,7 @@ package wscli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -71,15 +72,9 @@ func itemDisplayFields(item *Item) (key, status, assignee, itemType string) {
 	if key == "" {
 		key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 	}
-	if item.Status != nil {
-		status = item.Status.Name
-	}
-	if item.Assignee != nil {
-		assignee = item.Assignee.FullName
-	}
-	if item.ItemType != nil {
-		itemType = item.ItemType.Name
-	}
+	status = item.StatusName
+	assignee = item.AssigneeName
+	itemType = item.ItemTypeName
 	return
 }
 
@@ -152,17 +147,63 @@ func newFiltersWithWorkspace(client *Client, seed map[string]string) (map[string
 
 // applyStatusFilter resolves and adds a status filter (with optional ~negation)
 // to the supplied filters map. It is a no-op when statusVal is empty.
-func applyStatusFilter(filters map[string]string, statusVal string, client *Client) {
+func applyStatusFilter(filters map[string]string, statusVal string, client *Client) error {
 	if statusVal == "" {
-		return
+		return nil
 	}
+	key := "status_id"
 	if isNegatedFilter(statusVal) {
-		resolved := cfg.ResolveStatusWithFallback(stripNegation(statusVal), client)
-		filters["status_id_not"] = resolved
-	} else {
-		resolved := cfg.ResolveStatusWithFallback(statusVal, client)
-		filters["status_id"] = resolved
+		key, statusVal = "status_id_not", stripNegation(statusVal)
 	}
+	resolved := cfg.ResolveStatusWithFallback(statusVal, client)
+	if validStatusIDs(resolved) {
+		filters[key] = resolved
+		return nil
+	}
+	workspaceID, err := strconv.Atoi(filters["workspace_id"])
+	if err != nil || workspaceID <= 0 {
+		return fmt.Errorf("status names require a workspace: use -w, or supply a numeric status ID")
+	}
+	statuses, err := client.GetWorkspaceStatuses(workspaceID)
+	if err != nil {
+		return fmt.Errorf("resolve status: %w", err)
+	}
+	var ids, names []string
+	for _, status := range statuses {
+		names = append(names, status.Name)
+		if strings.EqualFold(status.Name, resolved) {
+			ids = append(ids, strconv.Itoa(status.ID))
+		}
+	}
+	if len(ids) == 0 {
+		return fmt.Errorf("unknown status %q; valid statuses: %s", statusVal, strings.Join(names, ", "))
+	}
+	filters[key] = strings.Join(ids, ",")
+	return nil
+}
+
+func validStatusIDs(value string) bool {
+	for _, part := range strings.Split(value, ",") {
+		id, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || id <= 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func resolveParentID(client *Client, value string) (int, error) {
+	if value == "0" {
+		return 0, nil
+	}
+	id, err := client.ResolveItemID(value)
+	if err != nil {
+		return 0, fmt.Errorf("resolve parent: %w", err)
+	}
+	if id <= 0 {
+		return 0, fmt.Errorf("parent must be an item key, positive ID, or 0 to clear")
+	}
+	return id, nil
 }
 
 // WorkspaceContext holds the commonly fetched workspace configuration data.

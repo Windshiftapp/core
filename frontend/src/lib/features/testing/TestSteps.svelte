@@ -6,7 +6,10 @@
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
-  import Spinner from '../../components/Spinner.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
+  import AlertBox from '../../components/AlertBox.svelte';
+  import Card from '../../components/Card.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -209,50 +212,37 @@
 <!-- Header -->
 <div class="p-6 pb-0">
   {#if loading}
-    <div class="flex items-center justify-center py-12">
-      <Spinner size="lg" />
-    </div>
+    <StateDisplay type="loading" message={t('common.loading')} size="lg" />
   {:else if error}
-    <div class="text-center py-12">
-      <div class="text-lg font-medium mb-2" style="color: var(--ds-text-danger);">{t('common.error')}</div>
-      <div class="text-sm" style="color: var(--ds-text-subtle);">{error}</div>
-    </div>
+    <StateDisplay type="error" title={t('common.error')} message={error} size="lg" />
   {:else if testCase}
-    <div class="flex items-start justify-between gap-4 mb-6">
-      <div>
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('testing.testStepsFor', { title: testCase.title })}
-        </h2>
-        {#if testCase.preconditions}
-          <div class="text-sm mt-3 px-4 py-3 rounded border-l-4"
-               style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle); border-left-color: var(--ds-status-info-solid);">
-            <strong style="color: var(--ds-text);">{t('testing.preconditions')}:</strong> {testCase.preconditions}
-          </div>
-        {/if}
-      </div>
-      <div class="flex items-center gap-3">
-        <Button
-          onclick={goBack}
-          icon={IconArrowLeft}
-          dataTestid="test-steps-back"
-        >
-          {t('testing.backToTestCases')}
-        </Button>
-        {#if !showStepForm}
-          <Button
-            variant="primary"
-            onclick={showAddStepForm}
-            icon={IconPlus}
-            size="medium"
-            keyboardHint="A"
-            hotkeyConfig={{ key: toHotkeyString('testSteps', 'addStep'), guard: () => !showStepForm }}
-            dataTestid="test-step-create-button"
-          >
-            {t('testing.addTestStep')}
+    <PageHeader title={t('testing.testStepsFor', { title: testCase.title })} marginClass="mb-4">
+      {#snippet actions()}
+        <div class="flex items-center gap-3">
+          <Button onclick={goBack} variant="ghost" icon={IconArrowLeft} dataTestid="test-steps-back">
+            {t('testing.backToTestCases')}
           </Button>
-        {/if}
-      </div>
-    </div>
+          {#if !showStepForm}
+            <Button
+              variant="primary"
+              onclick={showAddStepForm}
+              icon={IconPlus}
+              size="medium"
+              keyboardHint="A"
+              hotkeyConfig={{ key: toHotkeyString('testSteps', 'addStep'), guard: () => !showStepForm }}
+              dataTestid="test-step-create-button"
+            >
+              {t('testing.addTestStep')}
+            </Button>
+          {/if}
+        </div>
+      {/snippet}
+    </PageHeader>
+    {#if testCase.preconditions}
+      <AlertBox variant="info" class="mb-6">
+        <strong>{t('testing.preconditions')}:</strong> {testCase.preconditions}
+      </AlertBox>
+    {/if}
   {/if}
 </div>
 
@@ -261,7 +251,7 @@
   <div class="p-6">
     <!-- Add Step Form (if showing) -->
     {#if showStepForm}
-      <div class="test-step-form mb-6 p-5 rounded-xl border shadow-sm" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+      <Card variant="raised" padding="spacious" shadow class="test-step-form mb-6">
         <h4 class="text-lg font-medium mb-4" style="color: var(--ds-text);">
           {editingStep ? t('testing.editTestStep') : t('testing.addTestStep')}
         </h4>
@@ -335,7 +325,7 @@
             </Button>
           </div>
         </form>
-      </div>
+      </Card>
     {/if}
 
     <!-- Test Steps List -->

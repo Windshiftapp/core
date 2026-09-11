@@ -2,6 +2,7 @@ package actioncatalog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -129,9 +130,26 @@ type typedCapabilityResolver interface {
 // trigger-config validation; missing node types prevent node-config
 // validation for that specific node.
 func Validate(c *Catalog, def ActionDefinition, workspaceID int, caps CapabilityResolver) ValidationErrors {
-	var errs ValidationErrors
+	errs := validateDefinitionHeader(c, def)
+	nodeIDsSeen, triggerNodeCount, nodeErrs := validateDefinitionNodes(c, def.Nodes, workspaceID, caps)
+	errs = append(errs, nodeErrs...)
+	if len(def.Nodes) > 0 && triggerNodeCount > 1 {
+		errs = append(errs, ValidationError{
+			Code:    CodeMultipleTriggers,
+			Message: "Action graph must contain at most one trigger node",
+			Path:    "nodes",
+		})
+	}
 
-	// --- Top-level required fields ---------------------------------------
+	errs = append(errs, validateDefinitionEdges(nodeIDsSeen, def.Edges)...)
+	if !errs.Has(CodeUnknownNodeID) && !errs.Has(CodeDuplicateNodeID) {
+		errs = append(errs, validateDefinitionGraph(def.Nodes, def.Edges)...)
+	}
+	return errs
+}
+
+func validateDefinitionHeader(c *Catalog, def ActionDefinition) ValidationErrors {
+	var errs ValidationErrors
 	if strings.TrimSpace(def.Name) == "" {
 		errs = append(errs, ValidationError{Code: CodeRequired, Message: "Name is required", Path: "name"})
 	}
@@ -139,7 +157,6 @@ func Validate(c *Catalog, def ActionDefinition, workspaceID int, caps Capability
 		errs = append(errs, ValidationError{Code: CodeRequired, Message: "Trigger type is required", Path: "trigger_type"})
 	}
 
-	// --- Trigger type & config -------------------------------------------
 	if def.TriggerType != "" {
 		trig := c.Trigger(def.TriggerType)
 		if trig == nil {
@@ -158,11 +175,12 @@ func Validate(c *Catalog, def ActionDefinition, workspaceID int, caps Capability
 			}
 		}
 	}
+	return errs
+}
 
-	// --- Nodes: types + per-node config schema ---------------------------
-	nodeIDsSeen := make(map[int]bool, len(def.Nodes))
-	triggerNodeCount := 0
-	for i, n := range def.Nodes {
+func validateDefinitionNodes(c *Catalog, nodes []models.ActionNode, workspaceID int, caps CapabilityResolver) (nodeIDsSeen map[int]bool, triggerNodeCount int, errs ValidationErrors) {
+	nodeIDsSeen = make(map[int]bool, len(nodes))
+	for i, n := range nodes {
 		path := fmt.Sprintf("nodes[%d]", i)
 		if n.ID != 0 && nodeIDsSeen[n.ID] {
 			errs = append(errs, ValidationError{
@@ -177,125 +195,109 @@ func Validate(c *Catalog, def ActionDefinition, workspaceID int, caps Capability
 		if n.NodeType == models.ActionNodeTrigger {
 			triggerNodeCount++
 		}
-		meta := c.Node(n.NodeType)
-		if meta == nil {
-			errs = append(errs, ValidationError{
-				Code:    CodeUnknownNodeType,
-				Message: fmt.Sprintf("Unknown node type %q", n.NodeType),
-				Path:    path + ".node_type",
-			})
-			continue
-		}
-		if err := validateConfigJSON(meta.resolved, n.NodeConfig); err != nil {
-			errs = append(errs, ValidationError{
-				Code:    schemaErrCode(err),
-				Message: err.Error(),
-				Path:    path + ".node_config",
-			})
-			// Skip capability check if config itself is broken — the field
-			// we'd inspect might not even exist on the parsed shape.
-			continue
-		}
-		if msg, field := validateNodeConfigValues(n); msg != "" {
-			errs = append(errs, ValidationError{
-				Code:    CodeInvalidConfig,
-				Message: msg,
-				Path:    path + ".node_config." + field,
-			})
-			continue
-		}
-		if caps != nil && workspaceID > 0 {
-			if capID, field := capabilityRef(n); capID > 0 {
-				if !nodeCapabilityAvailable(caps, workspaceID, capID, n.NodeType) {
-					errs = append(errs, ValidationError{
-						Code:    CodeUnknownCapability,
-						Message: fmt.Sprintf("Capability %d is not available to this workspace or has the wrong type", capID),
-						Path:    path + ".node_config." + field,
-					})
-				}
-			}
-			if n.NodeType == models.ActionNodeAIAgent {
-				var cfg models.AIAgentNodeConfig
-				_ = json.Unmarshal([]byte(n.NodeConfig), &cfg)
-				for j, rawID := range cfg.Tools {
-					capID, err := strconv.Atoi(rawID)
-					if err != nil || capID <= 0 {
-						errs = append(errs, ValidationError{
-							Code:    CodeInvalidConfig,
-							Message: fmt.Sprintf("Tool capability %q is not a valid capability ID", rawID),
-							Path:    fmt.Sprintf("%s.node_config.tools[%d]", path, j),
-						})
-						continue
-					}
-					if !toolCapabilityAvailable(caps, workspaceID, capID) {
-						errs = append(errs, ValidationError{
-							Code:    CodeUnknownCapability,
-							Message: fmt.Sprintf("Tool capability %d is not available to this workspace or is not an http_client capability", capID),
-							Path:    fmt.Sprintf("%s.node_config.tools[%d]", path, j),
-						})
-					}
-				}
-			}
-		}
+		errs = append(errs, validateDefinitionNode(c, n, path, workspaceID, caps)...)
+	}
+	return nodeIDsSeen, triggerNodeCount, errs
+}
+
+func validateDefinitionNode(c *Catalog, node models.ActionNode, path string, workspaceID int, caps CapabilityResolver) ValidationErrors {
+	meta := c.Node(node.NodeType)
+	if meta == nil {
+		return ValidationErrors{{
+			Code:    CodeUnknownNodeType,
+			Message: fmt.Sprintf("Unknown node type %q", node.NodeType),
+			Path:    path + ".node_type",
+		}}
+	}
+	if err := validateConfigJSON(meta.resolved, node.NodeConfig); err != nil {
+		return ValidationErrors{{
+			Code:    schemaErrCode(err),
+			Message: err.Error(),
+			Path:    path + ".node_config",
+		}}
+	}
+	if msg, field := validateNodeConfigValues(node); msg != "" {
+		return ValidationErrors{{
+			Code:    CodeInvalidConfig,
+			Message: msg,
+			Path:    path + ".node_config." + field,
+		}}
+	}
+	if caps == nil || workspaceID <= 0 {
+		return nil
 	}
 
-	if len(def.Nodes) > 0 && triggerNodeCount > 1 {
+	var errs ValidationErrors
+	if capID, field := capabilityRef(node); capID > 0 && !nodeCapabilityAvailable(caps, workspaceID, capID, node.NodeType) {
 		errs = append(errs, ValidationError{
-			Code:    CodeMultipleTriggers,
-			Message: "Action graph must contain at most one trigger node",
-			Path:    "nodes",
+			Code:    CodeUnknownCapability,
+			Message: fmt.Sprintf("Capability %d is not available to this workspace or has the wrong type", capID),
+			Path:    path + ".node_config." + field,
 		})
 	}
+	if node.NodeType != models.ActionNodeAIAgent {
+		return errs
+	}
 
-	// --- Edges: source/target reference known nodes ----------------------
-	for i, e := range def.Edges {
+	var config models.AIAgentNodeConfig
+	_ = json.Unmarshal([]byte(node.NodeConfig), &config)
+	for i, rawID := range config.Tools {
+		capID, err := strconv.Atoi(rawID)
+		if err != nil || capID <= 0 {
+			errs = append(errs, ValidationError{
+				Code:    CodeInvalidConfig,
+				Message: fmt.Sprintf("Tool capability %q is not a valid capability ID", rawID),
+				Path:    fmt.Sprintf("%s.node_config.tools[%d]", path, i),
+			})
+			continue
+		}
+		if !toolCapabilityAvailable(caps, workspaceID, capID) {
+			errs = append(errs, ValidationError{
+				Code:    CodeUnknownCapability,
+				Message: fmt.Sprintf("Tool capability %d is not available to this workspace or is not an http_client capability", capID),
+				Path:    fmt.Sprintf("%s.node_config.tools[%d]", path, i),
+			})
+		}
+	}
+	return errs
+}
+
+func validateDefinitionEdges(nodeIDs map[int]bool, edges []models.ActionEdge) ValidationErrors {
+	var errs ValidationErrors
+	for i, edge := range edges {
 		path := fmt.Sprintf("edges[%d]", i)
-		if e.SourceNodeID == 0 || !nodeIDsSeen[e.SourceNodeID] {
+		if edge.SourceNodeID == 0 || !nodeIDs[edge.SourceNodeID] {
 			errs = append(errs, ValidationError{
 				Code:    CodeUnknownNodeID,
-				Message: fmt.Sprintf("Edge source_node_id %d does not match any node", e.SourceNodeID),
+				Message: fmt.Sprintf("Edge source_node_id %d does not match any node", edge.SourceNodeID),
 				Path:    path + ".source_node_id",
 			})
 		}
-		if e.TargetNodeID == 0 || !nodeIDsSeen[e.TargetNodeID] {
+		if edge.TargetNodeID == 0 || !nodeIDs[edge.TargetNodeID] {
 			errs = append(errs, ValidationError{
 				Code:    CodeUnknownNodeID,
-				Message: fmt.Sprintf("Edge target_node_id %d does not match any node", e.TargetNodeID),
+				Message: fmt.Sprintf("Edge target_node_id %d does not match any node", edge.TargetNodeID),
 				Path:    path + ".target_node_id",
 			})
 		}
 	}
+	return errs
+}
 
-	// --- Graph-level invariants (cycles, ambiguous flow, iterator body) --
-	if !errs.Has(CodeUnknownNodeID) && !errs.Has(CodeDuplicateNodeID) {
-		if err := actionutil.ValidateFlowAcyclic[
-			models.ActionNode, *models.ActionNode,
-			models.ActionEdge, *models.ActionEdge,
-		](def.Nodes, def.Edges); err != nil {
-			errs = append(errs, ValidationError{
-				Code:    CodeFlowCycle,
-				Message: err.Error(),
-				Path:    "edges",
-			})
-		}
-
-		if msg := validateNonTriggerAmbiguity(def.Nodes, def.Edges); msg != "" {
-			errs = append(errs, ValidationError{
-				Code:    CodeAmbiguousFlow,
-				Message: msg,
-				Path:    "edges",
-			})
-		}
-
-		if leak := validateIteratorBodies(def.Nodes, def.Edges); leak != "" {
-			errs = append(errs, ValidationError{
-				Code:    CodeIteratorBodyLeak,
-				Message: leak,
-				Path:    "edges",
-			})
-		}
+func validateDefinitionGraph(nodes []models.ActionNode, edges []models.ActionEdge) ValidationErrors {
+	var errs ValidationErrors
+	if err := actionutil.ValidateFlowAcyclic[
+		models.ActionNode, *models.ActionNode,
+		models.ActionEdge, *models.ActionEdge,
+	](nodes, edges); err != nil {
+		errs = append(errs, ValidationError{Code: CodeFlowCycle, Message: err.Error(), Path: "edges"})
 	}
-
+	if msg := validateNonTriggerAmbiguity(nodes, edges); msg != "" {
+		errs = append(errs, ValidationError{Code: CodeAmbiguousFlow, Message: msg, Path: "edges"})
+	}
+	if leak := validateIteratorBodies(nodes, edges); leak != "" {
+		errs = append(errs, ValidationError{Code: CodeIteratorBodyLeak, Message: leak, Path: "edges"})
+	}
 	return errs
 }
 
@@ -312,6 +314,10 @@ func (e ValidationErrors) Has(code string) bool {
 	return false
 }
 
+// errInvalidConfigJSON marks config that failed JSON parsing, as opposed
+// to valid JSON that violates the resolved schema.
+var errInvalidConfigJSON = errors.New("invalid JSON")
+
 // validateConfigJSON parses a JSON config string and validates it against
 // the resolved schema. An empty string is treated as `{}` — that's how
 // the storage layer represents "no config" today.
@@ -325,7 +331,7 @@ func validateConfigJSON(resolved *jsonschema.Resolved, cfg string) error {
 	}
 	var instance any
 	if err := json.Unmarshal([]byte(cfg), &instance); err != nil {
-		return fmt.Errorf("invalid JSON: %w", err)
+		return fmt.Errorf("%w: %w", errInvalidConfigJSON, err)
 	}
 	if err := resolved.Validate(instance); err != nil {
 		return err
@@ -341,7 +347,7 @@ func schemaErrCode(err error) string {
 	if err == nil {
 		return ""
 	}
-	if strings.HasPrefix(err.Error(), "invalid JSON") {
+	if errors.Is(err, errInvalidConfigJSON) {
 		return CodeInvalidConfigJSON
 	}
 	return CodeInvalidConfig
@@ -377,7 +383,9 @@ func validateIteratorBodies(nodes []models.ActionNode, edges []models.ActionEdge
 		if !n.NodeType.IsIterator() {
 			continue
 		}
-		body := iteratorBodyClosure(n.ID, edges)
+		body := actionutil.Descendants(n.ID, edges, func(edge models.ActionEdge) (int, int) {
+			return edge.SourceNodeID, edge.TargetNodeID
+		})
 		for _, e := range edges {
 			if !body[e.TargetNodeID] {
 				continue
@@ -391,28 +399,6 @@ func validateIteratorBodies(nodes []models.ActionNode, edges []models.ActionEdge
 		}
 	}
 	return ""
-}
-
-func iteratorBodyClosure(iteratorID int, edges []models.ActionEdge) map[int]bool {
-	body := map[int]bool{}
-	queue := []int{}
-	for _, e := range edges {
-		if e.SourceNodeID == iteratorID && !body[e.TargetNodeID] {
-			body[e.TargetNodeID] = true
-			queue = append(queue, e.TargetNodeID)
-		}
-	}
-	for len(queue) > 0 {
-		next := queue[0]
-		queue = queue[1:]
-		for _, e := range edges {
-			if e.SourceNodeID == next && !body[e.TargetNodeID] {
-				body[e.TargetNodeID] = true
-				queue = append(queue, e.TargetNodeID)
-			}
-		}
-	}
-	return body
 }
 
 // validateNodeConfigValues runs value-level checks that can't be expressed

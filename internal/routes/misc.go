@@ -32,19 +32,10 @@ func RegisterMiscRoutes(deps *Deps) {
 	api.HandleH("GET /calendar/feed/{token}", deps.CalendarFeedLimiter.Limit(http.HandlerFunc(deps.Misc.CalendarFeed.ServeICSFeed)))
 
 	// Custom field endpoints
-	api.HandleH("GET /custom-fields", auth(http.HandlerFunc(deps.Misc.CustomField.GetAll)))
-	api.HandleH("GET /custom-fields/{id}", auth(http.HandlerFunc(deps.Misc.CustomField.Get)))
 	api.HandleH("POST /admin/custom-fields", admin(http.HandlerFunc(deps.Misc.CustomField.Create)))
 	api.HandleH("PUT /admin/custom-fields/{id}", admin(http.HandlerFunc(deps.Misc.CustomField.Update)))
 	api.HandleH("DELETE /admin/custom-fields/{id}", admin(http.HandlerFunc(deps.Misc.CustomField.Delete)))
 	api.HandleH("PUT /admin/custom-fields/settings", admin(http.HandlerFunc(deps.Misc.CustomField.UpdateSettings)))
-
-	// Link type endpoints
-	api.HandleH("GET /link-types", auth(http.HandlerFunc(deps.Items.LinkType.GetAll)))
-	api.HandleH("GET /link-types/{id}", auth(http.HandlerFunc(deps.Items.LinkType.Get)))
-	api.HandleH("POST /admin/link-types", admin(http.HandlerFunc(deps.Items.LinkType.Create)))
-	api.HandleH("PUT /admin/link-types/{id}", admin(http.HandlerFunc(deps.Items.LinkType.Update)))
-	api.HandleH("DELETE /admin/link-types/{id}", admin(http.HandlerFunc(deps.Items.LinkType.Delete)))
 
 	// Setup endpoints
 	api.HandleH("GET /setup/status", deps.SetupLimiter.Limit(http.HandlerFunc(deps.Admin.Setup.GetSetupStatus)))

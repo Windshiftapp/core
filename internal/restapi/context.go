@@ -1,12 +1,14 @@
 // Package restapi provides REST API routing and context utilities.
 package restapi
 
-// Context keys for request context values
-type contextKey string
+import "windshift/internal/contextkeys"
+
+// ContextKey is aliased from contextkeys for backward compatibility.
+type ContextKey = contextkeys.ContextKey
 
 const (
-	ContextKeyRequestID  contextKey = "request_id"
-	ContextKeyUser       contextKey = "user"
-	ContextKeyAPIToken   contextKey = "api_token"
-	ContextKeyAuthMethod contextKey = "auth_method"
+	ContextKeyRequestID  = contextkeys.RequestID
+	ContextKeyUser       = contextkeys.User
+	ContextKeyAPIToken   = contextkeys.APIToken
+	ContextKeyAuthMethod = contextkeys.AuthMethod
 )

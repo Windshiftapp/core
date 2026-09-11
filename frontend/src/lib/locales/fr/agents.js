@@ -1,0 +1,60 @@
+/** Workspace agents and Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Prêt',
+      offline: 'Hors ligne · travaux en attente',
+      needsSetup: 'Configuration requise',
+      draft: 'Brouillon',
+      paused: 'En pause',
+      invalid: 'Non valide',
+      archived: 'Archivé',
+      unavailable: 'Indisponible',
+    },
+    types: {
+      standard: 'Standard',
+      coding: 'Développement',
+      legacy: 'Hérité',
+    },
+    runtimes: {
+      windshift: 'Exécuteur Windshift intégré',
+      authorizedRunner: 'Exécutant de développement autorisé',
+      legacyLocal: 'Exécuteur local hérité',
+    },
+    identities: {
+      workspaceManaged: 'Géré par l’espace de travail',
+      centralizedService: 'Identité de service centralisée',
+      userOwned: 'Identité détenue par l’utilisateur',
+    },
+    runStatuses: {
+      queued: 'en attente',
+      running: 'en cours',
+      succeeded: 'terminé',
+      completed: 'terminé',
+      failed: 'échoué',
+      cancelled: 'annulé',
+    },
+    catalog: {
+      title: 'Agents',
+      subtitle: 'Spécialistes disponibles dans cet espace de travail',
+      createAgent: 'Créer un agent',
+      searchPlaceholder: 'Rechercher des agents',
+      loading: 'Chargement des agents de l’espace de travail…',
+      loadErrorTitle: 'Impossible de charger les agents',
+      loadErrorMessage: 'Impossible de charger les agents.',
+      emptyTitle: 'Aucun agent pour le moment',
+      emptyAdminDescription: 'Créez un spécialiste Standard ou Développement pour cet espace de travail.',
+      emptyMemberDescription: 'Un administrateur d’espace de travail peut ajouter des spécialistes ici.',
+      noMatchesTitle: 'Aucun agent correspondant',
+      noMatchesDescription: 'Essayez un autre nom, identifiant, objectif ou type de profil.',
+      defaultPurpose: 'Un spécialiste d’espace de travail configuré par vos administrateurs.',
+      ownedBy: 'Détenu par {name}',
+      modelUnavailable: 'Modèle indisponible',
+      standardInteraction: 'Attribution, mentions et discussion d’espace de travail',
+      codingInteraction: 'Attribution directe et mentions',
+      lastRun: 'Dernière exécution : {status}',
+      viewProfileVersion: 'Voir le profil · Version {version}',
+    },
+  },
+};

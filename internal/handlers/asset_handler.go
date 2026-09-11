@@ -53,15 +53,8 @@ func (h *AssetHandler) AssetService() *services.AssetService {
 // Role name constants — these are response-shape strings, not used by the
 // permission service. Kept here next to the only callers that need them.
 const (
-	AssetRoleViewer        = "Viewer"
-	AssetRoleEditor        = "Editor"
 	AssetRoleAdministrator = "Administrator"
 )
-
-// getUserSetRole delegates to AssetPermissionService.
-func (h *AssetHandler) getUserSetRole(userID, setID int) (*models.AssetRole, error) {
-	return h.assetPerm.GetUserSetRole(userID, setID)
-}
 
 // hasAssetPermission delegates to AssetPermissionService.
 func (h *AssetHandler) hasAssetPermission(userID, setID int, permissionKey string) (bool, error) {
@@ -73,33 +66,6 @@ func (h *AssetHandler) hasAssetPermission(userID, setID int, permissionKey strin
 // as a permission source — they now transparently hit the shared service.
 func (h *AssetHandler) HasAssetSetPermission(userID, setID int, permissionKey string) (bool, error) {
 	return h.assetPerm.HasAssetSetPermission(userID, setID, permissionKey)
-}
-
-// getUserSetRoleName returns the role name (for API responses)
-func (h *AssetHandler) getUserSetRoleName(userID, setID int) (string, error) {
-	role, err := h.getUserSetRole(userID, setID)
-	if err != nil {
-		return "", err
-	}
-	if role == nil {
-		return "", nil
-	}
-	return role.Name, nil
-}
-
-// requireSetViewAccess checks auth, parses setId, and verifies view permission.
-func (h *AssetHandler) requireSetViewAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
-	return h.requireSetAccess(w, r, services.AssetPermissionKeyView)
-}
-
-// requireSetEditAccess checks auth, parses setId, and verifies edit permission.
-func (h *AssetHandler) requireSetEditAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
-	return h.requireSetAccess(w, r, services.AssetPermissionKeyEdit)
-}
-
-// requireSetCreateAccess checks auth, parses setId, and verifies create permission.
-func (h *AssetHandler) requireSetCreateAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
-	return h.requireSetAccess(w, r, services.AssetPermissionKeyCreate)
 }
 
 // requireSetAdminAccess checks auth, parses setId, and verifies admin permission.
@@ -139,24 +105,4 @@ func (h *AssetHandler) requireSetAccessByParam(w http.ResponseWriter, r *http.Re
 		return nil, 0, false
 	}
 	return currentUser, setID, true
-}
-
-// canViewSet checks if user can view a set
-func (h *AssetHandler) canViewSet(userID, setID int) (bool, error) {
-	return h.hasAssetPermission(userID, setID, services.AssetPermissionKeyView)
-}
-
-// canEditSet checks if user can edit assets in a set
-func (h *AssetHandler) canEditSet(userID, setID int) (bool, error) {
-	return h.hasAssetPermission(userID, setID, services.AssetPermissionKeyEdit)
-}
-
-// canAdminSet checks if user can administer a set
-func (h *AssetHandler) canAdminSet(userID, setID int) (bool, error) {
-	return h.hasAssetPermission(userID, setID, services.AssetPermissionKeyAdmin)
-}
-
-// canDeleteAsset checks if user can delete assets in a set
-func (h *AssetHandler) canDeleteAsset(userID, setID int) (bool, error) {
-	return h.hasAssetPermission(userID, setID, services.AssetPermissionKeyDelete)
 }

@@ -12,6 +12,7 @@
 
   const messages = $derived(chatStore.messages);
   const loading = $derived(chatStore.loading);
+  const conversationLoading = $derived(chatStore.conversationLoading);
 
   function back() {
     if (window.history.length > 1) window.history.back();
@@ -20,7 +21,7 @@
 
   async function send() {
     const t = text.trim();
-    if (!t || loading) return;
+    if (!t || loading || conversationLoading) return;
     text = '';
     // Same global chatStore the desktop drives; context is derived from the
     // current route (general assistant on the mobile surface).
@@ -46,6 +47,7 @@
 
   onMount(() => {
     chatStore.loadConnections();
+    void chatStore.startNewGeneralChat();
   });
 </script>
 
@@ -99,7 +101,7 @@
     data-testid="chat-input"
     class="mobile-chat-input"
   />
-  <button class="send" disabled={!text.trim() || loading} data-testid="chat-send" aria-label="Send" type="submit">
+  <button class="send" disabled={!text.trim() || loading || conversationLoading} data-testid="chat-send" aria-label="Send" type="submit">
     <Send size={18} />
   </button>
 </form>

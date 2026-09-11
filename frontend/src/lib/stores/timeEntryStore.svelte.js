@@ -1,12 +1,7 @@
 import { api } from '../api.js';
-import { formatDateWithOptions } from '../utils/dateFormatter.js';
-
-function formatLocalDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { getUserTimezone } from '../utils/dateFormatter.js';
+import { formatClockInZone, monthBoundsInZone } from '../utils/worklogTimezone.js';
+import { authStore } from './auth.svelte.js';
 
 class TimeEntryStore {
   // === Data ===
@@ -58,10 +53,11 @@ class TimeEntryStore {
   async init() {
     this.loading = true;
     try {
-      // Set default date range to current month BEFORE loading worklogs
-      const now = new Date();
-      this.filters.date_from = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1));
-      this.filters.date_to = formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+      // Default date range to the current month in the reporting timezone so
+      // client-side labels and server-side inclusion agree.
+      const { from, to } = monthBoundsInZone(getUserTimezone(authStore?.currentUser));
+      this.filters.date_from = from;
+      this.filters.date_to = to;
 
       await Promise.all([
         this.loadWorklogs(),
@@ -85,13 +81,23 @@ class TimeEntryStore {
   async loadWorklogs() {
     try {
       this.worklogsLoading = true;
-      this.worklogs = (await api.time.worklogs.getAll(this.filters)) || [];
+      this.worklogs = (await api.time.worklogs.getAll(this.dateFilters())) || [];
     } catch (err) {
       console.error('Failed to load worklogs:', err);
       this.worklogs = [];
     } finally {
       this.worklogsLoading = false;
     }
+  }
+
+  // Date filters travel with the reporting timezone the views group in, so
+  // the server interprets the civil range the same way the client displays it.
+  dateFilters() {
+    const { date_from, date_to, ...rest } = this.filters;
+    return {
+      ...rest,
+      ...(date_from || date_to ? { timezone: getUserTimezone(authStore?.currentUser) } : {}),
+    };
   }
 
   async loadCustomers() {
@@ -115,7 +121,7 @@ class TimeEntryStore {
   async loadWorkItems() {
     try {
       const result = await api.items.getAll({ limit: 100 });
-      this.workItems = result.items || [];
+      this.workItems = result.data ?? [];
     } catch (err) {
       console.error('Failed to load work items:', err);
       this.workItems = [];
@@ -225,12 +231,7 @@ class TimeEntryStore {
   // === Utility Methods ===
 
   formatTime(unixTimestamp) {
-    const date = new Date(unixTimestamp * 1000);
-    return formatDateWithOptions(date, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+    return formatClockInZone(unixTimestamp, getUserTimezone(authStore?.currentUser));
   }
 
   formatDuration(minutes) {

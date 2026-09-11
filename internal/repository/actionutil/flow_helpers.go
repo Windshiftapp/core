@@ -2,6 +2,35 @@ package actionutil
 
 import "fmt"
 
+// Descendants returns every node reachable from root through directed edges.
+// Root is excluded unless an edge cycle leads back to it.
+func Descendants[ID comparable, E any](root ID, edges []E, endpoints func(E) (ID, ID)) map[ID]bool {
+	descendants := make(map[ID]bool)
+	queue := make([]ID, 0)
+
+	for _, edge := range edges {
+		source, target := endpoints(edge)
+		if source == root && !descendants[target] {
+			descendants[target] = true
+			queue = append(queue, target)
+		}
+	}
+
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+		for _, edge := range edges {
+			source, target := endpoints(edge)
+			if source == next && !descendants[target] {
+				descendants[target] = true
+				queue = append(queue, target)
+			}
+		}
+	}
+
+	return descendants
+}
+
 // ValidateFlowAcyclic returns an error if the directed graph formed by the
 // given nodes and edges (using their client-side IDs) contains a cycle. It is
 // intended to run before persisting a flow so users get immediate validation

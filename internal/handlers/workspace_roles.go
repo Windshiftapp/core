@@ -142,7 +142,9 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
 		if countBefore == 0 {
-			h.permissionService.OnEveryoneAccessChanged()
+			if err := h.permissionService.ResetPermissionCache(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("workspace_id:%d", req.WorkspaceID)))
+			}
 		} else {
 			if err := h.permissionService.OnUserPermissionChanged(req.UserID); err != nil {
 				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", req.UserID)))
@@ -209,7 +211,9 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 	if h.permissionService != nil {
 		if countBefore == 1 {
 			// Was the only assignment, now removed → role becomes open to everyone
-			h.permissionService.OnEveryoneAccessChanged()
+			if err := h.permissionService.ResetPermissionCache(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("workspace_id:%d", workspaceID)))
+			}
 		} else {
 			if err := h.permissionService.OnUserPermissionChanged(userID); err != nil {
 				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d", userID)))
@@ -402,7 +406,9 @@ func (h *WorkspaceRoleHandler) AssignRoleToGroup(w http.ResponseWriter, r *http.
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
 		if countBefore == 0 {
-			h.permissionService.OnEveryoneAccessChanged()
+			if err := h.permissionService.ResetPermissionCache(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("workspace_id:%d", req.WorkspaceID)))
+			}
 		} else if err := h.permissionService.OnGroupPermissionChanged(req.GroupID); err != nil {
 			warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("group_id:%d", req.GroupID)))
 		}
@@ -466,7 +472,9 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromGroup(w http.ResponseWriter, r *htt
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
 		if countBefore == 1 {
-			h.permissionService.OnEveryoneAccessChanged()
+			if err := h.permissionService.ResetPermissionCache(); err != nil {
+				warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("workspace_id:%d", workspaceID)))
+			}
 		} else if err := h.permissionService.OnGroupPermissionChanged(groupID); err != nil {
 			warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("group_id:%d", groupID)))
 		}

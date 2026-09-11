@@ -41,6 +41,13 @@ type ResultHandler interface {
 	HandleResult(ResultMsg) tea.Cmd
 }
 
+// MessageHandler receives non-key Bubble Tea messages while the dialog is on
+// top. Forms use it for cursor blink and other retained component lifecycle
+// messages.
+type MessageHandler interface {
+	HandleMessage(tea.Msg) tea.Cmd
+}
+
 // Action is the result of a key press. Selected is type-asserted by the
 // caller based on which dialog it opened.
 type Action struct {

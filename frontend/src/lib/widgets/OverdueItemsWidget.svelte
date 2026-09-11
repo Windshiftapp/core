@@ -14,7 +14,6 @@
   let loading = $state(false);
   let error = $state(null);
   let currentWorkspaceId = $state(null);
-  let refreshInFlight = $state(false);
   let activeFetchId = $state(0);
   let currentCollectionFilter = $state(null);
 
@@ -27,7 +26,6 @@
     const fetchId = ++activeFetchId;
     loading = true;
     error = null;
-    refreshInFlight = true;
 
     try {
       const trimmedFilter = (collectionFilter || '').trim();
@@ -43,7 +41,7 @@
         ql: vql,
         limit: 50 // fetch more than needed, filter client-side
       });
-      const items = Array.isArray(response) ? response : (response?.items ?? []);
+      const items = response?.data ?? [];
       const parsedItems = items
         .map(item => ({
           id: item.id,
@@ -77,7 +75,6 @@
     } finally {
       if (fetchId === activeFetchId) {
         loading = false;
-        refreshInFlight = false;
       }
     }
   }
@@ -90,7 +87,7 @@
   }
 
   function handleRefresh() {
-    if (!refreshInFlight) {
+    if (!loading) {
       loadOverdueItems();
     }
   }

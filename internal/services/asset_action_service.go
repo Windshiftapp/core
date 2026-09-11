@@ -377,18 +377,7 @@ func (as *AssetActionService) matchesTrigger(action *models.AssetAction, event *
 	}
 
 	if event.EventType == models.AssetTriggerAssetStatusChanged {
-		if config.FromStatusID != nil {
-			oldStatusID := utils.InterfaceToIntPtr(event.OldValues["status_id"])
-			if oldStatusID == nil || *oldStatusID != *config.FromStatusID {
-				return false
-			}
-		}
-		if config.ToStatusID != nil {
-			newStatusID := utils.InterfaceToIntPtr(event.NewValues["status_id"])
-			if newStatusID == nil || *newStatusID != *config.ToStatusID {
-				return false
-			}
-		}
+		return matchesStatusTransition(config.FromStatusID, config.ToStatusID, event.OldValues, event.NewValues)
 	}
 
 	return true
@@ -401,10 +390,16 @@ func (as *AssetActionService) executeAction(action *models.AssetAction, event *m
 }
 
 func (as *AssetActionService) executeActionWithResult(action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain) (*AssetActionExecutionResult, error) {
-	return as.executeActionWithResultForEvent(action, event, chain, "")
+	return as.executeActionWithResultForEvent(context.Background(), action, event, chain, "")
 }
 
-func (as *AssetActionService) executeActionWithResultForEvent(action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain, durableEventKey string) (*AssetActionExecutionResult, error) {
+func (as *AssetActionService) executeActionWithResultForEvent(executionCtx context.Context, action *models.AssetAction, event *models.AssetActionEvent, chain *ExecutionChain, durableEventKey string) (*AssetActionExecutionResult, error) {
+	if executionCtx == nil {
+		executionCtx = context.Background()
+	}
+	if err := executionCtx.Err(); err != nil {
+		return nil, err
+	}
 	if action == nil {
 		return nil, fmt.Errorf("asset action is required")
 	}
@@ -459,6 +454,7 @@ func (as *AssetActionService) executeActionWithResultForEvent(action *models.Ass
 
 	// Build execution context
 	ctx := &models.AssetActionExecutionContext{
+		Context:     executionCtx,
 		Action:      action,
 		Event:       event,
 		Variables:   make(map[string]any),
@@ -521,6 +517,16 @@ func (as *AssetActionService) executeActionWithResultForEvent(action *models.Ass
 		err := as.executeNode(&node, ctx, &stepResult)
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
+		if contextErr := executionCtx.Err(); contextErr != nil {
+			stepResult.Status = models.ActionStatusFailed
+			stepResult.ErrorMessage = contextErr.Error()
+			ctx.StepResults = append(ctx.StepResults, stepResult)
+			log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(ctx.StepResults)
+			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+				return nil, fmt.Errorf("cancel asset action execution log: %w", logErr)
+			}
+			return &AssetActionExecutionResult{LogID: log.ID, Status: log.Status, ErrorMessage: log.ErrorMessage}, contextErr
+		}
 
 		if err != nil {
 			stepResult.Status = models.ActionStatusFailed
@@ -881,7 +887,7 @@ func (as *AssetActionService) executeCondition(node *models.AssetActionNode, ctx
 		fieldValue = ctx.Variables["new_"+config.FieldName]
 	}
 
-	result := evaluateCondition(fieldValue, config.Operator, config.Value)
+	result := evaluateAssetActionCondition(fieldValue, config.Operator, config.Value)
 
 	stepResult.Output = map[string]any{
 		"condition_result": result,
@@ -985,23 +991,12 @@ func (as *AssetActionService) canExecuteNode(nodeID int, edges []models.AssetAct
 	return actionutil.CanExecuteNodeTyped(nodeID, edges, executedNodes, ctx.StepResults)
 }
 
-// evaluateCondition evaluates a condition (reused from workspace action service)
-func evaluateCondition(value any, operator, compareValue string) bool {
+func evaluateAssetActionCondition(value any, operator, compareValue string) bool {
 	strValue := fmt.Sprintf("%v", value)
-
+	if result, handled := evaluateStringActionCondition(strValue, operator, compareValue); handled {
+		return result
+	}
 	switch operator {
-	case "eq", "==", "equals":
-		return strValue == compareValue
-	case "ne", "!=", "not_equals":
-		return strValue != compareValue
-	case "contains":
-		return strings.Contains(strValue, compareValue)
-	case "not_contains":
-		return !strings.Contains(strValue, compareValue)
-	case "starts_with":
-		return strings.HasPrefix(strValue, compareValue)
-	case "ends_with":
-		return strings.HasSuffix(strValue, compareValue)
 	case "gt", ">":
 		if numVal, err := strconv.ParseFloat(strValue, 64); err == nil {
 			if numCompare, err := strconv.ParseFloat(compareValue, 64); err == nil {
@@ -1016,10 +1011,6 @@ func evaluateCondition(value any, operator, compareValue string) bool {
 			}
 		}
 		return strValue < compareValue
-	case "is_empty":
-		return strValue == "" || strValue == "null" || strValue == "<nil>"
-	case "is_not_empty":
-		return strValue != "" && strValue != "null" && strValue != "<nil>"
 	default:
 		return false
 	}

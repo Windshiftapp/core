@@ -14,15 +14,15 @@ dark_mode: 'no'
 
 # Two requests per refresh. The poller exposes them as IDX_0 and IDX_1:
 #   IDX_0 -> the token owner (used for the greeting and to prove auth works)
-#   IDX_1 -> the item page  { data: [...], pagination: { total, ... } }
+#   IDX_1 -> the item page  { data: [...], pagination: { total_items, ... } }
 #
 # The `append` then `replace` pair tolerates a trailing slash on the entered
 # URL: it only collapses a doubled slash immediately before /rest/, so the
 # one in https:// is never touched. (`remove_last: '/'` is NOT a safe
 # substitute — with no trailing slash it eats the slash in the scheme.)
 polling_url: |-
-  {{ windshift_url | strip | append: '/rest/api/v1/users/me' | replace: '//rest/', '/rest/' }}
-  {{ windshift_url | strip | append: '/rest/api/v1/search/items' | replace: '//rest/', '/rest/' }}?ql={{ task_query | strip | url_encode }}&limit={{ max_items }}&sort=updated_at&order=desc
+  {{ windshift_url | strip | append: '/rest/api/v2/users/me' | replace: '//rest/', '/rest/' }}
+  {{ windshift_url | strip | append: '/rest/api/v2/items' | replace: '//rest/', '/rest/' }}?ql={{ task_query | strip | url_encode }}&page_size={{ max_items }}&sort=-updated_at
 
 polling_headers: Authorization=Bearer {{ api_token | strip }}&Accept=application/json
 
@@ -32,7 +32,7 @@ custom_fields:
     name: Windshift Server URL
     placeholder: https://windshift.example.com
     description: Base URL of your Windshift server
-    help_text: Just the origin — no /rest/api/v1 suffix. A trailing slash is fine.
+    help_text: Just the origin — no /rest/api/v2 suffix. A trailing slash is fine.
     required: true
 
   - keyname: api_token

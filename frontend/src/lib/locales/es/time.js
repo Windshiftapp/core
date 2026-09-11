@@ -125,7 +125,8 @@ export default {
       noBudgetSet: 'Sin presupuesto definido',
       noProjectSelected: 'Selecciona un proyecto para ver su reporte',
       printLoading: 'Preparando el reporte de tiempo para imprimir…',
-      printUnavailable: 'Este reporte de tiempo ya no está disponible. Vuelve a los reportes y expórtalo de nuevo.',
+      printUnavailable:
+        'Este reporte de tiempo ya no está disponible. Vuelve a los reportes y expórtalo de nuevo.',
       backToReports: 'Volver a reportes',
     },
 
@@ -228,7 +229,7 @@ export default {
       removeMember: 'Eliminar miembro',
       noManagers: 'No hay administradores asignados',
       noManagersHint:
-        'Cuando no hay administradores asignados, cualquiera puede administrar este proyecto',
+        'Sin administradores asignados, solo los administradores globales y los usuarios con permiso para gestionar todos los proyectos de tiempo y registros pueden gestionar este proyecto',
       noMembers: 'No hay miembros asignados',
       noMembersHint:
         'Cuando no hay miembros asignados, cualquiera puede registrar tiempo en este proyecto',

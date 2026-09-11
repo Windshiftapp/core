@@ -10,8 +10,16 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDate, worklogDateKey } from '../../utils/dateFormatter.js';
+  import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { serverNow } from '../../utils/serverClock.js';
+  import { authStore } from '../../stores/auth.svelte.js';
+  import {
+    addDaysToKey,
+    dateKeyInZone,
+    formatClockInZone,
+    mondayKeyInZone,
+    splitWorklogMinutesByDay
+  } from '../../utils/worklogTimezone.js';
 
   const STORAGE_KEY = 'windshift-timesheet-projects';
   const WEEKENDS_KEY = 'windshift-timesheet-show-weekends';
@@ -23,14 +31,24 @@
   let workspaces = $derived(timeEntryStore.workspaces);
   let activeProjects = $derived(timeEntryStore.activeProjects);
 
+  // The timesheet grid is anchored to civil dates in the reporting timezone;
+  // timestamps are split at local midnight so totals match the visible days.
+  const reportTimezone = $derived(getUserTimezone(authStore?.currentUser));
+
   // Local state
   let weekWorklogs = $state([]);
   let prevWeekWorklogs = $state([]);
   let loading = $state(false);
-  let currentWeekStart = $state(getMonday(new Date()));
+  let currentWeekStart = $state(/** @type {string | null} */ (null));
   let pinnedProjectIds = $state(loadPinnedProjects());
   let showWeekends = $state(loadShowWeekends());
   let addProjectPickerValue = $state(null);
+
+  $effect(() => {
+    if (!currentWeekStart) {
+      currentWeekStart = mondayKeyInZone(reportTimezone);
+    }
+  });
 
   // Modal state
   let showModal = $state(false);
@@ -89,33 +107,30 @@
     savePinnedProjects();
   }
 
-  function getMonday(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
-  // Full 7-day week (always Mon-Sun for data loading)
+  // Full 7-day week (always Mon-Sun for data loading), as civil date keys
   const fullWeekDays = $derived.by(() => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(currentWeekStart);
-      d.setDate(d.getDate() + i);
-      days.push(d);
+    const start = currentWeekStart;
+    if (!start) return [];
+    return Array.from({ length: 7 }, (_, i) => addDaysToKey(start, i));
+  });
+
+  // Minutes per civil day for each loaded worklog, in the reporting timezone
+  const worklogDaySplits = $derived.by(() => {
+    const splits = new Map();
+    for (const wl of weekWorklogs) {
+      splits.set(wl.id, splitWorklogMinutesByDay(wl.start_time, wl.end_time, reportTimezone));
     }
-    return days;
+    return splits;
   });
 
   // Check if any worklogs exist on weekends (Sat/Sun = index 5,6)
   const hasWeekendWorklogs = $derived.by(() => {
-    const satKey = toDateKey(fullWeekDays[5]);
-    const sunKey = toDateKey(fullWeekDays[6]);
+    if (fullWeekDays.length === 0) return false;
+    const satKey = fullWeekDays[5];
+    const sunKey = fullWeekDays[6];
     return weekWorklogs.some(wl => {
-      const dk = worklogDateKey(wl.date);
-      return dk === satKey || dk === sunKey;
+      const split = worklogDaySplits.get(wl.id);
+      return split.has(satKey) || split.has(sunKey);
     });
   });
 
@@ -126,32 +141,19 @@
   const weekDays = $derived(effectiveShowWeekends ? fullWeekDays : fullWeekDays.slice(0, 5));
 
   // Previous week start
-  const prevWeekStart = $derived.by(() => {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() - 7);
-    return d;
-  });
-
-  // Format date as YYYY-MM-DD
-  function toDateKey(date) {
-    return formatDate(date);
-  }
+  const prevWeekStart = $derived(currentWeekStart ? addDaysToKey(currentWeekStart, -7) : null);
 
   // Check if date is today
-  function isToday(date) {
-    const today = serverNow();
-    return toDateKey(date) === toDateKey(today);
+  function isToday(dateKey) {
+    return dateKey === dateKeyInZone(serverNow().getTime() / 1000, reportTimezone);
   }
 
   // Week range label
   const weekLabel = $derived.by(() => {
-    const start = weekDays[0];
-    const end = weekDays[weekDays.length - 1];
-    /** @type {Intl.DateTimeFormatOptions} */
-    const opts = { month: 'short', day: 'numeric' };
-    const startStr = start.toLocaleDateString('en-US', opts);
-    const endStr = end.toLocaleDateString('en-US', { ...opts, year: 'numeric' });
-    return `${startStr} – ${endStr}`;
+    if (weekDays.length === 0) return '';
+    const start = formatDateOnly(weekDays[0], { month: 'short', day: 'numeric' });
+    const end = formatDateOnly(weekDays[weekDays.length - 1], { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${start} – ${end}`;
   });
 
   // Project IDs that have worklogs in current or previous week
@@ -216,8 +218,9 @@
         });
       }
       const row = rowMap.get(key);
-      const dateKey = worklogDateKey(wl.date);
-      row.days.set(dateKey, (row.days.get(dateKey) || 0) + wl.duration_minutes);
+      for (const [dateKey, minutes] of worklogDaySplits.get(wl.id)) {
+        row.days.set(dateKey, (row.days.get(dateKey) || 0) + minutes);
+      }
     }
 
     // Sort: projects alphabetically, item sub-rows under their project
@@ -237,12 +240,11 @@
   const dailyTotals = $derived.by(() => {
     const totals = new Map();
     for (const day of weekDays) {
-      const dateKey = toDateKey(day);
       let total = 0;
       for (const row of gridRows) {
-        total += row.days.get(dateKey) || 0;
+        total += row.days.get(day) || 0;
       }
-      totals.set(dateKey, total);
+      totals.set(day, total);
     }
     return totals;
   });
@@ -276,29 +278,25 @@
 
   // Navigation
   function navigateWeek(offset) {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() + offset * 7);
-    currentWeekStart = d;
+    if (currentWeekStart) {
+      currentWeekStart = addDaysToKey(currentWeekStart, offset * 7);
+    }
   }
 
   function goToThisWeek() {
-    currentWeekStart = getMonday(new Date());
+    currentWeekStart = mondayKeyInZone(reportTimezone);
   }
 
   // Load week data (always full Mon-Sun + previous week for visibility rules)
   async function loadWeekWorklogs() {
+    if (fullWeekDays.length === 0 || !prevWeekStart) return;
     loading = true;
     try {
-      const dateFrom = toDateKey(fullWeekDays[0]);
-      const dateTo = toDateKey(fullWeekDays[6]);
-      const prevFrom = toDateKey(prevWeekStart);
-      const prevEnd = new Date(prevWeekStart);
-      prevEnd.setDate(prevEnd.getDate() + 6);
-      const prevTo = toDateKey(prevEnd);
+      const prevEnd = addDaysToKey(prevWeekStart, 6);
 
       const [current, prev] = await Promise.all([
-        api.time.worklogs.getAll({ date_from: dateFrom, date_to: dateTo }),
-        api.time.worklogs.getAll({ date_from: prevFrom, date_to: prevTo }),
+        api.time.worklogs.getAll({ date_from: fullWeekDays[0], date_to: fullWeekDays[6], timezone: reportTimezone }),
+        api.time.worklogs.getAll({ date_from: prevWeekStart, date_to: prevEnd, timezone: reportTimezone }),
       ]);
       weekWorklogs = current || [];
       prevWeekWorklogs = prev || [];
@@ -323,10 +321,10 @@
   });
 
   // Cell click handler
-  function handleCellClick(projectId, itemId, date) {
+  function handleCellClick(projectId, itemId, dateKey) {
     modalProjectId = projectId;
     modalItemId = itemId;
-    modalDate = toDateKey(date);
+    modalDate = dateKey;
     showModal = true;
   }
 
@@ -353,16 +351,12 @@
   }
 
   function getCurrentTime() {
-    const now = new Date();
-    return now.toTimeString().substring(0, 5);
+    return formatClockInZone(Date.now() / 1000, reportTimezone);
   }
 
   // Format day header
-  function formatDayHeader(date) {
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-    const dayNum = date.getDate();
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
-    return `${dayName} ${dayNum} ${month}`;
+  function formatDayHeader(dateKey) {
+    return formatDateOnly(dateKey, { weekday: 'short', day: 'numeric', month: 'short' });
   }
 </script>
 
@@ -490,8 +484,7 @@
                 </div>
               </td>
               {#each weekDays as day}
-                {@const dateKey = toDateKey(day)}
-                {@const minutes = row.days.get(dateKey) || 0}
+                {@const minutes = row.days.get(day) || 0}
                 <td
                   class="text-center px-3 py-2.5 border-b cursor-pointer transition-colors"
                   style="border-color: var(--ds-border); {isToday(day) ? 'background-color: var(--ds-surface-selected);' : ''}"
@@ -521,8 +514,7 @@
               {t('time.timesheet.total')}
             </td>
             {#each weekDays as day}
-              {@const dateKey = toDateKey(day)}
-              {@const dayTotal = dailyTotals.get(dateKey) || 0}
+              {@const dayTotal = dailyTotals.get(day) || 0}
               <td class="text-center px-3 py-3" style="{isToday(day) ? 'background-color: var(--ds-surface-selected);' : ''}">
                 <span class="text-sm font-mono font-semibold" style="color: {dayTotal ? 'var(--ds-text)' : 'var(--ds-text-disabled)'};">
                   {dayTotal ? formatDuration(dayTotal) : '—'}

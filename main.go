@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
-	"strings"
 	"syscall"
 	"time"
 
@@ -130,19 +129,9 @@ func main() {
 	var sshServer *ssh.Server
 	var sshDB database.Database // Declared at function scope to allow explicit cleanup
 	if cfg.SSH.Enabled {
-		// 127.0.0.1 (not "localhost") so the loopback IP family the TUI's
-		// HTTP client dials matches what the SSH listener stored in the
-		// session row. "localhost" resolves to ::1 on modern systems while
-		// SSH typically binds to 127.0.0.1, and the legacy /api/* session
-		// middleware compares request IP against session IP by string
-		// equality — IPv4 vs IPv6 loopback would mismatch.
+		// Use the explicit IPv4 loopback address so the TUI client reaches the
+		// same listener family on hosts where localhost resolves to IPv6 first.
 		apiURL := fmt.Sprintf("http://127.0.0.1:%d", srv.Port())
-
-		var additionalProxyList []string
-		if cfg.AdditionalProxies != "" {
-			additionalProxyList = strings.Split(cfg.AdditionalProxies, ",")
-		}
-		enableHTTPS := cfg.TLSCertPath != "" && cfg.TLSKeyPath != ""
 
 		// Create a separate DB connection for SSH auth. This pool only services
 		// public-key auth + session/token lookups, so it gets a small fixed cap
@@ -159,18 +148,6 @@ func main() {
 			if registerErr := srv.RegisterDatabasePool("ssh", sshDB); registerErr != nil {
 				slog.Warn("failed to register SSH database pool for diagnostics", "error", registerErr)
 			}
-			_, sshSessionCacheMB := config.SplitSSHCacheBudget(memoryBudget.SessionCacheMB, true)
-			sessionManager := auth.NewSessionManagerWithNamedValidationCacheTTL(
-				sshDB,
-				enableHTTPS,
-				cfg.UseProxy,
-				additionalProxyList,
-				cfg.Auth.SessionSecret,
-				cfg.Auth.SessionIPBinding,
-				cfg.Auth.SessionValidationCacheTTL,
-				"ssh_session_validation",
-				sshSessionCacheMB,
-			)
 			// nil tokenTracker: the SSH-minted temp tokens are short-lived
 			// (24h) and we don't need last-used-at tracking for them.
 			_, sshTokenCacheMB := config.SplitSSHCacheBudget(memoryBudget.APITokenCacheMB, true)
@@ -189,7 +166,7 @@ func main() {
 				wish.WithIdleTimeout(30*time.Minute),
 				wish.WithMaxTimeout(24*time.Hour),
 				wish.WithMiddleware(
-					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager, tokenManager)),
+					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, tokenManager)),
 					activeterm.Middleware(),
 					logging.Middleware(),
 				),

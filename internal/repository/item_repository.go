@@ -222,6 +222,32 @@ func (r *ItemRepository) FindByIDsForUpdateContext(ctx context.Context, tx datab
 	return items, nil
 }
 
+// LockWorkspaceItemsTx prevents new foreign-key references from being added to
+// the workspace's current items while a destructive workspace operation runs.
+// The caller must lock the workspace row first so concurrent item creation is
+// fenced as well.
+func (r *ItemRepository) LockWorkspaceItemsTx(tx database.Tx, workspaceID int) error {
+	query := "SELECT id FROM items WHERE workspace_id = ? ORDER BY id"
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	rows, err := tx.Query(query, workspaceID)
+	if err != nil {
+		return fmt.Errorf("lock workspace items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var itemID int
+		if err := rows.Scan(&itemID); err != nil {
+			return fmt.Errorf("scan locked workspace item: %w", err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate locked workspace items: %w", err)
+	}
+	return nil
+}
+
 type ItemWithWorkspaceStatus struct {
 	*models.Item
 	WorkspaceActive bool
@@ -811,13 +837,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
-		    due_date = ?, start_date = ?, end_date = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
+		    due_date = ?, start_date = ?, end_date = ?, is_task = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
 		    time_project_id = ?, assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, story_points = ?, estimate_minutes = ?, updated_at = ?, last_active_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
-		item.DueDate, item.StartDate, item.EndDate, item.IterationID, item.ProjectID, item.InheritProject,
+		item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
 		item.TimeProjectID, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, item.StoryPoints, item.EstimateMinutes, now, now, item.ID,
 	)
@@ -1230,13 +1256,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 	if len(workspaceIDs) == 0 {
 		return []models.LinkableItem{}, nil
 	}
-	wsPlaceholders := make([]string, len(workspaceIDs))
-	args := []any{}
-	args = append(args, "%"+query+"%", "%"+query+"%")
-	for i, id := range workspaceIDs {
-		wsPlaceholders[i] = "?"
-		args = append(args, id)
-	}
+	whereClause, args := r.buildWhereClause(ItemListParams{
+		WorkspaceIDs: workspaceIDs,
+		Filters:      itemSearchFilters(query),
+	})
 
 	itemTypeFilter := ""
 	if len(itemTypeIDs) > 0 {
@@ -1269,11 +1292,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE (i.title LIKE ? OR i.description LIKE ?)
-		  AND i.workspace_id IN (%s)%s
+		%s%s
 		ORDER BY i.title
 		LIMIT ?
-	`, strings.Join(wsPlaceholders, ","), itemTypeFilter)
+	`, whereClause, itemTypeFilter)
 
 	rows, err := r.db.Query(sqlQuery, args...)
 	if err != nil {
@@ -1421,6 +1443,35 @@ func (r *ItemRepository) ResolveItemKeyReferences(keys []string) ([]KeyReference
 		var ref KeyReference
 		if err := rows.Scan(&ref.ItemKey, &ref.ItemID, &ref.WorkspaceID); err != nil {
 			return nil, fmt.Errorf("scan key reference: %w", err)
+		}
+		results = append(results, ref)
+	}
+	return results, rows.Err()
+}
+
+func (r *ItemRepository) ResolveItemKeyReferencesInWorkspaces(keys []string, workspaceIDs []int) ([]KeyReference, error) {
+	if len(keys) == 0 || len(workspaceIDs) == 0 {
+		return []KeyReference{}, nil
+	}
+	keyPlaceholders, args := inPlaceholders(keys)
+	workspacePlaceholders, workspaceArgs := inPlaceholders(workspaceIDs)
+	args = append(args, workspaceArgs...)
+	query := `SELECT w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.id, i.workspace_id
+		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
+		WHERE w.key || '-' || CAST(i.workspace_item_number AS TEXT) IN (` + keyPlaceholders + `)
+		  AND i.workspace_id IN (` + workspacePlaceholders + `)`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve scoped item keys: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := []KeyReference{}
+	for rows.Next() {
+		var ref KeyReference
+		if err := rows.Scan(&ref.ItemKey, &ref.ItemID, &ref.WorkspaceID); err != nil {
+			return nil, fmt.Errorf("scan scoped key reference: %w", err)
 		}
 		results = append(results, ref)
 	}

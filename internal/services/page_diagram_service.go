@@ -40,21 +40,21 @@ type PageDiagram struct {
 }
 
 type CreatePageDiagramInput struct {
-	PageID              int
-	Name                string
-	Mermaid             string
-	Excalidraw          json.RawMessage
-	Placement           string
-	ExpectedContentHash *string
+	PageID              int             `json:"-"`
+	Name                string          `json:"name"`
+	Mermaid             string          `json:"mermaid,omitempty"`
+	Excalidraw          json.RawMessage `json:"excalidraw,omitempty" swaggertype:"object"`
+	Placement           string          `json:"placement"`
+	ExpectedContentHash *string         `json:"expected_content_hash,omitempty"`
 }
 
 type UpdatePageDiagramInput struct {
-	PageID              int
-	AttachmentID        int
-	Name                string
-	Mermaid             string
-	Excalidraw          json.RawMessage
-	ExpectedContentHash *string
+	PageID              int             `json:"-"`
+	AttachmentID        int             `json:"-"`
+	Name                string          `json:"name,omitempty"`
+	Mermaid             string          `json:"mermaid,omitempty"`
+	Excalidraw          json.RawMessage `json:"excalidraw,omitempty" swaggertype:"object"`
+	ExpectedContentHash *string         `json:"expected_content_hash,omitempty"`
 }
 
 type pageDiagramBlock struct {

@@ -28,6 +28,15 @@ type Model struct {
 	stack   []core.Screen
 	dialogs []dialog.Dialog
 	notice  statusbar.Notice
+
+	prefsKnown            bool
+	prefsThemeDirty       bool
+	prefsSplitDirty       bool
+	prefsWorkspaceDirty   bool
+	prefsVersion          uint64
+	prefsSavingVersion    uint64
+	prefsCompletedVersion uint64
+	prefsSaving           bool
 }
 
 // New builds the root model with root as the bottom (initial) screen.
@@ -43,7 +52,7 @@ func (m Model) active() core.Screen { return m.stack[len(m.stack)-1] }
 // Init starts the initial screen and kicks off the preferences load (which
 // never blocks startup — failure just means defaults).
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(data.LoadPrefs(m.ctx.Client), m.active().Init())
+	return tea.Batch(data.LoadPrefs(m.ctx.Client), data.LoadCurrentUser(m.ctx.Client), m.active().Init())
 }
 
 // Update routes messages: sizes fan out to the whole stack, keys go to the
@@ -93,41 +102,106 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case core.PrefsChangeMsg:
+		if msg.SetTheme {
+			m.ctx.Prefs.Theme = msg.Theme
+			m.prefsThemeDirty = true
+		}
+		if msg.SetSplitRatio {
+			ratio := msg.SplitRatio
+			m.ctx.Prefs.SplitRatio = &ratio
+			m.prefsSplitDirty = true
+		}
+		if msg.SetLastWorkspaceID {
+			workspaceID := msg.LastWorkspaceID
+			m.ctx.Prefs.LastWorkspaceID = &workspaceID
+			m.prefsWorkspaceDirty = true
+		}
+		m.prefsVersion++
+		cmd := m.startPrefsSave()
+		return m, cmd
+
 	case data.PrefsLoadedMsg:
+		m.prefsKnown = true
 		if msg.OK {
-			m.ctx.Prefs = msg.Prefs
-			if msg.Prefs.Theme != "" {
-				resolved := styles.ByName(msg.Prefs.Theme)
+			if !m.prefsThemeDirty {
+				m.ctx.Prefs.Theme = msg.Prefs.Theme
+			}
+			if !m.prefsSplitDirty {
+				m.ctx.Prefs.SplitRatio = msg.Prefs.SplitRatio
+			}
+			if !m.prefsWorkspaceDirty {
+				m.ctx.Prefs.LastWorkspaceID = msg.Prefs.LastWorkspaceID
+			}
+			if m.ctx.Prefs.Theme != "" {
+				resolved := styles.ByName(m.ctx.Prefs.Theme)
 				if resolved.Name != m.ctx.Theme {
 					m.applyTheme(resolved)
 				}
-				if resolved.Name != msg.Prefs.Theme {
+				if resolved.Name != m.ctx.Prefs.Theme {
 					m.ctx.Prefs.Theme = resolved.Name
-					return m, tea.Batch(m.broadcast(msg), data.SavePrefs(m.ctx.Client, m.ctx.Prefs))
+					m.prefsVersion++
+					m.prefsThemeDirty = true
 				}
 			}
 		}
-		return m, m.broadcast(msg)
+		merged := data.PrefsLoadedMsg{Prefs: m.ctx.Prefs, OK: msg.OK}
+		routeCmd := m.routeActive(merged)
+		saveCmd := m.startPrefsSave()
+		return m, tea.Batch(routeCmd, saveCmd)
+
+	case data.PrefsSavedMsg:
+		if msg.Version != m.prefsSavingVersion {
+			return m, nil
+		}
+		m.prefsSaving = false
+		m.prefsCompletedVersion = msg.Version
+		if msg.Err != "" {
+			m.notice = statusbar.Notice{Kind: statusbar.Error, Text: "Saving preferences failed: " + msg.Err}
+		}
+		cmd := m.startPrefsSave()
+		return m, cmd
+
+	case data.CurrentUserLoadedMsg:
+		if msg.OK {
+			m.ctx.UserTimezoneKnown = true
+			if m.ctx.User != nil {
+				m.ctx.User.Timezone = msg.Timezone
+			}
+		}
+		return m, m.routeActive(msg)
 
 	case data.ErrorMsg:
-		m.notice = statusbar.Notice{Kind: statusbar.Error, Text: msg.Err}
-		return m, m.broadcast(msg)
+		return m, m.routeActive(msg)
 	}
 
-	return m, m.broadcast(msg)
+	return m, m.routeActiveAndDialog(msg)
 }
 
-// broadcast delivers msg to every screen in the stack (bottom to top).
-// Screens ignore messages they don't know; the stack stays shallow, so this
-// is cheap and lets an underlying list refresh while a form is on top.
-func (m Model) broadcast(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
-	for _, s := range m.stack {
-		if cmd := s.Update(msg); cmd != nil {
-			cmds = append(cmds, cmd)
+// routeActive sends async results only to the screen that currently owns the
+// foreground. Hidden screens must not consume stale results or keep lifecycle
+// commands alive.
+func (m Model) routeActive(msg tea.Msg) tea.Cmd {
+	return m.active().Update(msg)
+}
+
+func (m Model) routeActiveAndDialog(msg tea.Msg) tea.Cmd {
+	cmds := []tea.Cmd{m.routeActive(msg)}
+	if len(m.dialogs) > 0 {
+		if handler, ok := m.dialogs[len(m.dialogs)-1].(dialog.MessageHandler); ok {
+			cmds = append(cmds, handler.HandleMessage(msg))
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+func (m *Model) startPrefsSave() tea.Cmd {
+	if !m.prefsKnown || m.prefsSaving || m.prefsVersion <= m.prefsCompletedVersion {
+		return nil
+	}
+	m.prefsSaving = true
+	m.prefsSavingVersion = m.prefsVersion
+	return data.SavePrefs(m.ctx.Client, m.ctx.Prefs, m.prefsSavingVersion)
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -135,6 +209,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// something succeeds or explicitly clears.
 	if m.notice.Kind == statusbar.Success {
 		m.notice = statusbar.Notice{}
+	}
+
+	// Ctrl+C is always a terminal interrupt. Printable q remains available in
+	// text editors and dialog filters.
+	if msg.String() == "ctrl+c" {
+		return m, tea.Quit
 	}
 
 	// Dialogs eat keys first.
@@ -153,7 +233,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					if theme, ok := action.Selected.(styles.Theme); ok {
 						m.applyTheme(theme)
 						m.ctx.Prefs.Theme = theme.Name
-						cmds = append(cmds, core.NotifySuccess("Theme: "+theme.Label), data.SavePrefs(m.ctx.Client, m.ctx.Prefs))
+						cmds = append(cmds, core.NotifySuccess("Theme: "+theme.Label), core.SaveTheme(theme.Name))
 					}
 				} else if len(m.dialogs) > 0 {
 					parent := m.dialogs[len(m.dialogs)-1]
@@ -247,12 +327,21 @@ func (m Model) helpGroups() []dialog.HelpGroup {
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	v.MouseMode = tea.MouseModeNone
 	v.WindowTitle = m.windowTitle()
 	v.BackgroundColor = m.ctx.Styles.Palette.BgBase
 
 	if m.ctx.Width == 0 || m.ctx.Height == 0 {
 		v.SetContent("")
+		return v
+	}
+	if m.ctx.Width < 20 || m.ctx.Height < 6 {
+		content := lipgloss.NewStyle().
+			MaxWidth(m.ctx.Width).
+			MaxHeight(m.ctx.Height).
+			Foreground(m.ctx.Styles.Palette.FgMuted).
+			Render("Terminal too small")
+		v.SetContent(content)
 		return v
 	}
 
@@ -302,8 +391,9 @@ func (m Model) overlayDialog(content string, d dialog.Dialog) string {
 	if sized, ok := d.(interface{ PreferredWidth() int }); ok {
 		width = sized.PreferredWidth()
 	}
-	if width > m.ctx.Width-8 {
-		width = m.ctx.Width - 8
+	availableWidth := max(1, m.ctx.Width-8)
+	if width > availableWidth {
+		width = availableWidth
 	}
 
 	footerText := "↑↓ select · enter confirm · esc cancel"
@@ -312,7 +402,7 @@ func (m Model) overlayDialog(content string, d dialog.Dialog) string {
 	}
 
 	titleLine := s.Dialog.Title.Render(d.Title())
-	stacked := titleLine + "\n" + d.View(width, m.ctx.Height-8)
+	stacked := titleLine + "\n" + d.View(width, max(1, m.ctx.Height-8))
 	if footerText != "" {
 		stacked += "\n" + s.Dialog.Footer.Render(footerText)
 	}

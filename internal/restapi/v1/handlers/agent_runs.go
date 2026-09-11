@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,16 +18,18 @@ import (
 // Mutations (rerun/cancel) stay on the session surface.
 type AgentRunHandler struct {
 	BaseHandler
-	itemRepo *repository.ItemRepository
-	runRepo  *repository.AgentRunRepository
+	reads *services.AgentRunReadService
 }
 
 // NewAgentRunHandler creates a new agent-run handler.
 func NewAgentRunHandler(db database.Database, permissionService *services.PermissionService) *AgentRunHandler {
 	return &AgentRunHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
-		itemRepo:    repository.NewItemRepository(db),
-		runRepo:     repository.NewAgentRunRepository(db),
+		reads: services.NewAgentRunReadService(
+			repository.NewItemRepository(db),
+			repository.NewAgentRunRepository(db),
+			permissionService,
+		),
 	}
 }
 
@@ -69,22 +72,6 @@ func (h *AgentRunHandler) ListForItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			h.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	allowed, err := h.Perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !allowed {
-		// 404, not 403 — item existence must not leak.
-		h.RespondError(w, r, restapi.ErrItemNotFound)
-		return
-	}
-
 	limit := 50
 	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 {
 		limit = n
@@ -94,7 +81,11 @@ func (h *AgentRunHandler) ListForItem(w http.ResponseWriter, r *http.Request) {
 		beforeID = n
 	}
 
-	runs, err := h.runRepo.ListForItem(r.Context(), itemID, limit, beforeID)
+	runs, err := h.reads.ListForItem(r.Context(), user.ID, itemID, limit, beforeID)
+	if errors.Is(err, services.ErrAgentRunItemNotVisible) {
+		h.RespondError(w, r, restapi.ErrItemNotFound)
+		return
+	}
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return

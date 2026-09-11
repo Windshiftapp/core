@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 var personalWorkspaceKeySanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
@@ -105,10 +106,13 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 		slog.Warn("failed to create item sequence for personal workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
-	// Invalidate permission cache so the user gets auto-granted permissions for the new workspace
-	if h.permissionService != nil {
-		_ = h.permissionService.InvalidateUserCache(userID)
-		h.permissionService.InvalidateActiveWorkspaceCache()
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		UserIDs:                 []int{userID},
+		ActiveWorkspacesChanged: true,
+		WorkspaceKeysChanged:    true,
+	}); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Return the created personal workspace

@@ -127,7 +127,7 @@
       });
       if (version !== itemLoadVersion) return;
 
-      const rawItems = Array.isArray(response) ? response : response?.items ?? [];
+      const rawItems = response?.data ?? [];
       items = rawItems.filter((item) => item?.id);
     } catch (loadError) {
       if (version !== itemLoadVersion) return;

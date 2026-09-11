@@ -10,6 +10,7 @@
   let errorMessage = $state('');
 
   let verificationRun = 0;
+  let lastVerificationKey = null;
 
   async function verify(currentSlug, currentToken, run) {
     if (!currentToken) {
@@ -45,6 +46,11 @@
   $effect(() => {
     const currentSlug = slug;
     const currentToken = token;
+    const verificationKey = currentSlug && currentToken
+      ? `${currentSlug}:${currentToken}`
+      : null;
+    if (verificationKey && verificationKey === lastVerificationKey) return;
+    lastVerificationKey = verificationKey;
     const run = ++verificationRun;
     status = 'verifying';
     errorMessage = '';

@@ -228,7 +228,7 @@
       }
 
       await api.items.updateFracIndex(draggedItem.id, {
-        prev_item_id: prevItemId,
+        previous_item_id: prevItemId,
         next_item_id: nextItemId
       });
 

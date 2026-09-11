@@ -29,19 +29,23 @@ export default {
     start: 'Inicio',
     end: 'Fim',
     duration: 'Duracao',
-    durationHelperText: 'Insira hora de inicio + duracao (2h) para calcular automaticamente a hora de termino, ou insira inicio + fim para calcular automaticamente a duracao. Formatos de tempo: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
+    durationHelperText:
+      'Insira hora de inicio + duracao (2h) para calcular automaticamente a hora de termino, ou insira inicio + fim para calcular automaticamente a duracao. Formatos de tempo: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
     onboarding: {
       title: 'Configurar Registro de Horas',
       subtitle: 'Vamos criar sua primeira organizacao de cliente e projeto para comecar',
       setupProgress: 'Progresso da Configuracao',
       stepOf: 'Etapa {current} de {total}',
       createCustomerTitle: 'Crie Sua Primeira Organizacao de Cliente',
-      createCustomerDescription: 'Uma organizacao de cliente representa a empresa ou entidade para a qual voce esta trabalhando. Pode ser uma organizacao cliente, seu empregador ou sua propria empresa.',
+      createCustomerDescription:
+        'Uma organizacao de cliente representa a empresa ou entidade para a qual voce esta trabalhando. Pode ser uma organizacao cliente, seu empregador ou sua propria empresa.',
       createProjectTitle: 'Crie Seu Primeiro Projeto',
-      createProjectDescription: 'Projetos ajudam a organizar seu trabalho dentro de um cliente. Voce pode registrar tempo em projetos especificos.',
+      createProjectDescription:
+        'Projetos ajudam a organizar seu trabalho dentro de um cliente. Voce pode registrar tempo em projetos especificos.',
       organizationNameRequired: 'O nome da organizacao e obrigatorio',
       projectNameRequired: 'O nome do projeto e obrigatorio',
-      failedToCreateCustomer: 'Falha ao criar a organizacao de cliente. Por favor, tente novamente.',
+      failedToCreateCustomer:
+        'Falha ao criar a organizacao de cliente. Por favor, tente novamente.',
       failedToCreateProject: 'Falha ao criar o projeto. Por favor, tente novamente.',
       customerCreatedSuccess: 'Organizacao de cliente "{name}" criada com sucesso!',
       organizationNamePlaceholder: 'ex.: Empresa ABC, TechStart Ltda, Trabalho Freelance',
@@ -101,7 +105,8 @@ export default {
       noBudgetSet: 'Nenhum orçamento definido',
       noProjectSelected: 'Selecione um projeto para ver o relatório',
       printLoading: 'Preparando relatório de horas para impressão…',
-      printUnavailable: 'Este relatório de horas não está mais disponível. Volte aos relatórios e exporte-o novamente.',
+      printUnavailable:
+        'Este relatório de horas não está mais disponível. Volte aos relatórios e exporte-o novamente.',
       backToReports: 'Voltar aos relatórios',
     },
     timer: {
@@ -121,7 +126,8 @@ export default {
       allCategories: 'Todas as Categorias',
       allStatuses: 'Todos os Status',
       statusCount: '{count} status',
-      noProjects: 'Nenhum projeto encontrado. Crie seu primeiro projeto para comecar a registrar horas.',
+      noProjects:
+        'Nenhum projeto encontrado. Crie seu primeiro projeto para comecar a registrar horas.',
       noProjectsInCategory: 'Nenhum projeto nesta categoria.',
       failedToSave: 'Falha ao salvar projeto',
       deleteProject: 'Excluir Projeto',
@@ -169,7 +175,8 @@ export default {
       title: 'Organizacoes',
       subtitle: 'Gerencie suas organizacoes de clientes',
       addOrganization: 'Adicionar Organizacao',
-      noOrganizations: 'Nenhuma organizacao encontrada. Crie sua primeira organizacao para comecar.',
+      noOrganizations:
+        'Nenhuma organizacao encontrada. Crie sua primeira organizacao para comecar.',
       name: 'Nome da Organizacao',
       emailOptional: 'E-mail (Opcional)',
       contactPersonOptional: 'Pessoa de Contato (Opcional)',
@@ -187,17 +194,21 @@ export default {
       removeManager: 'Remover Gerente',
       removeMember: 'Remover Membro',
       noManagers: 'Nenhum gerente atribuido',
-      noManagersHint: 'Quando nenhum gerente esta atribuido, qualquer pessoa pode gerenciar este projeto',
+      noManagersHint:
+        'Sem gerentes atribuídos, apenas administradores globais e usuários com permissão para gerenciar todos os projetos de tempo e registros podem gerenciar este projeto',
       noMembers: 'Nenhum membro atribuido',
-      noMembersHint: 'Quando nenhum membro esta atribuido, qualquer pessoa pode registrar tempo neste projeto',
+      noMembersHint:
+        'Quando nenhum membro esta atribuido, qualquer pessoa pode registrar tempo neste projeto',
       grantedAt: 'Adicionado',
       confirmRemove: 'Tem certeza de que deseja remover {name}?',
       failedToAdd: 'Falha ao adicionar',
       failedToRemove: 'Falha ao remover',
       managersNote: 'Gerentes:',
-      managersNoteText: 'Podem editar configuracoes do projeto, gerenciar membros e visualizar todos os registros de tempo deste projeto.',
+      managersNoteText:
+        'Podem editar configuracoes do projeto, gerenciar membros e visualizar todos os registros de tempo deste projeto.',
       membersNote: 'Membros:',
-      membersNoteText: 'Podem registrar tempo neste projeto e visualizar seus proprios registros de tempo.',
+      membersNoteText:
+        'Podem registrar tempo neste projeto e visualizar seus proprios registros de tempo.',
     },
     timesheet: {
       title: 'Planilha de horas',

@@ -288,8 +288,8 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 func (r *WorkspaceRepository) GrantAdministratorRoleTx(tx database.Tx, workspaceID int64, userID int) error {
 	result, err := tx.Exec(`
 		INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
-		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
-	`, workspaceID, userID, userID)
+		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE builtin_key = ?
+	`, workspaceID, userID, userID, models.RoleBuiltinAdministrator)
 	if err != nil {
 		return fmt.Errorf("failed to grant admin role to workspace creator: %w", err)
 	}
@@ -347,6 +347,15 @@ func (r *WorkspaceRepository) Delete(id int) error {
 	return nil
 }
 
+// DeleteTx removes a workspace inside the caller's transaction. Cache
+// invalidation remains the caller's post-commit responsibility.
+func (r *WorkspaceRepository) DeleteTx(tx database.Tx, id int) error {
+	if _, err := tx.ExecWrite("DELETE FROM workspaces WHERE id = ?", id); err != nil {
+		return err
+	}
+	return nil
+}
+
 // FindMissingOrPersonal accepts a set of workspace IDs and returns those that
 // don't exist or are flagged as personal — i.e. invalid as portal/form
 // submission targets. Used by UpdateChannelConfig to reject bogus IDs before
@@ -399,6 +408,20 @@ func (r *WorkspaceRepository) Exists(id int) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", id).Scan(&exists)
 	return exists, err
+}
+
+// LockForDeleteTx locks a workspace before its items are fenced and deleted.
+func (r *WorkspaceRepository) LockForDeleteTx(tx database.Tx, id int) (bool, error) {
+	query := "SELECT id FROM workspaces WHERE id = ?"
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	var lockedID int
+	err := tx.QueryRow(query, id).Scan(&lockedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // KeyExists checks if a workspace key exists

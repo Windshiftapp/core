@@ -2,14 +2,10 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"windshift/internal/objecttranslation"
-	"windshift/internal/sanitize"
 )
-
-const maxTranslationResolveTargets = 500
 
 // ObjectTranslationHandler exposes administrator-managed instance translations.
 type ObjectTranslationHandler struct {
@@ -54,14 +50,8 @@ func (h *ObjectTranslationHandler) Upsert(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	field := r.PathValue("field")
-	if field == objecttranslation.FieldDescription {
-		request.Value = sanitize.RichText.Sanitize(request.Value)
-	} else {
-		request.Value = sanitize.PlainTextField.Sanitize(request.Value)
-	}
 	translation, err := h.service.UpsertInstance(
-		r.Context(), r.PathValue("object_type"), objectID, field, r.PathValue("locale"), request.Value,
+		r.Context(), r.PathValue("object_type"), objectID, r.PathValue("field"), r.PathValue("locale"), request.Value,
 	)
 	if err != nil {
 		h.respondError(w, r, err)
@@ -97,11 +87,7 @@ func (h *ObjectTranslationHandler) Resolve(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if len(request.Targets) > maxTranslationResolveTargets {
-		respondValidationError(w, r, fmt.Sprintf("targets must contain at most %d objects", maxTranslationResolveTargets))
-		return
-	}
-	resolved, err := h.service.Resolve(r.Context(), request.Locale, request.Targets)
+	resolved, err := h.service.ResolveBounded(r.Context(), request.Locale, request.Targets)
 	if err != nil {
 		h.respondError(w, r, err)
 		return
@@ -136,7 +122,8 @@ func (h *ObjectTranslationHandler) respondError(w http.ResponseWriter, r *http.R
 	case errors.Is(err, objecttranslation.ErrUnsupportedObjectType),
 		errors.Is(err, objecttranslation.ErrUnsupportedField),
 		errors.Is(err, objecttranslation.ErrInvalidLocale),
-		errors.Is(err, objecttranslation.ErrInvalidValue):
+		errors.Is(err, objecttranslation.ErrInvalidValue),
+		errors.Is(err, objecttranslation.ErrTooManyTargets):
 		respondValidationError(w, r, err.Error())
 	default:
 		respondInternalError(w, r, err)

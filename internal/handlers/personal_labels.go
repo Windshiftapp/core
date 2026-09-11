@@ -598,63 +598,11 @@ func (h *PersonalLabelHandler) respondItemPersonalLabels(w http.ResponseWriter, 
 // The viewing user determines visibility: a user only sees their own personal
 // labels plus any shared (user_id IS NULL) labels.
 func LoadPersonalLabelsForItems(db database.Database, items []models.Item, viewingUserID int) error {
-	return LoadPersonalLabelsForItemsContext(context.Background(), db, items, viewingUserID)
+	return services.LoadPersonalLabelsForItems(context.Background(), db, items, viewingUserID)
 }
 
 // LoadPersonalLabelsForItemsContext is the request-aware form of
 // LoadPersonalLabelsForItems.
 func LoadPersonalLabelsForItemsContext(ctx context.Context, db database.Database, items []models.Item, viewingUserID int) error {
-	if len(items) == 0 {
-		return nil
-	}
-
-	itemIDs := make([]any, 0, len(items)+1)
-	placeholders := make([]string, 0, len(items))
-	for _, item := range items {
-		itemIDs = append(itemIDs, item.ID)
-		placeholders = append(placeholders, "?")
-	}
-	itemIDs = append(itemIDs, viewingUserID)
-
-	query := fmt.Sprintf(`
-		SELECT pil.item_id, pl.id, pl.name, pl.color, pl.user_id, pl.created_at, pl.updated_at
-		FROM personal_item_labels pil
-		JOIN personal_labels pl ON pil.personal_label_id = pl.id
-		WHERE pil.item_id IN (%s)
-		  AND (pl.user_id IS NULL OR pl.user_id = ?)
-		ORDER BY pl.name
-	`, strings.Join(placeholders, ","))
-
-	rows, err := db.QueryContext(ctx, query, itemIDs...)
-	if err != nil {
-		return fmt.Errorf("failed to load personal labels for items: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	labelMap := make(map[int][]models.PersonalLabel)
-	for rows.Next() {
-		var itemID int
-		var label models.PersonalLabel
-		var userID sql.NullInt64
-		if err := rows.Scan(&itemID, &label.ID, &label.Name, &label.Color, &userID,
-			&label.CreatedAt, &label.UpdatedAt); err != nil {
-			return fmt.Errorf("failed to scan personal label: %w", err)
-		}
-		if userID.Valid {
-			v := int(userID.Int64)
-			label.UserID = &v
-		}
-		labelMap[itemID] = append(labelMap[itemID], label)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate personal labels: %w", err)
-	}
-
-	for i := range items {
-		if labels, ok := labelMap[items[i].ID]; ok {
-			items[i].PersonalLabels = labels
-		}
-	}
-
-	return nil
+	return services.LoadPersonalLabelsForItems(ctx, db, items, viewingUserID)
 }

@@ -2001,6 +2001,13 @@ func (h *JiraImportHandler) ensureWorkspace(ctx context.Context, jobID string, m
 	if err != nil {
 		return 0, fmt.Errorf("failed to create workspace: %w", err)
 	}
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		ResetPermissions:        true,
+		ActiveWorkspacesChanged: true,
+		WorkspaceKeysChanged:    true,
+	}); err != nil {
+		return 0, fmt.Errorf("invalidate authorization caches for imported workspace: %w", err)
+	}
 
 	// Record the mapping
 	if err := h.recordMapping(jobID, "workspace", mapping.JiraKey, mapping.JiraKey, result.Workspace.ID, map[string]any{

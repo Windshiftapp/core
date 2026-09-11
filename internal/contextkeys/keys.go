@@ -25,4 +25,6 @@ const (
 	PortalCustomerID ContextKey = "portal_customer_id"
 	// ClientIP stores the proxy-validated client IP address (string)
 	ClientIP ContextKey = "client_ip"
+	// RequestID stores the request correlation ID (string)
+	RequestID ContextKey = "request_id"
 )

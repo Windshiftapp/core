@@ -53,8 +53,8 @@ type Form struct {
 // NewForm builds a form dialog. width is the inner content width the
 // fields are sized to.
 func NewForm(id, title string, fields []FormField, s *styles.Styles, width int) *Form {
-	if width < 30 {
-		width = 30
+	if width < 1 {
+		width = 1
 	}
 	f := &Form{
 		id:     id,
@@ -140,9 +140,9 @@ func (f *Form) beginEditing() tea.Cmd {
 	if field.Multiline {
 		return field.Area.Focus()
 	}
-	field.Input.Focus()
+	cmd := field.Input.Focus()
 	field.Input.CursorEnd()
-	return nil
+	return cmd
 }
 
 func (f *Form) stopEditing() {
@@ -238,11 +238,37 @@ func (f *Form) HandleResult(msg ResultMsg) tea.Cmd {
 	return nil
 }
 
-func (f *Form) View(_, _ int) string {
+func (f *Form) HandleMessage(msg tea.Msg) tea.Cmd {
+	if !f.editing || len(f.fields) == 0 {
+		return nil
+	}
+	field := &f.fields[f.focus]
+	var cmd tea.Cmd
+	if field.Multiline {
+		field.Area, cmd = field.Area.Update(msg)
+	} else {
+		field.Input, cmd = field.Input.Update(msg)
+	}
+	return cmd
+}
+
+func (f *Form) View(width, height int) string {
 	s := f.styles
 	var rows []string
+	focusLine := 0
+	fieldWidth := min(f.width, max(1, width))
 	for i := range f.fields {
 		fld := &f.fields[i]
+		if i == f.focus {
+			focusLine = lineCount(rows)
+		}
+		if fld.Choice == nil {
+			if fld.Multiline {
+				fld.Area.SetWidth(fieldWidth)
+			} else {
+				fld.Input.SetWidth(fieldWidth)
+			}
+		}
 		label := s.Form.Label.Render(fld.Label)
 		if i == f.focus {
 			label = s.List.SelBar.Render("▎") + " " + label
@@ -263,7 +289,7 @@ func (f *Form) View(_, _ int) string {
 		case fld.Multiline:
 			rows = append(rows, fld.Area.View())
 		default:
-			rows = append(rows, inputs.Render(s, fld.Input, i == f.focus, f.editing && i == f.focus, f.width))
+			rows = append(rows, inputs.Render(s, fld.Input, i == f.focus, f.editing && i == f.focus, fieldWidth))
 		}
 		if i < len(f.fields)-1 {
 			rows = append(rows, "")
@@ -277,5 +303,24 @@ func (f *Form) View(_, _ int) string {
 		}
 	}
 	rows = append(rows, "", s.Form.Hint.Render(hint))
-	return strings.Join(rows, "\n")
+	lines := strings.Split(strings.Join(rows, "\n"), "\n")
+	if height < 1 || len(lines) <= height {
+		return strings.Join(lines, "\n")
+	}
+	start := focusLine - height/3
+	if start < 0 {
+		start = 0
+	}
+	if start+height > len(lines) {
+		start = len(lines) - height
+	}
+	return strings.Join(lines[start:start+height], "\n")
+}
+
+func lineCount(rows []string) int {
+	count := 0
+	for _, row := range rows {
+		count += strings.Count(row, "\n") + 1
+	}
+	return count
 }

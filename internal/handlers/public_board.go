@@ -32,18 +32,6 @@ var publicBoardCardFieldAllowlist = map[string]struct{}{
 	"labels":       {},
 }
 
-func validatePublicBoardCardFields(fields []models.ListColumn) error {
-	for _, field := range fields {
-		if field.FieldType != "system" {
-			return fmt.Errorf("card field %q is not approved for public boards", field.FieldIdentifier)
-		}
-		if _, allowed := publicBoardCardFieldAllowlist[field.FieldIdentifier]; !allowed {
-			return fmt.Errorf("card field %q is not supported on public boards", field.FieldIdentifier)
-		}
-	}
-	return nil
-}
-
 func filterPublicBoardCardFields(fields []models.ListColumn) []models.ListColumn {
 	filtered := make([]models.ListColumn, 0, len(fields))
 	for _, field := range fields {

@@ -20,6 +20,7 @@
     triggerGap = 'gap-2',
     items = [],
     maxWidth = 'max-w-3xl',
+    matchTriggerWidth = false,
     /** @type {'bottom' | 'bottom-start' | 'bottom-end' | 'top' | 'top-start' | 'top-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end'} */
     placement = 'bottom',
     align = undefined,
@@ -55,6 +56,10 @@
   } = createPopover(/** @type {any} */ ({
     forceVisible: true,
     positioning: {
+      strategy: 'fixed',
+      fitViewport: true,
+      // svelte-ignore state_referenced_locally
+      sameWidth: matchTriggerWidth,
       // svelte-ignore state_referenced_locally
       placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },
@@ -232,10 +237,11 @@
   <div
     use:melt={$content}
     data-menu-container
+    data-testid={triggerTestid ? `${triggerTestid}-menu` : undefined}
     role="menu"
     tabindex="-1"
     onkeydown={handleMenuKeydown}
-    class="{maxWidth} rounded shadow-xl border focus:outline-none z-[60]"
+    class="{maxWidth} rounded shadow-xl border overflow-y-auto overscroll-contain focus:outline-none z-[60]"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
   >
     <div>
@@ -449,6 +455,9 @@
 
             {#if itemData.badge}
               <span class="ml-auto text-xs {itemData.badgeClass || ''}" style="{itemData.badgeStyle || (itemData.badgeClass ? '' : 'color: var(--ds-text-subtlest);')}">{itemData.badge}</span>
+            {/if}
+            {#if itemData.selected}
+              <Check class="ml-3 w-4 h-4 flex-shrink-0" style="color: var(--ds-icon-brand);" />
             {/if}
           </svelte:element>
         {/if}

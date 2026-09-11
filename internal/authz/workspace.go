@@ -184,37 +184,37 @@ func (a *Authz) CanViewWorkspaceTx(ctx context.Context, tx database.Tx, userID, 
 		return false, nil
 	}
 
-	roleHasPermission := func(roleName string) (bool, error) {
+	roleHasPermission := func(roleKey string) (bool, error) {
 		var has int
 		err := tx.QueryRowContext(ctx, `
 			SELECT COUNT(*) FROM role_permissions rp
 			JOIN permissions p ON p.id = rp.permission_id
 			JOIN workspace_roles wr ON wr.id = rp.role_id
-			WHERE wr.name = ? AND p.permission_key = ?
-		`, roleName, models.PermissionItemView).Scan(&has)
+			WHERE wr.builtin_key = ? AND p.permission_key = ?
+		`, roleKey, models.PermissionItemView).Scan(&has)
 		return has > 0, err
 	}
-	roleAssigned := func(roleName string) (bool, error) {
+	roleAssigned := func(roleKey string) (bool, error) {
 		var assigned int
 		err := tx.QueryRowContext(ctx, `
 			SELECT COUNT(*) FROM workspace_roles wr
-			WHERE wr.name = ? AND wr.id IN (
+			WHERE wr.builtin_key = ? AND wr.id IN (
 				SELECT role_id FROM user_workspace_roles WHERE workspace_id = ?
 				UNION
 				SELECT role_id FROM group_workspace_roles WHERE workspace_id = ?
 			)
-		`, roleName, workspaceID, workspaceID).Scan(&assigned)
+		`, roleKey, workspaceID, workspaceID).Scan(&assigned)
 		return assigned > 0, err
 	}
 
-	viewerAssigned, err := roleAssigned(models.RoleViewer)
+	viewerAssigned, err := roleAssigned(models.RoleBuiltinViewer)
 	if err != nil {
 		return false, fmt.Errorf("check template access viewer gating: %w", err)
 	}
 	if viewerAssigned {
 		return false, nil
 	}
-	viewerHas, err := roleHasPermission(models.RoleViewer)
+	viewerHas, err := roleHasPermission(models.RoleBuiltinViewer)
 	if err != nil {
 		return false, fmt.Errorf("check template access viewer permission: %w", err)
 	}
@@ -222,24 +222,24 @@ func (a *Authz) CanViewWorkspaceTx(ctx context.Context, tx database.Tx, userID, 
 		return true, nil
 	}
 
-	editorAssigned, err := roleAssigned(models.RoleEditor)
+	editorAssigned, err := roleAssigned(models.RoleBuiltinEditor)
 	if err != nil {
 		return false, fmt.Errorf("check template access editor gating: %w", err)
 	}
 	if !editorAssigned {
-		editorHas, err := roleHasPermission(models.RoleEditor)
+		editorHas, err := roleHasPermission(models.RoleBuiltinEditor)
 		if err != nil {
 			return false, fmt.Errorf("check template access editor permission: %w", err)
 		}
 		if editorHas {
 			return true, nil
 		}
-		testerAssigned, err := roleAssigned(models.RoleTester)
+		testerAssigned, err := roleAssigned(models.RoleBuiltinTester)
 		if err != nil {
 			return false, fmt.Errorf("check template access tester gating: %w", err)
 		}
 		if !testerAssigned {
-			testerHas, err := roleHasPermission(models.RoleTester)
+			testerHas, err := roleHasPermission(models.RoleBuiltinTester)
 			if err != nil {
 				return false, fmt.Errorf("check template access tester permission: %w", err)
 			}
@@ -276,16 +276,18 @@ func (a *Authz) canEditWorkspaceFallback(userID, workspaceID int) (bool, error) 
 	err := a.db.QueryRow(`
 		SELECT 1 FROM user_workspace_roles uwr
 		JOIN workspace_roles wr ON uwr.role_id = wr.id
-		WHERE uwr.workspace_id = ? AND uwr.user_id = ? AND wr.name IN ('Editor', 'Administrator')
+		WHERE uwr.workspace_id = ? AND uwr.user_id = ? AND wr.builtin_key IN (?, ?)
 		UNION
 		SELECT 1 FROM group_workspace_roles gwr
 		JOIN workspace_roles wr ON gwr.role_id = wr.id
 		JOIN group_members gm ON gwr.group_id = gm.group_id
-		WHERE gwr.workspace_id = ? AND gm.user_id = ? AND wr.name IN ('Editor', 'Administrator')
+		WHERE gwr.workspace_id = ? AND gm.user_id = ? AND wr.builtin_key IN (?, ?)
 		UNION
 		SELECT 1 FROM workspaces WHERE id = ? AND is_personal = true AND owner_id = ?
 		LIMIT 1
-	`, workspaceID, userID, workspaceID, userID, workspaceID, userID).Scan(&hasPermission)
+	`, workspaceID, userID, models.RoleBuiltinEditor, models.RoleBuiltinAdministrator,
+		workspaceID, userID, models.RoleBuiltinEditor, models.RoleBuiltinAdministrator,
+		workspaceID, userID).Scan(&hasPermission)
 	if err != nil {
 		return false, err
 	}

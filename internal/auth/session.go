@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
@@ -54,11 +55,24 @@ type SessionManager struct {
 	db                database.Database
 	opaqueKey         []byte
 	sessionValidation *sessionValidator
+	closeOnce         sync.Once
+	closeErr          error
 	// ipBinding is the resolved SESSION_IP_BINDING mode (config.SessionIPBinding*)
 	// that session validation applies to a client-IP change. An unknown or
 	// zero value is treated as strict so managers built without config.Load
 	// fail closed.
 	ipBinding string
+}
+
+// Close stops the session validation cache's background worker without closing
+// the shared database. It is safe with caching disabled and on repeated calls.
+func (sm *SessionManager) Close() error {
+	sm.closeOnce.Do(func() {
+		if sm.sessionValidation != nil && sm.sessionValidation.cache != nil {
+			sm.closeErr = sm.sessionValidation.cache.Close()
+		}
+	})
+	return sm.closeErr
 }
 
 // Session represents an active user session

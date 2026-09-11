@@ -117,7 +117,7 @@ func (s *ItemUpdateApplicationService) UpdateJSONFields(actorUserID int, actorUs
 	if _, ok := fields["status_id"]; ok {
 		return nil, &validation.ValidationError{
 			Field:   "status_id",
-			Message: "status_id may not be set via item update; use POST /rest/api/v1/items/{id}/transition",
+			Message: "status_id may not be set via item update; use POST /rest/api/v2/items/{id}/transition",
 		}
 	}
 
@@ -152,13 +152,39 @@ func itemUpdateData(fields map[string]json.RawMessage) (map[string]any, error) {
 		updateData["description"] = value
 	}
 	for _, field := range []string{"priority_id", "assignee_id", "parent_id", "iteration_id", "project_id"} {
-		if raw, ok := fields[field]; ok {
-			value, err := decodeNullableItemUpdateInt(raw, field)
-			if err != nil {
-				return nil, err
-			}
-			updateData[field] = value
+		raw, ok := fields[field]
+		if !ok {
+			continue
 		}
+		value, err := decodeNullableItemUpdateInt(raw, field)
+		if err != nil {
+			return nil, err
+		}
+		updateData[field] = value
+	}
+	if raw, ok := fields["story_points"]; ok {
+		value, err := decodeNullableItemUpdateFloat(raw, "story_points")
+		if err != nil {
+			return nil, err
+		}
+		updateData["story_points"] = value
+	}
+	if raw, ok := fields["estimate_minutes"]; ok {
+		value, err := decodeNullableItemUpdateInt(raw, "estimate_minutes")
+		if err != nil {
+			return nil, err
+		}
+		updateData["estimate_minutes"] = value
+	}
+	if raw, ok := fields["inherit_project"]; ok {
+		if string(raw) == "null" {
+			return nil, &validation.ValidationError{Field: "inherit_project", Message: "inherit_project cannot be null"}
+		}
+		var value bool
+		if err := decodeItemUpdateField(raw, "inherit_project", &value); err != nil {
+			return nil, err
+		}
+		updateData["inherit_project"] = value
 	}
 	if raw, ok := fields["item_type_id"]; ok && string(raw) != "null" {
 		var value int
@@ -183,7 +209,10 @@ func itemUpdateData(fields map[string]json.RawMessage) (map[string]any, error) {
 			updateData[field] = value
 		}
 	}
-	if raw, ok := fields["is_task"]; ok && string(raw) != "null" {
+	if raw, ok := fields["is_task"]; ok {
+		if string(raw) == "null" {
+			return nil, &validation.ValidationError{Field: "is_task", Message: "is_task cannot be null"}
+		}
 		var value bool
 		if err := decodeItemUpdateField(raw, "is_task", &value); err != nil {
 			return nil, err
@@ -223,6 +252,17 @@ func decodeNullableItemUpdateTime(raw json.RawMessage, field string) (any, error
 		return nil, nil
 	}
 	var value time.Time
+	if err := decodeItemUpdateField(raw, field, &value); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+func decodeNullableItemUpdateFloat(raw json.RawMessage, field string) (any, error) {
+	if string(raw) == "null" {
+		return nil, nil
+	}
+	var value float64
 	if err := decodeItemUpdateField(raw, field, &value); err != nil {
 		return nil, err
 	}

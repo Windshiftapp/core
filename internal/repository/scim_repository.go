@@ -56,8 +56,8 @@ type SCIMGroupMemberRow struct {
 func (r *SCIMRepository) ListUsersFiltered(whereClause string, filterArgs []any, count, offset int) ([]models.User, int, error) {
 	baseQuery := `SELECT id, email, username, first_name, last_name, is_active,
 	              COALESCE(scim_external_id, '') as scim_external_id, created_at, updated_at
-	              FROM users WHERE is_agent = false AND scim_managed = true`
-	countQuery := `SELECT COUNT(*) FROM users WHERE is_agent = false AND scim_managed = true`
+	              FROM users WHERE is_agent = false AND scim_managed = true AND scim_deleted_at IS NULL`
+	countQuery := `SELECT COUNT(*) FROM users WHERE is_agent = false AND scim_managed = true AND scim_deleted_at IS NULL`
 
 	args := []any{}
 	if whereClause != "" {
@@ -98,6 +98,8 @@ func (r *SCIMRepository) ListUsersFiltered(whereClause string, filterArgs []any,
 }
 
 // GetUserByID loads a single user with the SCIM-relevant flags.
+// Deprovisioned (tombstoned) users are excluded so every SCIM operation on
+// them — GET, PUT, PATCH, DELETE — reports 404 per RFC 7644 §3.6.
 func (r *SCIMRepository) GetUserByID(id int) (*models.User, error) {
 	var user models.User
 	var scimExternalID sql.NullString
@@ -105,7 +107,7 @@ func (r *SCIMRepository) GetUserByID(id int) (*models.User, error) {
 		SELECT id, email, username, first_name, last_name, is_active,
 		       scim_external_id, COALESCE(scim_managed, false), COALESCE(is_agent, false),
 		       created_at, updated_at
-		FROM users WHERE id = ?
+		FROM users WHERE id = ? AND scim_deleted_at IS NULL
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
 		&user.IsActive, &scimExternalID, &user.SCIMManaged, &user.IsAgent,
 		&user.CreatedAt, &user.UpdatedAt)
@@ -178,10 +180,39 @@ func (r *SCIMRepository) ReplaceUser(id int, email, username, firstName, lastNam
 	return err
 }
 
-// DeactivateUser flips a user inactive (SCIM DELETE deactivates, never deletes).
-func (r *SCIMRepository) DeactivateUser(id int) error {
-	_, err := r.db.ExecWrite(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	return err
+// TombstoneUser applies an RFC 7644 §3.6 SCIM DELETE: the user is deactivated
+// and marked deprovisioned so every SCIM query hides the resource, while the
+// row itself is retained for historical references. SCIM-managed group
+// memberships are removed so group projections cannot expose the deleted
+// user. Runs in one transaction — a partial delete must never leave a visible
+// membership on a tombstoned user.
+func (r *SCIMRepository) TombstoneUser(id int) error {
+	return database.WithTx(r.db, func(tx database.Tx) error {
+		if _, err := tx.Exec(`
+			UPDATE users
+			SET is_active = false, scim_deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND scim_deleted_at IS NULL
+		`, id); err != nil {
+			return fmt.Errorf("failed to tombstone user: %w", err)
+		}
+		if _, err := tx.Exec(`
+			DELETE FROM group_members WHERE user_id = ? AND scim_managed = true
+		`, id); err != nil {
+			return fmt.Errorf("failed to remove SCIM group memberships: %w", err)
+		}
+		return nil
+	})
+}
+
+// IsUserSCIMDeleted reports whether the user row carries the SCIM
+// deprovisioning tombstone. Used by the create/adopt flow so a re-provisioning
+// request for a deleted account conflicts instead of resurrecting it.
+func (r *SCIMRepository) IsUserSCIMDeleted(id int) bool {
+	var deleted bool
+	err := r.db.QueryRow(
+		`SELECT scim_deleted_at IS NOT NULL FROM users WHERE id = ?`, id,
+	).Scan(&deleted)
+	return err == nil && deleted
 }
 
 // SetUserActive applies a SCIM PATCH to the active flag.
@@ -229,7 +260,7 @@ func (r *SCIMRepository) IsUserSCIMVisible(userID int) bool {
 	var ok bool
 	err := r.db.QueryRow(`
 		SELECT COALESCE(scim_managed, false) = true AND COALESCE(is_agent, false) = false
-		FROM users WHERE id = ?
+		FROM users WHERE id = ? AND scim_deleted_at IS NULL
 	`, userID).Scan(&ok)
 	return err == nil && ok
 }
@@ -336,7 +367,7 @@ func (r *SCIMRepository) GetGroupMembers(groupID int) ([]SCIMGroupMemberRow, err
 		SELECT u.id, u.first_name, u.last_name, u.username
 		FROM group_members gm
 		JOIN users u ON gm.user_id = u.id
-		WHERE gm.group_id = ? AND gm.scim_managed = true
+		WHERE gm.group_id = ? AND gm.scim_managed = true AND u.scim_deleted_at IS NULL
 	`, groupID)
 	if err != nil {
 		return nil, err

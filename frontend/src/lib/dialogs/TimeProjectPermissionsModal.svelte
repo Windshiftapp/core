@@ -93,7 +93,7 @@
   async function initiateRemove(item, type) {
     const ok = await confirm({
       title: type === 'manager' ? t('time.permissions.removeManager') : t('time.permissions.removeMember'),
-      message: t('time.permissions.confirmRemove', { name: item?.manager_name || item?.member_name }),
+      message: t('time.permissions.confirmRemove', { name: item?.name }),
       confirmText: t('common.remove'),
       variant: 'danger',
     });
@@ -211,9 +211,9 @@
               <!-- Icon -->
               <div
                 class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-                style="background-color: {manager.manager_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'};"
+                style="background-color: {manager.principal_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'};"
               >
-                {#if manager.manager_type === 'user'}
+                {#if manager.principal_type === 'user'}
                   <User class="w-5 h-5" style="color: var(--ds-interactive);" />
                 {:else}
                   <Users class="w-5 h-5" style="color: var(--ds-text-subtle);" />
@@ -224,18 +224,18 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-medium" style="color: var(--ds-text);">
-                    {manager.manager_name}
+                    {manager.name}
                   </h4>
                   <span
                     class="px-2 py-0.5 text-xs font-medium rounded"
-                    style="background-color: {manager.manager_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'}; color: {manager.manager_type === 'user' ? 'var(--ds-interactive-pressed)' : 'var(--ds-text-subtle)'};"
+                    style="background-color: {manager.principal_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'}; color: {manager.principal_type === 'user' ? 'var(--ds-interactive-pressed)' : 'var(--ds-text-subtle)'};"
                   >
-                    {manager.manager_type === 'user' ? t('common.user') : t('common.group')}
+                    {manager.principal_type === 'user' ? t('common.user') : t('common.group')}
                   </span>
                 </div>
-                {#if manager.manager_email}
+                {#if manager.email}
                   <DescriptionText>
-                    {manager.manager_email}
+                    {manager.email}
                   </DescriptionText>
                 {/if}
                 <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">
@@ -278,9 +278,9 @@
               <!-- Icon -->
               <div
                 class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-                style="background-color: {member.member_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'};"
+                style="background-color: {member.principal_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'};"
               >
-                {#if member.member_type === 'user'}
+                {#if member.principal_type === 'user'}
                   <User class="w-5 h-5" style="color: var(--ds-interactive);" />
                 {:else}
                   <Users class="w-5 h-5" style="color: var(--ds-text-subtle);" />
@@ -291,18 +291,18 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-medium" style="color: var(--ds-text);">
-                    {member.member_name}
+                    {member.name}
                   </h4>
                   <span
                     class="px-2 py-0.5 text-xs font-medium rounded"
-                    style="background-color: {member.member_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'}; color: {member.member_type === 'user' ? 'var(--ds-interactive-pressed)' : 'var(--ds-text-subtle)'};"
+                    style="background-color: {member.principal_type === 'user' ? 'var(--ds-interactive-subtle)' : 'var(--ds-surface)'}; color: {member.principal_type === 'user' ? 'var(--ds-interactive-pressed)' : 'var(--ds-text-subtle)'};"
                   >
-                    {member.member_type === 'user' ? t('common.user') : t('common.group')}
+                    {member.principal_type === 'user' ? t('common.user') : t('common.group')}
                   </span>
                 </div>
-                {#if member.member_email}
+                {#if member.email}
                   <DescriptionText>
-                    {member.member_email}
+                    {member.email}
                   </DescriptionText>
                 {/if}
                 <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">

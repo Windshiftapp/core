@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -65,6 +66,15 @@ func scanGroupMember(rows *sql.Rows) (models.TeamGroupMember, error) {
 
 // ListAll returns every group with its member count, ordered by name.
 func (r *GroupRepository) ListAll() ([]models.TeamGroup, error) {
+	return r.list("")
+}
+
+// ListPage returns a bounded group page with its member counts.
+func (r *GroupRepository) ListPage(limit, offset int) ([]models.TeamGroup, error) {
+	return r.list(" LIMIT ? OFFSET ?", limit, offset)
+}
+
+func (r *GroupRepository) list(suffix string, args ...any) ([]models.TeamGroup, error) {
 	rows, err := r.db.Query(`
 		SELECT
 			g.id, g.name, g.description, g.ldap_distinguished_name, g.ldap_common_name,
@@ -74,8 +84,7 @@ func (r *GroupRepository) ListAll() ([]models.TeamGroup, error) {
 			(SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as member_count
 		FROM groups g
 		LEFT JOIN users u ON g.created_by = u.id
-		ORDER BY g.name
-	`)
+		ORDER BY g.name`+suffix, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list groups: %w", err)
 	}
@@ -103,6 +112,15 @@ func (r *GroupRepository) ListAll() ([]models.TeamGroup, error) {
 		return nil, fmt.Errorf("iterate groups: %w", err)
 	}
 	return groups, nil
+}
+
+// Count returns the total number of groups.
+func (r *GroupRepository) Count() (int, error) {
+	var total int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM groups").Scan(&total); err != nil {
+		return 0, fmt.Errorf("count groups: %w", err)
+	}
+	return total, nil
 }
 
 // GetByID returns a single group (without members). It returns ErrNotFound
@@ -354,6 +372,35 @@ func (r *GroupRepository) RemoveMember(groupID, userID int) (int64, error) {
 	}
 	rows, _ := result.RowsAffected()
 	return rows, nil
+}
+
+// ReplaceManualMembers atomically replaces the non-directory-managed members
+// of a group. Directory-managed memberships are preserved.
+func (r *GroupRepository) ReplaceManualMembers(groupID int, userIDs []int, addedBy *int, now time.Time) error {
+	tx, err := r.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("begin group membership replacement: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecWrite(`DELETE FROM group_members WHERE group_id = ? AND COALESCE(ldap_sync_enabled, false) = false`, groupID); err != nil {
+		return fmt.Errorf("clear manual group memberships: %w", err)
+	}
+	for _, userID := range userIDs {
+		if _, err := tx.ExecWrite(`
+			INSERT INTO group_members (group_id, user_id, added_by, added_at, created_at, updated_at)
+			SELECT ?, ?, ?, ?, ?, ?
+			WHERE NOT EXISTS (
+				SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?
+			)
+		`, groupID, userID, addedBy, now, now, now, groupID, userID); err != nil {
+			return fmt.Errorf("add replacement group member %d: %w", userID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit group membership replacement: %w", err)
+	}
+	return nil
 }
 
 // ListUserMemberships returns the active groups a user belongs to, ordered by

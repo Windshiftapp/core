@@ -9,7 +9,6 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
-	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
 
@@ -19,15 +18,16 @@ import (
 // but goes through bearer auth + token scopes.
 type PageLabelHandler struct {
 	BaseHandler
-	repo     *repository.PageLabelRepository
+	labels   *services.PageLabelService
 	pageAuth *services.PagePermissionService
 }
 
 // NewPageLabelHandler constructs a v1 PageLabelHandler.
 func NewPageLabelHandler(db database.Database, permissionService *services.PermissionService) *PageLabelHandler {
+	repo := repository.NewPageLabelRepository(db)
 	return &PageLabelHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
-		repo:        repository.NewPageLabelRepository(db),
+		labels:      services.NewPageLabelService(repo),
 		pageAuth:    services.NewPagePermissionService(db, permissionService),
 	}
 }
@@ -92,7 +92,7 @@ func (h *PageLabelHandler) ListLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	labels, err := h.repo.ListByWorkspace(wsID)
+	labels, err := h.labels.List(wsID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
@@ -124,8 +124,8 @@ func (h *PageLabelHandler) GetLabel(w http.ResponseWriter, r *http.Request) {
 	if !h.checkWorkspacePerm(w, r, user.ID, wsID, models.PermissionPageView) {
 		return
 	}
-	label, err := h.repo.GetByID(labelID)
-	if errors.Is(err, repository.ErrNotFound) || (err == nil && label.WorkspaceID != wsID) {
+	label, err := h.labels.Get(wsID, labelID)
+	if h.isLabelNotFound(err) {
 		h.RespondNotFound(w, r)
 		return
 	}
@@ -172,41 +172,9 @@ func (h *PageLabelHandler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	name := sanitize.ShortIdentifier.Sanitize(req.Name)
-	if !h.ValidateRequiredString(w, r, name, "name") {
-		return
-	}
-	color := req.Color
-	if color == "" {
-		color = "#3B82F6"
-	}
-
-	exists, err := h.repo.NameExistsInWorkspace(wsID, name, 0)
+	label, err := h.labels.Create(wsID, req.Name, req.Color)
 	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	if exists {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a page label with this name already exists in this workspace"))
-		return
-	}
-
-	id, _, err := h.repo.Create(name, color, wsID)
-	if err != nil {
-		// The pre-check above is racy: a concurrent Create can squeeze
-		// past NameExistsInWorkspace and only fail at the DB unique
-		// constraint. Mirror the pre-check's 409 so the loser of the
-		// race sees the same conflict response.
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a page label with this name already exists in this workspace"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	label, err := h.repo.GetByID(id)
-	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondLabelMutationError(w, r, err)
 		return
 	}
 	h.Auditor.Log(r, user, logger.ActionPageLabelCreate, logger.ResourcePageLabel, &label.ID, label.Name)
@@ -243,63 +211,14 @@ func (h *PageLabelHandler) UpdateLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := h.repo.GetByID(labelID)
-	if errors.Is(err, repository.ErrNotFound) || (err == nil && existing.WorkspaceID != wsID) {
-		h.RespondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-
 	var req pageLabelUpdateRequest
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	name := existing.Name
-	if req.Name != nil {
-		name = sanitize.ShortIdentifier.Sanitize(*req.Name)
-		if name == "" {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
-			return
-		}
-	}
-	color := existing.Color
-	if req.Color != nil {
-		color = *req.Color
-		if color == "" {
-			color = "#3B82F6"
-		}
-	}
-
-	if name != existing.Name {
-		exists, eerr := h.repo.NameExistsInWorkspace(wsID, name, labelID)
-		if eerr != nil {
-			h.RespondInternalError(w, r)
-			return
-		}
-		if exists {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a page label with this name already exists in this workspace"))
-			return
-		}
-	}
-
-	if err := h.repo.Update(labelID, name, color); err != nil {
-		// Same racy pre-check as Create: a concurrent rename can land on
-		// the workspace's UNIQUE(workspace_id, name) constraint after
-		// NameExistsInWorkspace reported the name was free.
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a page label with this name already exists in this workspace"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	updated, err := h.repo.GetByID(labelID)
+	updated, err := h.labels.Update(wsID, labelID, services.PageLabelUpdate{Name: req.Name, Color: req.Color})
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondLabelMutationError(w, r, err)
 		return
 	}
 	h.Auditor.Log(r, &models.User{ID: user.ID, Username: user.Username}, logger.ActionPageLabelUpdate, logger.ResourcePageLabel, &labelID, updated.Name)
@@ -331,18 +250,9 @@ func (h *PageLabelHandler) DeleteLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := h.repo.GetByID(labelID)
-	if errors.Is(err, repository.ErrNotFound) || (err == nil && existing.WorkspaceID != wsID) {
-		h.RespondNotFound(w, r)
-		return
-	}
+	existing, err := h.labels.Delete(wsID, labelID)
 	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-
-	if err := h.repo.Delete(labelID); err != nil {
-		h.RespondInternalError(w, r)
+		h.respondLabelMutationError(w, r, err)
 		return
 	}
 	h.Auditor.Log(r, &models.User{ID: user.ID, Username: user.Username}, logger.ActionPageLabelDelete, logger.ResourcePageLabel, &labelID, existing.Name)
@@ -370,7 +280,7 @@ func (h *PageLabelHandler) ListForPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	labels, err := h.repo.ListForPage(pageID)
+	labels, err := h.labels.ListForPage(pageID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
@@ -406,16 +316,9 @@ func (h *PageLabelHandler) SetForPage(w http.ResponseWriter, r *http.Request) {
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	if !h.labelsBelongToWorkspace(w, r, req.LabelIDs, wsID) {
-		return
-	}
-	if err := h.repo.ReplaceAssignments(pageID, req.LabelIDs); err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	labels, err := h.repo.ListForPage(pageID)
+	labels, err := h.labels.SetForPage(wsID, pageID, req.LabelIDs)
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondLabelAssignmentError(w, r, err)
 		return
 	}
 	h.RespondOK(w, pageListWithLabelsResponse{Items: labels})
@@ -449,24 +352,9 @@ func (h *PageLabelHandler) AddToPage(w http.ResponseWriter, r *http.Request) {
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	if req.LabelID == 0 {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "label_id is required"))
-		return
-	}
-	if !h.labelsBelongToWorkspace(w, r, []int{req.LabelID}, wsID) {
-		return
-	}
-	if err := h.repo.AddAssignment(pageID, req.LabelID); err != nil {
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "label is already attached to this page"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	labels, err := h.repo.ListForPage(pageID)
+	labels, err := h.labels.AddToPage(wsID, pageID, req.LabelID)
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondLabelAssignmentError(w, r, err)
 		return
 	}
 	h.RespondOK(w, pageListWithLabelsResponse{Items: labels})
@@ -497,7 +385,7 @@ func (h *PageLabelHandler) RemoveFromPage(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	if err := h.repo.RemoveAssignment(pageID, labelID); err != nil {
+	if err := h.labels.RemoveFromPage(pageID, labelID); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
@@ -565,17 +453,32 @@ func (h *PageLabelHandler) checkWorkspacePerm(w http.ResponseWriter, r *http.Req
 	return true
 }
 
-func (h *PageLabelHandler) labelsBelongToWorkspace(w http.ResponseWriter, r *http.Request, labelIDs []int, workspaceID int) bool {
-	for _, id := range labelIDs {
-		ws, err := h.repo.GetWorkspaceID(id)
-		if errors.Is(err, repository.ErrNotFound) || (err == nil && ws != workspaceID) {
-			h.RespondNotFound(w, r)
-			return false
-		}
-		if err != nil {
-			h.RespondInternalError(w, r)
-			return false
-		}
+func (h *PageLabelHandler) isLabelNotFound(err error) bool {
+	return errors.Is(err, repository.ErrNotFound) || errors.Is(err, services.ErrPageLabelWorkspaceMismatch)
+}
+
+func (h *PageLabelHandler) respondLabelMutationError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case h.isLabelNotFound(err):
+		h.RespondNotFound(w, r)
+	case errors.Is(err, services.ErrPageLabelNameRequired):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	case errors.Is(err, repository.ErrDuplicateEntry):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a page label with this name already exists in this workspace"))
+	default:
+		h.RespondInternalError(w, r)
 	}
-	return true
+}
+
+func (h *PageLabelHandler) respondLabelAssignmentError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrPageLabelIDRequired):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "label_id is required"))
+	case h.isLabelNotFound(err):
+		h.RespondNotFound(w, r)
+	case errors.Is(err, repository.ErrDuplicateEntry):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "label is already attached to this page"))
+	default:
+		h.RespondInternalError(w, r)
+	}
 }

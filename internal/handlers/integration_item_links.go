@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/integrations"
 	"windshift/internal/integrations/notion"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -117,7 +118,9 @@ func (h *IntegrationItemLinksHandler) GetItemLinks(w http.ResponseWriter, r *htt
 		if metadata.Valid {
 			link.LinkMetadata = metadata.String
 		}
-		links = append(links, link)
+		if integrations.SupportsGenericItemLinks(models.IntegrationProviderType(link.ProviderType)) {
+			links = append(links, link)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, err)
@@ -170,10 +173,10 @@ func (h *IntegrationItemLinksHandler) CreateItemLink(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Verify provider exists and is enabled
-	var providerExists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM integration_providers WHERE id = ? AND enabled = true)", req.ProviderID).Scan(&providerExists)
-	if err != nil || !providerExists {
+	// Verify provider exists, is enabled, and explicitly allows generic links.
+	var providerType models.IntegrationProviderType
+	err := h.db.QueryRow("SELECT provider_type FROM integration_providers WHERE id = ? AND enabled = true", req.ProviderID).Scan(&providerType)
+	if err != nil || !integrations.SupportsGenericItemLinks(providerType) {
 		respondBadRequest(w, r, "Integration provider not found or disabled")
 		return
 	}
@@ -234,6 +237,10 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		respondInternalError(w, r, fmt.Errorf("invalid item id on integration link: %w", err))
 		return
 	}
+	if !integrations.SupportsGenericItemLinks(models.IntegrationProviderType(link.ProviderType)) {
+		respondNotFound(w, r, "integration_link")
+		return
+	}
 
 	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
@@ -245,7 +252,6 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		respondInternalError(w, r, err)
 		return
 	}
-
 	h.auditItemLink(r, user, logger.ActionIntegrationItemLinkDelete, link)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -274,6 +280,10 @@ func (h *IntegrationItemLinksHandler) RefreshItemLink(w http.ResponseWriter, r *
 		} else {
 			respondInternalError(w, r, err)
 		}
+		return
+	}
+	if !integrations.SupportsGenericItemRefresh(providerType) {
+		respondNotFound(w, r, "integration_link")
 		return
 	}
 

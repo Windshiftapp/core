@@ -19,8 +19,8 @@ import (
 type WorkspaceBootstrapHandler struct {
 	workspace  *WorkspaceHandler
 	users      *UserHandler
-	milestones *MilestoneHandler
-	iterations *IterationHandler
+	planning   *services.PlanningService
+	permission *services.PermissionService
 	projects   *TimeProjectHandler
 }
 
@@ -41,13 +41,13 @@ type WorkspaceBootstrapResponse struct {
 func NewWorkspaceBootstrapHandler(
 	workspace *WorkspaceHandler,
 	users *UserHandler,
-	milestones *MilestoneHandler,
-	iterations *IterationHandler,
+	planning *services.PlanningService,
+	permission *services.PermissionService,
 	projects *TimeProjectHandler,
 ) *WorkspaceBootstrapHandler {
 	return &WorkspaceBootstrapHandler{
-		workspace: workspace, users: users, milestones: milestones,
-		iterations: iterations, projects: projects,
+		workspace: workspace, users: users, planning: planning,
+		permission: permission, projects: projects,
 	}
 }
 
@@ -198,7 +198,7 @@ func (h *WorkspaceBootstrapHandler) listAssignableUsers(ctx context.Context, wor
 }
 
 func (h *WorkspaceBootstrapHandler) listMilestones(userID, workspaceID int) ([]models.Milestone, error) {
-	results, _, err := h.milestones.planningService.ListMilestones(services.MilestoneListParams{
+	results, _, err := h.planning.ListMilestones(services.MilestoneListParams{
 		Limit: 1000, WorkspaceID: &workspaceID, IncludeGlobal: true,
 	})
 	if err != nil {
@@ -206,13 +206,13 @@ func (h *WorkspaceBootstrapHandler) listMilestones(userID, workspaceID int) ([]m
 	}
 	milestones := make([]models.Milestone, 0, len(results))
 	for i := range results {
-		milestones = append(milestones, h.milestones.milestoneResultToModel(&results[i], userID))
+		milestones = append(milestones, h.milestoneResult(&results[i], userID))
 	}
 	return milestones, nil
 }
 
 func (h *WorkspaceBootstrapHandler) listIterations(workspaceID int) ([]models.Iteration, error) {
-	results, _, err := h.iterations.planningService.ListIterations(services.IterationListParams{
+	results, _, err := h.planning.ListIterations(services.IterationListParams{
 		Limit: 1000, WorkspaceID: &workspaceID, IncludeGlobal: true,
 	})
 	if err != nil {
@@ -220,9 +220,52 @@ func (h *WorkspaceBootstrapHandler) listIterations(workspaceID int) ([]models.It
 	}
 	iterations := make([]models.Iteration, 0, len(results))
 	for i := range results {
-		iterations = append(iterations, iterationResultToModel(&results[i]))
+		iterations = append(iterations, iterationResult(&results[i]))
 	}
 	return iterations, nil
+}
+
+func (h *WorkspaceBootstrapHandler) milestoneResult(result *services.MilestoneResult, userID int) models.Milestone {
+	milestone := models.Milestone{
+		ID: result.ID, Name: result.Name, Description: result.Description, Status: result.Status,
+		CategoryID: result.CategoryID, CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
+		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
+		ExternalKey: result.ExternalKey, Position: result.Position, CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+	}
+	if result.TargetDate != "" {
+		milestone.TargetDate = &result.TargetDate
+	}
+	if result.LatestRelease == nil {
+		return milestone
+	}
+	release := &models.MilestoneRelease{
+		ID: result.LatestRelease.ID, MilestoneID: result.LatestRelease.MilestoneID,
+		TagName: result.LatestRelease.TagName, Name: result.LatestRelease.Name, Body: result.LatestRelease.Body,
+		IsDraft: result.LatestRelease.IsDraft, IsPrerelease: result.LatestRelease.IsPrerelease,
+		TargetCommitish: result.LatestRelease.TargetCommitish, SCMReleaseID: result.LatestRelease.SCMReleaseID,
+		SCMReleaseURL: result.LatestRelease.SCMReleaseURL, CreatedBy: result.LatestRelease.CreatedBy,
+		CreatedAt: result.LatestRelease.CreatedAt,
+	}
+	if result.LatestRelease.SCMConnectionID != nil {
+		workspaceID, err := h.planning.GetSCMConnectionWorkspaceID(*result.LatestRelease.SCMConnectionID)
+		allowed, permissionErr := h.permission.HasWorkspacePermission(userID, workspaceID, models.PermissionItemEdit)
+		if err == nil && permissionErr == nil && allowed {
+			release.SCMConnectionID = result.LatestRelease.SCMConnectionID
+			release.SCMRepository = result.LatestRelease.SCMRepository
+		}
+	}
+	milestone.LatestRelease = release
+	return milestone
+}
+
+func iterationResult(result *services.IterationResult) models.Iteration {
+	return models.Iteration{
+		ID: result.ID, Name: result.Name, Description: result.Description,
+		StartDate: result.StartDate, EndDate: result.EndDate, Status: result.Status,
+		TypeID: result.TypeID, TypeName: result.TypeName, TypeColor: result.TypeColor,
+		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
+		CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+	}
 }
 
 func (h *WorkspaceBootstrapHandler) listProjects(ctx context.Context, userID int, workspace *models.Workspace) ([]models.TimeProject, error) {

@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"windshift/internal/models"
+	"windshift/internal/repository/actionutil"
 )
 
 //go:embed templates/*.yaml
@@ -169,7 +170,9 @@ func validate(t *Template) error {
 		if !nodeType.IsIterator() {
 			continue
 		}
-		body := bodyClosure(n.ID, t.Edges)
+		body := actionutil.Descendants(n.ID, t.Edges, func(edge TemplateEdge) (string, string) {
+			return edge.SourceNodeID, edge.TargetNodeID
+		})
 		for _, e := range t.Edges {
 			if !body[e.TargetNodeID] {
 				continue
@@ -186,28 +189,4 @@ func validate(t *Template) error {
 	}
 
 	return nil
-}
-
-// bodyClosure mirrors action_engine_iterator.iteratorBodyNodes but operates
-// on the YAML graph (string IDs) so we can validate before persisting.
-func bodyClosure(iteratorID string, edges []TemplateEdge) map[string]bool {
-	body := map[string]bool{}
-	queue := []string{}
-	for _, e := range edges {
-		if e.SourceNodeID == iteratorID && !body[e.TargetNodeID] {
-			body[e.TargetNodeID] = true
-			queue = append(queue, e.TargetNodeID)
-		}
-	}
-	for len(queue) > 0 {
-		next := queue[0]
-		queue = queue[1:]
-		for _, e := range edges {
-			if e.SourceNodeID == next && !body[e.TargetNodeID] {
-				body[e.TargetNodeID] = true
-				queue = append(queue, e.TargetNodeID)
-			}
-		}
-	}
-	return body
 }

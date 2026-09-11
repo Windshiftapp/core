@@ -240,10 +240,12 @@ type Status struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	CategoryName       string `json:"category_name,omitempty"`
-	CategoryBuiltinKey string `json:"category_builtin_key,omitempty"`
-	CategoryColor      string `json:"category_color,omitempty"`
-	IsCompleted        bool   `json:"is_completed,omitempty"`
+	CategoryName        string `json:"category_name,omitempty"`
+	CategoryBuiltinKey  string `json:"category_builtin_key,omitempty"`
+	CategoryDescription string `json:"category_description,omitempty"`
+	CategoryColor       string `json:"category_color,omitempty"`
+	CategoryIsDefault   bool   `json:"category_is_default,omitempty"`
+	IsCompleted         bool   `json:"is_completed,omitempty"`
 }
 
 // Workflow represents a workflow definition
@@ -276,6 +278,16 @@ type WorkflowTransition struct {
 	FromStatusName string `json:"from_status_name,omitempty"`
 	ToStatusName   string `json:"to_status_name,omitempty"`
 	WorkflowName   string `json:"workflow_name,omitempty"`
+	// Category metadata supports alternate transport projections without
+	// expanding the legacy workflow-transition response.
+	FromStatusBuiltinKey   string `json:"-"`
+	FromCategoryBuiltinKey string `json:"-"`
+	FromCategoryName       string `json:"-"`
+	FromCategoryColor      string `json:"-"`
+	ToStatusBuiltinKey     string `json:"-"`
+	ToCategoryBuiltinKey   string `json:"-"`
+	ToCategoryName         string `json:"-"`
+	ToCategoryColor        string `json:"-"`
 }
 
 // CustomFieldIndexInfo represents which tables have indexes for a custom field

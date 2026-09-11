@@ -46,10 +46,28 @@ func (h *AIHandler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-	if sessions == nil {
-		sessions = []*models.AgentSession{}
+	workspaceIDs, err := h.permService.AccessibleWorkspaceIDs(user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
-	respondJSONOK(w, sessions)
+	accessible := make(map[int]struct{}, len(workspaceIDs))
+	for _, workspaceID := range workspaceIDs {
+		accessible[workspaceID] = struct{}{}
+	}
+	visible := make([]*models.AgentSession, 0, len(sessions))
+	for _, session := range sessions {
+		if session.SessionType == models.AgentSessionStandard {
+			if session.WorkspaceID == nil {
+				continue
+			}
+			if _, ok := accessible[*session.WorkspaceID]; !ok {
+				continue
+			}
+		}
+		visible = append(visible, session)
+	}
+	respondJSONOK(w, visible)
 }
 
 func (h *AIHandler) ListAvailableStandardAgents(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +147,10 @@ func (h *AIHandler) ListAgentMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	beforeID, _ := strconv.Atoi(r.URL.Query().Get("before_id"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	messages, err := h.conversations.ListMessagesForParticipant(r.Context(), sessionID, user.ID, beforeID, limit)
+	if !h.requireCurrentAgentSessionAccess(w, r, sessionID, user.ID) {
+		return
+	}
+	messages, err := h.conversations.ListMessages(r.Context(), sessionID, beforeID, limit)
 	if errors.Is(err, repository.ErrAgentSessionNotFound) {
 		respondNotFound(w, r, "agent session")
 		return
@@ -153,6 +174,9 @@ func (h *AIHandler) ArchiveAgentSession(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
+	if !h.requireCurrentAgentSessionAccess(w, r, sessionID, user.ID) {
+		return
+	}
 	archived, err := h.conversations.ArchiveOwnedStandard(r.Context(), sessionID, user.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -163,4 +187,29 @@ func (h *AIHandler) ArchiveAgentSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AIHandler) requireCurrentAgentSessionAccess(w http.ResponseWriter, r *http.Request, sessionID, userID int) bool {
+	session, err := h.conversations.GetForParticipant(r.Context(), sessionID, userID)
+	if errors.Is(err, repository.ErrAgentSessionNotFound) {
+		respondNotFound(w, r, "agent session")
+		return false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if session.SessionType != models.AgentSessionStandard {
+		return true
+	}
+	if session.WorkspaceID == nil {
+		respondNotFound(w, r, "agent session")
+		return false
+	}
+	allowed, err := h.permService.HasWorkspacePermission(userID, *session.WorkspaceID, models.PermissionItemView)
+	if err != nil || !allowed {
+		respondNotFound(w, r, "agent session")
+		return false
+	}
+	return true
 }

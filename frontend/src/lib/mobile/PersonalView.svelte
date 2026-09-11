@@ -43,7 +43,7 @@
         order_by: 'updated_at',
       });
       if (v !== version) return;
-      tasks = Array.isArray(res) ? res : (res?.items ?? []);
+      tasks = res?.data ?? [];
     } catch (err) {
       if (v !== version) return;
       console.error('Failed to load personal tasks:', err);

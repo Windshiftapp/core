@@ -2,7 +2,7 @@ import { api } from '../api.js';
 import { BaseCacheStore } from './BaseCacheStore.svelte.js';
 
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
-const LINK_BATCH_CHUNK = 200; // item ids per /links/batch request (server cap 500)
+const LINK_BATCH_CHUNK = 100;
 
 /**
  * Caches test case links per item, surviving view switches (singleton store).

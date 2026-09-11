@@ -265,9 +265,7 @@
       }
 
       const itemsResponse = await api.items.getAll(filters);
-      const items = Array.isArray(itemsResponse)
-        ? itemsResponse
-        : (itemsResponse?.items ?? []);
+      const items = itemsResponse?.data ?? [];
       const fetchedStatuses = await api.statuses.getAll();
       const statusList = Array.isArray(fetchedStatuses) ? fetchedStatuses : [];
       const localStatusById = new Map(

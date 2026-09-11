@@ -3,13 +3,13 @@
   assigns below are in scope for full/half_horizontal/half_vertical/quadrant.
 
   Polled responses (see settings.yml polling_url):
-    IDX_0 = GET /rest/api/v1/users/me
-    IDX_1 = GET /rest/api/v1/search/items?ql=...
+    IDX_0 = GET /rest/api/v2/users/me
+    IDX_1 = GET /rest/api/v2/items?ql=...
 {%- endcomment -%}
 
-{%- assign me = IDX_0 -%}
+{%- assign me = IDX_0.data -%}
 {%- assign items = IDX_1.data -%}
-{%- assign total = IDX_1.pagination.total -%}
+{%- assign total = IDX_1.pagination.total_items -%}
 
 {%- comment -%}
   A failed poll yields {} rather than an exception, so an unreachable server
@@ -75,8 +75,8 @@
       <span class="title title--small" data-clamp="{{ clamp | default: 2 }}">{{ item.title }}</span>
       <div class="flex gap--small">
         <span class="label label--small">{{ item.key }}</span>
-        {%- if item.status.name %}<span class="label label--small">{{ item.status.name }}</span>{% endif -%}
-        {%- if item.priority.name %}<span class="label label--small">{{ item.priority.name }}</span>{% endif -%}
+        {%- if item.status_name %}<span class="label label--small">{{ item.status_name }}</span>{% endif -%}
+        {%- if item.priority_name %}<span class="label label--small">{{ item.priority_name }}</span>{% endif -%}
         {%- if due_num > 0 -%}
           {%- if due_num < today_num -%}
             <span class="label label--small label--underline">Overdue {{ item.due_date | date: '%b %-d' }}</span>

@@ -86,8 +86,6 @@ func (s *ExternalItemReconciliationService) Create(ctx context.Context, req Exte
 		Title:             req.Input.Title,
 		ItemTypeID:        req.Input.ItemTypeID,
 		ParentID:          req.Input.ParentID,
-		StatusID:          req.Input.StatusID,
-		IsTask:            req.Input.IsTask,
 		RelatedWorkItemID: req.Input.RelatedWorkItemID,
 	})
 	if !validationResult.Valid {
@@ -123,6 +121,7 @@ func (s *ExternalItemReconciliationService) Create(ctx context.Context, req Exte
 		TimeProjectID:         req.Input.TimeProjectID,
 		AssigneeID:            req.Input.AssigneeID,
 		CreatorID:             creatorID,
+		ValidatingUserID:      req.Policy.ActorUserID,
 		DueDate:               req.Input.DueDate,
 		StartDate:             req.Input.StartDate,
 		EndDate:               req.Input.EndDate,

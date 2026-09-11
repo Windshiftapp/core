@@ -76,7 +76,7 @@ func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	pagination := h.ParsePagination(r)
 
-	users, total, err := h.userSvc.List(services.PaginationParams{
+	users, total, err := h.userSvc.ListAdmin(services.PaginationParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
@@ -158,30 +158,24 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "No fields to update"))
 		return
 	}
-	before, err := h.userSvc.GetByID(id)
+	result, err := h.userSvc.UpdateAdmin(id, update)
 	if err != nil {
-		if errors.Is(err, services.ErrUserNotFound) {
+		switch {
+		case errors.Is(err, services.ErrUserNotFound):
 			h.RespondError(w, r, restapi.ErrUserNotFound)
-			return
+		case errors.Is(err, services.ErrUserManagedExternally):
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, restapi.ErrCodeForbidden, "User is managed externally"))
+		case errors.Is(err, services.ErrUserEmailInvalid):
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid email"))
+		case errors.Is(err, services.ErrUserEmailExists), errors.Is(err, services.ErrUserUsernameExists):
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeConflict, err.Error()))
+		default:
+			h.RespondInternalError(w, r)
 		}
-		h.RespondInternalError(w, r)
 		return
 	}
-
-	if err := h.userSvc.UpdateAdmin(id, update); err != nil {
-		if errors.Is(err, services.ErrUserNotFound) {
-			h.RespondError(w, r, restapi.ErrUserNotFound)
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-
-	u, err := h.userSvc.GetByID(id)
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
+	before := result.Before
+	u := result.User
 
 	resp := mapUserToResponse(u)
 	resp.Warnings = warnings

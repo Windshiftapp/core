@@ -1,8 +1,8 @@
-// Package timelog is the log-time form for one work item. It still talks to
-// the legacy /api/* time endpoints via the session token.
+// Package timelog is the log-time form for one work item.
 package timelog
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 	"windshift/internal/tui/core"
 	"windshift/internal/tui/data"
 	"windshift/internal/tui/dialog"
+	"windshift/internal/utils"
 )
 
 const pickerProjectID = "picker.project"
@@ -42,12 +43,32 @@ type Model struct {
 	projectName    string
 	currentField   int
 	editing        bool
+	width          int
+	height         int
+	submitting     bool
+	requestID      uint64
+	timezone       string
 
 	errorHint string
 }
 
 func New(ctx *core.Ctx, item data.WorkItem, timeProjects []data.TimeProject) *Model {
-	now := time.Now()
+	timezone := "UTC"
+	if ctx.User != nil && ctx.User.Timezone != "" {
+		timezone = ctx.User.Timezone
+	}
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		timezone = "UTC"
+		location = time.UTC
+	}
+	now := ctx.CurrentTime().In(location)
+	activeProjects := make([]data.TimeProject, 0, len(timeProjects))
+	for _, project := range timeProjects {
+		if project.Status == "" || strings.EqualFold(project.Status, "active") {
+			activeProjects = append(activeProjects, project)
+		}
+	}
 
 	desc := inputs.New(ctx.Styles, "What did you work on?", 500)
 	desc.SetWidth(inputs.Width(ctx.Width))
@@ -63,18 +84,23 @@ func New(ctx *core.Ctx, item data.WorkItem, timeProjects []data.TimeProject) *Mo
 	m := &Model{
 		ctx:            ctx,
 		item:           item,
-		timeProjects:   timeProjects,
+		timeProjects:   activeProjects,
 		descInput:      desc,
 		durationInput:  dur,
 		dateInput:      d,
 		startTimeInput: t,
+		timezone:       timezone,
 	}
 
-	// Pre-fill the project from the workspace's default if one is set.
-	if ctx.Workspace != nil && ctx.Workspace.TimeProjectID != nil {
-		m.projectID = ctx.Workspace.TimeProjectID
-		for _, p := range timeProjects {
-			if int(p.ID) == *ctx.Workspace.TimeProjectID {
+	defaultProjectID := item.TimeProjectID
+	if defaultProjectID == nil && ctx.Workspace != nil {
+		defaultProjectID = ctx.Workspace.TimeProjectID
+	}
+	if defaultProjectID != nil {
+		for _, p := range activeProjects {
+			if p.ID == *defaultProjectID {
+				id := p.ID
+				m.projectID = &id
 				m.projectName = p.Name
 				break
 			}
@@ -85,7 +111,9 @@ func New(ctx *core.Ctx, item data.WorkItem, timeProjects []data.TimeProject) *Mo
 
 func (m *Model) Init() tea.Cmd { return nil }
 
-func (m *Model) SetSize(width, _ int) {
+func (m *Model) SetSize(width, height int) {
+	m.width = width
+	m.height = height
 	w := inputs.Width(width)
 	m.descInput.SetWidth(w)
 	m.durationInput.SetWidth(w)
@@ -116,16 +144,30 @@ func (m *Model) EditingText() bool { return m.editing }
 func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case data.TimeLogCreatedMsg:
-		return tea.Batch(core.NotifySuccess("Time logged"), core.Pop())
+		if msg.ItemID != m.item.ID || msg.RequestID != m.requestID {
+			return nil
+		}
+		m.submitting = false
+		return tea.Batch(core.NotifySuccess("Time logged on "+m.itemKey()), core.Pop())
 
 	case data.TimeProjectsLoadedMsg:
-		m.timeProjects = msg.Projects
+		if m.ctx.Workspace != nil && msg.WorkspaceID == m.ctx.Workspace.ID {
+			m.timeProjects = msg.Projects
+		}
+		return nil
+
+	case data.ErrorMsg:
+		if msg.Operation == data.OpTimeLogCreate && msg.ItemID == m.item.ID && msg.RequestID == m.requestID {
+			m.submitting = false
+			m.errorHint = msg.Err
+			return core.NotifyError(msg.Err)
+		}
 		return nil
 
 	case dialog.ResultMsg:
 		if msg.ID == pickerProjectID {
 			if p, ok := msg.Value.(data.TimeProject); ok {
-				id := int(p.ID)
+				id := p.ID
 				m.projectID = &id
 				m.projectName = p.Name
 			}
@@ -134,6 +176,9 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	}
+	if m.editing {
+		return m.updateFocusedInput(msg)
 	}
 	return nil
 }
@@ -157,13 +202,18 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 			return m.openProjectPicker()
 		}
 		m.editing = true
-		m.focusField()
+		return m.focusField()
 	case key.Matches(msg, k.Save):
-		if m.projectID == nil {
-			m.errorHint = "Please select a project"
+		if m.submitting {
+			return nil
+		}
+		if err := m.validate(); err != nil {
+			m.errorHint = err.Error()
 			return nil
 		}
 		m.errorHint = ""
+		m.submitting = true
+		m.requestID = m.ctx.NextRequestID()
 		return data.CreateTimeLog(
 			m.ctx.Client,
 			m.item.ID, *m.projectID,
@@ -171,6 +221,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.durationInput.Value(),
 			m.dateInput.Value(),
 			m.startTimeInput.Value(),
+			m.timezone,
+			m.requestID,
 		)
 	case key.Matches(msg, k.Back):
 		return core.Pop()
@@ -191,7 +243,7 @@ func (m *Model) handleEditingKey(msg tea.KeyPressMsg) tea.Cmd {
 			m.currentField++
 			if m.currentField < fieldProject {
 				m.editing = true
-				m.focusField()
+				return m.focusField()
 			}
 		}
 		return nil
@@ -211,22 +263,61 @@ func (m *Model) handleEditingKey(msg tea.KeyPressMsg) tea.Cmd {
 	return cmd
 }
 
-func (m *Model) focusField() {
+func (m *Model) focusField() tea.Cmd {
 	m.blurFields()
 	switch m.currentField {
 	case fieldDesc:
-		m.descInput.Focus()
+		cmd := m.descInput.Focus()
 		m.descInput.CursorEnd()
+		return cmd
 	case fieldDuration:
-		m.durationInput.Focus()
+		cmd := m.durationInput.Focus()
 		m.durationInput.CursorEnd()
+		return cmd
 	case fieldDate:
-		m.dateInput.Focus()
+		cmd := m.dateInput.Focus()
 		m.dateInput.CursorEnd()
+		return cmd
 	case fieldStartTime:
-		m.startTimeInput.Focus()
+		cmd := m.startTimeInput.Focus()
 		m.startTimeInput.CursorEnd()
+		return cmd
 	}
+	return nil
+}
+
+func (m *Model) updateFocusedInput(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	switch m.currentField {
+	case fieldDesc:
+		m.descInput, cmd = m.descInput.Update(msg)
+	case fieldDuration:
+		m.durationInput, cmd = m.durationInput.Update(msg)
+	case fieldDate:
+		m.dateInput, cmd = m.dateInput.Update(msg)
+	case fieldStartTime:
+		m.startTimeInput, cmd = m.startTimeInput.Update(msg)
+	}
+	return cmd
+}
+
+func (m *Model) validate() error {
+	if strings.TrimSpace(m.descInput.Value()) == "" {
+		return fmt.Errorf("description is required")
+	}
+	if _, err := utils.ParseDuration(m.durationInput.Value()); err != nil {
+		return fmt.Errorf("duration: %w", err)
+	}
+	if _, err := time.Parse(time.DateOnly, m.dateInput.Value()); err != nil {
+		return fmt.Errorf("date must use YYYY-MM-DD")
+	}
+	if _, err := time.Parse("15:04", m.startTimeInput.Value()); err != nil {
+		return fmt.Errorf("start time must use HH:MM")
+	}
+	if m.projectID == nil {
+		return fmt.Errorf("project is required")
+	}
+	return nil
 }
 
 func (m *Model) blurFields() {
@@ -248,7 +339,7 @@ func (m *Model) openProjectPicker() tea.Cmd {
 			Label: label,
 			Value: p,
 		}
-		if m.projectID != nil && int(p.ID) == *m.projectID {
+		if m.projectID != nil && p.ID == *m.projectID {
 			selectedIdx = i
 		}
 	}
@@ -257,7 +348,7 @@ func (m *Model) openProjectPicker() tea.Cmd {
 
 func (m *Model) View() string {
 	s := m.ctx.Styles
-	heading := s.Base.Heading.Render("Log time · " + m.item.Title)
+	heading := s.Base.Heading.Render("Log time · " + m.itemKey() + " · " + m.item.Title)
 	rows := []string{heading, ""}
 
 	w := inputs.Width(m.ctx.Width)
@@ -291,6 +382,26 @@ func (m *Model) View() string {
 	if m.errorHint != "" {
 		rows = append(rows, "", s.Form.Error.Render(m.errorHint))
 	}
+	if m.submitting {
+		rows = append(rows, "", s.Base.Hint.Render("Submitting time log…"))
+	}
 
-	return strings.Join(rows, "\n")
+	lines := strings.Split(strings.Join(rows, "\n"), "\n")
+	if m.height < 1 || len(lines) <= m.height {
+		return strings.Join(lines, "\n")
+	}
+	fieldLine := 2 + m.currentField*4
+	start := max(0, fieldLine-m.height/3)
+	if start+m.height > len(lines) {
+		start = len(lines) - m.height
+	}
+	return strings.Join(lines[start:start+m.height], "\n")
+}
+
+func (m *Model) itemKey() string {
+	workspaceKey := ""
+	if m.ctx.Workspace != nil {
+		workspaceKey = m.ctx.Workspace.Key
+	}
+	return m.item.DisplayKey(workspaceKey)
 }

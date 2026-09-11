@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"windshift/internal/database"
@@ -40,82 +39,20 @@ func (e *LegacyItemUpdatedEmitter) EmitItemUpdated(original, updated *models.Ite
 
 	if e.notify != nil {
 		var statusName string
-		if statusChanged && updated.StatusID != nil && e.db != nil {
-			if err := e.db.QueryRow("SELECT name FROM statuses WHERE id = ?", *updated.StatusID).Scan(&statusName); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if statusChanged {
+			var err error
+			statusName, err = itemUpdateStatusName(e.db, updated.StatusID)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				slog.Warn("failed to load status name", slog.Int("status_id", *updated.StatusID), slog.Any("error", err))
 			}
 		}
-		itemKey := fmt.Sprintf("%s-%d", updated.WorkspaceKey, updated.WorkspaceItemNumber)
-
-		if statusChanged {
-			e.notify(&NotificationEvent{
-				EventType:   models.EventStatusChanged,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Status Changed",
-				TemplateData: map[string]any{
-					"item.title":  updated.Title,
-					"item.key":    itemKey,
-					"item.id":     updated.ID,
-					"status.name": statusName,
-					"user.name":   actorName,
-				},
-			})
-		}
-		if assigneeChanged {
-			e.notify(&NotificationEvent{
-				EventType:   models.EventItemAssigned,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Item Assigned",
-				TemplateData: map[string]any{
-					"item.title": updated.Title,
-					"item.key":   itemKey,
-					"item.id":    updated.ID,
-					"user.name":  actorName,
-				},
-			})
-		}
-		if !statusChanged && !assigneeChanged {
-			e.notify(&NotificationEvent{
-				EventType:   models.EventItemUpdated,
-				WorkspaceID: updated.WorkspaceID,
-				ActorUserID: actorUserID,
-				ItemID:      updated.ID,
-				AssigneeID:  updated.AssigneeID,
-				CreatorID:   original.CreatorID,
-				Title:       "Item Updated",
-				TemplateData: map[string]any{
-					"item.title": updated.Title,
-					"item.key":   itemKey,
-					"item.id":    updated.ID,
-					"user.name":  actorName,
-				},
-			})
-		}
+		emitItemUpdateNotifications(e.notify, original, updated,
+			statusChanged, assigneeChanged, actorUserID, actorName, statusName)
 	}
 
 	if e.action != nil {
 		if statusChanged {
-			e.action.EmitActionEvent(&models.ActionEvent{
-				EventType:   models.ActionTriggerStatusTransition,
-				WorkspaceID: updated.WorkspaceID,
-				ItemID:      updated.ID,
-				ActorUserID: actorUserID,
-				OldValues:   map[string]any{"status_id": original.StatusID},
-				NewValues: map[string]any{
-					"status_id":   updated.StatusID,
-					"title":       updated.Title,
-					"assignee_id": updated.AssigneeID,
-					"creator_id":  updated.CreatorID,
-				},
-			})
+			e.action.EmitActionEvent(newStatusTransitionActionEvent(original, updated, actorUserID))
 		} else {
 			e.action.EmitActionEvent(&models.ActionEvent{
 				EventType:   models.ActionTriggerItemUpdated,
@@ -139,13 +76,5 @@ func (e *LegacyItemUpdatedEmitter) EmitItemUpdated(original, updated *models.Ite
 		}
 	}
 
-	if e.webhook != nil {
-		if statusChanged {
-			e.webhook.DispatchEvent("status.changed", updated)
-		}
-		if assigneeChanged {
-			e.webhook.DispatchEvent("item.assigned", updated)
-		}
-		e.webhook.DispatchEvent("item.updated", updated)
-	}
+	dispatchItemUpdateWebhooks(e.webhook, updated, statusChanged, assigneeChanged)
 }

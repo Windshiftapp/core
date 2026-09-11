@@ -25,22 +25,6 @@ type AvailableField struct {
 	FieldType  string `json:"field_type,omitempty"`
 }
 
-// requireWorkspaceIDAndID parses {workspaceId} and {id} path params and pulls
-// the current user. Used by workspace-scoped resource handlers that don't need
-// a DB handle (services/repositories manage their own connections).
-func requireWorkspaceIDAndID(w http.ResponseWriter, r *http.Request) (workspaceID, id int, user *models.User, ok bool) {
-	workspaceID, ok = requireIDParam(w, r, "workspaceId")
-	if !ok {
-		return
-	}
-	id, ok = requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	user = utils.GetCurrentUser(r)
-	return
-}
-
 // RequireAuth checks if a user is authenticated and returns the user.
 // If not authenticated, it writes a 401 Unauthorized response.
 // Returns the user and true if authenticated, nil and false otherwise.
@@ -60,7 +44,8 @@ func RequireAuth(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
 }
 
 // RequireWorkspacePermission checks if the user has a specific workspace permission.
-// If the user doesn't have permission, it writes a 403 Forbidden response.
+// If the user doesn't have permission, it writes a 404 response so private
+// workspace existence is not disclosed.
 // Returns true if permitted, false otherwise (error already written to response).
 // Usage:
 //
@@ -70,7 +55,7 @@ func RequireAuth(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
 func RequireWorkspacePermission(w http.ResponseWriter, r *http.Request, userID, workspaceID int, permission string, permService *services.PermissionService) bool {
 	hasPermission, err := permService.HasWorkspacePermission(userID, workspaceID, permission)
 	if err != nil || !hasPermission {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "workspace")
 		return false
 	}
 	return true

@@ -363,6 +363,9 @@ paths:
               properties:
                 session_id:
                   type: integer
+                history_after_message_id:
+                  type: integer
+                  description: Start a fresh General-chat context after this durable transcript message.
                 message:
                   type: string
       responses:

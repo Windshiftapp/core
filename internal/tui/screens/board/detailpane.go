@@ -18,12 +18,12 @@ import (
 type detailPane struct {
 	ctx *core.Ctx
 
-	item     *data.WorkItem
-	comments []data.Comment
-	loaded   bool // comments fetched for the current item
+	item         *data.WorkItem
+	comments     []data.Comment
+	commentState loadState
 
 	runs          []data.AgentRun
-	runsLoaded    bool
+	runState      loadState
 	agentAssignee bool // the item's assignee is a coding agent
 
 	lines  []string // wrapped content cache
@@ -55,12 +55,12 @@ func (d *detailPane) resetRenderer() {
 }
 
 // setItem swaps the displayed item, resetting scroll and async-section state.
-func (d *detailPane) setItem(item *data.WorkItem, comments []data.Comment, loaded bool, runs []data.AgentRun, runsLoaded, agentAssignee bool) {
+func (d *detailPane) setItem(item *data.WorkItem, comments []data.Comment, commentState loadState, runs []data.AgentRun, runState loadState, agentAssignee bool) {
 	d.item = item
 	d.comments = comments
-	d.loaded = loaded
+	d.commentState = commentState
 	d.runs = runs
-	d.runsLoaded = runsLoaded
+	d.runState = runState
 	d.agentAssignee = agentAssignee
 	d.offset = 0
 	d.rebuild()
@@ -70,14 +70,14 @@ func (d *detailPane) setItem(item *data.WorkItem, comments []data.Comment, loade
 // arrive async under the same item).
 func (d *detailPane) setComments(comments []data.Comment) {
 	d.comments = comments
-	d.loaded = true
+	d.commentState = loadLoaded
 	d.rebuild()
 }
 
 // setAgentRuns updates the agent-activity section without resetting scroll.
 func (d *detailPane) setAgentRuns(runs []data.AgentRun) {
 	d.runs = runs
-	d.runsLoaded = true
+	d.runState = loadLoaded
 	d.rebuild()
 }
 
@@ -171,13 +171,15 @@ func (d *detailPane) rebuild() {
 	if d.agentAssignee || len(d.runs) > 0 {
 		add("")
 		agentLabel := "Agent activity"
-		if d.runsLoaded {
+		if d.runState == loadLoaded {
 			agentLabel = fmt.Sprintf("Agent activity (%d)", len(d.runs))
 		}
 		add(s.Form.Label.Render(agentLabel) + " " + s.List.Rule.Render(strings.Repeat("─", max(0, min(w, 60)-len(agentLabel)-1))))
 		add("")
 		switch {
-		case !d.runsLoaded:
+		case d.runState == loadFailed:
+			add(s.Status.Error.Render("Agent activity could not be loaded."))
+		case d.runState != loadLoaded:
 			add(s.Base.Hint.Render("Loading agent runs…"))
 		case len(d.runs) == 0:
 			add(s.Base.Hint.Render("No agent runs yet — one starts when the agent picks this up."))
@@ -193,14 +195,16 @@ func (d *detailPane) rebuild() {
 
 	add("")
 	label := "Comments"
-	if d.loaded {
+	if d.commentState == loadLoaded {
 		label = fmt.Sprintf("Comments (%d)", len(d.comments))
 	}
 	add(s.Form.Label.Render(label) + " " + s.List.Rule.Render(strings.Repeat("─", max(0, min(w, 60)-len(label)-1))))
 	add("")
 
 	switch {
-	case !d.loaded:
+	case d.commentState == loadFailed:
+		add(s.Status.Error.Render("Comments could not be loaded."))
+	case d.commentState != loadLoaded:
 		add(s.Base.Hint.Render("Loading comments…"))
 	case len(d.comments) == 0:
 		add(s.Base.Hint.Render("No comments yet. Press 'c' to add one."))

@@ -330,10 +330,23 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	accessibleWorkspaceIDs, err := h.permService.AccessibleWorkspaceIDs(user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	accessible := make(map[int]struct{}, len(accessibleWorkspaceIDs))
+	for _, workspaceID := range accessibleWorkspaceIDs {
+		accessible[workspaceID] = struct{}{}
+	}
 
 	briefing, err := repository.NewAIRepository(h.db).GetLatestSuccessfulDailyBriefing(user.ID)
 	if err != nil {
 		slog.Warn("GetDailyBriefing: no briefing found", slog.Int("user_id", user.ID), slog.Any("error", err))
+		respondJSONOK(w, map[string]any{"content": ""})
+		return
+	}
+	if !briefing.ScopeRecorded || !workspaceScopeContained(briefing.SourceWorkspaceIDs, accessible) {
 		respondJSONOK(w, map[string]any{"content": ""})
 		return
 	}
@@ -362,7 +375,7 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if refs, qErr := repository.NewItemRepository(h.db).ResolveItemKeyReferences(unique); qErr == nil {
+		if refs, qErr := repository.NewItemRepository(h.db).ResolveItemKeyReferencesInWorkspaces(unique, accessibleWorkspaceIDs); qErr == nil {
 			for _, ref := range refs {
 				references[ref.ItemKey] = map[string]any{
 					"item_id":      ref.ItemID,
@@ -379,4 +392,13 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 		"generated_at": briefing.GeneratedAt,
 		"references":   references,
 	})
+}
+
+func workspaceScopeContained(source []int, accessible map[int]struct{}) bool {
+	for _, workspaceID := range source {
+		if _, ok := accessible[workspaceID]; !ok {
+			return false
+		}
+	}
+	return true
 }

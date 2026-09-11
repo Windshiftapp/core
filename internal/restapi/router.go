@@ -76,6 +76,9 @@ type Deps struct {
 	// ObjectTranslationService is shared with the cookie-auth admin surface so
 	// writes invalidate the same translation cache for every transport.
 	ObjectTranslationService *objecttranslation.Service
+	// AuthorizationCacheInvalidator is the shared post-commit invalidation
+	// boundary used by every authorization-affecting mutation surface.
+	AuthorizationCacheInvalidator *services.AuthorizationCacheInvalidator
 }
 
 // SetupRoutesFunc is a function type for setting up v1 routes

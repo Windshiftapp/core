@@ -7,14 +7,15 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/sanitize"
 )
 
 var (
-	ErrTestFolderNameRequired      = errors.New("folder name is required")
-	ErrTestFolderParentNotFound    = errors.New("parent folder not found")
-	ErrTestFolderNestedDepth       = errors.New("nested folders deeper than two levels are not allowed")
-	ErrTestFolderParentSelf        = errors.New("folder cannot be its own parent")
-	ErrTestFolderParentHasChildren = errors.New("folders with subfolders cannot be nested under another folder")
+	ErrTestFolderNameRequired      = &TestManagementValidationError{Msg: "folder name is required"}
+	ErrTestFolderParentNotFound    = &TestManagementValidationError{Msg: "parent folder not found"}
+	ErrTestFolderNestedDepth       = &TestManagementValidationError{Msg: "nested folders deeper than two levels are not allowed"}
+	ErrTestFolderParentSelf        = &TestManagementValidationError{Msg: "folder cannot be its own parent"}
+	ErrTestFolderParentHasChildren = &TestManagementValidationError{Msg: "folders with subfolders cannot be nested under another folder"}
 )
 
 // TestFolderUpdateInput carries a folder update plus JSON-field presence flags
@@ -44,6 +45,8 @@ func (s *TestFolderService) Get(workspaceID, id int) (*models.TestFolder, error)
 }
 
 func (s *TestFolderService) Create(workspaceID int, folder models.TestFolder) (models.TestFolder, error) {
+	folder.Name = sanitize.PlainTextField.Sanitize(folder.Name)
+	folder.Description = sanitize.RichText.Sanitize(folder.Description)
 	if folder.Name == "" {
 		return models.TestFolder{}, ErrTestFolderNameRequired
 	}
@@ -69,6 +72,8 @@ func (s *TestFolderService) Create(workspaceID int, folder models.TestFolder) (m
 
 func (s *TestFolderService) Update(workspaceID, id int, in TestFolderUpdateInput) (models.TestFolder, error) {
 	folder := in.Folder
+	folder.Name = sanitize.PlainTextField.Sanitize(folder.Name)
+	folder.Description = sanitize.RichText.Sanitize(folder.Description)
 	if folder.Name == "" {
 		return models.TestFolder{}, ErrTestFolderNameRequired
 	}

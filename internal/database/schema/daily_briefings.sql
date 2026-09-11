@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS daily_briefings (
     user_id INTEGER NOT NULL,
     date TEXT NOT NULL,
     content TEXT NOT NULL,
+    source_workspace_ids TEXT,
     generation_duration_ms INTEGER,
     error TEXT,
     lock_until DATETIME,

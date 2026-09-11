@@ -152,11 +152,11 @@ func New(p Palette) *Styles {
 			Padding(0, 1),
 		InputFocused: lipgloss.NewStyle().
 			Foreground(p.FgBase).
-			Background(p.BgSurfaceHovered).
+			Background(p.BgSurface).
 			Padding(0, 1).
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(p.BorderFocus),
-		Hint:  lipgloss.NewStyle().Foreground(p.FgMuted).Italic(true),
+		Hint:  lipgloss.NewStyle().Foreground(p.FgMuted),
 		Error: lipgloss.NewStyle().Foreground(p.Danger),
 	}
 
@@ -172,7 +172,7 @@ func New(p Palette) *Styles {
 			Background(p.BgOverlay).
 			Foreground(p.FgBase).
 			Padding(0, 1),
-		Title:  lipgloss.NewStyle().Foreground(p.PrimaryHovered).Bold(true),
+		Title:  lipgloss.NewStyle().Foreground(p.FgBase).Bold(true),
 		Body:   lipgloss.NewStyle().Foreground(p.FgBase),
 		Footer: lipgloss.NewStyle().Foreground(p.FgMuted).MarginTop(1),
 		Backdrop: lipgloss.NewStyle().

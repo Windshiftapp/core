@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,7 +9,6 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
-	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
 
@@ -18,7 +17,8 @@ import (
 // authenticated user's entries; create/update/delete target their own.
 type TimeWorklogHandler struct {
 	BaseHandler
-	timePerm *services.TimePermissionService
+	timePerm    *services.TimePermissionService
+	application *services.TimeWorklogService
 }
 
 // NewTimeWorklogHandler wires the handler with the shared permission pipeline.
@@ -26,6 +26,7 @@ func NewTimeWorklogHandler(base BaseHandler, timePerm *services.TimePermissionSe
 	return &TimeWorklogHandler{
 		BaseHandler: base,
 		timePerm:    timePerm,
+		application: services.NewTimeWorklogService(base.DB),
 	}
 }
 
@@ -84,6 +85,7 @@ func mapWorklogToResponse(wl models.Worklog) worklogResponse {
 // @Security     BearerAuth
 // @Param        date_from   query     string  false  "Inclusive start date (YYYY-MM-DD)"
 // @Param        date_to     query     string  false  "Inclusive end date (YYYY-MM-DD)"
+// @Param        timezone    query     string  false  "IANA timezone used to interpret date_from/date_to (defaults to the profile timezone)"
 // @Param        project_id  query     int     false  "Filter by time project ID"
 // @Param        page        query     int     false  "Page (1-indexed)"
 // @Param        limit       query     int     false  "Page size"
@@ -104,8 +106,14 @@ func (h *TimeWorklogHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		Offset: pagination.Offset,
 	}
 
+	reportLocation, locationErr := h.resolveReportTimezone(r, user.Timezone)
+	if locationErr != nil {
+		h.RespondError(w, r, locationErr)
+		return
+	}
+
 	if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" {
-		start, _, err := services.CivilDateRangeUTC(dateFrom, dateFrom, time.UTC)
+		start, _, err := services.CivilDateRangeUTC(dateFrom, dateFrom, reportLocation)
 		if err != nil {
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "invalid date_from format, use YYYY-MM-DD"))
 			return
@@ -114,7 +122,7 @@ func (h *TimeWorklogHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		filter.DateFromUnix = &from
 	}
 	if dateTo := r.URL.Query().Get("date_to"); dateTo != "" {
-		_, endExclusive, err := services.CivilDateRangeUTC(dateTo, dateTo, time.UTC)
+		_, endExclusive, err := services.CivilDateRangeUTC(dateTo, dateTo, reportLocation)
 		if err != nil {
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "invalid date_to format, use YYYY-MM-DD"))
 			return
@@ -200,52 +208,6 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sanitize.Apply(&req.Description, sanitize.RichText)
-
-	project, err := repository.NewTimeProjectRepository(h.DB).GetBookingInfo(req.ProjectID)
-	if err != nil {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusNotFound, "NOT_FOUND", "project not found"))
-		return
-	}
-	if project.Status != "Active" {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, fmt.Sprintf("project %q is not active (status: %s)", project.Name, project.Status)))
-		return
-	}
-	if project.CustomerID == nil {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "project has no customer assigned, cannot log time"))
-		return
-	}
-
-	timezone := req.Timezone
-	if timezone == "" {
-		timezone, err = services.LookupUserTimezone(h.DB, user.ID)
-		if err != nil {
-			h.RespondInternalError(w, r)
-			return
-		}
-	}
-	resolvedTimezone, location, err := services.ResolveTimezone(timezone)
-	if err != nil {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
-		return
-	}
-	date, err := services.ParseCivilDate(req.Date, location)
-	if err != nil {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
-		return
-	}
-
-	durationMins, startUnix, endUnix, err := services.ParseWorklogTimes(date, services.WorklogTimeInput{
-		Duration:        req.Duration,
-		DurationMinutes: req.DurationMinutes,
-		StartTime:       req.StartTime,
-		EndTime:         req.EndTime,
-	})
-	if err != nil {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
-		return
-	}
-
 	// Resolve optional item link
 	var itemID *int
 	if req.ItemKey != "" || (req.ItemID != nil && *req.ItemID > 0) {
@@ -263,34 +225,28 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 		itemID = &id
 	}
 
-	id, err := repository.NewTimeWorklogRepository(h.DB).Create(repository.NewWorklog{
-		ProjectID:       req.ProjectID,
-		CustomerID:      *project.CustomerID,
-		UserID:          user.ID,
-		ItemID:          itemID,
-		Description:     req.Description,
-		DateUnix:        services.WorklogDateUnix(date),
-		StartTimeUnix:   startUnix,
-		EndTimeUnix:     endUnix,
-		DurationMinutes: durationMins,
+	result, err := h.application.Create(user.ID, services.WorklogMutationInput{
+		ProjectID: req.ProjectID, ItemID: itemID, Description: req.Description, Date: req.Date,
+		Duration: req.Duration, DurationMinutes: req.DurationMinutes,
+		StartTime: req.StartTime, EndTime: req.EndTime, Timezone: req.Timezone,
 	})
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondMutationError(w, r, err)
 		return
 	}
 
 	h.RespondCreated(w, map[string]any{
-		"id":               id,
+		"id":               result.Worklog.ID,
 		"project_id":       req.ProjectID,
-		"project_name":     project.Name,
+		"project_name":     result.Worklog.ProjectName,
 		"date":             req.Date,
-		"duration_minutes": durationMins,
-		"description":      req.Description,
-		"timezone":         resolvedTimezone,
-		"start_time_local": time.Unix(startUnix, 0).In(location).Format("15:04"),
-		"end_time_local":   time.Unix(endUnix, 0).In(location).Format("15:04"),
-		"start_at":         time.Unix(startUnix, 0).UTC().Format(time.RFC3339),
-		"end_at":           time.Unix(endUnix, 0).UTC().Format(time.RFC3339),
+		"duration_minutes": result.DurationMinutes,
+		"description":      result.Worklog.Description,
+		"timezone":         result.Timezone,
+		"start_time_local": time.Unix(result.StartTimeUnix, 0).In(result.Location).Format("15:04"),
+		"end_time_local":   time.Unix(result.EndTimeUnix, 0).In(result.Location).Format("15:04"),
+		"start_at":         time.Unix(result.StartTimeUnix, 0).UTC().Format(time.RFC3339),
+		"end_at":           time.Unix(result.EndTimeUnix, 0).UTC().Format(time.RFC3339),
 	})
 }
 
@@ -341,8 +297,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sanitize.Apply(&req.Description, sanitize.RichText)
-	if err := worklogRepo.UpdateDescription(worklogID, req.Description); err != nil {
+	if _, err := h.application.UpdateDescription(worklogID, req.Description); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
@@ -385,10 +340,33 @@ func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := worklogRepo.Delete(worklogID); err != nil {
+	if err := h.application.Delete(worklogID); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
 
 	h.RespondNoContent(w)
+}
+
+func (h *TimeWorklogHandler) resolveReportTimezone(r *http.Request, profileTimezone string) (*time.Location, *restapi.APIError) {
+	raw := r.URL.Query().Get("timezone")
+	if raw == "" {
+		raw = profileTimezone
+	}
+	_, location, err := services.ResolveTimezone(raw)
+	if err != nil {
+		return nil, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error())
+	}
+	return location, nil
+}
+
+func (h *TimeWorklogHandler) respondMutationError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrWorklogProjectNotFound):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "project not found"))
+	case errors.Is(err, services.ErrWorklogProjectInactive), errors.Is(err, services.ErrWorklogCustomerMissing), errors.Is(err, services.ErrWorklogInvalidInput):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
+	default:
+		h.RespondInternalError(w, r)
+	}
 }

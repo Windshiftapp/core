@@ -364,6 +364,31 @@ func (s *RunService) unregisterCancel(runID int) {
 	delete(s.inflight, runID)
 }
 
+func newQueuedAgentRun(req RunRequest) *models.AgentRun {
+	run := &models.AgentRun{
+		WorkspaceID: req.WorkspaceID,
+		ItemID:      req.ItemID,
+		Status:      models.AgentRunStatusQueued,
+		Trigger:     req.Trigger,
+		IsEphemeral: req.Ephemeral,
+	}
+	if req.BindingID > 0 {
+		bindingID := req.BindingID
+		run.BindingID = &bindingID
+	}
+	if req.TriggeredByUserID > 0 {
+		userID := req.TriggeredByUserID
+		run.TriggeredByUserID = &userID
+	}
+	if req.TargetPoolID != nil {
+		run.TargetPoolID = req.TargetPoolID
+		run.JobKind = req.JobKind
+		// An empty image lets the remote runner use its default.
+		run.JobImage = req.JobImage
+	}
+	return run
+}
+
 // Start records a new run in the queued state and dispatches it onto a
 // background goroutine. The returned ID can be used to query state via the
 // repository. The caller's ctx is used only for the initial DB insert; the
@@ -386,34 +411,13 @@ func (s *RunService) Start(ctx context.Context, req RunRequest) (int, error) {
 	}
 	s.mu.Unlock()
 
-	run := &models.AgentRun{
-		WorkspaceID: req.WorkspaceID,
-		ItemID:      req.ItemID,
-		Status:      models.AgentRunStatusQueued,
-		Trigger:     req.Trigger,
-		IsEphemeral: req.Ephemeral,
-	}
+	run := newQueuedAgentRun(req)
 	if req.Grants != nil {
 		grantsJSON, err := json.Marshal(req.Grants)
 		if err != nil {
 			return 0, fmt.Errorf("run service: marshal grants: %w", err)
 		}
 		run.GrantsJSON = string(grantsJSON)
-	}
-	if req.BindingID > 0 {
-		bID := req.BindingID
-		run.BindingID = &bID
-	}
-	if req.TriggeredByUserID > 0 {
-		uID := req.TriggeredByUserID
-		run.TriggeredByUserID = &uID
-	}
-	if req.TargetPoolID != nil {
-		run.TargetPoolID = req.TargetPoolID
-		run.JobKind = req.JobKind
-		// A custom coding-agent image (or an admin container image) for a pool
-		// run; empty means the remote runner uses its default image (WI-450).
-		run.JobImage = req.JobImage
 	}
 	runID, err := s.repo.Insert(ctx, run)
 	if err != nil {
@@ -494,6 +498,22 @@ func (s *RunService) finalize(runID int, status, errMsg string) {
 	}
 }
 
+func (s *RunService) normalizeRunnerResult(ctx context.Context, runID int, result *RunnerResult) string {
+	if result.ContainerID != "" {
+		if err := s.repo.SetContainerID(ctx, runID, result.ContainerID); err != nil {
+			s.logger.Printf("run service: set container_id run=%d: %v", runID, err)
+		}
+	}
+	if models.IsAgentRunTerminal(result.Status) {
+		return result.Status
+	}
+	status := models.AgentRunStatusFailed
+	if result.Error == "" {
+		result.Error = fmt.Sprintf("runner returned non-terminal status %q", result.Status)
+	}
+	return status
+}
+
 // FinalizeRemote records the terminal verdict for a run executed by a remote
 // runner (the in-process path uses Report). It normalizes + finalizes the
 // status, emits the terminal event, and fires the post-run hook with the
@@ -505,18 +525,7 @@ func (s *RunService) FinalizeRemote(ctx context.Context, runID int, result Runne
 	if err != nil {
 		return fmt.Errorf("finalize remote: load run %d: %w", runID, err)
 	}
-	if result.ContainerID != "" {
-		if err := s.repo.SetContainerID(ctx, runID, result.ContainerID); err != nil {
-			s.logger.Printf("run service: set container_id run=%d: %v", runID, err)
-		}
-	}
-	status := result.Status
-	if !models.IsAgentRunTerminal(status) {
-		status = models.AgentRunStatusFailed
-		if result.Error == "" {
-			result.Error = fmt.Sprintf("runner returned non-terminal status %q", result.Status)
-		}
-	}
+	status := s.normalizeRunnerResult(ctx, runID, &result)
 	// Compare-and-swap finalize (WI-168): a remote runner credential must not
 	// be able to rewrite a run that already finalized or was canceled. If this
 	// call did not perform the running→terminal transition, treat the report
@@ -588,28 +597,7 @@ func (s *RunService) RecordFailedStart(ctx context.Context, req RunRequest, reas
 	if req.WorkspaceID == 0 {
 		return 0, errors.New("run service: workspace_id is required")
 	}
-	run := &models.AgentRun{
-		WorkspaceID: req.WorkspaceID,
-		ItemID:      req.ItemID,
-		Status:      models.AgentRunStatusQueued,
-		Trigger:     req.Trigger,
-		IsEphemeral: req.Ephemeral,
-	}
-	if req.BindingID > 0 {
-		bID := req.BindingID
-		run.BindingID = &bID
-	}
-	if req.TriggeredByUserID > 0 {
-		uID := req.TriggeredByUserID
-		run.TriggeredByUserID = &uID
-	}
-	if req.TargetPoolID != nil {
-		run.TargetPoolID = req.TargetPoolID
-		run.JobKind = req.JobKind
-		// A custom coding-agent image (or an admin container image) for a pool
-		// run; empty means the remote runner uses its default image (WI-450).
-		run.JobImage = req.JobImage
-	}
+	run := newQueuedAgentRun(req)
 	runID, err := s.repo.Insert(ctx, run)
 	if err != nil {
 		return 0, fmt.Errorf("insert agent_run: %w", err)
@@ -781,11 +769,14 @@ func (s *RunService) PrepareRemoteClaim(ctx context.Context, run *models.AgentRu
 		inputs = &RunInputs{}
 	}
 	spec.InitialPrompt += inputs.PromptSuffix
-	env := inputs.Env
-	if env == nil {
-		env = map[string]string{}
+	env := make(map[string]string, len(inputs.Env)+3)
+	for key, value := range inputs.Env {
+		env[key] = value
 	}
 	env["AGENT_RUN_ID"] = fmt.Sprintf("%d", run.ID)
+	if err := pinSandboxWSEnvironment(env); err != nil {
+		return JobSpec{}, fmt.Errorf("remote claim: pin ws destination: %w", err)
+	}
 	if inputs.Token != nil {
 		tokenSpec := *inputs.Token
 		if run.IsEphemeral {

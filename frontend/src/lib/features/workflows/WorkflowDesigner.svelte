@@ -28,8 +28,8 @@
       
       // Load workflow and statuses in parallel
       const [workflowData, statusesData] = await Promise.all([
-        api.get(`/workflows/${workflowId}`),
-        api.get('/statuses')
+        api.workflows.get(workflowId),
+        api.statuses.getAll()
       ]);
       
       workflow = workflowData;
@@ -59,7 +59,7 @@
 
   async function handleSave(allTransitions) {
     try {
-      await api.put(`/workflows/${workflow.id}/transitions`, allTransitions);
+      await api.workflows.updateTransitions(workflow.id, allTransitions);
       navigate('/admin/workflows');
     } catch (error) {
       throw error;

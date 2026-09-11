@@ -263,11 +263,11 @@ func (l *listPane) renderRow(i int) string {
 	}
 
 	it := r.Item
-	key := it.WorkspaceKey
+	key := ""
 	if key == "" && l.ctx.Workspace != nil {
 		key = l.ctx.Workspace.Key
 	}
-	itemKey := fmt.Sprintf("%s-%d", key, it.ID)
+	itemKey := it.DisplayKey(key)
 
 	mine := ""
 	if l.ctx.User != nil && it.AssigneeID != nil && *it.AssigneeID == l.ctx.User.UserID {

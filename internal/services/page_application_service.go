@@ -6,6 +6,7 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // ErrPageMutationForbidden is returned when a caller can address the
@@ -39,6 +40,147 @@ type PageApplicationUpdateInput struct {
 type PageApplicationService struct {
 	pages    *PageService
 	pageAuth *PagePermissionService
+}
+
+type PagePermissionsResult struct {
+	PageID             int                     `json:"page_id"`
+	InheritPermissions bool                    `json:"inherit_permissions"`
+	EffectiveLevel     string                  `json:"effective_level"`
+	ACL                []models.PagePermission `json:"acl"`
+}
+
+func (s *PageApplicationService) List(userID, workspaceID int) ([]models.Page, error) {
+	pages, err := s.pages.ListTreeMeta(workspaceID, false)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(pages))
+	for i := range pages {
+		ids[i] = pages[i].ID
+	}
+	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]models.Page, 0, len(pages))
+	for i := range pages {
+		if visible[pages[i].ID] {
+			filtered = append(filtered, pages[i])
+		}
+	}
+	if err := s.pages.PreloadLabels(filtered); err != nil {
+		return nil, err
+	}
+	return filtered, nil
+}
+
+func (s *PageApplicationService) Get(userID, workspaceID, pageID int) (*models.Page, error) {
+	if err := s.requirePageOp(userID, workspaceID, pageID, PageOpView); err != nil {
+		return nil, err
+	}
+	page, err := s.pages.GetByID(pageID)
+	if err != nil || page.WorkspaceID != workspaceID {
+		if err == nil {
+			err = ErrPageNotFound
+		}
+		return nil, err
+	}
+	if err := s.pages.PreloadLabelsForPage(page); err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
+func (s *PageApplicationService) Search(userID, workspaceID int, query string, limit int) ([]models.Page, error) {
+	pages, err := s.pages.SearchByKeyword(workspaceID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(pages))
+	for i := range pages {
+		ids[i] = pages[i].ID
+	}
+	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]models.Page, 0, len(pages))
+	for i := range pages {
+		if visible[pages[i].ID] {
+			pages[i].Content = ""
+			result = append(result, pages[i])
+		}
+	}
+	return result, nil
+}
+
+func (s *PageApplicationService) ListArchived(userID, workspaceID int) ([]repository.ArchivedPageRow, error) {
+	admin, err := s.pageAuth.IsSystemAdmin(userID)
+	if err != nil {
+		return nil, err
+	}
+	if !admin {
+		admin, err = s.pageAuth.HasWorkspacePermissionFor(userID, workspaceID, models.PermissionWorkspaceAdmin)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !admin {
+		return nil, ErrPageNotFound
+	}
+	return s.pages.ListArchived(workspaceID)
+}
+
+func (s *PageApplicationService) ListHistory(userID, workspaceID, pageID, limit, offset int) ([]models.PageRevision, int, error) {
+	if err := s.requirePageOp(userID, workspaceID, pageID, PageOpView); err != nil {
+		return nil, 0, err
+	}
+	total, err := s.pages.CountRevisions(pageID)
+	if err != nil {
+		return nil, 0, err
+	}
+	revisions, err := s.pages.ListRevisions(pageID, limit, offset)
+	return revisions, total, err
+}
+
+func (s *PageApplicationService) GetRevision(userID, workspaceID, pageID, revisionID int) (*models.PageRevision, error) {
+	if err := s.requirePageOp(userID, workspaceID, pageID, PageOpView); err != nil {
+		return nil, err
+	}
+	revision, err := s.pages.GetRevision(revisionID)
+	if err != nil || revision.PageID != pageID {
+		if err == nil {
+			err = ErrPageNotFound
+		}
+		return nil, err
+	}
+	return revision, nil
+}
+
+func (s *PageApplicationService) GetPermissions(userID, workspaceID, pageID int) (PagePermissionsResult, error) {
+	page, err := s.Get(userID, workspaceID, pageID)
+	if err != nil {
+		return PagePermissionsResult{}, err
+	}
+	effective := ""
+	for _, op := range []string{PageOpAdmin, PageOpEdit, PageOpView} {
+		allowed, checkErr := s.pageAuth.Can(userID, workspaceID, pageID, op)
+		if checkErr != nil {
+			return PagePermissionsResult{}, checkErr
+		}
+		if allowed {
+			effective = op
+			break
+		}
+	}
+	acl, err := s.pages.ListOwnACL(pageID)
+	if err != nil {
+		return PagePermissionsResult{}, err
+	}
+	if acl == nil {
+		acl = []models.PagePermission{}
+	}
+	return PagePermissionsResult{PageID: page.ID, InheritPermissions: page.InheritPermissions, EffectiveLevel: effective, ACL: acl}, nil
 }
 
 // NewPageApplicationService constructs the shared page mutation pipeline.

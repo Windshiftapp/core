@@ -194,7 +194,7 @@ Examples:
 // assets:delete, which isn't in DefaultAgentScopes — a CLI verb that
 // 403s out of the box for the default token is a footgun. Operators who
 // have minted a token with `--scopes assets:delete` can call
-// DELETE /rest/api/v1/assets/{id} via curl, or use the cookie-auth
+// DELETE /rest/api/v2/assets/{id} via curl, or use the cookie-auth
 // admin UI. Client.DeleteAsset stays available for embedders.
 
 // Flags for asset commands.

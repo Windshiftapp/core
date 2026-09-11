@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
@@ -62,6 +63,7 @@
     compactMode = false,
     initialType = 'work-item',
     initialWorkspaceId = null,
+    initialParentContext = null,
     skipNavigate = false,
     onclose = null,
     oncreated = null
@@ -102,6 +104,7 @@
     workspace_id: null
   });
   let collectionCategoryId = $state(null);
+  let submitting = $state(false);
 
   // Derived state for display
   let currentTypeName = $derived(typeLabels[selectedType] || 'Item');
@@ -200,18 +203,13 @@
     for (const image of workItemFormStore.pendingDescriptionImages) {
       if (!updatedDescription.includes(image.url)) continue;
 
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', image.file);
-      uploadFormData.append('entity_type', 'item');
-      uploadFormData.append('entity_id', String(itemId));
-
-      const uploadResult = await api.attachments.upload(uploadFormData);
-      const attachmentId = uploadResult?.attachment?.id;
+      const attachment = await api.attachments.uploadToItem(itemId, image.file);
+      const attachmentId = attachment?.id;
       if (!attachmentId) {
         throw new Error('Image upload failed');
       }
 
-      const downloadUrl = `/api/attachments/${attachmentId}/download`;
+      const downloadUrl = api.attachments.getDownloadUrl(attachmentId);
       updatedDescription = updatedDescription.split(image.url).join(downloadUrl);
     }
 
@@ -219,6 +217,8 @@
   }
 
   async function handleSubmit() {
+    if (submitting) return;
+    submitting = true;
     try {
       if (selectedType === 'work-item') {
         // Validate using store
@@ -234,10 +234,6 @@
         }
 
         let result = await api.items.create(formData);
-        if (formData.label_ids?.length > 0) {
-          const labels = await api.labels.setForItem(result.id, formData.label_ids);
-          result = { ...result, labels: labels || [] };
-        }
         const originalDescription = formData.description || '';
         const updatedDescription = await uploadPendingDescriptionImages(result.id, originalDescription);
         if (updatedDescription !== originalDescription) {
@@ -246,7 +242,7 @@
         }
 
         window.dispatchEvent(new CustomEvent('refresh-work-items', {
-          detail: { itemId: result.id, parentId: formData.parent_id ?? null }
+          detail: { item: result, itemId: result.id, parentId: formData.parent_id ?? null }
         }));
         oncreated?.(result);
 
@@ -284,7 +280,10 @@
         }
         const result = await api.workspaces.create(payload);
 
-        window.dispatchEvent(new CustomEvent('refresh-workspaces'));
+        workspacesStore.add(result);
+        window.dispatchEvent(new CustomEvent('refresh-workspaces', {
+          detail: { workspace: result }
+        }));
         if (!skipNavigate) {
           navigate(`/workspaces/${result.id}`);
         }
@@ -310,6 +309,8 @@
       } else {
         errorToast(`Failed to create ${currentTypeName.toLowerCase()}: ${errorMsg}`);
       }
+    } finally {
+      submitting = false;
     }
   }
 
@@ -317,7 +318,7 @@
     if (!isOpen) return;
     if (matchesShortcut(e, submitShortcut)) {
       e.preventDefault();
-      if (isFormValid) {
+      if (isFormValid && !submitting) {
         handleSubmit();
       }
     }
@@ -363,15 +364,24 @@
     selectedType = initialType;
   });
 
-  // The modal is lazy-loaded, so workspace context must arrive as state rather
-  // than a timer-based window event that can fire before this component mounts.
+  // Apply opening context without overwriting later workspace selections.
   $effect(() => {
-    if (
-      isOpen &&
-      initialWorkspaceId &&
-      workItemFormStore.formData.workspace_id !== Number(initialWorkspaceId)
-    ) {
-      applyWorkspace(initialWorkspaceId);
+    const workspaceId = initialWorkspaceId;
+    if (isOpen && workspaceId) {
+      untrack(() => {
+        if (workItemFormStore.formData.workspace_id !== Number(workspaceId)) {
+          void applyWorkspace(workspaceId);
+        }
+      });
+    }
+  });
+
+  $effect(() => {
+    if (isOpen && initialParentContext) {
+      untrack(() => workItemFormStore.setParentItem(
+        initialParentContext.parent,
+        initialParentContext.allowedItemTypes,
+      ));
     }
   });
 
@@ -509,7 +519,7 @@
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
-        <span class="font-medium" style="color: var(--ds-text);">
+        <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
           {#if workItemFormStore.parentItem}
             {t('createModal.newChildItem')}
           {:else}
@@ -569,7 +579,8 @@
           variant="primary"
           size="medium"
           keyboardHint={getDisplayString(submitShortcut)}
-          disabled={!isFormValid}
+          loading={submitting}
+          disabled={!isFormValid || submitting}
         >
           {t('createModal.create')} {currentTypeName}
         </Button>

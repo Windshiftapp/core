@@ -93,7 +93,6 @@ type UserPermissionCache struct {
 	RoleAssignments      map[int][]int             `json:"role_assignments"`      // workspace_id -> role_ids
 	DirectPermissions    map[int][]string          `json:"direct_permissions"`    // workspace_id -> permission_keys (direct assignments)
 	PermissionSources    map[int]map[string]string `json:"permission_sources"`    // workspace_id -> permission_key -> source (role/direct/group)
-	ItemWorkspaceMap     map[int]int               `json:"item_workspace_map"`    // item_id -> workspace_id (lazy-loaded on demand)
 	CachedAt             time.Time                 `json:"cached_at"`
 	ExpiresAt            time.Time                 `json:"expires_at"`
 }
@@ -247,10 +246,12 @@ type Theme struct {
 	NavBackgroundColorLight string `json:"nav_background_color_light"` // CSS color value (hex, rgb, etc.)
 	NavTextColorLight       string `json:"nav_text_color_light"`       // CSS color value (hex, rgb, etc.)
 	// Navigation bar theme properties for dark mode
-	NavBackgroundColorDark string    `json:"nav_background_color_dark"` // CSS color value (hex, rgb, etc.)
-	NavTextColorDark       string    `json:"nav_text_color_dark"`       // CSS color value (hex, rgb, etc.)
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	NavBackgroundColorDark string `json:"nav_background_color_dark"` // CSS color value (hex, rgb, etc.)
+	NavTextColorDark       string `json:"nav_text_color_dark"`       // CSS color value (hex, rgb, etc.)
+	// Optional company logo shown instead of the product mark
+	LogoURL   string    `json:"logo_url,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ThemeCreateRequest represents the payload for creating a new theme
@@ -261,6 +262,7 @@ type ThemeCreateRequest struct {
 	NavTextColorLight       string `json:"nav_text_color_light"`
 	NavBackgroundColorDark  string `json:"nav_background_color_dark"`
 	NavTextColorDark        string `json:"nav_text_color_dark"`
+	LogoURL                 string `json:"logo_url"`
 }
 
 // ThemeUpdateRequest represents the payload for updating a theme
@@ -271,5 +273,6 @@ type ThemeUpdateRequest struct {
 	NavTextColorLight       string `json:"nav_text_color_light"`
 	NavBackgroundColorDark  string `json:"nav_background_color_dark"`
 	NavTextColorDark        string `json:"nav_text_color_dark"`
+	LogoURL                 string `json:"logo_url"`
 	IsActive                bool   `json:"is_active"`
 }

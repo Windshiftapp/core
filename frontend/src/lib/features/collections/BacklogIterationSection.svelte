@@ -33,6 +33,8 @@
     storyPointsConfiguredForItem = null,
     storyPointsPendingItemIds = new Set(),
     onUpdateStoryPoints = null,
+    itemDndAction = () => {},
+    sectionDndAction = () => {},
   } = $props();
 
   const statusColors = {
@@ -74,6 +76,7 @@
 >
   <!-- Section Header -->
   <div
+    use:sectionDndAction={sectionId}
     role="button"
     tabindex="0"
     class={headerClass}
@@ -159,6 +162,7 @@
     <div class="mt-1">
       {#if items.length === 0}
         <div
+          use:sectionDndAction={sectionId}
           class={dropZoneClass}
           style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
           data-section-drop-zone
@@ -172,6 +176,7 @@
         <div class="flex flex-col" style={`row-gap: ${backlogRowGap}px;`}>
           {#each items as item (item.id)}
             <div
+              use:itemDndAction={item.id}
               class="relative"
               data-testid="backlog-item"
               data-item-card

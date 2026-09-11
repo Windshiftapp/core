@@ -21,6 +21,7 @@ var (
 	ErrInvitationInvalid          = errors.New("invitation is invalid")
 	ErrInvitationAlreadyUsed      = errors.New("invitation has already been used")
 	ErrInvitationGenerationFailed = errors.New("failed to generate invitation token")
+	ErrUserOffboarded             = errors.New("user has been offboarded")
 )
 
 const (
@@ -50,6 +51,19 @@ func NewInvitationService(db database.Database, smtpSender TransactionalEmailSen
 // outstanding (unused) tokens for the same user are invalidated so that only
 // the most recently issued token can be redeemed.
 func (s *InvitationService) GenerateInvitation(userID int) (string, error) {
+	// Offboarded accounts are irreversibly retired; a new invitation must
+	// never become a reactivation path.
+	var offboardedAt sql.NullTime
+	if err := s.db.QueryRow(`SELECT offboarded_at FROM users WHERE id = ?`, userID).Scan(&offboardedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrInvitationInvalid
+		}
+		return "", fmt.Errorf("failed to check user state: %w", err)
+	}
+	if offboardedAt.Valid {
+		return "", ErrUserOffboarded
+	}
+
 	// Generate a cryptographically secure random token
 	tokenBytes := make([]byte, InvitationTokenLength)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -105,13 +119,15 @@ func (s *InvitationService) SendInvitationEmail(user *models.User, token string)
 
 // VerifyInvitation validates an invitation token and returns the user info
 func (s *InvitationService) VerifyInvitation(token string) (*models.User, error) {
-	// Find invitation by token
+	// Find invitation by token. Offboarded users are excluded: their
+	// surviving tokens must not resolve, so verify and accept both reject
+	// with the generic invalid-invitation contract.
 	query := `
 		SELECT i.id, i.user_id, i.expires_at, i.used_at,
 		       u.email, u.username, u.first_name, u.last_name, u.is_active
 		FROM user_invitations i
 		JOIN users u ON i.user_id = u.id
-		WHERE i.token = ?
+		WHERE i.token = ? AND u.offboarded_at IS NULL
 	`
 
 	var invitationID int
@@ -169,14 +185,20 @@ func (s *InvitationService) AcceptInvitation(token, password string) error {
 
 	// 3. Update user and invitation in a transaction
 	if err := database.WithTx(s.db, func(tx database.Tx) error {
-		// Update user: set password, activate, mark as verified, and clear requires_password_reset
+		// Update user: set password, activate, mark as verified, and clear requires_password_reset.
+		// The offboarded_at predicate makes concurrent offboarding win: the
+		// update matches nothing and the whole acceptance rolls back.
 		userQuery := `
 			UPDATE users
 			SET password_hash = ?, requires_password_reset = false, email_verified = true, is_active = true, updated_at = ?
-			WHERE id = ?
+			WHERE id = ? AND offboarded_at IS NULL
 		`
-		if _, err := tx.Exec(userQuery, string(hashedPassword), time.Now(), user.ID); err != nil {
+		res, err := tx.Exec(userQuery, string(hashedPassword), time.Now(), user.ID)
+		if err != nil {
 			return fmt.Errorf("failed to update user password: %w", err)
+		}
+		if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+			return ErrUserOffboarded
 		}
 
 		// Mark invitation as used
@@ -186,6 +208,9 @@ func (s *InvitationService) AcceptInvitation(token, password string) error {
 		}
 		return nil
 	}); err != nil {
+		if errors.Is(err, ErrUserOffboarded) {
+			return ErrInvitationInvalid
+		}
 		return err
 	}
 

@@ -45,6 +45,7 @@ type ItemCreateInput struct {
 	EstimateMinutes   *int
 	CustomFieldValues map[string]any
 	MilestoneIDs      []int
+	LabelIDs          []int
 }
 
 // ItemCreateResult contains the committed item and mandatory-template detail
@@ -116,8 +117,6 @@ func (s *ItemCreationService) create(
 		Title:             input.Title,
 		ItemTypeID:        input.ItemTypeID,
 		ParentID:          input.ParentID,
-		StatusID:          input.StatusID,
-		IsTask:            input.IsTask,
 		RelatedWorkItemID: input.RelatedWorkItemID,
 		UserID:            actorUserID,
 		PermService:       s.perm,
@@ -156,6 +155,7 @@ func (s *ItemCreationService) create(
 		IsTask:                input.IsTask,
 		ParentID:              input.ParentID,
 		MilestoneIDs:          input.MilestoneIDs,
+		LabelIDs:              input.LabelIDs,
 		IterationID:           input.IterationID,
 		ProjectID:             input.ProjectID,
 		InheritProject:        input.InheritProject,

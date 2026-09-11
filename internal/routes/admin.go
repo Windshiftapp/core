@@ -76,10 +76,6 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("DELETE /themes/{id}", admin(http.HandlerFunc(deps.Admin.Theme.DeleteTheme)))
 	api.HandleH("POST /themes/{id}/activate", admin(http.HandlerFunc(deps.Admin.Theme.ActivateTheme)))
 
-	// User preferences routes
-	api.HandleH("GET /user/preferences", auth(http.HandlerFunc(deps.Admin.UserPreferences.GetUserPreferences)))
-	api.HandleH("PUT /user/preferences", auth(http.HandlerFunc(deps.Admin.UserPreferences.UpdateUserPreferences)))
-
 	// Personal dashboard layout (per-user)
 	api.HandleH("GET /user/dashboard-layout", auth(http.HandlerFunc(deps.Admin.UserPreferences.GetDashboardLayout)))
 	api.HandleH("PUT /user/dashboard-layout", auth(http.HandlerFunc(deps.Admin.UserPreferences.UpdateDashboardLayout)))

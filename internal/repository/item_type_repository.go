@@ -239,9 +239,7 @@ func (r *ItemTypeRepository) Create(it *models.ItemType, configSetIDs []int) (in
 	return int(id), nil
 }
 
-// Update mutates the item type's columns. When configSetIDs is non-empty the
-// configuration-set associations are replaced wholesale; an empty slice leaves
-// them untouched. Returns ErrDuplicateEntry on a unique-name collision.
+// Update mutates the item type and replaces its configuration-set associations.
 func (r *ItemTypeRepository) Update(id int, it *models.ItemType, configSetIDs []int) error {
 	now := time.Now()
 	_, err := r.db.ExecWrite(`
@@ -255,13 +253,11 @@ func (r *ItemTypeRepository) Update(id int, it *models.ItemType, configSetIDs []
 		}
 		return fmt.Errorf("update item type %d: %w", id, err)
 	}
-	if len(configSetIDs) > 0 {
-		if _, err := r.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE item_type_id = ?", id); err != nil {
-			return fmt.Errorf("clear configuration sets for item type %d: %w", id, err)
-		}
-		if err := r.insertConfigurationSets(id, configSetIDs, now); err != nil {
-			return err
-		}
+	if _, err := r.db.ExecWrite("DELETE FROM configuration_set_item_types WHERE item_type_id = ?", id); err != nil {
+		return fmt.Errorf("clear configuration sets for item type %d: %w", id, err)
+	}
+	if err := r.insertConfigurationSets(id, configSetIDs, now); err != nil {
+		return err
 	}
 	return nil
 }

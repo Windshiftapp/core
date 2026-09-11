@@ -7,6 +7,7 @@ import {
   fetchCollectionBacklog,
   fetchCollectionItemChanges,
   fetchCollectionItems,
+  fetchCollectionTotal,
   fetchItemsById,
   getCollection,
 } from '../features/collections/collectionService.js';
@@ -30,15 +31,28 @@ const BACKLOG_VIEWS = new Set(['workspace-backlog', 'collection-backlog']);
 
 const DEFAULT_PAGE_SIZE = 100;
 const LIST_INITIAL_PAGE_SIZE = 50;
+// Tree pages stay smaller than map/roadmap: every loaded item can require an
+// ancestors lookup, so the page bounds the hierarchy-repair fan-out.
+const TREE_PAGE_SIZE = 100;
 const LARGE_COLLECTION_PAGE_SIZE = 250;
 const BOARD_UNFINISHED_PAGE_SIZE = 1000;
+const BOARD_UNTHROTTLED_ITEM_COUNT = 1000;
+const BOARD_BACKGROUND_PAGE_DELAY_MS = 250;
 const BOARD_SEARCH_PAGE_SIZE = 100;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function appendUniqueItems(existing, incoming) {
+  const ids = new Set(existing.map((item) => item.id));
+  return [...existing, ...incoming.filter((item) => !ids.has(item.id))];
+}
 
 function initialItemsPageSize(view) {
   if (view === 'workspace-list' || view === 'collection-list') return LIST_INITIAL_PAGE_SIZE;
+  if (view === 'workspace-tree' || view === 'collection-tree') return TREE_PAGE_SIZE;
   if (
-    view === 'workspace-tree' ||
-    view === 'collection-tree' ||
     view === 'workspace-map' ||
     view === 'collection-map' ||
     view === 'workspace-roadmap' ||
@@ -77,6 +91,8 @@ class CollectionStore {
   items = $state([]);
   backlogItems = $state([]);
   collectionName = $state('Default');
+  collectionTotal = $state(null);
+  #countRequestId = 0;
   publicSlug = $state(null);
   loading = $state(false);
 
@@ -84,6 +100,7 @@ class CollectionStore {
   itemsPagination = $state(null);
   itemsHasMore = $state(false);
   itemsLoadingMore = $state(false);
+  boardBackgroundLoading = $state(false);
 
   // Board views load every unfinished item separately from completed work.
   // The rightmost cap is retained as a specialized view of that partition.
@@ -108,6 +125,35 @@ class CollectionStore {
   // Raw filter rows backing the QL — kept so the SubFilterBar UI can hydrate
   // its builder when remounted on a different view of the same collection.
   subFilterRows = $state([]);
+  showCompleted = $state(false);
+
+  get effectiveSubFilterQL() {
+    if (this.showCompleted) return this.subFilterQL;
+    return this.subFilterQL
+      ? `(${this.subFilterQL}) AND status_completed = false`
+      : 'status_completed = false';
+  }
+
+  #completionPreferenceKey(wsId, colId, view) {
+    const scope = colId ? `collection-${colId}` : `workspace-${wsId}`;
+    return `collection-show-completed:${scope}:${view?.split('-').at(-1)}`;
+  }
+
+  async setShowCompleted(value) {
+    this.showCompleted = value;
+    try {
+      localStorage.setItem(
+        this.#completionPreferenceKey(this.#wsId, this.#colId, this.#currentView),
+        String(value)
+      );
+    } catch {
+      // Keep the setting usable when browser storage is unavailable.
+    }
+    this.clearBoardSearch();
+    if (this.#wsId || this.#colId) {
+      await this.load(this.#wsId, this.#colId, this.#currentView);
+    }
+  }
 
   // Server-side sort state
   sortableFields = $state([]);
@@ -177,19 +223,34 @@ class CollectionStore {
     const sameCollection = wsId === this.#wsId && colId === this.#colId;
     const viewChanged = view !== this.#currentView;
     const targetInitialLimit = initialItemsPageSize(view);
+    const previousShowCompleted = this.showCompleted;
+    if (BOARD_VIEWS.has(view)) {
+      this.showCompleted = true;
+    } else if (!sameCollection || viewChanged) {
+      try {
+        this.showCompleted =
+          localStorage.getItem(this.#completionPreferenceKey(wsId, colId, view)) === 'true';
+      } catch {
+        this.showCompleted = false;
+      }
+    }
 
     // Switching between passive collection views does not need another network
     // roundtrip when the already-loaded item page is large enough and there is
     // no active server-side sort/filter. Board views may need capped-column
     // fetches, so they intentionally keep loading.
-    const canReuseTargetData = loadsItems(view)
-      ? this.items.length > 0 &&
-        !this.boardDeferred &&
-        (this.itemsPagination?.limit ?? 0) >= targetInitialLimit
-      : this.backlogPagination !== null;
+    const canReuseTargetData =
+      loadsItems(view) &&
+      loadsItems(this.#currentView) &&
+      this.items.length > 0 &&
+      !this.boardDeferred &&
+      (this.itemsPagination?.limit ?? 0) >= targetInitialLimit;
     if (
       sameCollection &&
       viewChanged &&
+      previousShowCompleted === this.showCompleted &&
+      !this.loading &&
+      !BOARD_VIEWS.has(this.#currentView) &&
       canReuseTargetData &&
       !this.subFilterQL &&
       !this.#sortBy &&
@@ -208,9 +269,11 @@ class CollectionStore {
       this.items = [];
       this.backlogItems = [];
       this.collectionName = 'Default';
+      this.collectionTotal = null;
       this.itemsPagination = null;
       this.itemsHasMore = false;
       this.itemsLoadingMore = false;
+      this.boardBackgroundLoading = false;
       this.boardDeferred = null;
       this.rightmostCap = null;
       this.backlogPagination = null;
@@ -238,30 +301,41 @@ class CollectionStore {
     this.#currentView = view;
     const loadId = ++this.#loadId;
 
+    this.boardBackgroundLoading = false;
     this.loading = true;
 
     try {
-      const [boardPartition, collection] = await Promise.all([
-        this.#resolveBoardPartition(wsId, colId, view),
-        colId ? getCollection(colId) : Promise.resolve(null),
-      ]);
+      const boardPartition = await this.#resolveBoardPartition(wsId, colId, view);
+      const collection = colId
+        ? BOARD_VIEWS.has(view)
+          ? (this.boardCollection ?? (await getCollection(colId)))
+          : await getCollection(colId)
+        : null;
       if (loadId !== this.#loadId) return; // stale
 
-      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
         loadsItems(view)
-          ? this.#fetchMainItems(wsId, colId, targetInitialLimit, boardPartition, collection)
+          ? this.#fetchMainItems(
+              wsId,
+              colId,
+              targetInitialLimit,
+              boardPartition,
+              collection,
+              BOARD_VIEWS.has(view)
+            )
           : Promise.resolve(null),
         loadsBacklog(view)
           ? fetchCollectionBacklog(wsId, colId, {
               page: 1,
               limit: DEFAULT_PAGE_SIZE,
-              sub_ql: this.subFilterQL || undefined,
+              sub_ql: this.effectiveSubFilterQL || undefined,
               collection,
             })
           : Promise.resolve(null),
         loadsItems(view)
           ? this.#fetchBoardDeferredItems(wsId, colId, boardPartition, collection)
           : Promise.resolve(null),
+        this.#refreshCollectionTotal(),
       ]);
 
       if (loadId !== this.#loadId) return; // stale
@@ -274,7 +348,7 @@ class CollectionStore {
           ? {
               ...boardPartition,
               pagination: deferredResult.pagination,
-              total: deferredResult.pagination?.total ?? deferredResult.items.length,
+              total: deferredResult.pagination?.total_items ?? deferredResult.items.length,
             }
           : null;
         this.rightmostCap = this.boardDeferred?.capped
@@ -302,7 +376,22 @@ class CollectionStore {
             collection?.is_public && collection?.public_slug ? collection.public_slug : null;
         }
       }
-      this.#changesWatermark = snapshotWatermark(itemsResult, backlogResult, deferredResult);
+      this.#changesWatermark = snapshotWatermark(
+        itemsResult,
+        backlogResult,
+        deferredResult,
+        countResult
+      );
+      if (itemsResult && BOARD_VIEWS.has(view)) {
+        void this.#loadRemainingBoardItems({
+          first: itemsResult,
+          wsId,
+          colId,
+          boardPartition,
+          collection,
+          loadId,
+        });
+      }
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] Load failed:', error);
@@ -313,13 +402,33 @@ class CollectionStore {
     }
   }
 
+  async #refreshCollectionTotal() {
+    if (!this.#wsId && !this.#colId) return null;
+    const requestId = ++this.#countRequestId;
+    const loadId = this.#loadId;
+    try {
+      const result = await fetchCollectionTotal(this.#wsId, this.#colId);
+      if (requestId === this.#countRequestId && loadId === this.#loadId) {
+        this.collectionTotal = result.total;
+        this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark);
+      }
+      return result;
+    } catch (error) {
+      if (requestId !== this.#countRequestId || loadId !== this.#loadId) return;
+      this.collectionTotal = null;
+      if (!isExpectedBackgroundSyncError(error)) {
+        console.error('[collectionStore] Count refresh failed:', error);
+      }
+    }
+  }
+
   /**
    * Resolves the statuses deferred from the board's full unfinished fetch.
    * A capped rightmost column keeps its existing 50-card behavior; otherwise
    * completed statuses are paged separately so they cannot hide active work.
    */
   async #resolveBoardPartition(wsId, colId, view) {
-    if (!BOARD_VIEWS.has(view)) return null;
+    if (!BOARD_VIEWS.has(view) || !this.showCompleted) return null;
     try {
       const config = await this.getBoardConfiguration(wsId, colId);
       let statuses = this.boardStatuses;
@@ -338,7 +447,7 @@ class CollectionStore {
       }
 
       const completedStatusIds = statuses
-        .filter((status) => status.is_completed || status.category_name === 'Done')
+        .filter((status) => status.is_completed)
         .map((status) => status.id);
       const retentionDays = Number(config?.completed_item_retention_days);
       const completedActivityDays =
@@ -419,31 +528,96 @@ class CollectionStore {
     return statusIds?.length ? { status_id_not: statusIds.join(',') } : {};
   }
 
-  async #fetchMainItems(wsId, colId, limit, boardPartition, collection) {
+  #fetchMainItems(wsId, colId, limit, boardPartition, collection, isBoard = false) {
     const fetchPage = (page, pageLimit) =>
       fetchCollectionItems(wsId, colId, {
         page,
         limit: pageLimit,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
+        collection,
+        ...this.#itemSortOptions(),
+        ...this.#boardExclusionFilter(boardPartition?.statusIds ?? null),
+      });
+
+    if (!isBoard) return fetchPage(1, limit);
+    return fetchPage(1, BOARD_UNFINISHED_PAGE_SIZE);
+  }
+
+  async #loadRemainingBoardItems({ first, wsId, colId, boardPartition, collection, loadId }) {
+    const totalPages = first.pagination?.total_pages ?? 1;
+    if (totalPages <= 1 || loadId !== this.#loadId) return;
+
+    this.boardBackgroundLoading = true;
+    let loadedCount = first.items.length;
+    try {
+      for (let page = 2; page <= totalPages; page++) {
+        if (loadedCount >= BOARD_UNTHROTTLED_ITEM_COUNT) {
+          await delay(BOARD_BACKGROUND_PAGE_DELAY_MS);
+        }
+        if (loadId !== this.#loadId) return;
+
+        const result = await fetchCollectionItems(wsId, colId, {
+          page,
+          limit: BOARD_UNFINISHED_PAGE_SIZE,
+          sub_ql: this.effectiveSubFilterQL || undefined,
+          collection,
+          ...this.#itemSortOptions(),
+          ...this.#boardExclusionFilter(boardPartition?.statusIds),
+        });
+        if (loadId !== this.#loadId) return;
+
+        this.items = appendUniqueItems(this.items, result.items);
+        this.itemsPagination = result.pagination;
+        if (!this.boardDeferred) this.itemsHasMore = calcHasMore(result.pagination);
+        this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
+        loadedCount += result.items.length;
+      }
+    } catch (error) {
+      if (loadId === this.#loadId && !isExpectedBackgroundSyncError(error)) {
+        console.error('[collectionStore] background board load failed:', error);
+      }
+    } finally {
+      if (loadId === this.#loadId) {
+        this.boardBackgroundLoading = false;
+      }
+    }
+  }
+
+  async #fetchCompleteMainItems(wsId, colId, limit, boardPartition, collection, loadId, isBoard) {
+    const first = await this.#fetchMainItems(
+      wsId,
+      colId,
+      limit,
+      boardPartition,
+      collection,
+      isBoard
+    );
+    const totalPages = first.pagination?.total_pages ?? 1;
+    if (!isBoard || totalPages <= 1) return first;
+
+    const pages = [first];
+    let loadedCount = first.items.length;
+    for (let page = 2; page <= totalPages; page++) {
+      if (loadedCount >= BOARD_UNTHROTTLED_ITEM_COUNT) {
+        await delay(BOARD_BACKGROUND_PAGE_DELAY_MS);
+      }
+      if (loadId !== this.#loadId) return first;
+
+      const result = await fetchCollectionItems(wsId, colId, {
+        page,
+        limit: BOARD_UNFINISHED_PAGE_SIZE,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds),
       });
-
-    if (!boardPartition) return fetchPage(1, limit);
-
-    const first = await fetchPage(1, BOARD_UNFINISHED_PAGE_SIZE);
-    const totalPages = first.pagination?.total_pages ?? 1;
-    if (totalPages <= 1) return first;
-
-    const pages = [first];
-    for (let page = 2; page <= totalPages; page++) {
-      pages.push(await fetchPage(page, BOARD_UNFINISHED_PAGE_SIZE));
+      pages.push(result);
+      loadedCount += result.items.length;
     }
     return {
       ...first,
       items: pages.flatMap((result) => result.items),
-      pagination: { ...first.pagination, page: totalPages },
+      pagination: pages.at(-1).pagination,
       watermark: snapshotWatermark(...pages),
     };
   }
@@ -456,7 +630,7 @@ class CollectionStore {
     return fetchCollectionItems(wsId, colId, {
       page: 1,
       limit,
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
       collection,
       status_id: boardPartition.statusIds.join(','),
       completed_activity_days: boardPartition.completedActivityDays || undefined,
@@ -481,11 +655,11 @@ class CollectionStore {
       const loaded = this.items.filter((item) => deferredSet.has(item.status_id)).length;
       return Math.max(0, this.boardDeferred.total - loaded);
     }
-    return Math.max(0, (this.itemsPagination?.total ?? 0) - this.mainItemsLoadedCount);
+    return Math.max(0, (this.itemsPagination?.total_items ?? 0) - this.mainItemsLoadedCount);
   }
 
   get itemsTotalCount() {
-    const mainTotal = this.itemsPagination?.total ?? this.mainItemsLoadedCount;
+    const mainTotal = this.itemsPagination?.total_items ?? this.mainItemsLoadedCount;
     return mainTotal + (this.boardDeferred?.total ?? 0);
   }
 
@@ -495,7 +669,7 @@ class CollectionStore {
 
   get boardSearchRemainingCount() {
     const loaded = this.boardSearchItems.length;
-    return Math.max(0, (this.boardSearchPagination?.total ?? loaded) - loaded);
+    return Math.max(0, (this.boardSearchPagination?.total_items ?? loaded) - loaded);
   }
 
   clearBoardSearch() {
@@ -568,7 +742,7 @@ class CollectionStore {
       page,
       limit: BOARD_SEARCH_PAGE_SIZE,
       search: query,
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
       collection: this.boardCollection ?? undefined,
       ...this.#itemSortOptions(),
     });
@@ -585,7 +759,13 @@ class CollectionStore {
    * Append mode: fetch next items page and append to existing items.
    */
   async loadMoreItems() {
-    if (!this.itemsHasMore || this.itemsLoadingMore) return;
+    if (
+      !this.itemsHasMore ||
+      this.itemsLoadingMore ||
+      (this.boardBackgroundLoading && !this.boardDeferred)
+    ) {
+      return;
+    }
 
     const deferred = this.boardDeferred && !this.boardDeferred.capped ? this.boardDeferred : null;
     const pagination = deferred?.pagination ?? this.itemsPagination;
@@ -597,7 +777,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page: nextPage,
         limit: pagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
         ...this.#itemSortOptions(),
         ...(deferred
           ? {
@@ -613,7 +793,7 @@ class CollectionStore {
         this.boardDeferred = {
           ...deferred,
           pagination: result.pagination,
-          total: result.pagination?.total ?? deferred.total,
+          total: result.pagination?.total_items ?? deferred.total,
         };
       } else {
         this.itemsPagination = result.pagination;
@@ -643,7 +823,7 @@ class CollectionStore {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
       });
 
       if (loadId !== this.#loadId) return;
@@ -671,12 +851,15 @@ class CollectionStore {
     const loadId = ++this.#loadId;
 
     try {
-      const result = await fetchCollectionItems(this.#wsId, this.#colId, {
-        page,
-        limit,
-        sub_ql: this.subFilterQL || undefined,
-        ...this.#itemSortOptions(),
-      });
+      const [result] = await Promise.all([
+        fetchCollectionItems(this.#wsId, this.#colId, {
+          page,
+          limit,
+          sub_ql: this.effectiveSubFilterQL || undefined,
+          ...this.#itemSortOptions(),
+        }),
+        this.#refreshCollectionTotal(),
+      ]);
 
       if (loadId !== this.#loadId) return;
 
@@ -711,27 +894,42 @@ class CollectionStore {
   async refresh() {
     if (!this.#wsId && !this.#colId) return;
     const loadId = ++this.#loadId;
+    this.boardBackgroundLoading = false;
 
     const itemsLimit = Math.max(initialItemsPageSize(this.#currentView), this.mainItemsLoadedCount);
     const backlogLimit = Math.max(DEFAULT_PAGE_SIZE, this.backlogItems.length);
 
     try {
-      const [boardPartition, collection] = await Promise.all([
-        this.#resolveBoardPartition(this.#wsId, this.#colId, this.#currentView),
-        this.#colId ? getCollection(this.#colId) : Promise.resolve(null),
-      ]);
+      const boardPartition = await this.#resolveBoardPartition(
+        this.#wsId,
+        this.#colId,
+        this.#currentView
+      );
+      const collection = this.#colId
+        ? BOARD_VIEWS.has(this.#currentView)
+          ? (this.boardCollection ?? (await getCollection(this.#colId)))
+          : await getCollection(this.#colId)
+        : null;
       if (loadId !== this.#loadId) return;
 
       const deferredLoadedCount = this.items.length - this.mainItemsLoadedCount;
-      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
         loadsItems(this.#currentView)
-          ? this.#fetchMainItems(this.#wsId, this.#colId, itemsLimit, boardPartition, collection)
+          ? this.#fetchCompleteMainItems(
+              this.#wsId,
+              this.#colId,
+              itemsLimit,
+              boardPartition,
+              collection,
+              loadId,
+              BOARD_VIEWS.has(this.#currentView)
+            )
           : Promise.resolve(null),
         loadsBacklog(this.#currentView)
           ? fetchCollectionBacklog(this.#wsId, this.#colId, {
               page: 1,
               limit: backlogLimit,
-              sub_ql: this.subFilterQL || undefined,
+              sub_ql: this.effectiveSubFilterQL || undefined,
               collection,
             })
           : Promise.resolve(null),
@@ -744,6 +942,7 @@ class CollectionStore {
               deferredLoadedCount
             )
           : Promise.resolve(null),
+        this.#refreshCollectionTotal(),
       ]);
       if (loadId !== this.#loadId) return;
 
@@ -755,7 +954,7 @@ class CollectionStore {
           ? {
               ...boardPartition,
               pagination: deferredResult.pagination,
-              total: deferredResult.pagination?.total ?? deferredResult.items.length,
+              total: deferredResult.pagination?.total_items ?? deferredResult.items.length,
             }
           : null;
         this.rightmostCap = this.boardDeferred?.capped
@@ -775,7 +974,12 @@ class CollectionStore {
         this.backlogPagination = backlogResult.pagination;
         this.backlogHasMore = calcHasMore(backlogResult.pagination);
       }
-      this.#changesWatermark = snapshotWatermark(itemsResult, backlogResult, deferredResult);
+      this.#changesWatermark = snapshotWatermark(
+        itemsResult,
+        backlogResult,
+        deferredResult,
+        countResult
+      );
     } catch (error) {
       if (loadId !== this.#loadId) return;
       if (!isExpectedBackgroundSyncError(error)) {
@@ -852,9 +1056,24 @@ class CollectionStore {
     try {
       const updated = await api.items.get(itemId);
       this.#applyUpdatedItem(updated);
+      await this.#refreshCollectionTotal();
     } catch (e) {
       console.error('[collectionStore] refreshItem failed:', e);
     }
+  }
+
+  applyItem(item) {
+    if (!item?.id) return;
+    void this.#refreshCollectionTotal();
+    if (this.#hideCompletedItem(item)) return;
+    const index = this.items.findIndex((current) => current.id === item.id);
+    if (index === -1) {
+      this.items = [...this.items, item];
+      return;
+    }
+    this.items = this.items.map((current, currentIndex) =>
+      currentIndex === index ? item : current
+    );
   }
 
   /**
@@ -873,7 +1092,7 @@ class CollectionStore {
     try {
       const changes = await fetchCollectionItemChanges(this.#wsId, this.#colId, {
         since: this.#changesWatermark,
-        sub_ql: this.subFilterQL || undefined,
+        sub_ql: this.effectiveSubFilterQL || undefined,
       });
       if (loadId !== this.#loadId) return;
       this.#changesWatermark = changes?.watermark ?? this.#changesWatermark;
@@ -885,7 +1104,9 @@ class CollectionStore {
 
       const removedIds = new Set(changes?.removed_item_ids ?? []);
       if (removedIds.size > 0) {
-        this.#removeItemsById(removedIds);
+        // Removed IDs may be off-page or outside the saved query altogether.
+        await this.refresh();
+        return;
       }
 
       const changedIds = [...new Set(changes?.changed_item_ids ?? [])].filter(
@@ -910,6 +1131,7 @@ class CollectionStore {
       }
 
       const updatedItems = await fetchItemsById(loadedChangedIds);
+      if (loadId !== this.#loadId) return;
       for (const updated of updatedItems) {
         this.#applyUpdatedItem(updated);
       }
@@ -917,6 +1139,7 @@ class CollectionStore {
       // object identity for rows/cards that were patched in place.
       this.items = [...this.items];
       this.backlogItems = [...this.backlogItems];
+      await this.#refreshCollectionTotal();
     } catch (error) {
       if (!isExpectedBackgroundSyncError(error)) {
         console.error('[collectionStore] Delta refresh failed:', error);
@@ -929,19 +1152,30 @@ class CollectionStore {
     const wsId = this.#wsId;
     const colId = this.#colId;
     const changes = await fetchCollectionItemChanges(wsId, colId, {
-      sub_ql: this.subFilterQL || undefined,
+      sub_ql: this.effectiveSubFilterQL || undefined,
     });
     if (loadId !== this.#loadId || wsId !== this.#wsId || colId !== this.#colId) return;
     this.#changesWatermark = changes?.watermark ?? 0;
   }
 
   #applyUpdatedItem(updated) {
+    if (this.#hideCompletedItem(updated)) return;
     const idx = this.items.findIndex((i) => i.id === updated.id);
     if (idx !== -1) Object.assign(this.items[idx], updated);
     const bIdx = this.backlogItems.findIndex((i) => i.id === updated.id);
     if (bIdx !== -1) Object.assign(this.backlogItems[bIdx], updated);
     const searchIdx = this.boardSearchItems.findIndex((i) => i.id === updated.id);
     if (searchIdx !== -1) Object.assign(this.boardSearchItems[searchIdx], updated);
+  }
+
+  #hideCompletedItem(item) {
+    if (this.showCompleted) return false;
+    const status =
+      workspaceDataStore.statuses.find((candidate) => candidate.id === item.status_id) ??
+      this.boardStatuses.find((candidate) => candidate.id === item.status_id);
+    if (!status?.is_completed) return false;
+    this.#removeItemsById(new Set([item.id]));
+    return true;
   }
 
   #removeItemsById(ids) {
@@ -965,7 +1199,7 @@ class CollectionStore {
     if (removedItems > 0 && this.itemsPagination) {
       this.itemsPagination = {
         ...this.itemsPagination,
-        total: Math.max(0, (this.itemsPagination.total ?? 0) - removedItems),
+        total_items: Math.max(0, (this.itemsPagination.total_items ?? 0) - removedItems),
       };
     }
     if (removedDeferredItems > 0 && this.boardDeferred) {
@@ -974,7 +1208,7 @@ class CollectionStore {
       const pagination = this.boardDeferred.pagination
         ? {
             ...this.boardDeferred.pagination,
-            total,
+            total_items: total,
             total_pages: Math.ceil(total / limit),
           }
         : null;
@@ -991,7 +1225,7 @@ class CollectionStore {
     if (removedBacklog > 0 && this.backlogPagination) {
       this.backlogPagination = {
         ...this.backlogPagination,
-        total: Math.max(0, (this.backlogPagination.total ?? 0) - removedBacklog),
+        total_items: Math.max(0, (this.backlogPagination.total_items ?? 0) - removedBacklog),
       };
       this.backlogHasMore = calcHasMore(this.backlogPagination);
     }
@@ -1037,6 +1271,11 @@ export function refreshCollectionDeltas() {
 /** Refresh a single item in the store without reloading the entire collection */
 export function refreshCollectionItem(itemId) {
   return collectionStore.refreshItem(itemId);
+}
+
+/** Apply a mutation response directly to the loaded collection page. */
+export function applyCollectionItem(item) {
+  collectionStore.applyItem(item);
 }
 
 /**

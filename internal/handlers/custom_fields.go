@@ -83,76 +83,59 @@ func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
 }
 
 func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	customFields, err := h.repo.List()
+	fields, err := h.repo.List()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-
-	// Load asset type usages for all custom fields
-	usageRows, err := h.repo.ListAssetTypeUsages()
+	usages, err := h.repo.ListAssetTypeUsages()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	assetTypeUsages := make(map[int][]assetTypeUsage)
-	for _, row := range usageRows {
-		assetTypeUsages[row.CustomFieldID] = append(assetTypeUsages[row.CustomFieldID], assetTypeUsage{
-			AssetTypeName: row.AssetTypeName,
-			SetName:       row.SetName,
+	usageByField := make(map[int][]assetTypeUsage)
+	for _, usage := range usages {
+		usageByField[usage.CustomFieldID] = append(usageByField[usage.CustomFieldID], assetTypeUsage{
+			AssetTypeName: usage.AssetTypeName, SetName: usage.SetName,
 		})
 	}
-
-	// Load index info for all custom fields
-	indexRows, err := h.repo.ListIndexes()
+	indexes, err := h.repo.ListIndexes()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	fieldIndexes := make(map[int]*models.CustomFieldIndexInfo)
-	indexCounts := map[string]int{"items": 0, "assets": 0}
-	for _, row := range indexRows {
-		if fieldIndexes[row.CustomFieldID] == nil {
-			fieldIndexes[row.CustomFieldID] = &models.CustomFieldIndexInfo{}
+	indexByField := make(map[int]*models.CustomFieldIndexInfo)
+	counts := map[string]int{"items": 0, "assets": 0}
+	for _, index := range indexes {
+		if indexByField[index.CustomFieldID] == nil {
+			indexByField[index.CustomFieldID] = &models.CustomFieldIndexInfo{}
 		}
-		switch row.TargetTable {
+		switch index.TargetTable {
 		case "items":
-			fieldIndexes[row.CustomFieldID].Items = true
-			indexCounts["items"]++
+			indexByField[index.CustomFieldID].Items = true
+			counts["items"]++
 		case "assets":
-			fieldIndexes[row.CustomFieldID].Assets = true
-			indexCounts["assets"]++
+			indexByField[index.CustomFieldID].Assets = true
+			counts["assets"]++
 		}
 	}
-
-	maxIndexes := h.maxIndexesPerTable()
-
-	// Wrap each field with its asset type usages and index info
-	result := make([]customFieldWithUsage, len(customFields))
-	for i, cf := range customFields {
-		usages := assetTypeUsages[cf.ID]
-		if usages == nil {
-			usages = []assetTypeUsage{}
+	result := make([]customFieldWithUsage, len(fields))
+	for i, field := range fields {
+		fieldUsages := usageByField[field.ID]
+		if fieldUsages == nil {
+			fieldUsages = []assetTypeUsage{}
 		}
-		entry := customFieldWithUsage{
-			CustomFieldDefinition: cf,
-			AssetTypeUsages:       usages,
+		result[i] = customFieldWithUsage{CustomFieldDefinition: field, AssetTypeUsages: fieldUsages}
+		if indexed, ok := indexByField[field.ID]; ok {
+			result[i].Indexed = indexed
+		} else if indexableFieldTypes[field.FieldType] {
+			result[i].Indexed = &models.CustomFieldIndexInfo{}
 		}
-		if idx, ok := fieldIndexes[cf.ID]; ok {
-			entry.Indexed = idx
-		} else if indexableFieldTypes[cf.FieldType] {
-			entry.Indexed = &models.CustomFieldIndexInfo{}
-		}
-		result[i] = entry
 	}
-
-	respondJSONOK(w, customFieldsResponse{
-		Data: result,
-		IndexCounts: map[string]indexCountInfo{
-			"items":  {Current: indexCounts["items"], Max: maxIndexes},
-			"assets": {Current: indexCounts["assets"], Max: maxIndexes},
-		},
-	})
+	limit := h.maxIndexesPerTable()
+	respondJSONOK(w, customFieldsResponse{Data: result, IndexCounts: map[string]indexCountInfo{
+		"items": {Current: counts["items"], Max: limit}, "assets": {Current: counts["assets"], Max: limit},
+	}})
 }
 
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -160,18 +143,16 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
-	cf, err := h.repo.FindByID(id)
+	field, err := h.repo.FindByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "custom_field")
+		return
+	}
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "custom_field")
-			return
-		}
 		respondInternalError(w, r, err)
 		return
 	}
-
-	respondJSONOK(w, cf)
+	respondJSONOK(w, field)
 }
 
 // validateAndNormalizeCustomField runs the name + field-type + per-type option

@@ -13,6 +13,7 @@ import (
 	"windshift/internal/jiraimport"
 	"windshift/internal/logger"
 	"windshift/internal/sanitize"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
 
@@ -27,6 +28,12 @@ type JiraImportHandler struct {
 	capturePayloadsDir string // JIRA_CAPTURE_PAYLOADS (empty disables capture)
 	mappingFailuresMu  sync.Mutex
 	mappingFailures    map[string]error
+	cacheInvalidator   *services.AuthorizationCacheInvalidator
+}
+
+func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
+	h.cacheInvalidator = invalidator
+	return h
 }
 
 // NewJiraImportHandler creates a new Jira import handler.

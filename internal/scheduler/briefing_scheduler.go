@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -265,10 +266,12 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 			slog.Int("workspaces", len(accessibleWSIDs)),
 			slog.Any("error", err),
 		)
-		// "No accessible workspaces" isn't a generation failure — the user simply
-		// has nothing to brief on. Don't penalize the run. The deferred release
-		// clears the lease (no storeBriefing on this path).
-		return err == nil
+		if err != nil {
+			return false
+		}
+		bs.storeBriefing(userID, today, "", time.Since(start).Milliseconds(), "", accessibleWSIDs)
+		stored = true
+		return true
 	}
 
 	// Gather context: recent activity
@@ -386,7 +389,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 
 	if len(contextParts) == 0 {
 		slog.Info("briefing: no context found", slog.Int("user_id", userID))
-		bs.storeBriefing(userID, today, "", time.Since(start).Milliseconds(), "")
+		bs.storeBriefing(userID, today, "", time.Since(start).Milliseconds(), "", accessibleWSIDs)
 		stored = true
 		return true
 	}
@@ -408,13 +411,13 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 			errMsg = err.Error()
 		}
 		slog.Warn("briefing generation failed", slog.Int("user_id", userID), slog.String("error", errMsg))
-		bs.storeBriefing(userID, today, "", durationMs, errMsg)
+		bs.storeBriefing(userID, today, "", durationMs, errMsg, accessibleWSIDs)
 		stored = true
 		return false
 	}
 
 	content := resp.Choices[0].Message.Content
-	bs.storeBriefing(userID, today, content, durationMs, "")
+	bs.storeBriefing(userID, today, content, durationMs, "", accessibleWSIDs)
 	stored = true
 
 	slog.Info("briefing: generated",
@@ -468,7 +471,7 @@ func resolveLookup(maps *repository.NameMaps, field, raw string) string {
 	return raw
 }
 
-func (bs *BriefingScheduler) storeBriefing(userID int, date, content string, durationMs int64, errMsg string) {
+func (bs *BriefingScheduler) storeBriefing(userID int, date, content string, durationMs int64, errMsg string, sourceWorkspaceIDs []int) {
 	var errVal any
 	if errMsg != "" {
 		errVal = errMsg
@@ -478,12 +481,18 @@ func (bs *BriefingScheduler) storeBriefing(userID int, date, content string, dur
 	// is cleared alongside the content/error so the row isn't left claimed.
 	// This UPSERT covers both the "we claimed the row first" path (UPDATE
 	// branch) and a defensive "no row yet" path (INSERT branch).
-	_, err := bs.db.ExecWrite(`INSERT INTO daily_briefings (user_id, date, content, generation_duration_ms, error, lock_until)
-		VALUES (?, ?, ?, ?, ?, NULL)
+	sourceJSON, err := json.Marshal(sourceWorkspaceIDs)
+	if err != nil {
+		slog.Error("failed to encode briefing workspace provenance", slog.Int("user_id", userID), slog.Any("error", err))
+		return
+	}
+	_, err = bs.db.ExecWrite(`INSERT INTO daily_briefings (user_id, date, content, source_workspace_ids, generation_duration_ms, error, lock_until)
+		VALUES (?, ?, ?, ?, ?, ?, NULL)
 		ON CONFLICT (user_id, date) DO UPDATE SET
-		content = excluded.content, generation_duration_ms = excluded.generation_duration_ms,
+		content = excluded.content, source_workspace_ids = excluded.source_workspace_ids,
+		generation_duration_ms = excluded.generation_duration_ms,
 		error = excluded.error, lock_until = NULL, updated_at = CURRENT_TIMESTAMP`,
-		userID, date, content, durationMs, errVal)
+		userID, date, content, string(sourceJSON), durationMs, errVal)
 	if err != nil {
 		slog.Error("failed to store briefing", slog.Int("user_id", userID), slog.Any("error", err))
 	}

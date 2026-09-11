@@ -182,7 +182,19 @@ function createWorkspacesStore() {
 
     // Add a new workspace to the store
     add(workspace) {
-      workspaces.update((ws) => [...ws, workspace]);
+      // A list request started before the create cannot know about this row.
+      // Invalidate it before applying the POST result so it cannot erase the
+      // newly created workspace when its stale response arrives.
+      listLoadGeneration += 1;
+      listLoadPromise = null;
+      loading.set(false);
+      workspaces.update((ws) =>
+        ws.some((existing) => String(existing.id) === String(workspace.id))
+          ? ws.map((existing) =>
+              String(existing.id) === String(workspace.id) ? workspace : existing
+            )
+          : [...ws, workspace]
+      );
     },
 
     // Update an existing workspace in the store

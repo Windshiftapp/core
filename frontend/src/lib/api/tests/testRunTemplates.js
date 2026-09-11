@@ -1,12 +1,12 @@
-import { fetchAPI } from '../core.js';
+import { fetchV2Data } from '../core.js';
 import { createCrudClient } from '../createCrudClient.js';
 
 export const testRunTemplates = {
-  ...createCrudClient('/test-run-templates', { parentPath: '/workspaces' }),
+  ...createCrudClient('/test-run-templates', { parentPath: '/workspaces', v2: true, allV2: true }),
   getExecutions: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-run-templates/${id}/executions`),
+    fetchV2Data(`/workspaces/${workspaceId}/test-run-templates/${id}/executions`),
   execute: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-run-templates/${id}/execute`, {
+    fetchV2Data(`/workspaces/${workspaceId}/test-run-templates/${id}/execute`, {
       method: 'POST',
     }),
 };

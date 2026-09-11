@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -23,21 +22,6 @@ func NewPageDiagramHandler(
 	pages *services.PageService,
 ) *PageDiagramHandler {
 	return &PageDiagramHandler{BaseHandler: base, service: service, pages: pages}
-}
-
-type pageDiagramCreateRequest struct {
-	Name                string          `json:"name"`
-	Mermaid             string          `json:"mermaid,omitempty"`
-	Excalidraw          json.RawMessage `json:"excalidraw,omitempty" swaggertype:"object"`
-	Placement           string          `json:"placement"`
-	ExpectedContentHash *string         `json:"expected_content_hash,omitempty"`
-}
-
-type pageDiagramUpdateRequest struct {
-	Name                string          `json:"name,omitempty"`
-	Mermaid             string          `json:"mermaid,omitempty"`
-	Excalidraw          json.RawMessage `json:"excalidraw,omitempty" swaggertype:"object"`
-	ExpectedContentHash *string         `json:"expected_content_hash,omitempty"`
 }
 
 type pageDiagramListResponse struct {
@@ -110,7 +94,7 @@ func (h *PageDiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id      path  int  true  "Workspace ID"
 // @Param        pageId  path  int  true  "Page ID"
-// @Param        body  body  handlers.pageDiagramCreateRequest  true  "Diagram payload and placement"
+// @Param        body  body  services.CreatePageDiagramInput  true  "Diagram payload and placement"
 // @Success      201  {object}  services.PageDiagram
 // @Failure      400  {object}  handlers.ErrorResponse  "Invalid scene, name, or placement"
 // @Failure      401  {object}  handlers.ErrorResponse
@@ -123,18 +107,12 @@ func (h *PageDiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req pageDiagramCreateRequest
-	if !h.DecodeBodyOrRespond(w, r, &req) {
+	var input services.CreatePageDiagramInput
+	if !h.DecodeBodyOrRespond(w, r, &input) {
 		return
 	}
-	diagram, err := h.service.Create(h.auditActor(r, user), services.CreatePageDiagramInput{
-		PageID:              pageID,
-		Name:                req.Name,
-		Mermaid:             req.Mermaid,
-		Excalidraw:          req.Excalidraw,
-		Placement:           req.Placement,
-		ExpectedContentHash: req.ExpectedContentHash,
-	})
+	input.PageID = pageID
+	diagram, err := h.service.Create(h.auditActor(r, user), input)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return
@@ -153,7 +131,7 @@ func (h *PageDiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param        id            path  int  true  "Workspace ID"
 // @Param        pageId        path  int  true  "Page ID"
 // @Param        attachmentId  path  int  true  "Current Page attachment ID"
-// @Param        body  body  handlers.pageDiagramUpdateRequest  true  "Replacement payload"
+// @Param        body  body  services.UpdatePageDiagramInput  true  "Replacement payload"
 // @Success      200  {object}  services.PageDiagram
 // @Failure      400  {object}  handlers.ErrorResponse  "Invalid scene"
 // @Failure      401  {object}  handlers.ErrorResponse
@@ -170,18 +148,13 @@ func (h *PageDiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req pageDiagramUpdateRequest
-	if !h.DecodeBodyOrRespond(w, r, &req) {
+	var input services.UpdatePageDiagramInput
+	if !h.DecodeBodyOrRespond(w, r, &input) {
 		return
 	}
-	diagram, err := h.service.Update(h.auditActor(r, user), services.UpdatePageDiagramInput{
-		PageID:              pageID,
-		AttachmentID:        attachmentID,
-		Name:                req.Name,
-		Mermaid:             req.Mermaid,
-		Excalidraw:          req.Excalidraw,
-		ExpectedContentHash: req.ExpectedContentHash,
-	})
+	input.PageID = pageID
+	input.AttachmentID = attachmentID
+	diagram, err := h.service.Update(h.auditActor(r, user), input)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return

@@ -56,10 +56,24 @@ const (
 // debounceMsg fires after the selection has been resting for a beat; stale
 // sequence numbers are dropped.
 type debounceMsg struct{ seq int }
+type agentRefreshMsg struct {
+	itemID    int
+	requestID uint64
+}
+
+type loadState uint8
+
+const (
+	loadStale loadState = iota
+	loadLoading
+	loadLoaded
+	loadFailed
+)
 
 // Model is the split-pane board screen.
 type Model struct {
-	ctx *core.Ctx
+	ctx         *core.Ctx
+	workspaceID int
 
 	items        []data.WorkItem
 	statuses     []data.Status
@@ -71,11 +85,22 @@ type Model struct {
 	filterInput textinput.Model
 	filtering   bool // filter input focused
 
-	comments      map[int][]data.Comment
-	commentsFresh map[int]bool
-	agentRuns     map[int][]data.AgentRun
-	runsFresh     map[int]bool
-	detailSeq     int
+	comments             map[int][]data.Comment
+	commentState         map[int]loadState
+	commentRequests      map[int]uint64
+	agentRuns            map[int][]data.AgentRun
+	runState             map[int]loadState
+	runRequests          map[int]uint64
+	detailsLoaded        map[int]bool
+	detailRequests       map[int]uint64
+	detailSeq            int
+	pendingItemAction    string
+	pendingItemID        int
+	pendingTimeLogItemID int
+
+	mutationRequests      map[int]uint64
+	itemCreateRequests    map[uint64]bool
+	commentCreateRequests map[uint64]int
 
 	list   *listPane
 	detail *detailPane
@@ -91,16 +116,10 @@ type Model struct {
 	truncated bool
 	spinner   spinner.Model
 
-	// ratioSaveSeq debounces split-ratio persistence: only the latest
-	// pending save fires.
-	ratioSaveSeq int
-
-	width  int
-	height int
+	width         int
+	height        int
+	loadRequestID uint64
 }
-
-// ratioSaveMsg fires after the split has been resting for a beat.
-type ratioSaveMsg struct{ seq int }
 
 func New(ctx *core.Ctx) *Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.MiniDot))
@@ -109,33 +128,45 @@ func New(ctx *core.Ctx) *Model {
 	if r := ctx.Prefs.SplitRatio; r != nil && *r >= minSplitRatio && *r <= maxSplitRatio {
 		ratio = *r
 	}
-	return &Model{
-		ctx:           ctx,
-		comments:      map[int][]data.Comment{},
-		commentsFresh: map[int]bool{},
-		agentRuns:     map[int][]data.AgentRun{},
-		runsFresh:     map[int]bool{},
-		list:          newListPane(ctx),
-		detail:        newDetailPane(ctx),
-		collapsed:     map[string]bool{},
-		splitRatio:    ratio,
-		loading:       true,
-		spinner:       sp,
-		filterInput:   inputs.New(ctx.Styles, "filter…", 100),
+	m := &Model{
+		ctx:                   ctx,
+		comments:              map[int][]data.Comment{},
+		commentState:          map[int]loadState{},
+		commentRequests:       map[int]uint64{},
+		agentRuns:             map[int][]data.AgentRun{},
+		runState:              map[int]loadState{},
+		runRequests:           map[int]uint64{},
+		detailsLoaded:         map[int]bool{},
+		detailRequests:        map[int]uint64{},
+		mutationRequests:      map[int]uint64{},
+		itemCreateRequests:    map[uint64]bool{},
+		commentCreateRequests: map[uint64]int{},
+		list:                  newListPane(ctx),
+		detail:                newDetailPane(ctx),
+		collapsed:             map[string]bool{},
+		splitRatio:            ratio,
+		loading:               true,
+		spinner:               sp,
+		filterInput:           inputs.New(ctx.Styles, "filter…", 100),
 	}
+	if ctx.Workspace != nil {
+		m.workspaceID = ctx.Workspace.ID
+	}
+	return m
 }
 
 func (m *Model) Init() tea.Cmd {
-	if m.ctx.Workspace == nil {
+	if m.workspaceID == 0 {
 		return nil
 	}
+	m.loadRequestID = m.ctx.NextRequestID()
 	m.loading = true
 	return tea.Batch(
-		data.LoadWorkItems(m.ctx.Client, m.ctx.Workspace.ID),
-		data.LoadStatuses(m.ctx.Client, m.ctx.Workspace.ID),
-		data.LoadPriorities(m.ctx.Client),
-		data.LoadTimeProjects(m.ctx.Client),
-		data.LoadAssignableUsers(m.ctx.Client, m.ctx.Workspace.ID),
+		data.LoadWorkItems(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadStatuses(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadPriorities(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadTimeProjects(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadAssignableUsers(m.ctx.Client, m.workspaceID, m.loadRequestID),
 		m.spinner.Tick,
 	)
 }
@@ -144,15 +175,15 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 	if m.narrow() {
-		m.list.setSize(width-2, m.listHeight())
-		m.detail.setSize(width-2, m.paneHeight()-2)
-		m.filterInput.SetWidth(width - 6)
+		m.list.setSize(max(1, width-2), m.listHeight())
+		m.detail.setSize(max(1, width-2), max(1, m.paneHeight()-2))
+		m.filterInput.SetWidth(max(1, width-6))
 		return
 	}
 	listW, detailW := m.paneWidths()
-	m.list.setSize(listW-2, m.listHeight())
-	m.detail.setSize(detailW-2, m.paneHeight()-2)
-	m.filterInput.SetWidth(listW - 6)
+	m.list.setSize(max(1, listW-2), m.listHeight())
+	m.detail.setSize(max(1, detailW-2), max(1, m.paneHeight()-2))
+	m.filterInput.SetWidth(max(1, listW-6))
 }
 
 // listHeight is the row budget inside the list pane's frame, minus the
@@ -223,11 +254,17 @@ func (m *Model) ShortHelp() []key.Binding {
 func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
+		if !m.loading {
+			return nil
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return cmd
 
 	case data.WorkItemsLoadedMsg:
+		if msg.WorkspaceID != m.workspaceID || msg.RequestID != m.loadRequestID {
+			return nil
+		}
 		m.items = msg.Items
 		m.truncated = msg.Truncated
 		m.loading = false
@@ -236,24 +273,50 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		return m.syncDetail()
 
 	case data.StatusesLoadedMsg:
+		if msg.WorkspaceID != m.workspaceID || msg.RequestID != m.loadRequestID {
+			return nil
+		}
 		m.statuses = msg.Statuses
 		m.rebuildRows()
 		return m.syncDetail()
 
 	case data.PrioritiesLoadedMsg:
+		if msg.WorkspaceID != m.workspaceID || msg.RequestID != m.loadRequestID {
+			return nil
+		}
 		m.priorities = msg.Priorities
 		m.rebuildRows()
 		return nil
 
 	case data.TimeProjectsLoadedMsg:
+		if msg.WorkspaceID != m.workspaceID || msg.RequestID != m.loadRequestID {
+			return nil
+		}
 		m.timeProjects = msg.Projects
 		return nil
 
 	case data.UsersLoadedMsg:
+		if msg.WorkspaceID != m.workspaceID || msg.RequestID != m.loadRequestID {
+			return nil
+		}
 		m.users = msg.Users
-		return nil
+		return m.syncDetail()
 
 	case data.WorkItemLoadedMsg:
+		switch msg.Operation {
+		case data.OpItemDetails:
+			if msg.RequestID != m.detailRequests[msg.Item.ID] {
+				return nil
+			}
+			m.detailsLoaded[msg.Item.ID] = true
+		case data.OpItemStatus, data.OpItemPriority, data.OpItemAssignee, data.OpItemUpdate:
+			if msg.RequestID != m.mutationRequests[msg.Item.ID] {
+				return nil
+			}
+			delete(m.mutationRequests, msg.Item.ID)
+		default:
+			return nil
+		}
 		for i := range m.items {
 			if m.items[i].ID == msg.Item.ID {
 				m.items[i] = msg.Item
@@ -261,47 +324,81 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			}
 		}
 		m.rebuildRows()
-		return m.syncDetail()
+		cmds := []tea.Cmd{m.syncDetail()}
+		if msg.Operation == data.OpItemDetails && m.pendingItemID == msg.Item.ID {
+			action := m.pendingItemAction
+			m.pendingItemAction = ""
+			m.pendingItemID = 0
+			switch action {
+			case pickerStatusID:
+				cmds = append(cmds, m.openStatusPicker())
+			case formEditID:
+				cmds = append(cmds, m.openEdit())
+			}
+		}
+		if msg.Operation != data.OpItemDetails {
+			cmds = append(cmds, core.NotifySuccess(m.itemKey(&msg.Item)+" updated"))
+		}
+		return tea.Batch(cmds...)
 
 	case dialog.ResultMsg:
 		return m.applyPickerResult(msg)
 
 	case data.WorkItemCreatedMsg:
-		if m.ctx.Workspace != nil {
-			return tea.Batch(core.NotifySuccess("Work item created"), data.LoadWorkItems(m.ctx.Client, m.ctx.Workspace.ID))
+		if msg.WorkspaceID == m.workspaceID && m.itemCreateRequests[msg.RequestID] {
+			delete(m.itemCreateRequests, msg.RequestID)
+			return tea.Batch(core.NotifySuccess("Work item created"), m.reloadItems())
 		}
 		return nil
 
 	case data.WorkItemUpdatedMsg:
-		if m.ctx.Workspace != nil {
-			return tea.Batch(core.NotifySuccess("Saved"), data.LoadWorkItems(m.ctx.Client, m.ctx.Workspace.ID))
+		if msg.WorkspaceID == m.workspaceID {
+			return tea.Batch(core.NotifySuccess("Saved"), m.reloadItems())
 		}
 		return nil
 
 	case data.CommentCreatedMsg:
-		// Invalidate whatever item is selected — the composer only posts to
-		// the selected item.
-		if it := m.list.selectedItem(); it != nil {
-			m.commentsFresh[it.ID] = false
-			return tea.Batch(core.NotifySuccess("Comment added"), data.LoadComments(m.ctx.Client, it.ID))
+		if m.commentCreateRequests[msg.RequestID] != msg.ItemID {
+			return nil
 		}
-		return nil
+		delete(m.commentCreateRequests, msg.RequestID)
+		requestID := m.ctx.NextRequestID()
+		m.commentState[msg.ItemID] = loadLoading
+		m.commentRequests[msg.ItemID] = requestID
+		return tea.Batch(core.NotifySuccess("Comment added to "+m.keyForItemID(msg.ItemID)), data.LoadComments(m.ctx.Client, msg.ItemID, requestID))
 
 	case data.CommentsLoadedMsg:
+		if msg.RequestID != m.commentRequests[msg.ItemID] {
+			return nil
+		}
 		m.comments[msg.ItemID] = msg.Comments
-		m.commentsFresh[msg.ItemID] = true
+		m.commentState[msg.ItemID] = loadLoaded
 		if it := m.list.selectedItem(); it != nil && it.ID == msg.ItemID {
 			m.detail.setComments(msg.Comments)
 		}
 		return nil
 
 	case data.AgentRunsLoadedMsg:
+		if msg.RequestID != m.runRequests[msg.ItemID] {
+			return nil
+		}
 		m.agentRuns[msg.ItemID] = msg.Runs
-		m.runsFresh[msg.ItemID] = true
+		m.runState[msg.ItemID] = loadLoaded
 		if it := m.list.selectedItem(); it != nil && it.ID == msg.ItemID {
 			m.detail.setAgentRuns(msg.Runs)
 		}
+		if hasActiveRun(msg.Runs) {
+			return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return agentRefreshMsg{itemID: msg.ItemID, requestID: msg.RequestID}
+			})
+		}
 		return nil
+
+	case agentRefreshMsg:
+		if msg.requestID != m.runRequests[msg.itemID] || m.runState[msg.itemID] != loadLoaded {
+			return nil
+		}
+		return m.loadAgentRuns(msg.itemID)
 
 	case debounceMsg:
 		if msg.seq != m.detailSeq {
@@ -312,19 +409,16 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		var cmds []tea.Cmd
-		if !m.commentsFresh[it.ID] {
-			cmds = append(cmds, data.LoadComments(m.ctx.Client, it.ID))
+		if m.commentState[it.ID] == loadStale {
+			cmds = append(cmds, m.loadComments(it.ID))
 		}
-		if !m.runsFresh[it.ID] {
-			cmds = append(cmds, data.LoadAgentRuns(m.ctx.Client, it.ID))
+		if m.runState[it.ID] == loadStale {
+			cmds = append(cmds, m.loadAgentRuns(it.ID))
+		}
+		if !m.detailsLoaded[it.ID] && m.detailRequests[it.ID] == 0 {
+			cmds = append(cmds, m.loadItemDetails(it.ID))
 		}
 		return tea.Batch(cmds...)
-
-	case ratioSaveMsg:
-		if msg.seq != m.ratioSaveSeq {
-			return nil // superseded by a newer adjustment
-		}
-		return data.SavePrefs(m.ctx.Client, m.ctx.Prefs)
 
 	case data.PrefsLoadedMsg:
 		// Prefs arrived after the board was built — apply the split late.
@@ -336,14 +430,89 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		}
 		return nil
 
+	case data.CurrentUserLoadedMsg:
+		if m.pendingTimeLogItemID == 0 {
+			return nil
+		}
+		itemID := m.pendingTimeLogItemID
+		m.pendingTimeLogItemID = 0
+		if !msg.OK {
+			return core.NotifyError("Could not load your timezone")
+		}
+		if item := m.itemByID(itemID); item != nil {
+			return core.Push(timelog.New(m.ctx, *item, m.timeProjects))
+		}
+		return nil
+
 	case data.ErrorMsg:
-		m.loading = false
+		matched := false
+		if msg.Operation == data.OpWorkItems && msg.WorkspaceID == m.workspaceID && msg.RequestID == m.loadRequestID {
+			m.loading = false
+			matched = true
+		}
+		if msg.WorkspaceID == m.workspaceID && msg.RequestID == m.loadRequestID {
+			switch msg.Operation {
+			case data.OpStatuses, data.OpPriorities, data.OpTimeProjects, data.OpUsers:
+				matched = true
+			}
+		}
+		if msg.Operation == data.OpComments && msg.RequestID == m.commentRequests[msg.ItemID] {
+			m.commentState[msg.ItemID] = loadFailed
+			m.refreshSelectedDetail()
+			matched = true
+		}
+		if msg.Operation == data.OpAgentRuns && msg.RequestID == m.runRequests[msg.ItemID] {
+			m.runState[msg.ItemID] = loadFailed
+			m.refreshSelectedDetail()
+			matched = true
+		}
+		if msg.Operation == data.OpItemDetails && msg.RequestID == m.detailRequests[msg.ItemID] {
+			delete(m.detailRequests, msg.ItemID)
+			m.pendingItemAction = ""
+			m.pendingItemID = 0
+			matched = true
+		}
+		if msg.RequestID == m.mutationRequests[msg.ItemID] {
+			delete(m.mutationRequests, msg.ItemID)
+			m.detailsLoaded[msg.ItemID] = false
+			delete(m.detailRequests, msg.ItemID)
+			return tea.Batch(core.NotifyError(m.keyForItemID(msg.ItemID)+": "+msg.Err), m.loadItemDetails(msg.ItemID))
+		}
+		if msg.Operation == data.OpItemCreate && msg.WorkspaceID == m.workspaceID && m.itemCreateRequests[msg.RequestID] {
+			delete(m.itemCreateRequests, msg.RequestID)
+			matched = true
+		}
+		if msg.Operation == data.OpCommentCreate && m.commentCreateRequests[msg.RequestID] == msg.ItemID {
+			delete(m.commentCreateRequests, msg.RequestID)
+			matched = true
+		}
+		if matched {
+			return core.NotifyError(msg.Err)
+		}
 		return nil
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
+	if m.filtering {
+		var cmd tea.Cmd
+		m.filterInput, cmd = m.filterInput.Update(msg)
+		return cmd
+	}
 	return nil
+}
+
+func (m *Model) reloadItems() tea.Cmd {
+	m.loadRequestID = m.ctx.NextRequestID()
+	m.loading = true
+	return tea.Batch(
+		data.LoadWorkItems(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadStatuses(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadPriorities(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadTimeProjects(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		data.LoadAssignableUsers(m.ctx.Client, m.workspaceID, m.loadRequestID),
+		m.spinner.Tick,
+	)
 }
 
 // rebuildRows reflattens grouping state into the list pane.
@@ -401,7 +570,9 @@ func (m *Model) applyPickerResult(msg dialog.ResultMsg) tea.Cmd {
 			id := priority.ID
 			priorityID = &id
 		}
-		return data.CreateWorkItem(m.ctx.Client, m.ctx.Workspace.ID, title, form.Values["description"], priorityID)
+		requestID := m.ctx.NextRequestID()
+		m.itemCreateRequests[requestID] = true
+		return data.CreateWorkItem(m.ctx.Client, m.workspaceID, title, form.Values["description"], priorityID, requestID)
 	}
 
 	it := m.list.selectedItem()
@@ -422,18 +593,10 @@ func (m *Model) applyPickerResult(msg dialog.ResultMsg) tea.Cmd {
 		if status, ok := form.Choices["status"].(data.Status); ok && (it.StatusID == nil || *it.StatusID != status.ID) {
 			id := status.ID
 			statusID = &id
-			it.StatusID = &id
-			it.StatusName = status.Name
-			it.Status = status.Name
-			it.StatusCategoryColor = status.CategoryColor
 		}
 		if priority, ok := form.Choices["priority"].(data.Priority); ok && (it.PriorityID == nil || *it.PriorityID != priority.ID) {
 			id := priority.ID
 			priorityID = &id
-			it.PriorityID = &id
-			it.PriorityName = priority.Name
-			it.Priority = priority.Name
-			it.PriorityColor = priority.Color
 		}
 		assigneeChanged := false
 		assigneeID := 0
@@ -445,24 +608,11 @@ func (m *Model) applyPickerResult(msg dialog.ResultMsg) tea.Cmd {
 			}
 			if current != assigneeID {
 				assigneeChanged = true
-				if assigneeID > 0 {
-					id := assigneeID
-					it.AssigneeID = &id
-					it.AssigneeName = assignee.FullName
-				} else {
-					it.AssigneeID = nil
-					it.AssigneeName = ""
-				}
 			}
 		}
-		it.Title = title
-		it.Description = form.Values["description"]
-		m.rebuildRows()
-		cmds := []tea.Cmd{m.syncDetail(), data.UpdateWorkItem(m.ctx.Client, it.ID, title, it.Description, statusID, priorityID)}
-		if assigneeChanged {
-			cmds = append(cmds, data.SetItemAssignee(m.ctx.Client, it.ID, assigneeID))
-		}
-		return tea.Batch(cmds...)
+		return m.startMutation(it.ID, func(requestID uint64) tea.Cmd {
+			return data.UpdateWorkItem(m.ctx.Client, m.workspaceID, it.ID, title, form.Values["description"], statusID, priorityID, assigneeChanged, assigneeID, requestID)
+		})
 	case formCommentID:
 		form, ok := msg.Value.(dialog.FormResult)
 		if !ok {
@@ -472,48 +622,57 @@ func (m *Model) applyPickerResult(msg dialog.ResultMsg) tea.Cmd {
 		if body == "" {
 			return nil
 		}
-		return data.CreateComment(m.ctx.Client, it.ID, body)
+		requestID := m.ctx.NextRequestID()
+		m.commentCreateRequests[requestID] = it.ID
+		return data.CreateComment(m.ctx.Client, it.ID, body, requestID)
 	case pickerStatusID:
 		s, ok := msg.Value.(data.Status)
 		if !ok {
 			return nil
 		}
-		id := s.ID
-		it.StatusID = &id
-		it.StatusName = s.Name
-		it.StatusCategoryColor = s.CategoryColor
-		it.Status = s.Name
-		m.rebuildRows()
-		return tea.Batch(m.syncDetail(), data.SetItemStatus(m.ctx.Client, it.ID, s.ID))
+		if it.StatusID != nil && *it.StatusID == s.ID {
+			return nil
+		}
+		return m.startMutation(it.ID, func(requestID uint64) tea.Cmd {
+			return data.SetItemStatus(m.ctx.Client, it.ID, s.ID, requestID)
+		})
 	case pickerPriorityID:
 		p, ok := msg.Value.(data.Priority)
 		if !ok {
 			return nil
 		}
-		id := p.ID
-		it.PriorityID = &id
-		it.PriorityName = p.Name
-		it.PriorityColor = p.Color
-		it.Priority = p.Name
-		m.rebuildRows()
-		return tea.Batch(m.syncDetail(), data.SetItemPriority(m.ctx.Client, it.ID, p.ID))
+		if it.PriorityID != nil && *it.PriorityID == p.ID {
+			return nil
+		}
+		return m.startMutation(it.ID, func(requestID uint64) tea.Cmd {
+			return data.SetItemPriority(m.ctx.Client, it.ID, p.ID, requestID)
+		})
 	case pickerAssignID:
 		u, ok := msg.Value.(data.User)
 		if !ok {
 			return nil
 		}
-		if u.ID > 0 {
-			id := u.ID
-			it.AssigneeID = &id
-			it.AssigneeName = u.FullName
-		} else {
-			it.AssigneeID = nil
-			it.AssigneeName = ""
+		current := 0
+		if it.AssigneeID != nil {
+			current = *it.AssigneeID
 		}
-		m.rebuildRows()
-		return tea.Batch(m.syncDetail(), data.SetItemAssignee(m.ctx.Client, it.ID, u.ID))
+		if current == u.ID {
+			return nil
+		}
+		return m.startMutation(it.ID, func(requestID uint64) tea.Cmd {
+			return data.SetItemAssignee(m.ctx.Client, it.ID, u.ID, requestID)
+		})
 	}
 	return nil
+}
+
+func (m *Model) startMutation(itemID int, command func(uint64) tea.Cmd) tea.Cmd {
+	if _, busy := m.mutationRequests[itemID]; busy {
+		return core.NotifyError(m.keyForItemID(itemID) + " is already being updated")
+	}
+	requestID := m.ctx.NextRequestID()
+	m.mutationRequests[itemID] = requestID
+	return command(requestID)
 }
 
 // syncDetail points the detail pane at the current selection and returns the
@@ -521,18 +680,69 @@ func (m *Model) applyPickerResult(msg dialog.ResultMsg) tea.Cmd {
 func (m *Model) syncDetail() tea.Cmd {
 	it := m.list.selectedItem()
 	if it == nil {
-		m.detail.setItem(nil, nil, false, nil, false, false)
+		m.detail.setItem(nil, nil, loadStale, nil, loadStale, false)
 		return nil
 	}
-	commentsFresh := m.commentsFresh[it.ID]
-	runsFresh := m.runsFresh[it.ID]
-	m.detail.setItem(it, m.comments[it.ID], commentsFresh, m.agentRuns[it.ID], runsFresh, m.assigneeIsAgent(it))
-	if commentsFresh && runsFresh {
+	commentState := m.commentState[it.ID]
+	runState := m.runState[it.ID]
+	m.detail.setItem(it, m.comments[it.ID], commentState, m.agentRuns[it.ID], runState, m.assigneeIsAgent(it))
+	if commentState != loadStale && runState != loadStale && (m.detailsLoaded[it.ID] || m.detailRequests[it.ID] != 0) {
 		return nil
 	}
 	m.detailSeq++
 	seq := m.detailSeq
 	return tea.Tick(commentsDebounce, func(time.Time) tea.Msg { return debounceMsg{seq: seq} })
+}
+
+func (m *Model) refreshSelectedDetail() {
+	if it := m.list.selectedItem(); it != nil {
+		m.detail.setItem(it, m.comments[it.ID], m.commentState[it.ID], m.agentRuns[it.ID], m.runState[it.ID], m.assigneeIsAgent(it))
+	}
+}
+
+func (m *Model) loadComments(itemID int) tea.Cmd {
+	requestID := m.ctx.NextRequestID()
+	m.commentState[itemID] = loadLoading
+	m.commentRequests[itemID] = requestID
+	return data.LoadComments(m.ctx.Client, itemID, requestID)
+}
+
+func (m *Model) loadAgentRuns(itemID int) tea.Cmd {
+	requestID := m.ctx.NextRequestID()
+	m.runState[itemID] = loadLoading
+	m.runRequests[itemID] = requestID
+	return data.LoadAgentRuns(m.ctx.Client, itemID, requestID)
+}
+
+func (m *Model) loadItemDetails(itemID int) tea.Cmd {
+	requestID := m.ctx.NextRequestID()
+	m.detailRequests[itemID] = requestID
+	return data.ReloadWorkItem(m.ctx.Client, itemID, data.OpItemDetails, requestID)
+}
+
+func hasActiveRun(runs []data.AgentRun) bool {
+	for _, run := range runs {
+		if run.Status == "queued" || run.Status == "running" {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Model) keyForItemID(itemID int) string {
+	if item := m.itemByID(itemID); item != nil {
+		return m.itemKey(item)
+	}
+	return fmt.Sprintf("item %d", itemID)
+}
+
+func (m *Model) itemByID(itemID int) *data.WorkItem {
+	for i := range m.items {
+		if m.items[i].ID == itemID {
+			return &m.items[i]
+		}
+	}
+	return nil
 }
 
 // assigneeIsAgent resolves the item's assignee against the workspace user
@@ -631,13 +841,22 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.openComment()
 	case key.Matches(msg, k.LogTime):
 		if it := m.list.selectedItem(); it != nil {
+			if !m.ctx.UserTimezoneKnown {
+				m.pendingTimeLogItemID = it.ID
+				return data.LoadCurrentUser(m.ctx.Client)
+			}
 			return core.Push(timelog.New(m.ctx, *it, m.timeProjects))
 		}
 	case key.Matches(msg, k.Refresh):
-		if m.ctx.Workspace != nil {
-			m.loading = true
-			return tea.Batch(data.LoadWorkItems(m.ctx.Client, m.ctx.Workspace.ID), m.spinner.Tick)
+		var detailCmd tea.Cmd
+		if it := m.list.selectedItem(); it != nil {
+			m.commentState[it.ID] = loadStale
+			m.runState[it.ID] = loadStale
+			m.detailsLoaded[it.ID] = false
+			delete(m.detailRequests, it.ID)
+			detailCmd = m.syncDetail()
 		}
+		return tea.Batch(m.reloadItems(), detailCmd)
 	case key.Matches(msg, k.Back):
 		if m.filter.Active() {
 			m.clearFilter()
@@ -686,22 +905,30 @@ func (m *Model) clearFilter() {
 
 func (m *Model) openStatusPicker() tea.Cmd {
 	it := m.list.selectedItem()
-	if it == nil || len(m.statuses) == 0 {
+	if it == nil {
 		return nil
 	}
-	options := make([]dialog.Option, len(m.statuses))
-	selectedIdx := 0
-	for i, s := range m.statuses {
+	if !m.detailsLoaded[it.ID] {
+		m.pendingItemAction = pickerStatusID
+		m.pendingItemID = it.ID
+		if m.detailRequests[it.ID] != 0 {
+			return nil
+		}
+		return m.loadItemDetails(it.ID)
+	}
+	transitions := validTransitions(it)
+	if len(transitions) == 0 {
+		return core.NotifyError("No status transition is available for " + m.itemKey(it))
+	}
+	options := make([]dialog.Option, len(transitions))
+	for i, s := range transitions {
 		options[i] = dialog.Option{
 			Label:  chip.Status(m.ctx.Styles, s.Name, s.CategoryColor),
 			Search: s.Name,
 			Value:  s,
 		}
-		if it.StatusID != nil && *it.StatusID == s.ID {
-			selectedIdx = i
-		}
 	}
-	return dialog.Open(dialog.NewPicker(pickerStatusID, "Set status", options, selectedIdx, m.ctx.Styles))
+	return dialog.Open(dialog.NewPicker(pickerStatusID, "Set status", options, 0, m.ctx.Styles))
 }
 
 func (m *Model) openPriorityPicker() tea.Cmd {
@@ -757,16 +984,45 @@ func (m *Model) openAssignPicker() tea.Cmd {
 }
 
 func (m *Model) statusFormOptions(it *data.WorkItem) (options []dialog.Option, selected any) {
-	options = make([]dialog.Option, 0, len(m.statuses))
-	for _, status := range m.statuses {
+	if it == nil {
+		return nil, nil
+	}
+	allowed := make([]data.Status, 0, len(it.Transitions)+1)
+	if it.StatusID != nil {
+		for _, status := range m.statuses {
+			if status.ID == *it.StatusID {
+				allowed = append(allowed, status)
+				break
+			}
+		}
+	}
+	allowed = append(allowed, validTransitions(it)...)
+	options = make([]dialog.Option, 0, len(allowed))
+	for _, status := range allowed {
 		options = append(options, dialog.Option{
 			Label: chip.Status(m.ctx.Styles, status.Name, status.CategoryColor), Search: status.Name, Value: status,
 		})
-		if it != nil && it.StatusID != nil && *it.StatusID == status.ID {
+		if it.StatusID != nil && *it.StatusID == status.ID {
 			selected = status
 		}
 	}
 	return options, selected
+}
+
+func validTransitions(it *data.WorkItem) []data.Status {
+	seen := make(map[int]bool, len(it.Transitions))
+	if it.StatusID != nil {
+		seen[*it.StatusID] = true
+	}
+	transitions := make([]data.Status, 0, len(it.Transitions))
+	for _, status := range it.Transitions {
+		if seen[status.ID] {
+			continue
+		}
+		seen[status.ID] = true
+		transitions = append(transitions, status)
+	}
+	return transitions
 }
 
 func (m *Model) priorityFormOptions(it *data.WorkItem) (options []dialog.Option, selected any) {
@@ -819,9 +1075,7 @@ func (m *Model) adjustSplit(delta float64) tea.Cmd {
 
 	r := m.splitRatio
 	m.ctx.Prefs.SplitRatio = &r
-	m.ratioSaveSeq++
-	seq := m.ratioSaveSeq
-	return tea.Tick(time.Second, func(time.Time) tea.Msg { return ratioSaveMsg{seq: seq} })
+	return core.SaveSplitRatio(r)
 }
 
 // formWidth sizes overlay-form fields to the terminal.
@@ -830,8 +1084,8 @@ func (m *Model) formWidth() int {
 	if w > 70 {
 		w = 70
 	}
-	if w < 30 {
-		w = 30
+	if w < 1 {
+		w = 1
 	}
 	return w
 }
@@ -852,6 +1106,14 @@ func (m *Model) openEdit() tea.Cmd {
 	it := m.list.selectedItem()
 	if it == nil {
 		return nil
+	}
+	if !m.detailsLoaded[it.ID] {
+		m.pendingItemAction = formEditID
+		m.pendingItemID = it.ID
+		if m.detailRequests[it.ID] != 0 {
+			return nil
+		}
+		return m.loadItemDetails(it.ID)
 	}
 	title := inputs.New(m.ctx.Styles, "Title", 200)
 	title.SetValue(it.Title)
@@ -906,11 +1168,11 @@ func (m *Model) openComment() tea.Cmd {
 }
 
 func (m *Model) itemKey(it *data.WorkItem) string {
-	prefix := it.WorkspaceKey
+	prefix := ""
 	if prefix == "" && m.ctx.Workspace != nil {
 		prefix = m.ctx.Workspace.Key
 	}
-	return fmt.Sprintf("%s-%d", prefix, it.ID)
+	return it.DisplayKey(prefix)
 }
 
 func (m *Model) View() string {

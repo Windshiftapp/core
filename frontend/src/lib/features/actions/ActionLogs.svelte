@@ -48,7 +48,7 @@
   async function loadLogs() {
     loading = true;
     try {
-      logs = await api.get(`/workspaces/${workspaceId}/actions/${action.id}/logs?limit=50`) || [];
+      logs = await api.actions.getLogs(workspaceId, action.id) || [];
     } catch (err) {
       console.error('Failed to load logs:', err);
       logs = [];

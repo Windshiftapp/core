@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -305,12 +304,6 @@ func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request
 	h.RespondOK(w, recurrenceForceGenerateResponse{InstancesGenerated: count})
 }
 
-type rrulePreviewResponse struct {
-	RRule       string   `json:"rrule"`
-	DtStart     string   `json:"dtstart"`
-	Occurrences []string `json:"occurrences"`
-}
-
 // PreviewRRule handles POST /rest/api/v1/recurrence-rules/preview.
 //
 // @Summary      Preview RRULE occurrences
@@ -319,7 +312,7 @@ type rrulePreviewResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body  body  models.RRulePreviewRequest  true  "RRULE preview"
-// @Success      200  {object}  handlers.rrulePreviewResponse
+// @Success      200  {object}  services.RecurrencePreview
 // @Failure      400  {object}  handlers.ErrorResponse
 // @Failure      401  {object}  handlers.ErrorResponse
 // @Failure      403  {object}  handlers.ErrorResponse
@@ -341,11 +334,5 @@ func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request)
 		h.RespondInternalError(w, r)
 		return
 	}
-	dates := make([]string, len(preview.Occurrences))
-	for i, occurrence := range preview.Occurrences {
-		dates[i] = occurrence.Format(time.RFC3339)
-	}
-	h.RespondOK(w, rrulePreviewResponse{
-		RRule: preview.RRule, DtStart: preview.DtStart.Format(time.RFC3339), Occurrences: dates,
-	})
+	h.RespondOK(w, preview)
 }

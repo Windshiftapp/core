@@ -23,11 +23,12 @@ export const ai = {
     ),
   acceptDependencies: (iterationId, suggestions) =>
     post(`/ai/iterations/${iterationId}/accept-dependencies`, { suggestions }),
-  chat: (message, connectionId, sessionId, context) =>
+  chat: (message, connectionId, sessionId, context, historyAfterMessageId) =>
     post('/ai/chat', {
       message,
       ...(connectionId ? { connection_id: connectionId } : {}),
       ...(sessionId ? { session_id: sessionId } : {}),
+      ...(historyAfterMessageId ? { history_after_message_id: historyAfterMessageId } : {}),
       ...(context && Object.keys(context).length ? { context } : {}),
     }),
   getGeneralSession: () => get('/ai/sessions/general'),

@@ -8,6 +8,9 @@ import (
 // resetFlagState prevents command flags and config from leaking across Run calls.
 func resetFlagState() {
 	resetCommandFlags(rootCmd)
+	// pflag's string-array value keeps its own changed bit after Flag.Changed
+	// is reset, so clear the backing slice explicitly between invocations.
+	apiHeaders = nil
 	cfg = Config{StatusAliases: map[string]string{}}
 }
 

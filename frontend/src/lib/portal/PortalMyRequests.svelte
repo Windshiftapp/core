@@ -16,18 +16,19 @@
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import SafeMarkdown from '../components/SafeMarkdown.svelte';
-  import { iconMap, portalStore } from '../stores/portal.svelte.js';
+  import { portalRequestsStore } from '../stores/portalActivity.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import { formatDateSimple, formatDateTimeLocale } from '../utils/dateFormatter.js';
 </script>
 
-{#if portalStore.selectedRequest}
-  {@const request = portalStore.selectedRequest}
+{#if portalRequestsStore.selected}
+  {@const request = portalRequestsStore.selected}
   {@const RequestIcon = iconMap[request.request_type_icon] || FileText}
 
   <div class="request-detail-view">
     <button
       type="button"
-      onclick={() => portalStore.closeRequestDetail()}
+      onclick={() => portalRequestsStore.closeDetail()}
       class="inline-flex items-center gap-2 text-sm font-medium mb-7 hover:underline"
       style="color: var(--ds-text-link);"
       data-testid="portal-request-detail-back"
@@ -90,18 +91,18 @@
         <section class="request-activity">
           <div class="flex items-center justify-between gap-3 mb-5">
             <h2 class="text-lg font-semibold" style="color: var(--ds-text);">Activity</h2>
-            {#if portalStore.requestComments.length > 0}
-              <Badge variant="neutral" size="sm">{portalStore.requestComments.length}</Badge>
+            {#if portalRequestsStore.comments.length > 0}
+              <Badge variant="neutral" size="sm">{portalRequestsStore.comments.length}</Badge>
             {/if}
           </div>
 
-          {#if portalStore.loadingComments}
+          {#if portalRequestsStore.loadingComments}
             <div class="flex justify-center py-8">
               <Spinner />
             </div>
           {:else}
             <div class="space-y-3 mb-7">
-              {#each portalStore.requestComments as comment}
+              {#each portalRequestsStore.comments as comment}
                 <article class="request-comment">
                   <div class="request-comment-avatar" aria-hidden="true">
                     {(comment.author_name || '?').slice(0, 1).toUpperCase()}
@@ -134,8 +135,8 @@
               </label>
               <Textarea
                 id="portal-request-comment"
-                value={portalStore.newCommentContent}
-                oninput={(event) => (portalStore.newCommentContent = event.target.value)}
+                value={portalRequestsStore.newComment}
+                oninput={(event) => (portalRequestsStore.newComment = event.target.value)}
                 placeholder="Write an update or question…"
                 rows={3}
               />
@@ -143,9 +144,9 @@
                 <!-- shortcut-guard-exempt: portal comments are an explicit, form-scoped submit action. -->
                 <Button
                   variant="primary"
-                  onclick={() => portalStore.addComment()}
-                  disabled={!portalStore.newCommentContent.trim() || portalStore.addingComment}
-                  loading={portalStore.addingComment}
+                  onclick={() => portalRequestsStore.addComment()}
+                  disabled={!portalRequestsStore.newComment.trim() || portalRequestsStore.addingComment}
+                  loading={portalRequestsStore.addingComment}
                 >
                   Add comment
                 </Button>
@@ -210,14 +211,14 @@
     <PageHeader
       title="My requests"
       subtitle="Track requests and continue conversations with the team."
-      count={!portalStore.loadingRequests && portalStore.myRequests.length > 0
-        ? portalStore.myRequests.length
+      count={!portalRequestsStore.loading && portalRequestsStore.requests.length > 0
+        ? portalRequestsStore.requests.length
         : null}
     />
 
-    {#if portalStore.loadingRequests}
+    {#if portalRequestsStore.loading}
       <div class="flex justify-center py-12"><Spinner size="lg" /></div>
-    {:else if portalStore.myRequests.length === 0}
+    {:else if portalRequestsStore.requests.length === 0}
       <div class="max-w-xl py-8 border-t" style="border-color: var(--ds-border);">
         <div class="flex items-start gap-3">
           <List class="w-5 h-5 mt-0.5" style="color: var(--ds-text-subtle);" />
@@ -231,12 +232,12 @@
       </div>
     {:else}
       <div class="request-list" data-testid="portal-my-requests-list">
-        {#each portalStore.myRequests as request}
+        {#each portalRequestsStore.requests as request}
           {@const RequestIcon = iconMap[request.request_type_icon] || MessageSquare}
           <button
             data-testid="portal-my-requests-row"
             data-request-id={request.id}
-            onclick={() => portalStore.viewRequest(request)}
+            onclick={() => portalRequestsStore.view(request)}
             class="request-list-row group w-full px-4 sm:px-5 py-5 border-b last:border-b-0 text-left transition-colors"
             style="--request-accent: {request.request_type_color || 'var(--ds-interactive)'};{request.status_is_completed ? ' opacity: 0.7;' : ''}"
           >

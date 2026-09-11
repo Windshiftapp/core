@@ -3,6 +3,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { portal } from '../../actions/portal.js';
+  import { api } from '../../api.js';
   import { fade, scale } from 'svelte/transition';
 
   let {
@@ -47,11 +48,11 @@
   }
 
   function thumbUrl(att) {
-    return `/api/attachments/${att.id}/thumbnail`;
+    return api.attachments.getThumbnailUrl(att.id);
   }
 
   function contentUrl(att) {
-    return `/api/attachments/${att.id}/download`;
+    return api.attachments.getDownloadUrl(att.id);
   }
 
   function formatFileSize(bytes) {
@@ -64,7 +65,7 @@
 
   async function handleDownload(attachment) {
     try {
-      const downloadUrl = `/api/attachments/${attachment.id}/download`;
+      const downloadUrl = api.attachments.getDownloadUrl(attachment.id);
       const response = await fetch(downloadUrl);
       if (!response.ok) {
         throw new Error(`Download failed: ${response.statusText}`);

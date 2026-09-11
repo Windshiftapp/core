@@ -9,14 +9,15 @@ const DEBOUNCE_MS = 250;
  * initial load. Polling remains the fallback while disconnected.
  *
  * @param {() => (number|string|null|undefined)} getItemId
- * @param {{ onReconcile?: Function, onItem?: Function, onChildren?: Function, onComment?: Function, onLinks?: Function, onDeleted?: Function }} handlers
+ * @param {{ onReconcile?: Function, onItem?: Function, onChildren?: Function, onComment?: Function, onLinks?: Function, onZammad?: Function, onDeleted?: Function }} handlers
  * @returns {{ readonly connected: boolean }}
  */
 export function useItemEventStream(getItemId, handlers = {}) {
   let connected = $state(false);
+  let streamItemId = $derived(normalizeItemEventStreamID(getItemId()));
 
   $effect(() => {
-    const itemId = getItemId();
+    const itemId = streamItemId;
     if (!itemId) return;
     if (typeof EventSource === 'undefined') return; // SSR / unsupported → polling stays the source of truth
 
@@ -37,6 +38,7 @@ export function useItemEventStream(getItemId, handlers = {}) {
       if (kinds.has('children')) handlers.onChildren?.();
       if (kinds.has('comment')) handlers.onComment?.();
       if (kinds.has('links')) handlers.onLinks?.();
+      if (kinds.has('zammad')) handlers.onZammad?.();
       if (kinds.has('deleted')) handlers.onDeleted?.();
     };
     const schedule = (...kinds) => {
@@ -69,6 +71,7 @@ export function useItemEventStream(getItemId, handlers = {}) {
       handlers.onDeleted?.();
     });
     es.addEventListener('link', () => schedule('links'));
+    es.addEventListener('zammad', () => schedule('zammad'));
     // The browser auto-reconnects (honoring the server's retry hint). Until it
     // does, mark disconnected so the components' pollers resume as the fallback.
     es.onerror = () => {
@@ -89,6 +92,12 @@ export function useItemEventStream(getItemId, handlers = {}) {
       return connected;
     },
   };
+}
+
+// Route parameters begin as strings and are later hydrated from API records as
+// numbers. Keep that representation-only change from reopening the stream.
+export function normalizeItemEventStreamID(itemId) {
+  return itemId ? String(itemId) : null;
 }
 
 /**

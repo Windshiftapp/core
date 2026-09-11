@@ -1,5 +1,4 @@
 <script>
-  import { tick } from 'svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -34,7 +33,6 @@
   let uploadingAvatar = $state(false);
   let showAvatarUpload = $state(false);
   const nameInputId = 'customer-name-input';
-  let nameInputRef = $state(null);
 
   // Avatar upload functionality
   async function handleAvatarUpload(files) {
@@ -94,23 +92,6 @@
     oncancel();
   }
 
-  async function focusNameInput() {
-    await tick();
-    // Wait for Modal's own focus logic (100ms) to complete
-    setTimeout(() => {
-      const el = nameInputRef || document.getElementById(nameInputId);
-      if (el) {
-        el.focus();
-        el.select();
-      }
-    }, 120);
-  }
-
-  $effect(() => {
-    if (isOpen) {
-      focusNameInput();
-    }
-  });
 </script>
 
 {#if isOpen}
@@ -130,7 +111,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <Label required class="mb-2">{t('organization.organizationName')}</Label>
-          <Input id={nameInputId} bind:inputRef={nameInputRef} bind:value={formData.name} required />
+          <Input id={nameInputId} bind:value={formData.name} required />
         </div>
 
         <div>

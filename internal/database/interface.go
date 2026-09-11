@@ -4,7 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync/atomic"
 )
+
+var databaseInstanceCounter atomic.Uint64
+
+func newDatabaseInstanceID() uint64 {
+	return databaseInstanceCounter.Add(1)
+}
 
 // Driver names are the canonical values returned by Database.GetDriverName.
 const (

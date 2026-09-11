@@ -171,8 +171,9 @@ var assetActionEventsSchemaPostgres string
 
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
-	db  *sql.DB
-	dsn string
+	db         *sql.DB
+	dsn        string
+	instanceID uint64
 }
 
 // schemaFile holds a schema file name and its content for execution
@@ -208,8 +209,9 @@ func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	return &PostgresDB{
-		db:  db,
-		dsn: connectionString,
+		db:         db,
+		dsn:        connectionString,
+		instanceID: newDatabaseInstanceID(),
 	}, nil
 }
 
@@ -341,6 +343,11 @@ func ConvertPlaceholders(query string) string {
 // GetDB returns the underlying *sql.DB for backward compatibility
 func (p *PostgresDB) GetDB() *sql.DB {
 	return p.db
+}
+
+// InstanceID distinguishes database pools created during this process.
+func (p *PostgresDB) InstanceID() uint64 {
+	return p.instanceID
 }
 
 // GetDriverName returns the database driver name

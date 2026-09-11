@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	FieldName        = "name"
-	FieldDescription = "description"
+	FieldName         = "name"
+	FieldDescription  = "description"
+	MaxResolveTargets = 500
 
 	SourceSystem   = "system"
 	SourceInstance = "instance"
@@ -19,6 +20,7 @@ var (
 	ErrUnsupportedField      = errors.New("unsupported translation field")
 	ErrInvalidLocale         = errors.New("invalid translation locale")
 	ErrInvalidValue          = errors.New("invalid translation value")
+	ErrTooManyTargets        = errors.New("targets must contain at most 500 objects")
 	ErrObjectNotFound        = errors.New("translated object not found")
 	ErrTranslationNotFound   = errors.New("translation not found")
 )

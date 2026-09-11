@@ -20,7 +20,7 @@ export function customFieldFormData(field = null) {
 /** Load custom fields and every screen assignment with two bounded requests. */
 export async function loadCustomFieldsOverview(apiClient) {
   const [fieldsOutcome, screensOutcome] = await Promise.allSettled([
-    apiClient.customFields.getAll(),
+    apiClient.customFields.getOverview(),
     apiClient.screens.getAllWithFields(),
   ]);
   if (fieldsOutcome.status === 'rejected') {
@@ -29,12 +29,8 @@ export async function loadCustomFieldsOverview(apiClient) {
   const fieldsResult = fieldsOutcome.value;
   const screensResult = screensOutcome.status === 'fulfilled' ? screensOutcome.value : [];
   return {
-    customFields: Array.isArray(fieldsResult?.data)
-      ? fieldsResult.data
-      : Array.isArray(fieldsResult)
-        ? fieldsResult
-        : [],
-    indexCounts: fieldsResult?.index_counts ?? defaultIndexCounts,
+    customFields: fieldsResult?.customFields ?? [],
+    indexCounts: fieldsResult?.indexCounts ?? defaultIndexCounts,
     screens: Array.isArray(screensResult)
       ? screensResult.map((screen) => ({
           ...screen,

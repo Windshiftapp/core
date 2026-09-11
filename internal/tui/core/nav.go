@@ -56,3 +56,26 @@ func NotifySuccess(text string) tea.Cmd {
 func NotifyError(text string) tea.Cmd {
 	return func() tea.Msg { return NoticeMsg{Kind: NoticeError, Text: text} }
 }
+
+// PrefsChangeMsg applies one preference field. The root merges changes with a
+// late initial load and serializes the resulting full-snapshot writes.
+type PrefsChangeMsg struct {
+	Theme              string
+	SetTheme           bool
+	SplitRatio         float64
+	SetSplitRatio      bool
+	LastWorkspaceID    int
+	SetLastWorkspaceID bool
+}
+
+func SaveTheme(theme string) tea.Cmd {
+	return func() tea.Msg { return PrefsChangeMsg{Theme: theme, SetTheme: true} }
+}
+
+func SaveSplitRatio(ratio float64) tea.Cmd {
+	return func() tea.Msg { return PrefsChangeMsg{SplitRatio: ratio, SetSplitRatio: true} }
+}
+
+func SaveLastWorkspace(id int) tea.Cmd {
+	return func() tea.Msg { return PrefsChangeMsg{LastWorkspaceID: id, SetLastWorkspaceID: true} }
+}

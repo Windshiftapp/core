@@ -46,9 +46,8 @@
     const filters = { cql: cqlQuery || undefined };
     if (searchQuery) filters.search = searchQuery;
     const result = await api.assets.getAll(assetSetId, filters);
-    // API returns { assets: [...], total, limit, offset }
-    totalCount = result?.total ?? 0;
-    return result?.assets || [];
+	totalCount = result?.pagination?.total_items ?? 0;
+	return result?.data || [];
   });
 
   // Reload when assetSetId, cqlQuery, or searchQuery changes

@@ -184,7 +184,7 @@ Examples:
 			if err == nil {
 				var filtered []TestRun
 				for _, run := range runs {
-					if run.SetID == setID {
+					if run.PlanID == setID {
 						filtered = append(filtered, run)
 					}
 				}
@@ -304,8 +304,8 @@ Examples:
 			}
 
 			req := TestRunCreateRequest{
-				SetID: setID,
-				Name:  name,
+				PlanID: setID,
+				Name:   name,
 			}
 
 			run, err = client.CreateTestRun(wsID, req)

@@ -64,21 +64,6 @@ func (r *LabelRepository) FindIDByName(name string) (int, error) {
 	return id, nil
 }
 
-// NameExists reports whether a case-insensitive global name already exists.
-func (r *LabelRepository) NameExists(name string, excludeID int) (bool, error) {
-	var count int
-	var err error
-	if excludeID > 0 {
-		err = r.db.QueryRow("SELECT COUNT(*) FROM labels WHERE LOWER(name) = LOWER(?) AND id != ?", name, excludeID).Scan(&count)
-	} else {
-		err = r.db.QueryRow("SELECT COUNT(*) FROM labels WHERE LOWER(name) = LOWER(?)", name).Scan(&count)
-	}
-	if err != nil {
-		return false, fmt.Errorf("check label name %q: %w", name, err)
-	}
-	return count > 0, nil
-}
-
 // Create inserts a label and returns the id + the stamped timestamp.
 func (r *LabelRepository) Create(name, color string) (int64, time.Time, error) {
 	now := time.Now()

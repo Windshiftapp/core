@@ -24,16 +24,9 @@ func NewUserPreferencesHandler(db database.Database, permissionService *services
 		prefsSvc: services.NewUserPreferencesService(
 			repository.NewUserPreferencesRepository(db),
 			repository.NewThemeRepository(db),
+			permissionService,
 		),
 	}
-}
-
-// TUIPreferencesResponse is the wire shape of the SSH TUI preferences
-// sub-document (also accepted verbatim on PUT).
-type TUIPreferencesResponse struct {
-	Theme           string   `json:"theme,omitempty"`
-	SplitRatio      *float64 `json:"split_ratio,omitempty"`
-	LastWorkspaceID *int     `json:"last_workspace_id,omitempty"`
 }
 
 // GetTUI handles GET /rest/api/v1/users/me/tui-preferences
@@ -43,7 +36,7 @@ type TUIPreferencesResponse struct {
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  handlers.TUIPreferencesResponse
+// @Success      200  {object}  models.UserTUIPreferences
 // @Failure      401  {object}  handlers.ErrorResponse
 // @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the user-preferences:read scope"
 // @Failure      500  {object}  handlers.ErrorResponse
@@ -59,7 +52,7 @@ func (h *UserPreferencesHandler) GetTUI(w http.ResponseWriter, r *http.Request) 
 		h.RespondInternalError(w, r)
 		return
 	}
-	h.RespondOK(w, TUIPreferencesResponse(tui))
+	h.RespondOK(w, tui)
 }
 
 // UpdateTUI handles PUT /rest/api/v1/users/me/tui-preferences
@@ -70,8 +63,8 @@ func (h *UserPreferencesHandler) GetTUI(w http.ResponseWriter, r *http.Request) 
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        preferences  body      handlers.TUIPreferencesResponse  true  "TUI preferences"
-// @Success      200  {object}  handlers.TUIPreferencesResponse
+// @Param        preferences  body      models.UserTUIPreferences  true  "TUI preferences"
+// @Success      200  {object}  models.UserTUIPreferences
 // @Failure      400  {object}  handlers.ErrorResponse  "Malformed body"
 // @Failure      401  {object}  handlers.ErrorResponse
 // @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the user-preferences:write scope"
@@ -83,12 +76,12 @@ func (h *UserPreferencesHandler) UpdateTUI(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req TUIPreferencesResponse
+	var req models.UserTUIPreferences
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if err := h.prefsSvc.UpdateTUI(user.ID, models.UserTUIPreferences(req)); err != nil {
+	if err := h.prefsSvc.UpdateTUI(user.ID, req); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
@@ -98,5 +91,5 @@ func (h *UserPreferencesHandler) UpdateTUI(w http.ResponseWriter, r *http.Reques
 		h.RespondInternalError(w, r)
 		return
 	}
-	h.RespondOK(w, TUIPreferencesResponse(tui))
+	h.RespondOK(w, tui)
 }

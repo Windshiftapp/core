@@ -15,6 +15,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/validation"
 )
 
 // initialStatusCacheEntry holds a cached initial status ID with expiry
@@ -454,6 +455,9 @@ func (s *WorkflowService) PerformTransition(
 	if err != nil {
 		return nil, err
 	}
+	if err := validation.ValidateTaskState(s.db, item.WorkspaceID, req.ActorUserID, item.IsTask, &req.ToStatusID); err != nil {
+		return nil, err
+	}
 
 	missingStatus := item.StatusID == nil
 	oldStatusID := constants.StatusIDOpen
@@ -603,6 +607,13 @@ func (s *WorkflowService) CommitTransition(
 	itemID, oldStatusID, newStatusID, actorUserID int,
 	metadata itemevents.Metadata,
 ) error {
+	item, err := itemRepo.FindByIDForUpdate(tx, itemID)
+	if err != nil {
+		return err
+	}
+	if err := validation.ValidateTaskState(tx, item.WorkspaceID, actorUserID, item.IsTask, &newStatusID); err != nil {
+		return err
+	}
 	changedAt := time.Now()
 	if err := itemRepo.UpdateFields(tx, itemID, map[string]any{
 		"status_id": newStatusID,
@@ -620,7 +631,7 @@ func (s *WorkflowService) CommitTransition(
 	}); err != nil {
 		return fmt.Errorf("record transition history: %w", err)
 	}
-	item, err := itemRepo.FindByIDForUpdate(tx, itemID)
+	item, err = itemRepo.FindByIDForUpdate(tx, itemID)
 	if err != nil {
 		return err
 	}
@@ -840,35 +851,14 @@ type WorkflowTransitionResult struct {
 
 // List retrieves all workflows.
 func (s *WorkflowService) List() ([]WorkflowResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
-		FROM workflows
-		ORDER BY name
-	`)
+	workflowModels, err := repository.NewWorkflowRepository(s.db).List()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list workflows: %w", err)
+		return nil, fmt.Errorf("list workflows: %w", err)
 	}
-	defer rows.Close()
-
-	var workflows []WorkflowResult
-	for rows.Next() {
-		var wf WorkflowResult
-		var description sql.NullString
-		err := rows.Scan(&wf.ID, &wf.BuiltinKey, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
-		if err != nil {
-			continue
-		}
-		wf.Description = description.String
-		workflows = append(workflows, wf)
+	workflows := make([]WorkflowResult, 0, len(workflowModels))
+	for _, workflow := range workflowModels {
+		workflows = append(workflows, workflowResult(workflow))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate workflows: %w", err)
-	}
-
-	if workflows == nil {
-		workflows = []WorkflowResult{}
-	}
-
 	return workflows, nil
 }
 
@@ -897,29 +887,26 @@ func (s *WorkflowService) ListForWorkspace(workspaceID int) ([]WorkflowResult, e
 
 // GetByID retrieves a workflow by ID.
 func (s *WorkflowService) GetByID(id int) (*WorkflowResult, error) {
-	var wf WorkflowResult
-	var description sql.NullString
-	err := s.db.QueryRow(`
-		SELECT id, COALESCE(builtin_key, ''), name, description, is_default, created_at, updated_at
-		FROM workflows WHERE id = ?
-	`, id).Scan(&wf.ID, &wf.BuiltinKey, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("workflow not found: %d", id)
-	}
+	model, err := repository.NewWorkflowRepository(s.db).Get(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get workflow: %w", err)
+		return nil, fmt.Errorf("get workflow %d: %w", id, err)
 	}
+	result := workflowResult(*model)
+	return &result, nil
+}
 
-	wf.Description = description.String
-	return &wf, nil
+func workflowResult(workflow models.Workflow) WorkflowResult {
+	return WorkflowResult{
+		ID: workflow.ID, BuiltinKey: workflow.BuiltinKey, Name: workflow.Name,
+		Description: workflow.Description, IsDefault: workflow.IsDefault,
+		CreatedAt: workflow.CreatedAt, UpdatedAt: workflow.UpdatedAt,
+	}
 }
 
 // Exists checks if a workflow exists.
 func (s *WorkflowService) Exists(id int) (bool, error) {
-	var exists int
-	err := s.db.QueryRow("SELECT 1 FROM workflows WHERE id = ?", id).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
+	_, err := repository.NewWorkflowRepository(s.db).Get(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -967,26 +954,24 @@ func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionR
 
 // GetTransitions retrieves all transitions for a workflow.
 func (s *WorkflowService) GetTransitions(workflowID int) ([]WorkflowTransitionResult, error) {
-	rows, err := s.db.Query(`
-		SELECT wt.id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses,
-		       fs.builtin_key as from_status_builtin_key, fs.name as from_status_name,
-		       COALESCE(ts.builtin_key, ''), ts.name as to_status_name,
-		       fsc.builtin_key as from_category_builtin_key, fsc.name as from_category_name, fsc.color as from_category_color,
-		       COALESCE(tsc.builtin_key, ''), tsc.name as to_category_name, tsc.color as to_category_color
-		FROM workflow_transitions wt
-		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
-		JOIN statuses ts ON wt.to_status_id = ts.id
-		LEFT JOIN status_categories fsc ON fs.category_id = fsc.id
-		JOIN status_categories tsc ON ts.category_id = tsc.id
-		WHERE wt.workflow_id = ?
-		ORDER BY wt.display_order
-	`, workflowID)
+	transitionModels, err := repository.NewWorkflowRepository(s.db).ListTransitions(workflowID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transitions: %w", err)
+		return nil, fmt.Errorf("get workflow transitions: %w", err)
 	}
-	defer rows.Close()
-
-	return s.scanTransitions(rows)
+	transitions := make([]WorkflowTransitionResult, 0, len(transitionModels))
+	for _, transition := range transitionModels {
+		transitions = append(transitions, WorkflowTransitionResult{
+			ID: transition.ID, FromStatusID: transition.FromStatusID,
+			FromAllStatuses:      transition.FromAllStatuses,
+			FromStatusBuiltinKey: transition.FromStatusBuiltinKey, FromStatusName: transition.FromStatusName,
+			FromCategoryBuiltinKey: transition.FromCategoryBuiltinKey, FromCategoryName: transition.FromCategoryName,
+			FromCategoryColor: transition.FromCategoryColor, ToStatusID: transition.ToStatusID,
+			ToStatusBuiltinKey: transition.ToStatusBuiltinKey, ToStatusName: transition.ToStatusName,
+			ToCategoryBuiltinKey: transition.ToCategoryBuiltinKey, ToCategoryName: transition.ToCategoryName,
+			ToCategoryColor: transition.ToCategoryColor,
+		})
+	}
+	return transitions, nil
 }
 
 // GetTransitionsFromStatus retrieves directed transitions from a given status

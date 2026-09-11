@@ -85,6 +85,20 @@ func (s *AttachmentService) CanModifyItemAttachment(userID, portalCustomerID *in
 	return false, nil
 }
 
+func (s *AttachmentService) CanViewItemAttachment(userID, itemID int) (bool, error) {
+	item, err := repository.NewItemRepository(s.db).FindByID(itemID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if s.permissionService == nil {
+		return true, nil
+	}
+	return s.permissionService.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
+}
+
 // AttachmentDetails contains attachment info needed for deletion
 type AttachmentDetails struct {
 	FilePath         string

@@ -131,6 +131,7 @@
   <div class={compact ? 'p-3 pb-2' : ''}>
     <Textarea
       value={formState.title}
+      data-testid={`quick-add-title-${parentId}`}
       data-quick-add-parent={parentId}
       oninput={(e) => onUpdateField(parentId, 'title', e.currentTarget.value)}
       onkeydown={handleKeydown}

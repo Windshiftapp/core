@@ -29,7 +29,7 @@
 		if (userId && bridge) {
 			try {
 				// Fetch user details to send back to plugin
-				const user = await api.get(`/users/${userId}`);
+				const user = await api.getUser(userId);
 				bridge.sendToPlugin({
 					type: MESSAGE_TYPES.USER_PICKER_RESULT,
 					user

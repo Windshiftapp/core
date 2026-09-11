@@ -2,14 +2,12 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import {
-    Plus, Edit, Trash2, TestTube, CheckCircle, Power, PowerOff, Star, AlertTriangle, Eye, EyeOff
+    Plus, Edit, Trash2, TestTube, CheckCircle, Star, AlertTriangle, Eye, EyeOff
   } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -21,6 +19,9 @@
   import { llmConnectionTestErrorMessage } from './llmConnectionErrors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import EnabledStatus from './EnabledStatus.svelte';
+  import EntityFormModal from './EntityFormModal.svelte';
+  import EntityRowActions from './EntityRowActions.svelte';
 
   let connections = $state([]);
   let providers = $state([]);
@@ -398,53 +399,21 @@
         </div>
       {/snippet}
       {#snippet status(conn)}
-        {#if conn.is_enabled}
-          <div class="flex items-center gap-1">
-            <Power size={14} style="color: var(--ds-icon-success);" />
-            <span class="text-xs" style="color: var(--ds-text-success);">{t('common.enabled')}</span>
-          </div>
-        {:else}
-          <div class="flex items-center gap-1">
-            <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-            <span class="text-xs" style="color: var(--ds-text-subtle);">{t('common.disabled')}</span>
-          </div>
-        {/if}
+        <EnabledStatus enabled={conn.is_enabled} />
       {/snippet}
       {#snippet actions(conn)}
-        <div class="flex items-center justify-end gap-1">
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-subtle);"
-            title={t('settings.adminOperations.llmConnections.testConnection')}
-            data-testid="llm-connection-test"
-            disabled={testingConnectionId === conn.id}
-            onclick={() => testConnection(conn.id)}
-          >
-            {#if testingConnectionId === conn.id}
-              <Spinner size="sm" />
-            {:else}
-              <TestTube size={14} />
-            {/if}
-          </button>
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-subtle);"
-            title={t('common.edit')}
-            data-testid="llm-connection-edit"
-            onclick={() => openEdit(conn)}
-          >
-            <Edit size={14} />
-          </button>
-          <button
-            class="p-1.5 rounded hover:opacity-80"
-            style="color: var(--ds-text-danger);"
-            title={t('common.delete')}
-            data-testid="llm-connection-delete"
-            onclick={() => deleteConnection(conn)}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        <EntityRowActions actions={[
+          {
+            id: 'test',
+            icon: TestTube,
+            title: t('settings.adminOperations.llmConnections.testConnection'),
+            testId: 'llm-connection-test',
+            loading: testingConnectionId === conn.id,
+            onclick: () => testConnection(conn.id),
+          },
+          { id: 'edit', icon: Edit, title: t('common.edit'), testId: 'llm-connection-edit', onclick: () => openEdit(conn) },
+          { id: 'delete', icon: Trash2, title: t('common.delete'), testId: 'llm-connection-delete', danger: true, onclick: () => deleteConnection(conn) },
+        ]} />
       {/snippet}
     </DataTable>
   {/if}
@@ -452,73 +421,59 @@
 
 <!-- Create Modal -->
 {#if showCreateModal}
-  <Modal
-    isOpen={true}
+  <EntityFormModal
+    title={t('settings.adminOperations.llmConnections.addTitle')}
     onclose={() => showCreateModal = false}
-    onSubmit={handleCreate}
-    submitDisabled={!form.name || !form.provider_type || !form.model || saving}
+    onsubmit={handleCreate}
+    disabled={!form.name || !form.provider_type || !form.model}
+    {saving}
+    confirmLabel={t('common.create')}
+    submitId="llm-connection-create-submit"
   >
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.adminOperations.llmConnections.addTitle')} onclose={() => showCreateModal = false} />
-      <div class="p-4 space-y-4">
-        {@render connectionForm()}
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button id="llm-connection-create-submit" variant="primary" onclick={handleCreate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
-            {t('common.create')}
-          </Button>
-        </div>
-      </div>
+    {#snippet fields()}
+      {@render connectionForm()}
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 <!-- Edit Modal -->
 {#if showEditModal}
-  <Modal
-    isOpen={true}
+  <EntityFormModal
+    title={t('settings.adminOperations.llmConnections.editTitle')}
     onclose={() => showEditModal = false}
-    onSubmit={handleUpdate}
-    submitDisabled={!form.name || !form.provider_type || !form.model || saving}
+    onsubmit={handleUpdate}
+    disabled={!form.name || !form.provider_type || !form.model}
+    {saving}
+    submitId="llm-connection-save-submit"
   >
-    {#snippet children(submitHint)}
-      <ModalHeader title={t('settings.adminOperations.llmConnections.editTitle')} onclose={() => showEditModal = false} />
-      <div class="p-4 space-y-4">
-        {@render connectionForm()}
+    {#snippet fields()}
+      {@render connectionForm()}
 
-        {#if editingConnection && !form.is_enabled && enabledLLMCapabilitiesForConnection(editingConnection.id).length > 0}
-          <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
-            <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
-            <div>
-              <div class="font-medium">{t('settings.adminOperations.llmConnections.disableWarning')}</div>
-              <div class="mt-1 text-xs">{t('settings.adminOperations.llmConnections.disableWarningHelp', { capabilities: capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id)) })}</div>
-            </div>
+      {#if editingConnection && !form.is_enabled && enabledLLMCapabilitiesForConnection(editingConnection.id).length > 0}
+        <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
+          <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
+          <div>
+            <div class="font-medium">{t('settings.adminOperations.llmConnections.disableWarning')}</div>
+            <div class="mt-1 text-xs">{t('settings.adminOperations.llmConnections.disableWarningHelp', { capabilities: capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id)) })}</div>
           </div>
-        {/if}
-
-        {#if editingConnection}
-          <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-            <Button dataTestid="llm-connection-test-modal" variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
-              {t('settings.adminOperations.llmConnections.testConnection')}
-            </Button>
-            {#if testResult}
-              <div class="flex items-center gap-1 text-xs">
-                <CheckCircle size={14} style="color: var(--ds-icon-success);" />
-                <span style="color: var(--ds-text-success);">{testResult.message}</span>
-              </div>
-            {/if}
-          </div>
-        {/if}
-
-        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">{t('common.cancel')}</Button>
-          <Button id="llm-connection-save-submit" variant="primary" onclick={handleUpdate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
-            {t('common.save')}
-          </Button>
         </div>
-      </div>
+      {/if}
+
+      {#if editingConnection}
+        <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+          <Button dataTestid="llm-connection-test-modal" variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
+            {t('settings.adminOperations.llmConnections.testConnection')}
+          </Button>
+          {#if testResult}
+            <div class="flex items-center gap-1 text-xs">
+              <CheckCircle size={14} style="color: var(--ds-icon-success);" />
+              <span style="color: var(--ds-text-success);">{testResult.message}</span>
+            </div>
+          {/if}
+        </div>
+      {/if}
     {/snippet}
-  </Modal>
+  </EntityFormModal>
 {/if}
 
 

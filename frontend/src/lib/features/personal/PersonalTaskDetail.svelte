@@ -78,7 +78,7 @@
   async function loadAttachments() {
     try {
       const response = await api.attachments.getByItem(itemId);
-      attachments = response?.attachments || response || [];
+      attachments = response?.data || [];
     } catch (err) {
       console.error('Failed to load attachments:', err);
       attachments = [];
@@ -233,10 +233,7 @@
     const { files } = data;
     for (const file of files) {
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('item_id', item.id);
-        await api.attachments.upload(formData);
+        await api.attachments.uploadToItem(item.id, file);
       } catch (err) {
         console.error('Failed to upload:', err);
       }

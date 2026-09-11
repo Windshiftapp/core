@@ -5,22 +5,22 @@
   Polled responses (see settings.yml polling_url):
     IDX_0 = /users/me
     IDX_1 = the open backlog the stats are computed from (window of 100)
-    IDX_2 = closed-today count (only pagination.total is read)
+    IDX_2 = closed-today count (only pagination.total_items is read)
     IDX_3 = today's activity across all visible workspaces
 
   Accuracy note: open_total, closed_today and activity_total come from
-  pagination.total and are exact for any backlog size. due_today_count and
+  pagination.total_items and are exact for any backlog size. due_today_count and
   overdue_count are counted from the 100-item window, so they are exact only
   while the scope query returns 100 items or fewer — which the default
   per-assignee query always will.
 {%- endcomment -%}
 
-{%- assign me = IDX_0 -%}
+{%- assign me = IDX_0.data -%}
 {%- assign open_items = IDX_1.data -%}
-{%- assign open_total = IDX_1.pagination.total -%}
-{%- assign closed_today = IDX_2.pagination.total -%}
+{%- assign open_total = IDX_1.pagination.total_items -%}
+{%- assign closed_today = IDX_2.pagination.total_items -%}
 {%- assign activity = IDX_3.data -%}
-{%- assign activity_total = IDX_3.pagination.total -%}
+{%- assign activity_total = IDX_3.pagination.total_items -%}
 
 {%- comment -%}
   A failed poll yields {} rather than an exception, so an unreachable server

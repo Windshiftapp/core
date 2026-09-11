@@ -95,10 +95,14 @@
   // Reload when workspaceId changes. Capture the ID for this request so an
   // earlier global load cannot overwrite a later workspace-scoped result.
   $effect(() => {
-    if (providedMilestones === null) loadMilestones(workspaceId);
+    if (providedMilestones !== null) return;
+
+    const controller = new AbortController();
+    loadMilestones(workspaceId, { signal: controller.signal });
+    return () => controller.abort();
   });
 
-  async function loadMilestones(currentWorkspaceId) {
+  async function loadMilestones(currentWorkspaceId, requestOptions = {}) {
     const token = ++loadToken;
     internalLoading = true;
 
@@ -109,7 +113,7 @@
         filters.include_global = true;
       }
 
-      const response = await api.milestones.getAll(filters);
+      const response = await api.milestones.getAll(filters, requestOptions);
       if (token !== loadToken) return;
       loadedMilestones = response || [];
       createdMilestones = [];

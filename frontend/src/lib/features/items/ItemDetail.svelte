@@ -86,6 +86,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       }
       window.dispatchEvent(new CustomEvent('item-comments-changed', { detail: { itemId } }));
       window.dispatchEvent(new CustomEvent('item-scm-links-changed', { detail: { itemId } }));
+      window.dispatchEvent(new CustomEvent('item-zammad-links-changed', { detail: { itemId } }));
     },
     onItem: () => itemDetailStore.refreshCurrentItem().catch((err) => console.error('SSE item refresh failed:', err)),
     onChildren: () => itemDetailStore.loadChildItems().catch((err) => console.error('SSE children refresh failed:', err)),
@@ -96,6 +97,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       itemDetailStore.loadLinks().catch((err) => console.error('SSE links refresh failed:', err));
       window.dispatchEvent(new CustomEvent('item-scm-links-changed', { detail: { itemId } }));
     },
+    onZammad: () => window.dispatchEvent(new CustomEvent('item-zammad-links-changed', { detail: { itemId } })),
     // The viewed item was deleted (its own topic published `deleted`). This is
     // authoritative — mark it gone so the view closes instead of refetching
     // (which would 404) and showing stale data.
@@ -113,7 +115,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   $effect(() => {
     if (!itemDetailStore.notFound) return;
     itemDetailStore.notFound = false;
-    infoToast('This item was deleted.');
+    showDeletionFeedback();
     if (isModal && onclose) {
       onclose({ hasChanges: false });
     } else if (!isModal) {
@@ -746,7 +748,21 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     navigate(`/workspaces/${moved.workspace_id}/items/${moved.id}`);
   }
 
+  let deletionFeedbackItemId = null;
+
+  function showDeletionFeedback() {
+    const deletedId = String(itemId);
+    if (deletionFeedbackItemId === deletedId) return;
+    deletionFeedbackItemId = deletedId;
+    infoToast('This item was deleted.');
+  }
+
   function handleDeleteComplete(result) {
+    showDeletionFeedback();
+    // Do not let the next detail briefly render the deleted shared-store item.
+    itemDetailStore.reset();
+    // Reparent navigation can reuse this component; allow its next item load.
+    itemDetailStore.loading = false;
     const collectionId = $currentRoute.params?.collectionId;
     // Navigate based on deletion result
     if (result?.mode === 'reparent' && result?.newParentId) {
@@ -792,6 +808,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       },
       {
         id: 'watch',
+        testid: 'item-watch-toggle',
         type: 'regular',
         icon: itemDetailStore.isWatching ? BookmarkCheck : Bookmark,
         title: itemDetailStore.isWatching ? t('items.unwatchWorkItem') : t('items.watchWorkItem'),
@@ -1169,48 +1186,24 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     loadRecurrence();
   }
 
-  // Sub-issue creation function
   function startCreateSubIssue() {
     if (itemDetailStore.availableSubIssueTypes.length === 0) {
       showError(t('items.noSubIssueTypes'), t('items.cannotCreateChildItems'));
       return;
     }
 
-    // Set up for sub-issue creation and open the global create modal
-
-    // First, trigger loading the CreateModal component
-    window.dispatchEvent(new CustomEvent('show-create-modal'));
-
-    // Small delay to let the modal load, then configure it
-    setTimeout(() => {
-      // Set the type first
-      window.dispatchEvent(new CustomEvent('set-create-type', {
-        detail: { type: 'work-item' }
-      }));
-
-      // Set the parent
-      window.dispatchEvent(new CustomEvent('set-create-parent', {
-        detail: {
-          parentId: itemDetailStore.item.id,
-          parentTitle: itemDetailStore.item.title,
-          availableItemTypes: itemDetailStore.availableSubIssueTypes
-        }
-      }));
-
-      // Open the modal (this will load workspaces)
-      window.dispatchEvent(new CustomEvent('open-create-modal'));
-
-      // After modal is open and workspaces are loaded, set the workspace
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('set-create-workspace', {
-          detail: {
-            workspaceId: workspaceId,
-            workspaceName: itemDetailStore.workspace?.name
-          }
-        }));
-      }, 200);
-    }, 150);
+    window.dispatchEvent(new CustomEvent('show-create-modal', {
+      detail: {
+        type: 'work-item',
+        workspaceId,
+        parentContext: {
+          parent: { id: itemDetailStore.item.id, title: itemDetailStore.item.title },
+          allowedItemTypes: itemDetailStore.availableSubIssueTypes,
+        },
+      },
+    }));
   }
+
 </script>
 
 {#snippet contentSnippet()}

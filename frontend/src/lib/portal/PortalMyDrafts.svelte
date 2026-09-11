@@ -2,7 +2,9 @@
   import { FileText, Package, Trash2 } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import { portalStore, iconMap } from '../stores/portal.svelte.js';
+  import { portalCatalogStore as portalStore } from '../stores/portal.svelte.js';
+  import { portalDraftsStore } from '../stores/portalActivity.svelte.js';
+  import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatRelativeTime } from '../utils/dateFormatter.js';
 
@@ -22,18 +24,18 @@
 
   async function deleteDraft(draft) {
     if (!window.confirm(t('portal.draftDeleteConfirm'))) return;
-    await portalStore.deleteDraft(draft.request_type_id);
+    await portalDraftsStore.delete(draft.request_type_id);
   }
 </script>
 
 <div>
   <PageHeader title={t('portal.draftsTitle')} subtitle={t('portal.draftsSubtitle')} />
 
-  {#if portalStore.loadingDrafts}
+  {#if portalDraftsStore.loading}
     <div class="flex justify-center py-12">
       <Spinner size="lg" />
     </div>
-  {:else if portalStore.myDrafts.length === 0}
+  {:else if portalDraftsStore.drafts.length === 0}
     <div class="max-w-xl mt-7 py-8 border-t" style="border-color: var(--ds-border);">
       <div class="flex items-start gap-3">
         <FileText class="w-5 h-5 mt-0.5" style="color: var(--ds-text-subtle);" />
@@ -47,7 +49,7 @@
     </div>
   {:else}
     <div class="mt-7 border rounded-md overflow-hidden" style="border-color: var(--ds-border); background-color: var(--ds-surface-card);">
-      {#each portalStore.myDrafts as draft (draft.id)}
+      {#each portalDraftsStore.drafts as draft (draft.id)}
         {@const Icon = iconMap[draft.request_type_icon] || Package}
         <div
           class="w-full p-4 border-b last:border-b-0 text-left flex items-start gap-4"

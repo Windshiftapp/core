@@ -1997,20 +1997,6 @@
         },
         "type": "object"
       },
-      "handlers.TUIPreferencesResponse": {
-        "properties": {
-          "last_workspace_id": {
-            "type": "integer"
-          },
-          "split_ratio": {
-            "type": "number"
-          },
-          "theme": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "handlers.TranslationResolveRequest": {
         "properties": {
           "locale": {
@@ -2129,6 +2115,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "time_project_id": {
+            "type": "integer"
           },
           "updated_at": {
             "type": "string"
@@ -2381,6 +2370,29 @@
           },
           "item_id": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.itemChangesResponse": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/handlers.itemChangeResponse"
+            },
+            "type": "array"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "reset_required": {
+            "type": "boolean"
+          },
+          "watermark": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2712,23 +2724,6 @@
           },
           "pagination": {
             "$ref": "#/components/schemas/restapi.PaginationMeta"
-          }
-        },
-        "type": "object"
-      },
-      "handlers.rrulePreviewResponse": {
-        "properties": {
-          "dtstart": {
-            "type": "string"
-          },
-          "occurrences": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "rrule": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -3563,6 +3558,10 @@
           "iteration_name": {
             "type": "string"
           },
+          "key": {
+            "description": "Ready-to-display workspace key and item number",
+            "type": "string"
+          },
           "labels": {
             "description": "Global item labels",
             "items": {
@@ -3583,6 +3582,9 @@
           "parent_id": {
             "description": "Hierarchy fields",
             "type": "integer"
+          },
+          "parent_key": {
+            "type": "string"
           },
           "parent_title": {
             "type": "string"
@@ -4721,6 +4723,20 @@
         },
         "type": "object"
       },
+      "models.UserTUIPreferences": {
+        "properties": {
+          "last_workspace_id": {
+            "type": "integer"
+          },
+          "split_ratio": {
+            "type": "number"
+          },
+          "theme": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "models.WorkspaceAgentSkill": {
         "properties": {
           "body": {
@@ -4919,6 +4935,26 @@
         },
         "type": "object"
       },
+      "services.CreatePageDiagramInput": {
+        "properties": {
+          "excalidraw": {
+            "type": "object"
+          },
+          "expected_content_hash": {
+            "type": "string"
+          },
+          "mermaid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "placement": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "services.PageDiagram": {
         "properties": {
           "attachment_id": {
@@ -4944,6 +4980,23 @@
           },
           "revision_number": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "services.RecurrencePreview": {
+        "properties": {
+          "dtstart": {
+            "type": "string"
+          },
+          "occurrences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rrule": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -5036,6 +5089,23 @@
         },
         "type": "object"
       },
+      "services.UpdatePageDiagramInput": {
+        "properties": {
+          "excalidraw": {
+            "type": "object"
+          },
+          "expected_content_hash": {
+            "type": "string"
+          },
+          "mermaid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "windshift_internal_restapi_v1_handlers.AuditLogStreamResponse": {
         "properties": {
           "entries": {
@@ -5099,66 +5169,6 @@
               "type": "string"
             },
             "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "windshift_internal_restapi_v1_handlers.itemChangesResponse": {
-        "properties": {
-          "changes": {
-            "items": {
-              "$ref": "#/components/schemas/handlers.itemChangeResponse"
-            },
-            "type": "array"
-          },
-          "has_more": {
-            "type": "boolean"
-          },
-          "next_cursor": {
-            "type": "string"
-          },
-          "reset_required": {
-            "type": "boolean"
-          },
-          "watermark": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "windshift_internal_restapi_v1_handlers.pageDiagramCreateRequest": {
-        "properties": {
-          "excalidraw": {
-            "type": "object"
-          },
-          "expected_content_hash": {
-            "type": "string"
-          },
-          "mermaid": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "placement": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "windshift_internal_restapi_v1_handlers.pageDiagramUpdateRequest": {
-        "properties": {
-          "excalidraw": {
-            "type": "object"
-          },
-          "expected_content_hash": {
-            "type": "string"
-          },
-          "mermaid": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -9113,7 +9123,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/windshift_internal_restapi_v1_handlers.itemChangesResponse"
+                  "$ref": "#/components/schemas/handlers.itemChangesResponse"
                 }
               }
             },
@@ -9238,6 +9248,16 @@
               }
             },
             "description": "Item not found or not visible to caller"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Item or descendant still has a protected integration link"
           },
           "500": {
             "content": {
@@ -13235,27 +13255,6 @@
         ]
       }
     },
-    "/openapi.yaml": {
-      "get": {
-        "description": "Returns the OpenAPI 3.0 description of this API. Public; no auth required.",
-        "responses": {
-          "200": {
-            "content": {
-              "application/yaml": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "OpenAPI 3.0 document"
-          }
-        },
-        "summary": "OpenAPI 3.0 spec (YAML)",
-        "tags": [
-          "meta"
-        ]
-      }
-    },
     "/pages/{id}/links": {
       "get": {
         "description": "Returns outgoing and incoming links for the given entity. The URL prefix (items / pages / test-cases) selects the entity type. Required scope depends on the route: items:read for items/test-cases, pages:read for pages.",
@@ -13533,7 +13532,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/handlers.rrulePreviewResponse"
+                  "$ref": "#/components/schemas/services.RecurrencePreview"
                 }
               }
             },
@@ -14246,6 +14245,14 @@
             }
           },
           {
+            "description": "IANA timezone used to interpret date_from/date_to (defaults to the profile timezone)",
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Filter by time project ID",
             "in": "query",
             "name": "project_id",
@@ -14884,7 +14891,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/handlers.TUIPreferencesResponse"
+                  "$ref": "#/components/schemas/models.UserTUIPreferences"
                 }
               }
             },
@@ -14937,7 +14944,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/handlers.TUIPreferencesResponse"
+                "$ref": "#/components/schemas/models.UserTUIPreferences"
               }
             }
           },
@@ -14950,7 +14957,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/handlers.TUIPreferencesResponse"
+                  "$ref": "#/components/schemas/models.UserTUIPreferences"
                 }
               }
             },
@@ -15663,6 +15670,16 @@
             },
             "description": "Workspace not found or caller cannot delete it"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Workspace still has externally linked items"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -16149,6 +16166,52 @@
       }
     },
     "/workspaces/{id}/actions/{actionId}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Workspace ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Action ID",
+            "in": "path",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete an action",
+        "tags": [
+          "actions"
+        ]
+      },
       "get": {
         "parameters": [
           {
@@ -19781,7 +19844,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/windshift_internal_restapi_v1_handlers.pageDiagramCreateRequest"
+                "$ref": "#/components/schemas/services.CreatePageDiagramInput"
               }
             }
           },
@@ -19980,7 +20043,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/windshift_internal_restapi_v1_handlers.pageDiagramUpdateRequest"
+                "$ref": "#/components/schemas/services.UpdatePageDiagramInput"
               }
             }
           },

@@ -669,11 +669,75 @@ function evaluateFunctionShared(ast) {
   }
 }
 
+class QLEvaluatorEngine {
+  constructor(errorLabel) {
+    this.errorLabel = errorLabel;
+  }
+
+  getFieldValue(_fieldName, _record) {
+    throw new Error('QL evaluator must implement field resolution');
+  }
+
+  evaluate(ast, record) {
+    switch (ast.type) {
+      case NodeType.BINARY_OP:
+        return this.evaluateBinaryOp(ast, record);
+      case NodeType.COMPARISON:
+        return evaluateComparisonShared(this, ast, record);
+      case NodeType.IN_EXPRESSION:
+        return evaluateInExpressionShared(this, ast, record);
+      case NodeType.NULL_CHECK: {
+        const value = this.evaluate(ast.field, record);
+        const isNull = value === null || value === undefined;
+        return ast.operator === 'IS NOT NULL' ? !isNull : isNull;
+      }
+      case NodeType.IDENTIFIER:
+        return this.getFieldValue(ast.value, record);
+      case NodeType.LITERAL:
+        return ast.value;
+      case NodeType.FUNCTION_CALL:
+        return evaluateFunctionShared(ast);
+      default:
+        throw new Error(`Unknown AST node type: ${ast.type}`);
+    }
+  }
+
+  evaluateBinaryOp(ast, record) {
+    switch (ast.operator) {
+      case 'AND':
+        return this.evaluate(ast.left, record) && this.evaluate(ast.right, record);
+      case 'OR':
+        return this.evaluate(ast.left, record) || this.evaluate(ast.right, record);
+      case 'NOT':
+        return !this.evaluate(ast.right, record);
+      default:
+        throw new Error(`Unknown binary operator: ${ast.operator}`);
+    }
+  }
+
+  compareValues(left, right, operation) {
+    return compareValuesShared(left, right, operation);
+  }
+
+  filter(records, queryString) {
+    if (!queryString?.trim()) return records;
+    try {
+      const tokens = new QLTokenizer(queryString).tokenize();
+      const ast = new QLParser(tokens).parse();
+      return records.filter((record) => this.evaluate(ast, record));
+    } catch (error) {
+      console.error(this.errorLabel, error.message);
+      throw error;
+    }
+  }
+}
+
 /**
  * QL Evaluator - executes AST against work items
  */
-export class QLEvaluator {
+export class QLEvaluator extends QLEvaluatorEngine {
   constructor(workspaces = []) {
+    super('QL Error:');
     this.workspaces = workspaces;
     this.workspaceMap = new Map();
 
@@ -683,58 +747,6 @@ export class QLEvaluator {
       this.workspaceMap.set(ws.name.toLowerCase(), ws);
       this.workspaceMap.set(ws.key.toLowerCase(), ws);
     });
-  }
-
-  evaluate(ast, item) {
-    switch (ast.type) {
-      case NodeType.BINARY_OP:
-        return this.evaluateBinaryOp(ast, item);
-      case NodeType.COMPARISON:
-        return this.evaluateComparison(ast, item);
-      case NodeType.IN_EXPRESSION:
-        return this.evaluateInExpression(ast, item);
-      case NodeType.NULL_CHECK:
-        return this.evaluateNullCheck(ast, item);
-      case NodeType.IDENTIFIER:
-        return this.getFieldValue(ast.value, item);
-      case NodeType.LITERAL:
-        return ast.value;
-      case NodeType.FUNCTION_CALL:
-        return this.evaluateFunction(ast, item);
-      default:
-        throw new Error(`Unknown AST node type: ${ast.type}`);
-    }
-  }
-
-  evaluateBinaryOp(ast, item) {
-    switch (ast.operator) {
-      case 'AND':
-        return this.evaluate(ast.left, item) && this.evaluate(ast.right, item);
-      case 'OR':
-        return this.evaluate(ast.left, item) || this.evaluate(ast.right, item);
-      case 'NOT':
-        return !this.evaluate(ast.right, item);
-      default:
-        throw new Error(`Unknown binary operator: ${ast.operator}`);
-    }
-  }
-
-  evaluateComparison(ast, item) {
-    return evaluateComparisonShared(this, ast, item);
-  }
-
-  evaluateInExpression(ast, item) {
-    return evaluateInExpressionShared(this, ast, item);
-  }
-
-  evaluateNullCheck(ast, item) {
-    const value = this.evaluate(ast.field, item);
-    const isNull = value === null || value === undefined;
-    return ast.operator === 'IS NOT NULL' ? !isNull : isNull;
-  }
-
-  evaluateFunction(ast, _item) {
-    return evaluateFunctionShared(ast);
   }
 
   getFieldValue(fieldName, item) {
@@ -770,29 +782,6 @@ export class QLEvaluator {
         return item.id;
       default:
         throw new Error(`Unknown field: ${fieldName}`);
-    }
-  }
-
-  compareValues(left, right, operation) {
-    return compareValuesShared(left, right, operation);
-  }
-
-  filter(items, queryString) {
-    if (!queryString?.trim()) {
-      return items;
-    }
-
-    try {
-      const tokenizer = new QLTokenizer(queryString);
-      const tokens = tokenizer.tokenize();
-
-      const parser = new QLParser(tokens);
-      const ast = parser.parse();
-
-      return items.filter((item) => this.evaluate(ast, item));
-    } catch (error) {
-      console.error('QL Error:', error.message);
-      throw error;
     }
   }
 }
@@ -993,7 +982,11 @@ export class QLBuilder {
 
     const customFieldsCatalog = options.customFields || [];
     const customFieldsById = new Map(
-      customFieldsCatalog.filter((f) => f?.id).map((f) => [String(f.id).toLowerCase(), f])
+      customFieldsCatalog.flatMap((field) =>
+        [field?.id, field?.completion?.name, ...(field?.completion?.aliases || [])]
+          .filter(Boolean)
+          .map((identifier) => [String(identifier).toLowerCase(), field])
+      )
     );
 
     const result = {
@@ -1122,7 +1115,12 @@ export class QLBuilder {
     if (fieldNode?.type !== NodeType.IDENTIFIER) return false;
     const fieldId = String(fieldNode.value).trim();
     const lowerField = fieldId.toLowerCase();
-    if (!lowerField.startsWith('cf_') && !lowerField.startsWith('custom.')) return false;
+    if (
+      !lowerField.startsWith('cf_') &&
+      !lowerField.startsWith('cfid_') &&
+      !lowerField.startsWith('custom.')
+    )
+      return false;
 
     if (isIn) {
       const valueNodes = node.values?.values || [];
@@ -1235,9 +1233,8 @@ export class QLBuilder {
     const known = catalog.get(String(fieldId).toLowerCase());
     if (known) {
       return {
-        id: known.id,
+        ...known,
         type: known.type || fallbackType || 'text',
-        name: known.name,
       };
     }
     return {
@@ -1252,8 +1249,9 @@ export class QLBuilder {
  * Asset QL Evaluator - executes QL AST against assets in memory
  * Similar to QLEvaluator but with asset-specific field mappings
  */
-export class AssetQLEvaluator {
+export class AssetQLEvaluator extends QLEvaluatorEngine {
   constructor(assetSets = []) {
+    super('Asset QL Error:');
     this.assetSets = assetSets;
     this.setMap = new Map();
 
@@ -1262,58 +1260,6 @@ export class AssetQLEvaluator {
       this.setMap.set(set.id, set);
       this.setMap.set(set.name.toLowerCase(), set);
     });
-  }
-
-  evaluate(ast, asset) {
-    switch (ast.type) {
-      case NodeType.BINARY_OP:
-        return this.evaluateBinaryOp(ast, asset);
-      case NodeType.COMPARISON:
-        return this.evaluateComparison(ast, asset);
-      case NodeType.IN_EXPRESSION:
-        return this.evaluateInExpression(ast, asset);
-      case NodeType.NULL_CHECK:
-        return this.evaluateNullCheck(ast, asset);
-      case NodeType.IDENTIFIER:
-        return this.getFieldValue(ast.value, asset);
-      case NodeType.LITERAL:
-        return ast.value;
-      case NodeType.FUNCTION_CALL:
-        return this.evaluateFunction(ast, asset);
-      default:
-        throw new Error(`Unknown AST node type: ${ast.type}`);
-    }
-  }
-
-  evaluateBinaryOp(ast, asset) {
-    switch (ast.operator) {
-      case 'AND':
-        return this.evaluate(ast.left, asset) && this.evaluate(ast.right, asset);
-      case 'OR':
-        return this.evaluate(ast.left, asset) || this.evaluate(ast.right, asset);
-      case 'NOT':
-        return !this.evaluate(ast.right, asset);
-      default:
-        throw new Error(`Unknown binary operator: ${ast.operator}`);
-    }
-  }
-
-  evaluateComparison(ast, asset) {
-    return evaluateComparisonShared(this, ast, asset);
-  }
-
-  evaluateInExpression(ast, asset) {
-    return evaluateInExpressionShared(this, ast, asset);
-  }
-
-  evaluateNullCheck(ast, asset) {
-    const value = this.evaluate(ast.field, asset);
-    const isNull = value === null || value === undefined;
-    return ast.operator === 'IS NOT NULL' ? !isNull : isNull;
-  }
-
-  evaluateFunction(ast, _asset) {
-    return evaluateFunctionShared(ast);
   }
 
   getFieldValue(fieldName, asset) {
@@ -1404,29 +1350,6 @@ export class AssetQLEvaluator {
 
       default:
         throw new Error(`Unknown asset field: ${fieldName}`);
-    }
-  }
-
-  compareValues(left, right, operation) {
-    return compareValuesShared(left, right, operation);
-  }
-
-  filter(assets, queryString) {
-    if (!queryString?.trim()) {
-      return assets;
-    }
-
-    try {
-      const tokenizer = new QLTokenizer(queryString);
-      const tokens = tokenizer.tokenize();
-
-      const parser = new QLParser(tokens);
-      const ast = parser.parse();
-
-      return assets.filter((asset) => this.evaluate(ast, asset));
-    } catch (error) {
-      console.error('Asset QL Error:', error.message);
-      throw error;
     }
   }
 }

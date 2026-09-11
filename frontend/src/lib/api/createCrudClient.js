@@ -1,9 +1,21 @@
-import { fetchAPI } from './core.js';
+import { fetchAllV2Pages, fetchAPI, fetchV2Data } from './core.js';
 import { buildQueryString } from './utils.js';
 
 /** Build CRUD clients with parent-scoped, flat-item, or admin-write paths. */
 export function createCrudClient(basePath, options = {}) {
-  const { parentPath, itemPath, adminBasePath } = options;
+  const {
+    parentPath,
+    itemPath,
+    adminBasePath,
+    readV2 = false,
+    v2 = false,
+    allV2 = false,
+  } = options;
+  const detailRead = readV2 || v2 || allV2 ? fetchV2Data : fetchAPI;
+  const listRead = allV2 ? fetchAllV2Pages : detailRead;
+  const write = v2 ? fetchV2Data : fetchAPI;
+  const updateMethod = v2 ? 'PATCH' : 'PUT';
+  const updateHeaders = v2 ? { 'Content-Type': 'application/merge-patch+json' } : undefined;
 
   if (parentPath) {
     const collection = (parentId) => `${parentPath}/${parentId}${basePath}`;
@@ -13,20 +25,21 @@ export function createCrudClient(basePath, options = {}) {
       const item = (id) => `${itemPath}/${id}`;
       return {
         getAll: (parentId, filters = {}, requestOptions = {}) =>
-          fetchAPI(`${collection(parentId)}${buildQueryString(filters)}`, requestOptions),
-        get: (id, requestOptions = {}) => fetchAPI(item(id), requestOptions),
+          listRead(`${collection(parentId)}${buildQueryString(filters)}`, requestOptions),
+        get: (id, requestOptions = {}) => detailRead(item(id), requestOptions),
         create: (parentId, data) =>
-          fetchAPI(collection(parentId), {
+          write(collection(parentId), {
             method: 'POST',
             body: JSON.stringify(data),
           }),
         update: (id, data) =>
-          fetchAPI(item(id), {
-            method: 'PUT',
+          write(item(id), {
+            method: updateMethod,
+            headers: updateHeaders,
             body: JSON.stringify(data),
           }),
         delete: (id) =>
-          fetchAPI(item(id), {
+          write(item(id), {
             method: 'DELETE',
           }),
       };
@@ -36,20 +49,21 @@ export function createCrudClient(basePath, options = {}) {
     const item = (parentId, id) => `${collection(parentId)}/${id}`;
     return {
       getAll: (parentId, filters = {}, requestOptions = {}) =>
-        fetchAPI(`${collection(parentId)}${buildQueryString(filters)}`, requestOptions),
-      get: (parentId, id, requestOptions = {}) => fetchAPI(item(parentId, id), requestOptions),
+        listRead(`${collection(parentId)}${buildQueryString(filters)}`, requestOptions),
+      get: (parentId, id, requestOptions = {}) => detailRead(item(parentId, id), requestOptions),
       create: (parentId, data) =>
-        fetchAPI(collection(parentId), {
+        write(collection(parentId), {
           method: 'POST',
           body: JSON.stringify(data),
         }),
       update: (parentId, id, data) =>
-        fetchAPI(item(parentId, id), {
-          method: 'PUT',
+        write(item(parentId, id), {
+          method: updateMethod,
+          headers: updateHeaders,
           body: JSON.stringify(data),
         }),
       delete: (parentId, id) =>
-        fetchAPI(item(parentId, id), {
+        write(item(parentId, id), {
           method: 'DELETE',
         }),
     };
@@ -58,20 +72,21 @@ export function createCrudClient(basePath, options = {}) {
   const writePath = adminBasePath ?? basePath;
   return {
     getAll: (filters = {}, requestOptions = {}) =>
-      fetchAPI(`${basePath}${buildQueryString(filters)}`, requestOptions),
-    get: (id, requestOptions = {}) => fetchAPI(`${basePath}/${id}`, requestOptions),
+      listRead(`${basePath}${buildQueryString(filters)}`, requestOptions),
+    get: (id, requestOptions = {}) => detailRead(`${basePath}/${id}`, requestOptions),
     create: (data) =>
-      fetchAPI(writePath, {
+      write(writePath, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     update: (id, data) =>
-      fetchAPI(`${writePath}/${id}`, {
-        method: 'PUT',
+      write(`${writePath}/${id}`, {
+        method: updateMethod,
+        headers: updateHeaders,
         body: JSON.stringify(data),
       }),
     delete: (id) =>
-      fetchAPI(`${writePath}/${id}`, {
+      write(`${writePath}/${id}`, {
         method: 'DELETE',
       }),
   };

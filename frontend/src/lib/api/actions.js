@@ -1,4 +1,29 @@
-import { fetchAPI } from './core.js';
+import { fetchAllV2Pages, fetchV2Data } from './core.js';
+
+function actionMutationData(data) {
+  const {
+    name,
+    description,
+    trigger_type,
+    trigger_config,
+    is_enabled,
+    actor_user_id,
+    allowed_role_ids,
+    nodes,
+    edges,
+  } = data;
+  return {
+    name,
+    description,
+    trigger_type,
+    trigger_config,
+    is_enabled,
+    actor_user_id,
+    allowed_role_ids,
+    nodes,
+    edges,
+  };
+}
 
 export const actions = {
   // getCatalog returns the workspace-scoped action catalog: every available
@@ -6,39 +31,40 @@ export const actions = {
   // capabilities reachable from this workspace. The visual palette is
   // built from this rather than a hardcoded list so adding a node type
   // server-side automatically surfaces it in the editor.
-  getCatalog: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/action-catalog`),
+  getCatalog: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/action-catalog`),
   getAll: (workspaceId, requestOptions = {}) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions`, requestOptions),
-  get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/actions/${id}`),
+    fetchV2Data(`/workspaces/${workspaceId}/actions`, requestOptions),
+  get: (workspaceId, id) => fetchV2Data(`/workspaces/${workspaceId}/actions/${id}`),
   create: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions`, {
+    fetchV2Data(`/workspaces/${workspaceId}/actions`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(actionMutationData(data)),
     }),
   update: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
+    fetchV2Data(`/workspaces/${workspaceId}/actions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify(actionMutationData(data)),
     }),
   delete: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions/${id}`, {
+    fetchV2Data(`/workspaces/${workspaceId}/actions/${id}`, {
       method: 'DELETE',
     }),
   execute: (workspaceId, actionId, itemId) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions/${actionId}/execute`, {
+    fetchV2Data(`/workspaces/${workspaceId}/actions/${actionId}/execute`, {
       method: 'POST',
       body: JSON.stringify({ item_id: itemId }),
     }),
   getLogs: (workspaceId, actionId) =>
-    fetchAPI(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
+    fetchAllV2Pages(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
 };
 
 // Action templates: read-only registry shipped with the binary, plus
 // instantiation into a workspace via snapshot copy.
 export const actionTemplates = {
-  list: () => fetchAPI('/action-templates'),
+  list: () => fetchV2Data('/action-templates'),
   apply: (workspaceId, templateKey) =>
-    fetchAPI(`/workspaces/${workspaceId}/action-templates/${templateKey}/apply`, {
+    fetchV2Data(`/workspaces/${workspaceId}/action-templates/${templateKey}/apply`, {
       method: 'POST',
     }),
 };

@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/repository/actionutil"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/sanitize"
@@ -23,8 +23,8 @@ import (
 // (token scopes) and error shape (structured ValidationErrors list).
 type ActionHandler struct {
 	BaseHandler
-	repo          *repository.ActionRepository
-	actionService *services.ActionService
+	repo        *repository.ActionRepository
+	definitions *services.ActionDefinitionService
 }
 
 // NewActionHandler constructs a v1 action handler. actionService is
@@ -32,36 +32,17 @@ type ActionHandler struct {
 // relies on the background refresher to pick up changes (acceptable for
 // low-volume admin tooling, slower than the cookie path).
 func NewActionHandler(db database.Database, permissionService *services.PermissionService, actionService *services.ActionService) *ActionHandler {
+	repo := repository.NewActionRepository(db)
+	definitions := services.NewActionDefinitionService(repo, actionService)
 	return &ActionHandler{
-		BaseHandler:   NewBaseHandler(db, permissionService),
-		repo:          repository.NewActionRepository(db),
-		actionService: actionService,
+		BaseHandler: NewBaseHandler(db, permissionService),
+		repo:        repo,
+		definitions: definitions,
 	}
 }
 
-// HasCapability satisfies actioncatalog.CapabilityResolver so the validator
-// can confirm capability_id references resolve to a capability this
-// workspace can actually reach.
-func (h *ActionHandler) HasCapability(workspaceID, capabilityID int) bool {
-	capability, err := h.repo.GetCapabilityByID(capabilityID)
-	if err != nil || capability == nil || !capability.IsEnabled {
-		return false
-	}
-	scoped, err := h.repo.IsCapabilityScopedToWorkspace(capabilityID, workspaceID)
-	return err == nil && scoped
-}
-
-// HasCapabilityOfType lets the shared validator enforce the same typed
-// capability references on the bearer-token surface as on the cookie and MCP
-// surfaces. Without it, the resolver falls back to existence-only checks and
-// accepts (for example) a docker capability on an http_request node.
-func (h *ActionHandler) HasCapabilityOfType(workspaceID, capabilityID int, capabilityType models.CapabilityType) bool {
-	capability, err := h.repo.GetCapabilityByID(capabilityID)
-	if err != nil || capability == nil || !capability.IsEnabled || capability.CapabilityType != capabilityType {
-		return false
-	}
-	scoped, err := h.repo.IsCapabilityScopedToWorkspace(capabilityID, workspaceID)
-	return err == nil && scoped
+func (h *ActionHandler) SetAssetService(service *services.AssetService) {
+	h.definitions.SetAssetService(service)
 }
 
 // requireActionManage authenticates, parses the workspace ID from the
@@ -326,12 +307,6 @@ func (h *ActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: &req.Description, Policy: sanitize.RichText, Label: "Description"},
 	)
 
-	def := req.toDefinition()
-	if errs := actioncatalog.Validate(actioncatalog.Default(), def, workspaceID, h); len(errs) > 0 {
-		h.respondValidationErrors(w, r, errs)
-		return
-	}
-
 	action := &models.Action{
 		WorkspaceID:   workspaceID,
 		Name:          req.Name,
@@ -341,33 +316,17 @@ func (h *ActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		TriggerConfig: req.TriggerConfig,
 		CreatedBy:     &userID,
 	}
-	actionID, err := h.repo.Create(action)
-	if err != nil {
-		h.RespondInternalError(w, r)
+	created, validationErrors, err := h.definitions.Create(action, req.Nodes, req.Edges)
+	if len(validationErrors) > 0 {
+		h.respondValidationErrors(w, r, validationErrors)
 		return
 	}
-	action.ID = actionID
-
-	if flowErr := actionutil.CreateFlowNodesAndEdges[
-		models.ActionNode, *models.ActionNode,
-		models.ActionEdge, *models.ActionEdge,
-	](
-		actionID, req.Nodes, req.Edges,
-		func(n *models.ActionNode) (int, error) { return h.repo.CreateNode(n) },
-		func(e *models.ActionEdge) (int, error) { return h.repo.CreateEdge(e) },
-		func() { _ = h.repo.Delete(actionID) },
-	); flowErr != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-
-	if h.actionService != nil {
-		h.actionService.InvalidateWorkspaceCache(workspaceID)
-	}
-
-	created, err := h.repo.GetByID(actionID)
 	if err != nil {
-		h.RespondInternalError(w, r)
+		if errors.Is(err, services.ErrActionDefinitionInvalid) {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error()))
+		} else {
+			h.RespondInternalError(w, r)
+		}
 		return
 	}
 	if user := middleware.GetUser(r.Context()); user != nil {
@@ -419,35 +378,66 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: &req.Description, Policy: sanitize.RichText, Label: "Description"},
 	)
 
-	def := req.toDefinition()
-	if errs := actioncatalog.Validate(actioncatalog.Default(), def, workspaceID, h); len(errs) > 0 {
-		h.respondValidationErrors(w, r, errs)
-		return
-	}
-
 	existing.Name = req.Name
 	existing.Description = req.Description
 	existing.TriggerType = req.TriggerType
 	existing.TriggerConfig = req.TriggerConfig
 
-	if err := h.repo.SaveActionWithNodesAndEdges(existing, req.Nodes, req.Edges); err != nil {
-		h.RespondInternalError(w, r)
+	updated, validationErrors, err := h.definitions.Save(existing, req.Nodes, req.Edges, true, true)
+	if len(validationErrors) > 0 {
+		h.respondValidationErrors(w, r, validationErrors)
 		return
 	}
-
-	if h.actionService != nil {
-		h.actionService.InvalidateWorkspaceCache(workspaceID)
-	}
-
-	updated, err := h.repo.GetByID(actionID)
 	if err != nil {
-		h.RespondInternalError(w, r)
+		if errors.Is(err, services.ErrActionDefinitionInvalid) {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error()))
+		} else {
+			h.RespondInternalError(w, r)
+		}
 		return
 	}
 	if user := middleware.GetUser(r.Context()); user != nil {
 		h.Auditor.LogWithDetails(r, user, logger.ActionAutomationUpdate, logger.ResourceAutomation, &updated.ID, updated.Name, map[string]any{"workspace_id": workspaceID})
 	}
 	h.RespondOK(w, actionResponse{Action: updated, Warnings: warnings})
+}
+
+// DeleteAction handles DELETE /rest/api/v1/workspaces/{id}/actions/{actionId}.
+//
+// @Summary      Delete an action
+// @Tags         actions
+// @Security     BearerAuth
+// @Param        id        path  int  true  "Workspace ID"
+// @Param        actionId  path  int  true  "Action ID"
+// @Success      204
+// @Failure      404  {object}  handlers.ErrorResponse
+// @Router       /workspaces/{id}/actions/{actionId} [delete]
+func (h *ActionHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
+	_, workspaceID, ok := h.requireActionManage(w, r)
+	if !ok {
+		return
+	}
+	actionID, ok := h.ParsePathID(w, r, "actionId", "action ID")
+	if !ok {
+		return
+	}
+	action, err := h.repo.GetByID(actionID)
+	if errors.Is(err, repository.ErrNotFound) || (err == nil && action.WorkspaceID != workspaceID) {
+		h.RespondNotFound(w, r)
+		return
+	}
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+	if err := h.definitions.Delete(actionID, workspaceID); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+	if user := middleware.GetUser(r.Context()); user != nil {
+		h.Auditor.LogWithDetails(r, user, logger.ActionAutomationDelete, logger.ResourceAutomation, &actionID, action.Name, map[string]any{"workspace_id": workspaceID})
+	}
+	h.RespondNoContent(w)
 }
 
 // validateActionResponse is the structured payload returned by the
@@ -482,7 +472,11 @@ func (h *ActionHandler) ValidateAction(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: &req.Name, Policy: sanitize.PlainTextField},
 		sanitize.Pair{Target: &req.Description, Policy: sanitize.RichText},
 	)
-	errs := actioncatalog.Validate(actioncatalog.Default(), req.toDefinition(), workspaceID, h)
+	errs, validationErr := h.definitions.Validate(workspaceID, req.toDefinition())
+	if validationErr != nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, validationErr.Error()))
+		return
+	}
 	if errs == nil {
 		errs = actioncatalog.ValidationErrors{}
 	}

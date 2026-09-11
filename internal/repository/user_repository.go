@@ -208,11 +208,12 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 	var u models.User
 	var avatarURL, timezone, language sql.NullString
 	var requiresPasswordReset sql.NullBool
+	var agentOwnerUserID sql.NullInt64
 	err := r.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), created_at, updated_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName,
-		&u.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &u.IsAgent, &u.CreatedAt, &u.UpdatedAt)
+		&u.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &u.IsAgent, &agentOwnerUserID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d", id))
 	}
@@ -225,6 +226,10 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 	u.Language = "en"
 	if language.Valid {
 		u.Language = language.String
+	}
+	if agentOwnerUserID.Valid {
+		ownerID := int(agentOwnerUserID.Int64)
+		u.AgentOwnerUserID = &ownerID
 	}
 	u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
 	return &u, nil
@@ -349,7 +354,7 @@ func CreateWorkspaceManagedAgentIdentity(ctx context.Context, tx database.Tx, p 
 	}
 
 	var editorRoleID int
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM workspace_roles WHERE name = ?`, models.RoleEditor).Scan(&editorRoleID); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM workspace_roles WHERE builtin_key = ?`, models.RoleBuiltinEditor).Scan(&editorRoleID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, fmt.Errorf("load workspace-managed agent role %q: %w", models.RoleEditor, ErrNotFound)
 		}
@@ -364,15 +369,15 @@ func CreateWorkspaceManagedAgentIdentity(ctx context.Context, tx database.Tx, p 
 			SELECT 1
 			FROM user_workspace_roles uwr
 			JOIN workspace_roles wr ON wr.id = uwr.role_id
-			WHERE uwr.workspace_id = ? AND wr.name IN (?, ?)
+			WHERE uwr.workspace_id = ? AND wr.builtin_key IN (?, ?)
 			UNION ALL
 			SELECT 1
 			FROM group_workspace_roles gwr
 			JOIN workspace_roles wr ON wr.id = gwr.role_id
-			WHERE gwr.workspace_id = ? AND wr.name IN (?, ?)
+			WHERE gwr.workspace_id = ? AND wr.builtin_key IN (?, ?)
 		)
-	`, p.WorkspaceID, models.RoleViewer, models.RoleEditor,
-		p.WorkspaceID, models.RoleViewer, models.RoleEditor).Scan(&editorRestricted)
+	`, p.WorkspaceID, models.RoleBuiltinViewer, models.RoleBuiltinEditor,
+		p.WorkspaceID, models.RoleBuiltinViewer, models.RoleBuiltinEditor).Scan(&editorRestricted)
 	if err != nil {
 		return 0, fmt.Errorf("check workspace Editor restrictions: %w", err)
 	}
@@ -682,8 +687,9 @@ func (r *UserRepository) GetDeleteSnapshot(id int) (*DeleteSnapshot, error) {
 
 // PasswordResetTarget is the small subset the password-reset audit needs.
 type PasswordResetTarget struct {
-	Username string
-	Email    string
+	Username   string
+	Email      string
+	Offboarded bool
 }
 
 // GetPasswordResetTarget returns username+email for the reset audit.
@@ -691,9 +697,9 @@ type PasswordResetTarget struct {
 func (r *UserRepository) GetPasswordResetTarget(id int) (*PasswordResetTarget, error) {
 	var t PasswordResetTarget
 	err := r.db.QueryRow(
-		"SELECT username, email FROM users WHERE id = ?",
+		"SELECT username, email, offboarded_at IS NOT NULL FROM users WHERE id = ?",
 		id,
-	).Scan(&t.Username, &t.Email)
+	).Scan(&t.Username, &t.Email, &t.Offboarded)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d for password reset", id))
 	}
@@ -711,11 +717,12 @@ func (r *UserRepository) SetPassword(id int, passwordHash string, requiresReset 
 }
 
 // ActivationTarget carries username/email/is_active for the activate/deactivate
-// audit + idempotence check.
+// audit + idempotence check, plus the irreversible offboarding state.
 type ActivationTarget struct {
-	Username string
-	Email    string
-	IsActive bool
+	Username   string
+	Email      string
+	IsActive   bool
+	Offboarded bool
 }
 
 // GetActivationTarget reads the activate/deactivate audit fields.
@@ -723,9 +730,9 @@ type ActivationTarget struct {
 func (r *UserRepository) GetActivationTarget(id int) (*ActivationTarget, error) {
 	var t ActivationTarget
 	err := r.db.QueryRow(
-		"SELECT username, email, is_active FROM users WHERE id = ?",
+		"SELECT username, email, is_active, offboarded_at IS NOT NULL FROM users WHERE id = ?",
 		id,
-	).Scan(&t.Username, &t.Email, &t.IsActive)
+	).Scan(&t.Username, &t.Email, &t.IsActive, &t.Offboarded)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d activation target", id))
 	}

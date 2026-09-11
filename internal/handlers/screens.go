@@ -143,6 +143,10 @@ func (h *ScreenHandler) loadScreen(id int) (*models.Screen, error) {
 	return &screen, nil
 }
 
+func (h *ScreenHandler) LoadScreen(id int) (*models.Screen, error) {
+	return h.loadScreen(id)
+}
+
 func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 	screen, ok := decodeJSON[models.Screen](w, r)
 	if !ok {

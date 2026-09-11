@@ -127,34 +127,7 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 			LEFT JOIN test_folders tf ON tc.folder_id = tf.id
 			WHERE tc.workspace_id = ?`
 	args := []any{params.WorkspaceID}
-
-	if !params.All {
-		if params.FolderID == nil {
-			query += " AND tc.folder_id IS NULL"
-		} else {
-			query += " AND tc.folder_id = ?"
-			args = append(args, *params.FolderID)
-		}
-	}
-	if params.LabelID != nil {
-		query += " AND EXISTS (SELECT 1 FROM test_case_labels tcl WHERE tcl.test_case_id = tc.id AND tcl.label_id = ?)"
-		args = append(args, *params.LabelID)
-	}
-	if search := strings.TrimSpace(params.Search); search != "" {
-		pattern := "%" + strings.ToLower(search) + "%"
-		query += ` AND (
-			LOWER(tc.title) LIKE ? OR
-			LOWER(COALESCE(tc.preconditions, '')) LIKE ? OR
-			LOWER(COALESCE(tc.priority, '')) LIKE ? OR
-			LOWER(COALESCE(tc.status, '')) LIKE ? OR
-			EXISTS (
-				SELECT 1 FROM test_case_labels search_tcl
-				JOIN test_labels search_tl ON search_tl.id = search_tcl.label_id
-				WHERE search_tcl.test_case_id = tc.id AND LOWER(search_tl.name) LIKE ?
-			)
-		)`
-		args = append(args, pattern, pattern, pattern, pattern, pattern)
-	}
+	query, args = appendTestCaseListFilters(query, args, params)
 
 	if params.All {
 		query += " ORDER BY tf.sort_order, tc.sort_order, tc.title, tc.id"
@@ -197,6 +170,45 @@ func (r *TestCaseRepository) FindAll(params TestCaseListParams) ([]models.TestCa
 	}
 
 	return testCases, nil
+}
+
+// Count returns the total for the same filters used by FindAll.
+func (r *TestCaseRepository) Count(params TestCaseListParams) (int, error) {
+	query := "SELECT COUNT(*) FROM test_cases tc WHERE tc.workspace_id = ?"
+	args := []any{params.WorkspaceID}
+	query, args = appendTestCaseListFilters(query, args, params)
+	var count int
+	if err := r.db.QueryRow(query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count test cases: %w", err)
+	}
+	return count, nil
+}
+
+func appendTestCaseListFilters(query string, args []any, params TestCaseListParams) (filteredQuery string, filteredArgs []any) {
+	if !params.All {
+		if params.FolderID == nil {
+			query += " AND tc.folder_id IS NULL"
+		} else {
+			query += " AND tc.folder_id = ?"
+			args = append(args, *params.FolderID)
+		}
+	}
+	if params.LabelID != nil {
+		query += " AND EXISTS (SELECT 1 FROM test_case_labels tcl WHERE tcl.test_case_id = tc.id AND tcl.label_id = ?)"
+		args = append(args, *params.LabelID)
+	}
+	if search := strings.TrimSpace(params.Search); search != "" {
+		pattern := "%" + strings.ToLower(search) + "%"
+		query += ` AND (
+			LOWER(tc.title) LIKE ? OR LOWER(COALESCE(tc.preconditions, '')) LIKE ? OR
+			LOWER(COALESCE(tc.priority, '')) LIKE ? OR LOWER(COALESCE(tc.status, '')) LIKE ? OR
+			EXISTS (SELECT 1 FROM test_case_labels search_tcl
+				JOIN test_labels search_tl ON search_tl.id = search_tcl.label_id
+				WHERE search_tcl.test_case_id = tc.id AND LOWER(search_tl.name) LIKE ?)
+		)`
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
+	}
+	return query, args
 }
 
 // CountAll returns the number of test cases in a workspace without loading them.

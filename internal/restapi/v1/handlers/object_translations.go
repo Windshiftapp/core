@@ -2,15 +2,11 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"windshift/internal/objecttranslation"
 	"windshift/internal/restapi"
-	"windshift/internal/sanitize"
 )
-
-const maxObjectTranslationResolveTargets = 500
 
 // ObjectTranslationHandler exposes instance translation administration to API tokens.
 type ObjectTranslationHandler struct {
@@ -105,14 +101,8 @@ func (h *ObjectTranslationHandler) Upsert(w http.ResponseWriter, r *http.Request
 	if !h.DecodeBodyOrRespond(w, r, &request) {
 		return
 	}
-	field := r.PathValue("field")
-	if field == objecttranslation.FieldDescription {
-		request.Value = sanitize.RichText.Sanitize(request.Value)
-	} else {
-		request.Value = sanitize.PlainTextField.Sanitize(request.Value)
-	}
 	translation, err := h.service.UpsertInstance(
-		r.Context(), r.PathValue("objectType"), objectID, field, r.PathValue("locale"), request.Value,
+		r.Context(), r.PathValue("objectType"), objectID, r.PathValue("field"), r.PathValue("locale"), request.Value,
 	)
 	if err != nil {
 		h.respondTranslationError(w, r, err)
@@ -171,14 +161,7 @@ func (h *ObjectTranslationHandler) Resolve(w http.ResponseWriter, r *http.Reques
 	if !h.DecodeBodyOrRespond(w, r, &request) {
 		return
 	}
-	if len(request.Targets) > maxObjectTranslationResolveTargets {
-		h.RespondError(w, r, restapi.NewAPIError(
-			http.StatusBadRequest, restapi.ErrCodeInvalidInput,
-			fmt.Sprintf("targets must contain at most %d objects", maxObjectTranslationResolveTargets),
-		))
-		return
-	}
-	resolved, err := h.service.Resolve(r.Context(), request.Locale, request.Targets)
+	resolved, err := h.service.ResolveBounded(r.Context(), request.Locale, request.Targets)
 	if err != nil {
 		h.respondTranslationError(w, r, err)
 		return
@@ -233,7 +216,8 @@ func (h *ObjectTranslationHandler) respondTranslationError(w http.ResponseWriter
 	case errors.Is(err, objecttranslation.ErrUnsupportedObjectType),
 		errors.Is(err, objecttranslation.ErrUnsupportedField),
 		errors.Is(err, objecttranslation.ErrInvalidLocale),
-		errors.Is(err, objecttranslation.ErrInvalidValue):
+		errors.Is(err, objecttranslation.ErrInvalidValue),
+		errors.Is(err, objecttranslation.ErrTooManyTargets):
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
 	default:
 		h.RespondInternalError(w, r)

@@ -37,6 +37,9 @@ func (o *Output) printJSON(data any) {
 }
 
 func (o *Output) printTable(data any) {
+	if items, ok := data.(*PaginatedResponse[Item]); ok {
+		warnItemPagination(items)
+	}
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	defer func() { _ = w.Flush() }() //nolint:errcheck // output to stdout
 
@@ -144,6 +147,9 @@ func (o *Output) printTable(data any) {
 }
 
 func (o *Output) printCSV(data any) {
+	if items, ok := data.(*PaginatedResponse[Item]); ok {
+		warnItemPagination(items)
+	}
 	w := csv.NewWriter(stdout)
 	defer w.Flush()
 
@@ -245,10 +251,7 @@ func (o *Output) printItemsCSV(w *csv.Writer, items []Item) {
 
 func (o *Output) printItemCSV(w *csv.Writer, item *Item) {
 	key, status, assignee, itemType := itemDisplayFields(item)
-	priority := ""
-	if item.Priority != nil {
-		priority = item.Priority.Name
-	}
+	priority := item.PriorityName
 	_ = w.Write([]string{"KEY", "TITLE", "STATUS", "TYPE", "PRIORITY", "ASSIGNEE", "DESCRIPTION", "CREATED", "UPDATED"})
 	_ = w.Write([]string{key, item.Title, status, itemType, priority, assignee, item.Description, item.CreatedAt.Format(time.RFC3339), item.UpdatedAt.Format(time.RFC3339)})
 }
@@ -372,7 +375,7 @@ func (o *Output) printTestRunCSV(w *csv.Writer, run *TestRun) {
 		status = "completed"
 	}
 	_ = w.Write([]string{"ID", "NAME", "SET_ID", "ASSIGNEE", "STARTED", "ENDED", "STATUS"})
-	_ = w.Write([]string{fmt.Sprintf("%d", run.ID), run.Name, fmt.Sprintf("%d", run.SetID), assignee, started, ended, status})
+	_ = w.Write([]string{fmt.Sprintf("%d", run.ID), run.Name, fmt.Sprintf("%d", run.PlanID), assignee, started, ended, status})
 }
 
 func (o *Output) printTestResultsCSV(w *csv.Writer, results []TestResult) {
@@ -456,11 +459,11 @@ func (o *Output) printItemDetailTable(w *tabwriter.Writer, item *Item) {
 	key, _, _, _ := itemDisplayFields(item)
 	_, _ = fmt.Fprintf(w, "Key:\t%s\n", key)
 	_, _ = fmt.Fprintf(w, "Title:\t%s\n", item.Title)
-	if item.Status != nil {
-		_, _ = fmt.Fprintf(w, "Status:\t%s\n", item.Status.Name)
+	if item.StatusName != "" {
+		_, _ = fmt.Fprintf(w, "Status:\t%s\n", item.StatusName)
 	}
-	if item.ItemType != nil {
-		_, _ = fmt.Fprintf(w, "Type:\t%s\n", item.ItemType.Name)
+	if item.ItemTypeName != "" {
+		_, _ = fmt.Fprintf(w, "Type:\t%s\n", item.ItemTypeName)
 	}
 	if item.ParentID != nil {
 		_, _ = fmt.Fprintf(w, "Parent:\t%s\n", parentDisplay(item))
@@ -468,14 +471,14 @@ func (o *Output) printItemDetailTable(w *tabwriter.Writer, item *Item) {
 	if len(item.Children) > 0 {
 		_, _ = fmt.Fprintf(w, "Children:\t%s\n", childrenSummary(item.Children))
 	}
-	if item.Priority != nil {
-		_, _ = fmt.Fprintf(w, "Priority:\t%s\n", item.Priority.Name)
+	if item.PriorityName != "" {
+		_, _ = fmt.Fprintf(w, "Priority:\t%s\n", item.PriorityName)
 	}
-	if item.Assignee != nil {
-		_, _ = fmt.Fprintf(w, "Assignee:\t%s\n", item.Assignee.FullName)
+	if item.AssigneeName != "" {
+		_, _ = fmt.Fprintf(w, "Assignee:\t%s\n", item.AssigneeName)
 	}
-	if item.Creator != nil {
-		_, _ = fmt.Fprintf(w, "Creator:\t%s\n", item.Creator.FullName)
+	if item.CreatorName != "" {
+		_, _ = fmt.Fprintf(w, "Creator:\t%s\n", item.CreatorName)
 	}
 	if item.Description != "" {
 		_, _ = fmt.Fprintf(w, "Description:\t%s\n", truncateString(item.Description, 100))
@@ -633,7 +636,7 @@ func (o *Output) printTestRunsTable(w *tabwriter.Writer, runs []TestRun) {
 func (o *Output) printTestRunDetailTable(w *tabwriter.Writer, run *TestRun) {
 	_, _ = fmt.Fprintf(w, "ID:\t%d\n", run.ID)
 	_, _ = fmt.Fprintf(w, "Name:\t%s\n", run.Name)
-	_, _ = fmt.Fprintf(w, "Set ID:\t%d\n", run.SetID)
+	_, _ = fmt.Fprintf(w, "Plan ID:\t%d\n", run.PlanID)
 	if run.AssigneeName != "" {
 		_, _ = fmt.Fprintf(w, "Assignee:\t%s\n", run.AssigneeName)
 	}
@@ -1392,8 +1395,7 @@ func (o *Output) printAssetDetailTable(w *tabwriter.Writer, a *Asset) {
 		_, _ = fmt.Fprintf(w, "Category:\t%s\n", a.Category.Name)
 	}
 	if a.Creator != nil {
-		// v1 asset surface no longer exposes creator.email under
-		// assets:read; render the display name (id as fallback) instead.
+		// The asset surface does not expose creator.email under assets:read.
 		name := a.Creator.FullName
 		if name == "" {
 			name = fmt.Sprintf("#%d", a.Creator.ID)
@@ -1480,21 +1482,21 @@ func (o *Output) printAssetTypeDetailTable(w *tabwriter.Writer, t *AssetType) {
 }
 
 func (o *Output) printAssetImportJobTable(w *tabwriter.Writer, j *AssetImportJob) {
-	_, _ = fmt.Fprintf(w, "Job ID:\t%d\n", j.ID)
-	_, _ = fmt.Fprintf(w, "Set ID:\t%d\n", j.SetID)
-	if j.AssetTypeID > 0 {
-		_, _ = fmt.Fprintf(w, "Asset type ID:\t%d\n", j.AssetTypeID)
-	}
+	_, _ = fmt.Fprintf(w, "Job ID:\t%s\n", j.JobID)
 	_, _ = fmt.Fprintf(w, "Status:\t%s\n", j.Status)
-	_, _ = fmt.Fprintf(w, "Rows:\t%d total, %d processed, %d created, %d errors\n", j.TotalRows, j.ProcessedRows, j.CreatedRows, j.ErrorRows)
+	if j.Progress != nil {
+		_, _ = fmt.Fprintf(w, "Rows:\t%d total, %d imported, %d errors\n", j.Progress.TotalRows, j.Progress.ImportedCount, j.Progress.FailedCount)
+	}
 	if j.ErrorMessage != "" {
 		_, _ = fmt.Fprintf(w, "Error:\t%s\n", j.ErrorMessage)
 	}
-	_, _ = fmt.Fprintf(w, "Created:\t%s\n", j.CreatedAt)
+	if j.CreatedAt != nil {
+		_, _ = fmt.Fprintf(w, "Created:\t%s\n", j.CreatedAt.Format(time.RFC3339))
+	}
 	if j.StartedAt != nil {
-		_, _ = fmt.Fprintf(w, "Started:\t%s\n", *j.StartedAt)
+		_, _ = fmt.Fprintf(w, "Started:\t%s\n", j.StartedAt.Format(time.RFC3339))
 	}
 	if j.CompletedAt != nil {
-		_, _ = fmt.Fprintf(w, "Completed:\t%s\n", *j.CompletedAt)
+		_, _ = fmt.Fprintf(w, "Completed:\t%s\n", j.CompletedAt.Format(time.RFC3339))
 	}
 }

@@ -22,6 +22,7 @@
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
+  import { formatItemCount } from '../../utils/itemCount.js';
   import { isSystemFieldAvailableForItem } from '../../utils/screenFields.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -33,12 +34,11 @@
   let statusCategories = $derived(workspaceDataStore.statusCategories);
 
   let backlogItems = $derived(collectionStore.backlogItems);
+  let backlogItemsById = $derived(new Map(backlogItems.map((item) => [item.id, item])));
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
-  let setupTimeout;
-  let setupElements = new Map(); // Track which elements have drag/drop set up and their cleanup functions
   let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
 
   // Edge-based drag state (must use $state for Svelte 5 reactivity)
@@ -241,8 +241,16 @@
     }
   }
 
-  // Total item count across all sections
-  let totalItemCount = $derived(collectionStore.backlogPagination?.total ?? backlogItems.length);
+  let shownItemCount = $derived(
+    iterationSections.reduce((count, section) => count + (
+      collapsedSections.has(section.iteration.id) ? 0 : section.items.length
+    ), collapsedSections.has('unassigned') ? 0 : unassignedItems.length)
+  );
+
+  let backlogTotal = $derived(collectionStore.backlogPagination?.total_items ?? backlogItems.length);
+  let backlogShownCount = $derived(collectionStore.loading ? null : shownItemCount);
+  let backlogRemaining = $derived(Math.max(0, backlogTotal - backlogItems.length));
+  let backlogCountSummary = $derived(formatItemCount(backlogTotal, backlogShownCount, t));
 
   // Centralized gradient styling
   const styles = useGradientStyles();
@@ -251,7 +259,7 @@
   async function handleRefreshWorkItems(event) {
     if (event.detail?.itemId) {
       try {
-        const newItem = await api.items.get(event.detail.itemId);
+        const newItem = event.detail.item ?? await api.items.get(event.detail.itemId);
         // When viewing a collection, accept items from any workspace (the collection defines scope).
         // Otherwise fall back to current-workspace check.
         const belongsToView = collectionId
@@ -295,7 +303,7 @@
 
   // Keep backlog count in sync
   $effect(() => {
-    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
+    backlogStore.setCount(workspaceId, backlogTotal);
   });
 
   // Adaptive polling for backlog items: use cheap deltas, falling back to full refresh only when needed.
@@ -411,14 +419,14 @@
       const boundaryItem = await api.items.getBacklogBoundary(
         workspaceId,
         collectionId,
-        collectionStore.subFilterQL,
+        collectionStore.effectiveSubFilterQL,
         boundary,
       );
       if (!boundaryItem || boundaryItem.id === item.id) return;
 
       await api.items.updateFracIndex(item.id, boundary === 'start'
-        ? { prev_item_id: null, next_item_id: boundaryItem.id }
-        : { prev_item_id: boundaryItem.id, next_item_id: null });
+        ? { previous_item_id: null, next_item_id: boundaryItem.id }
+        : { previous_item_id: boundaryItem.id, next_item_id: null });
 
       const otherItems = collectionStore.backlogItems.filter(i => i.id !== item.id);
       collectionStore.backlogItems = boundary === 'start'
@@ -472,153 +480,113 @@
     return backlogItems.filter(i => i.iteration_id === numId);
   }
 
-  // Edge-based drag and drop setup using Pragmatic DnD
-  function setupDragAndDrop() {
-    // Clear any pending setup
-    if (setupTimeout) {
-      clearTimeout(setupTimeout);
-    }
+  function registerBacklogItem(element, itemId) {
+    dragState.set(itemId, { isDragging: false, closestEdge: null });
 
-    // Clean up existing registrations
-    setupElements.forEach((cleanup, elementId) => {
-      if (typeof cleanup === 'function') {
-        cleanup();
+    const draggableCleanup = draggable({
+      element,
+      getInitialData: () => {
+        const item = backlogItemsById.get(itemId);
+        return { item, type: 'work-item', sectionId: item?.iteration_id || 'unassigned' };
+      },
+      onDragStart: () => {
+        element.style.opacity = '0.5';
+        document.body.classList.add('is-dragging');
+        const state = dragState.get(itemId) || {};
+        const next = new Map(dragState);
+        next.set(itemId, { ...state, isDragging: true });
+        dragState = next;
+      },
+      onDrop: () => {
+        element.style.opacity = '';
+        document.body.classList.remove('is-dragging');
+        dragState = new Map([...dragState].map(([id]) => [id, { isDragging: false, closestEdge: null }]));
+        sectionDropHighlight = new Map();
       }
     });
-    setupElements.clear();
 
-    // Reset drag state
-    dragState.clear();
-
-    // Setup work item cards as both draggable and drop targets
-    const itemCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-item-card]'));
-
-    itemCards.forEach(element => {
-      const itemId = parseInt(element.dataset.itemId);
-      const sectionId = element.dataset.sectionId || 'unassigned';
-      const elementId = `item-${itemId}`;
-
-      const item = backlogItems.find(i => i.id === itemId);
-      if (!item) return;
-
-      // Initialize drag state for this item
-      dragState.set(itemId, { isDragging: false, closestEdge: null });
-
-      // Make draggable
-      const draggableCleanup = draggable({
-        element,
-        getInitialData: () => ({
-          item,
-          type: 'work-item',
-          sectionId: item.iteration_id || 'unassigned',
-        }),
-        onDragStart: () => {
-          element.style.opacity = '0.5';
-          document.body.classList.add('is-dragging');
-          // Mark this item as being dragged - create new Map for Svelte 5 reactivity
-          const state = dragState.get(itemId) || {};
-          const newMap = new Map(dragState);
-          newMap.set(itemId, { ...state, isDragging: true });
-          dragState = newMap;
-        },
-        onDrop: () => {
-          element.style.opacity = '';
-          document.body.classList.remove('is-dragging');
-          // Reset all drag states - create new Map for Svelte 5 reactivity
-          const newMap = new Map();
-          dragState.forEach((state, id) => {
-            newMap.set(id, { isDragging: false, closestEdge: null });
-          });
-          dragState = newMap;
-          // Clear section highlights
-          sectionDropHighlight = new Map();
+    const dropTargetCleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = /** @type {any} */ (source.data);
+        return data.type === 'work-item' && data.item?.id !== itemId;
+      },
+      getData: ({ input, element: targetElement }) => attachClosestEdge(
+        { sectionId: element.dataset.sectionId || 'unassigned' },
+        { input, element: targetElement, allowedEdges: ['top', 'bottom'] }
+      ),
+      onDragEnter: ({ self, source }) => {
+        const data = /** @type {any} */ (source.data);
+        if (data.type !== 'work-item' || data.item?.id === itemId) return;
+        const next = new Map(dragState);
+        next.set(itemId, {
+          ...(dragState.get(itemId) || {}),
+          closestEdge: extractClosestEdge(self.data),
+        });
+        dragState = next;
+      },
+      onDragLeave: () => {
+        const next = new Map(dragState);
+        next.set(itemId, { ...(dragState.get(itemId) || {}), closestEdge: null });
+        dragState = next;
+      },
+      onDrop: ({ self, source }) => {
+        const data = /** @type {any} */ (source.data);
+        const item = backlogItemsById.get(itemId);
+        const closestEdge = extractClosestEdge(self.data);
+        if (item && data.type === 'work-item' && closestEdge) {
+          handleEdgeBasedDrop(
+            data.item,
+            item,
+            closestEdge,
+            element.dataset.sectionId || 'unassigned'
+          );
         }
-      });
+      }
+    });
 
-      // Make drop target with edge detection
-      const dropTargetCleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => {
-          const data = /** @type {any} */ (source.data);
-          // Can't drop on self
-          return data.type === 'work-item' && data.item.id !== itemId;
-        },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({ sectionId }, {
-            input,
-            element,
-            allowedEdges: ['top', 'bottom']
-          });
-        },
-        onDragEnter: ({ self, source }) => {
-          const data = /** @type {any} */ (source.data);
-          if (data.type === 'work-item' && data.item.id !== itemId) {
-            const closestEdge = extractClosestEdge(self.data);
-            const state = dragState.get(itemId) || {};
-            // Create new Map to trigger Svelte 5 reactivity
-            const newMap = new Map(dragState);
-            newMap.set(itemId, { ...state, closestEdge });
-            dragState = newMap;
-          }
-        },
-        onDragLeave: () => {
-          const state = dragState.get(itemId) || {};
-          // Create new Map to trigger Svelte 5 reactivity
-          const newMap = new Map(dragState);
-          newMap.set(itemId, { ...state, closestEdge: null });
-          dragState = newMap;
-        },
-        onDrop: ({ self, source }) => {
-          const data = /** @type {any} */ (source.data);
-          const closestEdge = extractClosestEdge(self.data);
-
-          if (data.type === 'work-item' && closestEdge) {
-            handleEdgeBasedDrop(data.item, item, closestEdge, sectionId);
-          }
-        }
-      });
-
-      setupElements.set(elementId, () => {
+    return {
+      destroy() {
+        element.style.opacity = '';
+        document.body.classList.remove('is-dragging');
         draggableCleanup();
         dropTargetCleanup();
-      });
+        dragState.delete(itemId);
+      }
+    };
+  }
+
+  function registerBacklogSection(element, iterationId) {
+    const key = String(iterationId);
+    const cleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => (/** @type {any} */ (source.data)).type === 'work-item',
+      getData: () => ({ type: 'section-drop', iterationId: key }),
+      onDragEnter: ({ source }) => {
+        if ((/** @type {any} */ (source.data)).type !== 'work-item') return;
+        const next = new Map(sectionDropHighlight);
+        next.set(key, true);
+        sectionDropHighlight = next;
+      },
+      onDragLeave: () => {
+        const next = new Map(sectionDropHighlight);
+        next.delete(key);
+        sectionDropHighlight = next;
+      },
+      onDrop: ({ source }) => {
+        const data = /** @type {any} */ (source.data);
+        if (data.type === 'work-item') handleSectionDrop(data.item, key);
+        sectionDropHighlight = new Map();
+      },
     });
-
-    // Setup section drop zones (empty sections and section headers)
-    const sectionDropZones = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-section-drop-zone], [data-section-header]'));
-    sectionDropZones.forEach(element => {
-      const iterationId = element.dataset.iterationId;
-      if (!iterationId) return;
-
-      const zoneId = `section-${iterationId}-${element.dataset.sectionDropZone !== undefined ? 'zone' : 'header'}`;
-
-      const dropTargetCleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => (/** @type {any} */ (source.data)).type === 'work-item',
-        getData: () => ({ type: 'section-drop', iterationId }),
-        onDragEnter: ({ source }) => {
-          if ((/** @type {any} */ (source.data)).type === 'work-item') {
-            const newMap = new Map(sectionDropHighlight);
-            newMap.set(iterationId, true);
-            sectionDropHighlight = newMap;
-          }
-        },
-        onDragLeave: () => {
-          const newMap = new Map(sectionDropHighlight);
-          newMap.delete(iterationId);
-          sectionDropHighlight = newMap;
-        },
-        onDrop: ({ source }) => {
-          const data = /** @type {any} */ (source.data);
-          if (data.type === 'work-item') {
-            handleSectionDrop(data.item, iterationId);
-          }
-          sectionDropHighlight = new Map();
-        },
-      });
-
-      setupElements.set(zoneId, dropTargetCleanup);
-    });
+    return {
+      destroy() {
+        const next = new Map(sectionDropHighlight);
+        next.delete(key);
+        sectionDropHighlight = next;
+        cleanup();
+      }
+    };
   }
 
   async function handleEdgeBasedDrop(draggedItem, targetItem, closestEdge, targetSectionId) {
@@ -685,7 +653,7 @@
 
       // Update the frac_index using item IDs
       const indexData = {
-        prev_item_id: prevItemId,
+        previous_item_id: prevItemId,
         next_item_id: nextItemId
       };
       await api.items.updateFracIndex(draggedItem.id, indexData);
@@ -736,19 +704,6 @@
     }
   }
 
-  // Setup drag and drop when data changes
-  $effect(() => {
-    // Track both items and visible iterations so drag-drop re-initializes
-    // when global iterations are added/removed
-    const _items = backlogItems.length;
-    const _iterations = visibleIterations.length;
-    if (_items > 0 && typeof document !== 'undefined') {
-      if (setupTimeout) clearTimeout(setupTimeout);
-      setupTimeout = setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
-    }
-  });
 </script>
 
 {#if loading}
@@ -767,7 +722,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Backlog"
-          itemCount={totalItemCount}
+          itemCount={backlogTotal}
+          shownCount={backlogShownCount}
         >
           {#snippet actions()}
             <div class="flex items-center gap-2">
@@ -805,7 +761,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mb-6">
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}
@@ -844,6 +800,8 @@
               storyPointsConfiguredForItem={storyPointsConfiguredForItem}
               storyPointsPendingItemIds={pendingStoryPointsItemIds}
               onUpdateStoryPoints={updateStoryPoints}
+              itemDndAction={registerBacklogItem}
+              sectionDndAction={registerBacklogSection}
             />
           {/each}
 
@@ -869,6 +827,8 @@
             storyPointsConfiguredForItem={storyPointsConfiguredForItem}
             storyPointsPendingItemIds={pendingStoryPointsItemIds}
             onUpdateStoryPoints={updateStoryPoints}
+            itemDndAction={registerBacklogItem}
+            sectionDndAction={registerBacklogSection}
           />
 
           <!-- Load More -->
@@ -881,8 +841,8 @@
                 style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
               >
                 {collectionStore.backlogLoadingMore ? t('common.loading') : t('common.loadMore')}
-                {#if collectionStore.backlogPagination?.total}
-                  ({collectionStore.backlogPagination.total - collectionStore.backlogItems.length} {t('common.remaining')})
+                {#if collectionStore.backlogPagination?.total_items}
+                  ({backlogRemaining} {t('common.remaining')})
                 {/if}
               </button>
             </div>
@@ -890,8 +850,8 @@
 
           <!-- Summary -->
           <div class="mt-8 text-center">
-            <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
-              {t('collections.showingItemsFromBacklog', { count: collectionStore.backlogPagination?.total ?? backlogItems.length })}
+            <p data-testid="backlog-count-summary" class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
+              {backlogCountSummary}
             </p>
           </div>
         </div>

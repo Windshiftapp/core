@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
@@ -22,16 +21,6 @@ func (h *ItemHandler) canViewItem(userID, workspaceID int) (bool, error) {
 		return false, nil
 	}
 	return h.authz.CanViewWorkspace(userID, workspaceID)
-}
-
-// canViewItemAsActor extends canViewItem with the approver-pool fallback. See
-// userCanViewItemAsActor / CheckItemPermissionAsActor for the security model.
-func (h *ItemHandler) canViewItemAsActor(ctx context.Context, userID, itemID, workspaceID int) (bool, error) {
-	if h.permissionService == nil {
-		slog.Error("permission service unavailable, denying view access", slog.String("component", "items_permissions"))
-		return false, nil
-	}
-	return userCanViewItemAsActor(ctx, userID, itemID, workspaceID, h.permissionService, h.approvalService)
 }
 
 // canEditItem checks if a user can edit an item in a specific workspace
@@ -85,16 +74,6 @@ func (h *ItemHandler) filterItemsByPermissions(userID int, items []models.Item) 
 	}
 
 	return filteredItems, nil
-}
-
-// canAccessInactiveWorkspace checks if a user can access an inactive workspace
-// System admins and workspace admins can access inactive workspaces
-func (h *ItemHandler) canAccessInactiveWorkspace(user *models.User, workspaceID int) (bool, error) {
-	if h.permissionService == nil {
-		return false, nil
-	}
-	// Check if user has workspace admin permission (system admins pass automatically)
-	return h.authz.HasWorkspacePermission(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
 }
 
 // getAccessibleWorkspaceIDs returns all workspace IDs the user can access

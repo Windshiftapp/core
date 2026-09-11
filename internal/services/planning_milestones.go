@@ -216,6 +216,7 @@ type MilestoneResult struct {
 	ExternalKey   *string
 	Position      int
 	LatestRelease *MilestoneReleaseResult
+	Releases      []MilestoneReleaseResult
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -231,18 +232,20 @@ func milestoneOrderByClause(sortBy, sortOrder string) string {
 		dir = "DESC"
 	}
 	switch sortBy {
+	case "position":
+		return " ORDER BY m.position " + dir + ", m.name ASC, m.id ASC"
 	case "name":
-		return " ORDER BY m.name " + dir + ", m.position ASC"
+		return " ORDER BY m.name " + dir + ", m.position ASC, m.id ASC"
 	case "target_date":
 		// NULL dates sort last in ascending order on both backends via the
 		// IS NULL tiebreaker, keeping behavior consistent.
-		return " ORDER BY m.target_date IS NULL ASC, m.target_date " + dir + ", m.name ASC, m.position ASC"
+		return " ORDER BY m.target_date IS NULL ASC, m.target_date " + dir + ", m.name ASC, m.position ASC, m.id ASC"
 	case "status":
-		return " ORDER BY m.status " + dir + ", m.position ASC"
+		return " ORDER BY m.status " + dir + ", m.position ASC, m.id ASC"
 	case "created_at", "updated_at":
-		return " ORDER BY m." + sortBy + " " + dir + ", m.position ASC"
+		return " ORDER BY m." + sortBy + " " + dir + ", m.position ASC, m.id ASC"
 	default:
-		return " ORDER BY m.position ASC, m.name ASC"
+		return " ORDER BY m.position ASC, m.name ASC, m.id ASC"
 	}
 }
 
@@ -255,6 +258,7 @@ type MilestoneListParams struct {
 	CategoryID    *int   // Filter by category
 	Status        string // Filter by status
 	IncludeGlobal bool   // Include global milestones
+	IsGlobal      bool   // Restricts an unscoped list to global milestones only
 	// SortBy overrides the default manual-position ordering. When empty,
 	// results are ordered by position then name (the drag-and-drop order).
 	// When set (e.g. "name", "target_date", "status"), the client sort wins.
@@ -265,98 +269,11 @@ type MilestoneListParams struct {
 
 // ListMilestones retrieves milestones with pagination and filtering.
 func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]MilestoneResult, int, error) {
-	query := `
-		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
-		       mc.name as category_name, mc.color as category_color,
-		       m.is_global, m.workspace_id, w.name as workspace_name,
-		       m.external_key, m.position,
-		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
-		       mr.target_commitish, mr.workspace_repository_id, mr.tag_url, mr.release_status,
-		       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
-		       mr.scm_connection_id, mr.scm_repository,
-		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
-		       m.created_at, m.updated_at
-		FROM milestones m
-		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
-		LEFT JOIN workspaces w ON m.workspace_id = w.id
-		LEFT JOIN (
-			SELECT * FROM milestone_releases
-			WHERE state = 'created' AND id IN (
-				SELECT MAX(id) FROM milestone_releases WHERE state = 'created' GROUP BY milestone_id
-			)
-		) mr ON mr.milestone_id = m.id
-		WHERE 1=1`
-
-	countQuery := "SELECT COUNT(*) FROM milestones m WHERE 1=1"
-	var args []any
-	var countArgs []any
-
-	// Filter by workspace - show local milestones for this workspace + optionally global milestones
-	switch {
-	case params.WorkspaceID != nil:
-		if params.IncludeGlobal {
-			query += " AND (m.workspace_id = ? OR m.is_global = ?)"
-			countQuery += " AND (m.workspace_id = ? OR m.is_global = ?)"
-			args = append(args, *params.WorkspaceID, true)
-			countArgs = append(countArgs, *params.WorkspaceID, true)
-		} else {
-			query += " AND m.workspace_id = ?"
-			countQuery += " AND m.workspace_id = ?"
-			args = append(args, *params.WorkspaceID)
-			countArgs = append(countArgs, *params.WorkspaceID)
-		}
-	case len(params.WorkspaceIDs) > 0:
-		workspaceClause, workspaceArgs := planningWorkspaceFilter("m.workspace_id", params.WorkspaceIDs)
-		workspaceClause = strings.TrimPrefix(workspaceClause, " AND ")
-		if params.IncludeGlobal {
-			query += " AND (m.is_global = ? OR " + workspaceClause + ")"
-			countQuery += " AND (m.is_global = ? OR " + workspaceClause + ")"
-			args = append(args, true)
-			args = append(args, workspaceArgs...)
-			countArgs = append(countArgs, true)
-			countArgs = append(countArgs, workspaceArgs...)
-		} else {
-			query += " AND " + workspaceClause
-			countQuery += " AND " + workspaceClause
-			args = append(args, workspaceArgs...)
-			countArgs = append(countArgs, workspaceArgs...)
-		}
-	case params.IncludeGlobal:
-		// If no workspace specified but include_global, only show global milestones
-		query += " AND m.is_global = ?"
-		countQuery += " AND m.is_global = ?"
-		args = append(args, true)
-		countArgs = append(countArgs, true)
-	default:
-		// An unscoped local list must never widen to every workspace.
-		query += " AND 1=0"
-		countQuery += " AND 1=0"
-	}
-
-	// Filter by category
-	if params.CategoryID != nil {
-		if *params.CategoryID == 0 {
-			query += " AND m.category_id IS NULL"
-			countQuery += " AND m.category_id IS NULL"
-		} else {
-			query += " AND m.category_id = ?"
-			countQuery += " AND m.category_id = ?"
-			args = append(args, *params.CategoryID)
-			countArgs = append(countArgs, *params.CategoryID)
-		}
-	}
-
-	// Filter by status
-	if params.Status != "" {
-		query += " AND m.status = ?"
-		countQuery += " AND m.status = ?"
-		args = append(args, params.Status)
-		countArgs = append(countArgs, params.Status)
-	}
-
-	query += milestoneOrderByClause(params.SortBy, params.SortOrder)
-	query += " LIMIT ? OFFSET ?"
-	args = append(args, params.Limit, params.Offset)
+	list := newPlanningListQuery(milestoneSelectQuery+"\nWHERE 1=1", "SELECT COUNT(*) FROM milestones m WHERE 1=1")
+	list.addWorkspaceScope("m.workspace_id", "m.is_global", params.WorkspaceID, params.WorkspaceIDs, params.IncludeGlobal)
+	list.addNullableIDFilter("m.category_id", params.CategoryID)
+	list.addStringFilter("m.status", params.Status)
+	query, args := list.paginated(milestoneOrderByClause(params.SortBy, params.SortOrder), params.Limit, params.Offset)
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -367,7 +284,7 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 	milestones, _ := scanMilestones(rows)
 
 	var total int
-	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(list.countQuery, list.countArgs...).Scan(&total); err != nil {
 		slog.Warn("failed to get milestone pagination count", slog.Any("error", err))
 	}
 
@@ -376,28 +293,7 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 
 // GetMilestone retrieves a milestone by ID.
 func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
-	row := s.db.QueryRow(`
-		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
-		       mc.name as category_name, mc.color as category_color,
-		       m.is_global, m.workspace_id, w.name as workspace_name,
-		       m.external_key, m.position,
-		       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
-		       mr.target_commitish, mr.workspace_repository_id, mr.tag_url, mr.release_status,
-		       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
-		       mr.scm_connection_id, mr.scm_repository,
-		       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
-		       m.created_at, m.updated_at
-		FROM milestones m
-		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
-		LEFT JOIN workspaces w ON m.workspace_id = w.id
-		LEFT JOIN (
-			SELECT * FROM milestone_releases
-			WHERE state = 'created' AND id IN (
-				SELECT MAX(id) FROM milestone_releases WHERE state = 'created' GROUP BY milestone_id
-			)
-		) mr ON mr.milestone_id = m.id
-		WHERE m.id = ?
-	`, id)
+	row := s.db.QueryRow(milestoneSelectQuery+"\nWHERE m.id = ?", id)
 
 	m, err := scanMilestoneRow(row)
 	if errors.Is(err, sql.ErrNoRows) {

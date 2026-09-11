@@ -325,6 +325,8 @@ export default {
     removeCurrentStep: 'Удалить текущий шаг',
     dismissNotification: 'Закрыть уведомление',
     mainNavigation: 'Основная навигация',
+    resizeNavigation: 'Изменить ширину боковой панели навигации',
+    sidebarResizeHint: 'Перетащите для изменения размера. Дважды щёлкните для сброса.',
     mentionUsers: 'Упомянуть пользователей',
     notifications: 'Уведомления',
     adminSettings: 'Настройки администратора',

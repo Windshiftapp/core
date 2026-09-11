@@ -45,7 +45,6 @@ import {
   links,
   linkTypes,
   priorities,
-  projectFieldRequirements,
   screens,
 } from './configuration.js';
 import { del, fetchAPI, get, post, put } from './core.js';
@@ -57,6 +56,8 @@ import {
   itemIntegrationLinks,
   todoistSync,
   userIntegrations,
+  zammadConnections,
+  zammadTickets,
 } from './integrations.js';
 // Domain imports
 import { items } from './items.js';
@@ -78,7 +79,6 @@ import {
   jiraImport,
   labels,
   personalLabels,
-  projects,
   reviews,
   search,
   updateComment,
@@ -102,6 +102,7 @@ import {
   portalCustomers,
   portalPasskey,
 } from './portal.js';
+import { queryLanguage } from './queryLanguage.js';
 import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
@@ -120,6 +121,7 @@ import {
   deactivateUser,
   deleteMyAgent,
   deleteUser,
+  getAdminUsers,
   getAgentOwner,
   getApiToken,
   getApiTokens,
@@ -153,9 +155,7 @@ export const api = {
   delete: del,
 
   // Domain objects
-  projects,
   customFields,
-  projectFieldRequirements,
   workspaces,
   workspaceRoles,
   screens,
@@ -164,6 +164,7 @@ export const api = {
 
   // Users (standalone functions)
   getUsers,
+  getAdminUsers,
   getAssignableUsers,
   getUser,
   getAgentOwner,
@@ -237,6 +238,9 @@ export const api = {
 
   // Search
   search,
+
+  // Query language metadata and value help
+  queryLanguage,
 
   // Milestone Categories
   milestoneCategories,
@@ -408,6 +412,10 @@ export const api = {
 
   // Item Integration Links
   itemIntegrationLinks,
+
+  // Zammad ticket integration
+  zammadConnections,
+  zammadTickets,
 
   // OAuth Clients (admin only) — third-party apps registered against the
   // generic OAuth 2.0 server (/api/oauth/authorize + /api/oauth/token)

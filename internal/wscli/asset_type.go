@@ -11,7 +11,7 @@ var assetTypeCmd = &cobra.Command{
 	Use:   "asset-type",
 	Short: "Browse asset types",
 	Long: `Read-only commands for asset types (the schemas that asset rows in a set
-follow). Mutations stay admin-UI-only on v1.`,
+follow). Mutations remain available through the admin UI.`,
 }
 
 var assetTypeListCmd = &cobra.Command{

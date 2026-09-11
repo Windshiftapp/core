@@ -937,6 +937,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		"portal_logo":       true,
 		"portal_background": true,
 		"hub_logo":          true,
+		"theme_logo":        true,
 	}
 
 	if !allowedPortalAssetTypes[entityType] || category != entityType {

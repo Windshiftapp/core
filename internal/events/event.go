@@ -207,7 +207,8 @@ func Permanent(err error) error {
 	return permanentFailure{err: err}
 }
 
-func isPermanent(err error) bool {
+// IsPermanent reports whether an error disables automatic delivery retries.
+func IsPermanent(err error) bool {
 	var target permanentFailure
 	return errors.As(err, &target)
 }

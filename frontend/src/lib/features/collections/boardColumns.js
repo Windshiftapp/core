@@ -18,14 +18,22 @@ const CATEGORY_ORDER = {
   done: 3,
 };
 
+function categoryBuiltinKey(status) {
+  return status.category_builtin_key ?? status.category?.builtin_key;
+}
+
+function categoryColor(status) {
+  return status.category_color ?? status.category?.color;
+}
+
 /**
  * Sorts statuses into board order: To Do -> In Progress -> Done categories,
  * alphabetical within a category.
  */
 export function sortStatusesForBoard(statuses = []) {
   return statuses.slice().sort((a, b) => {
-    const aOrder = CATEGORY_ORDER[a.category_builtin_key] || 999;
-    const bOrder = CATEGORY_ORDER[b.category_builtin_key] || 999;
+    const aOrder = CATEGORY_ORDER[categoryBuiltinKey(a)] || 999;
+    const bOrder = CATEGORY_ORDER[categoryBuiltinKey(b)] || 999;
     if (aOrder !== bOrder) return aOrder - bOrder;
     return a.name.localeCompare(b.name);
   });
@@ -52,7 +60,7 @@ export function buildDisplayColumns(boardConfig, statuses = []) {
     name: status.name,
     builtin_key: status.builtin_key,
     status_ids: [status.id],
-    color: status.category_color,
+    color: categoryColor(status),
     wip_limit: null,
     is_default_column: true,
   }));

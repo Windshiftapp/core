@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // AttachmentDownloadRecord is the persistence projection needed to authorize
@@ -18,6 +19,88 @@ type AttachmentDownloadRecord struct {
 	FilePath         string
 	MimeType         string
 	FileSize         int64
+}
+
+// AttachmentRepository owns attachment metadata lookups.
+type AttachmentRepository struct {
+	db database.Database
+}
+
+// ListItem returns a stable, newest-first page of item attachment metadata.
+func (r *AttachmentRepository) ListItem(itemID, limit, offset int) ([]models.Attachment, int, error) {
+	var total int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM attachments WHERE item_id = ? AND COALESCE(entity_type, 'item') = 'item'`, itemID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count item attachments: %w", err)
+	}
+	rows, err := r.db.Query(`
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
+		       a.uploaded_by, a.has_thumbnail, a.created_at,
+		       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.username, ''),
+		       COALESCE(u.email, '')
+		FROM attachments a
+		LEFT JOIN users u ON u.id = a.uploaded_by
+		WHERE a.item_id = ? AND COALESCE(a.entity_type, 'item') = 'item'
+		ORDER BY a.created_at DESC, a.id DESC
+		LIMIT ? OFFSET ?
+	`, itemID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list item attachments: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	result := make([]models.Attachment, 0, limit)
+	for rows.Next() {
+		var attachment models.Attachment
+		var rowItemID, uploadedBy sql.NullInt64
+		if err := rows.Scan(&attachment.ID, &rowItemID, &attachment.Filename, &attachment.OriginalFilename,
+			&attachment.MimeType, &attachment.FileSize, &uploadedBy, &attachment.HasThumbnail,
+			&attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail); err != nil {
+			return nil, 0, fmt.Errorf("scan item attachment: %w", err)
+		}
+		if rowItemID.Valid {
+			id := int(rowItemID.Int64)
+			attachment.ItemID = &id
+		}
+		if uploadedBy.Valid {
+			id := int(uploadedBy.Int64)
+			attachment.UploadedBy = &id
+		}
+		result = append(result, attachment)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate item attachments: %w", err)
+	}
+	return result, total, nil
+}
+
+func (r *AttachmentRepository) GetItem(id int) (*models.Attachment, error) {
+	var attachment models.Attachment
+	var itemID, uploadedBy sql.NullInt64
+	err := r.db.QueryRow(`
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
+		       a.uploaded_by, a.has_thumbnail, a.created_at,
+		       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.username, ''),
+		       COALESCE(u.email, '')
+		FROM attachments a
+		LEFT JOIN users u ON u.id = a.uploaded_by
+		WHERE a.id = ? AND a.item_id IS NOT NULL AND COALESCE(a.entity_type, 'item') = 'item'
+	`, id).Scan(
+		&attachment.ID, &itemID, &attachment.Filename, &attachment.OriginalFilename,
+		&attachment.MimeType, &attachment.FileSize, &uploadedBy, &attachment.HasThumbnail,
+		&attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get item attachment: %w", err)
+	}
+	item := int(itemID.Int64)
+	attachment.ItemID = &item
+	if uploadedBy.Valid {
+		uploader := int(uploadedBy.Int64)
+		attachment.UploadedBy = &uploader
+	}
+	return &attachment, nil
 }
 
 // AttachmentThumbnailRecord is the persistence projection needed to authorize
@@ -42,11 +125,6 @@ type PageAttachmentRecord struct {
 	FileSize         int64
 	UploadedBy       *int
 	CreatedAt        time.Time
-}
-
-// AttachmentRepository owns attachment metadata lookups.
-type AttachmentRepository struct {
-	db database.Database
 }
 
 type CaptureAttachment struct {

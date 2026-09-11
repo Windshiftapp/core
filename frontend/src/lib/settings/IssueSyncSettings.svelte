@@ -235,10 +235,7 @@
   $effect(() => {
     const itemTypeId = formData.default_item_type_id;
     loadingStatuses = true;
-    const url = itemTypeId
-      ? `/workspaces/${workspaceId}/statuses?item_type_id=${itemTypeId}`
-      : `/workspaces/${workspaceId}/statuses`;
-    api.get(url).then(res => {
+    api.workspaces.getStatuses(workspaceId, itemTypeId).then(res => {
       statuses = res || [];
     }).catch(() => {
       statuses = [];

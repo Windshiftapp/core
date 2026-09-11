@@ -15,7 +15,7 @@ var (
 var searchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search work items by text or CQL filter",
-	Long: `Search items the caller can view via the v1 search endpoint.
+	Long: `Search items the caller can view via the v2 API.
 Multiple arguments are joined into a single query string.
 
 The query may be free text or a structured CQL filter. A query that parses as
@@ -25,7 +25,7 @@ errors instead of silently falling back to text.
 
 The server searches across every accessible workspace; when a workspace is
 configured (via -w, $WS_WORKSPACE, or defaults.workspace_key in ws.toml)
-the returned page is additionally filtered to that workspace client-side.
+	the server scopes the query to that workspace.
 
 Examples:
   ws search "login bug"
@@ -54,28 +54,14 @@ func runItemSearch(query string, limit int, asCQL bool) error {
 		return fmt.Errorf("search query must not be empty")
 	}
 
-	resp, err := client.SearchItems(query, limit, asCQL)
-	if err != nil {
-		return fmt.Errorf("failed to search items: %w", err)
-	}
-
-	// The v1 search endpoint has no workspace filter parameter, so an
-	// effective workspace narrows the returned page client-side.
 	wsID, err := resolveOptionalWorkspace(client)
 	if err != nil {
 		return err
 	}
-	if wsID != nil {
-		filtered := make([]Item, 0, len(resp.Data))
-		for _, item := range resp.Data {
-			if item.WorkspaceID == *wsID {
-				filtered = append(filtered, item)
-			}
-		}
-		NewOutput().Print(filtered)
-		return nil
+	resp, err := client.SearchItems(query, limit, asCQL, wsID)
+	if err != nil {
+		return fmt.Errorf("failed to search items: %w", err)
 	}
-
 	NewOutput().Print(resp)
 	return nil
 }

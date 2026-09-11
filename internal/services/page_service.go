@@ -47,6 +47,14 @@ func (s *PageService) SetPageLabelRepository(repo *repository.PageLabelRepositor
 	s.pageLabels = repo
 }
 
+func (s *PageService) pageByIDTx(tx database.Tx, pageID int) (*models.Page, error) {
+	page, err := s.pages.GetByIDTx(tx, pageID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrPageNotFound
+	}
+	return page, err
+}
+
 // PreloadLabels populates Labels on each page when a page-label repository
 // is wired. Safe to call on an empty slice or when the repo is unset.
 func (s *PageService) PreloadLabels(pages []models.Page) error {
@@ -281,60 +289,16 @@ func (s *PageService) Update(actorID int, in UpdatePageInput) (*models.Page, err
 // is preserved (no frac_index write).
 func (s *PageService) Move(actorID, pageID int, newParentID, prevSiblingID, nextSiblingID *int) (*models.Page, error) {
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
-
-		var (
-			newPath  string
-			newDepth int
-		)
-		if newParentID == nil {
-			newPath = "/"
-			newDepth = 0
-		} else {
-			cyclic, cErr := s.pages.WouldCreatePageCycleTx(tx, pageID, *newParentID)
-			if cErr != nil {
-				return nil, cErr
-			}
-			if cyclic {
-				return nil, ErrPageCycle
-			}
-			parent, pErr := s.pages.GetByIDTx(tx, *newParentID)
-			if pErr != nil {
-				if errors.Is(pErr, repository.ErrNotFound) {
-					return nil, ErrPageNotFound
-				}
-				return nil, pErr
-			}
-			if parent.WorkspaceID != page.WorkspaceID {
-				return nil, ErrPageParentMismatch
-			}
-			newDepth = parent.Depth + 1
-			if newDepth >= repository.MaxPageDepth {
-				return nil, ErrPageDepthExceeded
-			}
-			newPath = parent.Path + fmt.Sprintf("%d/", parent.ID)
+		destination, err := s.resolvePageMoveDestinationTx(tx, pageID, page.WorkspaceID, newParentID, true)
+		if err != nil {
+			return nil, err
 		}
-
-		// Check the deepest descendant once so the moved subtree stays within the depth cap.
-		descendantPrefix := page.Path + fmt.Sprintf("%d/", page.ID)
-		var deepestDescendant sql.NullInt64
-		if err := tx.QueryRow(
-			`SELECT MAX(depth) FROM pages WHERE workspace_id = ? AND path LIKE ?`,
-			page.WorkspaceID, descendantPrefix+"%",
-		).Scan(&deepestDescendant); err != nil {
-			return nil, fmt.Errorf("measure subtree depth: %w", err)
-		}
-		if deepestDescendant.Valid {
-			shifted := int(deepestDescendant.Int64) - page.Depth + newDepth
-			if shifted >= repository.MaxPageDepth {
-				return nil, ErrPageDepthExceeded
-			}
+		if err := s.validateStoredSubtreeMoveDepthTx(tx, page, destination.depth); err != nil {
+			return nil, err
 		}
 
 		// Recompute the rank when siblings or the parent change, backfilling missing neighbor keys.
@@ -344,21 +308,13 @@ func (s *PageService) Move(actorID, pageID int, newParentID, prevSiblingID, next
 			return nil, err
 		}
 
-		if err := s.pages.MoveTx(tx, pageID, newParentID, newPath, newDepth, actorID, newFracIndex); err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
-			// Translate a rank collision to the handler's conflict response.
-			if errors.Is(err, repository.ErrDuplicateEntry) {
-				return nil, ErrPageUniqueConflict
-			}
-			return nil, err
+		if err := s.pages.MoveTx(tx, pageID, newParentID, destination.path, destination.depth, actorID, newFracIndex); err != nil {
+			return nil, pageMoveError(err)
 		}
 
-		// Rewrite every descendant path and depth under the new prefix.
 		oldPrefix := page.Path + fmt.Sprintf("%d/", page.ID)
-		newPrefix := newPath + fmt.Sprintf("%d/", pageID)
-		depthShift := newDepth + 1 - (page.Depth + 1)
+		newPrefix := destination.path + fmt.Sprintf("%d/", pageID)
+		depthShift := destination.depth - page.Depth
 		if oldPrefix != newPrefix || depthShift != 0 {
 			_, execErr := tx.Exec(`
 				UPDATE pages
@@ -371,16 +327,7 @@ func (s *PageService) Move(actorID, pageID int, newParentID, prevSiblingID, next
 				return nil, fmt.Errorf("rewrite descendant paths: %w", execErr)
 			}
 		}
-
-		moved, err := s.pages.GetByIDTx(tx, pageID)
-		if err != nil {
-			return nil, err
-		}
-		// Content is unchanged, but record the parent/path change in a revision.
-		if _, err := s.writeRevisionTx(tx, moved, actorID, models.PageRevisionChangeTypeMove, ""); err != nil {
-			return nil, err
-		}
-		return moved, nil
+		return s.finishPageMoveTx(tx, pageID, actorID, "")
 	})
 }
 
@@ -391,11 +338,8 @@ func (s *PageService) Move(actorID, pageID int, newParentID, prevSiblingID, next
 // not workspace-scoped.
 func (s *PageService) MoveAcrossWorkspace(actorID, pageID, destinationWorkspaceID int, newParentID, prevSiblingID, nextSiblingID *int) (*models.Page, error) {
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
 		if page.WorkspaceID == destinationWorkspaceID {
@@ -410,32 +354,11 @@ func (s *PageService) MoveAcrossWorkspace(actorID, pageID, destinationWorkspaceI
 			return nil, ErrPageNotFound
 		}
 
-		var newPath string
-		newDepth := 0
-		if newParentID == nil {
-			newPath = "/"
-		} else {
-			parent, parentErr := s.pages.GetByIDTx(tx, *newParentID)
-			if parentErr != nil {
-				if errors.Is(parentErr, repository.ErrNotFound) {
-					return nil, ErrPageNotFound
-				}
-				return nil, parentErr
-			}
-			if parent.WorkspaceID != destinationWorkspaceID {
-				return nil, ErrPageParentMismatch
-			}
-			newDepth = parent.Depth + 1
-			newPath = parent.Path + fmt.Sprintf("%d/", parent.ID)
+		destination, err := s.resolvePageMoveDestinationTx(tx, pageID, destinationWorkspaceID, newParentID, false)
+		if err != nil {
+			return nil, err
 		}
-
-		deepestDepth := page.Depth
-		for i := range subtree {
-			if subtree[i].Depth > deepestDepth {
-				deepestDepth = subtree[i].Depth
-			}
-		}
-		if deepestDepth-page.Depth+newDepth >= repository.MaxPageDepth {
+		if subtreeMoveExceedsDepth(page.Depth, deepestPageDepth(page.Depth, subtree), destination.depth) {
 			return nil, ErrPageDepthExceeded
 		}
 
@@ -443,61 +366,126 @@ func (s *PageService) MoveAcrossWorkspace(actorID, pageID, destinationWorkspaceI
 		if err != nil {
 			return nil, err
 		}
-		if err := s.pages.MoveAcrossWorkspaceTx(tx, pageID, destinationWorkspaceID, newParentID, newPath, newDepth, actorID, newFracIndex); err != nil {
-			if errors.Is(err, repository.ErrDuplicateEntry) {
-				return nil, ErrPageUniqueConflict
-			}
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
-			return nil, err
+		if err := s.pages.MoveAcrossWorkspaceTx(tx, pageID, destinationWorkspaceID, newParentID, destination.path, destination.depth, actorID, newFracIndex); err != nil {
+			return nil, pageMoveError(err)
 		}
-
-		oldPrefix := page.Path + fmt.Sprintf("%d/", page.ID)
-		newPrefix := newPath + fmt.Sprintf("%d/", page.ID)
-		depthShift := newDepth - page.Depth
-		pageIDs := make([]int, 0, len(subtree))
-		pageIDs = append(pageIDs, page.ID)
-		for i := range subtree {
-			descendant := &subtree[i]
-			if descendant.ID == page.ID {
-				continue
-			}
-			if !strings.HasPrefix(descendant.Path, oldPrefix) {
-				return nil, fmt.Errorf("page %d is outside subtree prefix %q", descendant.ID, oldPrefix)
-			}
-			descendantPath := newPrefix + strings.TrimPrefix(descendant.Path, oldPrefix)
-			if err := s.pages.MoveAcrossWorkspaceTx(
-				tx,
-				descendant.ID,
-				destinationWorkspaceID,
-				descendant.ParentID,
-				descendantPath,
-				descendant.Depth+depthShift,
-				actorID,
-				descendant.FracIndex,
-			); err != nil {
-				if errors.Is(err, repository.ErrDuplicateEntry) {
-					return nil, ErrPageUniqueConflict
-				}
-				return nil, err
-			}
-			pageIDs = append(pageIDs, descendant.ID)
-		}
-
-		if err := s.rehomePageSubtreeRelationsTx(tx, pageIDs, destinationWorkspaceID, actorID); err != nil {
-			return nil, err
-		}
-
-		moved, err := s.pages.GetByIDTx(tx, pageID)
+		pageIDs, err := s.movePageDescendantsAcrossWorkspaceTx(tx, page, subtree, destinationWorkspaceID, destination, actorID)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.writeRevisionTx(tx, moved, actorID, models.PageRevisionChangeTypeMove, "Moved to another workspace"); err != nil {
+		if err := s.rehomePageSubtreeRelationsTx(tx, pageIDs, destinationWorkspaceID, actorID); err != nil {
 			return nil, err
 		}
-		return moved, nil
+		return s.finishPageMoveTx(tx, pageID, actorID, "Moved to another workspace")
 	})
+}
+
+type pageMoveDestination struct {
+	path  string
+	depth int
+}
+
+func (s *PageService) resolvePageMoveDestinationTx(tx database.Tx, pageID, workspaceID int, parentID *int, preventCycle bool) (pageMoveDestination, error) {
+	if parentID == nil {
+		return pageMoveDestination{path: "/"}, nil
+	}
+	if preventCycle {
+		cyclic, err := s.pages.WouldCreatePageCycleTx(tx, pageID, *parentID)
+		if err != nil {
+			return pageMoveDestination{}, err
+		}
+		if cyclic {
+			return pageMoveDestination{}, ErrPageCycle
+		}
+	}
+	parent, err := s.pageByIDTx(tx, *parentID)
+	if err != nil {
+		return pageMoveDestination{}, err
+	}
+	if parent.WorkspaceID != workspaceID {
+		return pageMoveDestination{}, ErrPageParentMismatch
+	}
+	destination := pageMoveDestination{
+		path:  parent.Path + fmt.Sprintf("%d/", parent.ID),
+		depth: parent.Depth + 1,
+	}
+	if destination.depth >= repository.MaxPageDepth {
+		return pageMoveDestination{}, ErrPageDepthExceeded
+	}
+	return destination, nil
+}
+
+func (s *PageService) validateStoredSubtreeMoveDepthTx(tx database.Tx, page *models.Page, newDepth int) error {
+	prefix := page.Path + fmt.Sprintf("%d/", page.ID)
+	var deepestDescendant sql.NullInt64
+	if err := tx.QueryRow(
+		`SELECT MAX(depth) FROM pages WHERE workspace_id = ? AND path LIKE ?`,
+		page.WorkspaceID, prefix+"%",
+	).Scan(&deepestDescendant); err != nil {
+		return fmt.Errorf("measure subtree depth: %w", err)
+	}
+	if deepestDescendant.Valid && subtreeMoveExceedsDepth(page.Depth, int(deepestDescendant.Int64), newDepth) {
+		return ErrPageDepthExceeded
+	}
+	return nil
+}
+
+func subtreeMoveExceedsDepth(oldRootDepth, deepestDepth, newRootDepth int) bool {
+	return deepestDepth-oldRootDepth+newRootDepth >= repository.MaxPageDepth
+}
+
+func deepestPageDepth(rootDepth int, subtree []models.Page) int {
+	deepest := rootDepth
+	for i := range subtree {
+		if subtree[i].Depth > deepest {
+			deepest = subtree[i].Depth
+		}
+	}
+	return deepest
+}
+
+func (s *PageService) movePageDescendantsAcrossWorkspaceTx(tx database.Tx, page *models.Page, subtree []models.Page, workspaceID int, destination pageMoveDestination, actorID int) ([]int, error) {
+	oldPrefix := page.Path + fmt.Sprintf("%d/", page.ID)
+	newPrefix := destination.path + fmt.Sprintf("%d/", page.ID)
+	depthShift := destination.depth - page.Depth
+	pageIDs := make([]int, 0, len(subtree))
+	pageIDs = append(pageIDs, page.ID)
+	for i := range subtree {
+		descendant := &subtree[i]
+		if descendant.ID == page.ID {
+			continue
+		}
+		if !strings.HasPrefix(descendant.Path, oldPrefix) {
+			return nil, fmt.Errorf("page %d is outside subtree prefix %q", descendant.ID, oldPrefix)
+		}
+		descendantPath := newPrefix + strings.TrimPrefix(descendant.Path, oldPrefix)
+		if err := s.pages.MoveAcrossWorkspaceTx(tx, descendant.ID, workspaceID, descendant.ParentID, descendantPath, descendant.Depth+depthShift, actorID, descendant.FracIndex); err != nil {
+			return nil, pageMoveError(err)
+		}
+		pageIDs = append(pageIDs, descendant.ID)
+	}
+	return pageIDs, nil
+}
+
+func (s *PageService) finishPageMoveTx(tx database.Tx, pageID, actorID int, summary string) (*models.Page, error) {
+	moved, err := s.pageByIDTx(tx, pageID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.writeRevisionTx(tx, moved, actorID, models.PageRevisionChangeTypeMove, summary); err != nil {
+		return nil, err
+	}
+	return moved, nil
+}
+
+func pageMoveError(err error) error {
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrPageNotFound
+	}
+	if errors.Is(err, repository.ErrDuplicateEntry) {
+		return ErrPageUniqueConflict
+	}
+	return err
 }
 
 // rehomePageSubtreeRelationsTx applies the explicit cross-workspace policy:
@@ -509,18 +497,64 @@ func (s *PageService) rehomePageSubtreeRelationsTx(tx database.Tx, pageIDs []int
 	if len(pageIDs) == 0 {
 		return nil
 	}
+	query := newPageIDQuery(pageIDs)
+	assignments, err := loadPageLabelAssignmentsTx(tx, query.idList, query.args)
+	if err != nil {
+		return err
+	}
+	destinationLabels, err := loadPageLabelsByNameTx(tx, destinationWorkspaceID)
+	if err != nil {
+		return err
+	}
+	if err := remapPageLabelsTx(tx, query.idList, query.args, assignments, destinationLabels); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM page_permissions WHERE page_id IN (`+query.idList+`)`, query.args...); err != nil {
+		return fmt.Errorf("clear page permissions during workspace move: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM workspace_agent_skill_pages WHERE page_id IN (`+query.idList+`)`, query.args...); err != nil {
+		return fmt.Errorf("clear workspace skill page references during workspace move: %w", err)
+	}
+	linkArgs := append(append([]any{}, query.args...), query.args...)
+	metadata := itemevents.User(actorID, "application")
+	if err := itemevents.NewRecorder(s.db).RemovedLinks(context.Background(), tx, "page", pageIDs, metadata); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		DELETE FROM item_links
+		WHERE (source_type = 'page' AND source_id IN (`+query.idList+`))
+		   OR (target_type = 'page' AND target_id IN (`+query.idList+`))
+	`, linkArgs...); err != nil {
+		return fmt.Errorf("clear page links during workspace move: %w", err)
+	}
+	chunkArgs := append([]any{destinationWorkspaceID}, query.args...)
+	if _, err := tx.Exec(`UPDATE page_chunks SET workspace_id = ? WHERE page_id IN (`+query.idList+`)`, chunkArgs...); err != nil {
+		return fmt.Errorf("rehome page chunks during workspace move: %w", err)
+	}
+	return nil
+}
+
+type pageLabelAssignment struct {
+	pageID int
+	name   string
+}
+
+type pageIDQuery struct {
+	idList string
+	args   []any
+}
+
+func newPageIDQuery(pageIDs []int) pageIDQuery {
 	placeholders := make([]string, len(pageIDs))
 	args := make([]any, len(pageIDs))
 	for i, pageID := range pageIDs {
 		placeholders[i] = "?"
 		args[i] = pageID
 	}
-	idList := strings.Join(placeholders, ",")
+	return pageIDQuery{idList: strings.Join(placeholders, ","), args: args}
+}
 
-	type labelAssignment struct {
-		pageID int
-		name   string
-	}
+func loadPageLabelAssignmentsTx(tx database.Tx, idList string, args []any) ([]pageLabelAssignment, error) {
 	rows, err := tx.Query(`
 		SELECT a.page_id, l.name
 		FROM page_label_assignments a
@@ -528,47 +562,53 @@ func (s *PageService) rehomePageSubtreeRelationsTx(tx database.Tx, pageIDs []int
 		WHERE a.page_id IN (`+idList+`)
 	`, args...)
 	if err != nil {
-		return fmt.Errorf("load page labels before workspace move: %w", err)
+		return nil, fmt.Errorf("load page labels before workspace move: %w", err)
 	}
-	assignments := make([]labelAssignment, 0)
+	assignments := make([]pageLabelAssignment, 0)
 	for rows.Next() {
-		var assignment labelAssignment
+		var assignment pageLabelAssignment
 		if err := rows.Scan(&assignment.pageID, &assignment.name); err != nil {
 			_ = rows.Close()
-			return fmt.Errorf("scan page label before workspace move: %w", err)
+			return nil, fmt.Errorf("scan page label before workspace move: %w", err)
 		}
 		assignments = append(assignments, assignment)
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
-		return fmt.Errorf("iterate page labels before workspace move: %w", err)
+		return nil, fmt.Errorf("iterate page labels before workspace move: %w", err)
 	}
 	if err := rows.Close(); err != nil {
-		return fmt.Errorf("close page label rows: %w", err)
+		return nil, fmt.Errorf("close page label rows: %w", err)
 	}
+	return assignments, nil
+}
 
-	destinationLabels := make(map[string]int)
-	labelRows, err := tx.Query(`SELECT id, name FROM page_labels WHERE workspace_id = ?`, destinationWorkspaceID)
+func loadPageLabelsByNameTx(tx database.Tx, workspaceID int) (map[string]int, error) {
+	rows, err := tx.Query(`SELECT id, name FROM page_labels WHERE workspace_id = ?`, workspaceID)
 	if err != nil {
-		return fmt.Errorf("load destination page labels: %w", err)
+		return nil, fmt.Errorf("load destination page labels: %w", err)
 	}
-	for labelRows.Next() {
+	labels := make(map[string]int)
+	for rows.Next() {
 		var id int
 		var name string
-		if err := labelRows.Scan(&id, &name); err != nil {
-			_ = labelRows.Close()
-			return fmt.Errorf("scan destination page label: %w", err)
+		if err := rows.Scan(&id, &name); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("scan destination page label: %w", err)
 		}
-		destinationLabels[name] = id
+		labels[name] = id
 	}
-	if err := labelRows.Err(); err != nil {
-		_ = labelRows.Close()
-		return fmt.Errorf("iterate destination page labels: %w", err)
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, fmt.Errorf("iterate destination page labels: %w", err)
 	}
-	if err := labelRows.Close(); err != nil {
-		return fmt.Errorf("close destination page label rows: %w", err)
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close destination page label rows: %w", err)
 	}
+	return labels, nil
+}
 
+func remapPageLabelsTx(tx database.Tx, idList string, args []any, assignments []pageLabelAssignment, destinationLabels map[string]int) error {
 	if _, err := tx.Exec(`DELETE FROM page_label_assignments WHERE page_id IN (`+idList+`)`, args...); err != nil {
 		return fmt.Errorf("clear page labels during workspace move: %w", err)
 	}
@@ -580,29 +620,6 @@ func (s *PageService) rehomePageSubtreeRelationsTx(tx database.Tx, pageIDs []int
 		if _, err := tx.Exec(`INSERT INTO page_label_assignments (page_id, page_label_id) VALUES (?, ?)`, assignment.pageID, destinationLabelID); err != nil {
 			return fmt.Errorf("remap page label %q during workspace move: %w", assignment.name, err)
 		}
-	}
-
-	if _, err := tx.Exec(`DELETE FROM page_permissions WHERE page_id IN (`+idList+`)`, args...); err != nil {
-		return fmt.Errorf("clear page permissions during workspace move: %w", err)
-	}
-	if _, err := tx.Exec(`DELETE FROM workspace_agent_skill_pages WHERE page_id IN (`+idList+`)`, args...); err != nil {
-		return fmt.Errorf("clear workspace skill page references during workspace move: %w", err)
-	}
-	linkArgs := append(append([]any{}, args...), args...)
-	metadata := itemevents.User(actorID, "application")
-	if err := itemevents.NewRecorder(s.db).RemovedLinks(context.Background(), tx, "page", pageIDs, metadata); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`
-		DELETE FROM item_links
-		WHERE (source_type = 'page' AND source_id IN (`+idList+`))
-		   OR (target_type = 'page' AND target_id IN (`+idList+`))
-	`, linkArgs...); err != nil {
-		return fmt.Errorf("clear page links during workspace move: %w", err)
-	}
-	chunkArgs := append([]any{destinationWorkspaceID}, args...)
-	if _, err := tx.Exec(`UPDATE page_chunks SET workspace_id = ? WHERE page_id IN (`+idList+`)`, chunkArgs...); err != nil {
-		return fmt.Errorf("rehome page chunks during workspace move: %w", err)
 	}
 	return nil
 }
@@ -624,11 +641,8 @@ func (s *PageService) Archive(actorID, pageID int) error {
 // inserted between an out-of-transaction descendant scan and the archive UPDATE.
 func (s *PageService) ArchiveChecked(actorID, pageID int, authorize func([]models.Page) error) error {
 	return database.WithTx(s.db, func(tx database.Tx) error {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return ErrPageNotFound
-			}
 			return err
 		}
 
@@ -718,17 +732,18 @@ func (s *PageService) ListRevisions(pageID, limit, offset int) ([]models.PageRev
 	return s.pages.ListRevisions(pageID, limit, offset)
 }
 
+func (s *PageService) CountRevisions(pageID int) (int, error) {
+	return s.pages.CountRevisions(pageID)
+}
+
 // Restore overwrites a page's live content/title with the snapshot stored
 // in the given revision and records a new revision of change_type
 // 'restore'. The revision must belong to the same page; cross-page
 // restores return ErrPageRevisionMismatch.
 func (s *PageService) Restore(actorID, pageID, revisionID int) (*models.Page, error) {
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
 		rev, err := s.pages.GetRevisionByIDTx(tx, revisionID)
@@ -793,11 +808,8 @@ func (s *PageService) ListArchived(workspaceID int) ([]repository.ArchivedPageRo
 // existing Restore semantics.
 func (s *PageService) Unarchive(actorID, pageID int) (*models.Page, error) {
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
 		if page.ArchivedAt == nil {
@@ -917,8 +929,7 @@ func (s *PageService) SearchByKeyword(workspaceID int, query string, limit int) 
 }
 
 // BuildPageTree turns a flat ordered page list (typically from ListTree)
-// into a nested PageNode tree suitable for direct rendering in the
-// frontend.
+// into a nested PageNode tree suitable for direct rendering in internal tools.
 func BuildPageTree(pages []models.Page) []*models.PageNode {
 	byID := make(map[int]*models.PageNode, len(pages))
 	for i := range pages {
@@ -934,9 +945,7 @@ func BuildPageTree(pages []models.Page) []*models.PageNode {
 		}
 		parent, ok := byID[*pages[i].ParentID]
 		if !ok {
-			// Orphaned (e.g., parent was archived but this page wasn't —
-			// shouldn't happen in normal flow). Promote to a root so the UI
-			// still renders it instead of dropping it silently.
+			// Promote orphans so callers do not silently drop visible pages.
 			roots = append(roots, node)
 			continue
 		}
@@ -992,11 +1001,8 @@ func (s *PageService) GrantPermission(actorID, pageID int, principalType string,
 	}
 
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.PagePermission, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
 
@@ -1042,11 +1048,8 @@ func (s *PageService) GrantPermission(actorID, pageID int, principalType string,
 // hand.
 func (s *PageService) RevokePermission(actorID, pageID, permissionID int) error {
 	return database.WithTx(s.db, func(tx database.Tx) error {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return ErrPageNotFound
-			}
 			return err
 		}
 		if err := s.pages.RevokePermissionTx(tx, pageID, permissionID); err != nil {
@@ -1066,11 +1069,8 @@ func (s *PageService) RevokePermission(actorID, pageID, permissionID int) error 
 // flip the flag.
 func (s *PageService) SetInheritPermissions(actorID, pageID int, inherit bool) (*models.Page, error) {
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		page, err := s.pages.GetByIDTx(tx, pageID)
+		page, err := s.pageByIDTx(tx, pageID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrPageNotFound
-			}
 			return nil, err
 		}
 		if page.InheritPermissions == inherit {

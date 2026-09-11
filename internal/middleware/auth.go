@@ -88,12 +88,12 @@ func (am *AuthMiddleware) tryAuthenticate(r *http.Request) authResult {
 		// Fall through to try other auth methods
 	}
 
-	// Only v1 accepts crw_* tokens; accepting them here bypasses token scopes.
+	// Only bearer REST mounts accept crw_* tokens; accepting them here bypasses scopes.
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		if strings.HasPrefix(token, "crw_") {
-			return authResult{errorMessage: "API tokens authenticate only on /rest/api/v1/* — see https://docs.windshift.app/api/v1"}
+			return authResult{errorMessage: "API tokens authenticate only on /rest/api/*"}
 		}
 	}
 

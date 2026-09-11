@@ -106,6 +106,11 @@ const (
 	RoleEditor        = "Editor"
 	RoleAdministrator = "Administrator"
 	RoleTester        = "Tester"
+
+	RoleBuiltinViewer        = "viewer"
+	RoleBuiltinEditor        = "editor"
+	RoleBuiltinAdministrator = "administrator"
+	RoleBuiltinTester        = "tester"
 )
 
 // UserPermissionSummary provides a complete overview of a user's permissions

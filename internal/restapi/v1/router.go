@@ -2,10 +2,13 @@
 //
 // Only /rest/api/v1 accepts crw_* bearer tokens; /api uses session auth and
 // /api/internal uses the sidecar secret. Routes must enforce token scope and
-// resource access. System admins never bypass token scopes.
+// resource access. Browser application code must never hold these tokens or
+// call this surface. System admins never bypass token scopes.
 package v1
 
 import (
+	"net/http"
+
 	coremiddleware "windshift/internal/middleware"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
@@ -15,6 +18,14 @@ import (
 	"windshift/internal/router"
 	"windshift/internal/services"
 )
+
+func deprecationHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Deprecation", "true")
+		w.Header().Set("Link", `</rest/api/v2/openapi.json>; rel="successor-version"`)
+		next.ServeHTTP(w, r)
+	})
+}
 
 // RegisterRoutes registers all v1 API routes on the given ServeMux
 func RegisterRoutes(deps restapi.Deps) {
@@ -36,7 +47,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	itemHandler := handlers.NewItemHandler(db, permissionService, deps.CommentService, deps.ItemCreationService)
 	itemHandler.SetItemUpdateApplicationService(deps.ItemUpdateApplicationService)
 	itemHandler.SetItemDeletionApplicationService(deps.ItemDeletionApplicationService)
-	workspaceHandler := handlers.NewWorkspaceHandler(db, permissionService)
+	workspaceHandler := handlers.NewWorkspaceHandler(db, permissionService, deps.AuthorizationCacheInvalidator)
 	statusHandler := handlers.NewStatusHandler(db, permissionService, objectTranslationService)
 	workflowHandler := handlers.NewWorkflowHandler(db, permissionService)
 	itemTypeHandler := handlers.NewItemTypeHandler(db, permissionService, objectTranslationService)
@@ -50,6 +61,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 	actionHandler := handlers.NewActionHandler(db, permissionService, deps.ActionService)
+	actionHandler.SetAssetService(deps.AssetService)
 	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.AttachmentPath)
 	pagePermissionService := services.NewPagePermissionService(db, permissionService)
 	pageApplicationService := deps.PageApplicationService
@@ -106,16 +118,17 @@ func RegisterRoutes(deps restapi.Deps) {
 	// RequireAuth — the OpenAPI document describes the public surface and
 	// has to be fetchable by clients that don't yet have a token.
 	publicV1 := router.NewRouteGroup(mux, "/rest/api/v1",
+		deprecationHeaders,
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
 		rateLimiter.Middleware,
 	)
 	publicV1.Handle("GET /openapi.json", handlers.OpenAPISpecJSON)
-	publicV1.Handle("GET /openapi.yaml", handlers.OpenAPISpecYAML)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter
 	v1 := router.NewRouteGroup(mux, "/rest/api/v1",
+		deprecationHeaders,
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
 		bearerAuth.RequireAuth,
@@ -249,6 +262,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	v1.HandleWithMiddleware("POST /workspaces/{id}/actions/validate", actionHandler.ValidateAction, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /workspaces/{id}/actions/{actionId}", actionHandler.GetAction, bearerAuth.RequirePermission("actions:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("PUT /workspaces/{id}/actions/{actionId}", actionHandler.UpdateAction, bearerAuth.RequirePermission("actions:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("DELETE /workspaces/{id}/actions/{actionId}", actionHandler.DeleteAction, bearerAuth.RequirePermission("actions:write"), router.RequireNumericID)
 
 	v1.HandleWithMiddleware("GET /workspaces/{id}/pages", pageHandler.List, bearerAuth.RequirePermission("pages:read"), router.RequireNumericID)
 	// Literal "search" segment; the ServeMux prefers it over the {pageId}
@@ -507,7 +521,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	v1.HandleWithMiddleware("DELETE /timer/stop", activeTimerHandler.StopTimer, bearerAuth.RequirePermission("time:write"))
 
 	adminUserHandler := handlers.NewAdminUserHandler(db, permissionService)
-	adminGroupHandler := handlers.NewAdminGroupHandler(db, permissionService)
+	adminGroupHandler := handlers.NewAdminGroupHandler(db, permissionService, deps.AuthorizationCacheInvalidator)
 	adminAuditLogHandler := handlers.NewAdminAuditLogHandler(db, permissionService)
 	adminAPITokenHandler := handlers.NewAdminAPITokenHandler(db, tokenManager, permissionService)
 	objectTranslationHandler := handlers.NewObjectTranslationHandler(

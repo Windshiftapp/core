@@ -31,7 +31,7 @@
     states: { open },
   } = createPopover({
     forceVisible: true,
-    positioning: { placement: 'bottom-end' },
+    positioning: { strategy: 'fixed', placement: 'bottom-end', fitViewport: true },
     portal: 'body',
   });
 
@@ -214,7 +214,7 @@
           {/if}
         </p>
       {:else}
-        <ul class="list">
+        <ul class="list" data-testid="page-work-items-search-list">
           {#each searchResults as result, index}
             {@const isHighlighted = highlightedIndex === index}
             <li>
@@ -334,6 +334,7 @@
     overflow: hidden;
   }
   .popover-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -363,6 +364,7 @@
   }
 
   .search-row {
+    flex-shrink: 0;
     padding: 0.5rem;
     border-bottom: 1px solid var(--ds-border);
   }
@@ -389,6 +391,8 @@
   }
 
   .list {
+    min-height: 0;
+    overscroll-behavior: contain;
     list-style: none;
     padding: 0.25rem;
     margin: 0;

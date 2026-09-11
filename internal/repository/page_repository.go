@@ -848,6 +848,14 @@ func (r *PageRepository) ListRevisions(pageID, limit, offset int) ([]models.Page
 	return out, rows.Err()
 }
 
+func (r *PageRepository) CountRevisions(pageID int) (int, error) {
+	var total int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM page_revisions WHERE page_id = ?", pageID).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count page revisions: %w", err)
+	}
+	return total, nil
+}
+
 // --- ACL ---
 
 // GrantPermissionTx inserts an ACL row inside an existing tx. Returns the

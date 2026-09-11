@@ -147,24 +147,53 @@ func (r *TimeProjectRepository) ListDetailsFiltered(filter TimeProjectListFilter
 
 // Create inserts a project and populates its generated ID and timestamps.
 func (r *TimeProjectRepository) Create(project *models.TimeProject) error {
-	settings, err := encodeTimeProjectSettings(project.Settings)
+	now := time.Now()
+	id, err := insertTimeProject(r.db.QueryRow, project, now)
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	var id int64
-	err = r.db.QueryRow(`
-		INSERT INTO time_projects (customer_id, category_id, name, description, status, color, hourly_rate, settings, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, project.CustomerID, project.CategoryID, project.Name, project.Description, project.Status,
-		project.Color, project.HourlyRate, settings, now, now).Scan(&id)
-	if err != nil {
-		return fmt.Errorf("create time project: %w", err)
-	}
-	project.ID = int(id)
-	project.CreatedAt = now
-	project.UpdatedAt = now
+	project.ID, project.CreatedAt, project.UpdatedAt = id, now, now
 	return nil
+}
+
+// CreateWithManager atomically creates a project and assigns its creator.
+func (r *TimeProjectRepository) CreateWithManager(project *models.TimeProject, creatorID int) error {
+	now := time.Now()
+	var id int
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		var err error
+		id, err = insertTimeProject(tx.QueryRow, project, now)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecWrite(`INSERT INTO time_project_managers (project_id, manager_type, manager_id, granted_by)
+   VALUES (?, 'user', ?, ?)`, id, creatorID, creatorID)
+		if err != nil {
+			return fmt.Errorf("assign project creator: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	project.ID, project.CreatedAt, project.UpdatedAt = id, now, now
+	return nil
+}
+
+func insertTimeProject(queryRow func(string, ...any) *sql.Row, project *models.TimeProject, now time.Time) (int, error) {
+	settings, err := encodeTimeProjectSettings(project.Settings)
+	if err != nil {
+		return 0, err
+	}
+	var id int
+	err = queryRow(`INSERT INTO time_projects
+  (customer_id, category_id, name, description, status, color, hourly_rate, settings, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`, project.CustomerID, project.CategoryID,
+		project.Name, project.Description, project.Status, project.Color, project.HourlyRate, settings, now, now).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("create time project: %w", err)
+	}
+	return id, nil
 }
 
 // FindIDByNameAndCustomer returns a project with the exact import identity.

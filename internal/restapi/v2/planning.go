@@ -1,0 +1,608 @@
+package v2
+
+import (
+	"errors"
+	"net/http"
+	"strconv"
+
+	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/services"
+)
+
+func registerPlanningRoutes(builder *routeBuilder, planning planningApplication) {
+	builder.Page("/milestones", AuthAuthenticated, []string{"milestones:read"}, listMilestones(planning, false))
+	builder.JSON(http.MethodPost, "/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"milestones:write"}, createMilestone(planning, false))
+	builder.Page("/workspaces/{workspace_id}/milestones", AuthAuthenticated, []string{"items:read"}, listMilestones(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createMilestone(planning, true))
+	builder.Read("/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:read"}, getMilestone(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchMilestone(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/milestones/{milestone_id}", AuthAuthenticated, []string{"items:delete"}, deleteMilestone(planning))
+	builder.Read("/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:read"}, getMilestone(planning))
+	builder.JSON(http.MethodPatch, "/milestones/{milestone_id}", http.StatusOK, true, AuthAuthenticated, []string{"milestones:write"}, patchMilestone(planning))
+	builder.Command(http.MethodDelete, "/milestones/{milestone_id}", AuthAuthenticated, []string{"milestones:delete"}, deleteMilestone(planning))
+	builder.JSON(http.MethodPost, "/milestones/{milestone_id}/release", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, releaseMilestone(planning))
+	builder.Read("/milestones/{milestone_id}/progress", AuthAuthenticated, []string{"milestones:read"}, milestoneProgress(planning))
+	builder.Read("/milestones/{milestone_id}/test-statistics", AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatistics(planning))
+	builder.JSON(http.MethodPost, "/milestones/test-statistics", http.StatusOK, false, AuthAuthenticated, []string{"milestones:read"}, milestoneTestStatisticsBatch(planning))
+	builder.JSON(http.MethodPost, "/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"milestones:write"}, reorderMilestones(planning, false))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/milestones/reorder", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, reorderMilestones(planning, true))
+
+	builder.Page("/iterations", AuthAuthenticated, []string{"iterations:read"}, listIterations(planning, false))
+	builder.JSON(http.MethodPost, "/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"iterations:write"}, createIteration(planning, false))
+	builder.Page("/workspaces/{workspace_id}/iterations", AuthAuthenticated, []string{"items:read"}, listIterations(planning, true))
+	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/iterations", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, createIteration(planning, true))
+	builder.Read("/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:read"}, getIteration(planning))
+	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, patchIteration(planning))
+	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/iterations/{iteration_id}", AuthAuthenticated, []string{"items:delete"}, deleteIteration(planning))
+	builder.Read("/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:read"}, getIteration(planning))
+	builder.JSON(http.MethodPatch, "/iterations/{iteration_id}", http.StatusOK, true, AuthAuthenticated, []string{"iterations:write"}, patchIteration(planning))
+	builder.Command(http.MethodDelete, "/iterations/{iteration_id}", AuthAuthenticated, []string{"iterations:delete"}, deleteIteration(planning))
+	builder.JSON(http.MethodPost, "/iterations/{iteration_id}/complete", http.StatusOK, false, AuthAuthenticated, []string{"iterations:write"}, completeIteration(planning))
+	builder.Read("/iterations/{iteration_id}/progress", AuthAuthenticated, []string{"iterations:read"}, iterationProgress(planning))
+	builder.Read("/iterations/{iteration_id}/burndown", AuthAuthenticated, []string{"iterations:read"}, iterationBurndown(planning))
+	builder.JSON(http.MethodPost, "/iterations/progress", http.StatusOK, false, AuthAuthenticated, []string{"iterations:read"}, iterationProgressBatch(planning))
+}
+
+func milestoneTestStatistics(planning planningApplication) readOperation[*services.MilestoneTestStats] {
+	return func(r *http.Request) (*services.MilestoneTestStats, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		id, err := pathID(r, "milestone_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetMilestoneTestStatistics(user.ID, id)
+		return result, planningError(err)
+	}
+}
+
+type milestoneTestStatisticsEntry struct {
+	MilestoneID int                          `json:"milestone_id"`
+	Statistics  *services.MilestoneTestStats `json:"statistics"`
+}
+
+type iterationProgressEntry struct {
+	IterationID int                               `json:"iteration_id"`
+	Progress    *services.IterationProgressReport `json:"progress"`
+}
+
+func milestoneTestStatisticsBatch(planning planningApplication) jsonOperation[idBatchRequest, []milestoneTestStatisticsEntry] {
+	return func(r *http.Request, input idBatchRequest) ([]milestoneTestStatisticsEntry, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := normalizeBatchIDs(input.IDs)
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetMilestoneTestStatisticsBatch(user.ID, ids)
+		if err != nil {
+			return nil, planningError(err)
+		}
+		entries := make([]milestoneTestStatisticsEntry, 0, len(result))
+		for _, id := range ids {
+			if statistics, ok := result[id]; ok {
+				entries = append(entries, milestoneTestStatisticsEntry{MilestoneID: id, Statistics: statistics})
+			}
+		}
+		return entries, nil
+	}
+}
+
+func iterationProgressBatch(planning planningApplication) jsonOperation[idBatchRequest, []iterationProgressEntry] {
+	return func(r *http.Request, input idBatchRequest) ([]iterationProgressEntry, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := normalizeBatchIDs(input.IDs)
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetIterationProgressBatch(user.ID, ids)
+		if err != nil {
+			return nil, planningError(err)
+		}
+		entries := make([]iterationProgressEntry, 0, len(result))
+		for _, id := range ids {
+			if progress, ok := result[id]; ok {
+				entries = append(entries, iterationProgressEntry{IterationID: id, Progress: progress})
+			}
+		}
+		return entries, nil
+	}
+}
+
+type milestoneCreateRequest struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	TargetDate  *string `json:"target_date"`
+	Status      string  `json:"status"`
+	CategoryID  *int    `json:"category_id"`
+}
+
+type milestoneReorderRequest struct {
+	OrderedIDs []int `json:"ordered_ids"`
+	CategoryID *int  `json:"category_id"`
+}
+
+type milestoneReorderResponse struct {
+	Reordered bool `json:"reordered"`
+}
+
+type releaseMilestoneRequest struct {
+	Mode            string `json:"mode"`
+	ConnectionID    int    `json:"connection_id"`
+	RepositoryID    int    `json:"repository_id"`
+	Repository      string `json:"repository"`
+	TagName         string `json:"tag_name"`
+	Name            string `json:"name"`
+	Body            string `json:"body"`
+	IsDraft         bool   `json:"is_draft"`
+	IsPrerelease    bool   `json:"is_prerelease"`
+	TargetCommitish string `json:"target_commitish"`
+}
+
+type iterationCreateRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	Status      string `json:"status"`
+	TypeID      *int   `json:"type_id"`
+}
+
+type completeIterationRequest struct {
+	TargetIterationID *int `json:"move_incomplete_to_iteration_id"`
+}
+
+func listMilestones(planning planningApplication, workspaceScoped bool) pageOperation[models.Milestone] {
+	return func(r *http.Request) ([]models.Milestone, Pagination, int, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		page, err := ParsePagination(r, map[string]bool{
+			"position": true, "name": true, "target_date": true, "status": true, "created_at": true, "updated_at": true,
+		}, "position")
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		workspaceID, err := planningWorkspaceID(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
+		categoryID, err := optionalPositiveQueryID(r, "category_id")
+		if err != nil {
+			return nil, page, 0, err
+		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
+		rows, total, err := planning.ListMilestones(user.ID, services.MilestoneListParams{
+			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, CategoryID: categoryID,
+			Status: r.URL.Query().Get("status"), SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
+		})
+		return mapMilestones(rows), page, total, planningError(err)
+	}
+}
+
+func getMilestone(planning planningApplication) readOperation[models.Milestone] {
+	return func(r *http.Request) (models.Milestone, error) {
+		user, id, err := planningTarget(r, "milestone_id")
+		if err != nil {
+			return models.Milestone{}, err
+		}
+		result, err := planning.GetMilestone(user.ID, id)
+		if err != nil {
+			return models.Milestone{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
+		return milestoneModel(result), nil
+	}
+}
+
+func createMilestone(planning planningApplication, workspaceScoped bool) jsonOperation[milestoneCreateRequest, models.Milestone] {
+	return func(r *http.Request, input milestoneCreateRequest) (models.Milestone, error) {
+		user, err := principal(r)
+		if err != nil {
+			return models.Milestone{}, err
+		}
+		workspaceID, err := planningWorkspaceID(r, workspaceScoped)
+		if err != nil {
+			return models.Milestone{}, err
+		}
+		result, err := planning.CreateMilestone(user.ID, auditActor(r, user), services.CreateMilestoneParams{
+			Name: input.Name, Description: input.Description, TargetDate: input.TargetDate, Status: input.Status,
+			CategoryID: input.CategoryID, IsGlobal: !workspaceScoped, WorkspaceID: workspaceID,
+		})
+		return milestoneModel(result), planningError(err)
+	}
+}
+
+func patchMilestone(planning planningApplication) jsonOperation[models.MilestonePatch, models.Milestone] {
+	return func(r *http.Request, patch models.MilestonePatch) (models.Milestone, error) {
+		user, id, err := planningTarget(r, "milestone_id")
+		if err != nil {
+			return models.Milestone{}, err
+		}
+		existing, err := planning.GetMilestone(user.ID, id)
+		if err != nil {
+			return models.Milestone{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Milestone{}, err
+		}
+		merged := patch.Apply(milestoneModel(existing))
+		result, err := planning.UpdateMilestone(user.ID, auditActor(r, user), services.UpdateMilestoneParams{
+			ID: id, Name: merged.Name, Description: merged.Description, TargetDate: merged.TargetDate,
+			Status: merged.Status, CategoryID: merged.CategoryID,
+		})
+		return milestoneModel(result), planningError(err)
+	}
+}
+
+func deleteMilestone(planning planningApplication) commandOperation {
+	return func(r *http.Request) error {
+		user, id, err := planningTarget(r, "milestone_id")
+		if err != nil {
+			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetMilestone(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
+		}
+		return planningError(planning.DeleteMilestone(user.ID, auditActor(r, user), id))
+	}
+}
+
+func milestoneProgress(planning planningApplication) readOperation[*services.MilestoneProgressReport] {
+	return func(r *http.Request) (*services.MilestoneProgressReport, error) {
+		user, id, err := planningTarget(r, "milestone_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetMilestoneProgress(user.ID, id)
+		return result, planningError(err)
+	}
+}
+
+func reorderMilestones(planning planningApplication, workspaceScoped bool) jsonOperation[milestoneReorderRequest, milestoneReorderResponse] {
+	return func(r *http.Request, input milestoneReorderRequest) (milestoneReorderResponse, error) {
+		user, err := principal(r)
+		if err != nil {
+			return milestoneReorderResponse{}, err
+		}
+		workspaceID, err := planningWorkspaceID(r, workspaceScoped)
+		if err != nil {
+			return milestoneReorderResponse{}, err
+		}
+		if len(input.OrderedIDs) == 0 {
+			return milestoneReorderResponse{}, newError(http.StatusBadRequest, "invalid_request", "ordered_ids is required")
+		}
+		err = planning.ReorderMilestones(user.ID, auditActor(r, user), services.MilestoneScope{IsGlobal: !workspaceScoped, WorkspaceID: workspaceID, CategoryID: input.CategoryID}, input.OrderedIDs)
+		err = planningError(err)
+		return milestoneReorderResponse{Reordered: err == nil}, err
+	}
+}
+
+func releaseMilestone(planning planningApplication) jsonOperation[releaseMilestoneRequest, models.Milestone] {
+	return func(r *http.Request, input releaseMilestoneRequest) (models.Milestone, error) {
+		user, id, err := planningTarget(r, "milestone_id")
+		if err != nil {
+			return models.Milestone{}, err
+		}
+		result, err := planning.ReleaseMilestone(r.Context(), user.ID, auditActor(r, user), id, services.ReleaseMilestoneInput{
+			Mode: input.Mode, ConnectionID: input.ConnectionID, RepositoryID: input.RepositoryID, Repository: input.Repository,
+			IdempotencyKey: r.Header.Get("Idempotency-Key"), TagName: input.TagName, Name: input.Name, Body: input.Body,
+			IsDraft: input.IsDraft, IsPrerelease: input.IsPrerelease, TargetCommitish: input.TargetCommitish,
+		})
+		return milestoneModel(result), planningError(err)
+	}
+}
+
+func listIterations(planning planningApplication, workspaceScoped bool) pageOperation[models.Iteration] {
+	return func(r *http.Request) ([]models.Iteration, Pagination, int, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		page, err := ParsePagination(r, map[string]bool{
+			"start_date": true, "end_date": true, "name": true, "status": true, "created_at": true, "updated_at": true,
+		}, "-start_date")
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		workspaceID, err := planningWorkspaceID(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
+		typeID, err := optionalPositiveQueryID(r, "type_id")
+		if err != nil {
+			return nil, page, 0, err
+		}
+		isGlobal, includeGlobal, err := planningScopeQueryFlags(r, workspaceScoped)
+		if err != nil {
+			return nil, page, 0, err
+		}
+		rows, total, err := planning.ListIterations(user.ID, services.IterationListParams{
+			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, TypeID: typeID, Status: r.URL.Query().Get("status"),
+			SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
+		})
+		return mapIterations(rows), page, total, planningError(err)
+	}
+}
+
+func sortDirection(desc bool) string {
+	if desc {
+		return "desc"
+	}
+	return "asc"
+}
+
+func getIteration(planning planningApplication) readOperation[models.Iteration] {
+	return func(r *http.Request) (models.Iteration, error) {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return models.Iteration{}, err
+		}
+		result, err := planning.GetIteration(user.ID, id)
+		if err != nil {
+			return models.Iteration{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, result.IsGlobal, result.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
+		return iterationModel(result), nil
+	}
+}
+
+func createIteration(planning planningApplication, workspaceScoped bool) jsonOperation[iterationCreateRequest, models.Iteration] {
+	return func(r *http.Request, input iterationCreateRequest) (models.Iteration, error) {
+		user, err := principal(r)
+		if err != nil {
+			return models.Iteration{}, err
+		}
+		workspaceID, err := planningWorkspaceID(r, workspaceScoped)
+		if err != nil {
+			return models.Iteration{}, err
+		}
+		result, err := planning.CreateIteration(user.ID, auditActor(r, user), services.CreateIterationParams{
+			Name: input.Name, Description: input.Description, StartDate: input.StartDate, EndDate: input.EndDate,
+			Status: input.Status, TypeID: input.TypeID, IsGlobal: !workspaceScoped, WorkspaceID: workspaceID,
+		})
+		return iterationModel(result), planningError(err)
+	}
+}
+
+func patchIteration(planning planningApplication) jsonOperation[models.IterationPatch, models.Iteration] {
+	return func(r *http.Request, patch models.IterationPatch) (models.Iteration, error) {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return models.Iteration{}, err
+		}
+		existing, err := planning.GetIteration(user.ID, id)
+		if err != nil {
+			return models.Iteration{}, planningError(err)
+		}
+		if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+			return models.Iteration{}, err
+		}
+		merged := patch.Apply(iterationModel(existing))
+		result, err := planning.UpdateIteration(user.ID, auditActor(r, user), services.UpdateIterationParams{
+			ID: id, Name: merged.Name, Description: merged.Description, StartDate: merged.StartDate,
+			EndDate: merged.EndDate, Status: merged.Status, TypeID: merged.TypeID,
+		})
+		return iterationModel(result), planningError(err)
+	}
+}
+
+func deleteIteration(planning planningApplication) commandOperation {
+	return func(r *http.Request) error {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return err
+		}
+		if r.PathValue("workspace_id") != "" {
+			existing, err := planning.GetIteration(user.ID, id)
+			if err != nil {
+				return planningError(err)
+			}
+			if err := requirePlanningWorkspace(r, existing.IsGlobal, existing.WorkspaceID); err != nil {
+				return err
+			}
+		}
+		return planningError(planning.DeleteIteration(user.ID, auditActor(r, user), id))
+	}
+}
+
+func completeIteration(planning planningApplication) jsonOperation[completeIterationRequest, *services.CompleteIterationResult] {
+	return func(r *http.Request, input completeIterationRequest) (*services.CompleteIterationResult, error) {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.CompleteIteration(r.Context(), user.ID, id, input.TargetIterationID)
+		return result, planningError(err)
+	}
+}
+
+func iterationProgress(planning planningApplication) readOperation[*services.IterationProgressReport] {
+	return func(r *http.Request) (*services.IterationProgressReport, error) {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetIterationProgress(user.ID, id)
+		return result, planningError(err)
+	}
+}
+
+func iterationBurndown(planning planningApplication) readOperation[*services.IterationBurndownData] {
+	return func(r *http.Request) (*services.IterationBurndownData, error) {
+		user, id, err := planningTarget(r, "iteration_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := planning.GetIterationBurndown(user.ID, id)
+		return result, planningError(err)
+	}
+}
+
+func planningWorkspaceID(r *http.Request, workspaceScoped bool) (*int, error) {
+	if !workspaceScoped {
+		return nil, nil
+	}
+	workspaceID, err := pathID(r, "workspace_id")
+	if err != nil {
+		return nil, err
+	}
+	return &workspaceID, nil
+}
+
+// planningScopeQueryFlags parses the list-scope filters: workspace-scoped
+// routes take include_global (workspace rows plus global rows in one page),
+// unscoped routes take is_global (global rows only).
+func planningScopeQueryFlags(r *http.Request, workspaceScoped bool) (isGlobal, includeGlobal bool, err error) {
+	if workspaceScoped {
+		includeGlobal, err = optionalBoolQuery(r, "include_global")
+		return false, includeGlobal, err
+	}
+	isGlobal, err = optionalBoolQuery(r, "is_global")
+	return isGlobal, false, err
+}
+
+func optionalBoolQuery(r *http.Request, name string) (bool, error) {
+	value := r.URL.Query().Get(name)
+	if value == "" {
+		return false, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, newError(http.StatusBadRequest, "invalid_request", name+" must be a boolean")
+	}
+	return parsed, nil
+}
+
+func planningTarget(r *http.Request, name string) (*models.User, int, error) {
+	user, err := principal(r)
+	if err != nil {
+		return nil, 0, err
+	}
+	id, err := pathID(r, name)
+	return user, id, err
+}
+
+func milestoneModel(result *services.MilestoneResult) models.Milestone {
+	if result == nil {
+		return models.Milestone{}
+	}
+	var targetDate *string
+	if result.TargetDate != "" {
+		targetDate = &result.TargetDate
+	}
+	milestone := models.Milestone{
+		ID: result.ID, Name: result.Name, Description: result.Description, TargetDate: targetDate, Status: result.Status,
+		CategoryID: result.CategoryID, CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
+		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
+		ExternalKey: result.ExternalKey, Position: result.Position, CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+	}
+	if result.LatestRelease != nil {
+		latest := milestoneReleaseModel(*result.LatestRelease)
+		milestone.LatestRelease = &latest
+	}
+	if len(result.Releases) > 0 {
+		milestone.Releases = make([]models.MilestoneRelease, len(result.Releases))
+		for i := range result.Releases {
+			milestone.Releases[i] = milestoneReleaseModel(result.Releases[i])
+		}
+	}
+	return milestone
+}
+
+func milestoneReleaseModel(result services.MilestoneReleaseResult) models.MilestoneRelease {
+	return models.MilestoneRelease{
+		ID: result.ID, MilestoneID: result.MilestoneID, WorkspaceRepositoryID: result.WorkspaceRepositoryID,
+		TagName: result.TagName, TagURL: result.TagURL, ReleaseStatus: result.ReleaseStatus,
+		ReleasedAt: result.ReleasedAt, Assets: result.Assets, LastSyncedAt: result.LastSyncedAt,
+		Name: result.Name, Body: result.Body, IsDraft: result.IsDraft, IsPrerelease: result.IsPrerelease,
+		TargetCommitish: result.TargetCommitish, SCMReleaseID: result.SCMReleaseID,
+		SCMReleaseURL: result.SCMReleaseURL, CreatedBy: result.CreatedBy, CreatedAt: result.CreatedAt,
+	}
+}
+
+func mapMilestones(rows []services.MilestoneResult) []models.Milestone {
+	result := make([]models.Milestone, len(rows))
+	for i := range rows {
+		result[i] = milestoneModel(&rows[i])
+	}
+	return result
+}
+
+func iterationModel(result *services.IterationResult) models.Iteration {
+	if result == nil {
+		return models.Iteration{}
+	}
+	return models.Iteration{
+		ID: result.ID, Name: result.Name, Description: result.Description, StartDate: result.StartDate, EndDate: result.EndDate,
+		Status: result.Status, TypeID: result.TypeID, TypeName: result.TypeName, TypeColor: result.TypeColor,
+		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
+		CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+	}
+}
+
+func mapIterations(rows []services.IterationResult) []models.Iteration {
+	result := make([]models.Iteration, len(rows))
+	for i := range rows {
+		result[i] = iterationModel(&rows[i])
+	}
+	return result
+}
+
+func planningError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if validation, ok := services.AsPlanningValidationError(err); ok {
+		return newError(http.StatusBadRequest, "invalid_request", validation.Message)
+	}
+	switch {
+	case errors.Is(err, repository.ErrNotFound), errors.Is(err, services.ErrIterationCompletionNotFound):
+		return newError(http.StatusNotFound, "not_found", "Planning object was not found")
+	case errors.Is(err, services.ErrPlanningForbidden), errors.Is(err, services.ErrIterationCompletionForbidden):
+		return newError(http.StatusNotFound, "not_found", "Planning object was not found")
+	case errors.Is(err, services.ErrIterationCompletionConflict), errors.Is(err, services.ErrIterationCompletionRequired), errors.Is(err, services.ErrIterationLifecycleConflict), errors.Is(err, services.ErrMilestoneReleaseIdempotencyConflict), errors.Is(err, services.ErrMilestoneReleaseInProgress):
+		return newError(http.StatusConflict, "conflict", err.Error())
+	default:
+		return internalError(err)
+	}
+}
+
+// requirePlanningWorkspace binds nested routes to the object's owning workspace.
+func requirePlanningWorkspace(r *http.Request, global bool, workspaceID *int) error {
+	if r.PathValue("workspace_id") == "" {
+		return nil
+	}
+	id, err := pathID(r, "workspace_id")
+	if err != nil {
+		return err
+	}
+	if global || workspaceID == nil || *workspaceID != id {
+		return planningError(services.ErrPlanningForbidden)
+	}
+	return nil
+}

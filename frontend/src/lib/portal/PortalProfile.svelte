@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ArrowLeft, KeyRound, Plus, Trash2, ShieldCheck, X } from '@lucide/svelte';
-  import { portalStore } from '../stores/portal.svelte.js';
+  import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';

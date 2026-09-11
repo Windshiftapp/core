@@ -97,6 +97,7 @@ type Engine struct {
 
 	mu            sync.Mutex
 	handlers      map[string]Handler
+	nextHandler   int
 	started       bool
 	used          bool
 	cancel        context.CancelFunc
@@ -107,6 +108,8 @@ type Engine struct {
 
 	now    func() time.Time
 	jitter func(time.Duration) time.Duration
+	// leaseRenewed is a test observation hook set before engine startup.
+	leaseRenewed func(Delivery, time.Time)
 }
 
 // NewEngine creates a stopped engine. Register handlers before Start.
@@ -336,8 +339,18 @@ func (e *Engine) processOne(ctx context.Context) (bool, error) {
 
 func (e *Engine) handle(ctx context.Context, handler Handler, delivery Delivery) error {
 	handlerCtx, cancel := context.WithTimeout(ctx, e.config.HandlerTimeout)
+	renewCtx, stopRenewing := context.WithCancel(context.Background())
+	renewalDone := make(chan error, 1)
+	go func() {
+		renewalDone <- e.renewLease(renewCtx, delivery, cancel)
+	}()
 	err := handler.Handle(handlerCtx, delivery.Event)
+	stopRenewing()
+	renewalErr := <-renewalDone
 	cancel()
+	if renewalErr != nil {
+		return fmt.Errorf("renew delivery %d/%s: %w", delivery.Event.ID, delivery.ConsumerKey, renewalErr)
+	}
 	if ctx.Err() != nil {
 		// Leave the lease to expire so another process can reclaim it.
 		return ctx.Err()
@@ -349,7 +362,7 @@ func (e *Engine) handle(ctx context.Context, handler Handler, delivery Delivery)
 		return nil
 	}
 
-	retry := !isPermanent(err) && delivery.AttemptCount < e.config.MaxAttempts
+	retry := !IsPermanent(err) && delivery.AttemptCount < e.config.MaxAttempts
 	nextAttempt := e.now()
 	if retry {
 		nextAttempt = nextAttempt.Add(e.retryDelay(delivery.AttemptCount))
@@ -358,6 +371,33 @@ func (e *Engine) handle(ctx context.Context, handler Handler, delivery Delivery)
 		return fmt.Errorf("record delivery %d/%s failure: %w", delivery.Event.ID, delivery.ConsumerKey, failErr)
 	}
 	return nil
+}
+
+func (e *Engine) renewLease(ctx context.Context, delivery Delivery, cancelHandler context.CancelFunc) error {
+	interval := e.config.LeaseDuration / 3
+	if interval <= 0 {
+		interval = time.Nanosecond
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			now := e.now().UTC()
+			renewCtx, cancel := context.WithTimeout(context.Background(), interval)
+			expiresAt, err := e.store.Renew(renewCtx, delivery, now, e.config.LeaseDuration)
+			cancel()
+			if err != nil {
+				cancelHandler()
+				return err
+			}
+			if e.leaseRenewed != nil {
+				e.leaseRenewed(delivery, expiresAt)
+			}
+		}
+	}
 }
 
 func (e *Engine) retryDelay(attempt int) time.Duration {
@@ -381,7 +421,15 @@ func (e *Engine) handlerKeys() []string {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
-	return keys
+	if len(keys) == 0 {
+		return keys
+	}
+	start := e.nextHandler % len(keys)
+	e.nextHandler = (start + 1) % len(keys)
+	if start == 0 {
+		return keys
+	}
+	return append(keys[start:], keys[:start]...)
 }
 
 func (e *Engine) handler(key string) Handler {

@@ -121,8 +121,7 @@ class ScreenEditorStore extends DragStateStore {
 
   async loadCustomFields() {
     try {
-      const result = await api.customFields.getAll();
-      this.customFields = result?.data || [];
+      this.customFields = await api.customFields.getAll();
     } catch (err) {
       console.error('Failed to load custom fields:', err);
       this.customFields = [];

@@ -149,20 +149,6 @@ func (h *AttachmentHandler) authorizeTestResultAttachmentAccess(w http.ResponseW
 	return true
 }
 
-// checkItemAttachmentPermission checks if the user can modify attachments on an item.
-// Requires item.edit permission in the item's workspace. The route is gated by
-// AuthMiddleware.RequireAuth (internal users only), so portal customer sessions
-// never reach here; if portal-customer attachment access is ever enabled it must
-// land on a separate, portal-scoped surface rather than be threaded through this
-// polymorphic handler.
-func (h *AttachmentHandler) checkItemAttachmentPermission(r *http.Request, itemID int) (bool, error) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		return false, nil
-	}
-	return h.attachmentService.CanModifyItemAttachment(&user.ID, nil, itemID)
-}
-
 // IsEnabled checks if attachments are enabled (attachment path is set)
 func (h *AttachmentHandler) IsEnabled() bool {
 	return h.attachmentPath != ""
@@ -177,69 +163,6 @@ func (h *AttachmentHandler) IsEnabled() bool {
 // every branch can assume an authenticated session.
 func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http.Request, entityType string, entityID int) bool {
 	switch entityType {
-	case "item":
-		exists, err := repository.NewItemRepository(h.db).Exists(entityID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return false
-		}
-		if !exists {
-			respondNotFound(w, r, "item")
-			return false
-		}
-		canModify, err := h.checkItemAttachmentPermission(r, entityID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return false
-		}
-		if !canModify {
-			respondNotFound(w, r, "item")
-			return false
-		}
-		return true
-
-	case "page":
-		// Resolve workspace via pages and gate on page-edit. When the
-		// page-permission evaluator is wired (production wiring in
-		// server.go), use it so per-page ACL grants are honored; otherwise
-		// fall back to a workspace page.edit check.
-		var wsID int
-		err := h.db.QueryRow(`SELECT workspace_id FROM pages WHERE id = ?`, entityID).Scan(&wsID)
-		if errors.Is(err, sql.ErrNoRows) {
-			respondNotFound(w, r, "page")
-			return false
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return false
-		}
-		user, ok := RequireAuth(w, r)
-		if !ok {
-			return false
-		}
-		if h.pagePermissionService != nil {
-			can, perr := h.pagePermissionService.Can(user.ID, wsID, entityID, services.PageOpEdit)
-			if perr != nil {
-				respondInternalError(w, r, perr)
-				return false
-			}
-			if !can {
-				respondNotFound(w, r, "page")
-				return false
-			}
-			return true
-		}
-		allowed, err := h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionPageEdit)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return false
-		}
-		if !allowed {
-			respondNotFound(w, r, "page")
-			return false
-		}
-		return true
-
 	case "test_case":
 		return h.authorizeTestCaseAttachmentAccess(w, r, entityID, models.PermissionTestManage)
 
@@ -395,9 +318,10 @@ func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http
 		respondNotFound(w, r, "channel")
 		return false
 
-	case "hub_logo":
-		// Hub config is system-admin-only; keep its public logo upload aligned
-		// with PUT /api/hub/config.
+	case "hub_logo", "theme_logo":
+		// Hub and theme branding are system-admin surfaces (PUT /api/hub/config
+		// and the admin-only theme routes); keep their public logo uploads
+		// aligned with those authorization contracts.
 		user, ok := RequireAuth(w, r)
 		if !ok {
 			return false
@@ -480,6 +404,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			entityType = "portal_logo"
 		case "hub_logo":
 			entityType = "hub_logo"
+		case "theme_logo":
+			entityType = "theme_logo"
 		default:
 			entityType = "item" // Default to item for backwards compatibility
 		}
@@ -496,7 +422,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	isPortalBackground := entityType == "portal_background"
 	isPortalLogo := entityType == "portal_logo"
 	isHubLogo := entityType == "hub_logo"
-	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo
+	isThemeLogo := entityType == "theme_logo"
+	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo
 
 	// category is an older image-asset discriminator used by /api/portal-assets.
 	// Keep it in lockstep with entity_type so callers cannot make an item/test
@@ -513,9 +440,11 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// (item, test_case, test_result, workspace/team/customer scoped image
 	// assets). Portal logo/background uploads use entity_id as the owning
 	// channel id so public URLs cannot be minted by arbitrary users. The truly
-	// global uploads — user avatar and hub logo — need no owner id here.
+	// global uploads — user avatar, hub logo, and theme logo — need no owner
+	// id here.
 	entityIDRequired := entityType != "avatar" &&
-		entityType != "hub_logo"
+		entityType != "hub_logo" &&
+		entityType != "theme_logo"
 	if entityIDStr == "" && entityIDRequired {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		respondValidationError(w, r, "entity_id is required")
@@ -532,6 +461,11 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
+
+	if entityType == "item" || entityType == "page" {
+		h.uploadDomainAttachment(w, r, entityType, entityID)
+		return
+	}
 
 	if !h.authorizeUploadEntity(w, r, entityType, entityID) {
 		return
@@ -651,6 +585,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "portal_logos")
 	case "hub_logo":
 		itemDir = filepath.Join(h.attachmentPath, "hub_logos")
+	case "theme_logo":
+		itemDir = filepath.Join(h.attachmentPath, "theme_logos")
 	case "test_case":
 		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
 	case "test_result":
@@ -757,7 +693,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if isImageEntityType {
 		// Image uploads use public or authenticated download URLs by entity type.
 		var downloadURL string
-		if isPortalBackground || isPortalLogo || isHubLogo {
+		if isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo {
 			// Public endpoint for portal branding (no auth required)
 			downloadURL = fmt.Sprintf("/api/portal-assets/%d", attachmentID)
 		} else {
@@ -784,6 +720,9 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			urlKey = "logo_url"
 		case isHubLogo:
 			message = "Hub logo uploaded successfully"
+			urlKey = "logo_url"
+		case isThemeLogo:
+			message = "Theme logo uploaded successfully"
 			urlKey = "logo_url"
 		}
 		response := map[string]any{
@@ -817,6 +756,61 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("upload completed successfully", slog.String("component", "attachments"))
 		respondJSONOK(w, response)
 	}
+}
+
+func (h *AttachmentHandler) uploadDomainAttachment(w http.ResponseWriter, r *http.Request, entityType string, entityID int) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		respondBadRequest(w, r, "Failed to get file from form: "+err.Error())
+		return
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to read file data: %w", err))
+		return
+	}
+
+	var response models.AttachmentUploadResponse
+	switch entityType {
+	case "item":
+		response, err = services.NewItemAttachmentService(h.db, h.attachmentPath, h.permissionService).UploadItemAttachment(services.ItemAttachmentUploadInput{
+			ItemID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
+			FileData: data, FileSize: int64(len(data)),
+		})
+	case "page":
+		response, err = services.NewPageAttachmentUploadService(h.db, h.attachmentPath, h.permissionService, h.pagePermissionService).UploadPageAttachment(services.PageAttachmentUploadInput{
+			PageID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
+			FileData: data, FileSize: int64(len(data)),
+		})
+	}
+	if err != nil {
+		h.respondDomainUploadError(w, r, entityType, err)
+		return
+	}
+	respondJSONOK(w, response)
+}
+
+func (h *AttachmentHandler) respondDomainUploadError(w http.ResponseWriter, r *http.Request, entityType string, err error) {
+	if errors.Is(err, services.ErrItemAttachmentDisabled) || errors.Is(err, services.ErrPageAttachmentUploadDisabled) {
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
+		return
+	}
+	if errors.Is(err, services.ErrItemAttachmentNotFound) || errors.Is(err, services.ErrPageAttachmentUploadNotFound) {
+		respondNotFound(w, r, entityType)
+		return
+	}
+	for _, sentinel := range []error{services.ErrItemAttachmentInvalid, services.ErrPageAttachmentUploadInvalid} {
+		if errors.Is(err, sentinel) {
+			respondValidationError(w, r, strings.TrimPrefix(err.Error(), sentinel.Error()+": "))
+			return
+		}
+	}
+	respondInternalError(w, r, err)
 }
 
 // GetByItem returns attachments for a specific item with pagination support
@@ -1140,10 +1134,6 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking and audit context.
 	currentUser := utils.GetCurrentUser(r)
-	var userID *int
-	if currentUser != nil {
-		userID = &currentUser.ID
-	}
 
 	// Get attachment details before deletion (for history tracking and permission check)
 	details, err := h.attachmentService.GetAttachmentDetails(attachmentID)
@@ -1155,27 +1145,32 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	if details.EntityType == "item" || details.EntityType == "" {
+		if currentUser == nil || details.ItemID == nil {
+			respondNotFound(w, r, "attachment")
+			return
+		}
+		itemAttachments := services.NewItemAttachmentService(h.db, h.attachmentPath, h.permissionService)
+		if err := itemAttachments.DeleteItemAttachment(attachmentID, currentUser.ID); err != nil {
+			if errors.Is(err, services.ErrItemAttachmentNotFound) {
+				respondNotFound(w, r, "attachment")
+				return
+			}
+			respondInternalError(w, r, err)
+			return
+		}
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionAttachmentDelete, logger.ResourceAttachment, &attachmentID, details.OriginalFilename, map[string]any{
+			"entity_type":       details.EntityType,
+			"item_id":           details.ItemID,
+			"original_filename": details.OriginalFilename,
+		})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	// Authorize each entity type explicitly. Missing item IDs return 404;
 	// parent-owned branding avatars are refused, except uploader-owned profiles.
 	switch details.EntityType {
-	case "item", "":
-		if details.ItemID == nil {
-			respondNotFound(w, r, "attachment")
-			return
-		}
-		var canModify bool
-		canModify, err = h.checkItemAttachmentPermission(r, *details.ItemID)
-		if err != nil {
-			slog.Error("failed to check attachment permission", slog.String("component", "attachments"), slog.Any("error", err))
-			respondInternalError(w, r, err)
-			return
-		}
-		if !canModify {
-			slog.Debug("user lacks permission to delete attachment from item", slog.String("component", "attachments"), slog.Int("item_id", *details.ItemID))
-			respondNotFound(w, r, "item")
-			return
-		}
 	case "test_case":
 		if details.ItemID == nil {
 			respondNotFound(w, r, "attachment")
@@ -1231,20 +1226,12 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		// workspace_avatar, workspace_background, team_avatar,
-		// customer_avatar, portal_background, portal_logo, hub_logo, and
-		// any unknown entity_type. Refuse — the parent entity owns the
-		// lifecycle. Unknown types likewise default-deny so a future
-		// entity_type can't accidentally land in a permissive branch.
+		// customer_avatar, portal_background, portal_logo, hub_logo,
+		// theme_logo, and any unknown entity_type. Refuse — the parent
+		// entity owns the lifecycle. Unknown types likewise default-deny so a
+		// future entity_type can't accidentally land in a permissive branch.
 		respondNotFound(w, r, "attachment")
 		return
-	}
-
-	// Record history if attachment is associated with a work item.
-	if details.ItemID != nil && userID != nil && (details.EntityType == "item" || details.EntityType == "") {
-		if err = h.attachmentService.RecordItemHistory(*details.ItemID, userID, "attachment_deleted", &details.OriginalFilename, 0, details.OriginalFilename); err != nil {
-			slog.Warn("failed to record attachment deletion history", slog.String("component", "attachments"), slog.Any("error", err))
-			// Don't fail the whole operation if history recording fails
-		}
 	}
 
 	// Delete from database

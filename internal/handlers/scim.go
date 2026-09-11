@@ -50,6 +50,7 @@ type SCIMHandler struct {
 	repo              *repository.SCIMRepository
 	baseURL           string
 	permissionService *services.PermissionService
+	cacheInvalidator  *services.AuthorizationCacheInvalidator
 	auditor           *logger.Auditor
 	// deactivateCascade and activeSystemAdminIDs are dependency-injected
 	// closures over services.DeactivateOwnedAgentsAndTokens and
@@ -68,11 +69,17 @@ func NewSCIMHandler(
 	deactivateCascade func(ownerID int) (services.AgentDeactivationResult, error),
 	activeSystemAdminIDs func() ([]int, error),
 	notificationService *services.NotificationService,
+	invalidators ...*services.AuthorizationCacheInvalidator,
 ) *SCIMHandler {
+	cacheInvalidator := services.NewAuthorizationCacheInvalidator(permissionService, nil)
+	if len(invalidators) > 0 && invalidators[0] != nil {
+		cacheInvalidator = invalidators[0]
+	}
 	return &SCIMHandler{
 		repo:                 repo,
 		baseURL:              baseURL,
 		permissionService:    permissionService,
+		cacheInvalidator:     cacheInvalidator,
 		auditor:              auditor,
 		deactivateCascade:    deactivateCascade,
 		activeSystemAdminIDs: activeSystemAdminIDs,
@@ -357,6 +364,19 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	existingUser, err := h.repo.GetUserByEmail(email)
 	if err == nil {
+		// A tombstoned account stays deleted: re-provisioning the same email
+		// must conflict rather than resurrect it (RFC 7644 §3.6). Un-deleting
+		// is an operator decision, not an IdP-driven one.
+		if h.repo.IsUserSCIMDeleted(existingUser.ID) {
+			h.logSCIMAuditEvent(r, logger.ActionSCIMUserCreate, logger.ResourceUser, &existingUser.ID, email,
+				map[string]any{
+					"username": existingUser.Username,
+					"reason":   "email_matches_tombstoned_user",
+				}, false, "refused: email belongs to a SCIM-deleted user")
+			respondSCIMErrorMsg(w, http.StatusConflict, "User with this email already exists", "uniqueness")
+			return
+		}
+
 		username := scimUser.UserName
 		if username == "" {
 			username = existingUser.Username
@@ -645,7 +665,7 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repo.DeactivateUser(id)
+	err = h.repo.TombstoneUser(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete user", "")
 		return
@@ -706,6 +726,7 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	groupRef := &models.TeamGroup{ID: groupIDInt, Name: scimGroup.DisplayName}
 
+	addedMemberIDs := []int{}
 	// Audit each member insert individually so partial failures remain visible.
 	for _, member := range scimGroup.Members {
 		memberID, convErr := strconv.Atoi(member.Value)
@@ -721,10 +742,14 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		execErr := h.repo.AddGroupMember(groupIDInt, memberID)
 		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID, execErr)
+		if execErr == nil {
+			addedMemberIDs = append(addedMemberIDs, memberID)
+		}
 	}
 
-	if len(scimGroup.Members) > 0 {
-		_ = h.permissionService.InvalidateGroupMemberCaches(groupIDInt)
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{UserIDs: addedMemberIDs}); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to invalidate authorization cache", "")
+		return
 	}
 
 	group, err := h.repo.GetGroupByID(groupIDInt)
@@ -851,7 +876,12 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 
 	// Past this point the write has committed; cache invalidation and audit
 	// logging follow once, with the final state visible to other readers.
-	_ = h.permissionService.InvalidateGroupMemberCaches(id)
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		UserIDs: append(priorMemberIDs, acceptedMembers...),
+	}); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to invalidate authorization cache", "")
+		return
+	}
 
 	for _, uid := range priorMemberIDs {
 		h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, groupRef, uid, nil)
@@ -920,14 +950,31 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasMemberOps := false
-	var changes []attrChange
 	for _, op := range patchReq.Operations {
 		if strings.EqualFold(op.Path, "members") || strings.HasPrefix(strings.ToLower(op.Path), "members[") {
 			hasMemberOps = true
+			break
 		}
+	}
+	var invalidation services.AuthorizationInvalidation
+	if hasMemberOps {
+		invalidation, err = h.cacheInvalidator.GroupPlan(id)
+		if err != nil {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to capture authorization invalidation", "")
+			return
+		}
+	}
+	var changes []attrChange
+	for _, op := range patchReq.Operations {
 		opChanges, opErr := h.applyGroupPatchOp(r, snapshot, op)
 		if opErr != nil {
 			h.logPatchOpError(r, "group", id, op, opErr)
+			if hasMemberOps {
+				if err := h.applyGroupInvalidationAfterMutation(id, invalidation); err != nil {
+					respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to invalidate authorization cache", "")
+					return
+				}
+			}
 			respondSCIMErrorMsg(w, http.StatusBadRequest, "Patch operation failed", "invalidValue")
 			return
 		}
@@ -935,7 +982,10 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if hasMemberOps {
-		_ = h.permissionService.InvalidateGroupMemberCaches(id)
+		if err := h.applyGroupInvalidationAfterMutation(id, invalidation); err != nil {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to invalidate authorization cache", "")
+			return
+		}
 	}
 
 	group, err := h.repo.GetGroupByID(id)
@@ -953,6 +1003,16 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		}, true, "")
 
 	respondSCIMJSON(w, http.StatusOK, h.groupToSCIM(group, members))
+}
+
+func (h *SCIMHandler) applyGroupInvalidationAfterMutation(id int, invalidation services.AuthorizationInvalidation) error {
+	current, err := h.cacheInvalidator.GroupPlan(id)
+	if err != nil {
+		invalidation.ResetPermissions = true
+	} else {
+		invalidation.UserIDs = append(invalidation.UserIDs, current.UserIDs...)
+	}
+	return h.cacheInvalidator.Apply(invalidation)
 }
 
 func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
@@ -980,11 +1040,19 @@ func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.permissionService.InvalidateGroupMemberCaches(id)
+	invalidation, err := h.cacheInvalidator.GroupDeletePlan(id)
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to capture authorization invalidation", "")
+		return
+	}
 
 	err = h.repo.DeleteGroup(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete group", "")
+		return
+	}
+	if err := h.cacheInvalidator.Apply(invalidation); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to invalidate authorization cache", "")
 		return
 	}
 

@@ -146,7 +146,13 @@ export function useMainAppLifecycle({
 
   onMount(() => {
     const handleShowCreateModal = (event) => onShowCreateModal(event.detail || {});
-    const handleRefreshWorkspaces = () => void workspacesStore.reload();
+    const handleRefreshWorkspaces = (event) => {
+      if (event.detail?.workspace) {
+        workspacesStore.add(event.detail.workspace);
+        return;
+      }
+      void workspacesStore.reload();
+    };
     const handleRefreshWorkspaceData = () => void workspaceDataStore.refresh();
     const handleRefreshWorkItems = () => homepageStore.invalidateSnapshot();
 

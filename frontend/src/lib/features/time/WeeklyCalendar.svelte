@@ -140,7 +140,7 @@
         assignee_id: user.id,
         limit: 50
       });
-      const assignedItems = assignedResponse.items || [];
+      const assignedItems = assignedResponse.data ?? [];
 
       // 2. Items from personal workspace (regardless of assignee)
       let personalItems = [];
@@ -149,7 +149,7 @@
           workspace_id: workspace.id,
           limit: 50
         });
-        personalItems = personalResponse.items || [];
+        personalItems = personalResponse.data ?? [];
       }
 
       // Merge and deduplicate by item ID

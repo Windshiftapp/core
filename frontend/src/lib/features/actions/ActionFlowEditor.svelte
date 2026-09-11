@@ -313,7 +313,7 @@
     const unsub = agentRuns.subscribe(async () => {
       if (!action?.id) return;
       try {
-        const fresh = await api.get(`/workspaces/${action.workspace_id}/actions/${action.id}`);
+        const fresh = await api.actions.get(action.workspace_id, action.id);
         actionFlowStore.init(fresh, statuses);
         infoToast(t('actions.aiUpdated', 'Action updated by AI'));
       } catch (err) {

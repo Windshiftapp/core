@@ -28,6 +28,7 @@
 </script>
 
 <div 
+  data-testid={`workflow-status-node-${data.statusId}`}
   class="status-node rounded border-2 shadow-lg select-none transition-all duration-200 group relative"
   class:border-blue-500={selected}
   class:border-gray-300={!selected}

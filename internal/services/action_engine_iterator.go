@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 )
 
 // defaultIteratorMaxItems bounds unconfigured iterator fan-out.
@@ -23,28 +24,9 @@ var errStepBudgetExceeded = fmt.Errorf("action step budget exceeded (%d): nested
 // iteratorBodyNodes finds nodes reachable from iterator edges for each emitted
 // item. It trusts creation-time validation that no outside edges join the body.
 func iteratorBodyNodes(iteratorNodeID int, edges []models.ActionEdge) map[int]bool {
-	body := map[int]bool{}
-	queue := []int{}
-
-	for _, e := range edges {
-		if e.SourceNodeID == iteratorNodeID && !body[e.TargetNodeID] {
-			body[e.TargetNodeID] = true
-			queue = append(queue, e.TargetNodeID)
-		}
-	}
-
-	for len(queue) > 0 {
-		next := queue[0]
-		queue = queue[1:]
-		for _, e := range edges {
-			if e.SourceNodeID == next && !body[e.TargetNodeID] {
-				body[e.TargetNodeID] = true
-				queue = append(queue, e.TargetNodeID)
-			}
-		}
-	}
-
-	return body
+	return actionutil.Descendants(iteratorNodeID, edges, func(edge models.ActionEdge) (int, int) {
+		return edge.SourceNodeID, edge.TargetNodeID
+	})
 }
 
 // runIterator handles a single iterator node: it executes the iterator's

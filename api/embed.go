@@ -10,10 +10,10 @@ import _ "embed"
 //go:embed openapi.json
 var SpecJSON []byte
 
-// SpecYAML is the OpenAPI 3.0 spec serialized as YAML.
+// V2SpecJSON is the canonical dual-mount API v2 contract.
 //
-//go:embed openapi.yaml
-var SpecYAML []byte
+//go:embed openapi-v2.json
+var V2SpecJSON []byte
 
 // AgentStudioSpecYAML documents the cookie/session-header /api surface used by
 // Agent Studio. It is deliberately separate from the bearer-token v1 spec.

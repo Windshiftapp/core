@@ -88,6 +88,22 @@ func NewRequestTypeHandler(
 	}
 }
 
+func (h *RequestTypeHandler) ListVisibleFields(ctx context.Context, userID, requestTypeID int) ([]models.RequestTypeField, error) {
+	requestType, err := h.repo.GetByID(requestTypeID)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := h.channelService.UserCanManage(ctx, userID, requestType.ChannelID)
+	if err != nil || !allowed {
+		return []models.RequestTypeField{}, err
+	}
+	fields, err := h.repo.ListFields(requestTypeID)
+	if fields == nil {
+		fields = []models.RequestTypeField{}
+	}
+	return fields, err
+}
+
 func channelSupportsRequestTypes(channel *models.Channel) bool {
 	return channel != nil && channel.Direction == "inbound" && (channel.Type == "portal" || channel.Type == "form")
 }

@@ -23,6 +23,7 @@ type Model struct {
 
 	workspaces []data.Workspace
 	selected   int
+	offset     int
 	loading    bool
 	loadedOnce bool
 	// autoOpened guards the once-per-session jump to the persisted last
@@ -30,9 +31,10 @@ type Model struct {
 	autoOpened bool
 	prefsKnown bool
 
-	spinner spinner.Model
-	width   int
-	height  int
+	spinner   spinner.Model
+	width     int
+	height    int
+	requestID uint64
 }
 
 func New(ctx *core.Ctx) *Model {
@@ -46,13 +48,15 @@ func New(ctx *core.Ctx) *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
+	m.requestID = m.ctx.NextRequestID()
 	m.loading = true
-	return tea.Batch(data.LoadWorkspaces(m.ctx.Client), m.spinner.Tick)
+	return tea.Batch(data.LoadWorkspaces(m.ctx.Client, m.requestID), m.spinner.Tick)
 }
 
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	m.ensureVisible()
 }
 
 // OnThemeChanged re-derives styles baked into retained components
@@ -71,17 +75,24 @@ func (m *Model) ShortHelp() []key.Binding {
 func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
+		if !m.loading {
+			return nil
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return cmd
 
 	case data.WorkspacesLoadedMsg:
+		if msg.RequestID != m.requestID {
+			return nil
+		}
 		m.workspaces = msg.Workspaces
 		m.loading = false
 		m.loadedOnce = true
 		if len(m.workspaces) > 0 && m.selected >= len(m.workspaces) {
 			m.selected = 0
 		}
+		m.ensureVisible()
 		return m.maybeAutoOpen()
 
 	case data.PrefsLoadedMsg:
@@ -89,7 +100,10 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		return m.maybeAutoOpen()
 
 	case data.ErrorMsg:
-		m.loading = false
+		if msg.Operation == data.OpWorkspaces && msg.RequestID == m.requestID {
+			m.loading = false
+			return core.NotifyError(msg.Err)
+		}
 		return nil
 
 	case tea.KeyPressMsg:
@@ -130,24 +144,25 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		} else if len(m.workspaces) > 0 {
 			m.selected = len(m.workspaces) - 1
 		}
+		m.ensureVisible()
 	case key.Matches(msg, k.Down):
 		if len(m.workspaces) > 0 {
 			m.selected = (m.selected + 1) % len(m.workspaces)
 		}
+		m.ensureVisible()
 	case key.Matches(msg, k.Enter):
 		if len(m.workspaces) > 0 && m.selected < len(m.workspaces) {
 			ws := m.workspaces[m.selected]
 			m.ctx.Workspace = &ws
-			id := ws.ID
-			m.ctx.Prefs.LastWorkspaceID = &id
 			return tea.Batch(
 				core.Push(board.New(m.ctx)),
-				data.SavePrefs(m.ctx.Client, m.ctx.Prefs),
+				core.SaveLastWorkspace(ws.ID),
 			)
 		}
 	case key.Matches(msg, k.Refresh):
+		m.requestID = m.ctx.NextRequestID()
 		m.loading = true
-		return tea.Batch(data.LoadWorkspaces(m.ctx.Client), m.spinner.Tick)
+		return tea.Batch(data.LoadWorkspaces(m.ctx.Client, m.requestID), m.spinner.Tick)
 	}
 	return nil
 }
@@ -171,7 +186,11 @@ func (m *Model) View() string {
 	}
 
 	rows := []string{heading + "   " + count, ""}
-	for i, w := range m.workspaces {
+	visible := max(1, m.height-len(rows))
+	m.ensureVisible()
+	end := min(len(m.workspaces), m.offset+visible)
+	for i := m.offset; i < end; i++ {
+		w := m.workspaces[i]
 		label := fmt.Sprintf("%s · %s", w.Key, w.Name)
 		if i == m.selected {
 			rows = append(rows, s.List.SelBar.Render("▎")+" "+s.List.ItemSelected.Render(label))
@@ -180,4 +199,21 @@ func (m *Model) View() string {
 		}
 	}
 	return strings.Join(rows, "\n")
+}
+
+func (m *Model) ensureVisible() {
+	visible := max(1, m.height-2)
+	if m.selected < m.offset {
+		m.offset = m.selected
+	}
+	if m.selected >= m.offset+visible {
+		m.offset = m.selected - visible + 1
+	}
+	maxOffset := max(0, len(m.workspaces)-visible)
+	if m.offset > maxOffset {
+		m.offset = maxOffset
+	}
+	if m.offset < 0 {
+		m.offset = 0
+	}
 }

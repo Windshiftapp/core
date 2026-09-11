@@ -263,8 +263,7 @@ class WorkItemFormStore {
   async loadCustomFields() {
     if (this.customFieldsLoaded) return;
     try {
-      const result = await api.customFields.getAll();
-      this.allCustomFields = result?.data || [];
+      this.allCustomFields = await api.customFields.getAll();
       this.customFieldsLoaded = true;
     } catch (error) {
       console.error('Failed to load custom fields:', error);
@@ -543,10 +542,20 @@ class WorkItemFormStore {
         customFieldIds.includes(field.id)
       );
 
-      // Reset custom field values for new fields
+      // Keep values the user already entered for fields that remain configured
+      // across the workspace/type change; only fields new to the screen get
+      // their default. Resetting wholesale silently discarded picks when the
+      // item type changed after a field was filled.
+      const previousValues = this.customFieldValues;
       this.customFieldValues = {};
       filteredCustomFields.forEach((field) => {
-        this.customFieldValues[field.id] = isBooleanCustomFieldType(field.field_type) ? false : '';
+        const previous = previousValues[field.id];
+        this.customFieldValues[field.id] =
+          previous !== undefined && previous !== null && previous !== ''
+            ? previous
+            : isBooleanCustomFieldType(field.field_type)
+              ? false
+              : '';
       });
 
       this.customFields = filteredCustomFields;
@@ -636,8 +645,7 @@ class WorkItemFormStore {
     this.templatesLoading = true;
     try {
       const list =
-        (await api.itemTemplates.getAll({ workspace_id: workspaceId, item_type_id: itemTypeId })) ??
-        [];
+        (await api.itemTemplates.getAll(workspaceId, { item_type_id: itemTypeId })) ?? [];
       // Guard against an out-of-order response after another type change.
       if (`${this.formData.workspace_id}:${this.formData.item_type_id}` !== key) return;
 

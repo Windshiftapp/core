@@ -162,7 +162,7 @@
       };
       if (completedSince) filters.completed_since = completedSince;
       const response = await api.items.getAll(filters);
-      personalTodos = response?.items || response || [];
+      personalTodos = response?.data ?? [];
     } catch (error) {
       console.error('Failed to load personal todos:', error);
       personalTodos = [];
@@ -183,7 +183,7 @@
       };
       if (completedSince) filters.completed_since = completedSince;
       const response = await api.items.getAll(filters);
-      let allAssigned = response?.items || response || [];
+      let allAssigned = response?.data ?? [];
       assignedWork = allAssigned.filter(item => item.workspace_id !== parseInt(workspaceId));
     } catch (error) {
       console.error('Failed to load assigned work:', error);

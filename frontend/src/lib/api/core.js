@@ -8,6 +8,7 @@ import {
 
 // Use relative path for API calls - Vite proxy will handle dev, production uses same origin
 export const API_BASE = '/api';
+export const API_V2_BASE = '/api/v2';
 export const ADMIN_UI_MUTATION_EVENT = 'windshift:admin-ui-mutation';
 
 // Ensure the clock-drift warning toast fires at most once per session
@@ -54,7 +55,7 @@ function normalizeGETEndpoint(endpoint) {
   }
 }
 
-function inFlightGETKey(endpoint, options) {
+function inFlightGETKey(base, endpoint, options) {
   if (!apiRequestSessionKey) return null;
   const method = String(options?.method || 'GET').toUpperCase();
   if (method !== 'GET') return null;
@@ -64,7 +65,7 @@ function inFlightGETKey(endpoint, options) {
   const optionKeys = Object.keys(options || {});
   if (optionKeys.some((key) => key !== 'method')) return null;
 
-  return `${apiRequestSessionKey}|${requestLocale()}|${normalizeGETEndpoint(endpoint)}`;
+  return `${apiRequestSessionKey}|${requestLocale()}|${base}|${normalizeGETEndpoint(endpoint)}`;
 }
 
 function isAdminUIPath() {
@@ -110,9 +111,11 @@ function createApiError(response, responseText) {
   // Try to parse structured error from response
   try {
     const parsed = JSON.parse(responseText);
-    /** @type {any} */ (error).code = parsed.code;
-    /** @type {any} */ (error).errorCode = parsed.code; // Alias for compatibility
-    /** @type {any} */ (error).details = parsed.details || {};
+    const payload =
+      typeof parsed.error === 'object' && parsed.error !== null ? parsed.error : parsed;
+    /** @type {any} */ (error).code = payload.code;
+    /** @type {any} */ (error).errorCode = payload.code; // Alias for compatibility
+    /** @type {any} */ (error).details = payload.details || {};
     /** @type {any} */ (error).requestId = parsed.request_id;
     /** @type {any} */ (error).body = parsed;
     // Authentication policy responses carry flow-control fields alongside the
@@ -122,7 +125,8 @@ function createApiError(response, responseText) {
     /** @type {any} */ (error).enrollment_required = parsed.enrollment_required === true;
     /** @type {any} */ (error).sso_required = parsed.sso_required === true;
     /** @type {any} */ (error).policy_message = parsed.policy_message;
-    error.message = parsed.error || parsed.message || error.message;
+    error.message =
+      (typeof parsed.error === 'string' ? parsed.error : payload.message) || error.message;
   } catch {
     // Response is not JSON, keep original message
   }
@@ -135,10 +139,11 @@ function createApiError(response, responseText) {
 }
 
 /**
+ * @param {string} base
  * @param {string} endpoint
  * @param {RequestInit & { timeout?: number }} [options]
  */
-async function performFetchAPI(endpoint, options = {}) {
+async function performFetchAPI(base, endpoint, options = {}) {
   const { timeout: requestedTimeout = 0, signal: callerSignal, ...fetchOptions } = options;
   const isFormData = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
   const headers = isFormData
@@ -187,7 +192,7 @@ async function performFetchAPI(endpoint, options = {}) {
 
   let response;
   try {
-    response = await fetch(`${API_BASE}${endpoint}`, {
+    response = await fetch(`${base}${endpoint}`, {
       ...fetchOptions,
       credentials: 'same-origin', // Include cookies for session auth
       headers,
@@ -301,14 +306,43 @@ async function performFetchAPI(endpoint, options = {}) {
 }
 
 export function fetchAPI(endpoint, options = {}) {
-  const key = inFlightGETKey(endpoint, options);
-  if (!key) return performFetchAPI(endpoint, options);
+  return fetchFromAPI(API_BASE, endpoint, options);
+}
+
+export function fetchAPIV2(endpoint, options = {}) {
+  return fetchFromAPI(API_V2_BASE, endpoint, options);
+}
+
+export async function fetchV2Data(endpoint, options = {}) {
+  const document = await fetchAPIV2(endpoint, options);
+  return document?.data;
+}
+
+export async function fetchAllV2Pages(endpoint, options = {}) {
+  const url = new URL(endpoint, 'https://windshift.invalid');
+  url.searchParams.set('page_size', '100');
+  const items = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    url.searchParams.set('page', String(page));
+    const document = await fetchAPIV2(`${url.pathname}${url.search}`, options);
+    items.push(...(document?.data ?? []));
+    totalPages = document?.pagination?.total_pages ?? 0;
+    page += 1;
+  } while (page <= totalPages);
+  return items;
+}
+
+function fetchFromAPI(base, endpoint, options) {
+  const key = inFlightGETKey(base, endpoint, options);
+  if (!key) return performFetchAPI(base, endpoint, options);
 
   const existing = inFlightGetRequests.get(key);
   if (existing) return existing;
 
   let trackedRequest;
-  trackedRequest = performFetchAPI(endpoint, options).finally(() => {
+  trackedRequest = performFetchAPI(base, endpoint, options).finally(() => {
     if (inFlightGetRequests.get(key) === trackedRequest) {
       inFlightGetRequests.delete(key);
     }

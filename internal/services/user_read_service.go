@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
+	"net/mail"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/sanitize"
 )
 
 // UserReadService provides read operations for users
@@ -23,6 +24,10 @@ type AdminUserUpdate struct {
 	FirstName *string
 	LastName  *string
 	Email     *string
+	Username  *string
+	AvatarURL *string
+	Timezone  *string
+	Language  *string
 	IsActive  *bool
 }
 
@@ -31,7 +36,25 @@ func (u AdminUserUpdate) IsEmpty() bool {
 	return (u.FirstName == nil || *u.FirstName == "") &&
 		(u.LastName == nil || *u.LastName == "") &&
 		(u.Email == nil || *u.Email == "") &&
+		(u.Username == nil || *u.Username == "") &&
+		u.AvatarURL == nil &&
+		(u.Timezone == nil || *u.Timezone == "") &&
+		(u.Language == nil || *u.Language == "") &&
 		u.IsActive == nil
+}
+
+var (
+	ErrUserManagedExternally = errors.New("user is managed externally")
+	ErrUserEmailExists       = errors.New("email already exists")
+	ErrUserUsernameExists    = errors.New("username already exists")
+	ErrUserEmailInvalid      = errors.New("email is invalid")
+)
+
+// AdminUserUpdateResult carries the pre-image and updated user for transport
+// audit projections.
+type AdminUserUpdateResult struct {
+	Before *repository.UpdateProfileSnapshot
+	User   *models.User
 }
 
 // NewUserReadService creates a new user read service
@@ -115,62 +138,113 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 
 // GetByID retrieves a user by ID
 func (s *UserReadService) GetByID(id int) (*models.User, error) {
-	row := s.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at
-		FROM users WHERE id = ?
-	`, id)
-
-	u, err := scanUserRow(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("user not found: %d: %w", id, repository.ErrNotFound)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	return &u, nil
+	return repository.NewUserRepository(s.db).GetByID(id)
 }
 
-// UpdateAdmin applies a partial system-admin update to a user. Callers should
-// check AdminUserUpdate.IsEmpty before invoking it. ErrUserNotFound is returned
-// when no row is updated.
-func (s *UserReadService) UpdateAdmin(id int, update AdminUserUpdate) error {
-	sets := []string{}
-	args := []any{}
-	if update.FirstName != nil && *update.FirstName != "" {
-		sets = append(sets, "first_name = ?")
-		args = append(args, *update.FirstName)
+// ListAdmin returns all users, including inactive users, with stable pagination.
+func (s *UserReadService) ListAdmin(pagination PaginationParams) ([]models.User, int, error) {
+	users, err := repository.NewUserRepository(s.db).ListAdmin()
+	if err != nil {
+		return nil, 0, err
 	}
-	if update.LastName != nil && *update.LastName != "" {
-		sets = append(sets, "last_name = ?")
-		args = append(args, *update.LastName)
+	total := len(users)
+	start := pagination.Offset
+	if start < 0 {
+		start = 0
 	}
-	if update.Email != nil && *update.Email != "" {
-		sets = append(sets, "email = ?")
-		args = append(args, *update.Email)
+	if start > total {
+		start = total
 	}
-	if update.IsActive != nil {
-		sets = append(sets, "is_active = ?")
-		args = append(args, *update.IsActive)
+	end := total
+	if pagination.Limit > 0 && start+pagination.Limit < end {
+		end = start + pagination.Limit
 	}
-	if len(sets) == 0 {
-		return nil
-	}
-	sets = append(sets, "updated_at = CURRENT_TIMESTAMP")
-	args = append(args, id)
+	return users[start:end], total, nil
+}
 
-	result, err := s.db.ExecWrite("UPDATE users SET "+strings.Join(sets, ", ")+" WHERE id = ?", args...)
+// UpdateAdmin applies the shared administrator profile mutation. Empty string
+// pointer values retain the existing value, matching the bearer compatibility
+// contract. Activation remains an independently projected field.
+func (s *UserReadService) UpdateAdmin(id int, update AdminUserUpdate) (*AdminUserUpdateResult, error) {
+	sanitizeOptional := func(value *string, policy sanitize.Policy) {
+		if value != nil {
+			sanitize.Apply(value, policy)
+		}
+	}
+	sanitizeOptional(update.FirstName, sanitize.PlainTextField)
+	sanitizeOptional(update.LastName, sanitize.PlainTextField)
+	sanitizeOptional(update.Username, sanitize.ShortIdentifier)
+	sanitizeOptional(update.Timezone, sanitize.ShortIdentifier)
+	sanitizeOptional(update.Language, sanitize.ShortIdentifier)
+	repo := repository.NewUserRepository(s.db)
+	before, err := repo.GetUpdateProfileSnapshot(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrUserNotFound
+	}
 	if err != nil {
-		return fmt.Errorf("update user: %w", err)
+		return nil, err
 	}
-	rows, err := result.RowsAffected()
+	if before.SCIMManaged {
+		return nil, ErrUserManagedExternally
+	}
+
+	value := func(candidate *string, current string) string {
+		if candidate == nil || *candidate == "" {
+			return current
+		}
+		return *candidate
+	}
+	avatarURL := before.AvatarURL.String
+	if update.AvatarURL != nil {
+		avatarURL = *update.AvatarURL
+	}
+	timezone := value(update.Timezone, before.Timezone.String)
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	language := value(update.Language, before.Language.String)
+	if language == "" {
+		language = "en"
+	}
+	params := repository.UpdateProfileParams{
+		Email:     value(update.Email, before.Email),
+		Username:  value(update.Username, before.Username),
+		FirstName: value(update.FirstName, before.FirstName),
+		LastName:  value(update.LastName, before.LastName),
+		AvatarURL: avatarURL,
+		Timezone:  timezone,
+		Language:  language,
+	}
+	parsedEmail, parseErr := mail.ParseAddress(params.Email)
+	if parseErr != nil || parsedEmail.Address != params.Email {
+		return nil, ErrUserEmailInvalid
+	}
+	if exists, existsErr := repo.EmailExists(params.Email, id); existsErr != nil {
+		return nil, existsErr
+	} else if exists {
+		return nil, ErrUserEmailExists
+	}
+	if exists, existsErr := repo.UsernameExists(params.Username, id); existsErr != nil {
+		return nil, existsErr
+	} else if exists {
+		return nil, ErrUserUsernameExists
+	}
+	if err := repo.UpdateProfile(id, params); err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
+			return nil, ErrUserEmailExists
+		}
+		return nil, err
+	}
+	if update.IsActive != nil && *update.IsActive != before.IsActive {
+		if err := repo.SetActive(id, *update.IsActive); err != nil {
+			return nil, err
+		}
+	}
+	user, err := repo.GetByID(id)
 	if err != nil {
-		return fmt.Errorf("update user rows affected: %w", err)
+		return nil, err
 	}
-	if rows == 0 {
-		return ErrUserNotFound
-	}
-	return nil
+	return &AdminUserUpdateResult{Before: before, User: user}, nil
 }
 
 // GetGroupIDs returns active group membership IDs for a user.

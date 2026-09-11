@@ -2,6 +2,7 @@ import { derived, get, writable } from 'svelte/store';
 import { api } from '../api.js';
 import { confirm } from '../composables/useConfirm.js';
 import { QLBuilder } from '../utils/ql.js';
+import { completionFieldToFilterField } from '../utils/qlCompletion.js';
 import { t } from './i18n.svelte.js';
 import { warningToast } from './toasts.svelte.js';
 
@@ -14,7 +15,7 @@ import { warningToast } from './toasts.svelte.js';
  * URL round-trip, and the polished raw-mode UX (confirm-then-snapshot,
  * tryParseToBuilder on reset, warning toast for dropped clauses).
  */
-export function createWorkItemSearchStore() {
+export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
   // ===== Filter state =====
   const searchQuery = writable('');
   const selectedWorkspaces = writable([]);
@@ -173,7 +174,7 @@ export function createWorkItemSearchStore() {
   // ===== Search execution =====
   async function executeSearch({ page = 1, limit = 50 } = {}) {
     const finalQl = get(qlQuery);
-    if (!finalQl?.trim()) {
+    if (!allowEmptyQuery && !finalQl?.trim()) {
       workItems.set([]);
       pagination.set(null);
       qlError.set(null);
@@ -183,8 +184,8 @@ export function createWorkItemSearchStore() {
     qlError.set(null);
     try {
       const response = await api.items.getAll({ ql: finalQl, page, limit });
-      if (response?.items) {
-        workItems.set(response.items);
+      if (response?.data) {
+        workItems.set(response.data);
         pagination.set(response.pagination || null);
       } else {
         workItems.set(response || []);
@@ -232,16 +233,14 @@ export function createWorkItemSearchStore() {
     let statusCatalog = get(allStatuses);
     let priorityCatalog = get(allPriorities);
     try {
-      const [cf, st, pr] = await Promise.all([
-        api.customFields.getAll(),
+      const [catalog, st, pr] = await Promise.all([
+        api.queryLanguage.getCatalog(),
         statusCatalog.length ? null : api.statuses.getAll(),
         priorityCatalog.length ? null : api.priorities.getAll(),
       ]);
-      customFieldsCatalog = (cf?.data || []).map((field) => ({
-        id: `cf_${field.name}`,
-        name: field.name,
-        type: field.field_type,
-      }));
+      customFieldsCatalog = (catalog?.fields || [])
+        .filter((field) => /^cfid_\d+$/i.test(field.name))
+        .map(completionFieldToFilterField);
       if (st) {
         statusCatalog = (st || []).map((s) => ({ id: s.id, name: s.name || s.key || '' }));
       }

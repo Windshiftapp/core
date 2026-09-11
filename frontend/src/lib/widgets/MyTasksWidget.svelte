@@ -55,9 +55,7 @@
 
       if (currentVersion !== fetchVersion) return;
 
-      const rawItems = Array.isArray(response)
-        ? response
-        : (response?.items ?? []);
+      const rawItems = response?.data ?? [];
 
       const normalized = rawItems
         .filter(item => item && item.id)

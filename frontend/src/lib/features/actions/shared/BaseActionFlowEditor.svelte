@@ -293,9 +293,9 @@
   }
 </script>
 
-<div class="flex h-full action-flow-editor">
+<div class="flex h-full w-full min-w-0 action-flow-editor">
   <!-- Node Palette -->
-  <div class="w-64 sidebar border-r flex flex-col py-4 overflow-y-auto flex-shrink-0">
+  <div class="action-palette sidebar border-r flex flex-col py-4 overflow-y-auto flex-shrink-0">
     <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center gap-3">
         <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
@@ -347,7 +347,11 @@
   </div>
 
   <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative" bind:this={flowContainer} data-testid="action-editor-canvas">
+  <div
+    class="flex-1 min-w-0 relative overflow-hidden"
+    bind:this={flowContainer}
+    data-testid="action-editor-canvas"
+  >
     <SvelteFlow
       bind:nodes
       bind:edges
@@ -412,7 +416,7 @@
   <!-- Config Panel (shown when node is selected) -->
   {#if selectedNode}
     {#key selectedNode.id}
-      <div class="w-80 sidebar border-l p-4 overflow-y-auto flex-shrink-0">
+      <div class="action-config sidebar border-l p-4 overflow-y-auto flex-shrink-0">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-medium sidebar-title">{nodeConfigLabel}</h3>
           <button
@@ -443,6 +447,18 @@
   .sidebar {
     background-color: var(--ds-surface-raised);
     border-color: var(--ds-border);
+  }
+
+  .action-palette {
+    width: 16rem;
+    min-width: 16rem;
+    max-width: 16rem;
+  }
+
+  .action-config {
+    width: 20rem;
+    min-width: 20rem;
+    max-width: 20rem;
   }
 
   .sidebar-title {

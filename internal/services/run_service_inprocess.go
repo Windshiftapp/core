@@ -51,10 +51,18 @@ func runRepos(req RunRequest) []*repoprep.RepoSpec {
 // workspace layout (WI-449): the slug's last segment ("owner/core-tests" ->
 // "core-tests"), disambiguated with a numeric suffix if two repos share a name.
 func repoDirNames(repos []*repoprep.RepoSpec) []string {
-	names := make([]string, len(repos))
-	seen := make(map[string]int, len(repos))
-	for i, r := range repos {
-		base := r.RepoSlug
+	slugs := make([]string, len(repos))
+	for i, repo := range repos {
+		slugs[i] = repo.RepoSlug
+	}
+	return repoWorkspaceDirNames(slugs)
+}
+
+func repoWorkspaceDirNames(slugs []string) []string {
+	names := make([]string, len(slugs))
+	seen := make(map[string]int, len(slugs))
+	for i, slug := range slugs {
+		base := slug
 		if idx := strings.LastIndex(base, "/"); idx >= 0 && idx < len(base)-1 {
 			base = base[idx+1:]
 		}
@@ -85,156 +93,182 @@ func queueBuffer(capacity int) int {
 // claimNext admits queued work; preamble failures finalize in place, and shutdown drains queued runs.
 func (s *RunService) claimNext() *ClaimedJob {
 	for {
-		var job queuedJob
-		select {
-		case job = <-s.queue:
-		case <-s.shutdownCh:
-			// Drain still-queued runs as canceled, then stop. Channel
-			// receive is safe across workers; whichever worker wins
-			// finalizes the run.
-			for {
-				select {
-				case j := <-s.queue:
-					s.finalize(j.runID, models.AgentRunStatusCanceled, "shutdown before admission")
-					s.wg.Done()
-				default:
-					return nil
-				}
-			}
+		job, ok := s.dequeueClaimJob()
+		if !ok {
+			return nil
 		}
 
-		// Per-run context, wired to shutdown so RunService.Cancel and
-		// process shutdown both reach the in-flight runner.
-		runCtx, cancel := context.WithCancel(context.Background())
-		s.registerCancel(job.runID, cancel)
-		go func() {
-			select {
-			case <-s.shutdownCh:
-				cancel()
-			case <-runCtx.Done():
-			}
-		}()
-
-		now := s.now()
-		transitioned, err := s.repo.MarkRunningIfQueued(runCtx, job.runID, "", now)
-		if err != nil {
-			s.logger.Printf("run service: mark running run=%d: %v", job.runID, err)
-			s.failClaim(job, cancel, fmt.Sprintf("mark running: %v", err), false)
+		runCtx, cancel, ok := s.beginClaim(job)
+		if !ok {
 			continue
-		}
-		if !transitioned {
-			// The row left 'queued' while the job sat on the in-memory
-			// channel — canceled via the API (WI-341) or otherwise already
-			// terminal. The terminal status (and its lifecycle event) is
-			// recorded by whoever made that transition; just release the
-			// run's accounting and move on instead of executing it anyway.
-			s.logger.Printf("run service: skipping run=%d: no longer queued at dequeue", job.runID)
-			cancel()
-			s.unregisterCancel(job.runID)
-			s.wg.Done()
-			continue
-		}
-		if err := s.repo.AppendEvent(runCtx, job.runID, "lifecycle", `{"phase":"running"}`); err != nil {
-			s.logger.Printf("run service: append running event run=%d: %v", job.runID, err)
 		}
 
 		st := claimState{req: job.req, ephemeral: job.req.Ephemeral, cancel: cancel}
-
-		repos := runRepos(job.req)
-		if len(repos) > 0 {
-			// Single repo → the checkout dir itself is the agent's cwd (the
-			// pre-WI-449 layout, unchanged). Multiple repos → each is checked
-			// out as a sibling dir under a shared per-run workspace root that
-			// becomes the cwd, so the agent sees every bound repo at once.
-			multi := len(repos) > 1
-			if multi {
-				st.workspaceRoot = s.preparer.RunWorkspaceDir(job.runID)
-			}
-			dirNames := repoDirNames(repos)
-			prepFailed := false
-			for i, rspec := range repos {
-				spec := *rspec
-				if multi {
-					spec.DestDir = filepath.Join(st.workspaceRoot, dirNames[i])
-				}
-				pw, err := s.preparer.Prepare(runCtx, spec, job.runID)
-				if err != nil {
-					s.logger.Printf("run service: prepare checkout run=%d repo=%s: %v", job.runID, rspec.RepoSlug, err)
-					prepFailed = true
-					break
-				}
-				st.repos = append(st.repos, rspec)
-				st.checkouts = append(st.checkouts, pw)
-				_ = s.repo.AppendEvent(runCtx, job.runID, "lifecycle", fmt.Sprintf(
-					`{"phase":"worktree_ready","repo":%q,"path":%q,"branch":%q,"base_commit":%q}`,
-					rspec.RepoSlug, pw.Path, pw.Branch, pw.BaseCommit))
-			}
-			if prepFailed {
-				// A partial multi-repo checkout is unusable; clean up what we
-				// prepared and fail visibly. Checkout-prep failure fires the
-				// post-run hook (matches the prior inline behavior).
-				for _, pw := range st.checkouts {
-					_ = s.preparer.Cleanup(context.Background(), pw)
-				}
-				if st.workspaceRoot != "" {
-					s.preparer.CleanupWorkspaceDir(job.runID)
-				}
-				s.failClaim(job, cancel, "prepare checkout failed", true)
-				continue
-			}
-			// The primary checkout (index 0) drives the single-repo-compatible
-			// path: its branch is the grant ref, and it's the cwd for a
-			// single-repo run.
-			primary := st.checkouts[0]
-			st.branch = primary.Branch
-			st.baseCommit = primary.BaseCommit
-			if multi {
-				st.path = st.workspaceRoot
-			} else {
-				st.path = primary.Path
-			}
+		if err := s.prepareClaimRepos(runCtx, job, &st); err != nil {
+			s.failClaim(job, cancel, "prepare checkout failed", true)
+			continue
 		}
 
-		// Caller-supplied env first; the orchestrator's own injections
-		// (WS_TOKEN) overwrite on conflict so a confused caller cannot
-		// smuggle in its own token. The token mint + grant snapshot (bound to
-		// the minted token, git ref = the prepared worktree branch) is the
-		// shared preamble the remote claim path also runs (WI-195).
-		env := make(map[string]string, len(job.req.Env)+1)
-		for k, v := range job.req.Env {
-			env[k] = v
+		env, err := s.buildClaimEnv(runCtx, job, &st)
+		if err != nil {
+			s.logger.Printf("run service: mint ws token run=%d: %v", job.runID, err)
+			s.failClaim(job, cancel, fmt.Sprintf("mint ws token: %v", err), false)
+			continue
 		}
-		if job.req.Token != nil {
-			// Per-repo push refs: each grant may push only its prepared branch
-			// (WI-449). Built from the parallel repos/checkouts slices.
-			refByRepo := make(map[string]string, len(st.checkouts))
-			for i, pw := range st.checkouts {
-				refByRepo[st.repos[i].RepoSlug] = pw.Branch
-			}
-			token, err := s.mintTokenAndGrants(runCtx, job.runID, *job.req.Token, job.req.Grants, refByRepo)
-			if err != nil {
-				s.logger.Printf("run service: mint ws token run=%d: %v", job.runID, err)
-				// Token-mint failure does not fire the hook (matches the
-				// prior inline behavior).
-				s.failClaim(job, cancel, fmt.Sprintf("mint ws token: %v", err), false)
-				continue
-			}
-			env["WS_TOKEN"] = token
-			applyLLMProxyEnv(env, job.req.Grants, job.runID, token)
+		if err := pinSandboxWSEnvironment(env); err != nil {
+			s.logger.Printf("run service: pin ws destination run=%d: %v", job.runID, err)
+			s.failClaim(job, cancel, "pin ws destination failed", true)
+			continue
 		}
+		return s.finishClaim(runCtx, job, &st, env)
+	}
+}
 
-		s.claimsMu.Lock()
-		s.claims[job.runID] = &st
-		s.claimsMu.Unlock()
-
-		initialPrompt := s.initialPrompt
-		if job.req.InitialPrompt != "" {
-			initialPrompt = job.req.InitialPrompt
+func (s *RunService) dequeueClaimJob() (queuedJob, bool) {
+	select {
+	case job := <-s.queue:
+		return job, true
+	case <-s.shutdownCh:
+		for {
+			select {
+			case job := <-s.queue:
+				s.finalize(job.runID, models.AgentRunStatusCanceled, "shutdown before admission")
+				s.wg.Done()
+			default:
+				return queuedJob{}, false
+			}
 		}
-		// Per-binding instructions + skills index ride as a suffix on top of
-		// whichever base prompt won (WI-258).
-		initialPrompt += job.req.InitialPromptSuffix
-		return &ClaimedJob{Spec: JobSpec{RunID: job.runID, WorkspacePath: st.path, Env: env, InitialPrompt: initialPrompt, Kind: job.req.JobKind, Image: job.req.JobImage}, Ctx: runCtx}
+	}
+}
+
+func (s *RunService) beginClaim(job queuedJob) (runCtx context.Context, cancel context.CancelFunc, claimed bool) {
+	runCtx, cancel = context.WithCancel(context.Background())
+	s.registerCancel(job.runID, cancel)
+	go func() {
+		select {
+		case <-s.shutdownCh:
+			cancel()
+		case <-runCtx.Done():
+		}
+	}()
+
+	transitioned, err := s.repo.MarkRunningIfQueued(runCtx, job.runID, "", s.now())
+	if err != nil {
+		s.logger.Printf("run service: mark running run=%d: %v", job.runID, err)
+		s.failClaim(job, cancel, fmt.Sprintf("mark running: %v", err), false)
+		return nil, nil, false
+	}
+	if !transitioned {
+		s.logger.Printf("run service: skipping run=%d: no longer queued at dequeue", job.runID)
+		cancel()
+		s.unregisterCancel(job.runID)
+		s.wg.Done()
+		return nil, nil, false
+	}
+	if err := s.repo.AppendEvent(runCtx, job.runID, "lifecycle", `{"phase":"running"}`); err != nil {
+		s.logger.Printf("run service: append running event run=%d: %v", job.runID, err)
+	}
+	return runCtx, cancel, true
+}
+
+func (s *RunService) prepareClaimRepos(ctx context.Context, job queuedJob, state *claimState) error {
+	repos := runRepos(job.req)
+	if len(repos) == 0 {
+		return nil
+	}
+
+	multi := len(repos) > 1
+	if multi {
+		state.workspaceRoot = s.preparer.RunWorkspaceDir(job.runID)
+	}
+	dirNames := repoDirNames(repos)
+	for i, repo := range repos {
+		spec := *repo
+		if multi {
+			spec.DestDir = filepath.Join(state.workspaceRoot, dirNames[i])
+		}
+		prepared, err := s.preparer.Prepare(ctx, spec, job.runID)
+		if err != nil {
+			s.logger.Printf("run service: prepare checkout run=%d repo=%s: %v", job.runID, repo.RepoSlug, err)
+			for _, checkout := range state.checkouts {
+				_ = s.preparer.Cleanup(context.Background(), checkout)
+			}
+			if state.workspaceRoot != "" {
+				s.preparer.CleanupWorkspaceDir(job.runID)
+			}
+			return err
+		}
+		state.repos = append(state.repos, repo)
+		state.checkouts = append(state.checkouts, prepared)
+		if err := writeSandboxWSConfig(prepared.Path, job.req.Env); err != nil {
+			for _, checkout := range state.checkouts {
+				_ = s.preparer.Cleanup(context.Background(), checkout)
+			}
+			if state.workspaceRoot != "" {
+				s.preparer.CleanupWorkspaceDir(job.runID)
+			}
+			return fmt.Errorf("pin checkout ws config: %w", err)
+		}
+		_ = s.repo.AppendEvent(ctx, job.runID, "lifecycle", fmt.Sprintf(
+			`{"phase":"worktree_ready","repo":%q,"path":%q,"branch":%q,"base_commit":%q}`,
+			repo.RepoSlug, prepared.Path, prepared.Branch, prepared.BaseCommit))
+	}
+
+	primary := state.checkouts[0]
+	state.branch = primary.Branch
+	state.baseCommit = primary.BaseCommit
+	state.path = primary.Path
+	if multi {
+		state.path = state.workspaceRoot
+		if err := writeSandboxWSConfig(state.workspaceRoot, job.req.Env); err != nil {
+			for _, checkout := range state.checkouts {
+				_ = s.preparer.Cleanup(context.Background(), checkout)
+			}
+			s.preparer.CleanupWorkspaceDir(job.runID)
+			return fmt.Errorf("pin workspace ws config: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *RunService) buildClaimEnv(ctx context.Context, job queuedJob, state *claimState) (map[string]string, error) {
+	env := make(map[string]string, len(job.req.Env)+1)
+	for key, value := range job.req.Env {
+		env[key] = value
+	}
+	if job.req.Token == nil {
+		return env, nil
+	}
+
+	refByRepo := make(map[string]string, len(state.checkouts))
+	for i, checkout := range state.checkouts {
+		refByRepo[state.repos[i].RepoSlug] = checkout.Branch
+	}
+	token, err := s.mintTokenAndGrants(ctx, job.runID, *job.req.Token, job.req.Grants, refByRepo)
+	if err != nil {
+		return nil, err
+	}
+	env["WS_TOKEN"] = token
+	applyLLMProxyEnv(env, job.req.Grants, job.runID, token)
+	return env, nil
+}
+
+func (s *RunService) finishClaim(ctx context.Context, job queuedJob, state *claimState, env map[string]string) *ClaimedJob {
+	s.claimsMu.Lock()
+	s.claims[job.runID] = state
+	s.claimsMu.Unlock()
+
+	initialPrompt := s.initialPrompt
+	if job.req.InitialPrompt != "" {
+		initialPrompt = job.req.InitialPrompt
+	}
+	initialPrompt += job.req.InitialPromptSuffix
+	return &ClaimedJob{
+		Spec: JobSpec{
+			RunID: job.runID, WorkspacePath: state.path, Env: env,
+			InitialPrompt: initialPrompt, Kind: job.req.JobKind, Image: job.req.JobImage,
+		},
+		Ctx: ctx,
 	}
 }
 
@@ -282,41 +316,8 @@ func (s *RunService) Report(ctx context.Context, runID int, result RunnerResult)
 	delete(s.claims, runID)
 	s.claimsMu.Unlock()
 
-	if result.ContainerID != "" {
-		if err := s.repo.SetContainerID(ctx, runID, result.ContainerID); err != nil {
-			s.logger.Printf("run service: set container_id run=%d: %v", runID, err)
-		}
-	}
-	status := result.Status
-	if !models.IsAgentRunTerminal(status) {
-		status = models.AgentRunStatusFailed
-		if result.Error == "" {
-			result.Error = fmt.Sprintf("runner returned non-terminal status %q", result.Status)
-		}
-	}
-
-	// The orchestrator pushes because agents lack SCM credentials. Each repo is
-	// delivered independently; no-commit repos are skipped, while a push failure
-	// fails the run so the PR hook cannot open an unpushed branch.
-	var pushedRepos []PostRunRepo
-	if status == models.AgentRunStatusSucceeded && st != nil && !st.ephemeral && len(st.checkouts) > 0 && s.preparer != nil {
-		for i, pw := range st.checkouts {
-			rspec := st.repos[i]
-			rr := PostRunRepo{RepoSlug: rspec.RepoSlug, Branch: pw.Branch, BaseCommit: pw.BaseCommit}
-			switch err := s.preparer.Push(context.Background(), pw, rspec.Token); {
-			case errors.Is(err, repoprep.ErrNoNewCommits):
-				rr.Branch = "" // nothing delivered for this repo
-				if err := s.repo.AppendEvent(ctx, runID, "lifecycle", fmt.Sprintf(`{"phase":"no_changes","repo":%q}`, rspec.RepoSlug)); err != nil {
-					s.logger.Printf("run service: append no_changes event run=%d: %v", runID, err)
-				}
-			case err != nil:
-				s.logger.Printf("run service: push run branch run=%d repo=%s: %v", runID, rspec.RepoSlug, err)
-				status = models.AgentRunStatusFailed
-				result.Error = fmt.Sprintf("push run branch %s: %v", rspec.RepoSlug, err)
-			}
-			pushedRepos = append(pushedRepos, rr)
-		}
-	}
+	status := s.normalizeRunnerResult(ctx, runID, &result)
+	pushedRepos, status := s.pushClaimRepos(ctx, runID, st, status, &result)
 	// Legacy scalar branch fields mirror the primary repo's no-change outcome.
 	noChanges := len(pushedRepos) > 0 && pushedRepos[0].Branch == ""
 
@@ -373,6 +374,31 @@ func (s *RunService) Report(ctx context.Context, runID int, result RunnerResult)
 	s.unregisterCancel(runID)
 	s.wg.Done()
 	return nil
+}
+
+// pushClaimRepos delivers local checkout branches before the run is finalized.
+func (s *RunService) pushClaimRepos(ctx context.Context, runID int, st *claimState, status string, result *RunnerResult) (repos []PostRunRepo, finalStatus string) {
+	if status != models.AgentRunStatusSucceeded || st == nil || st.ephemeral || len(st.checkouts) == 0 || s.preparer == nil {
+		return nil, status
+	}
+	repos = make([]PostRunRepo, 0, len(st.checkouts))
+	for i, prepared := range st.checkouts {
+		repo := st.repos[i]
+		pushed := PostRunRepo{RepoSlug: repo.RepoSlug, Branch: prepared.Branch, BaseCommit: prepared.BaseCommit}
+		switch err := s.preparer.Push(context.Background(), prepared, repo.Token); {
+		case errors.Is(err, repoprep.ErrNoNewCommits):
+			pushed.Branch = ""
+			if err := s.repo.AppendEvent(ctx, runID, "lifecycle", fmt.Sprintf(`{"phase":"no_changes","repo":%q}`, repo.RepoSlug)); err != nil {
+				s.logger.Printf("run service: append no_changes event run=%d: %v", runID, err)
+			}
+		case err != nil:
+			s.logger.Printf("run service: push run branch run=%d repo=%s: %v", runID, repo.RepoSlug, err)
+			status = models.AgentRunStatusFailed
+			result.Error = fmt.Sprintf("push run branch %s: %v", repo.RepoSlug, err)
+		}
+		repos = append(repos, pushed)
+	}
+	return repos, status
 }
 
 // Heartbeat implements OrchestratorClient. The in-process worker holds the

@@ -263,10 +263,14 @@ func (r *WorkflowRepository) Delete(id int) (cancelledApprovalIDs []int, err err
 func (r *WorkflowRepository) ListTransitions(workflowID int) ([]models.WorkflowTransition, error) {
 	query := `
 		SELECT wt.id, wt.workflow_id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses, wt.display_order, wt.source_handle, wt.target_handle, wt.created_at,
-		       fs.name as from_status_name, ts.name as to_status_name, w.name as workflow_name
+		       fs.name as from_status_name, ts.name as to_status_name, w.name as workflow_name,
+		       fs.builtin_key, fsc.builtin_key, fsc.name, fsc.color,
+		       COALESCE(ts.builtin_key, ''), COALESCE(tsc.builtin_key, ''), tsc.name, tsc.color
 		FROM workflow_transitions wt
 		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
 		JOIN statuses ts ON wt.to_status_id = ts.id
+		LEFT JOIN status_categories fsc ON fs.category_id = fsc.id
+		JOIN status_categories tsc ON ts.category_id = tsc.id
 		JOIN workflows w ON wt.workflow_id = w.id
 		WHERE wt.workflow_id = ?
 		ORDER BY CASE WHEN wt.from_all_statuses THEN 1 ELSE 0 END, wt.from_status_id NULLS FIRST, wt.display_order ASC`
@@ -284,10 +288,14 @@ func (r *WorkflowRepository) ListTransitions(workflowID int) ([]models.WorkflowT
 func (r *WorkflowRepository) ListAllTransitions() ([]models.WorkflowTransition, error) {
 	rows, err := r.db.Query(`
 		SELECT wt.id, wt.workflow_id, wt.from_status_id, wt.to_status_id, wt.from_all_statuses, wt.display_order, wt.source_handle, wt.target_handle, wt.created_at,
-		       fs.name as from_status_name, ts.name as to_status_name, w.name as workflow_name
+		       fs.name as from_status_name, ts.name as to_status_name, w.name as workflow_name,
+		       fs.builtin_key, fsc.builtin_key, fsc.name, fsc.color,
+		       COALESCE(ts.builtin_key, ''), COALESCE(tsc.builtin_key, ''), tsc.name, tsc.color
 		FROM workflow_transitions wt
 		LEFT JOIN statuses fs ON wt.from_status_id = fs.id
 		JOIN statuses ts ON wt.to_status_id = ts.id
+		LEFT JOIN status_categories fsc ON fs.category_id = fsc.id
+		JOIN status_categories tsc ON ts.category_id = tsc.id
 		JOIN workflows w ON wt.workflow_id = w.id
 		ORDER BY wt.workflow_id, CASE WHEN wt.from_all_statuses THEN 1 ELSE 0 END, wt.from_status_id NULLS FIRST, wt.display_order ASC
 	`)
@@ -304,12 +312,15 @@ func scanWorkflowTransitions(rows *sql.Rows) ([]models.WorkflowTransition, error
 		var transition models.WorkflowTransition
 		var fromStatusID sql.NullInt64
 		var fromStatusName sql.NullString
+		var fromStatusBuiltinKey, fromCategoryBuiltinKey, fromCategoryName, fromCategoryColor sql.NullString
 		var sourceHandle sql.NullString
 		var targetHandle sql.NullString
 
 		err := rows.Scan(&transition.ID, &transition.WorkflowID, &fromStatusID, &transition.ToStatusID,
 			&transition.FromAllStatuses, &transition.DisplayOrder, &sourceHandle, &targetHandle, &transition.CreatedAt, &fromStatusName,
-			&transition.ToStatusName, &transition.WorkflowName)
+			&transition.ToStatusName, &transition.WorkflowName,
+			&fromStatusBuiltinKey, &fromCategoryBuiltinKey, &fromCategoryName, &fromCategoryColor,
+			&transition.ToStatusBuiltinKey, &transition.ToCategoryBuiltinKey, &transition.ToCategoryName, &transition.ToCategoryColor)
 		if err != nil {
 			return nil, err
 		}
@@ -322,6 +333,10 @@ func scanWorkflowTransitions(rows *sql.Rows) ([]models.WorkflowTransition, error
 		if fromStatusName.Valid {
 			transition.FromStatusName = fromStatusName.String
 		}
+		transition.FromStatusBuiltinKey = fromStatusBuiltinKey.String
+		transition.FromCategoryBuiltinKey = fromCategoryBuiltinKey.String
+		transition.FromCategoryName = fromCategoryName.String
+		transition.FromCategoryColor = fromCategoryColor.String
 
 		// Handle nullable handle fields
 		if sourceHandle.Valid {

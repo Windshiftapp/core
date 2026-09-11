@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"windshift/internal/cacheutil"
@@ -30,8 +31,21 @@ type scimTokenCacheEntry struct {
 
 // SCIMTokenManager handles SCIM token operations
 type SCIMTokenManager struct {
-	db    database.Database
-	cache *bigcache.BigCache
+	db        database.Database
+	cache     *bigcache.BigCache
+	closeOnce sync.Once
+	closeErr  error
+}
+
+// Close stops the validation cache's background worker without closing the
+// shared database. It may be called more than once, including with no cache.
+func (tm *SCIMTokenManager) Close() error {
+	tm.closeOnce.Do(func() {
+		if tm.cache != nil {
+			tm.closeErr = tm.cache.Close()
+		}
+	})
+	return tm.closeErr
 }
 
 // NewSCIMTokenManager creates a new SCIM token manager

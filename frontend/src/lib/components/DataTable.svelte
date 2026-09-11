@@ -171,6 +171,7 @@
           <tr>
             {#each columns as column, colIndex}
               <th
+                data-testid={`table-column-${column.key}`}
                 class="{thClass} {getColumnAlign(column)} {getColumnWidth(column)} {column.sortable ? 'group cursor-pointer select-none' : ''}"
                 style="color: var(--ds-text); {getColumnWidthStyle(column)} {column.headerStyle || ''}"
                 onclick={() => toggleSort(column)}

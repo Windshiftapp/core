@@ -64,7 +64,7 @@
     loading = true;
     try {
       const [tmpls, types] = await Promise.all([
-        api.itemTemplates.getAll({ workspace_id: workspaceId }),
+        api.itemTemplates.getAll(workspaceId),
         api.itemTypes.getAll(),
       ]);
       templates = tmpls ?? [];
@@ -120,15 +120,14 @@
       mode: formMode,
       is_active: formActive,
       item_type_ids: formTargetTypeIds,
-      workspace_id: Number(workspaceId),
     };
     saving = true;
     try {
       if (editingId === null) {
-        await api.itemTemplates.create(body);
+        await api.itemTemplates.create(workspaceId, body);
         successToast(t('workspaceTemplates.created'));
       } else {
-        await api.itemTemplates.update(editingId, body);
+        await api.itemTemplates.update(workspaceId, editingId, body);
         successToast(t('workspaceTemplates.updated'));
       }
       closeModal();
@@ -152,7 +151,7 @@
     pendingDelete = null;
     if (!target) return;
     try {
-      await api.itemTemplates.delete(target.id);
+      await api.itemTemplates.delete(workspaceId, target.id);
       successToast(t('workspaceTemplates.deleted'));
       await load();
     } catch (err) {

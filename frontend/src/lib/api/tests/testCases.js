@@ -1,8 +1,8 @@
-import { fetchAPI } from '../core.js';
+import { fetchAllV2Pages, fetchAPIV2, fetchV2Data } from '../core.js';
 import { createCrudClient } from '../createCrudClient.js';
 
 export const testCases = {
-  ...createCrudClient('/test-cases', { parentPath: '/workspaces' }),
+  ...createCrudClient('/test-cases', { parentPath: '/workspaces', v2: true }),
   // Custom getAll: callers pass `folder_id: null` (literal string "null" expected
   // by backend) or `all: true`; the generic buildQueryString cannot replicate
   // that, so the override stays bespoke.
@@ -13,61 +13,70 @@ export const testCases = {
     } else if (params.folder_id !== undefined) {
       queryParams.append('folder_id', params.folder_id === null ? 'null' : params.folder_id);
     }
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.offset) queryParams.append('offset', params.offset);
+    if (params.limit) queryParams.append('page_size', String(params.limit));
+    if (params.offset && params.limit) {
+      queryParams.append('page', String(Math.floor(params.offset / params.limit) + 1));
+    }
     if (params.q) queryParams.append('q', params.q);
     if (params.label_id) queryParams.append('label_id', params.label_id);
     const queryString = queryParams.toString();
-    return fetchAPI(`/workspaces/${workspaceId}/test-cases${queryString ? `?${queryString}` : ''}`);
+    const endpoint = `/workspaces/${workspaceId}/test-cases${queryString ? `?${queryString}` : ''}`;
+    return params.all && !params.limit ? fetchAllV2Pages(endpoint) : fetchV2Data(endpoint);
   },
-  count: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/test-cases/count`),
+  count: async (workspaceId) => {
+    const document = await fetchAPIV2(
+      `/workspaces/${workspaceId}/test-cases?all=true&page=1&page_size=1`
+    );
+    return { count: document?.pagination?.total_items ?? 0 };
+  },
   move: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}/move`, {
-      method: 'PUT',
+    fetchV2Data(`/workspaces/${workspaceId}/test-cases/${id}/move`, {
+      method: 'POST',
       body: JSON.stringify(data),
     }),
   reorder: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases/reorder`, {
-      method: 'PUT',
+    fetchV2Data(`/workspaces/${workspaceId}/test-cases/reorder`, {
+      method: 'POST',
       body: JSON.stringify(data),
     }),
   connections: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}/connections`),
+    fetchV2Data(`/workspaces/${workspaceId}/test-cases/${id}/connections`),
   // Test Steps
   steps: {
     getAll: (workspaceId, testCaseId) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`),
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`),
     create: (workspaceId, testCaseId, data) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`, {
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     update: (workspaceId, testCaseId, stepId, data) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/${stepId}`, {
-        method: 'PUT',
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/${stepId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/merge-patch+json' },
         body: JSON.stringify(data),
       }),
     delete: (workspaceId, testCaseId, stepId) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/${stepId}`, {
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/${stepId}`, {
         method: 'DELETE',
       }),
     reorder: (workspaceId, testCaseId, data) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/reorder`, {
-        method: 'PUT',
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/steps/reorder`, {
+        method: 'POST',
         body: JSON.stringify(data),
       }),
   },
   // Test Case Labels
   labels: {
     getAll: (workspaceId, testCaseId) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`),
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`),
     add: (workspaceId, testCaseId, labelId) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`, {
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`, {
         method: 'POST',
         body: JSON.stringify({ label_id: labelId }),
       }),
     remove: (workspaceId, testCaseId, labelId) =>
-      fetchAPI(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels/${labelId}`, {
+      fetchV2Data(`/workspaces/${workspaceId}/test-cases/${testCaseId}/labels/${labelId}`, {
         method: 'DELETE',
       }),
   },

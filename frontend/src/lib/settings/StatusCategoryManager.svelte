@@ -42,8 +42,8 @@
     try {
       loading = true;
       const [categories, statuses] = await Promise.all([
-        api.get('/status-categories') || [],
-        api.get('/statuses') || []
+        api.statusCategories.getAll() || [],
+        api.statuses.getAll() || []
       ]);
 
       // Add status count to each category
@@ -107,11 +107,11 @@
 
       if (editingId) {
         translationEditor?.validate();
-        await api.put(`/status-categories/${editingId}`, formData);
+        await api.statusCategories.update(editingId, formData);
         await translationEditor?.save();
         await loadStatusCategories();
       } else {
-        const created = await api.post('/status-categories', formData);
+        const created = await api.statusCategories.create(formData);
         statusCategories = [...statusCategories, { ...created, statusCount: 0 }];
       }
       
@@ -135,7 +135,7 @@
     if (!confirmed) return;
 
     try {
-      await api.delete(`/status-categories/${category.id}`);
+      await api.statusCategories.delete(category.id);
       statusCategories = statusCategories.filter(cat => cat.id !== category.id);
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {

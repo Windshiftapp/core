@@ -72,7 +72,7 @@
         api.customFields.getAll(),
       ]);
       configSets = allConfigSets?.configuration_sets || [];
-      previewCustomFieldDefinitions = customFields?.data || [];
+      previewCustomFieldDefinitions = customFields || [];
       availableWorkspaces = (channelWorkspaceIds && channelWorkspaceIds.length > 0)
         ? allWorkspaces.filter(ws => channelWorkspaceIds.includes(ws.id))
         : allWorkspaces;

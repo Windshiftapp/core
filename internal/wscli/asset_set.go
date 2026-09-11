@@ -10,8 +10,8 @@ import (
 var assetSetCmd = &cobra.Command{
 	Use:   "asset-set",
 	Short: "Browse asset sets",
-	Long: `Read-only commands for asset sets. Mutations (create / edit / archive
-roles / everyone-role / set CRUD) stay admin-UI-only on v1.`,
+	Long: `Read-only commands for asset sets. Mutations (create / edit / archive,
+roles, everyone-role, and set CRUD) remain available through the admin UI.`,
 }
 
 var assetSetListCmd = &cobra.Command{

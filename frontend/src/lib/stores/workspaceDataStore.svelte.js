@@ -287,7 +287,7 @@ class WorkspaceDataStore {
     try {
       const cfData = await api.customFields.getAll();
       if (this.workspaceId === 'global') {
-        this.customFieldDefinitions = cfData?.data || [];
+        this.customFieldDefinitions = cfData || [];
       }
     } catch (e) {
       console.warn('WorkspaceDataStore: failed to load custom field definitions', e);
@@ -317,7 +317,7 @@ class WorkspaceDataStore {
         api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
       customFieldDefinitions: async () => {
         const res = await api.customFields.getAll();
-        return res?.data || [];
+        return res || [];
       },
     };
 

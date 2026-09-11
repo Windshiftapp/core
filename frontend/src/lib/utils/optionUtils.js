@@ -1,14 +1,14 @@
 /**
  * Parse custom field options from the canonical ID-based format or a legacy label array.
  * Canonical format: {"next_id": 5, "items": [{"id": 1, "label": "Critical"}, ...]}
- * @param {string|null|undefined} optionsStr - JSON string of options
+ * @param {string|object|null|undefined} options - JSON options or their decoded v2 representation
  * @returns {{ nextId: number, items: Array<{id: number, label: string}> }}
  */
-export function parseFieldOptions(optionsStr) {
-  if (!optionsStr) return { nextId: 1, items: [] };
+export function parseFieldOptions(options) {
+  if (!options) return { nextId: 1, items: [] };
 
   try {
-    const parsed = JSON.parse(optionsStr);
+    const parsed = fieldOptionsObject(options);
 
     if (Array.isArray(parsed) && parsed.every((label) => typeof label === 'string')) {
       return {
@@ -28,6 +28,11 @@ export function parseFieldOptions(optionsStr) {
   }
 
   return { nextId: 1, items: [] };
+}
+
+export function fieldOptionsObject(options) {
+  if (!options) return {};
+  return typeof options === 'string' ? JSON.parse(options) : options;
 }
 
 /**

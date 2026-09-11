@@ -165,7 +165,7 @@
     <WaveBackground />
     <Seagulls />
   </div>
-  <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal">
+  <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal" dataTestid="setup-modal">
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div bind:this={keyboardDiv} role="dialog" tabindex="0" onkeydown={handleKeyDown} class="outline-none">
     <div class="px-6 py-8">
@@ -194,7 +194,7 @@
 
       <!-- Error Message -->
       {#if error}
-        <div class="mb-6 p-4 rounded flex items-center gap-2" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger); color: var(--ds-text-danger);">
+        <div data-testid="setup-validation-error" class="mb-6 p-4 rounded flex items-center gap-2" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger); color: var(--ds-text-danger);">
           <AlertCircle class="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -231,7 +231,7 @@
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
               <User class="w-6 h-6" style="color: var(--ds-icon-info);" />
             </div>
-            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.createAdminAccount')}</h2>
+            <h2 data-testid="setup-admin-heading" class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.createAdminAccount')}</h2>
             <p style="color: var(--ds-text-subtle);">{t('setup.adminAccountDesc', { appName: APP_NAME })}</p>
           </div>
 
@@ -319,7 +319,7 @@
             <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style="background-color: var(--ds-surface-information);">
               <Blocks class="w-6 h-6" style="color: var(--ds-icon-info);" />
             </div>
-            <h2 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.configureModules')}</h2>
+            <h2 data-testid="setup-modules-heading" class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.configureModules')}</h2>
             <p style="color: var(--ds-text-subtle);">{t('setup.configureModulesDesc')}</p>
           </div>
 
@@ -335,7 +335,7 @@
                     <p class="text-sm" style="color: var(--ds-text-subtle);">{t('setup.testManagementDesc')}</p>
                   </div>
                 </div>
-<Toggle bind:checked={moduleSettings.test_management_enabled} />
+<Toggle bind:checked={moduleSettings.test_management_enabled} dataTestid="setup-test-management" />
               </div>
             </div>
           </div>
@@ -366,6 +366,7 @@
               onclick={handleNext}
               title={t('setup.continueNextStepEnter')}
               keyboardHint="↵"
+              dataTestid="setup-next"
             >
               {t('setup.next')}
             </Button>
@@ -377,6 +378,7 @@
               loading={submitting}
               title={t('setup.completeSetupEnter')}
               keyboardHint={submitting ? null : '↵'}
+              dataTestid="setup-complete"
             >
               {#if submitting}
                 {t('setup.settingUp')}

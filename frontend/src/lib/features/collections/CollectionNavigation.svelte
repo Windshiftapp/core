@@ -1,13 +1,14 @@
 <script>
   import { IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconPencil as Pencil, IconLayoutRows as Rows_3, IconListTree as ListTree, IconFolderOpen as FolderOpen, IconChevronRight } from '@tabler/icons-svelte-runes';
   import { GanttChart } from '@lucide/svelte';
+  import { t } from '../../stores/i18n.svelte.js';
   import { navigate, currentRoute } from '../../router.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Button from '../../components/Button.svelte';
-  import { useEventListener } from 'runed';
-  import { uiStore } from '../../stores/ui.svelte.js';
+  import { uiStore, WS_SIDEBAR_DEFAULT_WIDTH } from '../../stores/ui.svelte.js';
   import { collectionStore } from '../../stores/collectionContext.js';
   import ScrollableSidebar from '../../layout/ScrollableSidebar.svelte';
+  import SidebarResizeHandle from '../../layout/SidebarResizeHandle.svelte';
 
 
   const MIN_WIDTH = 180;
@@ -16,44 +17,6 @@
 
   let sidebarWidth = $derived($uiStore.wsSidebarWidth);
   let isCollapsed = $derived($uiStore.wsSidebarCollapsed);
-  let isResizing = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-
-  function onResizeStart(e) {
-    e.preventDefault();
-    resizeStartX = e.clientX;
-    resizeStartWidth = isCollapsed ? 48 : sidebarWidth;
-    isResizing = true;
-  }
-
-  function handleResizeMove(e) {
-    const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
-    if (rawWidth < COLLAPSE_THRESHOLD) {
-      if (!isCollapsed) {
-        uiStore.wsSidebarCollapsed = true;
-      }
-    } else {
-      if (isCollapsed) {
-        uiStore.wsSidebarCollapsed = false;
-      }
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rawWidth));
-      uiStore.wsSidebarWidth = newWidth;
-    }
-  }
-
-  function handleResizeUp() {
-    isResizing = false;
-  }
-
-  useEventListener(() => isResizing ? window : undefined, 'mousemove', handleResizeMove);
-  useEventListener(() => isResizing ? window : undefined, 'mouseup', handleResizeUp);
-
-  function onResizeHandleDblClick() {
-    uiStore.wsSidebarCollapsed = false;
-    uiStore.resetWsSidebarWidth();
-  }
-
   let { collectionId = null } = $props();
 
   const collectionViewItems = [
@@ -70,18 +33,26 @@
   }
 
   let collectionName = $derived(collectionStore.collectionName);
-  let itemCount = $derived(collectionStore.itemsPagination?.total ?? 0);
+  let itemCount = $derived(collectionStore.collectionTotal);
 
   const sidebarBgStyle = 'background-color: var(--ds-surface); border-color: var(--ds-border);';
 </script>
 
 {#snippet resizeHandle()}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="ws-resize-handle"
-    onmousedown={onResizeStart}
-    ondblclick={onResizeHandleDblClick}
-  ></div>
+  <SidebarResizeHandle
+    width={sidebarWidth}
+    minWidth={MIN_WIDTH}
+    maxWidth={MAX_WIDTH}
+    defaultWidth={WS_SIDEBAR_DEFAULT_WIDTH}
+    collapsed={isCollapsed}
+    collapsedWidth={48}
+    collapseThreshold={COLLAPSE_THRESHOLD}
+    label="Resize collection navigation"
+    title="Drag to resize, double-click to reset"
+    onresize={(width) => uiStore.wsSidebarWidth = width}
+    onresizeend={(width) => uiStore.wsSidebarWidth = width}
+    oncollapsechange={(collapsed) => uiStore.wsSidebarCollapsed = collapsed}
+  />
 {/snippet}
 
 {#snippet expandedHeader()}
@@ -96,7 +67,7 @@
         <Tooltip content={collectionName}>
           <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{collectionName}</div>
         </Tooltip>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">Collection{#if itemCount > 0} · {itemCount} items{/if}</div>
+        <div data-testid="collection-sidebar-count" class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.collection')}{itemCount !== null ? ` · ${itemCount} ${t('layout.items')}` : ''}</div>
       </div>
     </div>
   </div>
@@ -155,6 +126,7 @@
         <Tooltip content={view.label} placement="right">
           <a
             href={getNavUrl(view.id)}
+            data-testid="collection-nav-{view.id}"
             class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
@@ -200,6 +172,7 @@
         <Tooltip content={view.tooltip} placement="right">
           <a
             href={getNavUrl(view.id)}
+            data-testid="collection-nav-{view.id}"
             class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
@@ -236,22 +209,6 @@
 {/if}
 
 <style>
-  .ws-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 4px;
-    height: 100%;
-    cursor: col-resize;
-    z-index: 10;
-    transition: background-color 150ms ease;
-  }
-
-  .ws-resize-handle:hover,
-  .ws-resize-handle:active {
-    background-color: var(--ds-border-focused, #3b82f6);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     nav,
     nav .border-t {

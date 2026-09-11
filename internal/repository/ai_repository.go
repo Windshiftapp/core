@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -19,11 +20,13 @@ func NewAIRepository(db database.Database) *AIRepository {
 
 // DailyBriefingSummary is the latest successful daily briefing for a user.
 type DailyBriefingSummary struct {
-	ID          int
-	Content     string
-	Date        string
-	UpdatedAt   string
-	GeneratedAt string
+	ID                 int
+	Content            string
+	Date               string
+	UpdatedAt          string
+	GeneratedAt        string
+	SourceWorkspaceIDs []int
+	ScopeRecorded      bool
 }
 
 // FailedBriefing is one row from daily_briefings where the LLM call failed.
@@ -70,15 +73,22 @@ func (r *AIRepository) ListFailedBriefings(since time.Time, limit int) ([]Failed
 // GetLatestSuccessfulDailyBriefing returns the latest non-error briefing for a user.
 func (r *AIRepository) GetLatestSuccessfulDailyBriefing(userID int) (*DailyBriefingSummary, error) {
 	var b DailyBriefingSummary
+	var sourceWorkspaceIDs sql.NullString
 	err := r.db.QueryRow(
-		`SELECT id, content, date, updated_at FROM daily_briefings WHERE user_id = ? AND error IS NULL ORDER BY date DESC LIMIT 1`,
+		`SELECT id, content, date, updated_at, source_workspace_ids FROM daily_briefings WHERE user_id = ? AND error IS NULL ORDER BY date DESC LIMIT 1`,
 		userID,
-	).Scan(&b.ID, &b.Content, &b.Date, &b.UpdatedAt)
+	).Scan(&b.ID, &b.Content, &b.Date, &b.UpdatedAt, &sourceWorkspaceIDs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if sourceWorkspaceIDs.Valid {
+		if err := json.Unmarshal([]byte(sourceWorkspaceIDs.String), &b.SourceWorkspaceIDs); err != nil {
+			return nil, err
+		}
+		b.ScopeRecorded = true
 	}
 	b.GeneratedAt = b.UpdatedAt
 	if t, parseErr := time.Parse("2006-01-02 15:04:05", b.UpdatedAt); parseErr == nil {

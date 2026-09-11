@@ -152,7 +152,7 @@ class TimerStore {
       this.error = null;
       this.#stateVersion += 1;
 
-      const result = await api.timer.stop(this.activeTimer.id);
+      const result = await api.timer.stop();
 
       // Clear active timer
       this.#stateVersion += 1;
@@ -199,6 +199,7 @@ class TimerStore {
         this.#stopSyncInterval();
       }
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error('Failed to sync timer:', err);
       this.error = err.message || 'Failed to sync timer';
     }

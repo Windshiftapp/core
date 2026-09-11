@@ -43,7 +43,12 @@
 />
 
 <foreignObject x={labelX - 24} y={labelY - 10} width="48" height="20" style="overflow: visible;">
-  <div class="all-incoming-label" class:all-incoming-label-selected={selected} title={t('workflows.fromAllStatuses')}>
+  <div
+    class="all-incoming-label"
+    class:all-incoming-label-selected={selected}
+    data-testid={`workflow-${id}`}
+    title={t('workflows.fromAllStatuses')}
+  >
     {t('workflows.allStatuses')}
   </div>
 </foreignObject>

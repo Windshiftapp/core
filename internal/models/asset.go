@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // AssetManagementSet represents a system-wide asset management container
 type AssetManagementSet struct {
@@ -402,6 +405,7 @@ type UpdateAssetActionRequest struct {
 
 // AssetActionExecutionContext holds context during asset action execution
 type AssetActionExecutionContext struct {
+	Context     context.Context   `json:"-"`
 	Action      *AssetAction      `json:"action"`
 	Event       *AssetActionEvent `json:"event"`
 	Variables   map[string]any    `json:"variables,omitempty"`

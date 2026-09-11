@@ -20,7 +20,7 @@
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { autoScrollWindowForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
+  import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import ItemDetail from '../items/ItemDetail.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
@@ -70,7 +70,9 @@
     searchActive ? collectionStore.boardSearchHasMore : collectionStore.itemsHasMore
   );
   let activeItemsLoadingMore = $derived(
-    searchActive ? collectionStore.boardSearchLoadingMore : collectionStore.itemsLoadingMore
+    searchActive
+      ? collectionStore.boardSearchLoadingMore
+      : collectionStore.itemsLoadingMore || collectionStore.boardBackgroundLoading
   );
   let activeItemsRemainingCount = $derived(
     searchActive ? collectionStore.boardSearchRemainingCount : collectionStore.itemsRemainingCount
@@ -80,15 +82,14 @@
   // result set so normal board pagination and completed-item trimming remain
   // unchanged when the query is cleared.
   let items = $derived(searchActive ? collectionStore.boardSearchItems : collectionStore.items);
+  let itemsById = $derived(new Map(items.map((item) => [item.id, item])));
   let transitions = $state([]);
   let boardConfig = $state(null);
   let cardFields = $derived((boardConfig?.card_fields || []).slice().sort((a, b) => a.display_order - b.display_order));
 
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
-  let setupTimeout;
-  let autoScrollCleanup;
-  let setupElements = new Map(); // Track which elements have drag/drop set up and their cleanup functions
+  const boardColumnElements = new Set();
   let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
@@ -96,7 +97,7 @@
   // Cached outgoing and incoming links for dependency hover summaries.
   let dependencyLinksByItem = $state({});
   let dependencyLinksToken = 0; // guards against stale async when items change
-  const DEPENDENCY_LINK_CHUNK = 200; // ids per batched /links/batch request (server cap 500)
+  const DEPENDENCY_LINK_CHUNK = 100;
 
   // Quick-add state per column
   let quickAddState = $state({});
@@ -106,7 +107,7 @@
       .filter((candidate) => candidate.is_personal)
       .map((candidate) => Number(candidate.id))
   ));
-  let selectedItem = $derived(items.find((item) => item.id === selectedItemId) ?? null);
+  let selectedItem = $derived(itemsById.get(selectedItemId) ?? null);
   let collectionAllowsAllWorkspaces = $derived(
     collectionStore.boardWorkspaceScopeLoaded &&
     !workspaceId &&
@@ -145,14 +146,14 @@
   // Edge-based drag state
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
   let boardAnnouncement = $state('');
-  let boardViewElement = $state(null);
+  let boardScrollElement = $state(null);
 
   // Centralized gradient styling
   const styles = useGradientStyles();
 
   $effect(() => {
     const query = searchQuery.trim();
-    const scope = `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.subFilterQL}`;
+    const scope = `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`;
     const effectId = ++searchEffectId;
     collectionStore.clearBoardSearch();
 
@@ -167,7 +168,7 @@
       if (
         effectId === searchEffectId &&
         query === searchQuery.trim() &&
-        scope === `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.subFilterQL}`
+        scope === `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`
       ) {
         searchDebouncing = false;
       }
@@ -178,14 +179,21 @@
 
   onDestroy(() => {
     collectionStore.clearBoardSearch();
-    autoScrollCleanup?.();
+  });
+
+  $effect(() => {
+    if (!boardScrollElement) return;
+    return autoScrollForElements({
+      element: boardScrollElement,
+      getAllowedAxis: () => 'horizontal',
+    });
   });
 
   // Listen for newly created items
   async function handleRefreshWorkItems(event) {
     if (event.detail?.itemId) {
       try {
-        const newItem = await api.items.get(event.detail.itemId);
+        const newItem = event.detail.item ?? await api.items.get(event.detail.itemId);
         // Collection membership may span workspaces; verify it server-side.
         const belongsToView = collectionId
           ? await checkItemVisibility(newItem.id, { collection_id: collectionId })
@@ -198,10 +206,6 @@
             // Item has no status, add it to backlog (at the end)
             collectionStore.backlogItems = [...collectionStore.backlogItems, newItem];
           }
-          // Re-setup drag and drop for the new item
-          setTimeout(() => {
-            setupDragAndDrop();
-          }, 100);
         }
       } catch (error) {
         console.error('Failed to load new item:', error);
@@ -395,7 +399,6 @@
         // The create endpoint returns the complete permission-masked item, so it
         // can be added directly without an immediate GET of the same item.
         collectionStore.items = [...collectionStore.items, newItem];
-        setTimeout(() => setupDragAndDrop(), 100);
 
         // Toast feedback
         showCreatedItemToast(newItem);
@@ -412,12 +415,6 @@
   }
 
   onMount(async () => {
-    autoScrollCleanup = autoScrollWindowForElements({
-      canScroll: ({ source }) =>
-        source.data.type === 'work-item' && Boolean(boardViewElement?.contains(source.element)),
-      getAllowedAxis: () => 'horizontal',
-    });
-
     await Promise.all([
       workspaceId ? loadWorkspaceGradient(workspaceId) : Promise.resolve(),
       workspaceId
@@ -465,7 +462,7 @@
 
   // Keep backlog count in sync
   $effect(() => {
-    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
+    backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total_items ?? collectionStore.backlogItems.length);
   });
 
   // Reset dependency links when the viewed board changes.
@@ -517,7 +514,7 @@
     if (toFetch.length === 0) return;
     const token = ++dependencyLinksToken;
     const ids = toFetch.map((i) => i.id);
-    // Batch below the server's 500-ID cap.
+    // Batch at the canonical API cap.
     const chunks = [];
     for (let i = 0; i < ids.length; i += DEPENDENCY_LINK_CHUNK) {
       chunks.push(ids.slice(i, i + DEPENDENCY_LINK_CHUNK));
@@ -1086,7 +1083,7 @@
     } catch (err) {
       updateLocalItemStatus(item.id, previousStatusId);
       console.error('Status transition failed:', err);
-      warningToast(t('collections.transition_failed'));
+      warningToast(err?.message || t('collections.transition_failed'));
       reloadCollection();
     }
   }
@@ -1101,231 +1098,168 @@
     }
   }
 
-  // Drag and drop setup using Pragmatic DnD
-  function setupDragAndDrop() {
-    // Clear any pending setup
-    if (setupTimeout) {
-      clearTimeout(setupTimeout);
-    }
+  function registerBoardCard(element, itemId) {
+    dragState.set(itemId, { isDragging: false, closestEdge: null });
 
-    // Clean up existing registrations
-    setupElements.forEach((cleanup, elementId) => {
-      if (typeof cleanup === 'function') {
-        cleanup();
+    const draggableCleanup = draggable({
+      element,
+      getInitialData: () => ({ item: itemsById.get(itemId), type: 'work-item' }),
+      onDragStart: () => {
+        element.style.opacity = '0.5';
+        document.body.classList.add('is-dragging');
+        const state = dragState.get(itemId) || {};
+        dragState.set(itemId, { ...state, isDragging: true });
+        dragState = new Map(dragState);
+      },
+      onDrop: () => {
+        element.style.opacity = '';
+        document.body.classList.remove('is-dragging');
+        dragState = new Map([...dragState].map(([id]) => [id, { isDragging: false, closestEdge: null }]));
+        resetAllColumnStyles();
       }
     });
-    setupElements.clear();
 
-    // Reset drag state
-    dragState = new Map();
-
-    // Setup work item cards as both draggable and drop targets with edge detection
-    const itemCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-item-card]'));
-
-    itemCards.forEach(element => {
-      const itemId = parseInt(element.dataset.itemId);
-      const elementId = `item-${itemId}`;
-
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-      const targetLaneParentId = parseLaneParentId(element.dataset.swimlaneParentId);
-
-      // Initialize drag state for this item
-      dragState.set(itemId, { isDragging: false, closestEdge: null });
-
-      // Make draggable
-      const draggableCleanup = draggable({
-        element,
-        getInitialData: () => ({
-          item,
-          type: 'work-item'
-        }),
-        onDragStart: () => {
-          element.style.opacity = '0.5';
-          document.body.classList.add('is-dragging');
-          // Mark this item as being dragged
-          const state = dragState.get(itemId) || {};
-          dragState.set(itemId, { ...state, isDragging: true });
-          dragState = new Map(dragState); // Trigger reactivity
-        },
-        onDrop: () => {
-          element.style.opacity = '';
-          document.body.classList.remove('is-dragging');
-          // Reset all drag states
-          dragState.forEach((state, id) => {
-            dragState.set(id, { isDragging: false, closestEdge: null });
-          });
-          dragState = new Map(dragState); // Trigger reactivity
-          // Reset all column border styles
-          resetAllColumnStyles();
-        }
-      });
-
-      // Make drop target with edge detection
-      const dropTargetCleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => {
-          const data = /** @type {any} */ (source.data);
-          // Can't drop on self
-          if (data.type !== 'work-item' || data.item.id === itemId) {
-            return false;
-          }
-          const targetColumn = getBoardColumnForItem(item);
-          return Boolean(
-            targetColumn && statusIdForBoardColumnMove(
-              data.item,
-              targetColumn,
-              validColumns,
-              personalWorkspaceIds,
-            ) != null
-          );
-        },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({}, {
-            input,
-            element,
-            allowedEdges: ['top', 'bottom']
-          });
-        },
-        onDragEnter: ({ self, source }) => {
-          const data = /** @type {any} */ (source.data);
-          if (data.type === 'work-item' && data.item.id !== itemId) {
-            const closestEdge = extractClosestEdge(self.data);
-            const state = dragState.get(itemId) || {};
-            dragState.set(itemId, { ...state, closestEdge });
-            dragState = new Map(dragState); // Trigger reactivity
-          }
-        },
-        onDragLeave: () => {
-          const state = dragState.get(itemId) || {};
-          dragState.set(itemId, { ...state, closestEdge: null });
-          dragState = new Map(dragState); // Trigger reactivity
-        },
-        onDrop: ({ self, source }) => {
-          const data = /** @type {any} */ (source.data);
-          const closestEdge = extractClosestEdge(self.data);
-
-          if (data.type === 'work-item' && closestEdge) {
-            const targetStatus = getStatusByItemId(itemId);
-            if (targetStatus) {
-              handleEdgeBasedDrop(data.item, item, closestEdge, targetStatus, targetLaneParentId);
-            }
-          }
-        }
-      });
-
-      setupElements.set(elementId, () => {
-        draggableCleanup();
-        dropTargetCleanup();
-      });
-    });
-
-    // Setup status columns as drop targets
-    const statusColumns = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-status-column]'));
-
-    statusColumns.forEach(element => {
-      const statusId = parseInt(element.dataset.statusId);
-      const elementId = element.dataset.statusColumnKey || `status-${statusId}`;
-
-      const status = statuses.find(s => s.id === statusId);
-      if (!status) return;
-      const targetColumn = validColumns.find(column => column.status_ids?.[0] === statusId);
-      if (!targetColumn) return;
-      const targetLaneParentId = parseLaneParentId(element.dataset.swimlaneParentId);
-
-      const cleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => {
-          const data = /** @type {any} */ (source.data);
-          return data.type === 'work-item' && statusIdForBoardColumnMove(
+    const dropTargetCleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = /** @type {any} */ (source.data);
+        const item = itemsById.get(itemId);
+        if (!item || data.type !== 'work-item' || data.item.id === itemId) return false;
+        const targetColumn = getBoardColumnForItem(item);
+        return Boolean(
+          targetColumn && statusIdForBoardColumnMove(
             data.item,
             targetColumn,
             validColumns,
             personalWorkspaceIds,
-          ) != null;
-        },
-        onDragEnter: ({ source }) => {
-          const data = /** @type {any} */ (source.data);
-          if (
-            data.type === 'work-item' &&
-            statusIdForBoardColumnMove(
-              data.item,
-              targetColumn,
-              validColumns,
-              personalWorkspaceIds,
-            ) != null
-          ) {
-            // The server is authoritative for workflow validation. Highlight
-            // every status target and let the optimistic drop roll back if the
-            // transition is rejected.
-            element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
-          }
-        },
-        onDragLeave: () => {
-          // Reset styles
-          element.style.boxShadow = '';
-        },
-        onDrop: async ({ source, location }) => {
-          // Reset all column styles immediately
-          resetAllColumnStyles();
-
-          const data = /** @type {any} */ (source.data);
-          if (data.type === 'work-item') {
-            // If an inner item drop target exists, handleEdgeBasedDrop already handles status
-            const dropTargets = location.current.dropTargets;
-            if (dropTargets.length > 1 && dropTargets[0].element !== element) {
-              return;
-            }
-            const transitionStatusId = statusIdForBoardColumnMove(
-              data.item,
-              targetColumn,
-              validColumns,
-              personalWorkspaceIds,
-            );
-            if (transitionStatusId == null) return;
-            const isSameStatus = data.item.status_id === transitionStatusId;
-            if (!isSameStatus && wouldChangeLaneParent(data.item, targetLaneParentId)) {
-              warnUnsupportedCombinedBoardMove();
-              return;
-            }
-            const previousStatusId = data.item.status_id;
-            if (!isSameStatus) updateLocalItemStatus(data.item.id, transitionStatusId);
-            try {
-              let droppedItem = data.item;
-              if (!isSameStatus) {
-                droppedItem = await api.items.transition(data.item.id, transitionStatusId);
-                mergeLocalItem(data.item.id, droppedItem);
-              }
-              await updateItemParentForLane(droppedItem, targetLaneParentId);
-            } catch (err) {
-              if (!isSameStatus) updateLocalItemStatus(data.item.id, previousStatusId);
-              console.error('Board drop failed:', err);
-              if (!err?.swimlaneMoveFailed) {
-                warningToast(t('collections.transition_failed'));
-              }
-            }
-            reloadCollection();
-          }
+          ) != null
+        );
+      },
+      getData: ({ input, element: targetElement }) => attachClosestEdge({}, {
+        input,
+        element: targetElement,
+        allowedEdges: ['top', 'bottom']
+      }),
+      onDragEnter: ({ self, source }) => {
+        const data = /** @type {any} */ (source.data);
+        if (data.type !== 'work-item' || data.item.id === itemId) return;
+        const state = dragState.get(itemId) || {};
+        dragState.set(itemId, { ...state, closestEdge: extractClosestEdge(self.data) });
+        dragState = new Map(dragState);
+      },
+      onDragLeave: () => {
+        const state = dragState.get(itemId) || {};
+        dragState.set(itemId, { ...state, closestEdge: null });
+        dragState = new Map(dragState);
+      },
+      onDrop: ({ self, source }) => {
+        const data = /** @type {any} */ (source.data);
+        const closestEdge = extractClosestEdge(self.data);
+        const item = itemsById.get(itemId);
+        const targetStatus = getStatusByItemId(itemId);
+        if (item && data.type === 'work-item' && closestEdge && targetStatus) {
+          const targetLaneParentId = parseLaneParentId(element.dataset.swimlaneParentId);
+          handleEdgeBasedDrop(data.item, item, closestEdge, targetStatus, targetLaneParentId);
         }
-      });
-
-      setupElements.set(elementId, cleanup);
+      }
     });
 
-    // No longer using position drop zones - edge detection handles everything
+    return {
+      destroy() {
+        element.style.opacity = '';
+        document.body.classList.remove('is-dragging');
+        draggableCleanup();
+        dropTargetCleanup();
+        dragState.delete(itemId);
+      }
+    };
+  }
+
+  function registerBoardColumn(element, _statusId) {
+    const getStatusId = () => Number(element.dataset.statusId);
+    boardColumnElements.add(element);
+    const cleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = /** @type {any} */ (source.data);
+        const targetColumn = validColumns.find(column => column.status_ids?.[0] === getStatusId());
+        return Boolean(
+          targetColumn &&
+          data.type === 'work-item' &&
+          statusIdForBoardColumnMove(data.item, targetColumn, validColumns, personalWorkspaceIds) != null
+        );
+      },
+      onDragEnter: ({ source }) => {
+        const data = /** @type {any} */ (source.data);
+        const targetColumn = validColumns.find(column => column.status_ids?.[0] === getStatusId());
+        if (
+          targetColumn &&
+          data.type === 'work-item' &&
+          statusIdForBoardColumnMove(data.item, targetColumn, validColumns, personalWorkspaceIds) != null
+        ) {
+          element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
+        }
+      },
+      onDragLeave: () => {
+        element.style.boxShadow = '';
+      },
+      onDrop: async ({ source, location }) => {
+        resetAllColumnStyles();
+        const data = /** @type {any} */ (source.data);
+        const targetColumn = validColumns.find(column => column.status_ids?.[0] === getStatusId());
+        if (!targetColumn || data.type !== 'work-item') return;
+        const dropTargets = location.current.dropTargets;
+        if (dropTargets.length > 1 && dropTargets[0].element !== element) return;
+
+        const transitionStatusId = statusIdForBoardColumnMove(
+          data.item,
+          targetColumn,
+          validColumns,
+          personalWorkspaceIds,
+        );
+        if (transitionStatusId == null) return;
+        const targetLaneParentId = parseLaneParentId(element.dataset.swimlaneParentId);
+        const isSameStatus = data.item.status_id === transitionStatusId;
+        if (!isSameStatus && wouldChangeLaneParent(data.item, targetLaneParentId)) {
+          warnUnsupportedCombinedBoardMove();
+          return;
+        }
+        const previousStatusId = data.item.status_id;
+        if (!isSameStatus) updateLocalItemStatus(data.item.id, transitionStatusId);
+        try {
+          let droppedItem = data.item;
+          if (!isSameStatus) {
+            droppedItem = await api.items.transition(data.item.id, transitionStatusId);
+            mergeLocalItem(data.item.id, droppedItem);
+          }
+          await updateItemParentForLane(droppedItem, targetLaneParentId);
+        } catch (err) {
+          if (!isSameStatus) updateLocalItemStatus(data.item.id, previousStatusId);
+          console.error('Board drop failed:', err);
+          if (!err?.swimlaneMoveFailed) warningToast(err?.message || t('collections.transition_failed'));
+        }
+        reloadCollection();
+      }
+    });
+
+    return {
+      destroy() {
+        boardColumnElements.delete(element);
+        element.style.boxShadow = '';
+        cleanup();
+      }
+    };
   }
 
   // Helper functions
   function resetAllColumnStyles() {
-    // Reset all status column styles to their default state
-    const statusColumns = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-status-column]'));
-    statusColumns.forEach(element => {
+    boardColumnElements.forEach(element => {
       element.style.boxShadow = '';
     });
   }
 
   function getStatusByItemId(itemId) {
-    const item = items.find(i => i.id === itemId);
+    const item = itemsById.get(itemId);
     if (!item) return null;
     const boardStatusId = boardStatusIdForItem(item, validColumns, personalWorkspaceIds);
     return statuses.find(s => s.id === boardStatusId);
@@ -1360,10 +1294,6 @@
           : item
       );
 
-      // Force a re-setup of drag and drop with the updated items
-      setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
     } catch (error) {
       console.error('Failed to update item status:', error);
       // Could add user notification here
@@ -1419,7 +1349,7 @@
         } catch (err) {
           updateLocalItemStatus(draggedItem.id, currentStatusId);
           console.error('Status transition failed:', err);
-          warningToast(t('collections.transition_failed'));
+          warningToast(err?.message || t('collections.transition_failed'));
           reloadCollection();
           return;
         }
@@ -1486,7 +1416,7 @@
 
       // Update the frac_index using item IDs
       const indexData = {
-        prev_item_id: prevItemId,
+        previous_item_id: prevItemId,
         next_item_id: nextItemId
       };
       const updatedItem = await api.items.updateFracIndex(draggedItem.id, indexData);
@@ -1511,30 +1441,6 @@
   }
 
 
-  // Setup drag and drop when data changes. Track grouping/swimlane inputs too,
-  // because switching group-by replaces the board DOM without changing item count.
-  $effect(() => {
-    const itemSignature = items.map(item => `${item.id}:${item.status_id ?? ''}:${item.parent_id ?? ''}`).join('|');
-    const laneSignature = boardSwimlanes.map(lane => `${lane.id}:${lane.itemCount}:${isSwimlaneExpanded(lane.id)}`).join('|');
-    const columnSignature = validColumns.map(column => `${column.id}:${(column.status_ids || []).join(',')}`).join('|');
-    // Collapsing/expanding a column swaps the rendered column element
-    // (narrow strip vs full column) without changing item counts, so the
-    // drop targets must be rebuilt — track the collapse state here.
-    const collapsedSignature = validColumns.map((column) => isColumnCollapsed(column.id) ? '1' : '0').join('');
-    groupByItemTypeId;
-    itemSignature;
-    laneSignature;
-    columnSignature;
-    collapsedSignature;
-
-    if (items.length > 0 && statuses.length > 0 && typeof document !== 'undefined') {
-      if (setupTimeout) clearTimeout(setupTimeout);
-      setupTimeout = setTimeout(() => {
-        setupDragAndDrop();
-      }, 100);
-    }
-  });
-
 </script>
 
 {#if loading || collectionStore.loading || workspaceDataStore.initialLoading}
@@ -1542,12 +1448,17 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace || !workspaceId}
-  <StaticViewBackground
-    backgroundStyle={styles.backgroundStyle}
-    contextVars={styles.contextVars}
-    contentClass="p-6 min-w-fit"
-    testid="collection-board-background"
+  <div
+    bind:this={boardScrollElement}
+    class="w-full min-w-0 max-w-full overflow-x-auto"
+    data-testid="board-scroll-container"
   >
+    <StaticViewBackground
+      backgroundStyle={styles.backgroundStyle}
+      contextVars={styles.contextVars}
+      contentClass="p-6 min-w-fit"
+      testid="collection-board-background"
+    >
     <!-- Content Container -->
       <!-- Header with view tabs -->
       <div class="mb-8">
@@ -1555,7 +1466,8 @@
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('workspaceSettings.views.board')}
-          itemCount={collectionStore.itemsTotalCount}
+          itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : totalVisibleItems}
         >
           {#snippet actions()}
             <div class="flex items-center gap-3">
@@ -1656,7 +1568,7 @@
           placeholder={t('common.search')}
           dataTestid="board-search-input"
         />
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
       {#if searchActive && (searchDebouncing || collectionStore.boardSearchLoading)}
@@ -1691,7 +1603,6 @@
       {:else}
         <!-- Board Columns / Swimlanes -->
         <div
-          bind:this={boardViewElement}
           class={selectedGroupByItemType ? 'space-y-4' : ''}
           data-testid="board-view"
         >
@@ -1763,6 +1674,7 @@
                            collapse chevron in BoardColumn's header (border-t-4 + p-4 +
                            the button's p-1). -->
                       <button
+                        use:registerBoardColumn={column.status_ids[0]}
                         type="button"
                         class="relative rounded border shadow-sm flex flex-col items-center justify-between gap-2 pt-5 pb-3 px-1 text-center cursor-pointer transition-colors"
                         style="{styles.columnStyle(12)} border-top: 4px solid {column.color};"
@@ -1777,6 +1689,7 @@
                         title={t('collections.expandColumn', { name: objectDisplayName(column, 'status') })}
                         onclick={() => toggleColumnCollapse(column.id)}
                       >
+                        <span class="sr-only" data-testid={`board-column-status-${column.status_ids[0]}`} aria-hidden="true"></span>
                         <ChevronRight class="w-4 h-4 flex-shrink-0" style={styles.glassTextStyle} />
                         <span class="board-column-collapsed-name font-semibold text-sm break-words" style={styles.glassTextStyle}>
                           {objectDisplayName(column, 'status')}
@@ -1800,6 +1713,7 @@
                       columnStyle={styles.columnStyle(12)}
                       textStyle={styles.glassTextStyle}
                       subtleTextStyle={styles.glassSubtleTextStyle}
+                      dndAction={registerBoardColumn}
                       onadd={laneQuickAddTypes.length > 0 && availableWorkspaces.length > 0
                         ? () => initQuickAdd(column.id, column.status_ids[0], quickAddKey, lane.parent ?? null)
                         : null}
@@ -1851,6 +1765,7 @@
                                 swimlaneParentId={selectedGroupByItemType && lane.parent ? lane.parent.id : ''}
                                 cardStyle={styles.cardStyle(0)}
                                 textStyle={styles.glassTextStyle}
+                                dndAction={registerBoardCard}
                                 onopen={openItem}
                               />
                             {/each}
@@ -1892,7 +1807,8 @@
           </p>
         </div>
       {/if}
-  </StaticViewBackground>
+    </StaticViewBackground>
+  </div>
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">

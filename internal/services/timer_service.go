@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/sanitize"
 )
 
 // TimerService owns the start/stop lifecycle for active timers. Both the
@@ -82,6 +83,7 @@ func (s *TimerService) StartTimer(
 	itemID *int,
 	description string,
 ) (*models.ActiveTimer, error) {
+	sanitize.Apply(&description, sanitize.RichText)
 	if description == "" {
 		return nil, fmt.Errorf("%w: description is required", ErrTimerValidation)
 	}

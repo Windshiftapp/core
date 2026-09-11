@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -41,6 +42,10 @@ type LLMConnectionResolver interface {
 type AssetSetPermissionChecker interface {
 	HasAssetSetPermission(userID, setID int, permissionKey string) (bool, error)
 }
+
+// ErrActionCompletedWithFailedSteps means execution finished and its log
+// contains the actionable failure details.
+var ErrActionCompletedWithFailedSteps = errors.New("action completed with failed steps")
 
 // ActionServiceConfig represents configuration for the action service
 type ActionServiceConfig struct {
@@ -371,6 +376,22 @@ func (as *ActionService) cleanupChains() {
 // MaxCascadeDepth bounds action-triggered mutation chains across consumers.
 const MaxCascadeDepth = 5
 
+func matchesStatusTransition(fromStatusID, toStatusID *int, oldValues, newValues map[string]any) bool {
+	if fromStatusID != nil {
+		oldStatusID := utils.InterfaceToIntPtr(oldValues["status_id"])
+		if oldStatusID == nil || *oldStatusID != *fromStatusID {
+			return false
+		}
+	}
+	if toStatusID != nil {
+		newStatusID := utils.InterfaceToIntPtr(newValues["status_id"])
+		if newStatusID == nil || *newStatusID != *toStatusID {
+			return false
+		}
+	}
+	return true
+}
+
 // matchesTrigger checks if an action's trigger matches the event
 func (as *ActionService) matchesTrigger(action *models.Action, event *models.ActionEvent) bool {
 	if action.TriggerType != event.EventType {
@@ -404,81 +425,82 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 
 	switch event.EventType {
 	case models.ActionTriggerStatusTransition:
-		if config.FromStatusID != nil {
-			oldStatusID := utils.InterfaceToIntPtr(event.OldValues["status_id"])
-			if oldStatusID == nil || *oldStatusID != *config.FromStatusID {
-				return false
-			}
-		}
-		if config.ToStatusID != nil {
-			newStatusID := utils.InterfaceToIntPtr(event.NewValues["status_id"])
-			if newStatusID == nil || *newStatusID != *config.ToStatusID {
-				return false
-			}
-		}
-		// Match the destination status category when configured.
-		if config.ToStatusCategoryIsCompleted != nil {
-			newStatusID := utils.InterfaceToIntPtr(event.NewValues["status_id"])
-			if newStatusID == nil {
-				return false
-			}
-			st, err := NewStatusService(as.db).GetStatus(*newStatusID)
-			if err != nil || st == nil {
-				return false
-			}
-			if st.IsCompleted != *config.ToStatusCategoryIsCompleted {
-				return false
-			}
-		}
+		return matchesStatusTransition(config.FromStatusID, config.ToStatusID, event.OldValues, event.NewValues) &&
+			as.matchesDestinationStatusCategory(config.ToStatusCategoryIsCompleted, event.NewValues)
 
 	case models.ActionTriggerItemCreated, models.ActionTriggerItemUpdated:
-		// Normalize item type IDs before comparing them.
-		if config.ItemTypeID != nil {
-			itemTypeID := utils.InterfaceToIntPtr(event.NewValues["item_type_id"])
-			if itemTypeID == nil || *itemTypeID != *config.ItemTypeID {
-				return false
-			}
-		}
-		if event.EventType == models.ActionTriggerItemUpdated && config.FieldName != "" {
-			if _, changed := event.NewValues[config.FieldName]; !changed {
-				return false
-			}
-		}
+		return matchesItemActionTrigger(config, event)
 
 	case models.ActionTriggerItemLinked:
-		// Normalize link type IDs before comparing them.
-		if config.LinkTypeID != nil {
-			linkTypeID := utils.InterfaceToIntPtr(event.NewValues["link_type_id"])
-			if linkTypeID == nil || *linkTypeID != *config.LinkTypeID {
-				return false
-			}
-		}
+		return matchesItemLinkTrigger(config.LinkTypeID, event.NewValues)
 
 	case models.ActionTriggerSCMTagCreated, models.ActionTriggerSCMReleaseBranchCreated,
 		models.ActionTriggerSCMPRLinked, models.ActionTriggerSCMPRMerged:
-		if config.WorkspaceRepositoryID != nil {
-			repoID := utils.InterfaceToIntPtr(event.NewValues["repo.workspace_repository_id"])
-			if repoID == nil || *repoID != *config.WorkspaceRepositoryID {
-				return false
-			}
-		}
-		if config.RepositoryFullName != "" {
-			fullName := fmt.Sprintf("%v", event.NewValues["repo.full_name"])
-			if !strings.EqualFold(fullName, config.RepositoryFullName) {
-				return false
-			}
-		}
+		return matchesSCMActionTrigger(config, event.NewValues)
 	}
 
 	return true
 }
 
-// executeAction executes an action's flow
-func (as *ActionService) executeAction(action *models.Action, event *models.ActionEvent, chain *ExecutionChain) error {
-	return as.executeActionForEvent(action, event, chain, "")
+func (as *ActionService) matchesDestinationStatusCategory(isCompleted *bool, newValues map[string]any) bool {
+	if isCompleted == nil {
+		return true
+	}
+	newStatusID := utils.InterfaceToIntPtr(newValues["status_id"])
+	if newStatusID == nil {
+		return false
+	}
+	status, err := NewStatusService(as.db).GetStatus(*newStatusID)
+	return err == nil && status != nil && status.IsCompleted == *isCompleted
 }
 
-func (as *ActionService) executeActionForEvent(action *models.Action, event *models.ActionEvent, chain *ExecutionChain, durableEventKey string) error {
+func matchesItemActionTrigger(config models.ActionTriggerConfig, event *models.ActionEvent) bool {
+	if config.ItemTypeID != nil {
+		itemTypeID := utils.InterfaceToIntPtr(event.NewValues["item_type_id"])
+		if itemTypeID == nil || *itemTypeID != *config.ItemTypeID {
+			return false
+		}
+	}
+	if event.EventType == models.ActionTriggerItemUpdated && config.FieldName != "" {
+		_, changed := event.NewValues[config.FieldName]
+		return changed
+	}
+	return true
+}
+
+func matchesItemLinkTrigger(linkTypeID *int, newValues map[string]any) bool {
+	if linkTypeID == nil {
+		return true
+	}
+	eventLinkTypeID := utils.InterfaceToIntPtr(newValues["link_type_id"])
+	return eventLinkTypeID != nil && *eventLinkTypeID == *linkTypeID
+}
+
+func matchesSCMActionTrigger(config models.ActionTriggerConfig, newValues map[string]any) bool {
+	if config.WorkspaceRepositoryID != nil {
+		repositoryID := utils.InterfaceToIntPtr(newValues["repo.workspace_repository_id"])
+		if repositoryID == nil || *repositoryID != *config.WorkspaceRepositoryID {
+			return false
+		}
+	}
+	if config.RepositoryFullName == "" {
+		return true
+	}
+	return strings.EqualFold(fmt.Sprintf("%v", newValues["repo.full_name"]), config.RepositoryFullName)
+}
+
+// executeAction executes an action's flow
+func (as *ActionService) executeAction(action *models.Action, event *models.ActionEvent, chain *ExecutionChain) error {
+	return as.executeActionForEvent(context.Background(), action, event, chain, "")
+}
+
+func (as *ActionService) executeActionForEvent(executionCtx context.Context, action *models.Action, event *models.ActionEvent, chain *ExecutionChain, durableEventKey string) error {
+	if executionCtx == nil {
+		executionCtx = context.Background()
+	}
+	if err := executionCtx.Err(); err != nil {
+		return err
+	}
 	if action == nil {
 		return errors.New("action is required")
 	}
@@ -573,6 +595,8 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 	}
 
 	ctx := &models.ExecutionContext{
+		Context:          executionCtx,
+		DurableEventKey:  durableEventKey,
 		Action:           action,
 		Event:            event,
 		EffectiveActorID: effectiveActorID,
@@ -591,6 +615,16 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 	}
 	for k, v := range event.NewValues {
 		ctx.Variables["new_"+k] = v
+	}
+	if err := as.loadExecutionActor(ctx); err != nil {
+		log.Status = models.ActionStatusFailed
+		log.ErrorMessage = err.Error()
+		completedAt := time.Now()
+		log.CompletedAt = &completedAt
+		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+			slog.Error("failed to update execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+		}
+		return err
 	}
 
 	sortedNodes, err := as.topologicalSort(action.Nodes, action.Edges)
@@ -661,6 +695,22 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 		}
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
+		if contextErr := executionCtx.Err(); contextErr != nil {
+			stepResult.Status = models.ActionStatusFailed
+			stepResult.ErrorMessage = contextErr.Error()
+			ctx.StepResults = append(ctx.StepResults, stepResult)
+			as.cleanupActionContainers(ctx.StepResults)
+			log.Status = models.ActionStatusFailed
+			log.ErrorMessage = contextErr.Error()
+			log.CompletedAt = &completedAt
+			if trace, marshalErr := json.Marshal(ctx.StepResults); marshalErr == nil {
+				log.ExecutionTrace = string(trace)
+			}
+			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+				slog.Error("failed to cancel action execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+			}
+			return contextErr
+		}
 
 		if err != nil {
 			stepResult.Status = models.ActionStatusFailed
@@ -714,9 +764,16 @@ func (as *ActionService) executeActionForEvent(action *models.Action, event *mod
 	)
 
 	if log.Status == models.ActionStatusFailed {
-		return fmt.Errorf("action %d completed with failed steps", action.ID)
+		return fmt.Errorf("%w: action %d", ErrActionCompletedWithFailedSteps, action.ID)
 	}
 	return nil
+}
+
+func actionRequestContext(ctx *models.ExecutionContext) context.Context {
+	if ctx != nil && ctx.Context != nil {
+		return ctx.Context
+	}
+	return context.Background()
 }
 
 // topologicalSort sorts nodes in execution order using Kahn's algorithm
@@ -913,78 +970,122 @@ func derefTimePtr(p *time.Time) any {
 	return *p
 }
 
+// loadExecutionActor resolves the identity whose permissions govern the action.
+func (as *ActionService) loadExecutionActor(ctx *models.ExecutionContext) error {
+	if ctx.EffectiveActorID > 0 {
+		actor, err := repository.NewUserRepository(as.db).GetByID(ctx.EffectiveActorID)
+		if err != nil {
+			return fmt.Errorf("load action actor: %w", err)
+		}
+		ctx.Actor = actor
+	}
+	return nil
+}
+
 func (as *ActionService) currentItemFieldValue(ctx *models.ExecutionContext, fieldName string) any {
-	return currentItemFieldValue(as.itemRepo, ctx, fieldName)
+	value, _ := currentItemFieldValueResolved(as.itemRepo, ctx, fieldName)
+	return value
 }
 
 func currentItemFieldValue(itemRepo *repository.ItemRepository, ctx *models.ExecutionContext, fieldName string) any {
+	value, _ := currentItemFieldValueResolved(itemRepo, ctx, fieldName)
+	return value
+}
+
+func currentItemFieldValueResolved(itemRepo *repository.ItemRepository, ctx *models.ExecutionContext, fieldName string) (any, bool) {
 	if ctx == nil {
-		return nil
+		return nil, false
 	}
 	itemID := currentActionItemID(ctx)
-	if ctx.Item != nil {
-		switch fieldName {
-		case "id", "item_id":
-			return ctx.Item.ID
-		case "workspace_id":
-			return ctx.Item.WorkspaceID
+	switch fieldName {
+	case "id", "item_id":
+		if itemID > 0 {
+			return itemID, true
 		}
-		if strings.HasPrefix(fieldName, "custom_field_") {
-			customFieldID, err := strconv.Atoi(strings.TrimPrefix(fieldName, "custom_field_"))
-			if err == nil && customFieldID > 0 {
-				if val, readErr := itemRepo.GetItemCustomFieldValue(itemID, customFieldID); readErr == nil {
-					return val
-				}
-			}
-			if ctx.Item.CustomFieldValues != nil {
-				return ctx.Item.CustomFieldValues[strings.TrimPrefix(fieldName, "custom_field_")]
-			}
+	case "workspace_id":
+		if workspaceID := currentActionWorkspaceID(ctx); workspaceID > 0 {
+			return workspaceID, true
 		}
 	}
-	if itemID != 0 && repository.IsAllowedItemColumn(fieldName) {
-		if val, err := itemRepo.GetAllowedColumnValue(itemID, fieldName); err == nil {
-			return val
+	if strings.HasPrefix(fieldName, "custom_field_") {
+		key := strings.TrimPrefix(fieldName, "custom_field_")
+		customFieldID, err := strconv.Atoi(key)
+		if itemRepo != nil && itemID > 0 && err == nil && customFieldID > 0 {
+			if val, readErr := itemRepo.GetItemCustomFieldValue(itemID, customFieldID); readErr == nil {
+				return val, true
+			}
 		}
+		if ctx.Item != nil && ctx.Item.CustomFieldValues != nil {
+			val, ok := ctx.Item.CustomFieldValues[key]
+			return val, ok
+		}
+	}
+	if itemRepo != nil && itemID > 0 && repository.IsAllowedItemColumn(fieldName) {
+		if val, err := itemRepo.GetAllowedColumnValue(itemID, fieldName); err == nil {
+			return val, true
+		}
+	}
+	// Only joined names need hydration. Resolve them without pinning ctx.Item:
+	// later nodes must see mutations, including inside iterator snapshots.
+	if (fieldName == "status" || fieldName == "priority") && itemRepo != nil && itemID > 0 {
+		lookupContext := ctx.Context
+		if lookupContext == nil {
+			lookupContext = context.Background()
+		}
+		item, err := itemRepo.FindByIDWithDetailsContext(lookupContext, itemID)
+		if err != nil {
+			slog.Warn("failed to resolve action item name", slog.String("component", "actions"),
+				slog.Int("item_id", itemID), slog.String("field", fieldName), slog.Any("error", err))
+			// Do not silently substitute a stale iterator name after a failed read.
+			return nil, false
+		}
+		resolved := *ctx
+		resolved.Item = item
+		ctx = &resolved
 	}
 	if ctx.Item != nil {
 		switch fieldName {
 		case "title":
-			return ctx.Item.Title
+			return ctx.Item.Title, true
 		case "description":
-			return ctx.Item.Description
+			return ctx.Item.Description, true
+		case "status":
+			return ctx.Item.StatusName, true
+		case "priority":
+			return ctx.Item.PriorityName, true
 		case "status_id":
-			return derefIntPtr(ctx.Item.StatusID)
+			return derefIntPtr(ctx.Item.StatusID), true
 		case "priority_id":
-			return derefIntPtr(ctx.Item.PriorityID)
+			return derefIntPtr(ctx.Item.PriorityID), true
 		case "assignee_id":
-			return derefIntPtr(ctx.Item.AssigneeID)
+			return derefIntPtr(ctx.Item.AssigneeID), true
 		case "creator_id":
-			return derefIntPtr(ctx.Item.CreatorID)
+			return derefIntPtr(ctx.Item.CreatorID), true
 		case "item_type_id":
-			return derefIntPtr(ctx.Item.ItemTypeID)
+			return derefIntPtr(ctx.Item.ItemTypeID), true
 		case "iteration_id":
-			return derefIntPtr(ctx.Item.IterationID)
+			return derefIntPtr(ctx.Item.IterationID), true
 		case "project_id":
-			return derefIntPtr(ctx.Item.ProjectID)
+			return derefIntPtr(ctx.Item.ProjectID), true
 		case "parent_id":
-			return derefIntPtr(ctx.Item.ParentID)
+			return derefIntPtr(ctx.Item.ParentID), true
 		case "story_points":
-			return derefFloatPtr(ctx.Item.StoryPoints)
+			return derefFloatPtr(ctx.Item.StoryPoints), true
 		case "due_date":
-			return derefTimePtr(ctx.Item.DueDate)
+			return derefTimePtr(ctx.Item.DueDate), true
 		case "start_date":
-			return derefTimePtr(ctx.Item.StartDate)
+			return derefTimePtr(ctx.Item.StartDate), true
 		case "end_date":
-			return derefTimePtr(ctx.Item.EndDate)
+			return derefTimePtr(ctx.Item.EndDate), true
 		}
 	}
 	if val, ok := ctx.Variables[fieldName]; ok {
-		return val
+		return val, true
 	}
 	if val, ok := ctx.Variables["new_"+fieldName]; ok {
-		return val
+		return val, true
 	}
-	return nil
+	return nil, false
 }
 
 // executeSetField executes a set_field node. It dispatches to either the
@@ -1226,45 +1327,11 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 		return err
 	}
 
-	// Validate options and sanitize substituted user content before persisting.
-	fieldKey := strconv.Itoa(config.CustomFieldID)
-	cfv := map[string]any{fieldKey: value}
-	fieldTypes, err := validation.CustomFieldTypes(as.db, cfv)
+	normalized, err := as.normalizeSetFieldCustomValue(config.CustomFieldID, value)
 	if err != nil {
-		return fmt.Errorf("resolve custom field type: %w", err)
+		return err
 	}
-	fieldType, ok := fieldTypes[fieldKey]
-	if !ok {
-		return fmt.Errorf("set_field: custom field %d does not exist", config.CustomFieldID)
-	}
-	switch fieldType {
-	case "select":
-		// An empty substitution clears the field rather than failing
-		// option-id validation.
-		if strings.TrimSpace(value) == "" {
-			cfv[fieldKey] = nil
-		}
-	case "multiselect":
-		// Multiselect values arrive as the substituted string form of a
-		// JSON array ("[1,2]") or a CSV of option ids — decode before
-		// validation so each element is checked against the option set.
-		cfv[fieldKey] = parseActionMultiselectValue(value)
-	case models.CustomFieldTypeBoolean, models.CustomFieldTypeCheckbox:
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "":
-			cfv[fieldKey] = nil
-		case "true":
-			cfv[fieldKey] = true
-		case "false":
-			cfv[fieldKey] = false
-		default:
-			return fmt.Errorf("set_field: custom field %d requires true or false", config.CustomFieldID)
-		}
-	}
-	if err := validation.ValidateAndNormalizeCustomFieldValues(as.db, cfv); err != nil {
-		return fmt.Errorf("set_field: custom field %d: %w", config.CustomFieldID, err)
-	}
-	newValue := cfv[fieldKey]
+	newValue := normalized.value
 
 	oldValue, err := as.itemRepo.GetItemCustomFieldValue(itemID, config.CustomFieldID)
 	if err != nil {
@@ -1284,7 +1351,7 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 	for key, existingValue := range item.CustomFieldValues {
 		customFieldValues[key] = existingValue
 	}
-	customFieldValues[fieldKey] = newValue
+	customFieldValues[normalized.key] = newValue
 	result, err := as.updateItemFromAction(ctx, map[string]any{
 		"custom_field_values": customFieldValues,
 	})
@@ -1292,7 +1359,7 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 		return err
 	}
 	if result.Item.CustomFieldValues != nil {
-		newValue = result.Item.CustomFieldValues[fieldKey]
+		newValue = result.Item.CustomFieldValues[normalized.key]
 	}
 
 	key := "custom_field_" + strconv.Itoa(config.CustomFieldID)
@@ -1304,6 +1371,47 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 	}
 
 	return nil
+}
+
+type normalizedActionCustomField struct {
+	key   string
+	value any
+}
+
+func (as *ActionService) normalizeSetFieldCustomValue(customFieldID int, value string) (normalizedActionCustomField, error) {
+	fieldKey := strconv.Itoa(customFieldID)
+	values := map[string]any{fieldKey: value}
+	fieldTypes, err := validation.CustomFieldTypes(as.db, values)
+	if err != nil {
+		return normalizedActionCustomField{}, fmt.Errorf("resolve custom field type: %w", err)
+	}
+	fieldType, ok := fieldTypes[fieldKey]
+	if !ok {
+		return normalizedActionCustomField{}, fmt.Errorf("set_field: custom field %d does not exist", customFieldID)
+	}
+	switch fieldType {
+	case "select":
+		if strings.TrimSpace(value) == "" {
+			values[fieldKey] = nil
+		}
+	case "multiselect":
+		values[fieldKey] = parseActionMultiselectValue(value)
+	case models.CustomFieldTypeBoolean, models.CustomFieldTypeCheckbox:
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "":
+			values[fieldKey] = nil
+		case "true":
+			values[fieldKey] = true
+		case "false":
+			values[fieldKey] = false
+		default:
+			return normalizedActionCustomField{}, fmt.Errorf("set_field: custom field %d requires true or false", customFieldID)
+		}
+	}
+	if err := validation.ValidateAndNormalizeCustomFieldValues(as.db, values); err != nil {
+		return normalizedActionCustomField{}, fmt.Errorf("set_field: custom field %d: %w", customFieldID, err)
+	}
+	return normalizedActionCustomField{key: fieldKey, value: values[fieldKey]}, nil
 }
 
 // parseActionMultiselectValue decodes a substituted multiselect set_field
@@ -1345,7 +1453,7 @@ func (as *ActionService) executeSetStatusID(statusID int, ctx *models.ExecutionC
 	}
 
 	workflowService := NewWorkflowService(as.db)
-	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+	result, err := workflowService.PerformTransition(actionRequestContext(ctx), PerformTransitionRequest{
 		ItemID:        itemID,
 		ToStatusID:    statusID,
 		ActorUserID:   ctx.EffectiveActorID,
@@ -1480,7 +1588,7 @@ func (as *ActionService) executeTransitionItem(node *models.ActionNode, ctx *mod
 	}
 
 	workflowService := NewWorkflowService(as.db)
-	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+	result, err := workflowService.PerformTransition(actionRequestContext(ctx), PerformTransitionRequest{
 		ItemID:        item.ID,
 		ToStatusID:    targetStatusID,
 		ActorUserID:   ctx.EffectiveActorID,
@@ -1800,20 +1908,10 @@ func (as *ActionService) executeCondition(node *models.ActionNode, ctx *models.E
 // evaluateCondition evaluates a condition
 func (as *ActionService) evaluateCondition(value any, operator, compareValue string) bool {
 	strValue := fmt.Sprintf("%v", value)
-
+	if result, handled := evaluateStringActionCondition(strValue, operator, compareValue); handled {
+		return result
+	}
 	switch operator {
-	case "eq", "==", "equals":
-		return strValue == compareValue
-	case "ne", "!=", "not_equals":
-		return strValue != compareValue
-	case "contains":
-		return strings.Contains(strValue, compareValue)
-	case "not_contains":
-		return !strings.Contains(strValue, compareValue)
-	case "starts_with":
-		return strings.HasPrefix(strValue, compareValue)
-	case "ends_with":
-		return strings.HasSuffix(strValue, compareValue)
 	case "gt", ">":
 		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a > b }, func(a, b string) bool { return a > b })
 	case "lt", "<":
@@ -1822,12 +1920,31 @@ func (as *ActionService) evaluateCondition(value any, operator, compareValue str
 		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a >= b }, func(a, b string) bool { return a >= b })
 	case "lte", "<=":
 		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a <= b }, func(a, b string) bool { return a <= b })
-	case "is_empty":
-		return strValue == "" || strValue == "null" || strValue == "<nil>"
-	case "is_not_empty":
-		return strValue != "" && strValue != "null" && strValue != "<nil>"
 	default:
 		return false
+	}
+}
+
+func evaluateStringActionCondition(value, operator, compareValue string) (matched, handled bool) {
+	switch operator {
+	case "eq", "==", "equals":
+		return value == compareValue, true
+	case "ne", "!=", "not_equals":
+		return value != compareValue, true
+	case "contains":
+		return strings.Contains(value, compareValue), true
+	case "not_contains":
+		return !strings.Contains(value, compareValue), true
+	case "starts_with":
+		return strings.HasPrefix(value, compareValue), true
+	case "ends_with":
+		return strings.HasSuffix(value, compareValue), true
+	case "is_empty":
+		return value == "" || value == "null" || value == "<nil>", true
+	case "is_not_empty":
+		return value != "" && value != "null" && value != "<nil>", true
+	default:
+		return false, false
 	}
 }
 
@@ -1845,60 +1962,139 @@ func compareNumericOrString(a, b string, numCmp func(float64, float64) bool, str
 	return false
 }
 
-// substituteVariables replaces {{variable}} placeholders with actual values
+// nestedExecutionValue walks JSON-like maps and slices using dotted path
+// segments. The boolean distinguishes a present null value from a missing path.
+func nestedExecutionValue(value any, path []string) (any, bool) {
+	for _, segment := range path {
+		switch current := value.(type) {
+		case map[string]any:
+			var ok bool
+			value, ok = current[segment]
+			if !ok {
+				return nil, false
+			}
+		case map[string]string:
+			var ok bool
+			value, ok = current[segment]
+			if !ok {
+				return nil, false
+			}
+		case []any:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(current) {
+				return nil, false
+			}
+			value = current[index]
+		case []string:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(current) {
+				return nil, false
+			}
+			value = current[index]
+		default:
+			return nil, false
+		}
+	}
+	return value, true
+}
+
+func stringifyExecutionValue(value any, nilValue string) (string, error) {
+	if value == nil {
+		return nilValue, nil
+	}
+	switch value := value.(type) {
+	case map[string]any, map[string]string, []any, []string:
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	case string:
+		return value, nil
+	default:
+		return fmt.Sprintf("%v", value), nil
+	}
+}
+
+// resolveExecutionValue resolves all action context paths from one place.
+// Exact variable names take precedence over dotted traversal so existing output
+// fields remain backward compatible.
+func (as *ActionService) resolveExecutionValue(ctx *models.ExecutionContext, path string) (any, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, false
+	}
+	if value, ok := ctx.Variables[path]; ok {
+		return value, true
+	}
+
+	parts := strings.Split(path, ".")
+	if len(parts) < 2 {
+		return nil, false
+	}
+
+	switch parts[0] {
+	case "item":
+		value, ok := currentItemFieldValueResolved(as.itemRepo, ctx, parts[1])
+		if !ok {
+			return nil, false
+		}
+		return nestedExecutionValue(value, parts[2:])
+	case "trigger":
+		if value, ok := ctx.Variables[parts[1]]; ok {
+			return nestedExecutionValue(value, parts[2:])
+		}
+		return nil, false
+	case "old":
+		if value, ok := ctx.Variables["old_"+parts[1]]; ok {
+			return nestedExecutionValue(value, parts[2:])
+		}
+		return nil, false
+	case "user":
+		if ctx.Actor != nil && len(parts) == 2 {
+			switch parts[1] {
+			case "name":
+				return ctx.Actor.FirstName + " " + ctx.Actor.LastName, true
+			case "email":
+				return ctx.Actor.Email, true
+			case "id":
+				return ctx.Actor.ID, true
+			}
+		}
+		return nil, false
+	case "ref", "repo", "commits":
+		// SCM trigger payloads are stored with their dotted keys intact.
+		if value, ok := ctx.Variables["new_"+path]; ok {
+			return value, true
+		}
+		if value, ok := ctx.Variables["new_"+parts[0]]; ok {
+			return nestedExecutionValue(value, parts[1:])
+		}
+		return nil, false
+	}
+
+	if value, ok := ctx.Variables[parts[0]]; ok {
+		return nestedExecutionValue(value, parts[1:])
+	}
+	return nil, false
+}
+
+// substituteVariables replaces {{variable}} placeholders with actual values.
+// Missing values intentionally remain unchanged so templates stay tolerant.
 func (as *ActionService) substituteVariables(template string, ctx *models.ExecutionContext) string {
-	// Matches double-brace variable placeholders like {{variable_name}}
 	re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 	return re.ReplaceAllStringFunc(template, func(match string) string {
-		// Extract variable name (remove {{ and }})
-		varName := strings.TrimPrefix(strings.TrimSuffix(match, "}}"), "{{")
-		varName = strings.TrimSpace(varName)
-
-		// Check different variable sources
-		parts := strings.Split(varName, ".")
-		if len(parts) == 2 {
-			switch parts[0] {
-			case "item":
-				if val := as.currentItemFieldValue(ctx, parts[1]); val != nil {
-					return fmt.Sprintf("%v", val)
-				}
-			case "trigger":
-				if val, ok := ctx.Variables[parts[1]]; ok {
-					return fmt.Sprintf("%v", val)
-				}
-			case "old":
-				if val, ok := ctx.Variables["old_"+parts[1]]; ok {
-					return fmt.Sprintf("%v", val)
-				}
-			case "user":
-				if ctx.Actor != nil {
-					switch parts[1] {
-					case "name":
-						return ctx.Actor.FirstName + " " + ctx.Actor.LastName
-					case "email":
-						return ctx.Actor.Email
-					case "id":
-						return strconv.Itoa(ctx.Actor.ID)
-					}
-				}
-			case "ref", "repo", "commits":
-				// SCM trigger payload — emitted by SyncService into
-				// ActionEvent.NewValues with dotted keys like "ref.short".
-				// The event init code prefixes NewValues keys with "new_"
-				// when populating ctx.Variables, so look up there.
-				if val, ok := ctx.Variables["new_"+varName]; ok {
-					return fmt.Sprintf("%v", val)
-				}
+		varName := strings.TrimSpace(strings.TrimPrefix(strings.TrimSuffix(match, "}}"), "{{"))
+		if value, ok := as.resolveExecutionValue(ctx, varName); ok {
+			formatted, err := stringifyExecutionValue(value, "")
+			if err == nil {
+				return formatted
 			}
 		}
-
-		// Direct variable lookup
-		if val, ok := ctx.Variables[varName]; ok {
-			return fmt.Sprintf("%v", val)
-		}
-
-		// Return original if not found
 		return match
 	})
 }
@@ -2131,12 +2327,15 @@ func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.E
 		return fmt.Errorf("failed to parse ai_extract config: %w", err)
 	}
 
-	// Get the untrusted input from execution context
-	inputRaw, ok := ctx.Variables[config.InputField]
+	// Get the untrusted input from execution context.
+	inputRaw, ok := as.resolveExecutionValue(ctx, config.InputField)
 	if !ok {
 		return fmt.Errorf("input field %q not found in execution context", config.InputField)
 	}
-	input := fmt.Sprintf("%v", inputRaw)
+	input, err := stringifyExecutionValue(inputRaw, "null")
+	if err != nil {
+		return fmt.Errorf("failed to encode input field %q: %w", config.InputField, err)
+	}
 
 	// Resolve LLM client (gated by the action's workspace scope)
 	client, err := as.resolveLLMClient(ctx.Event.WorkspaceID, config.CapabilityID)
@@ -2146,7 +2345,7 @@ func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.E
 
 	// Run sandboxed analysis (no tools, structured output only)
 	result, err := llm.RunSandboxedAnalysis[map[string]any](
-		context.Background(),
+		actionRequestContext(ctx),
 		client,
 		llm.SandboxedAnalysisRequest{
 			SystemPrompt: config.Prompt,
@@ -2191,11 +2390,34 @@ func wrapUntrustedAgentInput(field, payload string) string {
 	return fmt.Sprintf(`<input field=%q trust="untrusted">%s</input>`, field, payload)
 }
 
+func (as *ActionService) buildAIAgentUserMessage(ctx *models.ExecutionContext, fields []string) (string, error) {
+	inputParts := make([]string, 0, len(fields))
+	for _, field := range fields {
+		value, ok := as.resolveExecutionValue(ctx, field)
+		if !ok {
+			return "", fmt.Errorf("input field %q not found in execution context", field)
+		}
+		valueJSON, err := json.Marshal(value)
+		if err != nil {
+			return "", fmt.Errorf("failed to encode input field %q: %w", field, err)
+		}
+		inputParts = append(inputParts, wrapUntrustedAgentInput(field, string(valueJSON)))
+	}
+	return strings.Join(inputParts, "\n\n"), nil
+}
+
 // executeAIAgent executes an ai_agent node — agentic LLM loop with scoped tools.
 func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.AIAgentNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse ai_agent config: %w", err)
+	}
+
+	// Build user message before resolving the client so invalid action input
+	// configuration fails clearly and does not start an empty agent run.
+	userMessage, err := as.buildAIAgentUserMessage(ctx, config.InputFields)
+	if err != nil {
+		return err
 	}
 
 	// Resolve LLM client (gated by the action's workspace scope)
@@ -2204,19 +2426,6 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 		return err
 	}
 
-	// Build user message from input fields. Each value is wrapped in a
-	// trust-marked envelope so the agent can recognize it as untrusted data
-	// rather than instructions — item titles, comments, and HTTP responses
-	// have been a vector for indirect prompt injection.
-	var inputParts []string
-	for _, field := range config.InputFields {
-		if val, ok := ctx.Variables[field]; ok {
-			valJSON, _ := json.Marshal(val)
-			inputParts = append(inputParts, wrapUntrustedAgentInput(field, string(valJSON)))
-		}
-	}
-	userMessage := strings.Join(inputParts, "\n\n")
-
 	// Keep untrusted execution values in wrapped user input, never system prompts.
 	systemPrompt := aiAgentUntrustedInputGuardrail + "\n\n" + config.Prompt
 
@@ -2224,7 +2433,7 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 	// is workspace-scoped — capabilities not available to the action's workspace
 	// are filtered out before reaching the agent.
 	var tools []llm.ToolDefinition
-	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools)
+	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools, node.ID)
 
 	for _, toolCapID := range config.Tools {
 		toolDefs := as.buildToolDefinitions(ctx.Event.WorkspaceID, toolCapID)
@@ -2244,7 +2453,7 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 
 	// Run agent loop
 	agentResult, err := llm.RunAgent(
-		context.Background(),
+		actionRequestContext(ctx),
 		client,
 		llm.AgentConfig{
 			SystemPrompt:     systemPrompt,
@@ -2339,7 +2548,7 @@ func (as *ActionService) buildToolDefinitions(workspaceID int, capIDStr string) 
 // Captures the action's workspace ID so the agent's tool calls re-validate
 // capability scope at execution time (defense in depth: tools were already
 // scope-filtered in buildToolDefinitions).
-func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string, nodeID int) llm.ToolExecutorFunc {
 	workspaceID := 0
 	if ctx != nil && ctx.Event != nil {
 		workspaceID = ctx.Event.WorkspaceID
@@ -2365,7 +2574,7 @@ func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, to
 				return "", fmt.Errorf("capability %d not in allowed tools", capID)
 			}
 
-			return as.executeAgentHTTPRequest(execCtx, workspaceID, capID, arguments)
+			return as.executeAgentHTTPRequest(execCtx, workspaceID, capID, arguments, durableActionIdempotencyKey(ctx, nodeID))
 		}
 
 		return "", fmt.Errorf("unknown tool: %s", name)
@@ -2373,7 +2582,7 @@ func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, to
 }
 
 // executeAgentHTTPRequest executes an HTTP request from within an agent tool call.
-func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceID, capID int, arguments string) (string, error) {
+func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceID, capID int, arguments, idempotencyKey string) (string, error) {
 	capability, err := as.resolveCapability(workspaceID, capID, models.CapabilityHTTPClient)
 	if err != nil {
 		return "", err
@@ -2406,6 +2615,9 @@ func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceI
 	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(ctx, &httpConfig, args.Headers, workspaceID, capID)
 	if err != nil {
 		return "", err
+	}
+	if method != "GET" && idempotencyKey != "" {
+		mergedHeaders["Idempotency-Key"] = idempotencyKey
 	}
 	return doHTTPRequest(ctx, method, args.URL, args.Body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 }
@@ -2463,7 +2675,7 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 			return fmt.Errorf("container_run pool dispatch: %w", err)
 		}
 		pool := config.PoolCapabilityID
-		runID, derr := as.agentRuns.Insert(context.Background(), &models.AgentRun{
+		runID, derr := as.agentRuns.Insert(actionRequestContext(ctx), &models.AgentRun{
 			WorkspaceID:  ctx.Event.WorkspaceID,
 			Status:       models.AgentRunStatusQueued,
 			JobKind:      models.JobKindActionContainer,
@@ -2490,7 +2702,7 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 	if as.containerService == nil {
 		return fmt.Errorf("container service not configured")
 	}
-	containerInfo, err := as.containerService.StartContainer(context.Background(), envConfig, config.TimeoutSecs)
+	containerInfo, err := as.containerService.StartContainer(actionRequestContext(ctx), envConfig, config.TimeoutSecs)
 	if err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
@@ -2559,12 +2771,18 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 		return fmt.Errorf("URL %q not allowed by capability %d", redactHTTPURLForDiagnostics(targetURL), config.CapabilityID)
 	}
 
-	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(context.Background(), &httpConfig, headers, ctx.Event.WorkspaceID, config.CapabilityID)
+	requestCtx := actionRequestContext(ctx)
+	mergedHeaders, err := as.buildHTTPHeadersWithCredentials(requestCtx, &httpConfig, headers, ctx.Event.WorkspaceID, config.CapabilityID)
 	if err != nil {
 		return fmt.Errorf("http_request: %w", err)
 	}
+	if method != "GET" {
+		if idempotencyKey := durableActionIdempotencyKey(ctx, node.ID); idempotencyKey != "" {
+			mergedHeaders["Idempotency-Key"] = idempotencyKey
+		}
+	}
 
-	result, err := doHTTPRequest(context.Background(), method, targetURL, body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
+	result, err := doHTTPRequest(requestCtx, method, targetURL, body, mergedHeaders, nil, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 	if err != nil {
 		return fmt.Errorf("http_request failed: %w", err)
 	}
@@ -2586,6 +2804,14 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 	)
 
 	return nil
+}
+
+func durableActionIdempotencyKey(ctx *models.ExecutionContext, nodeID int) string {
+	if ctx == nil || ctx.Action == nil || ctx.DurableEventKey == "" || nodeID <= 0 {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", ctx.DurableEventKey, ctx.Action.ID, nodeID)))
+	return fmt.Sprintf("windshift-%x", sum[:])
 }
 
 // buildHTTPHeadersWithCredentials merges defaults, auth, credential references,

@@ -93,6 +93,7 @@ type ItemCreationParams struct {
 	IsTask                  bool
 	ParentID                *int
 	MilestoneIDs            []int
+	LabelIDs                []int
 	IterationID             *int
 	ProjectID               *int
 	InheritProject          bool

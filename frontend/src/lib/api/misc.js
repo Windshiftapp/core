@@ -1,11 +1,5 @@
-import { API_BASE, fetchAPI } from './core.js';
+import { API_BASE, fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
-
-export const projects = {
-  ...createCrudClient('/projects'),
-  getByWorkspace: (workspaceId) => fetchAPI(`/projects?workspace_id=${workspaceId}`),
-  getMilestones: (id) => fetchAPI(`/projects/${id}/milestones`),
-};
 
 export const search = {
   items: (params = {}) => {
@@ -30,9 +24,9 @@ export const search = {
     }
 
     // Limit
-    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.limit) searchParams.append('page_size', String(Math.min(Number(params.limit), 100)));
 
-    return fetchAPI(`/items/search?${searchParams.toString()}`);
+    return fetchV2Data(`/items/search?${searchParams.toString()}`);
   },
 };
 
@@ -48,58 +42,66 @@ export const homepage = {
 
 // Diagram API functions
 export const getDiagrams = (itemId, requestOptions = {}) =>
-  fetchAPI(`/items/${itemId}/diagrams`, requestOptions);
-export const getDiagram = (diagramId) => fetchAPI(`/diagrams/${diagramId}`);
+  fetchV2Data(`/items/${itemId}/diagrams`, requestOptions);
+export const getDiagram = (diagramId) => fetchV2Data(`/item-diagrams/${diagramId}`);
 export const createDiagram = (itemId, name, diagramData) =>
-  fetchAPI(`/items/${itemId}/diagrams`, {
+  fetchV2Data(`/items/${itemId}/diagrams`, {
     method: 'POST',
     body: JSON.stringify({ name, diagram_data: diagramData }),
   });
 export const updateDiagram = (diagramId, name, diagramData) =>
-  fetchAPI(`/diagrams/${diagramId}`, {
-    method: 'PUT',
+  fetchV2Data(`/item-diagrams/${diagramId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/merge-patch+json' },
     body: JSON.stringify({ name, diagram_data: diagramData }),
   });
 export const deleteDiagram = (diagramId) =>
-  fetchAPI(`/diagrams/${diagramId}`, {
+  fetchV2Data(`/item-diagrams/${diagramId}`, {
     method: 'DELETE',
   });
 
 // Comment API functions
 export const getComments = (itemId, params = {}) => {
   const searchParams = new URLSearchParams();
-  if (params.limit) searchParams.set('limit', params.limit);
-  if (params.before) searchParams.set('before', params.before);
-  if (params.beforeId) searchParams.set('before_id', params.beforeId);
-  if (params.since) searchParams.set('since', params.since);
-  if (params.sinceId) searchParams.set('since_id', params.sinceId);
+  if (params.limit) searchParams.set('page_size', params.limit);
+  if (params.cursor) searchParams.set('cursor', params.cursor);
   const query = searchParams.toString();
-  return fetchAPI(`/items/${itemId}/comments${query ? `?${query}` : ''}`);
+  return fetchV2Data(`/items/${itemId}/comments${query ? `?${query}` : ''}`);
 };
 export const createComment = (itemId, data) =>
-  fetchAPI(`/items/${itemId}/comments`, {
+  fetchV2Data(`/items/${itemId}/comments`, {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ content: data.content, is_private: Boolean(data.is_private) }),
   });
 export const updateComment = (commentId, data) =>
-  fetchAPI(`/comments/${commentId}`, {
-    method: 'PUT',
+  fetchV2Data(`/comments/${commentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/merge-patch+json' },
     body: JSON.stringify(data),
   });
 export const deleteComment = (commentId) =>
-  fetchAPI(`/comments/${commentId}`, {
+  fetchV2Data(`/comments/${commentId}`, {
     method: 'DELETE',
   });
 
 // Attachments
 export const attachments = {
-  // Get attachments for an item with pagination support
   getByItem: (itemId, params = {}) => {
+    const { page, limit, ...requestOptions } = params;
     const searchParams = new URLSearchParams();
-    if (params.page) searchParams.append('page', params.page);
-    if (params.limit) searchParams.append('limit', params.limit);
+    if (page) searchParams.append('page', page);
+    if (limit) searchParams.append('page_size', limit);
     const queryString = searchParams.toString();
-    return fetchAPI(`/items/${itemId}/attachments${queryString ? `?${queryString}` : ''}`);
+    return fetchAPIV2(
+      `/items/${itemId}/attachments${queryString ? `?${queryString}` : ''}`,
+      requestOptions
+    );
+  },
+
+  uploadToItem: (itemId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchV2Data(`/items/${itemId}/attachments`, { method: 'POST', body: formData });
   },
 
   // Upload attachment (uses FormData, no JSON)
@@ -119,15 +121,14 @@ export const attachments = {
     return response.json();
   },
 
-  // Download attachment (returns URL for download)
-  getDownloadUrl: (attachmentId) => `${API_BASE}/attachments/${attachmentId}/download`,
+  getDownloadUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/content`,
 
   // Get thumbnail URL for image attachments
-  getThumbnailUrl: (attachmentId) => `${API_BASE}/attachments/${attachmentId}/thumbnail`,
+  getThumbnailUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/thumbnail`,
 
   // Delete attachment
   delete: (attachmentId) =>
-    fetchAPI(`/attachments/${attachmentId}`, {
+    fetchV2Data(`/attachments/${attachmentId}`, {
       method: 'DELETE',
     }),
 };
@@ -226,25 +227,26 @@ export const personalLabels = {
 
 // Global item labels
 export const labels = {
-  getAll: () => fetchAPI('/labels'),
-  get: (id) => fetchAPI(`/labels/${id}`),
-  create: (data) =>
-    fetchAPI('/labels', {
+  getAll: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/labels`),
+  get: (workspaceId, id) => fetchV2Data(`/workspaces/${workspaceId}/labels/${id}`),
+  create: ({ workspace_id: workspaceId, ...data }) =>
+    fetchV2Data(`/workspaces/${workspaceId}/labels`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id, data) =>
-    fetchAPI(`/labels/${id}`, {
-      method: 'PUT',
+  update: (workspaceId, id, data) =>
+    fetchV2Data(`/workspaces/${workspaceId}/labels/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
       body: JSON.stringify(data),
     }),
-  delete: (id) =>
-    fetchAPI(`/labels/${id}`, {
+  delete: (workspaceId, id) =>
+    fetchAPIV2(`/workspaces/${workspaceId}/labels/${id}`, {
       method: 'DELETE',
     }),
-  getForItem: (itemId) => fetchAPI(`/items/${itemId}/labels`),
+  getForItem: (itemId) => fetchV2Data(`/items/${itemId}/labels`),
   setForItem: (itemId, labelIds) =>
-    fetchAPI(`/items/${itemId}/labels`, {
+    fetchV2Data(`/items/${itemId}/labels`, {
       method: 'PUT',
       body: JSON.stringify({ label_ids: labelIds }),
     }),

@@ -46,9 +46,7 @@
     error = null;
 
     try {
-      await api.post(`/workspaces/${workspaceId}/actions/${action.id}/execute`, {
-        item_id: selectedItemId
-      });
+      await api.actions.execute(workspaceId, action.id, selectedItemId);
       onsuccess?.();
       onclose();
     } catch (err) {

@@ -2,102 +2,87 @@ package services
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // StatusService encapsulates business logic for statuses and status categories.
 type StatusService struct {
-	db database.Database
+	db         database.Database
+	statuses   *EnumService
+	categories *EnumService
 }
 
 // NewStatusService creates a new StatusService.
 func NewStatusService(db database.Database) *StatusService {
-	return &StatusService{db: db}
+	return &StatusService{
+		db:         db,
+		statuses:   NewEnumService(db, NewStatusConfig()),
+		categories: NewEnumService(db, NewStatusCategoryConfig()),
+	}
 }
 
 // StatusResult represents a status with category details.
 type StatusResult struct {
-	ID                 int
-	BuiltinKey         string
-	Name               string
-	Description        string
-	CategoryID         int
-	CategoryName       string
-	CategoryBuiltinKey string
-	CategoryColor      string
-	IsDefault          bool
-	IsCompleted        bool
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                  int
+	BuiltinKey          string
+	Name                string
+	Description         string
+	CategoryID          int
+	CategoryName        string
+	CategoryBuiltinKey  string
+	CategoryDescription string
+	CategoryColor       string
+	CategoryIsDefault   bool
+	IsDefault           bool
+	IsCompleted         bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 // ListStatuses retrieves all statuses with their category details.
 func (s *StatusService) ListStatuses() ([]StatusResult, error) {
-	rows, err := s.db.Query(`
-		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
-		       s.created_at, s.updated_at
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		ORDER BY sc.id, s.name
-	`)
+	entities, err := s.statuses.GetAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list statuses: %w", err)
+		return nil, fmt.Errorf("list statuses: %w", err)
 	}
-	defer rows.Close()
-
-	var statuses []StatusResult
-	for rows.Next() {
-		var s StatusResult
-		var description sql.NullString
-		err := rows.Scan(&s.ID, &s.BuiltinKey, &s.Name, &description, &s.CategoryID, &s.IsDefault,
-			&s.CategoryName, &s.CategoryBuiltinKey, &s.CategoryColor, &s.IsCompleted,
-			&s.CreatedAt, &s.UpdatedAt)
-		if err != nil {
-			continue
+	statuses := make([]StatusResult, 0, len(entities))
+	for _, entity := range entities {
+		status, ok := entity.(*models.Status)
+		if !ok {
+			return nil, fmt.Errorf("list statuses: unexpected entity %T", entity)
 		}
-		s.Description = description.String
-		statuses = append(statuses, s)
+		statuses = append(statuses, statusResult(*status))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate statuses: %w", err)
-	}
-
-	if statuses == nil {
-		statuses = []StatusResult{}
-	}
-
 	return statuses, nil
 }
 
 // GetStatus retrieves a status by ID.
 func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
-	var status StatusResult
-	var description sql.NullString
-	err := s.db.QueryRow(`
-		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
-		       s.created_at, s.updated_at
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE s.id = ?
-	`, id).Scan(&status.ID, &status.BuiltinKey, &status.Name, &description, &status.CategoryID, &status.IsDefault,
-		&status.CategoryName, &status.CategoryBuiltinKey, &status.CategoryColor, &status.IsCompleted,
-		&status.CreatedAt, &status.UpdatedAt)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("status not found: %d", id)
-	}
+	entity, err := s.statuses.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %w", err)
+		return nil, fmt.Errorf("get status %d: %w", id, err)
 	}
+	status, ok := entity.(*models.Status)
+	if !ok {
+		return nil, fmt.Errorf("get status: unexpected entity %T", entity)
+	}
+	result := statusResult(*status)
+	return &result, nil
+}
 
-	status.Description = description.String
-	return &status, nil
+func statusResult(status models.Status) StatusResult {
+	return StatusResult{
+		ID: status.ID, BuiltinKey: status.BuiltinKey, Name: status.Name,
+		Description: status.Description, CategoryID: status.CategoryID,
+		CategoryName: status.CategoryName, CategoryBuiltinKey: status.CategoryBuiltinKey,
+		CategoryDescription: status.CategoryDescription, CategoryColor: status.CategoryColor,
+		CategoryIsDefault: status.CategoryIsDefault, IsDefault: status.IsDefault,
+		IsCompleted: status.IsCompleted, CreatedAt: status.CreatedAt, UpdatedAt: status.UpdatedAt,
+	}
 }
 
 // GetTerminalStatuses returns all statuses reachable in the given workflow
@@ -110,7 +95,8 @@ func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
 func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, error) {
 	rows, err := s.db.Query(`
 		SELECT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default,
-		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed,
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.description as category_description,
+		       sc.color as category_color, sc.is_default as category_is_default, sc.is_completed,
 		       s.created_at, s.updated_at
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
@@ -133,7 +119,8 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 		var st StatusResult
 		var description sql.NullString
 		if err := rows.Scan(&st.ID, &st.BuiltinKey, &st.Name, &description, &st.CategoryID, &st.IsDefault,
-			&st.CategoryName, &st.CategoryBuiltinKey, &st.CategoryColor, &st.IsCompleted,
+			&st.CategoryName, &st.CategoryBuiltinKey, &st.CategoryDescription,
+			&st.CategoryColor, &st.CategoryIsDefault, &st.IsCompleted,
 			&st.CreatedAt, &st.UpdatedAt); err != nil {
 			continue
 		}
@@ -153,7 +140,8 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT s.id, COALESCE(s.builtin_key, ''), s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.color as category_color, sc.is_completed
+		       sc.name as category_name, COALESCE(sc.builtin_key, ''), sc.description as category_description,
+		       sc.color as category_color, sc.is_default as category_is_default, sc.is_completed
 		FROM workflow_transitions wt
 		JOIN statuses s ON s.id = wt.to_status_id OR (wt.from_status_id IS NOT NULL AND s.id = wt.from_status_id)
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
@@ -168,16 +156,18 @@ func (s *StatusService) ListWorkflowStatuses(workflowID int) ([]StatusResult, er
 	var statuses []StatusResult
 	for rows.Next() {
 		var st StatusResult
-		var categoryName, categoryColor sql.NullString
+		var categoryName, categoryDescription, categoryColor sql.NullString
 		var isCompleted sql.NullBool
 		if err := rows.Scan(
 			&st.ID, &st.BuiltinKey, &st.Name, &st.Description, &st.CategoryID,
 			&st.IsDefault, &st.CreatedAt, &st.UpdatedAt,
-			&categoryName, &st.CategoryBuiltinKey, &categoryColor, &isCompleted,
+			&categoryName, &st.CategoryBuiltinKey, &categoryDescription,
+			&categoryColor, &st.CategoryIsDefault, &isCompleted,
 		); err != nil {
 			return nil, fmt.Errorf("scan workflow status: %w", err)
 		}
 		st.CategoryName = categoryName.String
+		st.CategoryDescription = categoryDescription.String
 		st.CategoryColor = categoryColor.String
 		st.IsCompleted = isCompleted.Bool
 		statuses = append(statuses, st)
@@ -204,54 +194,39 @@ type StatusCategoryResult struct {
 
 // ListCategories retrieves all status categories.
 func (s *StatusService) ListCategories() ([]StatusCategoryResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, COALESCE(builtin_key, ''), name, color, description, is_default, is_completed
-		FROM status_categories
-		ORDER BY id
-	`)
+	entities, err := s.categories.GetAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list categories: %w", err)
+		return nil, fmt.Errorf("list status categories: %w", err)
 	}
-	defer rows.Close()
-
-	var categories []StatusCategoryResult
-	for rows.Next() {
-		var c StatusCategoryResult
-		var description sql.NullString
-		err := rows.Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
-		if err != nil {
-			continue
+	categories := make([]StatusCategoryResult, 0, len(entities))
+	for _, entity := range entities {
+		category, ok := entity.(*models.StatusCategory)
+		if !ok {
+			return nil, fmt.Errorf("list status categories: unexpected entity %T", entity)
 		}
-		c.Description = description.String
-		categories = append(categories, c)
+		categories = append(categories, statusCategoryResult(*category))
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate categories: %w", err)
-	}
-
-	if categories == nil {
-		categories = []StatusCategoryResult{}
-	}
-
 	return categories, nil
 }
 
 // GetCategory retrieves a status category by ID.
 func (s *StatusService) GetCategory(id int) (*StatusCategoryResult, error) {
-	var c StatusCategoryResult
-	var description sql.NullString
-	err := s.db.QueryRow(`
-		SELECT id, COALESCE(builtin_key, ''), name, color, description, is_default, is_completed
-		FROM status_categories WHERE id = ?
-	`, id).Scan(&c.ID, &c.BuiltinKey, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("category not found: %d", id)
-	}
+	entity, err := s.categories.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get category: %w", err)
+		return nil, fmt.Errorf("get status category %d: %w", id, err)
 	}
+	category, ok := entity.(*models.StatusCategory)
+	if !ok {
+		return nil, fmt.Errorf("get status category: unexpected entity %T", entity)
+	}
+	result := statusCategoryResult(*category)
+	return &result, nil
+}
 
-	c.Description = description.String
-	return &c, nil
+func statusCategoryResult(category models.StatusCategory) StatusCategoryResult {
+	return StatusCategoryResult{
+		ID: category.ID, BuiltinKey: category.BuiltinKey, Name: category.Name,
+		Color: category.Color, Description: category.Description,
+		IsDefault: category.IsDefault, IsCompleted: category.IsCompleted,
+	}
 }

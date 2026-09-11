@@ -17,7 +17,9 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
-  import DropIndicator from '../layout/DropIndicator.svelte';
+  import DragHandleDots from '../components/DragHandleDots.svelte';
+  import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
+  import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { isAlwaysVisibleSystemField } from '../utils/screenFields.js';
@@ -450,32 +452,16 @@
             </div>
           {:else}
             {#each screenFields as field, index (field.field_identifier)}
-              <div
-                data-screen-field
-                data-field-index={index}
-                data-field-id={field.field_identifier}
-                class="relative group flex items-center gap-3 px-4 py-3 rounded border hover:shadow-sm transition-all duration-200 h-16"
+              <DraggableFieldRow
+                attributes={{ 'data-screen-field': true }}
+                fieldIndex={index}
+                fieldId={field.field_identifier}
+                closestEdge={fieldDragState.get(field.field_identifier)?.closestEdge}
+                class="gap-3 px-4 py-3 rounded border hover:shadow-sm transition-all duration-200 h-16"
                 style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); user-select: none;"
+                handleClass="w-4 h-4 group-hover:text-[var(--ds-icon-accent)]"
+                handleColor="var(--ds-text-subtle)"
               >
-                <!-- Drop indicator -->
-                {#if fieldDragState.get(field.field_identifier)?.closestEdge}
-                  <DropIndicator edge={fieldDragState.get(field.field_identifier)?.closestEdge} gap={8} />
-                {/if}
-                <!-- Drag Handle -->
-                <div
-                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 rounded hover-bg transition-colors"
-                  style="touch-action: none;"
-                >
-                  <svg class="w-4 h-4 drag-handle-icon" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="9" cy="6" r="1.5"/>
-                    <circle cx="15" cy="6" r="1.5"/>
-                    <circle cx="9" cy="12" r="1.5"/>
-                    <circle cx="15" cy="12" r="1.5"/>
-                    <circle cx="9" cy="18" r="1.5"/>
-                    <circle cx="15" cy="18" r="1.5"/>
-                  </svg>
-                </div>
-
                 <div class="flex-1">
                   <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
                     {getFieldDisplayName(field)}
@@ -494,25 +480,17 @@
                     size="small"
                   />
 
-                  {#if field.field_type === 'system' && isAlwaysVisibleSystemField(field.field_identifier)}
-                    <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4" style="color: var(--ds-text-disabled);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                      </svg>
-                    </div>
-                  {:else}
-                    <button
-                      onclick={() => removeField(index)}
-                      class="transition-colors p-1 rounded hover-danger flex-shrink-0" style="color: var(--ds-icon-danger);"
-                      title={t('screensPage.removeField')}
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  {/if}
+                  <FieldRemovalAction
+                    locked={field.field_type === 'system' && isAlwaysVisibleSystemField(field.field_identifier)}
+                    lockedClass="w-9 h-9 flex items-center justify-center flex-shrink-0"
+                    lockedColor="var(--ds-text-disabled)"
+                    removeClass="transition-colors p-1 rounded hover-danger flex-shrink-0"
+                    removeStyle="color: var(--ds-icon-danger);"
+                    removeTitle={t('screensPage.removeField')}
+                    onremove={() => removeField(index)}
+                  />
                 </div>
-              </div>
+              </DraggableFieldRow>
             {/each}
           {/if}
         </div>
@@ -545,14 +523,7 @@
             >
               <!-- Drag Handle -->
               <div class="flex-shrink-0">
-                <svg class="w-4 h-4 drag-handle-icon" style="color: var(--ds-text-subtle);" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="9" cy="6" r="1.5"/>
-                  <circle cx="15" cy="6" r="1.5"/>
-                  <circle cx="9" cy="12" r="1.5"/>
-                  <circle cx="15" cy="12" r="1.5"/>
-                  <circle cx="9" cy="18" r="1.5"/>
-                  <circle cx="15" cy="18" r="1.5"/>
-                </svg>
+                <DragHandleDots class="w-4 h-4 group-hover:text-[var(--ds-icon-accent)]" color="var(--ds-text-subtle)" />
               </div>
 
               <div class="flex-1">
@@ -591,10 +562,5 @@
   .available-field:hover {
     background-color: var(--ds-background-input-hovered) !important;
     border-color: var(--ds-border-focused) !important;
-  }
-
-  :global(.group):hover .drag-handle-icon,
-  .available-field:hover .drag-handle-icon {
-    color: var(--ds-icon-accent) !important;
   }
 </style>

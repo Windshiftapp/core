@@ -259,8 +259,9 @@ function createPortalAuthStore() {
       try {
         const response = await api.portalAuth.verifyMagicLink(slug, token);
         if (response.success) {
-          customer.set(response.customer);
-          isAuthenticated.set(true);
+          // The caller dismisses the one-time-token UI before checkAuth updates
+          // reactive auth state. Updating it here can remount the verifier and
+          // redeem the same token a second time.
           return { success: true, customer: response.customer };
         } else {
           error.set(response.message || 'Invalid or expired link');

@@ -33,15 +33,27 @@ func (l *UserConcurrencyLimiter) Limit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !l.acquire(user.ID) {
+		release, ok := l.Acquire(user.ID)
+		if !ok {
 			// Do not queue requests that would add pool pressure.
 			w.Header().Set("Retry-After", "1")
 			http.Error(w, "Too many concurrent requests. Please retry shortly.", http.StatusTooManyRequests)
 			return
 		}
-		defer l.release(user.ID)
+		defer release()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Acquire reserves one per-user slot and returns its release function.
+func (l *UserConcurrencyLimiter) Acquire(userID int) (func(), bool) {
+	if l == nil || l.limit <= 0 || e2eRateLimitsDisabled() {
+		return func() {}, true
+	}
+	if !l.acquire(userID) {
+		return nil, false
+	}
+	return func() { l.release(userID) }, true
 }
 
 func (l *UserConcurrencyLimiter) acquire(userID int) bool {

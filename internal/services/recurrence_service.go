@@ -90,9 +90,38 @@ type RecurrenceInstances struct {
 
 // RecurrencePreview is the normalized result of previewing an RRULE.
 type RecurrencePreview struct {
-	RRule       string
-	DtStart     time.Time
-	Occurrences []time.Time
+	RRule       string      `json:"rrule"`
+	DtStart     time.Time   `json:"dtstart"`
+	Occurrences []time.Time `json:"occurrences"`
+}
+
+// RecurrenceUpdate is a presence-aware recurrence rule mutation.
+type RecurrenceUpdate struct {
+	RRule             *string
+	DtStart           *string
+	DtEndSet          bool
+	DtEnd             *string
+	Timezone          *string
+	LeadTimeDays      *int
+	CopyAssignee      *bool
+	CopyPriority      *bool
+	CopyCustomFields  *bool
+	CopyDescription   *bool
+	StatusOnCreateSet bool
+	StatusOnCreate    *int
+	IsActive          *bool
+}
+
+// NewRecurrenceUpdate adapts the legacy update DTO to the shared mutation.
+func NewRecurrenceUpdate(req models.UpdateRecurrenceRequest) RecurrenceUpdate {
+	return RecurrenceUpdate{
+		RRule: req.RRule, DtStart: req.DtStart, DtEndSet: req.DtEnd != nil, DtEnd: req.DtEnd,
+		Timezone: req.Timezone, LeadTimeDays: req.LeadTimeDays,
+		CopyAssignee: req.CopyAssignee, CopyPriority: req.CopyPriority,
+		CopyCustomFields: req.CopyCustomFields, CopyDescription: req.CopyDescription,
+		StatusOnCreateSet: req.StatusOnCreate != nil, StatusOnCreate: req.StatusOnCreate,
+		IsActive: req.IsActive,
+	}
 }
 
 // Get returns the rule attached to itemID.
@@ -126,6 +155,11 @@ func (s *RecurrenceService) Create(itemID, workspaceID, userID int, req models.C
 
 // Update applies a partial update and returns the persisted rule.
 func (s *RecurrenceService) Update(itemID int, req models.UpdateRecurrenceRequest, auditActors ...AuditActor) (*models.RecurrenceRule, error) {
+	return s.UpdateWithPatch(itemID, NewRecurrenceUpdate(req), auditActors...)
+}
+
+// UpdateWithPatch applies a presence-aware partial update.
+func (s *RecurrenceService) UpdateWithPatch(itemID int, req RecurrenceUpdate, auditActors ...AuditActor) (*models.RecurrenceRule, error) {
 	rule, err := s.repo.GetByTemplateItemID(itemID)
 	if err != nil {
 		return nil, err
@@ -324,7 +358,7 @@ func buildRecurrenceRule(itemID, workspaceID, userID int, req models.CreateRecur
 	}, nil
 }
 
-func applyRecurrenceUpdate(rule *models.RecurrenceRule, req models.UpdateRecurrenceRequest) error {
+func applyRecurrenceUpdate(rule *models.RecurrenceRule, req RecurrenceUpdate) error {
 	if err := sanitizeUpdateRecurrenceRequest(&req); err != nil {
 		return err
 	}
@@ -341,8 +375,8 @@ func applyRecurrenceUpdate(rule *models.RecurrenceRule, req models.UpdateRecurre
 		}
 		rule.DtStart = dtstart
 	}
-	if req.DtEnd != nil {
-		if *req.DtEnd == "" {
+	if req.DtEndSet {
+		if req.DtEnd == nil || *req.DtEnd == "" {
 			rule.DtEnd = nil
 		} else {
 			dtend, err := parseRecurrenceDate(*req.DtEnd)
@@ -377,7 +411,7 @@ func applyRecurrenceUpdate(rule *models.RecurrenceRule, req models.UpdateRecurre
 	if req.CopyDescription != nil {
 		rule.CopyDescription = *req.CopyDescription
 	}
-	if req.StatusOnCreate != nil {
+	if req.StatusOnCreateSet {
 		rule.StatusOnCreate = req.StatusOnCreate
 	}
 	if req.IsActive != nil {
@@ -408,7 +442,7 @@ func sanitizeCreateRecurrenceRequest(req *models.CreateRecurrenceRequest) error 
 	return nil
 }
 
-func sanitizeUpdateRecurrenceRequest(req *models.UpdateRecurrenceRequest) error {
+func sanitizeUpdateRecurrenceRequest(req *RecurrenceUpdate) error {
 	if req.RRule != nil {
 		if err := validateRRuleLength(*req.RRule); err != nil {
 			return err

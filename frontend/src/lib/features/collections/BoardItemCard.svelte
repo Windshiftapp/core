@@ -28,6 +28,7 @@
     cardStyle = 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);',
     textStyle = 'color: var(--ds-text);',
     showMoveMenu = true,
+    dndAction = () => {},
     onopen = null,
   } = $props();
 
@@ -72,6 +73,7 @@
 </script>
 
 <div
+  use:dndAction={item.id}
   class="board-card relative rounded-[4px] border px-3 py-2.5"
   style={cardStyle}
   data-testid={`board-item-${item.id}`}

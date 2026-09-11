@@ -9,7 +9,7 @@ import (
 
 var assetImportCmd = &cobra.Command{
 	Use:   "import <csv-path>",
-	Short: "Import assets from a CSV file (sync, one-shot)",
+	Short: "Queue an asset import from a CSV file",
 	Long: `Stream a CSV file into the target set. The first row is treated as a
 header. Columns named "title", "description", or "asset_tag"/"tag" map to
 built-in fields; every other column is matched case-insensitively against
@@ -51,9 +51,6 @@ Examples:
 		job, err := client.ImportAssetsCSV(setID, assetImportTypeID, statusID, categoryID, f.Name(), f)
 		if err != nil {
 			return fmt.Errorf("import failed: %w", err)
-		}
-		if outputFormat == "" || outputFormat == "table" {
-			_, _ = fmt.Fprintf(stdout, "Import %s: %d total / %d created / %d errors\n", job.Status, job.TotalRows, job.CreatedRows, job.ErrorRows)
 		}
 		NewOutput().Print(job)
 		return nil

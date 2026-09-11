@@ -25,7 +25,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import BasePicker from '../pickers/BasePicker.svelte';
-  import { parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
+  import { fieldOptionsObject, parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
   import { X as XIcon } from '@lucide/svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, loadCustomFieldsOverview } from './customFieldsData.js';
@@ -88,7 +88,11 @@
     { value: 'linking', label: 'Linking', icon: Link2, iconColor: '#3B82F6' }
   ];
 
-  const selectedFieldType = $derived(fieldTypes.find(ft => ft.value === formData.field_type));
+  const fieldTypePickerPositioning = {
+    strategy: 'fixed',
+    placement: 'bottom-start',
+    sameWidth: true
+  };
 
   // Asset field configuration
   let assetSetId = $state(null);
@@ -211,7 +215,7 @@
     // Parse asset field config
     if (field.field_type === 'asset' && field.options) {
       try {
-        const config = JSON.parse(field.options);
+        const config = fieldOptionsObject(field.options);
         assetSetId = config.asset_set_id || null;
         assetQlQuery = config.ql_query || config.cql_query || '';
         assetMulti = config.multi === true;
@@ -229,7 +233,7 @@
     // Parse linking field config
     if (field.field_type === 'linking' && field.options) {
       try {
-        const config = JSON.parse(field.options);
+        const config = fieldOptionsObject(field.options);
         linkingLinkTypeId = config.link_type_id || null;
         linkingAllowedItemTypeIds = config.allowed_item_type_ids || [];
         linkingAllowedEntityTypes = config.allowed_entity_types || ['item'];
@@ -273,6 +277,15 @@
     linkingMulti = true;
     linkingMirrorName = '';
     linkingMirrorAllowedItemTypeIds = [];
+  }
+
+  function selectFieldType(type) {
+    if (!type) return;
+    if (isBooleanCustomFieldType(type.value)) {
+      optionItems = [];
+      nextOptionId = 1;
+    }
+    formData.field_type = type.value;
   }
 
   // Board-configuration routes this page may return to. External, protocol-
@@ -481,7 +494,7 @@
   const isPortalCustomerField = $derived(formData.field_type === 'portalcustomer');
   const isCustomerOrganisationField = $derived(formData.field_type === 'customerorganisation');
   const isLinkingField = $derived(formData.field_type === 'linking');
-  const isLinkingMirror = $derived(isLinkingField && editingField && (() => { try { const o = JSON.parse(editingField.options || '{}'); return !!o.mirror_of_field_id; } catch { return false; } })());
+  const isLinkingMirror = $derived(isLinkingField && editingField && (() => { try { return !!fieldOptionsObject(editingField.options).mirror_of_field_id; } catch { return false; } })());
   const hideAppliesToSection = $derived(formData.field_type === 'portalcustomer' || formData.field_type === 'customerorganisation' || formData.field_type === 'linking');
 
   // Reactive statement to trigger re-calculation when screens data changes
@@ -613,7 +626,7 @@
       render: (field) => {
         if (field.options) {
           try {
-            const options = JSON.parse(field.options);
+            const options = fieldOptionsObject(field.options);
             if (options && options.items && Array.isArray(options.items)) {
               return `${options.items.length} options`;
             } else if (Array.isArray(options)) {
@@ -660,6 +673,14 @@
     }
   ]);
 </script>
+
+{#snippet fieldTypeOption({ item: fieldType })}
+  {@const FieldTypeIcon = fieldType.icon}
+  <div class="flex items-center gap-3 min-w-0">
+    <FieldTypeIcon class="w-4 h-4 flex-shrink-0" style="color: {fieldType.iconColor};" />
+    <span class="truncate">{fieldType.label}</span>
+  </div>
+{/snippet}
 
 <PageHeader
   icon={Database}
@@ -734,32 +755,19 @@
 
         <div>
           <Label for="field-type" required class="mb-2">{t('fields.fieldType')}</Label>
-          <DropdownMenu
-            triggerTestid="custom-field-type-trigger"
-            triggerIcon={selectedFieldType?.icon}
-            triggerIconBgColor={selectedFieldType?.iconColor}
-            triggerText={selectedFieldType?.label || 'Select type...'}
-            triggerClass="w-full h-[38px] rounded-lg border px-3 text-sm"
-            triggerStyle="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
-            triggerAlignment="between"
-            showChevron={true}
+          <BasePicker
+            id="field-type"
+            value={formData.field_type}
+            items={fieldTypes}
+            placeholder="Select type..."
+            ariaLabel={t('fields.fieldType')}
             disabled={!!editingField}
-            maxWidth="max-w-72"
-            items={fieldTypes.map(type => ({
-              id: type.value,
-              type: 'regular',
-              icon: type.icon,
-              iconColor: type.iconColor,
-              title: type.label,
-              testid: `custom-field-type-${type.value}`,
-              onClick: () => {
-                if (isBooleanCustomFieldType(type.value)) {
-                  optionItems = [];
-                  nextOptionId = 1;
-                }
-                formData.field_type = type.value;
-              }
-            }))}
+            getValue={(type) => type.value}
+            getLabel={(type) => type.label}
+            itemSnippet={fieldTypeOption}
+            optionTestid={(option) => `custom-field-type-${option.value}`}
+            positioning={fieldTypePickerPositioning}
+            onSelect={selectFieldType}
           />
           {#if editingField}
             <p class="mt-2 text-xs" style="color: var(--ds-text-subtle);">

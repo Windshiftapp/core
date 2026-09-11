@@ -133,8 +133,8 @@
       workflows = wf || [];
       statusesAll = st || [];
       groups = gr || [];
-      users = (Array.isArray(us) ? us : us?.users) || [];
-      roles = Array.isArray(rs) ? rs : (rs?.roles ?? []);
+      users = us || [];
+      roles = rs || [];
       userCustomFields = (cf?.data || cf || [])
         .filter(f => f.field_type === 'user' || f.field_type === 'multi_user')
         .map(f => ({ id: f.id, name: f.name }));

@@ -1,5 +1,4 @@
-import { fetchAPI } from './core.js';
-import { createCrudClient } from './createCrudClient.js';
+import { fetchAllV2Pages, fetchAPI, fetchV2Data } from './core.js';
 
 export const permissions = {
   // Get all available permissions
@@ -62,16 +61,32 @@ export const permissions = {
 
 // Group Management
 export const groups = {
-  ...createCrudClient('/groups'),
-  addMembers: (groupId, userIds) =>
-    fetchAPI(`/groups/${groupId}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ user_ids: userIds }),
+  getAll: () => fetchAPI('/groups'),
+  getAdminAll: () => fetchAllV2Pages('/admin/groups'),
+  get: (groupId) => fetchV2Data(`/admin/groups/${groupId}`),
+  create: (data) => fetchV2Data('/admin/groups', { method: 'POST', body: JSON.stringify(data) }),
+  update: (groupId, data) =>
+    fetchV2Data(`/admin/groups/${groupId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify(data),
     }),
-  removeMembers: (groupId, userIds) =>
-    fetchAPI(`/groups/${groupId}/members`, {
-      method: 'DELETE',
-      body: JSON.stringify({ user_ids: userIds }),
-    }),
+  delete: (groupId) => fetchV2Data(`/admin/groups/${groupId}`, { method: 'DELETE' }),
+  addMembers: async (groupId, userIds) => {
+    const group = await fetchV2Data(`/admin/groups/${groupId}`);
+    return fetchV2Data(`/admin/groups/${groupId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify({ member_ids: [...new Set([...group.member_ids, ...userIds])] }),
+    });
+  },
+  removeMembers: async (groupId, userIds) => {
+    const group = await fetchV2Data(`/admin/groups/${groupId}`);
+    return fetchV2Data(`/admin/groups/${groupId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify({ member_ids: group.member_ids.filter((id) => !userIds.includes(id)) }),
+    });
+  },
   getUserMemberships: (userId) => fetchAPI(`/users/${userId}/groups`),
 };

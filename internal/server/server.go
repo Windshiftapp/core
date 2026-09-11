@@ -18,10 +18,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/aitools"
 	"windshift/internal/auth"
+	"windshift/internal/authz"
 	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/email"
@@ -42,17 +44,69 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	v1 "windshift/internal/restapi/v1"
+	v2 "windshift/internal/restapi/v2"
 	"windshift/internal/router"
 	"windshift/internal/routes"
 	"windshift/internal/scheduler"
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/smtp"
+	"windshift/internal/sso"
 	"windshift/internal/standardagent"
 	"windshift/internal/utils"
 	"windshift/internal/webauthn"
 	"windshift/internal/webhook"
 )
+
+type planningReleaseProviderAdapter struct {
+	provider interface {
+		scm.ReleaseProvider
+		ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+	}
+}
+
+func (a planningReleaseProviderAdapter) CreateRelease(ctx context.Context, owner, repo string, input services.ExternalReleaseOptions) (*services.ExternalRelease, error) {
+	release, err := a.provider.CreateRelease(ctx, owner, repo, scm.CreateReleaseOptions{
+		TagName: input.TagName, TargetCommitish: input.TargetCommitish, Name: input.Name,
+		Body: input.Body, IsDraft: input.IsDraft, IsPrerelease: input.IsPrerelease,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return externalPlanningRelease(release), nil
+}
+
+func (a planningReleaseProviderAdapter) ListReleases(ctx context.Context, owner, repo string) ([]services.ExternalRelease, error) {
+	releases, err := a.provider.ListReleases(ctx, owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]services.ExternalRelease, len(releases))
+	for i := range releases {
+		result[i] = *externalPlanningRelease(&releases[i])
+	}
+	return result, nil
+}
+
+func (a planningReleaseProviderAdapter) ListTags(ctx context.Context, owner, repo string) ([]services.ExternalTag, error) {
+	tags, err := a.provider.ListTags(ctx, owner, repo, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]services.ExternalTag, len(tags))
+	for i := range tags {
+		result[i] = services.ExternalTag{Name: tags[i].Name, URL: tags[i].URL}
+	}
+	return result, nil
+}
+
+func externalPlanningRelease(release *scm.Release) *services.ExternalRelease {
+	return &services.ExternalRelease{
+		ID: release.ID, URL: release.URL, TagName: release.TagName, TagURL: release.TagURL,
+		Name: release.Name, Body: release.Body, Status: release.Status, Assets: release.Assets,
+		IsDraft: release.IsDraft, IsPrerelease: release.IsPrerelease, ReleasedAt: release.ReleasedAt,
+	}
+}
 
 // Config is an alias to config.Config — the canonical, fully-resolved runtime
 // configuration. All resolution of env vars and CLI flags happens in
@@ -71,6 +125,12 @@ type Server struct {
 	db         database.Database
 	listener   net.Listener
 
+	permissionService *services.PermissionService
+	sessionManager    *auth.SessionManager
+	tokenManager      *auth.TokenManager
+	scimTokenManager  *auth.SCIMTokenManager
+	itemCache         *services.ItemCacheService
+
 	ldapHandler                  *handlers.LDAPHandler
 	notificationManager          *handlers.NotificationManager
 	notificationService          *services.NotificationService
@@ -78,6 +138,7 @@ type Server struct {
 	recurrenceScheduler          *scheduler.RecurrenceScheduler
 	cfvCleanupScheduler          *scheduler.CFVCleanupScheduler
 	todoistSyncScheduler         *scheduler.TodoistSyncScheduler
+	zammadSyncScheduler          *scheduler.ZammadSyncScheduler
 	runnerLeaseReaper            *scheduler.RunnerLeaseReaper
 	globalRankMigrationScheduler *scheduler.GlobalRankMigrationScheduler
 	codingRunService             *services.RunService
@@ -95,17 +156,21 @@ type Server struct {
 	tokenTracker                 *services.TokenTracker
 	webhookSender                *webhook.WebhookSender
 	scmSyncStopChan              chan struct{}
-	issueSyncStopChan            chan struct{}
-	magicLinkStopChan            chan struct{}
-	cleanupStopChan              chan struct{}
-	jiraHostStopChan             chan struct{}
-	cleanupTicker                *time.Ticker
-	pluginManager                *plugins.Manager
-	databaseDiagRepo             *repository.DatabaseDiagnosticsRepository
-	databasePoolMonitor          *services.DatabasePoolMonitor
-	channelService               *services.ChannelService
-	memoryBudget                 config.MemoryBudget
-	metrics                      *appmetrics.Metrics
+	// secretEncryption is the at-rest secret cipher shared by the SCM and
+	// integration OAuth surfaces; set during wiring, used to revoke provider
+	// grants when a user is offboarded.
+	secretEncryption    *sso.SecretEncryption
+	issueSyncStopChan   chan struct{}
+	magicLinkStopChan   chan struct{}
+	cleanupStopChan     chan struct{}
+	jiraHostStopChan    chan struct{}
+	cleanupTicker       *time.Ticker
+	pluginManager       *plugins.Manager
+	databaseDiagRepo    *repository.DatabaseDiagnosticsRepository
+	databasePoolMonitor *services.DatabasePoolMonitor
+	channelService      *services.ChannelService
+	memoryBudget        config.MemoryBudget
+	metrics             *appmetrics.Metrics
 
 	loginRateLimiter      *middleware.RateLimiter
 	runnerRegisterLimiter *middleware.RateLimiter
@@ -127,9 +192,10 @@ type Server struct {
 	publicBoardLimiter    *middleware.RateLimiter
 	userConcurrency       *middleware.UserConcurrencyLimiter
 
-	actualPort   int
-	started      bool
-	shuttingDown bool
+	actualPort         int
+	started            bool
+	shuttingDown       bool
+	backgroundStopOnce sync.Once
 }
 
 // New creates a new Server instance with the given configuration.
@@ -256,6 +322,7 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize permission service: %w", err)
 	}
+	s.permissionService = permService
 
 	// Shared channel service used by ChannelHandler, WebhookHandler,
 	// FormHandler, RequestTypeHandler, and AssetReportHandler for the
@@ -293,6 +360,7 @@ func (s *Server) initialize() error {
 		cfg.Auth.SessionValidationCacheTTL,
 		primarySessionCacheMB,
 	)
+	s.sessionManager = sessionManager
 
 	effectivePort := cfg.Port
 	if cfg.AllowedPort != "" {
@@ -350,6 +418,7 @@ func (s *Server) initialize() error {
 
 	apiTokenCacheMB, _ := config.SplitSSHCacheBudget(s.memoryBudget.APITokenCacheMB, cfg.SSH.Enabled)
 	tokenManager := auth.NewTokenManager(s.db, s.tokenTracker, apiTokenCacheMB)
+	s.tokenManager = tokenManager
 	if cleaned, cleanupErr := tokenManager.CleanupExpiredTokens(); cleanupErr != nil {
 		slog.Warn("failed to cleanup expired api tokens on startup", "error", cleanupErr)
 	} else if cleaned > 0 {
@@ -401,13 +470,19 @@ func (s *Server) initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to create notification manager: %w", err)
 	}
+	notificationAssetPermissions := services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)
+	notificationAuthorizer := services.NewNotificationAuthorizer(s.db, permService, notificationAssetPermissions)
 
 	s.notificationService = services.NewNotificationService(
 		s.db,
 		s.notificationManager,
 		permService,
 		services.DefaultNotificationServiceConfig(),
+		notificationAssetPermissions,
 	)
+	if err := services.PrepareDurableNotificationEngine(context.Background(), s.eventEngine, s.notificationService); err != nil {
+		return fmt.Errorf("prepare durable notification consumers: %w", err)
+	}
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
@@ -480,19 +555,16 @@ func (s *Server) initialize() error {
 	invitationService := services.NewInvitationService(s.db, smtpSender, baseURL)
 
 	workspaceKeyCache := handlers.NewWorkspaceKeyCache(repository.NewWorkspaceRepository(s.db))
+	authorizationCacheInvalidator := services.NewAuthorizationCacheInvalidator(permService, workspaceKeyCache)
 
 	transitionMatrixService := services.NewTransitionMatrixService(s.db)
 	bulkOperationMetrics := services.NewBulkOperationMetrics()
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService, s.memoryBudget.ItemCacheMB)
-	itemHandler.SetTransitionMatrixService(transitionMatrixService)
-	itemHandler.SetBulkOperationMetrics(bulkOperationMetrics)
-	itemHandler.SetDBRequestTimeout(s.config.DB.RequestTimeout)
+	s.itemCache = itemHandler.ItemCacheService()
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
-	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache)
+	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache, authorizationCacheInvalidator)
 	screenHandler := handlers.NewScreenHandler(s.db).WithObjectTranslations(objectTranslationService)
 	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService).WithObjectTranslations(objectTranslationService)
-	itemTypeHandler := handlers.NewItemTypeHandler(s.db).WithObjectTranslations(objectTranslationService)
-	priorityHandler := handlers.NewPriorityHandler(s.db).WithObjectTranslations(objectTranslationService)
 
 	// Shared audit emitter for enum services
 	enumAuditEmit := services.AuditEmitFunc(func(db database.Database, r *http.Request, actionType, resourceType string, entityID int, entityName string) {
@@ -526,18 +598,7 @@ func (s *Server) initialize() error {
 		logger.NewAuditor(s.db),
 		channelService,
 	)
-	statusCategoryConfig := services.NewStatusCategoryConfig()
-	statusCategoryConfig.AuditEmit = enumAuditEmit
-	statusCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, statusCategoryConfig),
-		func() any { return &models.StatusCategory{} }).WithObjectTranslations(objectTranslationService, "status_category")
-	statusHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewStatusConfig()),
-		func() any { return &models.Status{} }).WithObjectTranslations(objectTranslationService, "status")
-	statusQueryHandler := handlers.NewStatusQueryHandler(repository.NewStatusRepository(s.db))
 	workflowService := s.workflowService
-	workflowHandler := handlers.NewWorkflowHandler(repository.NewWorkflowRepository(s.db), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
-	workflowHandler.SetWorkflowService(workflowService)
 	userHandler := handlers.NewUserHandler(
 		repository.NewUserRepository(s.db),
 		logger.NewAuditor(s.db),
@@ -545,32 +606,25 @@ func (s *Server) initialize() error {
 		invitationService,
 		services.NewUserReadService(s.db),
 		func(id int) error {
-			tokenIDs, err := services.OffboardUser(s.db, id, s.notificationService)
-			if err != nil {
-				return err
+			result, err := services.OffboardUser(s.db, id, s.notificationService, authorizationCacheInvalidator)
+			if len(result.RevokedAPITokenIDs) > 0 {
+				tokenManager.InvalidateTokens(result.RevokedAPITokenIDs)
 			}
-			tokenManager.InvalidateTokens(tokenIDs)
-			return nil
+			sessionManager.InvalidateUserSessionValidation(id)
+			if err == nil {
+				s.revokeUserRemoteGrants(result.RemoteRevocations)
+			}
+			return err
 		},
 		userDeactivationService.DeactivateUser,
 		sessionManager.InvalidateUserSessionValidation,
 	)
-	groupHandler := handlers.NewGroupHandler(repository.NewGroupRepository(s.db), permService, logger.NewAuditor(s.db))
+	groupHandler := handlers.NewGroupHandler(repository.NewGroupRepository(s.db), permService, logger.NewAuditor(s.db), authorizationCacheInvalidator)
 	credentialHandler := handlers.NewCredentialHandler(repository.NewCredentialRepository(s.db), logger.NewAuditor(s.db), permService, cfg.SSH.Enabled)
 	var webAuthnHandler *handlers.WebAuthnHandler
 	if webAuthnConfig != nil {
 		webAuthnHandler = handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
 	}
-	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
-	boardConfigHandler := handlers.NewBoardConfigurationHandler(
-		repository.NewBoardConfigurationRepository(s.db),
-		repository.NewCollectionRepository(s.db),
-		permService,
-		services.NewItemCRUDService(s.db),
-		services.NewWorkspaceService(s.db),
-		logger.NewAuditor(s.db),
-	)
-	testCoverageHandler := handlers.NewTestCoverageHandler(repository.NewTestCoverageRepository(s.db), permService)
 	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService, cfg.AttachmentPath)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(repository.NewPermissionRepository(s.db), permService, logger.NewAuditor(s.db))
 	apiTokenHandler := handlers.NewAPITokenHandler(
@@ -583,6 +637,7 @@ func (s *Server) initialize() error {
 	agentHandler := handlers.NewAgentHandler(s.db, permService)
 
 	scimTokenManager := auth.NewSCIMTokenManager(s.db, s.memoryBudget.SCIMTokenCacheMB)
+	s.scimTokenManager = scimTokenManager
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
 	scimHandler := handlers.NewSCIMHandler(
 		repository.NewSCIMRepository(s.db),
@@ -594,6 +649,7 @@ func (s *Server) initialize() error {
 			return services.ActiveSystemAdminIDs(s.db)
 		},
 		s.notificationService,
+		authorizationCacheInvalidator,
 	)
 	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager, logger.NewAuditor(s.db))
 
@@ -603,69 +659,47 @@ func (s *Server) initialize() error {
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
 	customerOrgPermissionService := services.NewCustomerOrganisationPermissionService(s.db, permService, timePermissionService)
 	timeCustomerHandler := handlers.NewTimeCustomerHandler(repository.NewCustomerOrganisationRepository(s.db), logger.NewAuditor(s.db), timePermissionService, customerOrgPermissionService)
-	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, customerOrgPermissionService, workspaceKeyCache)
-	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(repository.NewTimeProjectCategoryRepository(s.db), logger.NewAuditor(s.db), timePermissionService)
-	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
+	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, customerOrgPermissionService)
+	timeWorklogService := services.NewTimeWorklogService(s.db)
 	activeTimerRepo := repository.NewActiveTimerRepository(s.db)
 	timerService := services.NewTimerService(activeTimerRepo, repository.NewItemRepository(s.db), timePermissionService, permService)
-	activeTimerHandler := handlers.NewActiveTimerHandler(activeTimerRepo, timerService)
-	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(logger.NewAuditor(s.db), timePermissionService)
 	customerOrgPermissionHandler := handlers.NewCustomerOrganisationPermissionHandler(logger.NewAuditor(s.db), customerOrgPermissionService)
 
-	testFolderHandler := handlers.NewTestFolderHandler(services.NewTestFolderService(s.db), logger.NewAuditor(s.db))
-	testCaseHandler := handlers.NewTestCaseHandlerWithPool(services.NewTestCaseService(s.db), logger.NewAuditor(s.db))
-	testSetHandler := handlers.NewTestSetHandlerWithPool(services.NewTestSetService(s.db), logger.NewAuditor(s.db))
-	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(services.NewTestRunTemplateService(s.db))
-	testRunHandler := handlers.NewTestRunHandlerWithPool(services.NewTestRunService(s.db), logger.NewAuditor(s.db))
-	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(repository.NewTestSummaryRepository(s.db))
-
-	linkTypeHandler := handlers.NewLinkTypeHandler(repository.NewLinkTypeRepository(s.db), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
-	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService, permService)
-
-	labelHandler := handlers.NewLabelHandler(repository.NewLabelRepository(s.db), repository.NewItemRepository(s.db), permService, logger.NewAuditor(s.db))
-
-	itemTemplateHandler := handlers.NewItemTemplateHandler(repository.NewTemplateRepository(s.db), permService, logger.NewAuditor(s.db))
+	itemLinkService := services.NewItemLinkService(s.db).
+		WithPermissionService(permService).
+		WithNotificationEmitter(s.notificationService)
 
 	pageLabelRepo := repository.NewPageLabelRepository(s.db)
 	pageService := services.NewPageService(s.db)
 	pageService.SetPageLabelRepository(pageLabelRepo)
 	pagePermissionService := services.NewPagePermissionService(s.db, permService)
-	itemLinkHandler.SetPagePermissionChecker(pagePermissionService)
-	pageHandler := handlers.NewPageHandler(pageService, pagePermissionService, permService, logger.NewAuditor(s.db))
+	itemLinkService.WithPagePermissionChecker(pagePermissionService)
+	pageApplication := services.NewPageApplicationService(pageService, pagePermissionService)
 	pageDiagramService := services.NewPageDiagramService(
 		s.db,
 		cfg.AttachmentPath,
-		pageHandler.PageApplicationService(),
+		pageApplication,
 		pagePermissionService,
 		permService,
 	)
-	pageHandler.SetPageDiagramService(pageDiagramService)
 	knowledgeRetrieval := services.NewKnowledgeRetrievalService(s.db, pagePermissionService)
 	knowledgeSearchHandler := handlers.NewKnowledgeSearchHandler(knowledgeRetrieval)
-	pageLabelHandler := handlers.NewPageLabelHandler(pageLabelRepo, pagePermissionService, logger.NewAuditor(s.db))
+	pageLabelService := services.NewPageLabelService(pageLabelRepo, logger.NewAuditor(s.db))
 
-	recurrenceHandler := handlers.NewRecurrenceHandler(repository.NewRecurrenceRepository(s.db), repository.NewItemRepository(s.db), s.recurrenceScheduler, permService, logger.NewAuditor(s.db))
+	recurrenceService := services.NewRecurrenceService(repository.NewRecurrenceRepository(s.db), s.recurrenceScheduler, logger.NewAuditor(s.db))
 
 	actionsHandler := handlers.NewActionsHandler(
 		repository.NewActionRepository(s.db),
 		repository.NewActionCredentialRepository(s.db),
-		repository.NewItemRepository(s.db),
 		logger.NewAuditor(s.db),
-		s.actionService,
-		permService,
 		workspaceKeyCache,
 	)
-	itemDetailHandler := handlers.NewItemDetailHandler(itemHandler, itemLinkHandler, linkTypeHandler, screenHandler, requestTypeHandler, actionsHandler)
 	actionCredentialService := services.NewActionCredentialService(repository.NewActionCredentialRepository(s.db), cfg.Auth.SessionSecret)
 	actionCredentialsHandler := handlers.NewActionCredentialsHandler(actionCredentialService, permService, workspaceKeyCache, logger.NewAuditor(s.db))
 	// Wire credential resolution into the action runtime so HTTP capabilities
 	// can reference tokens by ID. The service shares the same SSO_SECRET via
 	// a domain-separated HKDF label (ActionCredentialEncryptionInfo).
-	credentialSvc := services.NewActionCredentialService(
-		repository.NewActionCredentialRepository(s.db),
-		cfg.Auth.SessionSecret,
-	)
-	s.actionService.SetCredentialService(credentialSvc)
+	s.actionService.SetCredentialService(actionCredentialService)
 	// Lets container_run nodes dispatch to a remote runner pool (WI-146).
 	s.actionService.SetAgentRunRepository(repository.NewAgentRunRepository(s.db))
 	// One-shot scanner: warn about any legacy capability whose
@@ -694,19 +728,12 @@ func (s *Server) initialize() error {
 	channelCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, channelCategoryConfig),
 		func() any { return &models.ChannelCategory{} })
-	collectionCategoryConfig := services.NewCollectionCategoryConfig()
-	collectionCategoryConfig.AuditEmit = enumAuditEmit
-	collectionCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, collectionCategoryConfig),
-		func() any { return &models.CollectionCategory{} })
 	iterationTypeConfig := services.NewIterationTypeConfig()
 	iterationTypeConfig.AuditEmit = enumAuditEmit
 	iterationTypeHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, iterationTypeConfig),
 		func() any { return &models.IterationType{} }).WithGlobalMutationPermission(permService, models.PermissionIterationManage)
-	iterationHandler := handlers.NewIterationHandler(services.NewPlanningService(s.db), permService, logger.NewAuditor(s.db))
 	personalLabelHandler := handlers.NewPersonalLabelHandler(s.db, permService)
-	commentHandler := handlers.NewCommentHandler(s.db, permService, s.activityTracker, s.notificationService)
 	reviewHandler := handlers.NewReviewHandler(s.db, permService)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService, cfg.BaseURL)
 	securitySettingsHandler := handlers.NewSecuritySettingsHandler(repository.NewSystemSettingRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
@@ -743,7 +770,7 @@ func (s *Server) initialize() error {
 
 	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
 	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService)
-	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db))
+	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db), permService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
 	homepageHandler := handlers.NewHomepageHandler(
 		repository.NewWorkspaceRepository(s.db),
@@ -756,12 +783,14 @@ func (s *Server) initialize() error {
 	)
 
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService, permService)
+	notificationHandler.SetNotificationAuthorizer(notificationAuthorizer)
 	emailTemplateHandler := handlers.NewEmailTemplateHandler(repository.NewEmailTemplateRepository(s.db), logger.NewAuditor(s.db))
 
 	// Push dispatches every notification; VAPID config resolves env, persisted,
 	// then generated keys.
 	pushCfg := services.ResolveVAPIDConfig(s.db, cfg.Push, slog.Default())
 	pushService := services.NewPushService(s.db, pushCfg, permService)
+	pushService.SetNotificationAuthorizer(notificationAuthorizer)
 	pushHandler := handlers.NewPushHandler(pushService)
 	s.notificationManager.SetPushDispatcher(pushService)
 	if pushService.Enabled() {
@@ -775,13 +804,13 @@ func (s *Server) initialize() error {
 	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL)
+	s.secretEncryption = scmProviderHandler.GetEncryption()
 	scmWorkspaceRepo := repository.NewSCMWorkspaceRepository(s.db)
 	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), permService, baseURL)
 	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService, baseURL)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(repository.NewUserSCMTokenRepository(s.db), scmProviderHandler.GetEncryption())
 	milestonePlanningService := services.NewPlanningService(s.db)
 	milestonePlanningService.SetSCMWorkspaceRepository(scmWorkspaceRepo)
-	milestoneHandler := handlers.NewMilestoneHandler(milestonePlanningService, permService, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), logger.NewAuditor(s.db))
 
 	// The optional coding-agent harness queues and finalizes remote runner-pool
 	// work; disabled mode retains bindings without starting runs.
@@ -872,9 +901,6 @@ func (s *Server) initialize() error {
 	agentBindingHandler.SetPromptStore(promptStore)
 	agentBindingHandler.SetTemplateCatalog(templateCatalog)
 	agentBindingHandler.SetInitialPrompt(promptStore.Get(llm.PromptCodingAgentInitial))
-	agentSkillHandler := handlers.NewAgentSkillHandler(agentSkillRepo, permService, logger.NewAuditor(s.db))
-	agentRunHandler := handlers.NewAgentRunHandler(repository.NewAgentRunRepository(s.db), codingRunSvc, permService, repository.NewItemRepository(s.db), bindingSvc)
-	agentRunHandler.SetUsageRepository(repository.NewLLMUsageRepository(s.db)) // per-run token/cost readout (WI-494)
 	// Remote-runner control plane (WI-141). Constructed unconditionally;
 	// the handler 503s when the registry/run service is unavailable (i.e.
 	// CodingAgent.Enabled is off).
@@ -887,10 +913,10 @@ func (s *Server) initialize() error {
 	workspaceUsers := services.NewWorkspaceUserResolver(s.db, permService)
 	userHandler.SetWorkspaceUserResolver(workspaceUsers)
 	agentBindingHandler.SetPresenceService(agentPresenceService)
-	workspaceBootstrapHandler := handlers.NewWorkspaceBootstrapHandler(workspaceHandler, userHandler, milestoneHandler, iterationHandler, timeProjectHandler)
+	workspaceBootstrapHandler := handlers.NewWorkspaceBootstrapHandler(workspaceHandler, userHandler, milestonePlanningService, permService, timeProjectHandler)
 	// Secretless access layer (WI-144): brokers a granted credential to a
 	// running job without it ever living on the runner host.
-	runnerBrokerHandler := handlers.NewRunnerBrokerHandler(tokenManager, repository.NewAgentRunRepository(s.db), credentialSvc, llmManager, &scmCredsAdapter{cr: scmCredResolver})
+	runnerBrokerHandler := handlers.NewRunnerBrokerHandler(tokenManager, repository.NewAgentRunRepository(s.db), actionCredentialService, llmManager, &scmCredsAdapter{cr: scmCredResolver})
 	runnerBrokerHandler.SetUsageRepository(repository.NewLLMUsageRepository(s.db)) // meter LLM token/cost at the broker (WI-493)
 	if bindingSvc != nil {
 		// Registers the coding-agent assignee trigger inside the item
@@ -901,18 +927,18 @@ func (s *Server) initialize() error {
 	}
 
 	assetHandler := handlers.NewAssetHandler(s.db, permService, cfg.AttachmentPath)
-	actionsHandler.SetAssetService(assetHandler.AssetService())
+	assetApplication := services.NewAssetApplicationService(s.db, permService, assetHandler.AssetService(), assetHandler.AssetPermissionService()).
+		WithLinks(itemLinkService).
+		WithImportStorage(cfg.AttachmentPath)
 	s.actionService.SetAssetNodeServices(assetHandler.AssetService(), assetHandler.AssetPermissionService())
-	if n, err := assetHandler.ReconcileInterruptedImports(); err != nil {
+	if n, err := assetApplication.ReconcileInterruptedImports(); err != nil {
 		slog.Warn("failed to reconcile interrupted asset imports", slog.Any("error", err))
 	} else if n > 0 {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
-	itemLinkHandler.SetAssetPermissionChecker(assetHandler)
+	go s.runAssetImportRecovery(assetApplication)
+	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
-	assetTypeHandler := handlers.NewAssetTypeHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
-	assetCategoryHandler := handlers.NewAssetCategoryHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
-	assetStatusHandler := handlers.NewAssetStatusHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
 	assetReportHandler := handlers.NewAssetReportHandler(
 		repository.NewAssetReportRepository(s.db),
 		repository.NewChannelRepository(s.db),
@@ -923,7 +949,8 @@ func (s *Server) initialize() error {
 	)
 	assetActionHandler := handlers.NewAssetActionHandler(repository.NewAssetActionRepository(s.db), assetHandler, s.assetActionService, logger.NewAuditor(s.db))
 
-	jiraImportHandler := handlers.NewJiraImportHandler(s.db, cfg.Auth.SessionSecret, cfg.Jira.CapturePayloadsDir)
+	jiraImportHandler := handlers.NewJiraImportHandler(s.db, cfg.Auth.SessionSecret, cfg.Jira.CapturePayloadsDir).
+		WithAuthorizationCacheInvalidator(authorizationCacheInvalidator)
 
 	// Share one credential manager so every in-process refresh/callback path
 	// uses the same per-channel lock and CAS config writer.
@@ -977,7 +1004,6 @@ func (s *Server) initialize() error {
 	itemHandler.SetEventCoordinator(eventCoordinator)
 	s.actionService.SetItemUpdateApplicationService(itemHandler.ItemUpdateApplicationService())
 	s.assetActionService.SetItemCreationService(itemHandler.ItemCreationService())
-	commentHandler.SetWebhookSender(webhookSender)
 
 	// Item live-update stream (WI-484): register the in-memory SSE hub as the
 	// process-wide item-change publisher (WI-483 installed a no-op default), and
@@ -989,24 +1015,25 @@ func (s *Server) initialize() error {
 	mentionService := services.NewMentionService(s.db, s.notificationService, permService)
 	mentionService.SetWorkspaceUserResolver(workspaceUsers)
 	itemHandler.SetMentionService(mentionService)
-	commentHandler.SetMentionService(mentionService)
 
 	commentService := services.NewCommentService(s.db)
 	commentService.SetActivityTracker(s.activityTracker)
 	commentService.SetNotificationService(s.notificationService)
 	commentService.SetMentionService(mentionService)
 	commentService.SetWebhookSender(webhookSender)
+	commentService.SetIssueSync(issueSyncService)
 	if bindingSvc != nil {
 		// @mentioning a binding's acting user in a comment starts a run
 		// (WI-264), same machinery as the assignee-change trigger.
 		commentService.SetAgentMentionTrigger(bindingSvc)
 	}
-	commentHandler.SetCommentService(commentService)
-	commentHandler.SetIssueSyncService(issueSyncService)
 	s.actionService.SetCommentService(commentService)
 
 	// Wire email reply service for bidirectional email threading
 	emailReplyService := services.NewEmailReplyService(s.db, smtpSender)
+	if err := services.PrepareDurableEmailReplyEngine(context.Background(), s.eventEngine, emailReplyService); err != nil {
+		return fmt.Errorf("prepare durable email reply consumer: %w", err)
+	}
 	commentService.SetEmailReplyService(emailReplyService)
 	s.notificationScheduler.SetEmailReplyOutbox(emailReplyService)
 
@@ -1020,21 +1047,34 @@ func (s *Server) initialize() error {
 	slog.Info("comment service initialized")
 
 	itemHandler.SetActionService(s.actionService)
-	itemHandler.SetIssueSyncService(issueSyncService)
-	itemLinkHandler.SetActionService(s.actionService)
+	itemLinkService.WithActionEmitter(s.actionService)
 
 	scriptEngine := services.NewScriptEngine()
 	conditionService := services.NewConditionService(s.db, permService, scriptEngine)
-	itemHandler.SetConditionService(conditionService)
 
 	approvalService := services.NewApprovalService(s.db, leaveRepo, workflowService)
 	approvalService.SetEventCoordinator(eventCoordinator)
 	approvalSetService := services.NewApprovalSetService(s.db)
-	itemHandler.SetApprovalService(approvalService)
-	commentHandler.SetApprovalService(approvalService)
 	commentService.SetApprovalService(approvalService)
 	s.actionService.SetApprovalService(approvalService)
 	workspaceRoleHandler.SetApprovalService(approvalService)
+
+	zammadService := services.NewZammadService(
+		s.db,
+		repository.NewZammadRepository(s.db),
+		actionCredentialService,
+		permService,
+		workflowService,
+		conditionService,
+		approvalService,
+	)
+	zammadService.SetEventCoordinator(eventCoordinator)
+	zammadService.SetOAuthEncryption(scmProviderHandler.GetEncryption())
+	zammadHandler := handlers.NewZammadHandler(repository.NewItemRepository(s.db), zammadService, permService, logger.NewAuditor(s.db))
+	integrationOAuthHandler.RegisterSystemOAuthFlow(models.IntegrationProviderZammad, zammadService, logger.NewAuditor(s.db))
+	s.zammadSyncScheduler = scheduler.NewZammadSyncScheduler(zammadService)
+	s.zammadSyncScheduler.Start()
+	zammadHandler.SetSyncAllTrigger(s.zammadSyncScheduler.TriggerSyncAll)
 
 	// Standard profiles execute in-process through the canonical aitools
 	// registry. Wiring is intentionally late because their final comments and
@@ -1052,7 +1092,7 @@ func (s *Server) initialize() error {
 			Approvals:              approvalService,
 			Notifications:          s.notificationService,
 			ActionService:          s.actionService,
-			PageApplicationService: pageHandler.PageApplicationService(),
+			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			Registry:               aitools.Default,
 		})
@@ -1175,7 +1215,7 @@ func (s *Server) initialize() error {
 		slog.Info("attachments disabled (no attachment path specified)")
 	}
 
-	diagramHandler := handlers.NewDiagramHandler(repository.NewDiagramRepository(s.db), repository.NewItemRepository(s.db), permService)
+	itemDiagramService := services.NewItemDiagramService(repository.NewDiagramRepository(s.db))
 
 	var pluginRouter *plugins.Router
 	if !cfg.Plugins.Disabled {
@@ -1263,7 +1303,7 @@ func (s *Server) initialize() error {
 		timerService,
 		promptStore,
 		s.actionService,
-		pageHandler.PageApplicationService(),
+		pageApplication,
 		pageDiagramService,
 	)
 	aiHandler.SetConversationDependencies(commentService, approvalService)
@@ -1280,7 +1320,7 @@ func (s *Server) initialize() error {
 		setupHandler,
 		attachmentSettingsHandler,
 		aiHandler,
-		assetHandler,
+		assetApplication,
 		hubHandler,
 		channelService,
 		workItemStalenessHandler,
@@ -1416,7 +1456,6 @@ func (s *Server) initialize() error {
 		AIRateLimiter:         s.aiRateLimiter,
 		UploadLimiter:         s.uploadLimiter,
 		WebhookLimiter:        s.webhookLimiter,
-		SearchLimiter:         s.searchLimiter,
 		CalendarFeedLimiter:   s.calendarFeedLimiter,
 		PublicBoardLimiter:    s.publicBoardLimiter,
 
@@ -1440,16 +1479,8 @@ func (s *Server) initialize() error {
 		},
 		Items: routes.ItemHandlers{
 			Item:               itemHandler,
-			Detail:             itemDetailHandler,
-			Recurrence:         recurrenceHandler,
-			Comment:            commentHandler,
 			Attachment:         attachmentHandler,
 			AttachmentSettings: attachmentSettingsHandler,
-			Diagram:            diagramHandler,
-			ItemLink:           itemLinkHandler,
-			LinkType:           linkTypeHandler,
-			Label:              labelHandler,
-			ItemTemplate:       itemTemplateHandler,
 		},
 		Workspaces: routes.WorkspaceHandlers{
 			Workspace:             workspaceHandler,
@@ -1458,25 +1489,13 @@ func (s *Server) initialize() error {
 			ConfigSet:             configSetHandler,
 			ConfigSetNotification: configSetNotificationHandler,
 			NotificationSettings:  notificationSettingsHandler,
-			ItemType:              itemTypeHandler,
-			Priority:              priorityHandler,
 			HierarchyLevel:        hierarchyLevelHandler,
 			RequestType:           requestTypeHandler,
-			StatusCategory:        statusCategoryHandler,
-			Status:                statusHandler,
-			StatusQuery:           statusQueryHandler,
-			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
 			ActionCredentials:     actionCredentialsHandler,
 			ActionTemplates:       handlers.NewActionTemplatesHandler(services.NewActionTemplateService(s.db), s.actionService, workspaceKeyCache, logger.NewAuditor(s.db)),
 			Analytics:             handlers.NewAnalyticsHandler(services.NewAnalyticsService(s.db), permService, workspaceKeyCache),
-			ConditionSet:          handlers.NewConditionSetHandler(s.db),
-			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, logger.NewAuditor(s.db)),
-			Approval:              handlers.NewApprovalHandler(permService, approvalService, repository.NewItemRepository(s.db), logger.NewAuditor(s.db)),
-			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(repository.NewTransitionRepository(s.db), approvalSetService),
 			AgentBinding:          agentBindingHandler,
-			AgentSkill:            agentSkillHandler,
-			AgentRun:              agentRunHandler,
 			RunnerControl:         runnerControlHandler,
 			RunnerBroker:          runnerBrokerHandler,
 		},
@@ -1540,27 +1559,13 @@ func (s *Server) initialize() error {
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,
-			Milestone:         milestoneHandler,
 			IterationType:     iterationTypeHandler,
-			Iteration:         iterationHandler,
 			PersonalLabel:     personalLabelHandler,
 		},
 		TimeTracking: routes.TimeTrackingHandlers{
 			Customer:           timeCustomerHandler,
-			ProjectCategory:    timeProjectCategoryHandler,
 			Project:            timeProjectHandler,
-			Worklog:            timeWorklogHandler,
-			ActiveTimer:        activeTimerHandler,
-			ProjectPermission:  timeProjectPermissionHandler,
 			CustomerPermission: customerOrgPermissionHandler,
-		},
-		TestMgmt: routes.TestManagementHandlers{
-			Folder:      testFolderHandler,
-			Case:        testCaseHandler,
-			Set:         testSetHandler,
-			RunTemplate: testRunTemplateHandler,
-			Run:         testRunHandler,
-			Summary:     testSummaryHandler,
 		},
 		Channels: routes.ChannelHandlers{
 			ChannelCategory: channelCategoryHandler,
@@ -1580,19 +1585,10 @@ func (s *Server) initialize() error {
 			Form:           formHandler,
 		},
 		Assets: routes.AssetHandlers{
-			Asset:    assetHandler,
-			Type:     assetTypeHandler,
-			Category: assetCategoryHandler,
-			Status:   assetStatusHandler,
-			Action:   assetActionHandler,
+			Asset:  assetHandler,
+			Action: assetActionHandler,
 		},
 		PublicBoard: publicBoardHandler,
-		Collections: routes.CollectionHandlers{
-			Category:     collectionCategoryHandler,
-			Collection:   collectionHandler,
-			BoardConfig:  boardConfigHandler,
-			TestCoverage: testCoverageHandler,
-		},
 		AI: routes.AIHandlers{
 			AI:                aiHandler,
 			LLMConnection:     llmConnHandler,
@@ -1615,11 +1611,10 @@ func (s *Server) initialize() error {
 			OAuth:       integrationOAuthHandler,
 			ItemLinks:   integrationItemLinksHandler,
 			TodoistSync: todoistSyncHandler,
+			Zammad:      zammadHandler,
 		},
 		Pages: routes.PageHandlers{
-			Page:            pageHandler,
 			KnowledgeSearch: knowledgeSearchHandler,
-			PageLabel:       pageLabelHandler,
 		},
 		Push: pushHandler,
 	}
@@ -1649,17 +1644,130 @@ func (s *Server) initialize() error {
 		PermissionService:              permService,
 		ActionService:                  s.actionService,
 		AttachmentPath:                 cfg.AttachmentPath,
-		ItemLinkService:                itemLinkHandler.LinkService(),
+		ItemLinkService:                itemLinkService,
 		AssetPermissionService:         assetHandler.AssetPermissionService(),
 		AssetService:                   assetHandler.AssetService(),
 		CommentService:                 commentService,
 		ItemCreationService:            itemHandler.ItemCreationService(),
 		ItemUpdateApplicationService:   itemHandler.ItemUpdateApplicationService(),
 		ItemDeletionApplicationService: itemHandler.ItemDeletionApplicationService(),
-		PageApplicationService:         pageHandler.PageApplicationService(),
+		PageApplicationService:         pageApplication,
 		PageDiagramService:             pageDiagramService,
 		ObjectTranslationService:       objectTranslationService,
+		AuthorizationCacheInvalidator:  authorizationCacheInvalidator,
 	}, v1.RegisterRoutes)
+	v2CSRF := middleware.NewDisabledCSRFValidator()
+	if !cfg.DisableCSRF {
+		v2CSRF = middleware.NewCSRFValidator(csrfOrigins)
+	}
+	v2Access := authz.New(s.db, permService)
+	planningCredentialResolver := scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption())
+	planningApplication := services.NewPlanningApplicationService(
+		milestonePlanningService,
+		permService,
+		services.NewIterationCompletionService(s.db),
+		func(ctx context.Context, connectionID, userID int) (services.PlanningReleaseProvider, error) {
+			provider, err := planningCredentialResolver.GetProviderForUser(ctx, connectionID, userID)
+			if err != nil {
+				return nil, err
+			}
+			releaseProvider, ok := provider.(interface {
+				scm.ReleaseProvider
+				ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+			})
+			if !ok {
+				return nil, errors.New("SCM provider does not support releases")
+			}
+			return planningReleaseProviderAdapter{provider: releaseProvider}, nil
+		},
+	)
+	agentRunApplication := services.NewAgentRunReadService(
+		repository.NewItemRepository(s.db),
+		repository.NewAgentRunRepository(s.db),
+		permService,
+	).WithRuntime(codingRunSvc, bindingSvc).WithUsage(repository.NewLLMUsageRepository(s.db))
+	actionApplication := services.NewActionApplicationService(
+		s.db,
+		repository.NewActionRepository(s.db),
+		repository.NewItemRepository(s.db),
+		permService,
+		s.actionService,
+		assetHandler.AssetService(),
+	)
+	itemApplication := services.NewItemApplicationService(
+		s.db,
+		permService,
+		itemHandler.ItemCreationService(),
+		itemHandler.ItemUpdateApplicationService(),
+		itemHandler.ItemDeletionApplicationService(),
+	).WithReads(s.activityTracker, approvalService).
+		WithCache(itemHandler.ItemCacheService()).
+		WithWorkflow(conditionService, eventCoordinator, issueSyncService).
+		WithMutationEffects(mentionService)
+	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
+		WithContextReaders(screenHandler, requestTypeHandler, actionApplication)
+	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
+	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
+	if err := v2.RegisterRoutes(v2.Deps{
+		Mux:                mux,
+		Tokens:             tokenManager,
+		Users:              services.NewUserReadService(s.db),
+		Statuses:           services.NewStatusService(s.db),
+		Workflows:          workflowService,
+		Configuration:      services.NewConfigReadService(s.db),
+		ObjectTranslations: objectTranslationService,
+		Catalog:            services.NewCatalogReadService(s.db, permService, v2Access, s.activityTracker),
+		CatalogMutations:   catalogMutations,
+		Workspaces:         services.NewWorkspaceApplicationService(s.db, v2Access, authorizationCacheInvalidator),
+		ItemTemplates:      services.NewItemTemplateApplicationService(s.db, v2Access),
+		Labels:             services.NewLabelApplicationService(s.db),
+		Items:              repository.NewItemRepository(s.db),
+		Access:             v2Access,
+		Preferences:        userPreferencesService,
+		Recurrence:         recurrenceService,
+		ItemDiagrams:       itemDiagramService,
+		Pages:              pageService,
+		PageApplication:    pageApplication,
+		PageDiagrams:       pageDiagramService,
+		PageAccess:         pagePermissionService,
+		PageLabels:         pageLabelService,
+		Worklogs:           timeWorklogService,
+		TimeAccess:         timePermissionService,
+		TimeProjects:       services.NewTimeProjectApplicationService(s.db, timePermissionService, v2Access),
+		Timers:             timerService,
+		SystemAdmins:       permService,
+		GlobalPermission:   permService,
+		Groups:             groupHandler.Application(),
+		AdminUsers:         services.NewUserReadService(s.db),
+		AuditLogs:          repository.NewAuditLogRepository(s.db),
+		AdminTokens:        tokenManager,
+		AdminAuditor:       logger.NewAuditor(s.db),
+		AdminTranslations:  objectTranslationService,
+		Comments:           commentService,
+		CommentAccess:      permService,
+		Attachments:        services.NewItemAttachmentService(s.db, cfg.AttachmentPath, permService),
+		PageAttachments:    services.NewPageAttachmentUploadService(s.db, cfg.AttachmentPath, permService, pagePermissionService),
+		Collections:        services.NewCollectionApplicationService(s.db, permService),
+		Planning:           planningApplication,
+		Links:              itemLinkService,
+		AgentRuns:          agentRunApplication,
+		AgentSkills:        services.NewAgentSkillApplicationService(s.db, permService),
+		ConditionSets:      services.NewConditionSetApplicationService(s.db, permService),
+		Governance:         governanceApplication,
+		Actions:            actionApplication,
+		TestManagement:     services.NewTestManagementApplicationService(s.db, permService),
+		Assets:             assetApplication,
+		ItemApplication:    itemApplication,
+		ItemDetail:         itemDetailApplication,
+		SessionMiddleware:  authMiddleware.OptionalAuth,
+		SearchAllowed:      s.searchLimiter.AllowRequest,
+		DBRequestTimeout:   s.config.DB.RequestTimeout,
+		CORS:               v2.NewCORS(csrfOrigins, cfg.DisableCSRF, !cfg.DisableCSRF),
+		CSRF:               v2CSRF,
+		Concurrency:        s.userConcurrency,
+	}); err != nil {
+		return fmt.Errorf("register REST API v2: %w", err)
+	}
 
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true
 	if cfg.MCPEnabled {
@@ -1675,7 +1783,7 @@ func (s *Server) initialize() error {
 			TimerService:           timerService,
 			CommentService:         commentService,
 			ItemDeletionService:    itemHandler.ItemDeletionApplicationService(),
-			PageApplicationService: pageHandler.PageApplicationService(),
+			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			ActionService:          s.actionService,
 		})
@@ -1866,11 +1974,18 @@ func (s *Server) recoverUser(username string) {
 	var id int
 	var userEmail string
 	var isActive bool
+	var offboarded bool
 	err := s.db.QueryRow(
-		`SELECT id, email, is_active FROM users WHERE username = ?`, username,
-	).Scan(&id, &userEmail, &isActive)
+		`SELECT id, email, is_active, offboarded_at IS NOT NULL FROM users WHERE username = ?`, username,
+	).Scan(&id, &userEmail, &isActive, &offboarded)
 	if err != nil {
 		slog.Error("RECOVER_USER: user not found", "username", username)
+		return
+	}
+	if offboarded {
+		// Offboarding is irreversible; the recovery tool must not resurrect
+		// an anonymized account.
+		slog.Error("RECOVER_USER: refusing to re-enable offboarded user", "username", username, "id", id)
 		return
 	}
 	if isActive {
@@ -1941,29 +2056,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.databasePoolMonitor.Stop()
 	}
 
-	// Stop schedulers first - use safeClose helper to avoid panics on already-closed channels
-	safeClose := func(ch chan struct{}) {
-		if ch != nil {
-			defer func() { recover() }() //nolint:errcheck // Intentionally ignoring recover() return; used to suppress panics from closing already-closed channels
-			close(ch)
-		}
-	}
-
-	// Close, but do NOT nil, the stop channels: background schedulers select
-	// on these fields in a loop, so the nil-write races with their reads (and
-	// a select on a nil channel blocks forever, leaking the goroutine).
-	// Double-close safety comes from safeClose's recover, not from nil-ing.
-	safeClose(s.scmSyncStopChan)
-	safeClose(s.issueSyncStopChan)
-	safeClose(s.magicLinkStopChan)
-
-	if s.cleanupTicker != nil {
-		// Stop, but do NOT nil: runActivityCleanup selects on cleanupTicker.C
-		// in a loop and the nil-write races with that read.
-		s.cleanupTicker.Stop()
-	}
-	safeClose(s.cleanupStopChan)
-	safeClose(s.jiraHostStopChan)
+	s.stopBackgroundLoops()
 
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")
@@ -1983,6 +2076,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.todoistSyncScheduler != nil {
 		slog.Info("stopping todoist sync scheduler")
 		s.todoistSyncScheduler.Stop()
+	}
+
+	if s.zammadSyncScheduler != nil {
+		slog.Info("stopping Zammad sync scheduler")
+		s.zammadSyncScheduler.Stop()
 	}
 
 	if s.runnerLeaseReaper != nil {
@@ -2103,6 +2201,9 @@ func isAPIPath(p string) bool {
 
 // cleanup releases all resources.
 func (s *Server) cleanup() {
+	// New also calls cleanup after a partially completed initialize. Signal any
+	// loops already started there, even when Shutdown was never reachable.
+	s.stopBackgroundLoops()
 	if s.databasePoolMonitor != nil {
 		s.databasePoolMonitor.Stop()
 	}
@@ -2117,6 +2218,9 @@ func (s *Server) cleanup() {
 	// before closing the database so an in-flight rank batch cannot race cleanup.
 	if s.globalRankMigrationScheduler != nil {
 		s.globalRankMigrationScheduler.Stop()
+	}
+	if s.zammadSyncScheduler != nil {
+		s.zammadSyncScheduler.Stop()
 	}
 	// Stop rate limiters
 	if s.loginRateLimiter != nil {
@@ -2190,10 +2294,45 @@ func (s *Server) cleanup() {
 		_ = s.tokenTracker.Close()
 	}
 
+	// These caches are owned by this HTTP server, including on partial startup.
+	// Close them after consumers have stopped, before releasing the shared DB.
+	if s.permissionService != nil {
+		_ = s.permissionService.Close()
+	}
+	if s.sessionManager != nil {
+		_ = s.sessionManager.Close()
+	}
+	if s.tokenManager != nil {
+		_ = s.tokenManager.Close()
+	}
+	if s.scimTokenManager != nil {
+		_ = s.scimTokenManager.Close()
+	}
+	if s.itemCache != nil {
+		_ = s.itemCache.Close()
+	}
+
 	// Close database
 	if s.db != nil {
 		_ = s.db.Close()
 	}
+}
+
+func (s *Server) stopBackgroundLoops() {
+	s.backgroundStopOnce.Do(func() {
+		// Do not nil these fields: workers read them concurrently.
+		if s.cleanupTicker != nil {
+			s.cleanupTicker.Stop()
+		}
+		for _, ch := range []chan struct{}{
+			s.scmSyncStopChan, s.issueSyncStopChan, s.magicLinkStopChan,
+			s.cleanupStopChan, s.jiraHostStopChan,
+		} {
+			if ch != nil {
+				close(ch)
+			}
+		}
+	})
 }
 
 // RegisterDatabasePool makes a process-local auxiliary SQL pool visible to
@@ -2291,6 +2430,21 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 		case <-s.magicLinkStopChan:
 			slog.Info("magic link cleanup scheduler stopped")
 			return
+		}
+	}
+}
+
+func (s *Server) runAssetImportRecovery(assets *services.AssetApplicationService) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.cleanupStopChan:
+			return
+		case <-ticker.C:
+			if _, err := assets.ReconcileInterruptedImports(); err != nil {
+				slog.Error("asset import recovery failed", "error", err)
+			}
 		}
 	}
 }

@@ -36,7 +36,14 @@ var itemListCountCache = struct {
 
 var itemListCountFlights singleflight.Group
 
+type databaseInstance interface {
+	InstanceID() uint64
+}
+
 func itemListCountCacheDBKey(db database.Database) string {
+	if instance, ok := db.(databaseInstance); ok && instance.InstanceID() != 0 {
+		return fmt.Sprintf("%T:%d", db, instance.InstanceID())
+	}
 	value := reflect.ValueOf(db)
 	if value.IsValid() && value.Kind() == reflect.Pointer {
 		return fmt.Sprintf("%T:%x", db, value.Pointer())

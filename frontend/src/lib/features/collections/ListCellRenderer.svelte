@@ -12,15 +12,17 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import ListCustomFieldCell from './ListCustomFieldCell.svelte';
-  import { Calendar, User, Target, Globe, Building2, FolderKanban } from '@lucide/svelte';
+  import { Calendar, User, Target, FolderKanban } from '@lucide/svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import { formatDate, formatDateOnly } from '../../utils/dateFormatter.js';
   import {
     createStatusPickerConfig,
     priorityPickerConfig as priorityConfig,
-    iterationPickerConfig as iterationConfig,
     projectPickerConfig as projectConfig,
   } from '../../pickers/pickerConfigs.js';
+  import UserCellValue from './UserCellValue.svelte';
+  import IterationCellEditor from './IterationCellEditor.svelte';
+  import MilestoneCellValue from './MilestoneCellValue.svelte';
 
   let {
     item,
@@ -96,15 +98,18 @@
     }
   }
 
-  // Handle task checkbox toggle
+  // Handle task checkbox toggle. Personal tasks are workflow-less, so the
+  // permitted transition endpoint toggles between the globally stable Open and
+  // Done statuses, matching the mobile and personal views.
   async function toggleTaskStatus(isCompleted) {
-    const newStatus = isCompleted ? 'completed' : 'open';
+    const PERSONAL_STATUS_OPEN = 1;
+    const PERSONAL_STATUS_DONE = 3;
     try {
-      await api.items.update(item.id, { status: newStatus });
-      item.status = newStatus;
-      onitemUpdated?.({ item, field: 'status', value: newStatus });
+      const updatedItem = await api.items.transition(item.id, isCompleted ? PERSONAL_STATUS_DONE : PERSONAL_STATUS_OPEN);
+      item = { ...item, status_id: updatedItem.status_id, status_name: updatedItem.status_name };
+      onitemUpdated?.({ item, field: 'status', value: updatedItem.status_id });
     } catch (error) {
-      onupdateError?.({ error: error.message, field: 'status', value: newStatus });
+      onupdateError?.({ error: error.message, field: 'status', value: isCompleted });
     }
   }
 
@@ -160,10 +165,11 @@
   {:else if column.field_identifier === 'status'}
     <!-- Status / Task Checkbox -->
     {#if item.is_task}
+      {@const taskDone = item.status_id === 3 || [...editorOptions.statuses, ...statuses].some((s) => s.id === item.status_id && s.is_completed)}
       <Checkbox
-        checked={item.status === 'completed'}
+        checked={taskDone}
         onchange={(checked) => toggleTaskStatus(checked)}
-        label={item.status === 'completed' ? 'Done' : 'Todo'}
+        label={taskDone ? 'Done' : 'Todo'}
         size="small"
         disabled={!canEdit}
       />
@@ -271,14 +277,7 @@
       >
         {#snippet children()}
           {#if assignee}
-            <div class="flex items-center gap-2 cursor-pointer" data-testid={`list-cell-assignee-${item.id}`}>
-              <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-                {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '') || assignee.username?.[0]?.toUpperCase() || '?'}
-              </div>
-              <span class="text-sm truncate" style="color: var(--ds-text);">
-                {assignee.first_name} {assignee.last_name}
-              </span>
-            </div>
+            <UserCellValue user={assignee} interactive testId={`list-cell-assignee-${item.id}`} />
           {:else}
             <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);" data-testid={`list-cell-assignee-${item.id}`}>
               <User class="w-4 h-4" />
@@ -289,19 +288,9 @@
       </UserPicker>
     {:else}
       {#if assignee}
-        <div class="flex items-center gap-2">
-          <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
-            {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '') || assignee.username?.[0]?.toUpperCase() || '?'}
-          </div>
-          <span class="text-sm truncate" style="color: var(--ds-text);">
-            {assignee.first_name} {assignee.last_name}
-          </span>
-        </div>
+        <UserCellValue user={assignee} />
       {:else if item.assignee_name}
-        <div class="flex items-center gap-2">
-          <User class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <span class="text-sm truncate" style="color: var(--ds-text);">{item.assignee_name}</span>
-        </div>
+        <UserCellValue fallbackName={item.assignee_name} />
       {:else}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
       {/if}
@@ -331,13 +320,7 @@
               {t('pickers.selectMilestones')}
             </span>
           {:else}
-            <span class="flex items-center gap-1 flex-wrap text-sm cursor-pointer" style="color: var(--ds-text);">
-              {#each itemMs as ms (ms.id)}
-                <span class="inline-flex items-center gap-1">
-                  <ColorDot color={ms.category_color || '#9CA3AF'} />{ms.name}
-                </span>
-              {/each}
-            </span>
+            <MilestoneCellValue milestones={itemMs} interactive />
           {/if}
         {/snippet}
       </MilestoneCombobox>
@@ -345,67 +328,26 @@
       {#if itemMs.length === 0}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
       {:else}
-        <span class="flex items-center gap-1 flex-wrap text-sm" style="color: var(--ds-text);">
-          {#each itemMs as ms (ms.id)}
-            <span class="inline-flex items-center gap-1">
-              <ColorDot color={ms.category_color || '#9CA3AF'} />{ms.name}
-            </span>
-          {/each}
-        </span>
+        <MilestoneCellValue milestones={itemMs} />
       {/if}
     {/if}
 
   {:else if column.field_identifier === 'iteration'}
     <!-- Iteration -->
     {@const iteration = [...editorOptions.iterations, ...iterations].find(i => i.id === item.iteration_id) || (item.iteration_name ? { name: item.iteration_name, is_global: false } : null)}
-    {#if canEdit}
-      <ItemPicker
-        value={item.iteration_id}
-        items={editorOptions.iterations}
-        loading={editorOptions.loading.iterations}
-        config={iterationConfig}
-        placeholder="Set iteration"
-        showUnassigned={true}
-        unassignedLabel="No iteration"
-        allowClear={true}
-        onOpen={() => collectionEditorOptions.load(item.workspace_id, 'iterations')}
-        onSelect={async (selected) => {
-          const iterationId = selected?.id || null;
-          await handleItemUpdate('iteration_id', iterationId);
-        }}
-      >
-        {#snippet children()}
-          {#if iteration}
-            <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-              {#if iteration.is_global}
-                <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              {:else}
-                <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              {/if}
-              {iteration.name}
-            </span>
-          {:else}
-            <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
-              <Calendar class="w-4 h-4" />
-              {t('items.selectIteration')}
-            </span>
-          {/if}
-        {/snippet}
-      </ItemPicker>
-    {:else}
-      {#if iteration}
-        <span class="flex items-center gap-2 text-sm" style="color: var(--ds-text);">
-          {#if iteration.is_global}
-            <Globe class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          {:else}
-            <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          {/if}
-          {iteration.name}
-        </span>
-      {:else}
-        <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
-      {/if}
-    {/if}
+    <IterationCellEditor
+      {canEdit}
+      value={item.iteration_id}
+      {iteration}
+      items={editorOptions.iterations}
+      loading={editorOptions.loading.iterations}
+      selectPrompt={t('items.selectIteration')}
+      onOpen={() => collectionEditorOptions.load(item.workspace_id, 'iterations')}
+      onSelect={async (selected) => {
+        const iterationId = selected?.id || null;
+        await handleItemUpdate('iteration_id', iterationId);
+      }}
+    />
 
   {:else if column.field_identifier === 'due_date'}
     <!-- Due Date -->

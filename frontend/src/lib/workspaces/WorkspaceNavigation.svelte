@@ -10,12 +10,10 @@
     IconBook as BookOpen,
     IconChevronDown as ChevronDown,
     IconChevronRight,
-    IconGripVertical as Grip,
     IconPalette as Palette,
     IconSparkles as Sparkles,
     IconPencil as Pencil,
   } from '@tabler/icons-svelte-runes';
-  import { workspaceIconMap } from '../utils/icons.js';
   import { workspaceViewItems, workspaceOnlyViews, testNavigationItems, workspaceSettingsItems, workspaceSettingsViews, workspaceSettingsRoute } from '../navigation/workspaceNavigation.js';
   import { navItemStyle, onNavMouseEnter, onNavMouseLeave } from '../navigation/navItemStyle.js';
   import { navigate, currentRoute } from '../router.js';
@@ -24,14 +22,15 @@
   import { api } from '../api.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import ScrollableSidebar from '../layout/ScrollableSidebar.svelte';
+  import SidebarResizeHandle from '../layout/SidebarResizeHandle.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import PagesNavSidebar from '../features/pages/PagesNavSidebar.svelte';
   import WorkspaceAdminNav from './WorkspaceAdminNav.svelte';
   import { i18n, t } from '../stores/i18n.svelte.js';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../stores/workspaceGradient.svelte.js';
-  import { useEventListener } from 'runed';
   import {
     uiStore,
+    WS_SIDEBAR_DEFAULT_WIDTH,
     WS_SIDEBAR_MAX_WIDTH,
     WS_SIDEBAR_MIN_WIDTH,
   } from '../stores/ui.svelte.js';
@@ -53,48 +52,6 @@
 
   let sidebarWidth = $derived($uiStore.wsSidebarWidth);
   let isCollapsed = $derived($uiStore.wsSidebarCollapsed);
-  let isResizing = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-  let collapsedDuringDrag = $state(false);
-
-  function onResizeStart(e) {
-    e.preventDefault();
-    resizeStartX = e.clientX;
-    resizeStartWidth = isCollapsed ? COLLAPSED_WIDTH : sidebarWidth;
-    collapsedDuringDrag = false;
-    isResizing = true;
-  }
-
-  function handleResizeMove(e) {
-    const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
-    if (rawWidth < COLLAPSE_THRESHOLD) {
-      if (!isCollapsed) {
-        collapsedDuringDrag = true;
-        uiStore.wsSidebarCollapsed = true;
-      }
-    } else {
-      if (isCollapsed) {
-        uiStore.wsSidebarCollapsed = false;
-        collapsedDuringDrag = false;
-      }
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rawWidth));
-      uiStore.wsSidebarWidth = newWidth;
-    }
-  }
-
-  function handleResizeUp() {
-    isResizing = false;
-    collapsedDuringDrag = false;
-  }
-
-  useEventListener(() => isResizing ? window : undefined, 'mousemove', handleResizeMove);
-  useEventListener(() => isResizing ? window : undefined, 'mouseup', handleResizeUp);
-
-  function onResizeHandleDblClick() {
-    uiStore.wsSidebarCollapsed = false;
-    uiStore.resetWsSidebarWidth();
-  }
 
   let { workspaceId = null } = $props();
 
@@ -203,6 +160,7 @@
       // Sync with current route (reactive statement will handle this, but we need to rebuild dropdown)
       syncCollectionWithRoute($currentRoute.params.collectionId);
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       console.error('Failed to load collections:', error);
       collections = [];
       currentCollectionId = null;
@@ -416,63 +374,20 @@
 </script>
 
 {#snippet resizeHandle()}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="ws-resize-handle"
-    onmousedown={onResizeStart}
-    ondblclick={onResizeHandleDblClick}
-  ></div>
-{/snippet}
-
-{#snippet workspaceAvatar(collapsed = false)}
-  {#if $currentWorkspace?.avatar_url}
-    <div class={collapsed ? 'w-8 h-8 flex-shrink-0' : 'flex items-center justify-center w-10 h-10 flex-shrink-0'}>
-      <img
-        src={$currentWorkspace.avatar_url}
-        alt={$currentWorkspace.name}
-        class="w-8 h-8 rounded-md object-cover"
-      />
-    </div>
-  {:else}
-    {@const WorkspaceIcon = workspaceIconMap[$currentWorkspace?.icon] || Grip}
-    <div class={collapsed ? 'w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0' : 'flex items-center justify-center w-10 h-10 flex-shrink-0'}>
-      <div
-        class="w-8 h-8 rounded-md flex items-center justify-center"
-        style="background-color: {$currentWorkspace?.color || ($currentWorkspace?.is_personal ? '#f97316' : '#3b82f6')};"
-      >
-        <WorkspaceIcon size={collapsed ? 16 : 18} color="white" />
-      </div>
-    </div>
-  {/if}
-{/snippet}
-
-{#snippet workspaceHeader({ backLink = false } = {})}
-  <div class="px-4 pb-4 border-b" style="border-color: var(--ds-border);">
-    <div class="flex items-center gap-3">
-      {@render workspaceAvatar(false)}
-      <div class="flex-1 min-w-0">
-        <Tooltip content={$currentWorkspace?.name || t('common.workspace')}>
-          <div class="font-medium text-sm truncate" style="color: var(--ds-text);">
-            {$currentWorkspace?.name || t('common.workspace')}
-          </div>
-        </Tooltip>
-        {#if backLink}
-          <a class="workspace-header-back-link" href={`/workspaces/${workspaceId}`} data-testid="workspace-back-link">
-            <ArrowLeft size={13} />
-            <span>{t('workspaceSettings.backToWorkspace')}</span>
-          </a>
-        {:else if $currentWorkspace?.is_personal}
-          <div class="text-xs text-orange-600">{t('components.userAvatar.myWorkspace')}</div>
-        {:else if $currentWorkspace?.description}
-          <Tooltip content={$currentWorkspace.description}>
-            <div class="text-xs truncate" style="color: var(--ds-text-subtle);">
-              {$currentWorkspace.description}
-            </div>
-          </Tooltip>
-        {/if}
-      </div>
-    </div>
-  </div>
+  <SidebarResizeHandle
+    width={sidebarWidth}
+    minWidth={MIN_WIDTH}
+    maxWidth={MAX_WIDTH}
+    defaultWidth={WS_SIDEBAR_DEFAULT_WIDTH}
+    collapsed={isCollapsed}
+    collapsedWidth={COLLAPSED_WIDTH}
+    collapseThreshold={COLLAPSE_THRESHOLD}
+    label={t('aria.resizeNavigation')}
+    title={t('aria.sidebarResizeHint')}
+    testId="workspace-sidebar-resize"
+    onresize={(width) => uiStore.wsSidebarWidth = width}
+    oncollapsechange={(collapsed) => uiStore.wsSidebarCollapsed = collapsed}
+  />
 {/snippet}
 
 {#snippet navLink(item)}
@@ -513,15 +428,15 @@
 {/snippet}
 
 {#snippet regularSidebarHeader()}
-  {@render workspaceHeader()}
-
-  <!-- Keep workspace context visible while its navigation scrolls. -->
+  <!-- Keep the collection selector visible while navigation scrolls. -->
   <div class="px-4 pt-2 mb-6">
     <Tooltip content={t('collections.collection')} placement="right">
       <DropdownMenu
         triggerText={collectionDisplayName}
+        triggerTestid="workspace-collection-select"
         items={collectionDropdownItems}
         maxWidth="max-w-full"
+        matchTriggerWidth={true}
         showChevron={true}
         placement="bottom-start"
         triggerClass="w-full text-left font-medium rounded !px-3 !py-2.5 !text-sm transition-colors"
@@ -537,12 +452,11 @@
 {/snippet}
 
 {#snippet drilldownSidebarHeader()}
-  {@render workspaceHeader({ backLink: true })}
-{/snippet}
-
-{#snippet collapsedSidebarHeader()}
-  <div class="h-10 mb-2 w-full flex items-center justify-center">
-    {@render workspaceAvatar(true)}
+  <div class="px-4 pb-3">
+    <a class="workspace-header-back-link" href={`/workspaces/${workspaceId}`} data-testid="workspace-back-link">
+      <ArrowLeft size={13} />
+      <span>{t('workspaceSettings.backToWorkspace')}</span>
+    </a>
   </div>
 {/snippet}
 
@@ -550,10 +464,10 @@
   {#if isSettingsView}
     <!-- Collapsed admin rail: back arrow + a module icon per settings page. -->
     <div class="flex flex-col items-center space-y-1 mt-6">
-      {@render collapsedNavIcon({ href: `/workspaces/${workspaceId}`, label: t('workspaceSettings.backToWorkspace'), icon: ArrowLeft, isActive: false })}
+      {@render collapsedNavIcon({ href: `/workspaces/${workspaceId}`, testId: 'workspace-back-link', label: t('workspaceSettings.backToWorkspace'), icon: ArrowLeft, isActive: false })}
       {@render sectionDivider()}
       {#each workspaceSettingsItems as item (item.id)}
-        {@render collapsedNavIcon({ href: workspaceSettingsRoute(workspaceId, item.id), label: t(item.labelKey), icon: item.icon, isActive: $currentRoute.view === item.view })}
+        {@render collapsedNavIcon({ href: workspaceSettingsRoute(workspaceId, item.id), testId: `workspace-admin-nav-${item.id}`, label: t(item.labelKey), icon: item.icon, isActive: $currentRoute.view === item.view })}
       {/each}
     </div>
   {:else if $currentWorkspace?.is_personal}
@@ -609,10 +523,9 @@
 {#if isCollapsed}
   <!-- Collapsed icon-only sidebar -->
   <ScrollableSidebar
-    class="relative h-full flex-shrink-0 border-r items-center py-4 {sidebarBgClass}"
+    class="workspace-resizable-sidebar relative h-full flex-shrink-0 border-r items-center py-4 {sidebarBgClass}"
     style="width: {COLLAPSED_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
-    header={collapsedSidebarHeader}
     footer={collapsedSidebarFooter}
     reserveScrollbarSpace={false}
     scrollClass="w-full"
@@ -621,10 +534,9 @@
     {@render collapsedSidebarContent()}
   </ScrollableSidebar>
 {:else if isSettingsView}
-  <!-- Workspace admin drilldown: keep the workspace identity header (with a
-       back link) and swap the body for the folded admin module nav. -->
+  <!-- Workspace admin navigation with a link back to the default view. -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     data-testid="workspace-admin-sidebar"
     aria-label={t('workspaceSettings.title')}
@@ -635,27 +547,27 @@
     <WorkspaceAdminNav {workspaceId} />
   </ScrollableSidebar>
 {:else if $currentRoute.view === 'workspace-pages' || $currentRoute.view === 'workspace-pages-archived'}
-  <!-- Pages drilldown keeps the common workspace identity header and swaps the body for the page tree. -->
+  <!-- Pages drilldown uses the page tree beneath its back link. -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
+    data-testid="workspace-pages-sidebar"
     aria-label={t('pages.treeHeading')}
     header={drilldownSidebarHeader}
     footer={sidebarResizeHandle}
     scrollContent={false}
     reserveScrollbarSpace={false}
   >
-    <div class="flex flex-1 min-h-0">
+    <div class="flex h-full min-h-0">
       <PagesNavSidebar {workspaceId} embedded />
     </div>
   </ScrollableSidebar>
 {:else if $currentWorkspace?.is_personal}
   <!-- Simplified Personal Workspace Sidebar -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
-    header={workspaceHeader}
     footer={sidebarResizeHandle}
     scrollTestid="workspace-navigation-scroll"
   >
@@ -668,7 +580,7 @@
 {:else}
   <!-- Regular Workspace Navigation Sidebar -->
   <ScrollableSidebar
-    class="sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
+    class="workspace-resizable-sidebar sidebar-mode-panel relative h-full flex-shrink-0 {sidebarBgClass} border-r py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
     aria-label={t('aria.mainNavigation')}
     header={regularSidebarHeader}
@@ -782,21 +694,9 @@
     text-decoration: underline;
   }
 
-  /* Resize handle on sidebar right edge */
-  .ws-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 4px;
-    height: 100%;
-    cursor: col-resize;
-    z-index: 10;
-    transition: background-color 150ms ease;
-  }
-
-  .ws-resize-handle:hover,
-  .ws-resize-handle:active {
-    background-color: var(--ds-border-focused, #3b82f6);
+  /* Keep the shared handle's outer half clickable. */
+  :global(.workspace-resizable-sidebar.scrollable-sidebar) {
+    overflow: visible;
   }
 
   /* Enhanced navigation item transitions */

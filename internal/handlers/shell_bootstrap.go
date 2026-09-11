@@ -13,6 +13,10 @@ type channelManagementCapability interface {
 	ManagesChannels(context.Context, int) (bool, error)
 }
 
+type assetSetCapability interface {
+	HasAccessibleAssetSets(int) (bool, error)
+}
+
 // ShellBootstrapHandler composes the capability snapshots needed by the
 // authenticated application shell. Keeping this as one request prevents every
 // optional feature from competing for a per-user concurrency slot at login.
@@ -21,7 +25,7 @@ type ShellBootstrapHandler struct {
 	setup       *SetupHandler
 	attachments *AttachmentSettingsHandler
 	ai          *AIHandler
-	assets      *AssetHandler
+	assets      assetSetCapability
 	hub         *HubHandler
 	channels    channelManagementCapability
 	staleness   *WorkItemStalenessHandler
@@ -43,7 +47,7 @@ func NewShellBootstrapHandler(
 	setup *SetupHandler,
 	attachments *AttachmentSettingsHandler,
 	ai *AIHandler,
-	assets *AssetHandler,
+	assets assetSetCapability,
 	hub *HubHandler,
 	channels channelManagementCapability,
 	staleness *WorkItemStalenessHandler,

@@ -40,8 +40,8 @@
     }
     if (editingAction?.id === id) return;
     let cancelled = false;
-    api
-      .get(`/workspaces/${workspaceId}/actions/${id}`)
+    api.actions
+      .get(workspaceId, id)
       .then((full) => {
         if (!cancelled) editingAction = full;
       })
@@ -82,8 +82,9 @@
 
   async function loadActions() {
     try {
-      actions = await api.get(`/workspaces/${workspaceId}/actions`) || [];
+      actions = await api.actions.getAll(workspaceId) || [];
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       console.error('Failed to load actions:', error);
       errorToast(t('errors.failedToLoad'));
       actions = [];
@@ -112,7 +113,7 @@
     }
 
     try {
-      const newAction = await api.post(`/workspaces/${workspaceId}/actions`, {
+      const newAction = await api.actions.create(workspaceId, {
         name: newActionName.trim(),
         description: newActionDescription.trim(),
         trigger_type: 'status_transition',
@@ -135,7 +136,7 @@
 
   async function handleToggle(action) {
     try {
-      await api.post(`/workspaces/${workspaceId}/actions/${action.id}/toggle`);
+      await api.actions.update(workspaceId, action.id, { is_enabled: !action.is_enabled });
       await loadActions();
       successToast(action.is_enabled ? t('actions.disabled') : t('actions.enabled'));
     } catch (error) {
@@ -146,7 +147,7 @@
 
   async function handleDelete(action) {
     try {
-      await api.delete(`/workspaces/${workspaceId}/actions/${action.id}`);
+      await api.actions.delete(workspaceId, action.id);
       await loadActions();
       successToast(t('common.deleted'));
     } catch (error) {
@@ -165,7 +166,7 @@
 
   async function handleSaveAction(updatedAction) {
     try {
-      await api.put(`/workspaces/${workspaceId}/actions/${updatedAction.id}`, updatedAction);
+      await api.actions.update(workspaceId, updatedAction.id, updatedAction);
       await loadActions();
       successToast(t('common.saved'));
       navigate(`/workspaces/${workspaceId}/actions`);

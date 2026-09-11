@@ -280,8 +280,7 @@
   async function loadCustomFields() {
     if (customFieldsLoaded) return;
     try {
-      const result = await api.customFields.getAll();
-      allCustomFields = result?.data || [];
+      allCustomFields = await api.customFields.getAll();
     } catch (err) {
       console.error('Failed to load custom fields:', err);
       allCustomFields = [];
@@ -335,10 +334,19 @@
       const customIds = fields
         .filter((field) => field.field_type === 'custom')
         .map((field) => parseInt(field.field_identifier, 10));
+      // Preserve entered values for fields that remain configured across the
+      // workspace/type change; only fields new to the screen get defaults.
+      const previousValues = customFieldValues;
       customFieldValues = {};
       for (const field of allCustomFields) {
         if (customIds.includes(field.id)) {
-          customFieldValues[field.id] = isBooleanCustomFieldType(field.field_type) ? false : '';
+          const previous = previousValues[field.id];
+          customFieldValues[field.id] =
+            previous !== undefined && previous !== null && previous !== ''
+              ? previous
+              : isBooleanCustomFieldType(field.field_type)
+                ? false
+                : '';
         }
       }
       screenFieldsLoadedForKey = key;
@@ -406,7 +414,7 @@
     templatesLoading = true;
     try {
       const list =
-        (await api.itemTemplates.getAll({ workspace_id: wsId, item_type_id: typeId })) ?? [];
+        (await api.itemTemplates.getAll(wsId, { item_type_id: typeId })) ?? [];
       // Guard against an out-of-order response after another type change.
       if (`${workspaceId}:${itemTypeId}` !== key) return;
 
@@ -597,6 +605,7 @@
           priority_id: priorityId || null,
           assignee_id: assigneeId || null,
           milestone_ids: Array.isArray(milestoneIds) ? milestoneIds : [],
+          label_ids: selectedLabelIds(),
           iteration_id: iterationId || null,
           project_id: projectId || null,
           due_date: dateInputToISOString(dueDate),
@@ -619,9 +628,6 @@
       if (!isPersonal && !validateConfiguredFields()) return;
 
       const result = await api.items.create(createPayload());
-      if (!isPersonal && selectedLabelIds().length > 0) {
-        await api.labels.setForItem(result.id, selectedLabelIds());
-      }
       if (isPersonal) {
         // The newly created personal task lives in this tab's list - let the
         // active Personal view refresh itself. BroadcastChannel excludes the

@@ -1,8 +1,7 @@
 <script>
   import { FolderOpen, CheckCircle, Clock, AlertCircle } from '@lucide/svelte';
-  import StatCard from './StatCard.svelte';
   import { t } from '../stores/i18n.svelte.js';
-import { objectDisplayName } from '../utils/systemLabels.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let { stats = {
     totalCollections: 0,
@@ -28,33 +27,31 @@ import { objectDisplayName } from '../utils/systemLabels.js';
   }
 </script>
 
-<div class="flex items-center justify-between gap-4">
-  <StatCard
-    icon={FolderOpen}
-    bgColor="var(--ds-accent-blue-subtler)"
-    iconColor="var(--ds-icon-accent-blue)"
-    label={t('widgets.stats.collections')}
-    value={stats.totalCollections}
-  />
+{#snippet metric(Icon, color, label, value)}
+  <div class="min-w-0 basis-40 border-l border-ds-border pl-4">
+    <dt class="flex items-center gap-2 text-xs text-ds-text-subtle">
+      <Icon size={14} class="shrink-0" style={`color: ${color};`} aria-hidden="true" />
+      <span class="wrap-anywhere">{label}</span>
+    </dt>
+    <dd class="mt-2 text-3xl leading-none font-semibold tracking-tight tabular-nums text-ds-text">
+      {value}
+    </dd>
+  </div>
+{/snippet}
+
+<dl class="flex flex-wrap justify-between gap-x-6 gap-y-6 py-2">
+  {@render metric(FolderOpen, 'var(--ds-icon-accent-blue)', t('widgets.stats.collections'), stats.totalCollections)}
 
   {#each statusCategories as category}
-    {@const color = getCategoryColor(category)}
-    <StatCard
-      icon={getCategoryIcon(category.name)}
-      bgColor="{color}20"
-      iconColor={color}
-label={objectDisplayName(category, 'status_category')}
-      value={stats.itemsByStatusCategory[category.name] || 0}
-    />
+    {@render metric(
+      getCategoryIcon(category.name),
+      getCategoryColor(category),
+      objectDisplayName(category, 'status_category'),
+      stats.itemsByStatusCategory[category.name] || 0
+    )}
   {/each}
 
   {#if stats.totalItems > 0}
-    <StatCard
-      icon={FolderOpen}
-      bgColor="var(--ds-background-accent-purple-subtler)"
-      iconColor="var(--ds-icon-accent-purple)"
-      label={t('widgets.stats.totalItems')}
-      value={stats.totalItems}
-    />
+    {@render metric(FolderOpen, 'var(--ds-icon-accent-purple)', t('widgets.stats.totalItems'), stats.totalItems)}
   {/if}
-</div>
+</dl>

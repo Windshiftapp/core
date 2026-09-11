@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,8 @@ type ItemHierarchyCache struct {
 type ItemCacheService struct {
 	hierarchyCache *bigcache.BigCache
 	db             database.Database
+	closeOnce      sync.Once
+	closeErr       error
 
 	// Cache statistics
 	hierarchyHits   int64
@@ -36,6 +39,17 @@ type ItemCacheService struct {
 
 	// Configuration
 	config ItemCacheConfig
+}
+
+// Close stops the hierarchy cache's background worker without closing the
+// shared database. It may be called more than once.
+func (ics *ItemCacheService) Close() error {
+	ics.closeOnce.Do(func() {
+		if ics.hierarchyCache != nil {
+			ics.closeErr = ics.hierarchyCache.Close()
+		}
+	})
+	return ics.closeErr
 }
 
 // ItemCacheConfig represents configuration for the item cache

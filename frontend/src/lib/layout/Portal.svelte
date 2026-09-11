@@ -34,7 +34,15 @@
   const AlertCircleIcon = AlertCircle;
 
   // Store
-  import { portalStore } from '../stores/portal.svelte.js';
+  import {
+    portalCatalogStore,
+    portalCustomizationStore as portalStore,
+  } from '../stores/portal.svelte.js';
+  import {
+    portalApprovalsStore,
+    portalDraftsStore,
+    portalRequestsStore,
+  } from '../stores/portalActivity.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
@@ -155,22 +163,22 @@
 
     if (viewParam === 'requests') {
       // Set showMyRequests directly (don't toggle, which would navigate again)
-      portalStore.setShowMyRequests(true);
+      portalRequestsStore.setVisible(true);
 
       // If a specific request ID is in URL, load and view it
       if (requestIdParam) {
-        portalStore.loadAndViewRequest(requestIdParam);
+        portalRequestsStore.loadAndView(requestIdParam);
       }
     } else if (viewParam === 'approvals') {
-      portalStore.setShowMyApprovals(true);
+      portalApprovalsStore.setVisible(true);
 
       // Deep-link to a specific approval (magic-link `&next=` lands here).
       if (approvalIdParam) {
-        portalStore.loadAndViewApproval(approvalIdParam);
+        portalApprovalsStore.loadAndView(approvalIdParam);
       }
     } else {
-      portalStore.setShowMyRequests(false);
-      portalStore.setShowMyApprovals(false);
+      portalRequestsStore.setVisible(false);
+      portalApprovalsStore.setVisible(false);
 
       // Check for request-type param to auto-open form
       if (requestTypeParam) {
@@ -178,7 +186,7 @@
         if (!isNaN(requestTypeId)) {
           // Wait for request types to load, then open the form
           const checkAndOpenForm = () => {
-            const rt = portalStore.requestTypes.find(t => t.id === requestTypeId);
+            const rt = portalCatalogStore.requestTypes.find(t => t.id === requestTypeId);
             if (rt) {
               openRequestForm(rt);
               // Clear the query param from URL without reload
@@ -187,12 +195,12 @@
             }
           };
           // If request types already loaded, open immediately; otherwise wait
-          if (portalStore.requestTypes.length > 0) {
+          if (portalCatalogStore.requestTypes.length > 0) {
             checkAndOpenForm();
           } else {
             // Poll briefly for request types to load
             const interval = setInterval(() => {
-              if (portalStore.requestTypes.length > 0) {
+              if (portalCatalogStore.requestTypes.length > 0) {
                 clearInterval(interval);
                 checkAndOpenForm();
               }
@@ -265,7 +273,7 @@
     showRequestTypeModal = false;
     selectedRequestTypeForModal = null;
     await tick();
-    portalStore.loadRequestTypes();
+    portalCatalogStore.loadRequestTypes();
   }
 
   async function openAssetReportModal(mode, assetReport = null) {
@@ -279,7 +287,7 @@
     showAssetReportModal = false;
     selectedAssetReportForModal = null;
     await tick();
-    portalStore.loadAssetReports();
+    portalCatalogStore.loadAssetReports();
   }
 
   function openAssetReportFieldsModal(report) {
@@ -288,7 +296,7 @@
   }
 
   function handleAssetReportFieldsSaved() {
-    portalStore.loadAssetReports();
+    portalCatalogStore.loadAssetReports();
   }
 
   function openAssetReportForm(report) {
@@ -320,8 +328,8 @@
 
   function handleRequestSubmitted(itemId) {
     if (itemId) {
-      portalStore.setShowMyRequests(true);
-      portalStore.loadAndViewRequest(itemId);
+      portalRequestsStore.setVisible(true);
+      portalRequestsStore.loadAndView(itemId);
       navigate(`/portal/${portalStore.currentSlug}?view=requests&id=${itemId}`);
     }
   }
@@ -332,7 +340,7 @@
   // to the saved step automatically — no extra plumbing required here.
   function handleResumeDraft({ requestType }) {
     if (!requestType) return;
-    portalStore.showMyDrafts = false;
+    portalDraftsStore.visible = false;
     selectedRequestTypeForForm = requestType;
     showRequestFormModal = true;
     navigate(`/portal/${portalStore.currentSlug}`);
@@ -346,8 +354,8 @@
       selectedRequestTypeForForm = portalStore.pendingRequestType;
       portalStore.pendingRequestType = null;
       showRequestFormModal = true;
-    } else if (portalStore.showMyRequests) {
-      portalStore.loadMyRequests();
+    } else if (portalRequestsStore.visible) {
+      portalRequestsStore.load();
     }
   }
 
@@ -426,7 +434,7 @@
   class="min-h-screen flex flex-col"
   style="background-color: var(--ds-surface, #ffffff);"
   data-testid="portal-page"
-  data-ready={!!portalStore.portalData && authCheckComplete}
+  data-ready={!!portalStore.portalData && authCheckComplete && !portalStore.loading}
 >
   {#if portalStore.loading}
     <!-- Loading State -->
@@ -459,7 +467,11 @@
       <div class="flex-1 flex flex-col">
         <!-- Edit Mode Top Bar -->
         {#if portalStore.isEditing}
-          <div class="relative z-[60] h-10" style="background-color: #fefce8; border-bottom: 1px solid #fde68a;">
+          <div
+            class="relative z-[60] h-10"
+            style="background-color: #fefce8; border-bottom: 1px solid #fde68a;"
+            data-testid="portal-editing-bar"
+          >
             <div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-full">
               <span class="text-sm font-semibold" style="color: #92400e;">Editing portal</span>
               <Button variant="primary" size="small" icon={Check} onclick={() => portalStore.toggleEditing()}>
@@ -473,7 +485,7 @@
         <PortalHeader />
 
         <!-- Branded search hero on the portal home. -->
-        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals && !portalStore.showMyDrafts && !isProfileRoute}
+        {#if !portalRequestsStore.visible && !portalApprovalsStore.visible && !portalDraftsStore.visible && !isProfileRoute}
           <PortalHero />
         {/if}
 
@@ -482,11 +494,11 @@
           <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
             {#if isProfileRoute}
               <PortalProfile />
-            {:else if portalStore.showMyApprovals}
+            {:else if portalApprovalsStore.visible}
               <PortalMyApprovals />
-            {:else if portalStore.showMyDrafts}
+            {:else if portalDraftsStore.visible}
               <PortalMyDrafts onresume={handleResumeDraft} />
-            {:else if portalStore.showMyRequests}
+            {:else if portalRequestsStore.visible}
               <PortalMyRequests />
             {:else}
               <PortalPasskeyBanner />

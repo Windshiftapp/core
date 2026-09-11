@@ -2,14 +2,12 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
-	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
 
@@ -20,16 +18,17 @@ import (
 // view/edit (404-not-403 on permission failure to avoid leaking existence).
 type DiagramHandler struct {
 	BaseHandler
-	repo     *repository.DiagramRepository
 	itemRepo *repository.ItemRepository
+	service  *services.ItemDiagramService
 }
 
 // NewDiagramHandler constructs a v1 DiagramHandler.
 func NewDiagramHandler(db database.Database, permissionService *services.PermissionService) *DiagramHandler {
+	repo := repository.NewDiagramRepository(db)
 	return &DiagramHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
-		repo:        repository.NewDiagramRepository(db),
 		itemRepo:    repository.NewItemRepository(db),
+		service:     services.NewItemDiagramService(repo),
 	}
 }
 
@@ -91,7 +90,7 @@ func (h *DiagramHandler) resolveDiagramAccess(w http.ResponseWriter, r *http.Req
 		return nil, nil, false
 	}
 
-	diagram, err := h.repo.GetByID(diagramID)
+	diagram, err := h.service.Get(diagramID)
 	if errors.Is(err, repository.ErrNotFound) {
 		h.RespondNotFound(w, r)
 		return nil, nil, false
@@ -126,16 +125,16 @@ func (h *DiagramHandler) decodeWriteRequest(w http.ResponseWriter, r *http.Reque
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return "", "", false
 	}
-	name = sanitize.ShortIdentifier.Sanitize(req.Name)
-	if name == "" {
+	name, diagramData, err := services.NormalizeDiagramInput(req.Name, req.DiagramData)
+	if errors.Is(err, services.ErrDiagramNameRequired) {
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
 		return "", "", false
 	}
-	if req.DiagramData == "" {
+	if errors.Is(err, services.ErrDiagramDataRequired) {
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "diagram_data is required"))
 		return "", "", false
 	}
-	return name, req.DiagramData, true
+	return name, diagramData, true
 }
 
 // ListForItem handles GET /rest/api/v1/items/{id}/diagrams
@@ -159,7 +158,7 @@ func (h *DiagramHandler) ListForItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	diagrams, err := h.repo.ListByItem(item.ID)
+	diagrams, err := h.service.List(item.ID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
@@ -195,27 +194,11 @@ func (h *DiagramHandler) CreateForItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	createdBy := &user.ID
-
-	id, _, err := h.repo.Create(item.ID, name, diagramData, createdBy)
+	created, err := h.service.Create(item.ID, name, diagramData, user.ID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
-
-	// Reload through the joined-users SELECT so the response shape matches
-	// what GetByID returns elsewhere (creator_name etc.).
-	created, err := h.repo.GetByID(int(id))
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-
-	// Best-effort history record — same pattern the cookie handler uses.
-	// We don't want a history insertion failure to fail an otherwise
-	// successful create, so swallow the error.
-	newValue := fmt.Sprintf("diagram:%d:%s", id, name)
-	_ = h.repo.RecordHistory(item.ID, user.ID, "diagram_created", nil, newValue)
 
 	h.RespondCreated(w, created)
 }
@@ -271,8 +254,8 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedBy := &user.ID
-	if err := h.repo.Update(diagram.ID, name, diagramData, updatedBy); err != nil {
+	updated, err := h.service.Update(diagram.ID, name, diagramData, user.ID)
+	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			h.RespondNotFound(w, r)
 			return
@@ -281,19 +264,6 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort history; show the previous name only when it changed.
-	var historyOldName *string
-	if diagram.Name != name {
-		historyOldName = &diagram.Name
-	}
-	newValue := fmt.Sprintf("diagram:%d:%s", diagram.ID, name)
-	_ = h.repo.RecordHistory(diagram.ItemID, user.ID, "diagram_updated", historyOldName, newValue)
-
-	updated, err := h.repo.GetByID(diagram.ID)
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
 	h.RespondOK(w, updated)
 }
 
@@ -316,11 +286,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record history before deletion so the row still exists for the
-	// `old_value` snapshot.
-	_ = h.repo.RecordHistory(diagram.ItemID, user.ID, "diagram_deleted", &diagram.Name, diagram.Name)
-
-	if err := h.repo.Delete(diagram.ID); err != nil {
+	if _, err := h.service.Delete(diagram.ID, user.ID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			h.RespondNotFound(w, r)
 			return

@@ -1,4 +1,4 @@
-import { fetchAPI } from '../core.js';
+import { fetchV2Data } from '../core.js';
 import { buildQueryString } from '../utils.js';
 
 // Test reports dashboard
@@ -7,6 +7,8 @@ export const reports = {
     const mapped = {};
     if (options.milestoneId) mapped.milestone_id = options.milestoneId;
     if (options.days) mapped.days = options.days;
-    return fetchAPI(`/workspaces/${workspaceId}/test-reports/summary${buildQueryString(mapped)}`);
+    return fetchV2Data(
+      `/workspaces/${workspaceId}/test-reports/summary${buildQueryString(mapped)}`
+    );
   },
 };

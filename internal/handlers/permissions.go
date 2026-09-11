@@ -257,9 +257,8 @@ func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *htt
 }
 
 // invalidateGroupMemberCaches invalidates the permission cache for every
-// member of the given group, mirroring the historical semantics: a failed
-// member query is silent, a partial iteration failure surfaces a warning
-// but still invalidates the members collected so far.
+// member of the given group. Incomplete enumeration falls back to a full
+// reset so a committed revocation cannot retain an unenumerated snapshot.
 func (h *PermissionHandler) invalidateGroupMemberCaches(groupID int) []models.APIWarning {
 	var warnings []models.APIWarning
 	if h.permissionService == nil {
@@ -267,18 +266,12 @@ func (h *PermissionHandler) invalidateGroupMemberCaches(groupID int) []models.AP
 	}
 
 	userIDs, iterErr, queryErr := h.repo.GroupMemberUserIDs(groupID)
-	if queryErr != nil {
-		return warnings
+	plan := services.AuthorizationInvalidation{UserIDs: userIDs}
+	if queryErr != nil || iterErr != nil {
+		plan.ResetPermissions = true
 	}
-	if iterErr != nil {
-		warnings = append(warnings, createCacheWarning("permission", iterErr, fmt.Sprintf("group_id:%d", groupID)))
-	}
-
-	// Invalidate cache for each user in the group
-	for _, userID := range userIDs {
-		if err := h.permissionService.OnUserPermissionChanged(userID); err != nil {
-			warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("user_id:%d,group_id:%d", userID, groupID)))
-		}
+	if err := services.NewAuthorizationCacheInvalidator(h.permissionService, nil).Apply(plan); err != nil {
+		warnings = append(warnings, createCacheWarning("permission", err, fmt.Sprintf("group_id:%d", groupID)))
 	}
 	return warnings
 }

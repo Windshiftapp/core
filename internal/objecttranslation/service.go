@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 
 	"windshift/internal/database"
+	"windshift/internal/sanitize"
 )
 
 // Translation is one sparse localized field value.
@@ -151,6 +152,11 @@ func (s *Service) List(ctx context.Context, objectType string, objectID int) ([]
 
 // UpsertInstance creates or replaces one administrator-managed translation.
 func (s *Service) UpsertInstance(ctx context.Context, objectType string, objectID int, field, locale, value string) (Translation, error) {
+	if field == FieldDescription {
+		value = sanitize.RichText.Sanitize(value)
+	} else {
+		value = sanitize.PlainTextField.Sanitize(value)
+	}
 	spec, normalizedLocale, value, err := validateWrite(objectType, objectID, field, locale, value)
 	if err != nil {
 		return Translation{}, err
@@ -177,6 +183,14 @@ func (s *Service) UpsertInstance(ctx context.Context, objectType string, objectI
 
 	s.invalidate(objectType, objectID, field, normalizedLocale)
 	return s.get(ctx, objectType, objectID, field, normalizedLocale, SourceInstance)
+}
+
+// ResolveBounded applies the administrator API target limit before resolving.
+func (s *Service) ResolveBounded(ctx context.Context, locale string, targets []Target) ([]ResolvedValue, error) {
+	if len(targets) > MaxResolveTargets {
+		return nil, ErrTooManyTargets
+	}
+	return s.Resolve(ctx, locale, targets)
 }
 
 // DeleteInstance removes one administrator-managed translation.

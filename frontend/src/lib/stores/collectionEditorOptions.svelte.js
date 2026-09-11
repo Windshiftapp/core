@@ -172,8 +172,8 @@ export class CollectionEditorOptionsStore {
       .then((result) => {
         if (generation !== this.#generation) return { assets: [], total: 0 };
         const normalized = {
-          assets: Array.isArray(result?.assets) ? result.assets : [],
-          total: Number(result?.total) || 0,
+          assets: Array.isArray(result?.data) ? result.data : [],
+          total: Number(result?.pagination?.total_items) || 0,
         };
         this.#assetCache.set(key, { value: normalized, fetchedAt: Date.now() });
         while (this.#assetCache.size > MAX_ASSET_CACHE_ENTRIES) {

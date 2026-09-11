@@ -44,6 +44,62 @@ func sanitizeHomepageLayout(layout *models.WorkspaceHomepageLayout) {
 	sanitize.Apply(&layout.BackgroundImageURL, sanitize.PlainTextField)
 }
 
+func (h *WorkspaceHandler) loadWorkspaceStatuses(workspaceID int, itemTypeID *int) ([]models.Status, error) {
+	if itemTypeID == nil {
+		return h.workspaceService.GetStatuses(workspaceID)
+	}
+
+	workflowService := services.NewWorkflowService(h.db)
+	workflowID, err := workflowService.GetWorkflowIDForItem(workspaceID, itemTypeID)
+	if err != nil {
+		return nil, err
+	}
+	if workflowID == nil {
+		workflowID, err = workflowService.GetDefaultWorkflowID()
+		if err != nil || workflowID == nil {
+			return []models.Status{}, err
+		}
+	}
+
+	results, err := services.NewStatusService(h.db).ListWorkflowStatuses(*workflowID)
+	if err != nil {
+		return nil, err
+	}
+	statuses := make([]models.Status, 0, len(results))
+	for _, result := range results {
+		statuses = append(statuses, models.Status{
+			ID: result.ID, Name: result.Name, Description: result.Description,
+			CategoryID: result.CategoryID, IsDefault: result.IsDefault,
+			CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+			CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
+			IsCompleted: result.IsCompleted,
+		})
+	}
+	return statuses, nil
+}
+
+func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
+	if !ok || !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
+		return
+	}
+	var itemTypeID *int
+	if raw := r.URL.Query().Get("item_type_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil {
+			respondBadRequest(w, r, "invalid item_type_id")
+			return
+		}
+		itemTypeID = &id
+	}
+	statuses, err := h.loadWorkspaceStatuses(workspaceID, itemTypeID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, statuses)
+}
+
 // requireWorkspacePermission checks authentication and workspace-level permission in one step.
 // It writes the appropriate error response and returns nil, false when the check fails.
 func (h *WorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) bool {
@@ -214,94 +270,4 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	}
 
 	respondJSONOK(w, layout)
-}
-
-// GetStatuses returns statuses available for a workspace based on its configuration set workflow,
-// or the default workflow if none is assigned
-func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
-	if !ok {
-		return
-	}
-
-	// Check authentication and workspace view permission
-	ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
-	if !ok {
-		return
-	}
-
-	// Parse optional item_type_id query parameter
-	var itemTypeIDPtr *int
-	if itStr := r.URL.Query().Get("item_type_id"); itStr != "" {
-		itID, err := strconv.Atoi(itStr)
-		if err != nil {
-			respondBadRequest(w, r, "invalid item_type_id")
-			return
-		}
-		itemTypeIDPtr = &itID
-	}
-
-	statuses, err := h.loadWorkspaceStatuses(workspaceID, itemTypeIDPtr)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	respondJSONOK(w, statuses)
-}
-
-func (h *WorkspaceHandler) loadWorkspaceStatuses(workspaceID int, itemTypeID *int) ([]models.Status, error) {
-	// Use WorkflowService for proper fallback chain (item type override → config set → global default)
-	workflowService := services.NewWorkflowService(h.db)
-	workflowID, err := workflowService.GetWorkflowIDForItem(workspaceID, itemTypeID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fall back to default workflow if service returned nil (e.g. personal workspace)
-	if workflowID == nil {
-		workflowID, err = workflowService.GetDefaultWorkflowID()
-		if err != nil || workflowID == nil {
-			return []models.Status{}, err
-		}
-	}
-
-	statusResults, err := services.NewStatusService(h.db).ListWorkflowStatuses(*workflowID)
-	if err != nil {
-		return nil, err
-	}
-	statuses := make([]models.Status, 0, len(statusResults))
-	for _, st := range statusResults {
-		statuses = append(statuses, models.Status{
-			ID:            st.ID,
-			Name:          st.Name,
-			Description:   st.Description,
-			CategoryID:    st.CategoryID,
-			IsDefault:     st.IsDefault,
-			CreatedAt:     st.CreatedAt,
-			UpdatedAt:     st.UpdatedAt,
-			CategoryName:  st.CategoryName,
-			CategoryColor: st.CategoryColor,
-			IsCompleted:   st.IsCompleted,
-		})
-	}
-
-	return statuses, nil
-}
-
-// GetItemTypes returns only item types allowed by the workspace's active
-// configuration set.
-func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
-	if !ok {
-		return
-	}
-	if !h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView) {
-		return
-	}
-	itemTypes, err := services.NewWorkspaceService(h.db).GetItemTypes(workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	respondJSONOK(w, itemTypes)
 }

@@ -16,29 +16,11 @@ import (
 	"time"
 )
 
-// authMode picks which header doGet/doMutate attaches.
-type authMode int
-
-const (
-	authBearer authMode = iota
-	authSession
-)
-
 // Client handles communication with the Windshift API.
-//
-// The TUI's endpoints split across two surfaces:
-//   - /rest/api/v1/... uses bearer auth (Authorization: Bearer crw_*),
-//     populated from an SSH-minted temp API token.
-//   - /api/...           uses session auth (X-Session-Token), populated from
-//     an SSH-minted session row.
-//
-// Once v1 grows /time/projects and /time/worklogs endpoints, the legacy
-// session path can be removed entirely.
 type Client struct {
-	baseURL      string
-	httpClient   *http.Client
-	sessionToken string
-	bearerToken  string
+	baseURL     string
+	httpClient  *http.Client
+	bearerToken string
 }
 
 // NewClient creates a new API client.
@@ -51,36 +33,24 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-// SetSessionToken sets the session token used by legacy /api/* calls.
-func (c *Client) SetSessionToken(token string) {
-	c.sessionToken = token
-}
-
-// SetBearerToken sets the API token used by /rest/api/v1/* calls.
+// SetBearerToken sets the API token used by the REST API.
 func (c *Client) SetBearerToken(token string) {
 	c.bearerToken = token
 }
 
-func (c *Client) setAuth(req *http.Request, mode authMode) {
-	switch mode {
-	case authBearer:
-		if c.bearerToken != "" {
-			req.Header.Set("Authorization", "Bearer "+c.bearerToken)
-		}
-	case authSession:
-		if c.sessionToken != "" {
-			req.Header.Set("X-Session-Token", c.sessionToken)
-		}
+func (c *Client) setAuth(req *http.Request) {
+	if c.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
 	}
 }
 
 // doGet performs a GET request to the given path and decodes the JSON response into result.
-func (c *Client) doGet(path string, mode authMode, result any) error {
+func (c *Client) doGet(path string, result any) error {
 	req, err := http.NewRequest("GET", c.baseURL+path, http.NoBody)
 	if err != nil {
 		return err
 	}
-	c.setAuth(req, mode)
+	c.setAuth(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -104,7 +74,11 @@ func (c *Client) doGet(path string, mode authMode, result any) error {
 
 // doMutate performs a mutating HTTP request (POST, PUT, etc.) with a JSON body.
 // If result is non-nil, the response body is decoded into it.
-func (c *Client) doMutate(method, path string, mode authMode, body, result any) error { //nolint:unparam // result is wired for callers that will decode bodies; all current call sites pass nil
+func (c *Client) doMutate(method, path string, body, result any) error { //nolint:unparam // result is wired for callers that will decode bodies; all current call sites pass nil
+	return c.doMutateWithContentType(method, path, body, result, "application/json")
+}
+
+func (c *Client) doMutateWithContentType(method, path string, body, result any, contentType string) error {
 	jsonData, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -114,8 +88,8 @@ func (c *Client) doMutate(method, path string, mode authMode, body, result any) 
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	c.setAuth(req, mode)
+	req.Header.Set("Content-Type", contentType)
+	c.setAuth(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -140,15 +114,20 @@ func (c *Client) doMutate(method, path string, mode authMode, body, result any) 
 // ─── HTTP API methods ─────────────────────────────────────────────────
 
 func (c *Client) getWorkspaces() ([]Workspace, error) {
-	var resp v1WorkspacesPage
-	if err := c.doGet("/rest/api/v1/workspaces", authBearer, &resp); err != nil {
-		return nil, err
+	out := make([]Workspace, 0, 100)
+	for page := 1; ; page++ {
+		var resp workspacePageDocument
+		path := fmt.Sprintf("/rest/api/v2/workspaces?page=%d&page_size=100", page)
+		if err := c.doGet(path, &resp); err != nil {
+			return nil, err
+		}
+		for _, w := range resp.Data {
+			out = append(out, workspaceFromDTO(w))
+		}
+		if len(resp.Data) == 0 || page >= resp.Pagination.TotalPages {
+			return out, nil
+		}
 	}
-	out := make([]Workspace, 0, len(resp.Data))
-	for _, w := range resp.Data {
-		out = append(out, workspaceFromV1(w))
-	}
-	return out, nil
 }
 
 // maxWorkItems caps how many items getWorkItems accumulates across pages —
@@ -156,20 +135,18 @@ func (c *Client) getWorkspaces() ([]Workspace, error) {
 // API with dozens of page fetches.
 const maxWorkItems = 500
 
-// getWorkItems fetches all pages of a workspace's items (the v1 endpoint
-// caps limit at 100) up to maxWorkItems. The bool result reports truncation.
+// getWorkItems fetches all pages of a workspace's items up to maxWorkItems.
+// The bool result reports truncation.
 func (c *Client) getWorkItems(workspaceID int) ([]WorkItem, bool, error) {
 	out := make([]WorkItem, 0, 64)
 	for page := 1; ; page++ {
-		var resp v1ItemsPage
-		// expand= populates the nested status/priority/assignee/creator the
-		// list view chips need; without it those come back nil.
-		path := fmt.Sprintf("/rest/api/v1/workspaces/%d/items?expand=status,priority,assignee,creator&page=%d&limit=100", workspaceID, page)
-		if err := c.doGet(path, authBearer, &resp); err != nil {
+		var resp itemPageDocument
+		path := fmt.Sprintf("/rest/api/v2/items?workspace_id=%d&page=%d&page_size=100", workspaceID, page)
+		if err := c.doGet(path, &resp); err != nil {
 			return nil, false, err
 		}
 		for _, it := range resp.Data {
-			out = append(out, workItemFromV1(it))
+			out = append(out, workItemFromDTO(it))
 		}
 		if len(resp.Data) == 0 || page >= resp.Pagination.TotalPages {
 			return out, false, nil
@@ -182,48 +159,53 @@ func (c *Client) getWorkItems(workspaceID int) ([]WorkItem, bool, error) {
 
 func (c *Client) getComments(itemID int) ([]Comment, error) {
 	out := make([]Comment, 0, 64)
-	for page := 1; ; page++ {
-		var resp v1CommentsPage
-		path := fmt.Sprintf("/rest/api/v1/items/%d/comments?expand=author&page=%d&limit=100", itemID, page)
-		if err := c.doGet(path, authBearer, &resp); err != nil {
+	path := fmt.Sprintf("/rest/api/v2/items/%d/comments?page_size=100", itemID)
+	for {
+		var document dataDocument[struct {
+			Comments   []commentDTO `json:"comments"`
+			NextCursor string       `json:"next_cursor"`
+			HasMore    bool         `json:"has_more"`
+		}]
+		if err := c.doGet(path, &document); err != nil {
 			return nil, err
 		}
-		for _, c2 := range resp.Data {
-			out = append(out, commentFromV1(c2))
+		for _, c2 := range document.Data.Comments {
+			out = append(out, commentFromDTO(c2))
 		}
-		if len(resp.Data) == 0 || page >= resp.Pagination.TotalPages {
+		if !document.Data.HasMore || document.Data.NextCursor == "" || len(document.Data.Comments) == 0 {
 			return out, nil
 		}
+		path = fmt.Sprintf("/rest/api/v2/items/%d/comments?page_size=100&cursor=%s", itemID, document.Data.NextCursor)
 	}
 }
 
 func (c *Client) getStatuses(workspaceID int) ([]Status, error) {
 	// Workspace-scoped: /workspaces/{id}/statuses requires workspaces:read
 	// (the global /statuses route would need a separate statuses:read scope).
-	var raw []v1StatusSummary
-	if err := c.doGet(fmt.Sprintf("/rest/api/v1/workspaces/%d/statuses", workspaceID), authBearer, &raw); err != nil {
+	var doc dataDocument[[]statusDTO]
+	if err := c.doGet(fmt.Sprintf("/rest/api/v2/workspaces/%d/statuses", workspaceID), &doc); err != nil {
 		return nil, err
 	}
-	out := make([]Status, 0, len(raw))
-	for _, s := range raw {
+	out := make([]Status, 0, len(doc.Data))
+	for _, s := range doc.Data {
 		out = append(out, Status{
 			ID:            s.ID,
 			Name:          SanitizeLine(s.Name),
-			CategoryID:    s.CategoryID,
-			CategoryName:  SanitizeLine(s.CategoryName),
-			CategoryColor: SanitizeLine(s.CategoryColor),
+			CategoryID:    s.Category.ID,
+			CategoryName:  SanitizeLine(s.Category.Name),
+			CategoryColor: SanitizeLine(s.Category.Color),
 		})
 	}
 	return out, nil
 }
 
 func (c *Client) getPriorities() ([]Priority, error) {
-	var raw []v1PrioritySummary
-	if err := c.doGet("/rest/api/v1/priorities", authBearer, &raw); err != nil {
+	var doc dataDocument[[]priorityDTO]
+	if err := c.doGet("/rest/api/v2/priorities", &doc); err != nil {
 		return nil, err
 	}
-	out := make([]Priority, 0, len(raw))
-	for _, p := range raw {
+	out := make([]Priority, 0, len(doc.Data))
+	for _, p := range doc.Data {
 		out = append(out, Priority{
 			ID:    p.ID,
 			Name:  SanitizeLine(p.Name),
@@ -235,12 +217,12 @@ func (c *Client) getPriorities() ([]Priority, error) {
 }
 
 func (c *Client) getAssignableUsers(workspaceID int) ([]User, error) {
-	var raw []v1AssignableUser
-	if err := c.doGet(fmt.Sprintf("/rest/api/v1/workspaces/%d/assignable-users", workspaceID), authBearer, &raw); err != nil {
+	var doc dataDocument[[]assignableUserDTO]
+	if err := c.doGet(fmt.Sprintf("/rest/api/v2/workspaces/%d/assignable-users", workspaceID), &doc); err != nil {
 		return nil, err
 	}
-	out := make([]User, 0, len(raw))
-	for _, u := range raw {
+	out := make([]User, 0, len(doc.Data))
+	for _, u := range doc.Data {
 		out = append(out, User{
 			ID:       u.ID,
 			Username: SanitizeLine(u.Username),
@@ -251,33 +233,32 @@ func (c *Client) getAssignableUsers(workspaceID int) ([]User, error) {
 	return out, nil
 }
 
-// getWorkItem fetches a single item with expanded summaries — used for the
-// targeted refresh after a quick-set mutation.
+// getWorkItem fetches a single item for targeted refresh after a mutation.
 func (c *Client) getWorkItem(itemID int) (WorkItem, error) {
-	var raw v1ItemResponse
-	if err := c.doGet(fmt.Sprintf("/rest/api/v1/items/%d?expand=status,priority,assignee,creator", itemID), authBearer, &raw); err != nil {
+	var document dataDocument[itemDTO]
+	if err := c.doGet(fmt.Sprintf("/rest/api/v2/items/%d", itemID), &document); err != nil {
 		return WorkItem{}, err
 	}
-	return workItemFromV1(raw), nil
+	return workItemFromDTO(document.Data), nil
 }
 
-// setItemStatus drives the workflow transition endpoint (v1 PUT rejects
-// status_id so validator/condition rules stay in the hot path).
+// setItemStatus drives the workflow transition endpoint.
 func (c *Client) setItemStatus(itemID, statusID int) error {
 	body := map[string]any{"to_status_id": statusID}
-	return c.doMutate("POST", fmt.Sprintf("/rest/api/v1/items/%d/transition", itemID), authBearer, body, nil)
+	return c.doMutate("POST", fmt.Sprintf("/rest/api/v2/items/%d/transition", itemID), body, nil)
 }
 
-// setItemField PUTs a single field — v1 update semantics are partial
-// (pointer fields), so nothing else is clobbered.
+// setItemField merge-patches a single field.
 func (c *Client) setItemField(itemID int, field string, value any) error {
 	body := map[string]any{field: value}
-	return c.doMutate("PUT", fmt.Sprintf("/rest/api/v1/items/%d", itemID), authBearer, body, nil)
+	return c.doMutateWithContentType("PATCH", fmt.Sprintf("/rest/api/v2/items/%d", itemID), body, nil, "application/merge-patch+json")
 }
 
 func (c *Client) getAgentRuns(itemID int) ([]AgentRun, error) {
-	var raw []v1AgentRunResponse
-	if err := c.doGet(fmt.Sprintf("/rest/api/v1/items/%d/agent-runs?limit=10", itemID), authBearer, &raw); err != nil {
+	var document dataDocument[struct {
+		Runs []agentRunDTO `json:"runs"`
+	}]
+	if err := c.doGet(fmt.Sprintf("/rest/api/v2/items/%d/agent-runs?page_size=10", itemID), &document); err != nil {
 		return nil, err
 	}
 	fmtTime := func(t *time.Time) string {
@@ -286,8 +267,8 @@ func (c *Client) getAgentRuns(itemID int) ([]AgentRun, error) {
 		}
 		return t.Format(time.RFC3339)
 	}
-	out := make([]AgentRun, 0, len(raw))
-	for _, r := range raw {
+	out := make([]AgentRun, 0, len(document.Data.Runs))
+	for _, r := range document.Data.Runs {
 		out = append(out, AgentRun{
 			ID:        r.ID,
 			Status:    SanitizeLine(r.Status),
@@ -302,37 +283,49 @@ func (c *Client) getAgentRuns(itemID int) ([]AgentRun, error) {
 }
 
 func (c *Client) getPrefs() (Prefs, error) {
-	var p Prefs
-	if err := c.doGet("/rest/api/v1/users/me/tui-preferences", authBearer, &p); err != nil {
+	var document struct {
+		Data struct {
+			TUI Prefs `json:"tui"`
+		} `json:"data"`
+	}
+	if err := c.doGet("/rest/api/v2/users/me/preferences", &document); err != nil {
 		return Prefs{}, err
 	}
+	p := document.Data.TUI
 	p.Theme = SanitizeLine(p.Theme)
 	return p, nil
 }
 
+func (c *Client) getCurrentUserTimezone() (string, error) {
+	var doc dataDocument[currentUserDTO]
+	if err := c.doGet("/rest/api/v2/users/me", &doc); err != nil {
+		return "", err
+	}
+	return SanitizeLine(doc.Data.Timezone), nil
+}
+
 func (c *Client) putPrefs(p Prefs) error {
-	return c.doMutate("PUT", "/rest/api/v1/users/me/tui-preferences", authBearer, p, nil)
+	return c.doMutateWithContentType("PATCH", "/rest/api/v2/users/me/preferences", map[string]any{"tui": p}, nil, "application/merge-patch+json")
 }
 
 func (c *Client) getTimeProjects() ([]TimeProject, error) {
-	// Legacy /api/* + session auth — v1 doesn't yet expose /time/projects.
-	var projects []TimeProject
-	if err := c.doGet("/api/time/projects", authSession, &projects); err != nil {
+	var document dataDocument[[]TimeProject]
+	if err := c.doGet("/rest/api/v2/time/projects?status=Active", &document); err != nil {
 		return nil, err
 	}
+	projects := document.Data
 	for i := range projects {
 		projects[i].Name = SanitizeLine(projects[i].Name)
 		projects[i].Description = SanitizeStringPtr(projects[i].Description, false)
 		projects[i].CustomerName = SanitizeStringPtr(projects[i].CustomerName, true)
+		projects[i].Status = SanitizeLine(projects[i].Status)
 	}
 	return projects, nil
 }
 
-// updateWorkItem updates title/description/priority via PUT, then if statusID
+// updateWorkItem updates title/description/priority via PATCH, then if statusID
 // changed, drives the workflow transition through POST /items/{id}/transition.
-// v1's ItemUpdateRequest deliberately rejects status_id to keep workflow
-// validator/condition rules in the hot path.
-func (c *Client) updateWorkItem(itemID int, title, description string, statusID, priorityID *int) error {
+func (c *Client) updateWorkItem(itemID int, title, description string, statusID, priorityID *int, assigneeSet bool, assigneeID int) error {
 	body := map[string]any{
 		"title":       title,
 		"description": description,
@@ -340,12 +333,19 @@ func (c *Client) updateWorkItem(itemID int, title, description string, statusID,
 	if priorityID != nil {
 		body["priority_id"] = *priorityID
 	}
-	if err := c.doMutate("PUT", fmt.Sprintf("/rest/api/v1/items/%d", itemID), authBearer, body, nil); err != nil {
+	if assigneeSet {
+		if assigneeID > 0 {
+			body["assignee_id"] = assigneeID
+		} else {
+			body["assignee_id"] = nil
+		}
+	}
+	if err := c.doMutateWithContentType("PATCH", fmt.Sprintf("/rest/api/v2/items/%d", itemID), body, nil, "application/merge-patch+json"); err != nil {
 		return err
 	}
 	if statusID != nil {
 		transition := map[string]any{"to_status_id": *statusID}
-		if err := c.doMutate("POST", fmt.Sprintf("/rest/api/v1/items/%d/transition", itemID), authBearer, transition, nil); err != nil {
+		if err := c.doMutate("POST", fmt.Sprintf("/rest/api/v2/items/%d/transition", itemID), transition, nil); err != nil {
 			return fmt.Errorf("status transition: %w", err)
 		}
 	}
@@ -361,25 +361,23 @@ func (c *Client) createWorkItem(workspaceID int, title, description string, prio
 	if priorityID != nil {
 		body["priority_id"] = *priorityID
 	}
-	return c.doMutate("POST", "/rest/api/v1/items", authBearer, body, nil)
+	return c.doMutate("POST", "/rest/api/v2/items", body, nil)
 }
 
 func (c *Client) createComment(itemID int, content string) error {
-	// v1's request shape drops the author_id field — the user is identified
-	// from the bearer token. Less to forge.
 	body := map[string]any{"content": content}
-	return c.doMutate("POST", fmt.Sprintf("/rest/api/v1/items/%d/comments", itemID), authBearer, body, nil)
+	return c.doMutate("POST", fmt.Sprintf("/rest/api/v2/items/%d/comments", itemID), body, nil)
 }
 
-func (c *Client) createTimeLog(itemID, projectID int, description, duration, date, startTime string) error {
-	// Legacy /api/* + session auth — v1 doesn't yet expose /time/worklogs.
-	data := CreateTimeLogRequest{
-		ProjectID:   projectID,
-		ItemID:      &itemID,
-		Description: description,
-		Date:        date,
-		StartTime:   startTime,
-		Duration:    duration,
+func (c *Client) createTimeLog(itemID, projectID int, description, duration, date, startTime, timezone string) error {
+	data := map[string]any{
+		"project_id":  projectID,
+		"item_id":     itemID,
+		"description": description,
+		"date":        date,
+		"start_time":  startTime,
+		"duration":    duration,
+		"timezone":    timezone,
 	}
-	return c.doMutate("POST", "/api/time/worklogs", authSession, data, nil)
+	return c.doMutate("POST", "/rest/api/v2/time/worklogs", data, nil)
 }

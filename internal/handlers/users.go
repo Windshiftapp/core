@@ -101,88 +101,6 @@ func NewUserHandler(
 	}
 }
 
-func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
-
-	// Any authenticated user can list users (needed for issue assignment, mentions, etc.)
-	// System admins see all users with full details, regular users see only active users
-	// with limited fields.
-	if !isAdmin {
-		users, err := h.userSvc.ListAll()
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		// Strip sensitive fields for non-admins
-		for i := range users {
-			users[i].Email = ""
-			users[i].Timezone = ""
-			users[i].Language = ""
-		}
-		respondJSONOK(w, users)
-		return
-	}
-
-	users, err := h.repo.ListAdmin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	respondJSONOK(w, users)
-}
-
-func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	isOwnProfile := currentUser.ID == id
-	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
-	hasListPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionUserList)
-
-	if !isOwnProfile && !isAdmin && !hasListPerm {
-		respondForbidden(w, r)
-		return
-	}
-
-	user, err := h.repo.GetByID(id)
-	if errors.Is(err, repository.ErrNotFound) {
-		respondNotFound(w, r, "user")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Non-admin users with user.list can only see active users (not their own profile)
-	if !isOwnProfile && !isAdmin && !user.IsActive {
-		respondNotFound(w, r, "user")
-		return
-	}
-
-	// Limit returned fields when a non-admin views someone else's profile.
-	if !isOwnProfile && !isAdmin {
-		user.Email = ""
-		user.RequiresPasswordReset = false
-		user.Timezone = ""
-		user.Language = ""
-	}
-
-	respondJSONOK(w, user)
-}
-
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[CreateUserRequest](w, r)
 	if !ok {
@@ -367,146 +285,6 @@ func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	req, ok := decodeJSON[UpdateUserRequest](w, r)
-	if !ok {
-		return
-	}
-	sanitize.ApplyAll(
-		sanitize.Pair{Target: &req.FirstName, Policy: sanitize.PlainTextField},
-		sanitize.Pair{Target: &req.LastName, Policy: sanitize.PlainTextField},
-		sanitize.Pair{Target: &req.Username, Policy: sanitize.ShortIdentifier},
-		sanitize.Pair{Target: &req.Timezone, Policy: sanitize.ShortIdentifier},
-		sanitize.Pair{Target: &req.Language, Policy: sanitize.ShortIdentifier},
-	)
-
-	if err := utils.Validate(req); err != nil {
-		respondValidationError(w, r, err.Error())
-		return
-	}
-
-	old, err := h.repo.GetUpdateProfileSnapshot(id)
-	if errors.Is(err, repository.ErrNotFound) {
-		respondNotFound(w, r, "user")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if old.SCIMManaged {
-		respondForbidden(w, r)
-		return
-	}
-
-	timezone := req.Timezone
-	if timezone == "" && old.Timezone.Valid {
-		timezone = old.Timezone.String
-	}
-	if timezone == "" {
-		timezone = "UTC"
-	}
-
-	language := req.Language
-	if language == "" && old.Language.Valid {
-		language = old.Language.String
-	}
-	if language == "" {
-		language = "en"
-	}
-
-	if exists, err := h.repo.EmailExists(req.Email, id); err != nil {
-		respondInternalError(w, r, err)
-		return
-	} else if exists {
-		respondConflict(w, r, "Email already exists")
-		return
-	}
-	if exists, err := h.repo.UsernameExists(req.Username, id); err != nil {
-		respondInternalError(w, r, err)
-		return
-	} else if exists {
-		respondConflict(w, r, "Username already exists")
-		return
-	}
-
-	if err := h.repo.UpdateProfile(id, repository.UpdateProfileParams{
-		Email:     req.Email,
-		Username:  req.Username,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		AvatarURL: req.AvatarURL,
-		Timezone:  timezone,
-		Language:  language,
-	}); err != nil {
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			respondConflict(w, r, "Email or username already exists")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	user, err := h.repo.GetByID(id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	user.IsActive = old.IsActive // Preserve — Update doesn't toggle activation.
-
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		changes := make(map[string]any)
-		if old.Email != req.Email {
-			changes["email"] = map[string]string{"old": old.Email, "new": req.Email}
-		}
-		if old.Username != req.Username {
-			changes["username"] = map[string]string{"old": old.Username, "new": req.Username}
-		}
-		if old.FirstName != req.FirstName {
-			changes["first_name"] = map[string]string{"old": old.FirstName, "new": req.FirstName}
-		}
-		if old.LastName != req.LastName {
-			changes["last_name"] = map[string]string{"old": old.LastName, "new": req.LastName}
-		}
-		oldAvatarURL := ""
-		if old.AvatarURL.Valid {
-			oldAvatarURL = old.AvatarURL.String
-		}
-		if oldAvatarURL != req.AvatarURL {
-			changes["avatar_url"] = map[string]string{"old": oldAvatarURL, "new": req.AvatarURL}
-		}
-		oldTz := "UTC"
-		if old.Timezone.Valid {
-			oldTz = old.Timezone.String
-		}
-		if oldTz != timezone {
-			changes["timezone"] = map[string]string{"old": oldTz, "new": timezone}
-		}
-		oldLang := "en"
-		if old.Language.Valid {
-			oldLang = old.Language.String
-		}
-		if oldLang != language {
-			changes["language"] = map[string]string{"old": oldLang, "new": language}
-		}
-
-		h.auditor.LogWithDetails(r, currentUser,
-			logger.ActionUserUpdate, logger.ResourceUser,
-			&user.ID, user.Username, changes,
-		)
-	}
-
-	respondJSONOK(w, user)
-}
-
-// UpdateAvatar updates only the avatar_url field for a user
 func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -666,7 +444,17 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Audit before anonymization so we capture the original details.
+	if err := h.offboardUser(id); err != nil {
+		if errors.Is(err, services.ErrUserOffboardingHasProtectedIntegrationLinks) {
+			respondConflict(w, r, "Cannot offboard user while their personal workspace contains protected integration links")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Audit after successful offboarding so a failed or blocked operation is
+	// never recorded as a successful deletion.
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
 			logger.ActionUserDelete, logger.ResourceUser,
@@ -677,11 +465,6 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 				"last_name":  deleted.LastName,
 			},
 		)
-	}
-
-	if err := h.offboardUser(id); err != nil {
-		respondInternalError(w, r, err)
-		return
 	}
 	h.invalidateUserSessions(id)
 
@@ -749,6 +532,13 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Password material on an offboarded account is meaningless state; refuse
+	// instead of writing credentials onto a retired row.
+	if target.Offboarded {
+		respondConflict(w, r, "User has been offboarded and cannot be reactivated")
+		return
+	}
+
 	if err := h.repo.SetPassword(id, string(hashedBytes), requiresReset); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -766,39 +556,6 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	)
 
 	respondJSONOK(w, response)
-}
-
-// GetAssignable returns the shared mention and assignment roster. Every user
-// can view the workspace; agents also have a ready binding there.
-func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
-	if !ok {
-		return
-	}
-	canView, err := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "workspace")
-		return
-	}
-	if h.workspaceUsers == nil {
-		respondInternalError(w, r, errors.New("workspace user resolver is not configured"))
-		return
-	}
-	users, err := h.workspaceUsers.List(r.Context(), workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	respondJSONOK(w, users)
 }
 
 // GetAgentOwner returns the owner attribution for an agent user. Gated on
@@ -870,6 +627,13 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 
 	if target.IsActive {
 		respondValidationError(w, r, "User is already active")
+		return
+	}
+
+	// Offboarding is irreversible; activation must never resurrect the
+	// anonymized account.
+	if target.Offboarded {
+		respondConflict(w, r, "User has been offboarded and cannot be reactivated")
 		return
 	}
 

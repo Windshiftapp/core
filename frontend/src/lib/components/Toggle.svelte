@@ -40,7 +40,7 @@
       aria-checked={checked}
       aria-label={label}
       {disabled}
-      class="relative inline-flex items-center shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ds-border-focused)]
+      class="relative inline-flex items-center shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ctx-border-focused,var(--ds-border-focused))]
              disabled:cursor-not-allowed {currentSize.button} {className}"
       style="background-color: {checked ? 'var(--ds-interactive)' : 'var(--ds-background-neutral)'};"
       onclick={handleClick}
@@ -49,7 +49,7 @@
         class="inline-block transform rounded-full bg-white transition-transform shadow-sm {currentSize.knob} {checked ? currentSize.translateOn : currentSize.translateOff}"
       ></span>
     </button>
-    <span class="text-sm text-[var(--ds-text)]">{label}</span>
+    <span class="text-sm" style="color: var(--ctx-text, var(--ds-text));">{label}</span>
   </label>
 {:else}
   <button
@@ -60,7 +60,7 @@
     aria-checked={checked}
     aria-label={ariaLabel || 'Toggle'}
     {disabled}
-    class="relative inline-flex items-center shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ds-border-focused)]
+    class="relative inline-flex items-center shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ctx-border-focused,var(--ds-border-focused))]
            disabled:opacity-50 disabled:cursor-not-allowed {currentSize.button} {className}"
     style="background-color: {checked ? 'var(--ds-interactive)' : 'var(--ds-background-neutral)'};"
     onclick={handleClick}

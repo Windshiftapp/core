@@ -21,15 +21,21 @@ type WorkspaceHandler struct {
 	db               database.Database
 	workspaceService *services.WorkspaceService
 	itemCRUD         *services.ItemCRUDService
+	cacheInvalidator *services.AuthorizationCacheInvalidator
 }
 
 // NewWorkspaceHandler creates a new workspace handler
-func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService) *WorkspaceHandler {
+func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, invalidators ...*services.AuthorizationCacheInvalidator) *WorkspaceHandler {
+	cacheInvalidator := services.NewAuthorizationCacheInvalidator(permissionService, nil)
+	if len(invalidators) > 0 && invalidators[0] != nil {
+		cacheInvalidator = invalidators[0]
+	}
 	return &WorkspaceHandler{
 		BaseHandler:      NewBaseHandler(db, permissionService),
 		db:               db,
 		workspaceService: services.NewWorkspaceServiceWithAccess(db, authz.New(db, permissionService)),
 		itemCRUD:         services.NewItemCRUDService(db),
+		cacheInvalidator: cacheInvalidator,
 	}
 }
 
@@ -43,6 +49,7 @@ type WorkspaceResponse struct {
 	Key                     string   `json:"key"`
 	Description             string   `json:"description"`
 	Active                  bool     `json:"active"`
+	TimeProjectID           *int     `json:"time_project_id,omitempty"`
 	IsPersonal              bool     `json:"is_personal"`
 	IsTemplate              bool     `json:"is_template"`
 	InternalCommentsEnabled bool     `json:"internal_comments_enabled"`
@@ -96,6 +103,7 @@ func toWorkspaceResponse(ws *models.Workspace) WorkspaceResponse {
 		Key:                     ws.Key,
 		Description:             ws.Description,
 		Active:                  ws.Active,
+		TimeProjectID:           ws.TimeProjectID,
 		IsPersonal:              ws.IsPersonal,
 		IsTemplate:              ws.IsTemplate,
 		InternalCommentsEnabled: ws.InternalCommentsEnabled,
@@ -263,9 +271,13 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.PermissionService != nil {
-		h.PermissionService.InvalidateActiveWorkspaceCache()
-		h.PermissionService.OnEveryoneAccessChanged()
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		ResetPermissions:        true,
+		ActiveWorkspacesChanged: true,
+		WorkspaceKeysChanged:    true,
+	}); err != nil {
+		h.RespondInternalError(w, r)
+		return
 	}
 
 	if req.TemplateWorkspaceID != nil {
@@ -331,6 +343,12 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: req.Color, Policy: sanitize.ShortIdentifier, Label: "Color"},
 	)
 
+	before, err := h.workspaceService.GetByID(wsID)
+	if err != nil {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return
+	}
+
 	ws, err := h.workspaceService.Update(services.UpdateWorkspaceParams{
 		ID:          wsID,
 		Name:        req.Name,
@@ -352,6 +370,13 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.RespondInternalError(w, r)
 		return
 	}
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		ResetPermissions:        before.Active != ws.Active,
+		ActiveWorkspacesChanged: before.Active != ws.Active,
+	}); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
 
 	h.Auditor.Log(r, user, logger.ActionWorkspaceUpdate, logger.ResourceWorkspace, &ws.ID, ws.Name)
 	resp := toWorkspaceResponse(ws)
@@ -370,6 +395,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  handlers.ErrorResponse
 // @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the workspaces:delete scope"
 // @Failure      404  {object}  handlers.ErrorResponse  "Workspace not found or caller cannot delete it"
+// @Failure      409  {object}  handlers.ErrorResponse  "Workspace still has externally linked items"
 // @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id} [delete]
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -397,6 +423,22 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 			return
 		}
+		if errors.Is(err, services.ErrWorkspaceHasProtectedIntegrationLinks) {
+			h.RespondError(w, r, restapi.NewAPIError(
+				http.StatusConflict,
+				restapi.ErrCodeConflict,
+				"Remove all protected integration links from this workspace before deleting it.",
+			))
+			return
+		}
+		h.RespondInternalError(w, r)
+		return
+	}
+	if err := h.cacheInvalidator.Apply(services.AuthorizationInvalidation{
+		ResetPermissions:        true,
+		ActiveWorkspacesChanged: true,
+		WorkspaceKeysChanged:    true,
+	}); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}

@@ -297,6 +297,7 @@
 
   function getAssignmentActionItems(assignment) {
     return assignment.roles.map(role => ({
+      testid: `workspace-member-remove-role-${assignment.row_key}-${role.role_id}`,
       title: t('workspaceMembers.removeRoleAction', { role: getRoleName(assignmentRole(role)) }),
       icon: Trash2,
       onClick: () => assignment.type === 'group'

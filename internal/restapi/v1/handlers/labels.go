@@ -5,12 +5,10 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
-	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
-	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
 
@@ -19,15 +17,15 @@ import (
 // context for catalog access.
 type LabelHandler struct {
 	BaseHandler
-	repo     *repository.LabelRepository
-	itemRepo *repository.ItemRepository
+	application *services.LabelApplicationService
+	itemRepo    *repository.ItemRepository
 }
 
 // NewLabelHandler constructs a v1 LabelHandler.
 func NewLabelHandler(db database.Database, permissionService *services.PermissionService) *LabelHandler {
 	return &LabelHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
-		repo:        repository.NewLabelRepository(db),
+		application: services.NewLabelApplicationService(db),
 		itemRepo:    repository.NewItemRepository(db),
 	}
 }
@@ -58,8 +56,6 @@ type labelListResponse struct {
 	Items []models.Label `json:"items"`
 }
 
-const defaultLabelColor = "#3B82F6"
-
 // --- global catalog with workspace authorization context ---
 
 // ListForWorkspace handles GET /rest/api/v1/workspaces/{id}/labels
@@ -82,7 +78,7 @@ func (h *LabelHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	labels, err := h.repo.ListAll()
+	labels, err := h.application.List()
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
@@ -117,42 +113,10 @@ func (h *LabelHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request)
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	name := sanitize.ShortIdentifier.Sanitize(req.Name)
-	if !h.ValidateRequiredString(w, r, name, "name") {
-		return
-	}
-	color := req.Color
-	if color == "" {
-		color = defaultLabelColor
-	}
-
-	exists, err := h.repo.NameExists(name, 0)
+	label, err := h.application.Create(h.AuditActor(r, middleware.GetUser(r.Context())), req.Name, req.Color)
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondCatalogMutationError(w, r, err)
 		return
-	}
-	if exists {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a label with this name already exists"))
-		return
-	}
-
-	id, _, err := h.repo.Create(name, color)
-	if err != nil {
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a label with this name already exists"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	label, err := h.repo.GetByID(int(id))
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		labelID := label.ID
-		h.Auditor.Log(r, user, logger.ActionLabelCreate, logger.ResourceLabel, &labelID, label.Name)
 	}
 	h.RespondCreated(w, label)
 }
@@ -177,7 +141,7 @@ func (h *LabelHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	label, err := h.repo.GetByID(labelID)
+	label, err := h.application.Get(labelID)
 	if errors.Is(err, repository.ErrNotFound) {
 		h.RespondNotFound(w, r)
 		return
@@ -213,64 +177,17 @@ func (h *LabelHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	existing, err := h.repo.GetByID(labelID)
-	if errors.Is(err, repository.ErrNotFound) {
-		h.RespondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-
 	var req labelUpdateRequest
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-
-	name := existing.Name
-	if req.Name != nil {
-		name = sanitize.ShortIdentifier.Sanitize(*req.Name)
-		if name == "" {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
-			return
-		}
-	}
-	color := existing.Color
-	if req.Color != nil {
-		color = *req.Color
-		if color == "" {
-			color = defaultLabelColor
-		}
-	}
-
-	if name != existing.Name {
-		exists, eerr := h.repo.NameExists(name, labelID)
-		if eerr != nil {
-			h.RespondInternalError(w, r)
-			return
-		}
-		if exists {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a label with this name already exists"))
-			return
-		}
-	}
-
-	if err := h.repo.Update(labelID, name, color); err != nil {
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "a label with this name already exists"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	updated, err := h.repo.GetByID(labelID)
+	user := middleware.GetUser(r.Context())
+	updated, err := h.application.Update(h.AuditActor(r, user), labelID, services.LabelUpdate{
+		Name: req.Name, Color: req.Color,
+	})
 	if err != nil {
-		h.RespondInternalError(w, r)
+		h.respondCatalogMutationError(w, r, err)
 		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		h.Auditor.Log(r, user, logger.ActionLabelUpdate, logger.ResourceLabel, &labelID, updated.Name)
 	}
 	h.RespondOK(w, updated)
 }
@@ -295,21 +212,10 @@ func (h *LabelHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	existing, err := h.repo.GetByID(labelID)
-	if errors.Is(err, repository.ErrNotFound) {
-		h.RespondNotFound(w, r)
+	user := middleware.GetUser(r.Context())
+	if err := h.application.Delete(h.AuditActor(r, user), labelID); err != nil {
+		h.respondCatalogMutationError(w, r, err)
 		return
-	}
-	if err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	if err := h.repo.Delete(labelID); err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		h.Auditor.Log(r, user, logger.ActionLabelDelete, logger.ResourceLabel, &labelID, existing.Name)
 	}
 	h.RespondNoContent(w)
 }
@@ -364,14 +270,12 @@ func (h *LabelHandler) SetForItem(w http.ResponseWriter, r *http.Request) {
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	if !h.labelsExist(w, r, req.LabelIDs) {
+	labels, err := h.application.SetForItem(item.ID, req.LabelIDs)
+	if err != nil {
+		h.respondAssignmentError(w, r, err)
 		return
 	}
-	if err := h.repo.ReplaceItemLabels(item.ID, req.LabelIDs); err != nil {
-		h.RespondInternalError(w, r)
-		return
-	}
-	h.respondItemLabels(w, r, item.ID)
+	h.RespondOK(w, labelListResponse{Items: labels})
 }
 
 // AddToItem handles POST /rest/api/v1/items/{id}/labels
@@ -400,22 +304,12 @@ func (h *LabelHandler) AddToItem(w http.ResponseWriter, r *http.Request) {
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
-	if req.LabelID == 0 {
-		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "label_id is required"))
+	labels, err := h.application.AddToItem(item.ID, req.LabelID)
+	if err != nil {
+		h.respondAssignmentError(w, r, err)
 		return
 	}
-	if !h.labelsExist(w, r, []int{req.LabelID}) {
-		return
-	}
-	if err := h.repo.AddItemLabel(item.ID, req.LabelID); err != nil {
-		if errors.Is(err, repository.ErrDuplicateEntry) {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, "label is already attached to this item"))
-			return
-		}
-		h.RespondInternalError(w, r)
-		return
-	}
-	h.respondItemLabels(w, r, item.ID)
+	h.RespondOK(w, labelListResponse{Items: labels})
 }
 
 // RemoveFromItem handles DELETE /rest/api/v1/items/{id}/labels/{labelId}
@@ -441,7 +335,7 @@ func (h *LabelHandler) RemoveFromItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.repo.RemoveItemLabel(item.ID, labelID); err != nil {
+	if err := h.application.RemoveFromItem(item.ID, labelID); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
@@ -503,27 +397,41 @@ func (h *LabelHandler) resolveItemAccess(w http.ResponseWriter, r *http.Request,
 	return item, true
 }
 
-// labelsExist hides unknown global label IDs as 404.
-func (h *LabelHandler) labelsExist(w http.ResponseWriter, r *http.Request, labelIDs []int) bool {
-	for _, id := range labelIDs {
-		_, err := h.repo.GetByID(id)
-		if errors.Is(err, repository.ErrNotFound) {
-			h.RespondNotFound(w, r)
-			return false
-		}
-		if err != nil {
-			h.RespondInternalError(w, r)
-			return false
-		}
-	}
-	return true
-}
-
 func (h *LabelHandler) respondItemLabels(w http.ResponseWriter, r *http.Request, itemID int) {
-	labels, err := h.repo.ListForItem(itemID)
+	labels, err := h.application.ListForItem(itemID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
 	h.RespondOK(w, labelListResponse{Items: labels})
+}
+
+func (h *LabelHandler) respondCatalogMutationError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, repository.ErrNotFound):
+		h.RespondNotFound(w, r)
+	case errors.Is(err, repository.ErrDuplicateEntry):
+		h.RespondError(w, r, restapi.NewAPIError(
+			http.StatusConflict, restapi.ErrCodeValidationFailed, "a label with this name already exists",
+		))
+	case errors.Is(err, services.ErrLabelNameRequired):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	default:
+		h.RespondInternalError(w, r)
+	}
+}
+
+func (h *LabelHandler) respondAssignmentError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, repository.ErrNotFound):
+		h.RespondNotFound(w, r)
+	case errors.Is(err, repository.ErrDuplicateEntry):
+		h.RespondError(w, r, restapi.NewAPIError(
+			http.StatusConflict, restapi.ErrCodeValidationFailed, "label is already attached to this item",
+		))
+	case errors.Is(err, services.ErrLabelIDRequired):
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "label_id is required"))
+	default:
+		h.RespondInternalError(w, r)
+	}
 }

@@ -2,6 +2,7 @@ package cql
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -68,6 +69,15 @@ func (e *Evaluator) EvaluateToSQLAt(cqlQuery string, evaluationTime time.Time) (
 type AssetEvaluator struct {
 	sqlGenerator *SQLGenerator
 	workspaceMap map[string]int // For linkedOf() inner queries against items
+}
+
+// WithItemWorkspaceScope restricts all inner item queries, including nested
+// functions. An empty scope permits no items. The original evaluator is unchanged.
+func (e *AssetEvaluator) WithItemWorkspaceScope(workspaceIDs []int) *AssetEvaluator {
+	local := *e.sqlGenerator
+	local.itemWorkspaceScoped = true
+	local.itemWorkspaceScope = slices.Clone(workspaceIDs)
+	return &AssetEvaluator{sqlGenerator: &local, workspaceMap: e.workspaceMap}
 }
 
 // NewAssetEvaluator creates a new QL evaluator for assets. Supported call

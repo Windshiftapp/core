@@ -1,5 +1,27 @@
 import { api } from '../../api.js';
 
+function collectionPagination(pagination) {
+  if (!pagination) return null;
+  // Store continuations use limit; v2 responses name the effective size page_size.
+  return { ...pagination, limit: pagination.page_size };
+}
+
+// Use the authorized item query without view filters, fetching only one summary.
+export async function fetchCollectionTotal(workspaceId, collectionId) {
+  const scope = collectionId ? { collection_id: collectionId } : { workspace_id: workspaceId };
+  const response = await api.items.getAll({
+    ...scope,
+    page: 1,
+    limit: 1,
+    omit_descriptions: true,
+    include_watermark: true,
+  });
+  return {
+    total: response?.pagination?.total_items ?? null,
+    watermark: response?.meta?.watermark ?? 0,
+  };
+}
+
 /**
  * Fetches items for a collection (or all workspace items if no collection).
  * Handles QL query resolution and correct API parameter naming.
@@ -41,10 +63,10 @@ export async function fetchCollectionItems(
   }
 
   const response = await api.items.getAll(filters);
-  const items = response?.items ?? (Array.isArray(response) ? response : []);
-  const pagination = response?.pagination ?? null;
-  const sortableFields = response?.sortable_fields ?? [];
-  const watermark = response?.watermark ?? 0;
+  const items = response?.data ?? [];
+  const pagination = collectionPagination(response?.pagination);
+  const sortableFields = response?.meta?.sortable_fields ?? [];
+  const watermark = response?.meta?.watermark ?? 0;
 
   const publicSlug =
     collection?.is_public && collection?.public_slug ? collection.public_slug : null;
@@ -79,9 +101,9 @@ export async function fetchCollectionBacklog(
     omit_descriptions: true,
     include_watermark: true,
   });
-  const items = response?.items ?? (Array.isArray(response) ? response : []);
-  const pagination = response?.pagination ?? null;
-  const watermark = response?.watermark ?? 0;
+  const items = response?.data ?? [];
+  const pagination = collectionPagination(response?.pagination);
+  const watermark = response?.meta?.watermark ?? 0;
   return { items, collectionName, pagination, watermark };
 }
 
@@ -145,7 +167,7 @@ export async function checkItemVisibility(itemId, filters) {
     const response = await api.items.getAll(filtersWithId);
 
     // Handle paginated response
-    const items = response?.items || response || [];
+    const items = response?.data ?? [];
 
     // Check if the item is in the results
     return items.some((item) => item.id === itemId);

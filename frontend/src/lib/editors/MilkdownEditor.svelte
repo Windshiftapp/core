@@ -321,19 +321,25 @@
             };
           }
 
-          const formData = new FormData();
-          formData.append('file', image);
-
-          if (effectiveEntityId && effectiveEntityType) {
-            formData.append('entity_id', effectiveEntityId.toString());
-            formData.append('entity_type', effectiveEntityType);
+          let result;
+          if (!customUploadFn && effectiveEntityType === 'item' && effectiveEntityId) {
+            const attachment = await api.attachments.uploadToItem(effectiveEntityId, image);
+            result = { success: true, attachment };
+          } else {
+            const formData = new FormData();
+            formData.append('file', image);
+            if (effectiveEntityId && effectiveEntityType) {
+              formData.append('entity_id', effectiveEntityId.toString());
+              formData.append('entity_type', effectiveEntityType);
+            }
+            result = customUploadFn
+              ? await customUploadFn(formData)
+              : await api.attachments.upload(formData);
           }
-
-          const result = customUploadFn
-            ? await customUploadFn(formData)
-            : await api.attachments.upload(formData);
           if (result.success && result.attachment) {
-            const src = `${downloadUrlBase}/${result.attachment.id}/download`;
+            const src = downloadUrlBase === '/api/attachments'
+              ? api.attachments.getDownloadUrl(result.attachment.id)
+              : `${downloadUrlBase}/${result.attachment.id}/download`;
             const node = schema?.nodes?.image?.createAndFill({
               src,
               alt: image.name,

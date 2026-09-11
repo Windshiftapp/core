@@ -1,6 +1,9 @@
 package core
 
 import (
+	"sync/atomic"
+	"time"
+
 	"windshift/internal/tui/data"
 	"windshift/internal/tui/styles"
 )
@@ -17,9 +20,10 @@ type Ctx struct {
 	// Theme is the active theme name.
 	Theme string
 
-	Client *data.Client
-	User   *data.UserInfo
-	Keys   KeyMap
+	Client            *data.Client
+	User              *data.UserInfo
+	UserTimezoneKnown bool
+	Keys              KeyMap
 
 	// Prefs is the canonical current preference state. Mutation sites
 	// (theme cycle, split adjust, workspace entry) update it and fire
@@ -35,4 +39,16 @@ type Ctx struct {
 	// center against the whole terminal.
 	Width  int
 	Height int
+
+	Clock      func() time.Time
+	requestSeq atomic.Uint64
+}
+
+func (c *Ctx) NextRequestID() uint64 { return c.requestSeq.Add(1) }
+
+func (c *Ctx) CurrentTime() time.Time {
+	if c.Clock != nil {
+		return c.Clock()
+	}
+	return time.Now()
 }

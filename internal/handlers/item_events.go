@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -42,23 +43,31 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	itemRepo := repository.NewItemRepository(h.db)
-	if !CheckItemPermission(w, r, itemRepo, h.permissionService, itemID, models.PermissionItemView) {
+	workspaceID, err := itemRepo.GetWorkspaceID(itemID)
+	if err != nil {
+		respondNotFound(w, r, "Item")
+		return
+	}
+	allowed, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+	if err != nil || !allowed {
+		respondNotFound(w, r, "Item")
 		return
 	}
 
-	// authorized re-evaluates item.view for this user. The stream is authorized
-	// at connect AND re-checked on every heartbeat (below), so a mid-stream
-	// permission revocation — or the item's deletion — stops delivery within one
-	// heartbeat instead of continuing to leak changes (WI-484). The check is a
-	// brief query, not a held connection, so the idle stream still holds no DB
-	// connection between heartbeats.
-	authorized := func() bool {
-		workspaceID, err := itemRepo.GetWorkspaceID(itemID)
-		if err != nil {
-			return false // item no longer exists
+	// Recheck current ownership before writes. Deletion events retain the final
+	// workspace because their item row is already gone, even after a move.
+	authorized := func(deletedWorkspaceID int) bool {
+		currentWorkspaceID, err := itemRepo.GetWorkspaceID(itemID)
+		if deletedWorkspaceID > 0 && errors.Is(err, repository.ErrNotFound) {
+			currentWorkspaceID = deletedWorkspaceID
+		} else if err != nil {
+			return false
 		}
-		ok, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
-		return err == nil && ok
+		ok, err := h.permissionService.HasWorkspacePermission(user.ID, currentWorkspaceID, models.PermissionItemView)
+		if err != nil || !ok {
+			return false
+		}
+		return true
 	}
 
 	flusher, ok := w.(http.Flusher)
@@ -96,7 +105,19 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case ev := <-sub.Events():
+			deleted := ev.Kind == services.ItemChangeDeleted
+			deletedWorkspaceID := 0
+			if deleted {
+				deletedWorkspaceID = ev.WorkspaceID
+			}
+			if !authorized(deletedWorkspaceID) {
+				return
+			}
 			writeSSEEvent(w, string(ev.Kind), ev.ItemID)
+			if deleted {
+				flusher.Flush()
+				return
+			}
 			if sub.TakeStale() {
 				// A later event was dropped (buffer overflow); tell the client to
 				// reconcile fully so nothing is missed.
@@ -104,9 +125,8 @@ func (h *ItemHandler) Events(w http.ResponseWriter, r *http.Request) {
 			}
 			flusher.Flush()
 		case <-heartbeat.C:
-			// Re-authorize before the next heartbeat write: stop streaming if the
-			// user lost item.view (or the item was deleted) since connecting.
-			if !authorized() {
+			// Re-authorize before the next heartbeat write.
+			if !authorized(0) {
 				return
 			}
 			if sub.TakeStale() {

@@ -15,7 +15,7 @@ dark_mode: 'no'
 # Four requests per refresh, exposed as IDX_0..IDX_3:
 #   IDX_0 -> the token owner
 #   IDX_1 -> the open items the summary is computed from
-#   IDX_2 -> count of items the owner closed today (pagination.total only)
+#   IDX_2 -> count of items the owner closed today (pagination.total_items only)
 #   IDX_3 -> everything that moved today, across every workspace the token sees
 #
 # The date-dependent queries are pre-URL-encoded so that only the date itself
@@ -27,10 +27,10 @@ dark_mode: 'no'
 # one in https:// is never touched. (`remove_last: '/'` is NOT a safe
 # substitute — with no trailing slash it eats the slash in the scheme.)
 polling_url: |-
-  {{ windshift_url | strip | append: '/rest/api/v1/users/me' | replace: '//rest/', '/rest/' }}
-  {{ windshift_url | strip | append: '/rest/api/v1/search/items' | replace: '//rest/', '/rest/' }}?ql={{ scope_query | strip | url_encode }}&limit=100&sort=updated_at&order=desc
-  {{ windshift_url | strip | append: '/rest/api/v1/search/items' | replace: '//rest/', '/rest/' }}?ql=assignee%20%3D%20currentUser()%20AND%20status%20%3D%20Done%20AND%20updated%20%3E%3D%20%22{{ 'now' | date: '%Y-%m-%d' }}%22&limit=1
-  {{ windshift_url | strip | append: '/rest/api/v1/search/items' | replace: '//rest/', '/rest/' }}?ql=updated%20%3E%3D%20%22{{ 'now' | date: '%Y-%m-%d' }}%22&limit=6&sort=updated_at&order=desc
+  {{ windshift_url | strip | append: '/rest/api/v2/users/me' | replace: '//rest/', '/rest/' }}
+  {{ windshift_url | strip | append: '/rest/api/v2/items' | replace: '//rest/', '/rest/' }}?ql={{ scope_query | strip | url_encode }}&page_size=100&sort=-updated_at
+  {{ windshift_url | strip | append: '/rest/api/v2/items' | replace: '//rest/', '/rest/' }}?ql=assignee%20%3D%20currentUser()%20AND%20status%20%3D%20Done%20AND%20updated%20%3E%3D%20%22{{ 'now' | date: '%Y-%m-%d' }}%22&page_size=1
+  {{ windshift_url | strip | append: '/rest/api/v2/items' | replace: '//rest/', '/rest/' }}?ql=updated%20%3E%3D%20%22{{ 'now' | date: '%Y-%m-%d' }}%22&page_size=6&sort=-updated_at
 
 polling_headers: Authorization=Bearer {{ api_token | strip }}&Accept=application/json
 
@@ -40,7 +40,7 @@ custom_fields:
     name: Windshift Server URL
     placeholder: https://windshift.example.com
     description: Base URL of your Windshift server
-    help_text: Just the origin — no /rest/api/v1 suffix. A trailing slash is fine.
+    help_text: Just the origin — no /rest/api/v2 suffix. A trailing slash is fine.
     required: true
 
   - keyname: api_token

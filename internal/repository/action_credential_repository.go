@@ -251,6 +251,41 @@ func (r *ActionCredentialRepository) UpdateActionCredentialMetadataWithWorkspace
 	})
 }
 
+// UpdateManagedCredentialTx updates a provider-owned credential inside the
+// caller's transaction so provider policy and credential scope cannot diverge.
+func (r *ActionCredentialRepository) UpdateManagedCredentialTx(tx database.Tx, c *models.ActionCredential, workspaceIDs []int, encryptedSecret, prefix *string) error {
+	if err := updateActionCredentialMetadata(tx, c); err != nil {
+		return err
+	}
+	if err := setCredentialWorkspaces(tx, c.ID, workspaceIDs); err != nil {
+		return err
+	}
+	if encryptedSecret != nil && prefix != nil {
+		_, err := tx.ExecWrite(`UPDATE action_credentials
+			SET encrypted_secret = ?, secret_prefix = ?, updated_at = ? WHERE id = ?`,
+			*encryptedSecret, nullableString(*prefix), time.Now(), c.ID)
+		return err
+	}
+	return nil
+}
+
+// UpdateManagedCredentialSecretTx rotates only secret material. The metadata
+// predicate keeps the provider purpose/owner check valid at the write point,
+// while deliberately leaving name, enabled state, and workspace scope alone.
+func (r *ActionCredentialRepository) UpdateManagedCredentialSecretTx(tx database.Tx, id int, expectedMetadata, encryptedSecret, prefix string) (bool, error) {
+	if strings.TrimSpace(encryptedSecret) == "" {
+		return false, errors.New("managed action credential: encrypted_secret is required")
+	}
+	result, err := tx.ExecWrite(`UPDATE action_credentials
+		SET encrypted_secret = ?, secret_prefix = ?, updated_at = ?
+		WHERE id = ? AND secret_metadata = ?`, encryptedSecret, nullableString(prefix), time.Now(), id, expectedMetadata)
+	if err != nil {
+		return false, fmt.Errorf("failed to rotate managed action credential: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	return rows == 1, err
+}
+
 // RotateActionCredential replaces the encrypted secret and prefix on an
 // existing credential row.
 func (r *ActionCredentialRepository) RotateActionCredential(id int, encryptedSecret, prefix string) error {

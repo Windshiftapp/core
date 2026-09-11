@@ -4,13 +4,14 @@ package emailutil
 import (
 	"bytes"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
+	texttemplate "text/template"
 )
 
 // RenderTemplates parses and executes an HTML and a plain-text Go template
 // with the given data, returning the rendered strings.
 func RenderTemplates(htmlTemplateSrc, textTemplateSrc string, data any) (html, text string, err error) {
-	htmlTmpl, err := template.New("html").Parse(htmlTemplateSrc)
+	htmlTmpl, err := htmltemplate.New("html").Parse(htmlTemplateSrc)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to parse HTML template: %w", err)
 	}
@@ -20,7 +21,7 @@ func RenderTemplates(htmlTemplateSrc, textTemplateSrc string, data any) (html, t
 		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
 	}
 
-	textTmpl, err := template.New("text").Parse(textTemplateSrc)
+	textTmpl, err := texttemplate.New("text").Parse(textTemplateSrc)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to parse text template: %w", err)
 	}

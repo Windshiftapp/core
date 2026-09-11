@@ -20,16 +20,17 @@ type WorkspaceKeyCache struct {
 // NewWorkspaceKeyCache creates and populates a new workspace key cache.
 func NewWorkspaceKeyCache(repo *repository.WorkspaceRepository) *WorkspaceKeyCache {
 	c := &WorkspaceKeyCache{repo: repo, m: make(map[string]int)}
-	c.Load()
+	if err := c.Load(); err != nil {
+		slog.Error("failed to load workspace key cache", slog.Any("error", err))
+	}
 	return c
 }
 
 // Load queries all workspaces and rebuilds the cache.
-func (c *WorkspaceKeyCache) Load() {
+func (c *WorkspaceKeyCache) Load() error {
 	pairs, err := c.repo.ListIDKeys()
 	if err != nil {
-		slog.Error("failed to load workspace key cache", slog.Any("error", err))
-		return
+		return err
 	}
 
 	m := make(map[string]int, len(pairs)*2)
@@ -42,6 +43,7 @@ func (c *WorkspaceKeyCache) Load() {
 	c.mu.Lock()
 	c.m = m
 	c.mu.Unlock()
+	return nil
 }
 
 // Resolve converts an ID-or-key string into a numeric workspace ID.
@@ -60,6 +62,6 @@ func (c *WorkspaceKeyCache) Resolve(idOrKey string) (int, bool) {
 }
 
 // Invalidate rebuilds the cache from the database.
-func (c *WorkspaceKeyCache) Invalidate() {
-	c.Load()
+func (c *WorkspaceKeyCache) Invalidate() error {
+	return c.Load()
 }

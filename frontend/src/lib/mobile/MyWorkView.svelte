@@ -28,7 +28,7 @@
   const rows = $derived(data[segment] ?? []);
 
   function loadAssigned(raw) {
-    const list = Array.isArray(raw) ? raw : (raw?.items ?? []);
+    const list = raw?.data ?? [];
     return list
       .filter((i) => i?.id)
       .map((i) => ({

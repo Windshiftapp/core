@@ -12,8 +12,8 @@
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
   import Tooltip from '../../components/Tooltip.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
@@ -27,6 +27,7 @@
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
   import { childItemTypesForParent } from '../../utils/hierarchy.js';
+  import { indexCollectionHierarchy } from './collectionHierarchy.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -53,6 +54,7 @@
   // Item detail modal state
   let selectedItemId = $state(null);
   let showItemModal = $state(false);
+  let mapScrollElement = $state(null);
 
 
   // Centralized gradient styling
@@ -64,6 +66,14 @@
   }
 
   useEventListener(() => window, 'popstate', handlePopState);
+
+  $effect(() => {
+    if (!mapScrollElement) return;
+    return autoScrollForElements({
+      element: mapScrollElement,
+      getAllowedAxis: () => 'horizontal',
+    });
+  });
 
   onMount(async () => {
     if (workspaceId) {
@@ -101,14 +111,6 @@
     
     return loadStoryMapData(parentId);
   }
-
-  // Set up drag and drop whenever the data changes
-  $effect(() => {
-    if (backboneItems.length > 0 && !loading) {
-      // Use setTimeout to ensure DOM has been updated
-      setTimeout(setupDragAndDrop, 0);
-    }
-  });
 
   async function updateHierarchyBreadcrumbs() {
     const newBreadcrumbs = [];
@@ -184,21 +186,17 @@
     const parentId = currentParentId;
 
     // Compute into local variables to avoid read-after-write on $state
-    const itemIdSet = new Set(items.map(i => i.id));
+    const hierarchyIndex = indexCollectionHierarchy(items);
     const newBackbone = parentId === null
-      ? items.filter(item => !item.parent_id || !itemIdSet.has(item.parent_id)).sort((a, b) => a.id - b.id)
-      : items.filter(item => item.parent_id === parentId).sort((a, b) => a.id - b.id);
+      ? [...hierarchyIndex.roots].sort((a, b) => a.id - b.id)
+      : [...(hierarchyIndex.childrenByParent.get(parentId) || [])].sort((a, b) => a.id - b.id);
 
     // Group child items by their parent ID (children of current backbone items)
     const newChildren = {};
-    items
-      .filter(item => item.parent_id && newBackbone.some(b => b.id === item.parent_id))
-      .forEach(child => {
-        if (!newChildren[child.parent_id]) {
-          newChildren[child.parent_id] = [];
-        }
-        newChildren[child.parent_id].push(child);
-      });
+    for (const backbone of newBackbone) {
+      const children = hierarchyIndex.childrenByParent.get(backbone.id);
+      if (children?.length) newChildren[backbone.id] = [...children];
+    }
 
     // Sort child items within each parent group
     Object.keys(newChildren).forEach(pid => {
@@ -239,71 +237,48 @@
     loadStoryMapData(backboneItemId);
   }
 
-  let dragDropCleanup = null;
-
-  function setupDragAndDrop() {
-    // Clean up existing drag/drop registrations
-    if (dragDropCleanup) {
-      dragDropCleanup();
-    }
-
-    // Monitor for drag and drop events
-    const monitor = monitorForElements({
+  $effect(() => {
+    return monitorForElements({
       onDrop({ source, location }) {
         const draggedItemId = parseInt(String(source.data.itemId));
         const targetParentId = location.current.dropTargets.length > 0
           ? parseInt(String(location.current.dropTargets[0].data.parentId))
           : null;
-
-
         if (targetParentId && draggedItemId) {
           moveItemToParent(draggedItemId, targetParentId);
-        } else {
         }
       }
     });
+  });
 
-    // Set up draggable items
-    const draggableCleanups = [];
-    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-testid^="draggable-item"]')).forEach(element => {
-      const cleanup = draggable({
-        element,
-        getInitialData: () => ({
-          itemId: element.getAttribute('data-item-id')
-        })
-      });
-      draggableCleanups.push(cleanup);
+  function registerMapItem(element, itemId) {
+    const cleanup = draggable({
+      element,
+      getInitialData: () => ({ itemId })
     });
+    return { destroy: cleanup };
+  }
 
-    // Set up drop zones
-    const dropTargetCleanups = [];
-    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-testid^="drop-zone"]')).forEach(element => {
-      const cleanup = dropTargetForElements({
-        element,
-        getData: () => ({
-          parentId: element.getAttribute('data-parent-id')
-        }),
-        onDragEnter: () => {
-          element.style.borderColor = 'var(--ds-border-focused)';
-          element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
-        },
-        onDragLeave: () => {
-          element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
-          element.style.boxShadow = '';
-        },
-        onDrop: () => {
-          element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
-          element.style.boxShadow = '';
-        }
-      });
-      dropTargetCleanups.push(cleanup);
+  function registerMapDropZone(element, parentId) {
+    const reset = () => {
+      element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
+      element.style.boxShadow = '';
+    };
+    const cleanup = dropTargetForElements({
+      element,
+      getData: () => ({ parentId }),
+      onDragEnter: () => {
+        element.style.borderColor = 'var(--ds-border-focused)';
+        element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
+      },
+      onDragLeave: reset,
+      onDrop: reset,
     });
-
-    // Store cleanup function for next time
-    dragDropCleanup = () => {
-      monitor();
-      draggableCleanups.forEach(cleanup => cleanup());
-      dropTargetCleanups.forEach(cleanup => cleanup());
+    return {
+      destroy() {
+        reset();
+        cleanup();
+      }
     };
   }
 
@@ -439,13 +414,11 @@
     }
 
     try {
-      // Create the item
       const newItem = await api.items.create({
         workspace_id: state.workspaceId,
         item_type_id: state.itemTypeId,
         title: state.title.trim(),
         description: '',
-        priority: 'medium',
         parent_id: parentId
       });
 
@@ -568,6 +541,7 @@
     backgroundStyle={styles.backgroundStyle}
     contextVars={styles.contextVars}
     contentClass=""
+    rootStyle="width: 100%; min-width: 0; max-width: 100%;"
     testid="map-view"
   >
     <!-- Header -->
@@ -577,7 +551,8 @@
         workspaceName={workspace?.name || ''}
         collection={currentCollectionName}
         viewName="Map"
-        itemCount={collectionStore.itemsPagination?.total ?? (backboneItems.length + Object.values(childItemsByParent).flat().length)}
+        itemCount={collectionStore.collectionTotal}
+          shownCount={collectionStore.loading ? null : backboneItems.length + Object.values(childItemsByParent).flat().length}
       />
 
       <!-- Controls Bar -->
@@ -642,7 +617,11 @@
     </div>
 
     <!-- Story Map Container -->
-    <div class="p-6 overflow-x-auto">
+    <div
+      bind:this={mapScrollElement}
+      class="p-6 overflow-x-auto"
+      data-testid="map-scroll-container"
+    >
       <div class="min-w-max">
         <!-- Backbone (Horizontal) -->
         <div
@@ -710,6 +689,7 @@
 
               <!-- Drop Zone for this parent -->
               <div
+                use:registerMapDropZone={backboneItem.id}
                 class="min-h-96 p-3 rounded border-2 border-dashed transition-all"
                 style="border-color: var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-overlay, var(--ds-surface-overlay)); backdrop-filter: var(--ctx-backdrop, none);"
                 data-parent-id={backboneItem.id}
@@ -725,6 +705,7 @@
                     {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
+                      use:registerMapItem={childItem.id}
                       class="item-card rounded border p-3 cursor-move"
                       style="box-shadow: var(--ds-shadow-raised); {styles.cardStyle(4)}"
                       data-item-id={childItem.id}
@@ -783,6 +764,7 @@
                   <!-- Add Card button when there are existing items -->
                   {#if !quickAddState[backboneItem.id]?.show && childItemsByParent[backboneItem.id]?.length > 0 && canAddChildren(backboneItem.id)}
                     <button
+                      data-testid="map-add-card-{backboneItem.id}"
                       onclick={() => initQuickAdd(backboneItem.id)}
                       class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors "
                       style="border-color: var(--ctx-border, var(--ds-border)); background-color: transparent; color: var(--ds-text-subtle);"
@@ -804,6 +786,7 @@
                   {#if !quickAddState[backboneItem.id]?.show && (!childItemsByParent[backboneItem.id] || childItemsByParent[backboneItem.id].length === 0)}
                     {#if canAddChildren(backboneItem.id)}
                       <button
+                        data-testid="map-add-card-{backboneItem.id}"
                         onclick={() => initQuickAdd(backboneItem.id)}
                         class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors"
                         style="border-color: var(--ctx-border, var(--ds-border)); background-color: transparent; color: var(--ds-text-subtle);"

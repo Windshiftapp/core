@@ -11,13 +11,11 @@ import (
 	_ "image/gif" // Register GIF decoder for thumbnails.
 	"image/jpeg"
 	_ "image/png" // Register PNG decoder for thumbnails.
-	"log/slog"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
@@ -89,87 +87,42 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 		return models.AttachmentUploadResponse{}, err
 	}
 
-	if err := validateAttachmentFileExtension(in.OriginalFilename); err != nil {
-		return models.AttachmentUploadResponse{}, fmt.Errorf("%w: %s", ErrPageAttachmentUploadInvalid, err.Error())
+	fileInput := attachmentFileInput{
+		originalFilename: in.OriginalFilename,
+		data:             in.FileData,
+		validationSize:   in.FileSize,
 	}
-	detectedMimeType, err := verifyAttachmentFileContent(in.FileData, in.OriginalFilename)
+	detectedMimeType, err := validateAttachmentUpload(s.db, s.attachmentPath, fileInput, attachmentValidationErrors{
+		disabled: ErrPageAttachmentUploadDisabled,
+		invalid:  ErrPageAttachmentUploadInvalid,
+	})
 	if err != nil {
-		return models.AttachmentUploadResponse{}, fmt.Errorf("%w: File content validation failed: %s", ErrPageAttachmentUploadInvalid, err.Error())
-	}
-
-	settings, err := loadAttachmentSettings(s.db, s.attachmentPath)
-	if err != nil {
-		return models.AttachmentUploadResponse{}, fmt.Errorf("get attachment settings: %w", err)
-	}
-	if !settings.Enabled {
-		return models.AttachmentUploadResponse{}, ErrPageAttachmentUploadDisabled
-	}
-	if in.FileSize > settings.MaxFileSize {
-		return models.AttachmentUploadResponse{}, fmt.Errorf("%w: File too large. Maximum size: %d bytes", ErrPageAttachmentUploadInvalid, settings.MaxFileSize)
-	}
-	if err := validateAllowedMimeType(settings.AllowedMimeTypes, detectedMimeType); err != nil {
 		return models.AttachmentUploadResponse{}, err
 	}
-
-	uniqueFilename, err := generateAttachmentFilename(in.OriginalFilename)
+	stored, err := storeAttachmentFile(s.attachmentPath, "pages", "page", in.PageID, fileInput, detectedMimeType)
 	if err != nil {
-		return models.AttachmentUploadResponse{}, fmt.Errorf("generate filename: %w", err)
-	}
-
-	pageDir := filepath.Join(s.attachmentPath, "pages", fmt.Sprintf("%d", in.PageID))
-	if err := os.MkdirAll(pageDir, 0o750); err != nil { //nolint:gosec // path built from configured root + numeric page id
-		return models.AttachmentUploadResponse{}, fmt.Errorf("create attachment directory: %w", err)
-	}
-	filePath := filepath.Join(pageDir, uniqueFilename)
-	if err := os.WriteFile(filePath, in.FileData, 0o600); err != nil { //nolint:gosec // path built from configured root + generated filename
-		return models.AttachmentUploadResponse{}, fmt.Errorf("save file: %w", err)
-	}
-
-	hasThumbnail := false
-	thumbnailPath := ""
-	if strings.HasPrefix(detectedMimeType, "image/") {
-		if path, err := generateAttachmentThumbnail(filePath, uniqueFilename); err == nil {
-			hasThumbnail = true
-			thumbnailPath = path
-		} else {
-			slog.Warn("failed to generate page attachment thumbnail", slog.String("component", "attachments"), slog.Any("error", err))
-		}
+		return models.AttachmentUploadResponse{}, err
 	}
 
 	uploaderID := in.UploaderID
 	attachmentID, err := s.attachmentService.CreateRecord(CreateAttachmentParams{
 		ItemID:           in.PageID,
 		EntityType:       "page",
-		Filename:         uniqueFilename,
+		Filename:         stored.filename,
 		OriginalFilename: in.OriginalFilename,
-		FilePath:         filePath,
-		MimeType:         detectedMimeType,
-		FileSize:         int64(len(in.FileData)),
+		FilePath:         stored.path,
+		MimeType:         stored.mimeType,
+		FileSize:         stored.size,
 		UploadedBy:       &uploaderID,
-		HasThumbnail:     hasThumbnail,
-		ThumbnailPath:    thumbnailPath,
+		HasThumbnail:     stored.hasThumbnail,
+		ThumbnailPath:    stored.thumbnailPath,
 		Category:         "",
 	})
 	if err != nil {
-		_ = os.Remove(filePath) //nolint:gosec // cleanup of path built above
+		removeStoredAttachmentFile(stored)
 		return models.AttachmentUploadResponse{}, fmt.Errorf("save attachment record: %w", err)
 	}
-
-	pageID := in.PageID
-	return models.AttachmentUploadResponse{
-		Success: true,
-		Message: "File uploaded successfully",
-		Attachment: models.Attachment{
-			ID:               int(attachmentID),
-			ItemID:           &pageID,
-			Filename:         uniqueFilename,
-			OriginalFilename: in.OriginalFilename,
-			MimeType:         detectedMimeType,
-			FileSize:         int64(len(in.FileData)),
-			UploadedBy:       &uploaderID,
-			CreatedAt:        time.Now(),
-		},
-	}, nil
+	return newAttachmentUploadResponse(attachmentID, in.PageID, in.OriginalFilename, &uploaderID, stored), nil
 }
 
 // DeleteUploadedPageAttachment compensates a failed higher-level mutation.
@@ -248,26 +201,26 @@ func loadAttachmentSettings(db database.Database, attachmentPath string) (*model
 	return settings, nil
 }
 
-func validateAllowedMimeType(allowedMimeTypes, detectedMimeType string) error {
+func disallowedAttachmentMimeMessage(allowedMimeTypes, detectedMimeType string) string {
 	if allowedMimeTypes == "" {
-		return nil
+		return ""
 	}
 	// Preserve the legacy upload behavior: malformed settings are treated as
 	// no MIME restriction rather than blocking all uploads.
 	if !json.Valid([]byte(allowedMimeTypes)) {
-		return nil
+		return ""
 	}
 	var allowedTypes []string
 	_ = json.Unmarshal([]byte(allowedMimeTypes), &allowedTypes)
 	if len(allowedTypes) == 0 {
-		return nil
+		return ""
 	}
 	for _, allowedType := range allowedTypes {
 		if strings.HasPrefix(detectedMimeType, allowedType) {
-			return nil
+			return ""
 		}
 	}
-	return fmt.Errorf("%w: File type %s not allowed by server configuration", ErrPageAttachmentUploadInvalid, detectedMimeType)
+	return fmt.Sprintf("File type %s not allowed by server configuration", detectedMimeType)
 }
 
 func verifyAttachmentFileContent(fileData []byte, filename string) (string, error) {

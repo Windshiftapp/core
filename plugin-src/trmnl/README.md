@@ -27,7 +27,7 @@ Both plugins ask for the same two things, entered in TRMNL's plugin settings
 form (or in `.trmnlp.yml` for local dev):
 
 - **Windshift Server URL** — the origin, e.g. `https://windshift.example.com`.
-  No `/rest/api/v1` suffix; a trailing slash is tolerated.
+  No `/rest/api/v2` suffix; a trailing slash is tolerated.
 - **API Token** — a personal token from **Profile > API Tokens**, starting
   with `crw_`. It needs the `items:read` and `users:read` scopes and nothing
   else.
@@ -118,11 +118,11 @@ display name and doubles as an auth check.
 
 `windshift-tasks` adds one item query. `windshift-summary` adds three: the
 backlog it computes from, a closed-today count, and today's activity across
-every workspace the token can see. The two count-only queries use `limit=1`
-and read just `pagination.total`, so they stay cheap regardless of backlog
+every workspace the token can see. The two count-only queries use `page_size=1`
+and read just `pagination.total_items`, so they stay cheap regardless of backlog
 size.
 
-Counts that come from `pagination.total` (open, closed today, moved today) are
+Counts that come from `pagination.total_items` (open, closed today, moved today) are
 exact at any size. Due-today and overdue are counted in Liquid from a 100-item
 window, so they are exact as long as the scope query returns 100 items or
 fewer — which the default per-assignee query will.

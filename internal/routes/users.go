@@ -9,29 +9,19 @@ func RegisterUserRoutes(deps *Deps) {
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
 
 	// User endpoints
-	api.HandleH("GET /users", auth(http.HandlerFunc(deps.Users.User.GetAll)))
 	api.HandleH("POST /users", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.Create))))
 	api.HandleH("POST /users/invite", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.InviteUser))))
-	api.HandleH("GET /users/{id}", auth(http.HandlerFunc(deps.Users.User.Get)))
 	api.HandleH("GET /users/{id}/agent-owner", auth(http.HandlerFunc(deps.Users.User.GetAgentOwner)))
-	api.HandleH("PUT /users/{id}", admin(http.HandlerFunc(deps.Users.User.Update)))
 	api.HandleH("DELETE /users/{id}", admin(http.HandlerFunc(deps.Users.User.Delete)))
 	api.HandleH("POST /users/{id}/reset-password", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.ResetPassword))))
 	api.HandleH("PUT /users/{id}/avatar", auth(http.HandlerFunc(deps.Users.User.UpdateAvatar)))
 	api.HandleH("PUT /users/{id}/regional-settings", auth(http.HandlerFunc(deps.Users.User.UpdateRegionalSettings)))
-	api.HandleH("GET /workspaces/{workspaceId}/assignable-users", auth(http.HandlerFunc(deps.Users.User.GetAssignable)))
 	api.HandleH("POST /users/{id}/activate", admin(http.HandlerFunc(deps.Users.User.ActivateUser)))
 	api.HandleH("POST /users/{id}/deactivate", admin(http.HandlerFunc(deps.Users.User.DeactivateUser)))
 
 	// Group endpoints
 	api.HandleH("GET /groups", auth(http.HandlerFunc(deps.Users.Group.GetAll)))
-	api.HandleH("POST /groups", admin(http.HandlerFunc(deps.Users.Group.Create)))
 	api.HandleH("GET /groups/permissions", admin(http.HandlerFunc(deps.Users.Permission.GetAllGroupPermissions)))
-	api.HandleH("GET /groups/{id}", auth(http.HandlerFunc(deps.Users.Group.Get)))
-	api.HandleH("PUT /groups/{id}", admin(http.HandlerFunc(deps.Users.Group.Update)))
-	api.HandleH("DELETE /groups/{id}", admin(http.HandlerFunc(deps.Users.Group.Delete)))
-	api.HandleH("POST /groups/{id}/members", admin(http.HandlerFunc(deps.Users.Group.AddMembers)))
-	api.HandleH("DELETE /groups/{id}/members", admin(http.HandlerFunc(deps.Users.Group.RemoveMembers)))
 	api.HandleH("GET /users/{userId}/groups", auth(http.HandlerFunc(deps.Users.Group.GetUserMemberships)))
 
 	// Permission endpoints

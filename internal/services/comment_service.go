@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/validation"
@@ -84,6 +85,12 @@ type AgentMentionTrigger interface {
 	MaybeStartRunsForMentions(ctx context.Context, workspaceID, itemID int, mentionedUserIDs []int, commentAuthorID int, commentBody string, commentID int) error
 }
 
+// CommentIssueSync mirrors committed public comments to linked external issues.
+type CommentIssueSync interface {
+	PushCommentToGitHub(context.Context, int, int, int, string)
+	PushCommentUpdateToGitHub(context.Context, int, int, string)
+}
+
 // CommentService encapsulates comment creation logic used by both HTTP handlers
 // and action automation service.
 type CommentService struct {
@@ -96,6 +103,7 @@ type CommentService struct {
 	webhookSender       WebhookDispatcher
 	emailReplyService   EmailReplyHandler
 	agentMentionTrigger AgentMentionTrigger
+	issueSync           CommentIssueSync
 }
 
 type CaptureComment struct {
@@ -221,6 +229,11 @@ func (s *CommentService) approvalReader() *ApprovalService {
 	return NewApprovalService(s.db, nil, nil)
 }
 
+// UserCanReadItemAsApprover reports whether an active approval assignment grants comment context access.
+func (s *CommentService) UserCanReadItemAsApprover(ctx context.Context, userID, itemID int) (bool, error) {
+	return s.approvalReader().UserHasActivePoolMembershipOnItem(ctx, userID, itemID, nil)
+}
+
 // SetNotificationService sets the notification service for emitting comment events.
 func (s *CommentService) SetNotificationService(ns *NotificationService) {
 	s.notificationService = ns
@@ -245,6 +258,11 @@ func (s *CommentService) SetEmailReplyService(ers EmailReplyHandler) {
 // (WI-264). Nil disables the hook; Create calls it once per created comment.
 func (s *CommentService) SetAgentMentionTrigger(trigger AgentMentionTrigger) {
 	s.agentMentionTrigger = trigger
+}
+
+// SetIssueSync wires optional external issue comment mirroring.
+func (s *CommentService) SetIssueSync(sync CommentIssueSync) {
+	s.issueSync = sync
 }
 
 // All comment writes use CommentService so side effects and post-commit item changes cannot be bypassed.
@@ -349,7 +367,7 @@ func (s *CommentService) CreateInTx(ctx context.Context, tx database.Tx, itemID,
 		authorIDPtr = &authorID
 	}
 	_, err = itemevents.NewRecorder(s.db).CommentCreated(ctx, tx, workspaceID, itemevents.CommentCreatedV1{
-		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr,
+		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr, SuppressSideEffects: true,
 	}, metadata)
 	return id, err
 }
@@ -444,6 +462,7 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 	if _, err := itemevents.NewRecorder(s.db).CommentCreated(context.Background(), tx, item.WorkspaceID, itemevents.CommentCreatedV1{
 		ItemID: params.ItemID, CommentID: commentID, AuthorID: authorID,
 		PortalCustomerID: params.PortalCustomerID, IsPrivate: params.IsPrivate,
+		SuppressSideEffects: params.SuppressNotifications,
 	}, metadata); err != nil {
 		return nil, err
 	}
@@ -597,10 +616,31 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 	// item's comment list for anyone viewing it.
 	PublishItemChange(params.ItemID, ItemChangeComment)
 
+	if s.issueSync != nil && !params.IsPrivate && !params.SuppressNotifications && params.AuthorID > 0 {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			s.issueSync.PushCommentToGitHub(ctx, params.ItemID, int(commentID), params.AuthorID, params.Content)
+		}()
+	}
+
 	// 9. Return created comment
 	return &CreateCommentResult{
 		CommentID: commentID,
 	}, nil
+}
+
+// UpdateCommentParams carries transport-neutral actor context for a comment edit.
+type UpdateCommentParams struct {
+	CommentID int
+	Content   string
+	Actor     AuditActor
+}
+
+// DeleteCommentParams carries transport-neutral actor context for a comment deletion.
+type DeleteCommentParams struct {
+	CommentID int
+	Actor     AuditActor
 }
 
 // CommentWithDetails contains a comment with its related details
@@ -830,7 +870,7 @@ func (s *CommentService) Update(commentID int, content string, userID int) (*mod
 	var itemID int
 	err = tx.QueryRow("SELECT item_id FROM comments WHERE id = ?", commentID).Scan(&itemID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("comment not found: %d", commentID)
+		return nil, fmt.Errorf("comment %d: %w", commentID, repository.ErrNotFound)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to check comment: %w", err)
@@ -892,6 +932,49 @@ func (s *CommentService) Update(commentID int, content string, userID int) (*mod
 	return &comment, nil
 }
 
+// UpdateWithEffects updates a comment and emits every post-commit integration effect.
+func (s *CommentService) UpdateWithEffects(params UpdateCommentParams) (*models.Comment, error) {
+	before, err := s.Get(params.CommentID)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := s.Update(params.CommentID, params.Content, params.Actor.UserID)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.itemRepo.FindByIDWithDetails(before.ItemID)
+	if err != nil {
+		slog.Warn("failed to load item after comment update", slog.Int("comment_id", params.CommentID), slog.Any("error", err))
+		return updated, nil
+	}
+	if s.notificationService != nil {
+		s.notificationService.EmitEvent(&NotificationEvent{
+			EventType: models.EventCommentUpdated, WorkspaceID: item.WorkspaceID,
+			ActorUserID: params.Actor.UserID, ItemID: item.ID, AssigneeID: item.AssigneeID, CreatorID: item.CreatorID,
+			Title: "Comment Updated", TemplateData: map[string]any{"item.title": item.Title, "item.id": item.ID, "user.name": params.Actor.Username},
+		})
+	}
+	if s.mentionService != nil {
+		if err := s.mentionService.ProcessMentions(ProcessMentionsParams{
+			SourceType: "comment", SourceID: params.CommentID, Content: params.Content,
+			ItemID: item.ID, WorkspaceID: item.WorkspaceID, ActorUserID: params.Actor.UserID,
+		}); err != nil {
+			slog.Warn("failed to process updated comment mentions", slog.Int("comment_id", params.CommentID), slog.Any("error", err))
+		}
+	}
+	if s.webhookSender != nil {
+		s.webhookSender.DispatchEvent("comment.updated", item)
+	}
+	if s.issueSync != nil && !updated.IsPrivate && before.AuthorID != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			s.issueSync.PushCommentUpdateToGitHub(ctx, params.CommentID, *before.AuthorID, params.Content)
+		}()
+	}
+	return updated, nil
+}
+
 // Delete removes a comment
 func (s *CommentService) Delete(commentID int) error {
 	tx, err := s.db.Begin()
@@ -907,7 +990,7 @@ func (s *CommentService) Delete(commentID int) error {
 	err = tx.QueryRow("SELECT item_id FROM comments WHERE id = ?", commentID).Scan(&itemID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("comment not found: %d", commentID)
+			return fmt.Errorf("comment %d: %w", commentID, repository.ErrNotFound)
 		}
 		return fmt.Errorf("failed to check comment: %w", err)
 	}
@@ -927,6 +1010,40 @@ func (s *CommentService) Delete(commentID int) error {
 	// Live-update publish (WI-483): the delete committed.
 	PublishItemChange(itemID, ItemChangeComment)
 
+	return nil
+}
+
+// DeleteWithEffects deletes a comment and emits every post-commit integration effect.
+func (s *CommentService) DeleteWithEffects(params DeleteCommentParams) error {
+	comment, err := s.Get(params.CommentID)
+	if err != nil {
+		return err
+	}
+	item, err := s.itemRepo.FindByIDWithDetails(comment.ItemID)
+	if err != nil {
+		return err
+	}
+	if err := s.Delete(params.CommentID); err != nil {
+		return err
+	}
+	emitServiceAudit(s.db, params.Actor, logger.ActionCommentDelete, logger.ResourceComment, &params.CommentID, "", map[string]any{
+		"item_id": item.ID, "workspace_id": item.WorkspaceID, "comment_author_user_id": comment.AuthorID,
+	})
+	if s.mentionService != nil {
+		if err := s.mentionService.DeleteMentionsForSource("comment", params.CommentID); err != nil {
+			slog.Warn("failed to delete comment mentions", slog.Int("comment_id", params.CommentID), slog.Any("error", err))
+		}
+	}
+	if s.notificationService != nil {
+		s.notificationService.EmitEvent(&NotificationEvent{
+			EventType: models.EventCommentDeleted, WorkspaceID: item.WorkspaceID,
+			ActorUserID: params.Actor.UserID, ItemID: item.ID, AssigneeID: item.AssigneeID, CreatorID: item.CreatorID,
+			Title: "Comment Deleted", TemplateData: map[string]any{"item.title": item.Title, "item.id": item.ID, "user.name": params.Actor.Username},
+		})
+	}
+	if s.webhookSender != nil {
+		s.webhookSender.DispatchEvent("comment.deleted", item)
+	}
 	return nil
 }
 

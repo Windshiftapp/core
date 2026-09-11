@@ -125,7 +125,7 @@
     try {
       const response = await api.collections.getAll({ workspace_id: targetWorkspace });
       if (version !== collectionsLoadVersion) return;
-      collections = Array.isArray(response) ? response : response?.items || [];
+      collections = response || [];
       if (
         selectedCollection &&
         !collections.some((collection) => String(collection.id) === String(selectedCollection))
