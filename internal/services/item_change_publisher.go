@@ -16,6 +16,7 @@ const (
 	ItemChangeDeleted ItemChangeKind = "deleted"
 	ItemChangeComment ItemChangeKind = "comment"
 	ItemChangeLink    ItemChangeKind = "link"
+	ItemChangeZammad  ItemChangeKind = "zammad"
 )
 
 // ItemChangePublisher receives item-change notifications after a mutation has

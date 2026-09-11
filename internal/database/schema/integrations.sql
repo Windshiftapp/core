@@ -135,4 +135,102 @@ CREATE INDEX IF NOT EXISTS idx_todoist_task_links_user ON todoist_task_links(use
 CREATE INDEX IF NOT EXISTS idx_todoist_task_links_item ON todoist_task_links(item_id);
 CREATE INDEX IF NOT EXISTS idx_todoist_task_links_todoist ON todoist_task_links(todoist_task_id);
 
+-- Zammad provider extension. Provider identity and visible item links remain
+-- in the generic integration tables; these tables hold only Zammad-specific
+-- connection policy and durable synchronization state.
+CREATE TABLE IF NOT EXISTS zammad_connections (
+	provider_id TEXT PRIMARY KEY,
+	credential_id INTEGER NOT NULL,
+	auth_method TEXT NOT NULL DEFAULT 'api_token',
+	oauth_generation INTEGER NOT NULL DEFAULT 1,
+	config_revision INTEGER NOT NULL DEFAULT 1,
+	oauth_attempt_id TEXT,
+	base_url TEXT NOT NULL,
+	default_group_id INTEGER,
+	default_group_name TEXT DEFAULT '',
+	allowed_groups TEXT NOT NULL DEFAULT '[]',
+	default_customer TEXT NOT NULL,
+	correlation_field TEXT NOT NULL DEFAULT 'windshift_item_key',
+	closed_state_ids TEXT NOT NULL DEFAULT '[]',
+	completion_status_id INTEGER,
+	last_tested_at DATETIME,
+	last_test_error TEXT DEFAULT '',
+	created_by INTEGER,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (provider_id) REFERENCES integration_providers(id) ON DELETE CASCADE,
+	FOREIGN KEY (credential_id) REFERENCES action_credentials(id) ON DELETE RESTRICT,
+	FOREIGN KEY (completion_status_id) REFERENCES statuses(id) ON DELETE SET NULL,
+	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_zammad_connections_credential ON zammad_connections(credential_id);
+
+-- Connection-scoped OAuth material. Zammad is a system/workspace integration,
+-- so these tokens intentionally never use user_integration_tokens.
+CREATE TABLE IF NOT EXISTS zammad_oauth_tokens (
+	provider_id TEXT PRIMARY KEY,
+	oauth_generation INTEGER NOT NULL,
+	expires_at DATETIME NOT NULL,
+	reauthorization_required BOOLEAN NOT NULL DEFAULT false,
+	refresh_lock_until DATETIME,
+	refresh_claim_owner TEXT,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (provider_id) REFERENCES zammad_connections(provider_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS zammad_oauth_state (
+	state TEXT PRIMARY KEY,
+	provider_id TEXT NOT NULL,
+	initiated_by INTEGER NOT NULL,
+	oauth_generation INTEGER NOT NULL,
+	expires_at DATETIME NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (provider_id) REFERENCES zammad_connections(provider_id) ON DELETE CASCADE,
+	FOREIGN KEY (initiated_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zammad_oauth_state_expires ON zammad_oauth_state(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_zammad_oauth_state_provider ON zammad_oauth_state(provider_id);
+
+CREATE TABLE IF NOT EXISTS zammad_ticket_links (
+	id TEXT PRIMARY KEY,
+	item_id INTEGER NOT NULL,
+	provider_id TEXT NOT NULL,
+	item_integration_link_id TEXT,
+	ticket_id INTEGER,
+	ticket_number TEXT DEFAULT '',
+	ticket_url TEXT DEFAULT '',
+	group_id INTEGER,
+	group_name TEXT DEFAULT '',
+	owner_id INTEGER,
+	owner_name TEXT DEFAULT '',
+	correlation_key TEXT NOT NULL,
+	sync_state TEXT NOT NULL DEFAULT 'pending',
+	creating_started_at DATETIME,
+	last_status_id INTEGER,
+	last_status_name TEXT DEFAULT '',
+	last_synced_at DATETIME,
+	last_attempt_at DATETIME,
+	next_attempt_at DATETIME,
+	last_error TEXT DEFAULT '',
+	completion_applied BOOLEAN NOT NULL DEFAULT false,
+	sync_lock_until DATETIME,
+	sync_lock_owner TEXT,
+	created_by INTEGER,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT,
+	FOREIGN KEY (provider_id) REFERENCES zammad_connections(provider_id) ON DELETE CASCADE,
+	FOREIGN KEY (item_integration_link_id) REFERENCES item_integration_links(id) ON DELETE SET NULL,
+	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+	UNIQUE(item_id, provider_id),
+	UNIQUE(provider_id, ticket_id),
+	UNIQUE(provider_id, correlation_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_zammad_ticket_links_item ON zammad_ticket_links(item_id);
+CREATE INDEX IF NOT EXISTS idx_zammad_ticket_links_sync ON zammad_ticket_links(sync_state, last_synced_at);
+
 -- migration: 20260615_todoist_sync_tables
+-- migration: 20260829_zammad_integration

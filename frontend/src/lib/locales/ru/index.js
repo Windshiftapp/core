@@ -22,6 +22,7 @@ import pages from './pages.js';
 import adminOperations from './adminOperations.js';
 import agents from './agents.js';
 import dashboard from './dashboard.js';
+import zammad from './zammad.js';
 
 export default createLocale({
   common,
@@ -43,4 +44,5 @@ export default createLocale({
   adminOperations,
   agents,
   dashboard,
+  zammad,
 });

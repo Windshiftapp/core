@@ -540,11 +540,23 @@ const (
 	ActionLLMConnectionDelete = "llm_connection.delete"
 
 	// Integration Providers
-	ActionIntegrationProviderCreate = "integration_provider.create"
-	ActionIntegrationProviderUpdate = "integration_provider.update"
-	ActionIntegrationProviderDelete = "integration_provider.delete"
-	ActionIntegrationItemLinkCreate = "integration_item_link.create"
-	ActionIntegrationItemLinkDelete = "integration_item_link.delete"
+	ActionIntegrationProviderCreate             = "integration_provider.create"
+	ActionIntegrationProviderUpdate             = "integration_provider.update"
+	ActionIntegrationProviderDelete             = "integration_provider.delete"
+	ActionIntegrationItemLinkCreate             = "integration_item_link.create"
+	ActionIntegrationItemLinkDelete             = "integration_item_link.delete"
+	ActionZammadConnectionCreate                = "zammad_connection.create"
+	ActionZammadConnectionUpdate                = "zammad_connection.update"
+	ActionZammadConnectionDelete                = "zammad_connection.delete"
+	ActionZammadConnectionTest                  = "zammad_connection.test"
+	ActionIntegrationProviderOAuthCredentialSet = "integration_provider.oauth_credential_set" // #nosec G101 -- audit action name, not a credential
+	ActionZammadTicketCreate                    = "zammad_ticket.create"
+	ActionZammadTicketLinkExisting              = "zammad_ticket.link_existing"
+	ActionZammadTicketUpdate                    = "zammad_ticket.update"
+	ActionZammadTicketUnlink                    = "zammad_ticket.unlink"
+	ActionZammadTicketDetachLocal               = "zammad_ticket.detach_local"
+	ActionZammadTicketRefresh                   = "zammad_ticket.refresh"
+	ActionZammadTicketRefreshAll                = "zammad_ticket.refresh_all"
 
 	// Issue sync configuration
 	ActionIssueSyncConfigCreate = "issue_sync_config.create"
@@ -825,6 +837,8 @@ const (
 	ResourceLLMConnection        = "llm_connection"
 	ResourceIntegrationProvider  = "integration_provider"
 	ResourceIntegrationItemLink  = "integration_item_link"
+	ResourceZammadConnection     = "zammad_connection"
+	ResourceZammadTicket         = "zammad_ticket"
 	ResourceIssueSyncConfig      = "issue_sync_config"
 	ResourceWorkItemStaleness    = "work_item_staleness"
 	ResourceEmailProvider        = "email_provider"

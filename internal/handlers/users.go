@@ -444,7 +444,17 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Audit before anonymization so we capture the original details.
+	if err := h.offboardUser(id); err != nil {
+		if errors.Is(err, services.ErrUserOffboardingHasProtectedIntegrationLinks) {
+			respondConflict(w, r, "Cannot offboard user while their personal workspace contains protected integration links")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Audit after successful offboarding so a failed or blocked operation is
+	// never recorded as a successful deletion.
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
 			logger.ActionUserDelete, logger.ResourceUser,
@@ -455,11 +465,6 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 				"last_name":  deleted.LastName,
 			},
 		)
-	}
-
-	if err := h.offboardUser(id); err != nil {
-		respondInternalError(w, r, err)
-		return
 	}
 	h.invalidateUserSessions(id)
 

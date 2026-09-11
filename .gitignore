@@ -27,6 +27,10 @@ cx
 
 # Public regression coverage for the locale runtime ships with the implementation.
 !frontend/src/lib/stores/i18n-utils.spec.js
+!frontend/src/lib/api/integrations.spec.js
+!frontend/src/lib/features/items/zammadPanelContext.spec.js
+!frontend/src/lib/features/items/ZammadLinkResolver.spec.js
+!internal/repository/zammad_repository_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

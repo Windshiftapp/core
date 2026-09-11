@@ -41,6 +41,7 @@ const routes = {
   // Stable key routes used by CLI/browser deep links.
   '/workspace/:workspaceKey/item/:itemNumber': 'item-detail',
   '/item/:itemKey': 'item-detail',
+  '/zammad/:correlationKey': 'zammad-resolve',
   // Routes without collection (show all workspace items)
   '/workspaces/:id/board': 'workspace-board',
   '/workspaces/:id/board/configure': 'workspace-board-config',

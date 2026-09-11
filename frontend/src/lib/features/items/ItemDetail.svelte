@@ -86,6 +86,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       }
       window.dispatchEvent(new CustomEvent('item-comments-changed', { detail: { itemId } }));
       window.dispatchEvent(new CustomEvent('item-scm-links-changed', { detail: { itemId } }));
+      window.dispatchEvent(new CustomEvent('item-zammad-links-changed', { detail: { itemId } }));
     },
     onItem: () => itemDetailStore.refreshCurrentItem().catch((err) => console.error('SSE item refresh failed:', err)),
     onChildren: () => itemDetailStore.loadChildItems().catch((err) => console.error('SSE children refresh failed:', err)),
@@ -96,6 +97,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       itemDetailStore.loadLinks().catch((err) => console.error('SSE links refresh failed:', err));
       window.dispatchEvent(new CustomEvent('item-scm-links-changed', { detail: { itemId } }));
     },
+    onZammad: () => window.dispatchEvent(new CustomEvent('item-zammad-links-changed', { detail: { itemId } })),
     // The viewed item was deleted (its own topic published `deleted`). This is
     // authoritative — mark it gone so the view closes instead of refetching
     // (which would 404) and showing stale data.

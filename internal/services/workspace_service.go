@@ -14,21 +14,27 @@ import (
 	"windshift/internal/repository"
 )
 
+var ErrWorkspaceHasProtectedIntegrationLinks = errors.New("workspace has provider-managed integration links")
+
 // WorkspaceService encapsulates workspace business logic used by both HTTP handlers
 // and other services.
 type WorkspaceService struct {
-	db        database.Database
-	repo      *repository.WorkspaceRepository
-	templates *repository.WorkspaceTemplateRepository
-	access    WorkspaceSourceAccess
+	db                    database.Database
+	repo                  *repository.WorkspaceRepository
+	itemRepo              *repository.ItemRepository
+	templates             *repository.WorkspaceTemplateRepository
+	integrationLinkGuards *IntegrationLinkGuards
+	access                WorkspaceSourceAccess
 }
 
 // NewWorkspaceService creates a new WorkspaceService.
 func NewWorkspaceService(db database.Database) *WorkspaceService {
 	return &WorkspaceService{
-		db:        db,
-		repo:      repository.NewWorkspaceRepository(db),
-		templates: repository.NewWorkspaceTemplateRepository(db),
+		db:                    db,
+		repo:                  repository.NewWorkspaceRepository(db),
+		itemRepo:              repository.NewItemRepository(db),
+		templates:             repository.NewWorkspaceTemplateRepository(db),
+		integrationLinkGuards: NewIntegrationLinkGuards(db),
 	}
 }
 
@@ -348,26 +354,42 @@ func nullableUpdateValue[T any](update NullableUpdate[T]) any {
 
 // Delete removes a workspace by ID.
 func (s *WorkspaceService) Delete(id int) error {
-	// Check workspace exists
-	exists, err := s.repo.Exists(id)
-	if err != nil {
-		return fmt.Errorf("failed to check workspace existence: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("workspace not found: %d: %w", id, repository.ErrNotFound)
+	if err := database.WithTx(s.db, func(tx database.Tx) error {
+		exists, err := s.repo.LockForDeleteTx(tx, id)
+		if err != nil {
+			return fmt.Errorf("check workspace existence: %w", err)
+		}
+		if !exists {
+			return fmt.Errorf("workspace not found: %d: %w", id, repository.ErrNotFound)
+		}
+		if err := s.itemRepo.LockWorkspaceItemsTx(tx, id); err != nil {
+			return err
+		}
+
+		hasProtectedLinks, err := s.integrationLinkGuards.HasLinksForWorkspaceTx(tx, id)
+		if err != nil {
+			return err
+		}
+		if hasProtectedLinks {
+			return ErrWorkspaceHasProtectedIntegrationLinks
+		}
+
+		if err := s.repo.DeleteTx(tx, id); err != nil {
+			return fmt.Errorf("delete workspace: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// PostgreSQL workspaces have a per-workspace item-number sequence. SQLite
-	// treats this as a no-op.
+	// The sequence is auxiliary cleanup. Run it after the workspace deletion
+	// commits so a failed DROP cannot roll back an otherwise valid deletion or
+	// leave a PostgreSQL transaction permanently aborted.
 	if err := s.repo.DropItemSequence(int64(id)); err != nil {
 		slog.Warn("failed to drop item sequence for workspace", "workspace_id", id, "error", err)
 	}
 
-	// Delete workspace (cascade will handle related records)
-	err = s.repo.Delete(id)
-	if err != nil {
-		return fmt.Errorf("failed to delete workspace: %w", err)
-	}
+	repository.InvalidateItemListCountCache(s.db, id)
 
 	return nil
 }

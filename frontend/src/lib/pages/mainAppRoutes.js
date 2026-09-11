@@ -69,6 +69,7 @@ export const MAIN_APP_COMPONENT_LOADERS = {
   homepage: () => import('./Homepage.svelte'),
   licenses: () => import('./Licenses.svelte'),
   'item-detail': () => import('../features/items/ItemDetail.svelte'),
+  'zammad-resolve': () => import('../features/items/ZammadLinkResolver.svelte'),
   'personal-task-detail': () => import('../features/personal/PersonalTaskDetail.svelte'),
   'workspace-detail': () => import('../workspaces/WorkspaceWelcome.svelte'),
   'workspace-overview': () => import('../workspaces/WorkspaceWelcome.svelte'),
@@ -375,6 +376,10 @@ export const MAIN_APP_ROUTE_CONFIG = {
         moduleSettings: context.moduleSettings,
       };
     },
+  }),
+  'zammad-resolve': route('Resolving Zammad link...', 'Failed to resolve Zammad link', {
+    wrapper: 'surface-full',
+    getProps: (currentRoute) => ({ correlationKey: currentRoute.params.correlationKey }),
   }),
   'personal-task-detail': route('Loading Task...', 'Failed to load Task', {
     getProps: (currentRoute, context) => ({

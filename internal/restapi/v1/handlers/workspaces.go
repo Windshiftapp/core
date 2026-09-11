@@ -395,6 +395,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  handlers.ErrorResponse
 // @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the workspaces:delete scope"
 // @Failure      404  {object}  handlers.ErrorResponse  "Workspace not found or caller cannot delete it"
+// @Failure      409  {object}  handlers.ErrorResponse  "Workspace still has externally linked items"
 // @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id} [delete]
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -420,6 +421,14 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrWorkspaceHasProtectedIntegrationLinks) {
+			h.RespondError(w, r, restapi.NewAPIError(
+				http.StatusConflict,
+				restapi.ErrCodeConflict,
+				"Remove all protected integration links from this workspace before deleting it.",
+			))
 			return
 		}
 		h.RespondInternalError(w, r)

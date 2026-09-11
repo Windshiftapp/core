@@ -222,6 +222,32 @@ func (r *ItemRepository) FindByIDsForUpdateContext(ctx context.Context, tx datab
 	return items, nil
 }
 
+// LockWorkspaceItemsTx prevents new foreign-key references from being added to
+// the workspace's current items while a destructive workspace operation runs.
+// The caller must lock the workspace row first so concurrent item creation is
+// fenced as well.
+func (r *ItemRepository) LockWorkspaceItemsTx(tx database.Tx, workspaceID int) error {
+	query := "SELECT id FROM items WHERE workspace_id = ? ORDER BY id"
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	rows, err := tx.Query(query, workspaceID)
+	if err != nil {
+		return fmt.Errorf("lock workspace items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var itemID int
+		if err := rows.Scan(&itemID); err != nil {
+			return fmt.Errorf("scan locked workspace item: %w", err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate locked workspace items: %w", err)
+	}
+	return nil
+}
+
 type ItemWithWorkspaceStatus struct {
 	*models.Item
 	WorkspaceActive bool

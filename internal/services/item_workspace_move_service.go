@@ -584,6 +584,16 @@ func (s *ItemWorkspaceMoveService) MoveContext(ctx context.Context, itemID, acto
 	if err != nil {
 		return nil, err
 	}
+	integrationLinkUnavailable, err := NewIntegrationLinkGuards(s.db).HasLinkUnavailableInWorkspaceTx(tx, itemID, input.DestinationWorkspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("validate integration links for workspace move: %w", err)
+	}
+	if integrationLinkUnavailable {
+		return nil, &validation.ValidationError{
+			Field:   "destination_workspace_id",
+			Message: "Destination workspace is not allowed by every provider-managed integration link",
+		}
+	}
 
 	newNumber, err := itemRepo.GetNextWorkspaceItemNumber(tx, input.DestinationWorkspaceID)
 	if err != nil {

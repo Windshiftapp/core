@@ -19,6 +19,7 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import ItemSCMLinks from './ItemSCMLinks.svelte';
   import ItemIntegrationLinks from './ItemIntegrationLinks.svelte';
+  import ZammadItemPanel from './ZammadItemPanel.svelte';
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
   import AddIntegrationLinkModal from '../../dialogs/AddIntegrationLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
@@ -1383,6 +1384,10 @@
     {/if}
 
     <!-- Integration Links (Notion, etc.) -->
+    {#if item?.id && item?.workspace_id}
+      <ZammadItemPanel itemId={item.id} workspaceId={item.workspace_id} {canEdit} />
+    {/if}
+
     {#if item?.id}
       <ItemIntegrationLinks
         bind:this={integrationLinksRef}

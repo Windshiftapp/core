@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"windshift/internal/integrations"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -101,13 +102,10 @@ func (h *IntegrationProviderHandler) CreateProvider(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Validate provider type
-	validTypes := map[string]bool{
-		string(models.IntegrationProviderNotion):  true,
-		string(models.IntegrationProviderTodoist): true,
-	}
-	if !validTypes[req.ProviderType] {
-		respondBadRequest(w, r, "Invalid provider type. Supported: notion, todoist")
+	// Provider capabilities are declared centrally so adding a provider does
+	// not require another hardcoded allowlist in this handler.
+	if !integrations.SupportsAdminProviderCRUD(models.IntegrationProviderType(req.ProviderType)) {
+		respondBadRequest(w, r, "Provider type is not managed by this endpoint")
 		return
 	}
 

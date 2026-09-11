@@ -1,5 +1,6 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 import { excalidrawAssetsPlugin } from './scripts/excalidraw-assets.js';
@@ -30,6 +31,7 @@ export default defineConfig({
   base: './',
   plugins: [
     svelte(), // Uses svelte.config.js for preprocessors
+    svelteTesting(),
     tailwindcss(),
     excalidrawAssetsPlugin(),
     ...(enableBundleAnalyzer
