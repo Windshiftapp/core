@@ -270,6 +270,30 @@ export const items = {
     fetchV2Data(`/items/${itemId}/children`, requestOptions),
   getAncestors: (itemId, requestOptions = {}) =>
     fetchV2Data(`/items/${itemId}/ancestors`, requestOptions),
+  /**
+   * Fetch ancestor chains for many items in one (or a few) batch requests.
+   * Returns an array of { item_id, ancestors } entries — ancestors ordered
+   * root -> parent and excluding the item itself. Ids the caller can't view or
+   * that don't exist are silently omitted, matching getMany. Chunked under
+   * the server's 500-id cap.
+   */
+  getManyAncestors: async (ids = []) => {
+    const unique = [...new Set(ids)].filter((id) => id != null);
+    if (unique.length === 0) return [];
+    const chunks = [];
+    for (let i = 0; i < unique.length; i += ITEM_BATCH_CHUNK) {
+      chunks.push(unique.slice(i, i + ITEM_BATCH_CHUNK));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        fetchV2Data('/items/batch-ancestors', {
+          method: 'POST',
+          body: JSON.stringify({ ids: chunk }),
+        })
+      )
+    );
+    return results.flat();
+  },
   getDescendants: (itemId, maxDepth = null) => {
     const params = maxDepth ? `?max_depth=${maxDepth}` : '';
     return fetchV2Data(`/items/${itemId}/descendants${params}`);

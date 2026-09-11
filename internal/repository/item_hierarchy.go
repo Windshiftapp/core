@@ -224,32 +224,117 @@ func (r *ItemRepository) GetAncestorsForHierarchyContext(ctx context.Context, it
 	var ancestors []models.Item
 	for rows.Next() {
 		var item models.Item
-		var itemTypeID, assigneeID, creatorID, parentID sql.NullInt64
-		var customFieldValuesJSON sql.NullString
-		var workspaceName, workspaceKey, itemTypeName, itemTypeColor, itemTypeIcon sql.NullString
-		var level int
-		if err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
-			&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
-			&item.CreatedAt, &item.UpdatedAt,
-			&workspaceName, &workspaceKey, &itemTypeName, &itemTypeColor, &itemTypeIcon, &level,
-		); err != nil {
+		if err := scanAncestorItem(rows, &item); err != nil {
 			return nil, fmt.Errorf("failed to scan ancestor: %w", err)
 		}
-		_ = level
-		_ = itemTypeColor
-		_ = itemTypeIcon
-		assignNullableInt(&item.ItemTypeID, itemTypeID)
-		assignNullableInt(&item.AssigneeID, assigneeID)
-		assignNullableInt(&item.CreatorID, creatorID)
-		assignNullableInt(&item.ParentID, parentID)
-		assignNullableString(&item.WorkspaceName, workspaceName)
-		assignNullableString(&item.WorkspaceKey, workspaceKey)
-		assignNullableString(&item.ItemTypeName, itemTypeName)
-		item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
 		ancestors = append(ancestors, item)
 	}
 	return ancestors, rows.Err()
+}
+
+// scanAncestorItem reads one row of the shared ancestor SELECT column list:
+// id, workspace_id, workspace_item_number, item_type_id, title, description,
+// is_task, assignee_id, creator_id, custom_field_values, parent_id,
+// created_at, updated_at, workspace_name, workspace_key, item_type_name,
+// item_type_color, item_type_icon, level. Leading targets, when given, precede
+// the shared columns (the batch query prefixes each row with its start id).
+func scanAncestorItem(rows *sql.Rows, item *models.Item, leading ...any) error {
+	var itemTypeID, assigneeID, creatorID, parentID sql.NullInt64
+	var customFieldValuesJSON sql.NullString
+	var workspaceName, workspaceKey, itemTypeName, itemTypeColor, itemTypeIcon sql.NullString
+	var level int
+	dest := make([]any, 0, len(leading)+19)
+	dest = append(dest, leading...)
+	dest = append(dest,
+		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
+		&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+		&item.CreatedAt, &item.UpdatedAt,
+		&workspaceName, &workspaceKey, &itemTypeName, &itemTypeColor, &itemTypeIcon, &level,
+	)
+	if err := rows.Scan(dest...); err != nil {
+		return err
+	}
+	_ = level
+	_ = itemTypeColor
+	_ = itemTypeIcon
+	assignNullableInt(&item.ItemTypeID, itemTypeID)
+	assignNullableInt(&item.AssigneeID, assigneeID)
+	assignNullableInt(&item.CreatorID, creatorID)
+	assignNullableInt(&item.ParentID, parentID)
+	assignNullableString(&item.WorkspaceName, workspaceName)
+	assignNullableString(&item.WorkspaceKey, workspaceKey)
+	assignNullableString(&item.ItemTypeName, itemTypeName)
+	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
+	return nil
+}
+
+// GetAncestorsForItemsContext resolves ancestor chains for many items in one
+// recursive walk (maxDepth caps each chain). Chains exclude the items
+// themselves and are ordered root -> parent; every requested id gets an entry,
+// empty when the item has no ancestors.
+func (r *ItemRepository) GetAncestorsForItemsContext(ctx context.Context, itemIDs []int, maxDepth int) (map[int][]models.Item, error) {
+	result := make(map[int][]models.Item, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return result, nil
+	}
+	if maxDepth <= 0 || maxDepth > maxItemHierarchyDepth {
+		maxDepth = maxItemHierarchyDepth
+	}
+	placeholders := strings.Repeat("?,", len(itemIDs))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]any, 0, len(itemIDs)+1)
+	for _, id := range itemIDs {
+		args = append(args, id)
+	}
+	args = append(args, maxDepth)
+	rows, err := r.db.QueryContext(ctx, `
+		WITH RECURSIVE ancestors AS (
+			SELECT i.id AS start_id, i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
+			       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+			       i.created_at, i.updated_at,
+			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, it.color as item_type_color, it.icon as item_type_icon,
+			       0 as level, it.hierarchy_level
+			FROM items i
+			JOIN workspaces w ON i.workspace_id = w.id
+			LEFT JOIN item_types it ON i.item_type_id = it.id
+			WHERE i.id IN (`+placeholders+`)
+
+			UNION ALL
+
+			SELECT a.start_id, p.id, p.workspace_id, p.workspace_item_number, p.item_type_id, p.title, p.description, p.is_task,
+			       p.assignee_id, p.creator_id, p.custom_field_values, p.parent_id,
+			       p.created_at, p.updated_at,
+			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, it.color as item_type_color, it.icon as item_type_icon,
+			       a.level + 1 as level, it.hierarchy_level
+			FROM items p
+			JOIN workspaces w ON p.workspace_id = w.id
+			LEFT JOIN item_types it ON p.item_type_id = it.id
+			JOIN ancestors a ON p.id = a.parent_id
+			WHERE a.level < ?
+			  AND COALESCE(a.hierarchy_level, -999) != 0
+		)
+		SELECT start_id, id, workspace_id, workspace_item_number, item_type_id, title, description, is_task,
+		       assignee_id, creator_id, custom_field_values, parent_id,
+		       created_at, updated_at,
+		       workspace_name, workspace_key, item_type_name, item_type_color, item_type_icon, level
+		FROM ancestors
+		WHERE level > 0
+		ORDER BY start_id, level DESC
+	`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query ancestors for items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var startID int
+		var item models.Item
+		if err := scanAncestorItem(rows, &item, &startID); err != nil {
+			return nil, fmt.Errorf("failed to scan ancestor: %w", err)
+		}
+		result[startID] = append(result[startID], item)
+	}
+	return result, rows.Err()
 }
 
 // GetRootItems returns all root items (no parent) for a workspace

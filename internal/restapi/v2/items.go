@@ -163,6 +163,18 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		result, err := app.Batch(r.Context(), user.ID, ids)
 		return result, itemError(err)
 	})
+	builder.JSON(http.MethodPost, collection+"/batch-ancestors", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, func(r *http.Request, input idBatchRequest) ([]services.ItemAncestorsBatchEntry, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := normalizeBatchIDs(input.IDs)
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.BatchAncestors(r.Context(), user.ID, ids)
+		return result, itemError(err)
+	})
 	builder.Read("/workspaces/{workspace_key}/items/{item_number}", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.Item, error) {
 		user, err := principal(r)
 		if err != nil {

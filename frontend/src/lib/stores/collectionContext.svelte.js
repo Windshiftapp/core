@@ -31,6 +31,9 @@ const BACKLOG_VIEWS = new Set(['workspace-backlog', 'collection-backlog']);
 
 const DEFAULT_PAGE_SIZE = 100;
 const LIST_INITIAL_PAGE_SIZE = 50;
+// Tree pages stay smaller than map/roadmap: every loaded item can require an
+// ancestors lookup, so the page bounds the hierarchy-repair fan-out.
+const TREE_PAGE_SIZE = 100;
 const LARGE_COLLECTION_PAGE_SIZE = 250;
 const BOARD_UNFINISHED_PAGE_SIZE = 1000;
 const BOARD_UNTHROTTLED_ITEM_COUNT = 1000;
@@ -48,9 +51,8 @@ function appendUniqueItems(existing, incoming) {
 
 function initialItemsPageSize(view) {
   if (view === 'workspace-list' || view === 'collection-list') return LIST_INITIAL_PAGE_SIZE;
+  if (view === 'workspace-tree' || view === 'collection-tree') return TREE_PAGE_SIZE;
   if (
-    view === 'workspace-tree' ||
-    view === 'collection-tree' ||
     view === 'workspace-map' ||
     view === 'collection-map' ||
     view === 'workspace-roadmap' ||

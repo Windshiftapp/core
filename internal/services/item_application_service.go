@@ -1072,6 +1072,81 @@ func (s *ItemApplicationService) Ancestors(ctx context.Context, userID, itemID i
 	return items, nil
 }
 
+// ItemAncestorsBatchEntry pairs one requested item with its ancestor chain
+// (root -> parent, excluding the item itself).
+type ItemAncestorsBatchEntry struct {
+	ItemID    int           `json:"item_id"`
+	Ancestors []models.Item `json:"ancestors"`
+}
+
+// BatchAncestors resolves ancestor chains for many items in one request,
+// backing the tree view's hierarchy-gap filling. Ids the caller cannot view or
+// that don't exist are silently omitted, matching Batch.
+func (s *ItemApplicationService) BatchAncestors(ctx context.Context, userID int, ids []int) ([]ItemAncestorsBatchEntry, error) {
+	loaded, err := s.items.FindByIDsWithDetails(ids)
+	if err != nil {
+		return nil, err
+	}
+	loadedByID := make(map[int]*models.Item, len(loaded))
+	for _, item := range loaded {
+		loadedByID[item.ID] = item
+	}
+	allowed := make([]int, 0, len(ids))
+	permissions := make(map[int]bool)
+	for _, id := range ids {
+		item, exists := loadedByID[id]
+		if !exists {
+			continue
+		}
+		allowedFlag, ok := permissions[item.WorkspaceID]
+		if !ok {
+			allowedFlag, err = s.perm.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
+			if err != nil {
+				return nil, err
+			}
+			permissions[item.WorkspaceID] = allowedFlag
+		}
+		if allowedFlag {
+			allowed = append(allowed, id)
+		}
+	}
+
+	chains, err := s.hierarchy.GetAncestorsForItemsContext(ctx, allowed)
+	if err != nil {
+		return nil, err
+	}
+	// Enrich every distinct ancestor once, then index by id for regrouping.
+	seen := make(map[int]struct{})
+	flat := make([]models.Item, 0)
+	for _, chain := range chains {
+		for _, ancestor := range chain {
+			if _, dup := seen[ancestor.ID]; dup {
+				continue
+			}
+			seen[ancestor.ID] = struct{}{}
+			flat = append(flat, ancestor)
+		}
+	}
+	if err := s.enrich(ctx, userID, flat); err != nil {
+		return nil, err
+	}
+	enrichedByID := make(map[int]models.Item, len(flat))
+	for _, ancestor := range flat {
+		enrichedByID[ancestor.ID] = ancestor
+	}
+
+	entries := make([]ItemAncestorsBatchEntry, 0, len(allowed))
+	for _, id := range allowed {
+		chain := chains[id]
+		enriched := make([]models.Item, len(chain))
+		for i, ancestor := range chain {
+			enriched[i] = enrichedByID[ancestor.ID]
+		}
+		entries = append(entries, ItemAncestorsBatchEntry{ItemID: id, Ancestors: enriched})
+	}
+	return entries, nil
+}
+
 func (s *ItemApplicationService) Descendants(ctx context.Context, userID, itemID, maxDepth int) ([]models.Item, error) {
 	if err := s.requireView(ctx, userID, itemID); err != nil {
 		return nil, err
