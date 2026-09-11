@@ -364,6 +364,19 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	existingUser, err := h.repo.GetUserByEmail(email)
 	if err == nil {
+		// A tombstoned account stays deleted: re-provisioning the same email
+		// must conflict rather than resurrect it (RFC 7644 §3.6). Un-deleting
+		// is an operator decision, not an IdP-driven one.
+		if h.repo.IsUserSCIMDeleted(existingUser.ID) {
+			h.logSCIMAuditEvent(r, logger.ActionSCIMUserCreate, logger.ResourceUser, &existingUser.ID, email,
+				map[string]any{
+					"username": existingUser.Username,
+					"reason":   "email_matches_tombstoned_user",
+				}, false, "refused: email belongs to a SCIM-deleted user")
+			respondSCIMErrorMsg(w, http.StatusConflict, "User with this email already exists", "uniqueness")
+			return
+		}
+
 		username := scimUser.UserName
 		if username == "" {
 			username = existingUser.Username
@@ -652,7 +665,7 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repo.DeactivateUser(id)
+	err = h.repo.TombstoneUser(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to delete user", "")
 		return

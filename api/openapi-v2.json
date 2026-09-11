@@ -23676,6 +23676,10 @@
                     "description": "The is default value.",
                     "type": "boolean"
                   },
+                  "logo_url": {
+                    "description": "The logo url value.",
+                    "type": "string"
+                  },
                   "name": {
                     "description": "The name value.",
                     "type": "string"
@@ -44146,6 +44150,10 @@
                   "is_default": {
                     "description": "The is default value.",
                     "type": "boolean"
+                  },
+                  "logo_url": {
+                    "description": "The logo url value.",
+                    "type": "string"
                   },
                   "name": {
                     "description": "The name value.",

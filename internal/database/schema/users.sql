@@ -15,6 +15,7 @@
 		email_verification_expires DATETIME, -- Expiry time for verification token
 		scim_external_id TEXT, -- SCIM externalId from identity provider
 		scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
+		scim_deleted_at DATETIME, -- Set when the IdP deprovisioned the user via SCIM DELETE; row retained but hidden from every SCIM query (RFC 7644 §3.6)
 		offboarded_at DATETIME, -- Set when the account is administratively offboarded; never cleared, every activation path must reject it
 		is_agent BOOLEAN DEFAULT FALSE, -- If true, user is a non-human agent (API-only; cannot log in)
 		agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent (inherits owner permissions)
@@ -165,6 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token)
 CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
 
 
+-- migration: 20260911_users_scim_deleted_at
 -- migration: 20260911_users_offboarded_at
 
 -- migration: 0014_users_is_agent
