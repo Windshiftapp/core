@@ -542,10 +542,20 @@ class WorkItemFormStore {
         customFieldIds.includes(field.id)
       );
 
-      // Reset custom field values for new fields
+      // Keep values the user already entered for fields that remain configured
+      // across the workspace/type change; only fields new to the screen get
+      // their default. Resetting wholesale silently discarded picks when the
+      // item type changed after a field was filled.
+      const previousValues = this.customFieldValues;
       this.customFieldValues = {};
       filteredCustomFields.forEach((field) => {
-        this.customFieldValues[field.id] = isBooleanCustomFieldType(field.field_type) ? false : '';
+        const previous = previousValues[field.id];
+        this.customFieldValues[field.id] =
+          previous !== undefined && previous !== null && previous !== ''
+            ? previous
+            : isBooleanCustomFieldType(field.field_type)
+              ? false
+              : '';
       });
 
       this.customFields = filteredCustomFields;
