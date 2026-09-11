@@ -27,7 +27,7 @@ type zammadSyncService interface {
 }
 
 func NewZammadSyncScheduler(service *services.ZammadService) *ZammadSyncScheduler {
-	return &ZammadSyncScheduler{service: service, interval: 2 * time.Minute, triggerSyncAll: make(chan struct{}, 1)}
+	return &ZammadSyncScheduler{service: service, interval: time.Minute, triggerSyncAll: make(chan struct{}, 1)}
 }
 
 func (s *ZammadSyncScheduler) Start() {
@@ -90,7 +90,7 @@ func (s *ZammadSyncScheduler) loop(ctx context.Context, timer *time.Timer) {
 	for {
 		select {
 		case <-timer.C:
-			if err := s.service.SyncDue(ctx, 50); err != nil && ctx.Err() == nil {
+			if err := s.service.SyncDue(ctx, 100); err != nil && ctx.Err() == nil {
 				slog.Warn("Zammad ticket synchronization failed", slog.String("component", "zammad-sync"), slog.Any("error", err))
 			}
 			timer.Reset(s.interval)

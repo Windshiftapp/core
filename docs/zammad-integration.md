@@ -108,7 +108,7 @@ This is a recovery operation, not a normal unlink: the correlation value remains
 ## Refresh, backoff, and recovery
 
 `POST /api/zammad-ticket-links/{linkId}/refresh` performs an immediate remote read and updates the stored snapshot.
-A background scheduler also polls linked tickets approximately every two minutes after the previous run completes.
+A background scheduler polls up to 100 due linked tickets per run, waiting one minute after the previous run completes.
 Successful refreshes and persisted synchronization failures publish an item event so an open item panel reloads its Zammad snapshot without a page refresh.
 Failed synchronization records a sanitized error and schedules another attempt after a retry delay.
 Fair ordering by the most recent attempt prevents repeatedly failing links from starving healthy links.

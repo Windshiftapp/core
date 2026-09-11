@@ -12,6 +12,7 @@ import (
 type fakeZammadSyncService struct {
 	mu          sync.Mutex
 	dueCalls    int
+	dueLimit    int
 	dueStarted  chan int
 	releaseDue  chan struct{}
 	dueDone     chan struct{}
@@ -21,9 +22,10 @@ type fakeZammadSyncService struct {
 	allDoneOnce sync.Once
 }
 
-func (f *fakeZammadSyncService) SyncDue(context.Context, int) error {
+func (f *fakeZammadSyncService) SyncDue(_ context.Context, limit int) error {
 	f.mu.Lock()
 	f.dueCalls++
+	f.dueLimit = limit
 	call := f.dueCalls
 	f.mu.Unlock()
 	f.dueStarted <- call
@@ -46,6 +48,13 @@ func (f *fakeZammadSyncService) SyncAllTicketLinks(context.Context) (services.Za
 	return services.ZammadSyncSummary{Selected: 1, Succeeded: 1}, nil
 }
 
+func TestZammadSchedulerDefaultsToOneMinute(t *testing.T) {
+	s := NewZammadSyncScheduler(nil)
+	if s.interval != time.Minute {
+		t.Fatalf("poll interval = %s, want one minute", s.interval)
+	}
+}
+
 func TestZammadSchedulerWaitsFullIntervalAfterSlowRun(t *testing.T) {
 	fake := &fakeZammadSyncService{
 		dueStarted: make(chan int, 4), releaseDue: make(chan struct{}), dueDone: make(chan struct{}),
@@ -59,6 +68,13 @@ func TestZammadSchedulerWaitsFullIntervalAfterSlowRun(t *testing.T) {
 	case <-fake.dueStarted:
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("first scheduled synchronization did not start")
+	}
+	fake.mu.Lock()
+	limit := fake.dueLimit
+	fake.mu.Unlock()
+	if limit != 100 {
+		close(fake.releaseDue)
+		t.Fatalf("poll batch limit = %d, want 100", limit)
 	}
 	time.Sleep(50 * time.Millisecond)
 	close(fake.releaseDue)
