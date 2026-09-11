@@ -410,7 +410,7 @@
                     <button
                       type="button"
                       onclick={() => removeEventRule(index)}
-                      class="text-red-600 hover:text-red-800 transition-colors pb-1.5"
+                      class="text-ds-text-danger hover:opacity-80 transition-colors pb-1.5"
                     >
                       <Trash2 class="w-4 h-4" />
                     </button>

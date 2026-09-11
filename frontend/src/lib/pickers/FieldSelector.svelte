@@ -190,18 +190,18 @@
 
   function getFieldTypeColor(type) {
     const colors = {
-      text: 'bg-blue-100 text-blue-800',
-      number: 'bg-green-100 text-green-800',
-      date: 'bg-purple-100 text-purple-800',
-      enum: 'bg-orange-100 text-orange-800',
-      boolean: 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200',
-      user: 'bg-indigo-100 text-indigo-800',
-      reference: 'bg-pink-100 text-pink-800',
-      select: 'bg-orange-100 text-orange-800',
-      multiselect: 'bg-orange-100 text-orange-800',
-      textarea: 'bg-blue-100 text-blue-800'
+      text: 'bg-ds-accent-blue-subtle text-ds-text-accent-blue',
+      number: 'bg-ds-accent-green-subtle text-ds-text-accent-green',
+      date: 'bg-ds-accent-purple-subtle text-ds-text-accent-purple',
+      enum: 'bg-ds-accent-orange-subtle text-ds-text-accent-orange',
+      boolean: 'bg-ds-background-neutral text-ds-text-subtle',
+      user: 'bg-ds-accent-teal-subtle text-ds-text-accent-teal',
+      reference: 'bg-ds-accent-red-subtle text-ds-text-accent-red',
+      select: 'bg-ds-accent-orange-subtle text-ds-text-accent-orange',
+      multiselect: 'bg-ds-accent-orange-subtle text-ds-text-accent-orange',
+      textarea: 'bg-ds-accent-blue-subtle text-ds-text-accent-blue'
     };
-    return colors[type] || 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200';
+    return colors[type] || 'bg-ds-background-neutral text-ds-text-subtle';
   }
 </script>
 
@@ -224,7 +224,7 @@
           {getFieldTypeLabel(selectedField.type)}
         </span>
         {#if selectedField.isCustom}
-          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">{t('pickers.custom')}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded bg-ds-accent-purple-subtle text-ds-text-accent-purple">{t('pickers.custom')}</span>
         {/if}
       </div>
       <div class="flex items-center gap-1">
@@ -287,7 +287,7 @@
                           {getFieldTypeLabel(field.type)}
                         </span>
                         {#if field.isCustom}
-                          <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">{t('pickers.custom')}</span>
+                          <span class="text-xs px-1.5 py-0.5 rounded bg-ds-accent-purple-subtle text-ds-text-accent-purple">{t('pickers.custom')}</span>
                         {/if}
                       </div>
                       {#if field.description}

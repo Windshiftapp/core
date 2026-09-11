@@ -3516,6 +3516,25 @@
         ]
       }
     },
+    "/comments/batch": {
+      "post": {
+        "description": "Batch item comment feeds. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Batch item comment feeds",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/comments/{comment_id}": {
       "delete": {
         "description": "Delete comment. The server verifies resource ownership and deletion preconditions before removing the resource.",

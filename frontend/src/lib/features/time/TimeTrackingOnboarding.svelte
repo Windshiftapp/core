@@ -178,7 +178,7 @@
         </div>
         <div class="w-full rounded-full h-2" style="background-color: var(--ds-background-neutral);">
           <div
-            class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            class="bg-ds-interactive h-2 rounded-full transition-all duration-300"
             style="width: {progressPercentage}%"
           ></div>
         </div>

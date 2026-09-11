@@ -50661,6 +50661,141 @@
         ],
         "type": "object"
       },
+      "PostCommentsBatchPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "item_ids": {
+            "description": "The item ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "page_size": {
+            "description": "The page size value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_ids",
+          "page_size"
+        ],
+        "type": "object"
+      },
+      "PostCommentsBatchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "comments": {
+                  "description": "The comments value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "agent_owner_name": {
+                        "description": "The agent owner name value.",
+                        "type": "string"
+                      },
+                      "author_avatar": {
+                        "description": "The author avatar value.",
+                        "type": "string"
+                      },
+                      "author_email": {
+                        "description": "The author email value.",
+                        "type": "string"
+                      },
+                      "author_id": {
+                        "description": "The author id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "author_name": {
+                        "description": "The author name value.",
+                        "type": "string"
+                      },
+                      "content": {
+                        "description": "The content value.",
+                        "type": "string"
+                      },
+                      "content_html": {
+                        "description": "The content html value.",
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "The created at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "is_agent": {
+                        "description": "The is agent value.",
+                        "type": "boolean"
+                      },
+                      "is_private": {
+                        "description": "The is private value.",
+                        "type": "boolean"
+                      },
+                      "item_id": {
+                        "description": "The item id value.",
+                        "type": "integer"
+                      },
+                      "portal_customer_id": {
+                        "description": "The portal customer id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "source": {
+                        "description": "The source value.",
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "description": "The updated at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "content",
+                      "created_at",
+                      "id",
+                      "is_private",
+                      "item_id",
+                      "source",
+                      "updated_at"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "has_more": {
+                  "description": "The has more value.",
+                  "type": "boolean"
+                },
+                "item_id": {
+                  "description": "The item id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "comments",
+                "has_more",
+                "item_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostConditionSetsPayload": {
         "additionalProperties": false,
         "properties": {
@@ -74275,6 +74410,68 @@
         ],
         "x-required-scopes": [
           "tests:read"
+        ]
+      }
+    },
+    "/comments/batch": {
+      "post": {
+        "description": "Batch item comment feeds. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postCommentsBatch",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCommentsBatchPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostCommentsBatchResult"
+                }
+              }
+            },
+            "description": "Batch item comment feeds response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Batch item comment feeds",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
         ]
       }
     },

@@ -415,10 +415,10 @@
 									<p class="text-sm mb-2" style="color: var(--ds-text-subtle)">{t('settings.groups.usersToAdd')} ({selectedUsersToAdd.length}):</p>
 									<div class="space-y-2 max-h-32 overflow-y-auto">
 										{#each selectedUsersToAdd as user}
-											<div class="flex items-center justify-between p-2 bg-blue-50 rounded border dark:bg-blue-900/20">
+											<div class="flex items-center justify-between p-2 bg-ds-accent-blue-subtle rounded border">
 												<div class="flex items-center">
-													<div class="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center mr-2">
-														<span class="text-xs font-medium text-white">
+													<div class="h-6 w-6 rounded-full bg-ds-accent-blue flex items-center justify-center mr-2">
+														<span class="text-xs font-medium text-ds-text-inverse">
 															{user.first_name.charAt(0)}{user.last_name.charAt(0)}
 														</span>
 													</div>

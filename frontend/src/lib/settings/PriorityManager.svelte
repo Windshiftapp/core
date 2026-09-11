@@ -282,7 +282,7 @@
             />
           {/each}
         {:else}
-          <span class="text-xs text-gray-500">{t('pickers.noConfigurationSetsFound')}</span>
+          <span class="text-xs text-ds-text-subtle">{t('pickers.noConfigurationSetsFound')}</span>
         {/if}
       </div>
     {/snippet}

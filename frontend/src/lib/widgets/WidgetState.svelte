@@ -17,18 +17,18 @@
 
 <div class="min-h-[160px] space-y-3">
   {#if loading}
-    <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-600">
-      <Loader2 class="w-5 h-5 animate-spin text-blue-500" />
+    <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-ds-border px-4 py-6 text-sm text-ds-text-subtle">
+      <Loader2 class="w-5 h-5 animate-spin text-ds-interactive" />
       <span>{loadingText || t('common.loading')}</span>
     </div>
   {:else if error}
-    <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-rose-200 px-4 py-4 text-sm text-rose-600">
+    <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-ds-status-danger-border px-4 py-4 text-sm text-ds-text-danger">
       <AlertCircle class="w-5 h-5" />
       <div class="text-left">
         <p class="font-medium">{error}</p>
         {#if onRetry}
           <button
-            class="text-xs text-blue-600 hover:text-blue-800 underline"
+            class="text-xs text-ds-text-link hover:text-ds-text-link-hovered underline"
             onclick={onRetry}
           >
             {t('common.retry')}
@@ -37,13 +37,13 @@
       </div>
     </div>
   {:else if isEmpty}
-    <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-gray-500">
+    <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-ds-border px-4 py-8 text-center text-ds-text-subtle">
       {#if EmptyIcon}
         <EmptyIcon class="h-10 w-10 mb-2 opacity-30" />
       {/if}
-      <p class="text-sm font-medium text-gray-700">{emptyTitle || t('items.noItems')}</p>
+      <p class="text-sm font-medium text-ds-text">{emptyTitle || t('items.noItems')}</p>
       {#if emptySubtitle}
-        <p class="text-xs text-gray-400">{emptySubtitle}</p>
+        <p class="text-xs text-ds-text-subtlest">{emptySubtitle}</p>
       {/if}
     </div>
   {:else}

@@ -658,7 +658,7 @@
                 {#each discoveredInstallations as installation}
                   <button
                     type="button"
-                    class="flex items-center p-2 rounded border hover:border-blue-500 transition-colors text-left w-full"
+                    class="flex items-center p-2 rounded border hover:border-ds-interactive transition-colors text-left w-full"
                     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
                     onclick={() => selectInstallation(installation)}
                   >

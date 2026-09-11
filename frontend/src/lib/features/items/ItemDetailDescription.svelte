@@ -276,7 +276,7 @@
                 onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 onclick={() => handleExecuteAction(action)}
               >
-                <Zap class="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <Zap class="w-4 h-4 text-ds-accent-yellow flex-shrink-0" />
                 {action.name}
               </button>
             {/each}

@@ -201,7 +201,7 @@
       icon: linkType.active ? PowerOff : Power,
       title: linkType.active ? t('common.deactivate') : t('common.activate'),
       color: linkType.active ? '#f59e0b' : '#10b981',
-      hoverClass: linkType.active ? 'hover:bg-orange-50' : 'hover:bg-green-50',
+      hoverClass: linkType.active ? 'hover:bg-ds-accent-orange-subtle' : 'hover:bg-ds-success-subtle',
       onClick: () => toggleActive(linkType)
     });
 
@@ -356,7 +356,7 @@
   {#snippet color(linkType)}
     <div class="flex items-center gap-2">
       <div
-        class="w-6 h-6 rounded border border-gray-300"
+        class="w-6 h-6 rounded border border-ds-border-bold"
         style="background-color: {linkType.color};"
       ></div>
       <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{linkType.color}</span>

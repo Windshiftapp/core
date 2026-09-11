@@ -1472,22 +1472,3 @@
     }}
   />
 {/if}
-
-<style>
-  /* Override Tailwind hover states for dark mode compatibility */
-  :global(.group):hover :global(.hover\:bg-gray-50) {
-    background-color: var(--ds-background-neutral-hovered) !important;
-  }
-
-  :global(.hover\:bg-gray-50):hover {
-    background-color: var(--ds-background-neutral-hovered) !important;
-  }
-
-  :global(.hover\:bg-gray-200):hover {
-    background-color: var(--ds-background-neutral-hovered) !important;
-  }
-
-  :global(.text-gray-600) {
-    color: var(--ds-text-subtle) !important;
-  }
-</style>

@@ -811,7 +811,6 @@
   isOpen={showVisibilityModal}
   requestType={selectedRequestTypeForVisibility}
   channelId={portalStore.portalData?.channel_id}
-  isDarkMode={portalStore.isDarkMode}
   onSaved={handleVisibilitySaved}
   onclose={closeVisibilityModal}
 />
@@ -821,7 +820,6 @@
   isOpen={showAssetReportVisibilityModal}
   requestType={selectedAssetReportForVisibility}
   channelId={portalStore.portalData?.channel_id}
-  isDarkMode={portalStore.isDarkMode}
   onSaved={handleAssetReportVisibilitySaved}
   onclose={closeAssetReportVisibilityModal}
 />

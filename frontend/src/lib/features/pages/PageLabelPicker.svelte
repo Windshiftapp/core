@@ -264,7 +264,7 @@
   }
 
   .trigger:hover {
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
     color: var(--ds-text);
   }
 
@@ -340,7 +340,7 @@
   }
 
   .row:hover {
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
   }
 
   .row--checked {
@@ -436,7 +436,7 @@
   }
 
   .create-btn:hover:not(:disabled) {
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
   }
 
   .create-btn:disabled {

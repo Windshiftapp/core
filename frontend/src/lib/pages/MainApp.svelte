@@ -375,7 +375,7 @@
         {#if terminalState.visible}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
-            class="terminal-resize-handle w-1 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors flex-shrink-0"
+            class="terminal-resize-handle w-1 cursor-col-resize hover:bg-ds-interactive/40 active:bg-ds-interactive/60 transition-colors flex-shrink-0"
             style="background-color: var(--ds-border);"
             onmousedown={handleTerminalResizeStart}
           ></div>

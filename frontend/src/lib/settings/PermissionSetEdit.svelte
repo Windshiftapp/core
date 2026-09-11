@@ -363,7 +363,7 @@
 
                       <button
                       onclick={() => openAssignmentPicker(permission.id)}
-                      class="inline-flex items-center px-2.5 py-1 rounded-full text-xs border-2 border-dashed transition-colors hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                      class="inline-flex items-center px-2.5 py-1 rounded-full text-xs border-2 border-dashed transition-colors hover:border-ds-accent-blue hover:text-ds-accent-blue hover:bg-ds-accent-blue-subtle"
                       style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
                     >
                       <UserPlus class="w-3 h-3 mr-1" />

@@ -722,7 +722,7 @@
                   <IconEdit class="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onclick={() => deleteType(row.id)}>
-                  <IconTrash class="w-4 h-4 text-red-500" />
+                  <IconTrash class="w-4 h-4 text-ds-icon-danger" />
                 </Button>
               </div>
             {/if}
@@ -782,9 +782,9 @@
                   <span class="w-6"></span>
                 {/if}
                 {#if expandedCategories.has(category.id)}
-                  <IconFolderOpen class="w-4 h-4 text-yellow-500" />
+                  <IconFolderOpen class="w-4 h-4 text-ds-accent-yellow" />
                 {:else}
-                  <IconFolder class="w-4 h-4 text-yellow-500" />
+                  <IconFolder class="w-4 h-4 text-ds-accent-yellow" />
                 {/if}
                 <span class="font-medium" style="color: var(--ds-text);">{category.name}</span>
                 {#if category.asset_count > 0}
@@ -800,7 +800,7 @@
                     <IconEdit class="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onclick={() => deleteCategory(category.id)}>
-                    <IconTrash class="w-4 h-4 text-red-500" />
+                    <IconTrash class="w-4 h-4 text-ds-icon-danger" />
                   </Button>
                 </div>
               {/if}
@@ -1024,7 +1024,7 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'user' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'role-toggle-inactive'}"
+            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'user' ? 'border-ds-interactive bg-ds-accent-blue-subtle text-ds-text-accent-blue' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'user'}
           >
             <IconUser class="w-4 h-4 inline mr-1" />
@@ -1032,7 +1032,7 @@
           </button>
           <button
             type="button"
-            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'group' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'role-toggle-inactive'}"
+            class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'group' ? 'border-ds-accent-purple bg-ds-accent-purple-subtle text-ds-text-accent-purple' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'group'}
           >
             <IconUsers class="w-4 h-4 inline mr-1" />

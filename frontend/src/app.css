@@ -43,6 +43,72 @@
   /* Interactive */
   --color-ds-interactive: var(--ds-interactive);
   --color-ds-interactive-hovered: var(--ds-interactive-hovered);
+  --color-ds-interactive-pressed: var(--ds-interactive-pressed);
+  --color-ds-interactive-subtle: var(--ds-interactive-subtle);
+
+  /* Feedback text */
+  --color-ds-text-danger: var(--ds-text-danger);
+  --color-ds-text-success: var(--ds-text-success);
+  --color-ds-text-info: var(--ds-text-info);
+  --color-ds-text-warning: var(--ds-text-warning);
+
+  /* Feedback backgrounds */
+  --color-ds-background-danger-bold: var(--ds-background-danger-bold);
+  --color-ds-background-danger-bold-hovered: var(--ds-background-danger-bold-hovered);
+  --color-ds-background-warning-bold: var(--ds-background-warning-bold);
+  --color-ds-background-warning-bold-hovered: var(--ds-background-warning-bold-hovered);
+  --color-ds-background-neutral: var(--ds-background-neutral);
+  --color-ds-background-neutral-hovered: var(--ds-background-neutral-hovered);
+  --color-ds-danger-subtle: var(--ds-danger-subtle);
+  --color-ds-warning-subtle: var(--ds-warning-subtle);
+  --color-ds-success-subtle: var(--ds-success-subtle);
+  --color-ds-status-danger-bg: var(--ds-status-danger-bg);
+  --color-ds-status-danger-border: var(--ds-status-danger-border);
+  --color-ds-status-danger-text: var(--ds-status-danger-text);
+  --color-ds-status-success-bg: var(--ds-status-success-bg);
+  --color-ds-status-success-border: var(--ds-status-success-border);
+  --color-ds-status-success-text: var(--ds-status-success-text);
+  --color-ds-status-warning-bg: var(--ds-status-warning-bg);
+  --color-ds-status-warning-border: var(--ds-status-warning-border);
+  --color-ds-status-warning-text: var(--ds-status-warning-text);
+  --color-ds-status-info-bg: var(--ds-status-info-bg);
+  --color-ds-status-info-border: var(--ds-status-info-border);
+  --color-ds-status-info-text: var(--ds-status-info-text);
+
+  /* Accents (subtle backgrounds / solid fills) */
+  --color-ds-accent-blue: var(--ds-accent-blue);
+  --color-ds-accent-blue-subtle: var(--ds-accent-blue-subtle);
+  --color-ds-accent-green: var(--ds-accent-green);
+  --color-ds-accent-green-subtle: var(--ds-accent-green-subtle);
+  --color-ds-accent-orange: var(--ds-accent-orange);
+  --color-ds-accent-orange-subtle: var(--ds-accent-orange-subtle);
+  --color-ds-accent-purple: var(--ds-accent-purple);
+  --color-ds-accent-purple-subtle: var(--ds-accent-purple-subtle);
+  --color-ds-accent-teal: var(--ds-accent-teal);
+  --color-ds-accent-teal-subtle: var(--ds-accent-teal-subtle);
+  --color-ds-accent-red: var(--ds-accent-red);
+  --color-ds-accent-red-subtle: var(--ds-accent-red-subtle);
+  --color-ds-accent-yellow: var(--ds-accent-yellow);
+  --color-ds-accent-yellow-subtle: var(--ds-accent-yellow-subtle);
+
+  /* Accent text — readable-on-subtle text for badges and chips */
+  --color-ds-text-accent-blue: var(--ds-text-accent-blue);
+  --color-ds-text-accent-green: var(--ds-text-accent-green);
+  --color-ds-text-accent-purple: var(--ds-text-accent-purple);
+  --color-ds-text-accent-teal: var(--ds-text-accent-teal);
+  --color-ds-text-accent-orange: var(--ds-text-accent-orange);
+  --color-ds-text-accent-red: var(--ds-text-accent-red);
+  --color-ds-text-accent-yellow: var(--ds-text-accent-yellow);
+
+  /* Icons & feedback text */
+  --color-ds-icon-danger: var(--ds-icon-danger);
+  --color-ds-icon-info: var(--ds-icon-info);
+  --color-ds-icon-success: var(--ds-icon-success);
+  --color-ds-icon-warning: var(--ds-icon-warning);
+  --color-ds-warning: var(--ds-warning);
+
+  /* Links */
+  --color-ds-text-link-hovered: var(--ds-text-link-hovered);
 }
 
 /* Base styles */

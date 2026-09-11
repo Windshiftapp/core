@@ -305,14 +305,14 @@
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 data-available-field-editor={JSON.stringify({ ...field, identifier })}
-                class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
+                class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-ds-border-focused active:cursor-grabbing"
                 style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
                 onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                 onmouseleave={(e) => e.currentTarget.style.background = 'var(--ds-background-input)'}
               >
                 <!-- Drag Handle -->
                 <div class="flex-shrink-0">
-                  <DragHandleDots class="w-4 h-4 group-hover:text-blue-500" />
+                  <DragHandleDots class="w-4 h-4 group-hover:text-ds-interactive" />
                 </div>
 
                 <div class="flex-1 min-w-0">
@@ -369,7 +369,7 @@
                 closestEdge={fieldDragState.get(field.field_identifier)?.closestEdge}
                 class="gap-3 px-3 py-2 rounded border hover:shadow-sm transition-all duration-200"
                 style="background: var(--ds-background-input); border-color: var(--ds-border); user-select: none;"
-                handleClass="w-4 h-4 group-hover:text-blue-500"
+                handleClass="w-4 h-4 group-hover:text-ds-interactive"
               >
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm flex items-center gap-2" style="color: var(--ds-text);">
@@ -389,7 +389,7 @@
 
                   <FieldRemovalAction
                     locked={isProtected(field)}
-                    removeClass="text-red-500 hover:text-red-700 transition-colors p-1 rounded flex-shrink-0 remove-field-btn"
+                    removeClass="text-ds-text-danger hover:opacity-80 transition-opacity p-1 rounded flex-shrink-0 remove-field-btn"
                     removeTitle={t('aria.removeField')}
                     onremove={() => removeField(index)}
                   />

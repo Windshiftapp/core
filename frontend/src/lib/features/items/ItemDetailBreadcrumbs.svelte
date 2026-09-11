@@ -419,7 +419,7 @@
             <button
               onclick={removeParent}
               disabled={saving}
-              class="w-full px-3 py-2 text-left border-b text-red-600 hover:text-red-700 disabled:opacity-50"
+              class="w-full px-3 py-2 text-left border-b text-ds-text-danger hover:opacity-80 disabled:opacity-50"
               style="border-color: var(--ds-border);"
             >
               <div class="flex items-center gap-2">

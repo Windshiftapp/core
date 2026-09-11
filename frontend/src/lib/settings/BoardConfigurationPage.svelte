@@ -916,14 +916,14 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   data-available-status={JSON.stringify({ id: status.id, name: status.name, color: status.category_color })}
-                  class="group flex items-center gap-2 px-2 py-1.5 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
+                  class="group flex items-center gap-2 px-2 py-1.5 rounded border transition-all duration-200 cursor-grab hover:border-ds-border-focused active:cursor-grabbing"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
                   onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                   onmouseleave={(e) => e.currentTarget.style.background = 'var(--ds-background-input)'}
                 >
                   <!-- 6-dot drag handle -->
                   <div class="flex-shrink-0">
-                    <DragHandleDots class="w-4 h-4 group-hover:text-blue-500" />
+                    <DragHandleDots class="w-4 h-4 group-hover:text-ds-interactive" />
                   </div>
                   <!-- Color dot -->
                   <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.category_color || '#6b7280'};"></span>
@@ -1048,7 +1048,7 @@
 
                         <!-- Drag handle -->
                         <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="touch-action: none;">
-                          <DragHandleDots class="w-3.5 h-3.5 group-hover:text-blue-500" />
+                          <DragHandleDots class="w-3.5 h-3.5 group-hover:text-ds-interactive" />
                         </div>
                         <!-- Color dot -->
                         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getStatusColor(statusId)};"></span>

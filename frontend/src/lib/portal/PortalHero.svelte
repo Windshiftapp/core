@@ -50,7 +50,7 @@
       <form onsubmit={handleSearch} class="relative">
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search class="h-6 w-6 text-gray-400" />
+            <Search class="h-6 w-6 text-ds-icon-subtle" />
           </div>
           <Input
             type="text"

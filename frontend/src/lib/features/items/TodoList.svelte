@@ -412,7 +412,7 @@
                     <button
                       onclick={saveTodo}
                       disabled={!newTodoTitle.trim()}
-                      class="p-2 text-green-600 hover:text-green-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed add-btn"
+                      class="p-2 text-ds-text-success hover:opacity-80 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed add-btn"
                     >
                       <Check class="w-5 h-5" />
                     </button>
@@ -470,7 +470,7 @@
                         <div class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
                           <button
                             onclick={() => deleteTodo(todo, true)}
-                            class="p-1 text-red-500 hover:text-red-700 rounded transition-colors delete-btn"
+                            class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
                           >
                             <Trash2 class="w-4 h-4" />
                           </button>
@@ -535,7 +535,7 @@
                         <div class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
                           <button
                             onclick={() => deleteTodo(item, false)}
-                            class="p-1 text-red-500 hover:text-red-700 rounded transition-colors delete-btn"
+                            class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
                           >
                             <Trash2 class="w-4 h-4" />
                           </button>

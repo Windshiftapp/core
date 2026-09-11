@@ -91,7 +91,7 @@
       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
         {#if isDefault}
           <span class="flex items-center gap-2">
-            <Shield class="w-4 h-4 text-amber-500" />
+            <Shield class="w-4 h-4 text-ds-icon-warning" />
             {t('settings.channelManagers.systemChannelNote')}
           </span>
         {:else}

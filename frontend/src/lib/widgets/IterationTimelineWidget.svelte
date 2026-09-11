@@ -167,10 +167,10 @@
               </div>
               <span
                 class="text-xs font-medium px-2 py-0.5 rounded whitespace-nowrap"
-                class:bg-green-100={active}
-                class:text-green-700={active}
-                class:bg-gray-100={!active}
-                class:text-gray-600={!active}
+                class:bg-ds-success-subtle={active}
+                class:text-ds-text-success={active}
+                class:bg-ds-background-neutral={!active}
+                class:text-ds-text-subtle={!active}
               >
                 {getStatusLabel(iteration)}
               </span>

@@ -239,7 +239,7 @@
         iconOnly={true}
         showChevron={false}
         triggerLabel={t('widgets.resizeAriaLabel')}
-        triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hover rounded"
+        triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hovered rounded"
         triggerTestid="widget-width-menu"
         placement="bottom-end"
         items={menuItems}
@@ -247,7 +247,7 @@
 
       {#if isEditing}
         <button
-          class="hover:text-red-600 p-1 text-ds-text-subtlest"
+          class="hover:text-ds-text-danger p-1 text-ds-text-subtlest"
           onclick={handleRemove}
           title={t('widgets.removeWidget')}
           aria-label={t('widgets.removeWidget')}

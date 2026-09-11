@@ -28,7 +28,7 @@
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors {
             subtab === tab.id
               ? ''
-              : 'border-transparent hover:border-gray-300'
+              : 'border-transparent hover:border-ds-border-bold'
           }"
           style="{subtab === tab.id ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
           aria-current={subtab === tab.id ? 'page' : undefined}

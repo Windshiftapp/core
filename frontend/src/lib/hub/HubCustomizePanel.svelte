@@ -109,7 +109,7 @@
                   {#if hubStore.selectedGradient === index}
                     <div class="absolute inset-0 flex items-center justify-center">
                       <div class="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-lg">
-                        <Check class="w-4 h-4 text-gray-800" />
+                        <Check class="w-4 h-4 text-ds-text" />
                       </div>
                     </div>
                   {/if}
@@ -177,7 +177,7 @@
                 />
                 <button
                   onclick={() => hubStore.deleteSection(section.id)}
-                  class="p-1 rounded hover:bg-red-100 text-red-600"
+                  class="p-1 rounded hover:bg-ds-danger-subtle text-ds-text-danger"
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>

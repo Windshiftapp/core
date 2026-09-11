@@ -135,7 +135,7 @@
         accept="image/*"
         onchange={(event) => upload(/** @type {HTMLInputElement} */ (event.target).files)}
         disabled={uploading}
-        class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
+        class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-ds-interactive file:text-white hover:file:bg-ds-interactive-hovered disabled:opacity-50"
         style="color: var(--ds-text-subtle);"
       />
       <p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">{t('users.avatarFileHint')}</p>

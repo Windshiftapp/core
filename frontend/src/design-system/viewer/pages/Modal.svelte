@@ -26,7 +26,7 @@
     <Modal bind:isOpen={basicOpen} onclose={() => basicOpen = false}>
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Basic Modal</h3>
-        <p class="text-gray-600 mb-4">
+        <p class="text-ds-text-subtle mb-4">
           This is a basic modal with default settings. Click the X button or outside the modal to close.
         </p>
         <div class="flex justify-end">
@@ -50,7 +50,7 @@
     <Modal bind:isOpen={customWidthOpen} maxWidth="max-w-2xl" onclose={() => customWidthOpen = false}>
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Wide Modal</h3>
-        <p class="text-gray-600 mb-4">
+        <p class="text-ds-text-subtle mb-4">
           This modal uses <code>maxWidth="max-w-2xl"</code> for a wider content area.
           Available options include: <code>max-w-sm</code>, <code>max-w-md</code>, <code>max-w-lg</code>,
           <code>max-w-xl</code>, <code>max-w-2xl</code>, <code>max-w-3xl</code>, etc.
@@ -78,7 +78,7 @@
     >
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Persistent Modal</h3>
-        <p class="text-gray-600 mb-4">
+        <p class="text-ds-text-subtle mb-4">
           This modal cannot be closed by clicking outside or pressing Escape.
           The user must explicitly click the button to close it.
         </p>

@@ -352,7 +352,7 @@
             />
           {/each}
         {:else}
-          <span class="text-xs text-gray-500">{t('settings.itemTypes.noConfigurationSets')}</span>
+          <span class="text-xs text-ds-text-subtle">{t('settings.itemTypes.noConfigurationSets')}</span>
         {/if}
       </div>
     {/snippet}

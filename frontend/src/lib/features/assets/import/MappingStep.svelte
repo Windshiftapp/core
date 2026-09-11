@@ -63,7 +63,7 @@
           <div class="w-32 flex-shrink-0 flex items-center gap-1.5">
             <span class="text-sm" style="color: var(--ds-text);">{field.label}</span>
             {#if field.required}
-              <span class="text-red-500 text-xs">*</span>
+              <span class="text-ds-text-danger text-xs">*</span>
             {/if}
           </div>
           <Select value={mapping[field.key] ?? -1} onchange={(v) => handleFieldChange(field.key, { target: { value: v } })} size="small" class="flex-1" options={[{ value: -1, label: 'Not mapped' }, ...headers.map((header, i) => ({ value: i, label: header }))]} />
@@ -80,7 +80,7 @@
             <div class="w-32 flex-shrink-0 flex items-center gap-1.5">
               <span class="text-sm" style="color: var(--ds-text);">{field.name || field.field_name}</span>
               {#if field.is_required}
-                <span class="text-red-500 text-xs">*</span>
+                <span class="text-ds-text-danger text-xs">*</span>
               {/if}
               <Badge variant="subtle" size="small">{field.field_type || field.type}</Badge>
             </div>

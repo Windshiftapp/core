@@ -411,7 +411,7 @@
             bind:value={formData.name}
             oninput={handleNameChange}
             size="small"
-            class={formErrors.name ? 'border-red-500' : ''}
+            class={formErrors.name ? 'border-ds-border-danger' : ''}
             placeholder={t('settings.sso.displayNamePlaceholder')}
           />
           {#if formErrors.name}
@@ -426,7 +426,7 @@
             type="text"
             id="slug"
             bind:value={formData.slug}
-            class={formErrors.slug ? 'font-mono border-red-500' : 'font-mono'}
+            class={formErrors.slug ? 'font-mono border-ds-border-danger' : 'font-mono'}
             size="small"
             placeholder={t('settings.sso.slugPlaceholder')}
           />
@@ -459,7 +459,7 @@
           type="url"
           id="issuer_url"
           bind:value={formData.issuer_url}
-          class={formErrors.issuer_url ? 'font-mono border-red-500' : 'font-mono'}
+          class={formErrors.issuer_url ? 'font-mono border-ds-border-danger' : 'font-mono'}
           size="small"
           placeholder={t('settings.sso.issuerUrlPlaceholder')}
         />
@@ -477,7 +477,7 @@
             type="text"
             id="client_id"
             bind:value={formData.client_id}
-            class={formErrors.client_id ? 'font-mono border-red-500' : 'font-mono'}
+            class={formErrors.client_id ? 'font-mono border-ds-border-danger' : 'font-mono'}
             size="small"
             placeholder={t('settings.sso.clientIdPlaceholder')}
           />
@@ -494,7 +494,7 @@
             id="client_secret"
             bind:value={formData.client_secret}
             size="small"
-            class={formErrors.client_secret ? 'border-red-500' : ''}
+            class={formErrors.client_secret ? 'border-ds-border-danger' : ''}
             placeholder={showEditModal ? t('settings.sso.leaveEmptyToKeepCurrent') : t('settings.sso.enterClientSecret')}
           />
           {#if formErrors.client_secret}

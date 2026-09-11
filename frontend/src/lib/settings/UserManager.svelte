@@ -266,7 +266,7 @@
 					icon: UserX,
 					title: t('common.disable'),
 					color: '#f59e0b',
-					hoverClass: 'hover:bg-orange-50',
+					hoverClass: 'hover:bg-ds-accent-orange-subtle',
 					onClick: () => deactivateUser(user.id, user.full_name)
 				});
 			} else {
@@ -276,7 +276,7 @@
 					icon: UserCheck,
 					title: t('common.enable'),
 					color: '#10b981',
-					hoverClass: 'hover:bg-green-50',
+					hoverClass: 'hover:bg-ds-success-subtle',
 					onClick: () => activateUser(user.id, user.full_name)
 				});
 			}
@@ -578,12 +578,12 @@
 		<div class="px-6 py-4">
 			<div class="space-y-4">
 				{#if emailSent}
-					<div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg text-green-800 border border-green-100">
+					<div class="flex items-start gap-3 p-3 bg-ds-success-subtle rounded-lg text-ds-text-success border border-ds-status-success-border">
 						<CheckCircle class="w-5 h-5 flex-shrink-0 mt-0.5" />
 						<p class="text-sm">An invitation email has been sent to <strong>{formData.email}</strong>.</p>
 					</div>
 				{:else}
-					<div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg text-amber-800 border border-amber-100">
+					<div class="flex items-start gap-3 p-3 bg-ds-warning-subtle rounded-lg text-ds-text-warning border border-ds-status-warning-border">
 						<AlertTriangle class="w-5 h-5 flex-shrink-0 mt-0.5" />
 						<div>
 							<p class="text-sm font-medium">Email could not be sent.</p>
@@ -625,7 +625,7 @@
 						<Radio
 							bind:groupValue={generateRandomPassword}
 							value={true}
-							class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+							class="h-4 w-4 text-ds-interactive focus:ring-ds-border-focused border-ds-border-bold"
 						/>
 						<span class="ml-2 text-sm" style="color: var(--ds-text)">{t('auth.resetPassword')}</span>
 					</label>
@@ -636,7 +636,7 @@
 						<Radio
 							bind:groupValue={generateRandomPassword}
 							value={false}
-							class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+							class="h-4 w-4 text-ds-interactive focus:ring-ds-border-focused border-ds-border-bold"
 						/>
 						<span class="ml-2 text-sm" style="color: var(--ds-text)">{t('common.custom')}</span>
 					</label>

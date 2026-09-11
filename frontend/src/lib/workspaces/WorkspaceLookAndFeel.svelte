@@ -276,7 +276,7 @@
 {:else if !canAdmin}
   <Card rounded="xl" shadow padding="loose">
     <div class="text-center py-8">
-      <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
+      <Shield class="w-12 h-12 mx-auto mb-4 text-ds-icon-warning" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('workspaceSettings.accessDeniedDescription')}</p>
       <Button href={`/workspaces/${workspaceId}`} variant="primary">
@@ -424,10 +424,10 @@
                   accept="image/*"
                   onchange={(e) => handleAvatarUpload(e.currentTarget.files)}
                   disabled={uploadingAvatar}
-                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                  class="block w-full text-sm text-ds-text-subtle file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-ds-background-neutral file:text-ds-text-link hover:file:bg-ds-background-neutral-hovered disabled:opacity-50"
                 />
                 {#if uploadingAvatar}
-                  <div class="mt-2 text-sm text-blue-600">{t('workspaceSettings.uploading')}</div>
+                  <div class="mt-2 text-sm text-ds-interactive">{t('workspaceSettings.uploading')}</div>
                 {/if}
                 <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
                   {t('workspaceSettings.uploadRecommendation')}

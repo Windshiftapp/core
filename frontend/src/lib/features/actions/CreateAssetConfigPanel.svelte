@@ -162,7 +162,7 @@
       <div class="mb-3">
         <div class="flex items-center gap-1 mb-1">
           <label for="asset-title" class="block text-xs font-medium">{t('actions.config.assetTitle')}</label>
-          <span class="text-red-500 text-xs">*</span>
+          <span class="text-ds-text-danger text-xs">*</span>
           <button
             onclick={() => showPlaceholderModal = true}
             class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"

@@ -290,7 +290,7 @@
 {:else if !canAdmin}
   <Card rounded="xl" shadow padding="loose">
     <div class="text-center py-8">
-      <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
+      <Shield class="w-12 h-12 mx-auto mb-4 text-ds-icon-warning" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('workspaceSettings.accessDeniedDescription')}</p>
       <Button href={`/workspaces/${workspaceId}`} variant="primary">
@@ -523,11 +523,11 @@
     {:else if activeTab === 'danger'}
         <!-- Remove Workspace -->
         <div class="flex items-center gap-3 mb-6">
-          <AlertTriangle class="w-5 h-5 text-red-600" />
-          <h3 class="text-lg font-medium text-red-900">{t('workspaceSettings.permanentRemoval')}</h3>
+          <AlertTriangle class="w-5 h-5 text-ds-text-danger" />
+          <h3 class="text-lg font-medium text-ds-text-danger">{t('workspaceSettings.permanentRemoval')}</h3>
         </div>
 
-        <div class="text-sm text-red-700 mb-6">
+        <div class="text-sm text-ds-text-danger mb-6">
           <p class="mb-4">{t('workspaceSettings.removeWarningIntro')}</p>
           <ul class="list-disc list-inside space-y-2 ml-4">
             <li>{t('workspaceSettings.removeWarningItems')}</li>
@@ -539,18 +539,18 @@
         </div>
 
         {#if !showDeleteConfirm}
-          <button
+          <Button
             data-testid="delete-workspace-open"
             onclick={() => showDeleteConfirm = true}
-            class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
+            variant="danger"
+            icon={Trash2}
           >
-            <Trash2 class="w-4 h-4" />
             {t('workspaceSettings.removeWorkspaceButton')}
-          </button>
+          </Button>
         {:else}
           <div class="space-y-4">
             <div>
-              <label for="delete-confirm" class="block text-sm font-medium text-red-900 mb-2">
+              <label for="delete-confirm" class="block text-sm font-medium text-ds-text-danger mb-2">
                 {t('workspaceSettings.typeToConfirm', { name: workspace.name })}
               </label>
               <Input
@@ -558,27 +558,27 @@
                 dataTestid="delete-workspace-confirm-name"
                 type="text"
                 bind:value={deleteConfirmText}
-                class="border-red-300 text-red-900"
+                class="border-ds-border-danger text-ds-text-danger"
                 placeholder={t('workspaceSettings.typeNameHere', { name: workspace.name })}
               />
             </div>
 
             <div class="flex items-center gap-3">
-              <button
+              <Button
                 data-testid="delete-workspace-confirm"
                 onclick={deleteWorkspace}
                 disabled={deleteConfirmText !== workspace.name}
-                class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="danger"
               >
                 {t('workspaceSettings.yesRemoveWorkspace')}
-              </button>
-              <button
+              </Button>
+              <Button
                 onclick={cancelDeleteWorkspace}
                 data-testid="cancel-delete-workspace"
-                class="px-4 py-2 text-sm font-medium rounded border transition-colors hover-danger" style="border-color: var(--ds-border-danger); color: var(--ds-text-danger);"
+                variant="default"
               >
                 {t('workspaceSettings.cancel')}
-              </button>
+              </Button>
             </div>
           </div>
         {/if}

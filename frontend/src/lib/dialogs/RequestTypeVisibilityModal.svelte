@@ -9,7 +9,6 @@
     isOpen = false,
     requestType = null,
     channelId = null,
-    isDarkMode = false,
     onSaved = () => {},
     onclose = () => {}
   } = $props();
@@ -122,7 +121,7 @@
       </div>
     {:else}
       {#if error}
-        <div class="mb-4 p-3 rounded bg-red-50 text-red-600 text-sm" style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'};">
+        <div class="mb-4 p-3 rounded bg-ds-danger-subtle text-ds-text-danger text-sm">
           {error}
         </div>
       {/if}
@@ -146,13 +145,13 @@
         <button
           type="button"
           onclick={() => handleModeChange('everyone')}
-          class="w-full flex items-start gap-3 p-3 rounded border-2 transition-all text-left"
-          style="border-color: {visibilityMode === 'everyone' ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-border)'}; background-color: {visibilityMode === 'everyone' ? (isDarkMode ? 'rgba(37, 99, 235, 0.1)' : '#eff6ff') : 'transparent'};"
+          class="w-full flex items-start gap-3 p-3 rounded border-2 transition-all text-left {visibilityMode === 'everyone'
+            ? 'border-ds-interactive bg-ds-interactive-subtle'
+            : 'border-ds-border bg-transparent'}"
         >
-          <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5"
-            style="border-color: {visibilityMode === 'everyone' ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-border)'};">
+          <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 {visibilityMode === 'everyone' ? 'border-ds-interactive' : 'border-ds-border'}">
             {#if visibilityMode === 'everyone'}
-              <div class="w-2.5 h-2.5 rounded-full" style="background-color: var(--ds-interactive, #2563eb);"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-ds-interactive"></div>
             {/if}
           </div>
           <div class="flex-1">
@@ -164,13 +163,13 @@
         <button
           type="button"
           onclick={() => handleModeChange('restricted')}
-          class="w-full flex items-start gap-3 p-3 rounded border-2 transition-all text-left"
-          style="border-color: {visibilityMode === 'restricted' ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-border)'}; background-color: {visibilityMode === 'restricted' ? (isDarkMode ? 'rgba(37, 99, 235, 0.1)' : '#eff6ff') : 'transparent'};"
+          class="w-full flex items-start gap-3 p-3 rounded border-2 transition-all text-left {visibilityMode === 'restricted'
+            ? 'border-ds-interactive bg-ds-interactive-subtle'
+            : 'border-ds-border bg-transparent'}"
         >
-          <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5"
-            style="border-color: {visibilityMode === 'restricted' ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-border)'};">
+          <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 {visibilityMode === 'restricted' ? 'border-ds-interactive' : 'border-ds-border'}">
             {#if visibilityMode === 'restricted'}
-              <div class="w-2.5 h-2.5 rounded-full" style="background-color: var(--ds-interactive, #2563eb);"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-ds-interactive"></div>
             {/if}
           </div>
           <div class="flex-1">
@@ -184,8 +183,8 @@
       {#if visibilityMode === 'restricted'}
         <div class="space-y-4">
           <!-- Info hint about OR logic -->
-          <div class="flex items-start gap-2 p-3 rounded" style="background-color: {isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'};">
-            <Info class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-interactive, #2563eb);" />
+          <div class="flex items-start gap-2 p-3 rounded bg-ds-accent-blue-subtle">
+            <Info class="w-4 h-4 mt-0.5 flex-shrink-0 text-ds-interactive" />
             <span class="text-sm" style="color: var(--ds-text-subtle);">{t('portal.visibility.orLogicHint')}</span>
           </div>
 

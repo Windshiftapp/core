@@ -617,7 +617,7 @@
               <ColorDot color={category.color} size="md" />
               <span class="text-sm">{category.name}</span>
             {:else}
-              <span class="text-sm text-gray-500">{t('milestones.noCategory')}</span>
+              <span class="text-sm text-ds-text-subtle">{t('milestones.noCategory')}</span>
             {/if}
           {/key}
         {/if}
@@ -647,11 +647,11 @@
                 {/if}
               </div>
             {:else}
-              <span class="text-gray-400">—</span>
+              <span class="text-ds-text-subtlest">—</span>
             {/if}
           {/key}
         {:else}
-          <span class="text-gray-400">—</span>
+          <span class="text-ds-text-subtlest">—</span>
         {/if}
       {/snippet}
 

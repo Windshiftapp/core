@@ -282,7 +282,7 @@
           {t('nav.loading')}
         </div>
       {:else if error}
-        <div class="py-2 text-xs text-red-600">
+        <div class="py-2 text-xs text-ds-text-danger">
           {error}
         </div>
       {:else if !personalWorkspace}
@@ -345,7 +345,7 @@
                   title={isTaskCompleted(task) ? t('personal.markIncomplete') : t('personal.markComplete')}
                 >
                   {#if isTaskCompleted(task)}
-                    <div class="w-4 h-4 bg-green-500 rounded flex items-center justify-center">
+                    <div class="w-4 h-4 bg-ds-accent-green rounded flex items-center justify-center">
                       <Check size={12} class="text-white" strokeWidth={2.5} />
                     </div>
                   {:else}
@@ -377,7 +377,7 @@
                     onclick={() => handleUnlink(task)}
                     title={t('personal.unlinkTask')}
                   >
-                    <X size={12} class="text-red-600" />
+                    <X size={12} class="text-ds-text-danger" />
                   </button>
                 </div>
               </div>

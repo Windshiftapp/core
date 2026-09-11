@@ -30,8 +30,8 @@
 <div 
   data-testid={`workflow-status-node-${data.statusId}`}
   class="status-node rounded border-2 shadow-lg select-none transition-all duration-200 group relative"
-  class:border-blue-500={selected}
-  class:border-gray-300={!selected}
+  class:border-ds-interactive={selected}
+  class:border-ds-border={!selected}
   style="width: 100px; height: 32px;"
 >
   <!-- Source handles (visible) - for initiating connections -->
@@ -83,7 +83,7 @@
 
     <!-- Remove button - positioned in top-right corner -->
     <button
-      class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1 transition-opacity duration-200 z-10"
+      class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-ds-text-danger hover:opacity-80 p-1 transition-opacity duration-200 z-10"
       onclick={handleRemove}
       title={t('workflows.removeFromWorkflow')}
     >

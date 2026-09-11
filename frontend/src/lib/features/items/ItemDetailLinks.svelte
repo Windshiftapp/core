@@ -276,7 +276,7 @@
 
       {#if loadingLinks}
         <div class="text-center py-4">
-          <div class="text-sm text-gray-500">{t('items.loadingLinks')}</div>
+          <div class="text-sm text-ds-text-subtle">{t('items.loadingLinks')}</div>
         </div>
       {:else}
       <div class="space-y-2">
@@ -329,7 +329,7 @@
               <!-- Item title -->
               <LinkComponent
                 href={linkedItemHref}
-                class="text-sm hover:text-blue-600 cursor-pointer truncate"
+                class="text-sm hover:text-ds-text-link cursor-pointer truncate"
                 onClick={(event) => handleLinkClick(event, linkedItemType, linkedItemId, linkedItemWorkspaceId, linkedItemHref)}
                 style="color: var(--ds-text);"
               >
@@ -428,7 +428,7 @@
               </div>
               <LinkComponent
                 href={linkedPageHref}
-                class="text-sm hover:text-blue-600 cursor-pointer truncate"
+                class="text-sm hover:text-ds-text-link cursor-pointer truncate"
                 onClick={(event) => handleLinkClick(event, 'page', linkedPageId, linkedPageWorkspaceId, linkedPageHref)}
                 style="color: var(--ds-text);"
               >
@@ -500,7 +500,7 @@
                 <!-- Item title -->
                 <LinkComponent
                   href={`/workspaces/${childItem.workspace_id || workspaceId}/items/${childItem.id}`}
-                  class="text-sm hover:text-blue-600 cursor-pointer truncate"
+                  class="text-sm hover:text-ds-text-link cursor-pointer truncate"
                   style="color: var(--ds-text);"
                 >
                   {childItem.title}

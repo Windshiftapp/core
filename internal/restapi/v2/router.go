@@ -423,6 +423,7 @@ type adminUserApplication interface {
 type commentApplication interface {
 	Get(int) (*services.CommentWithDetails, error)
 	GetFeedByItemID(int, bool, services.CommentFeedOptions) (*services.CommentFeedPage, error)
+	GetFeedByItemIDs([]int, bool, services.CommentFeedOptions) (map[int]*services.CommentFeedPage, error)
 	CountFeedByItemID(int) (int, error)
 	UserCanReadItemAsApprover(context.Context, int, int) (bool, error)
 	Create(services.CreateCommentParams) (*services.CreateCommentResult, error)

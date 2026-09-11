@@ -67,7 +67,7 @@
 	onclick={handleClick}
 >
 	{#if copied}
-		<Check class="{iconSize} text-green-600" aria-hidden="true" />
+		<Check class="{iconSize} text-ds-icon-success" aria-hidden="true" />
 	{:else}
 		<Copy class={iconSize} aria-hidden="true" />
 	{/if}

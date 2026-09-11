@@ -191,7 +191,7 @@
       <div class="space-y-4">
         <div>
           <label for="rt-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('common.name')} <span class="text-red-500">*</span>
+            {t('common.name')} <span class="text-ds-text-danger">*</span>
           </label>
           <Input
             id="rt-name"
@@ -225,7 +225,7 @@
 
         <div>
           <label for="rt-itemtype" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('portal.createsItemType')} <span class="text-red-500">*</span>
+            {t('portal.createsItemType')} <span class="text-ds-text-danger">*</span>
           </label>
           <BasePicker
             bind:value={formData.item_type_id}

@@ -270,7 +270,7 @@
   {#if loading}
     <div class="p-8 text-center" style="color: var(--ds-text-subtle);">{t('nav.loading')}</div>
   {:else if error && !item}
-    <div class="p-8 text-center text-red-600">{error}</div>
+    <div class="p-8 text-center text-ds-text-danger">{error}</div>
   {:else if item}
     {#if !isModal && workspace}
       <!-- Breadcrumbs for full-page mode using ItemDetailBreadcrumbs -->

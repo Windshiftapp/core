@@ -270,7 +270,7 @@
           <tr>
             <td class="p-2"><code>displayClass</code></td>
             <td class="p-2">string</td>
-            <td class="p-2">'hover:bg-gray-50 cursor-pointer'</td>
+            <td class="p-2">'hover:bg-ds-background-neutral-hovered cursor-pointer'</td>
           </tr>
         </tbody>
       </table>

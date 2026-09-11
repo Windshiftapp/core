@@ -4,6 +4,7 @@
   import { BasePicker } from '../pickers';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
+  import StatusPill from '../components/StatusPill.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import {
     addMinutesToTime,
@@ -298,9 +299,7 @@
                 <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{workItem.subtitle}</span>
               {/if}
               {#if workItem.status}
-                <span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded mt-1 inline-block w-fit">
-                  {workItem.status}
-                </span>
+                <StatusPill name={workItem.status} />
               {/if}
             </div>
           {/snippet}

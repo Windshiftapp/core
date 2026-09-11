@@ -473,7 +473,7 @@
                   </div>
                   {#if row.isPinned && !row.itemId}
                     <button
-                      class="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded hover:bg-red-100 cursor-pointer"
+                      class="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded hover:bg-ds-danger-subtle cursor-pointer"
                       style="color: var(--ds-text-subtle);"
                       onclick={() => removeProject(row.projectId)}
                       title={t('time.timesheet.removeProject')}

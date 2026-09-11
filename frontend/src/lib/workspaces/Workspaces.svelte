@@ -53,8 +53,8 @@
 
   function getStatusBadgeClass(active) {
     return active
-      ? 'bg-green-100 text-green-800'
-      : 'bg-gray-100 text-gray-800';
+      ? 'bg-ds-success-subtle text-ds-text-success'
+      : 'bg-ds-background-neutral text-ds-text-subtle';
   }
 
   function buildWorkspaceDropdownItems(workspace) {
@@ -159,7 +159,7 @@
           <div class="flex items-center gap-2">
             <div style="color: var(--ds-text);">{workspace.name}</div>
             {#if workspace.is_personal}
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-ds-accent-purple-subtle text-ds-text-accent-purple">
                 {t('workspaces.personal')}
               </span>
             {/if}

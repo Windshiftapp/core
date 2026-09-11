@@ -116,7 +116,7 @@
               </button>
               <button
                 onclick={() => hubStore.deleteSection(section.id)}
-                class="p-1 rounded hover:bg-red-100 text-red-600"
+                class="p-1 rounded hover:bg-ds-danger-subtle text-ds-text-danger"
                 title="Delete section"
               >
                 <Trash2 class="w-5 h-5" />

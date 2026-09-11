@@ -56,7 +56,7 @@
         subtitle="Personal task management"
       >
         {#snippet actions()}
-          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+          <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-ds-accent-orange-subtle text-ds-text-accent-orange">
             Personal
           </span>
         {/snippet}

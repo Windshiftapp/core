@@ -63,10 +63,10 @@
                     </div>
                     <button
                       onclick={() => portalStore.removeFooterLink(columnIndex, linkIndex)}
-                      class="p-1 rounded transition-all hover:bg-red-100"
+                      class="p-1 rounded transition-all hover:bg-ds-danger-subtle"
                       title={t('portal.removeLink')}
                     >
-                      <X class="w-3 h-3 text-red-600" />
+                      <X class="w-3 h-3 text-ds-text-danger" />
                     </button>
                   {:else if link.text && link.url}
                     <a

@@ -328,7 +328,7 @@
             {item.type_name}
           </span>
         {:else}
-          <span class="text-gray-400">-</span>
+          <span class="text-ds-text-subtlest">-</span>
         {/if}
       {/snippet}
 

@@ -122,7 +122,7 @@
           href={`/workspaces/${item.workspace_id}/items/${item.item_id}`}
         >
           <div class="flex-shrink-0">
-            <div class="rounded-full bg-blue-50 text-blue-600 p-2">
+            <div class="rounded-full bg-ds-accent-blue-subtle text-ds-accent-blue p-2">
               <Clock class="h-4 w-4" />
             </div>
           </div>

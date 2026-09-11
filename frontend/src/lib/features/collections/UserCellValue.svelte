@@ -23,7 +23,7 @@
 
 <div class="flex items-center gap-2 {interactive ? 'cursor-pointer' : ''}" data-testid={testId}>
   {#if user || fallbackAvatar}
-    <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
+    <div class="w-5 h-5 rounded-full bg-ds-accent-blue flex items-center justify-center text-ds-text-inverse text-[10px] font-medium">
       {initials}
     </div>
   {:else}

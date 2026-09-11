@@ -304,7 +304,7 @@
         ? handleRemoveGroupRole(assignment, role)
         : handleRemoveMemberRole(assignment, role),
       hoverClass: 'hover-danger',
-      iconClass: 'text-red-500'
+      iconClass: 'text-ds-text-danger'
     }));
   }
 
@@ -396,7 +396,7 @@
   <!-- Role Summary -->
   <div class="space-y-4 mb-8">
     <div class="flex items-start gap-3">
-      <Shield class="w-4 h-4 text-blue-600 mt-0.5" />
+      <Shield class="w-4 h-4 text-ds-accent-blue mt-0.5" />
       <div>
         <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('workspaceMembers.summaryTitle')}</h3>
         <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
@@ -470,7 +470,7 @@
       {t('workspaceMembers.loading')}
     </div>
   {:else if error}
-    <div class="text-center py-12 text-red-600">
+    <div class="text-center py-12 text-ds-text-danger">
       {error}
     </div>
   {:else}

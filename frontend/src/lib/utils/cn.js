@@ -7,7 +7,7 @@
  * LAST in the cn() call so they win in the source order.
  *
  * @example
- *   cn('px-4 py-2', isActive && 'bg-blue-500', { 'opacity-50': disabled }, className)
+ *   cn('px-4 py-2', isActive && 'bg-ds-interactive', { 'opacity-50': disabled }, className)
  */
 export function cn(...args) {
   return args

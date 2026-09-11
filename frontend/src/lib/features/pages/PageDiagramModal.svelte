@@ -176,7 +176,7 @@
             size="small"
           />
           {#if hasChanges}
-            <span class="text-sm text-orange-600">{t('editors.diagramUnsaved')}</span>
+            <span class="text-sm text-ds-text-warning">{t('editors.diagramUnsaved')}</span>
           {/if}
         </div>
         <div class="flex items-center space-x-2 shrink-0">

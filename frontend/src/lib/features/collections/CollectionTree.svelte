@@ -496,14 +496,14 @@
             {#if item.isTestCase}
               <!-- Test Case Row -->
               <div
-                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-green-50/30 hover:bg-green-50/50"
+                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-ds-success-subtle/30 hover:bg-ds-success-subtle/50"
               >
                 <!-- Hierarchy Indent + Icon -->
                 <div class="flex items-center gap-1" style="margin-left: {getIndentLevel(item.level)}">
                   <div class="w-6 h-6"></div> <!-- Spacer (no expand/collapse) -->
 
                   <!-- Test Case Icon -->
-                  <div class="w-4 h-4 rounded flex items-center justify-center bg-green-600">
+                  <div class="w-4 h-4 rounded flex items-center justify-center bg-ds-accent-green">
                     <FileCheck class="w-2.5 h-2.5 text-white" />
                   </div>
                 </div>
@@ -513,7 +513,7 @@
                   <LinkComponent
                     href="#view-test-case"
                     onClick={(e) => handleTestCaseClick(e, item.id)}
-                    class="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors text-green-700 bg-green-100 hover:bg-green-200"
+                    class="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors text-ds-text-accent-green bg-ds-accent-green-subtle hover:opacity-80"
                   >
                     TC-{item.id}
                   </LinkComponent>
@@ -524,14 +524,14 @@
                   <LinkComponent
                     href="#view-test-case"
                     onClick={(e) => handleTestCaseClick(e, item.id)}
-                    class="text-left w-full text-sm transition-colors truncate cursor-pointer text-green-900 hover:text-green-700"
+                    class="text-left w-full text-sm transition-colors truncate cursor-pointer text-ds-text-accent-green hover:opacity-80"
                   >
                     {item.title}
                   </LinkComponent>
                 </div>
 
                 <!-- Empty columns for alignment -->
-                <div class="w-24 text-sm text-green-600">{t('testing.testCase')}</div>
+                <div class="w-24 text-sm text-ds-text-success">{t('testing.testCase')}</div>
                 <div class="w-20"></div>
                 <div class="w-20"></div>
               </div>

@@ -61,7 +61,7 @@
 									<Label class="mb-1">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Label>
 									<div class="text-sm" style="color: var(--ds-text);">
 										{#if typeof value === 'object'}
-											<pre class="text-xs overflow-auto bg-gray-50 p-2 rounded">{JSON.stringify(value, null, 2)}</pre>
+											<pre class="text-xs overflow-auto bg-ds-background-neutral p-2 rounded">{JSON.stringify(value, null, 2)}</pre>
 										{:else}
 											{value || t('common.noData')}
 										{/if}

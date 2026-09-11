@@ -567,7 +567,7 @@
       </div>
     {:else if error}
       <div class="text-center py-16">
-        <div class="text-red-600 text-sm font-medium mb-2">{error}</div>
+        <div class="text-ds-text-danger text-sm font-medium mb-2">{error}</div>
         <Button onclick={loadChannels} variant="default" size="small">
           {t('common.retry')}
         </Button>

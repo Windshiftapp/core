@@ -82,7 +82,7 @@
     <div>
       <div class="mb-2 flex items-center gap-2">
         <span
-          class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"
+          class="rounded-full bg-ds-accent-blue-subtle px-2.5 py-1 text-xs font-semibold text-ds-text-accent-blue"
           data-testid="icon-navigation-active-candidate"
         >
           {candidate.label}
@@ -117,7 +117,7 @@
           style="border-color: var(--ds-border); background: var(--ds-surface-raised);"
         >
           <div class="mb-6 flex h-10 items-center gap-3 px-3.5">
-            <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-blue-600 text-sm font-bold text-white">W</div>
+            <div class="grid size-8 shrink-0 place-items-center rounded-lg bg-ds-accent-blue text-sm font-bold text-white">W</div>
             {#if mainExpanded}<span class="text-sm font-semibold" style="color: var(--ds-text);">Windshift</span>{/if}
           </div>
 
@@ -169,9 +169,9 @@
                   class:size-5={!candidate.refined}
                   class:rounded-lg={candidate.refined}
                   class:border={candidate.refined}
-                  class:border-blue-200={candidate.refined && activeMain === item.id}
-                  class:bg-blue-100={candidate.refined && activeMain === item.id}
-                  class:text-blue-700={candidate.refined && activeMain === item.id}
+                  class:border-ds-accent-blue-subtle={candidate.refined && activeMain === item.id}
+                  class:bg-ds-accent-blue-subtle={candidate.refined && activeMain === item.id}
+                  class:text-ds-text-accent-blue={candidate.refined && activeMain === item.id}
                   class:border-transparent={candidate.refined && activeMain !== item.id}
                 >
                   <Glyph
@@ -188,7 +188,7 @@
 
             <div class="my-2 border-t" style="border-color: var(--ds-border);"></div>
             <button
-              class="flex h-10 items-center bg-blue-600 text-sm font-medium text-white shadow-sm"
+              class="flex h-10 items-center bg-ds-interactive text-sm font-medium text-white shadow-sm"
               class:gap-2.5={candidate.refined}
               class:gap-3={!candidate.refined}
               class:rounded-lg={candidate.refined}
@@ -244,7 +244,7 @@
               </button>
             {/each}
             <div class="flex h-10 items-center gap-3 px-2.5" class:justify-center={!mainExpanded}>
-              <div class="grid size-7 shrink-0 place-items-center rounded-full bg-purple-600 text-[10px] font-semibold text-white">SE</div>
+              <div class="grid size-7 shrink-0 place-items-center rounded-full bg-ds-accent-purple text-[10px] font-semibold text-white">SE</div>
               {#if mainExpanded}<span class="text-sm" style="color: var(--ds-text);">Stefan Ernst</span>{/if}
             </div>
           </div>
@@ -256,7 +256,7 @@
           <div class="mt-5 grid gap-3 sm:grid-cols-2">
             {#each ['Open work', 'Due this week', 'Recently updated', 'Team capacity'] as card, index}
               <div class="rounded-lg border p-4" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
-                <div class="mb-5 h-2 w-16 rounded bg-blue-200"></div>
+                <div class="mb-5 h-2 w-16 rounded bg-ds-accent-blue-subtle"></div>
                 <div class="text-2xl font-semibold" style="color: var(--ds-text);">{[24, 7, 13, 82][index]}{index === 3 ? '%' : ''}</div>
                 <div class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{card}</div>
               </div>
@@ -309,7 +309,7 @@
                         class:size-6={candidate.refined}
                         class:size-4={!candidate.refined}
                         class:rounded-md={candidate.refined}
-                        class:bg-blue-600={candidate.refined && activeAdmin === item.id}
+                        class:bg-ds-interactive={candidate.refined && activeAdmin === item.id}
                         class:text-white={candidate.refined && activeAdmin === item.id}
                       >
                         <Glyph
@@ -331,11 +331,11 @@
 
         <div class="min-w-0 flex-1 p-6">
           <div
-            class="flex size-10 items-center justify-center bg-blue-100 text-blue-700"
+            class="flex size-10 items-center justify-center bg-ds-accent-blue-subtle text-ds-text-accent-blue"
             class:rounded-xl={candidate.refined}
             class:rounded-lg={!candidate.refined}
             class:border={candidate.refined}
-            class:border-blue-200={candidate.refined}
+            class:border-ds-accent-blue-subtle={candidate.refined}
             class:shadow-sm={candidate.refined}
           >
             <Glyph icon={iconFor('customFields')} mode={candidate.mode} size={candidate.refined ? 21 : 24} selected={true} />

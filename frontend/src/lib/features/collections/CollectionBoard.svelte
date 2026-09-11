@@ -1026,13 +1026,13 @@
   function getStatusColor(categoryColor) {
     // Convert hex color to Tailwind-compatible text classes
     const colorMap = {
-      '#3b82f6': 'text-blue-800',
-      '#ef4444': 'text-red-800',
-      '#10b981': 'text-green-800',
-      '#f59e0b': 'text-orange-800',
-      '#6b7280': 'text-gray-800'
+      '#3b82f6': 'text-ds-text-accent-blue',
+      '#ef4444': 'text-ds-text-accent-red',
+      '#10b981': 'text-ds-text-accent-green',
+      '#f59e0b': 'text-ds-text-accent-orange',
+      '#6b7280': 'text-ds-text'
     };
-    return colorMap[categoryColor] || 'text-gray-800';
+    return colorMap[categoryColor] || 'text-ds-text';
   }
 
   function openItem(itemId, event) {
@@ -1595,7 +1595,7 @@
           </p>
           <button
             onclick={() => navigate('/admin/workflows')}
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            class="px-4 py-2 bg-ds-interactive text-white rounded hover:bg-ds-interactive-hovered transition-colors"
           >
             {t('statuses.createStatus')}
           </button>

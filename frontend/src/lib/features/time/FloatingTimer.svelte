@@ -187,7 +187,7 @@
     }}
   >
     <div
-      class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl border-2 border-blue-400 shadow-xl overflow-hidden transition-all duration-200 backdrop-blur-sm"
+      class="bg-gradient-to-r from-ds-interactive-hovered to-ds-interactive rounded-xl border-2 border-white/40 shadow-xl overflow-hidden transition-all duration-200 backdrop-blur-sm"
       class:collapsed
     >
       <!-- Timer header (always visible) -->
@@ -209,7 +209,7 @@
             <a
               href={`/workspaces/${timer.workspace_id}/items/${timer.item_id}`}
               onclick={(e) => e.stopPropagation()}
-              class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1 no-underline"
+              class="text-xs font-mono bg-white/30 text-white/90 px-1.5 py-0.5 rounded hover:bg-white/50 transition-colors flex items-center gap-1 no-underline"
               title={t('time.timer.goToWorkItem', { title: timer.item_title || t('items.workItem') })}
             >
               {getWorkItemKey()}
@@ -221,7 +221,7 @@
         <div class="flex items-center gap-1 flex-shrink-0">
           <button
             onclick={(e) => { e.stopPropagation(); toggleCollapsed(); }}
-            class="p-1 rounded hover:bg-blue-400 hover:bg-opacity-50 transition-colors text-white"
+            class="p-1 rounded hover:bg-white/50 transition-colors text-white"
             title={collapsed ? t('time.timer.expandTimer') : t('time.timer.collapseTimer')}
             type="button"
           >
@@ -235,7 +235,7 @@
           <button
             onclick={(e) => { e.stopPropagation(); handleStopTimer(); }}
             data-testid="stop-timer-btn"
-            class="p-1 rounded hover:bg-red-500 hover:bg-opacity-80 text-white transition-colors"
+            class="p-1 rounded hover:bg-ds-background-danger-bold/80 text-white transition-colors"
             title={t('time.stopTimer')}
             disabled={timerStore.syncing}
             type="button"
@@ -247,10 +247,10 @@
 
       <!-- Expanded content -->
       {#if !collapsed}
-        <div class="px-3 py-2 border-t border-blue-400 border-opacity-30 bg-blue-600 bg-opacity-20">
+        <div class="px-3 py-2 border-t border-white/30 bg-white/10">
           <div class="space-y-1.5 text-xs">
             {#if timerStore.activeTimer.project_name}
-              <div class="text-blue-100">
+              <div class="text-white/90">
                 <span class="font-medium">{t('time.timer.project')}:</span> {timerStore.activeTimer.project_name}
                 {#if timerStore.activeTimer.customer_name}
                   ({timerStore.activeTimer.customer_name})
@@ -259,7 +259,7 @@
             {/if}
 
             {#if timerStore.activeTimer.workspace_name}
-              <div class="text-blue-100">
+              <div class="text-white/90">
                 <span class="font-medium">{t('time.timer.workspace')}:</span> {timerStore.activeTimer.workspace_name}
               </div>
             {/if}

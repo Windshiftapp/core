@@ -70,7 +70,7 @@
           >
             <span class="font-medium">{t('hub.inbox', 'Inbox')}</span>
             {#if hubStore.openRequestCount > 0}
-              <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold leading-none text-white bg-red-500 rounded-full">
+              <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold leading-none text-white bg-ds-background-danger-bold rounded-full">
                 {hubStore.openRequestCount}
               </span>
             {/if}
@@ -140,7 +140,7 @@
         <div class="relative">
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search class="h-5 w-5 text-gray-400" />
+              <Search class="h-5 w-5 text-ds-icon-subtle" />
             </div>
             <Input
               type="text"

@@ -110,8 +110,8 @@
               <Clock class="w-4 h-4 animate-pulse" style="color: var(--ds-text-info);" />
               <span style="color: var(--ds-text-info);">{t('actions.logs.running')}</span>
             {:else if item.status === 'skipped'}
-              <SkipForward class="w-4 h-4 text-gray-400" />
-              <span class="text-gray-500">{t('actions.logs.skipped')}</span>
+              <SkipForward class="w-4 h-4 text-ds-icon-subtle" />
+              <span class="text-ds-text-subtle">{t('actions.logs.skipped')}</span>
             {:else}
               <span class="capitalize status-text">{item.status}</span>
             {/if}
@@ -140,11 +140,11 @@
         <!-- Error slot -->
         {#snippet error(item)}
           {#if item.error_message}
-            <span class="text-red-500 text-xs truncate block max-w-xs" title={item.error_message}>
+            <span class="text-ds-text-danger text-xs truncate block max-w-xs" title={item.error_message}>
               {item.error_message}
             </span>
           {:else}
-            <span class="text-gray-400">—</span>
+            <span class="text-ds-text-subtlest">—</span>
           {/if}
         {/snippet}
 

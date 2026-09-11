@@ -245,7 +245,7 @@
 
         <div>
           <label for="ar-name" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('common.name')} <span class="text-red-500">*</span>
+            {t('common.name')} <span class="text-ds-text-danger">*</span>
           </label>
           <Input
             id="ar-name"
@@ -282,7 +282,7 @@
 
         <div>
           <label for="ar-assetset" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('portal.assetSet')} <span class="text-red-500">*</span>
+            {t('portal.assetSet')} <span class="text-ds-text-danger">*</span>
           </label>
           <BasePicker
             bind:value={formData.asset_set_id}
@@ -298,7 +298,7 @@
 
         <div>
           <label for="ar-cql" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-            {t('portal.qlQuery')} <span class="text-red-500">*</span>
+            {t('portal.qlQuery')} <span class="text-ds-text-danger">*</span>
           </label>
           <Textarea
             id="ar-cql"
@@ -320,7 +320,7 @@
             <div class="space-y-4">
               <div>
                 <label for="ar-itemtype" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
-                  {t('portal.itemType')} <span class="text-red-500">*</span>
+                  {t('portal.itemType')} <span class="text-ds-text-danger">*</span>
                 </label>
                 <BasePicker
                   bind:value={formData.item_type_id}

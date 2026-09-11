@@ -185,7 +185,7 @@
         type: 'regular',
         icon: ArrowRight,
         title: t('workflows.design'),
-        hoverClass: 'hover:bg-blue-50',
+        hoverClass: 'hover:bg-ds-accent-blue-subtle',
         onClick: () => navigate(`/workflows/${workflow.id}/design`)
       },
       {

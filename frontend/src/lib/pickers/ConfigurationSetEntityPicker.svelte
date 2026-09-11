@@ -225,7 +225,7 @@
               data-testid={`${entityType}-add-${entity.id}`}
               type="button"
               onclick={() => addEntity(entity.id)}
-              class="p-1 rounded hover:bg-blue-50 transition-colors flex-shrink-0 ml-2"
+              class="p-1 rounded hover:bg-ds-accent-blue-subtle transition-colors flex-shrink-0 ml-2"
               style="color: var(--ds-interactive);"
               title={t('common.add')}
             >

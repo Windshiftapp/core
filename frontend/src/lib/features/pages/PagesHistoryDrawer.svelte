@@ -220,7 +220,7 @@
     padding: 4px;
     border-radius: 4px;
   }
-  .icon-btn:hover { background: var(--ds-surface-hover, #f3f4f6); }
+  .icon-btn:hover { background: var(--ds-surface-hovered, #f3f4f6); }
   .drawer-body {
     flex: 1;
     overflow-y: auto;
@@ -262,7 +262,7 @@
     color: inherit;
     border-radius: 6px;
   }
-  .rev-header:hover { background: var(--ds-surface-hover, #f3f4f6); }
+  .rev-header:hover { background: var(--ds-surface-hovered, #f3f4f6); }
   .rev-number {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
@@ -310,6 +310,6 @@
     cursor: pointer;
     font: inherit;
   }
-  .restore-btn:hover:not(:disabled) { background: var(--ds-surface-hover, #f3f4f6); }
+  .restore-btn:hover:not(:disabled) { background: var(--ds-surface-hovered, #f3f4f6); }
   .restore-btn:disabled { opacity: 0.6; cursor: progress; }
 </style>

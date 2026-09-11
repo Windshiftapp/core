@@ -299,7 +299,7 @@
     <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center gap-3">
         <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
-          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-amber-500">
+          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-ds-warning">
             <Zap size={18} color="white" />
           </div>
         </div>
@@ -420,7 +420,7 @@
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-medium sidebar-title">{nodeConfigLabel}</h3>
           <button
-            class="text-sm text-gray-500 hover:text-gray-700"
+            class="text-sm text-ds-text-subtle hover:text-ds-text"
             onclick={handleClearSelection}
           >
             &times;

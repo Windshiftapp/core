@@ -250,7 +250,7 @@
         <div class="section-header">
           <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('pickers.icon')}</h4>
           <div class="search-box">
-            <Search class="w-4 h-4 text-gray-400" />
+            <Search class="w-4 h-4 text-ds-icon-subtle" />
             <Input
               type="text"
               placeholder={t('pickers.searchIcons')}

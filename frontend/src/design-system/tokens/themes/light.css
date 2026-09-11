@@ -147,6 +147,27 @@ html[data-color-mode="light"],
   --ds-accent-orange-subtler: #ffe2b8;
   --ds-icon-accent-orange: #d94800;
 
+  /* Red */
+  --ds-accent-red: var(--color-red-600);
+  --ds-accent-red-subtle: #ffebe6;
+  --ds-accent-red-subtler: #ffbdad;
+  --ds-icon-accent-red: #bf2600;
+
+  /* Yellow */
+  --ds-accent-yellow: var(--color-yellow-600);
+  --ds-accent-yellow-subtle: #fff7d6;
+  --ds-accent-yellow-subtler: #ffe380;
+  --ds-icon-accent-yellow: #b38600;
+
+  /* Accent text — readable-on-subtle text for badges and chips */
+  --ds-text-accent-blue: var(--color-blue-800);
+  --ds-text-accent-green: var(--color-green-800);
+  --ds-text-accent-purple: var(--color-purple-800);
+  --ds-text-accent-teal: var(--color-teal-800);
+  --ds-text-accent-orange: var(--color-orange-800);
+  --ds-text-accent-red: var(--color-red-800);
+  --ds-text-accent-yellow: var(--color-yellow-800);
+
   /* =================================================================
      STATUS COLORS
      For test status badges, progress indicators, and status buttons

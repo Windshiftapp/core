@@ -253,7 +253,7 @@
             </div>
             <button
               type="button"
-              class="p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+              class="p-2 rounded hover:bg-ds-danger-subtle transition-colors disabled:opacity-50"
               style="color: var(--ds-text-danger, #b91c1c);"
               disabled={removingId === cred.id}
               onclick={() => handleRemove(cred)}

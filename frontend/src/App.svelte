@@ -14,6 +14,7 @@
     resetAuthenticatedShellUILoad,
   } from './lib/services/authenticatedShellUI.js';
   import BrandedLoader from './lib/components/BrandedLoader.svelte';
+  import Button from './lib/components/Button.svelte';
   import LazyRootDialog from './lib/components/LazyRootDialog.svelte';
   import LazyRootView from './lib/components/LazyRootView.svelte';
 
@@ -338,13 +339,10 @@
         <h1 class="text-xl font-semibold mb-2">
           {getStartupCopy('errors.failedToLoad', i18nReady, t)} Windshift
         </h1>
-        <p class="text-gray-600 mb-5">{getStartupCopy(startupError, i18nReady, t)}</p>
-        <button
-          type="button"
-          class="min-h-11 px-5 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"
-          onclick={() => initializeApp()}
-          data-testid="startup-retry"
-        >{getStartupCopy('common.retry', i18nReady, t)}</button>
+        <p class="text-ds-text-subtle mb-5">{getStartupCopy(startupError, i18nReady, t)}</p>
+        <Button variant="primary" size="large" class="min-h-11" onclick={() => initializeApp()} dataTestid="startup-retry">
+          {getStartupCopy('common.retry', i18nReady, t)}
+        </Button>
       </div>
     </div>
   <!-- Show loading screen during initial setup/session checks -->
@@ -417,8 +415,8 @@
         <!-- Login dialog will show, but we can show a minimal background -->
         <div class="text-center">
           <img src="windshift-3.svg" alt="Windshift" width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <h1 class="text-2xl font-bold text-gray-400 mb-2">Windshift</h1>
-          <p class="text-gray-500">{t('footer.platformName')}</p>
+          <h1 class="text-2xl font-bold text-ds-text-subtlest mb-2">Windshift</h1>
+          <p class="text-ds-text-subtle">{t('footer.platformName')}</p>
         </div>
       {/if}
     </div>

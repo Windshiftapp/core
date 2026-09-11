@@ -16,12 +16,12 @@
     <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Basic Usage</h2>
     <DropdownMenu
       triggerText="Options"
-      triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+      triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
       items={[
         { id: 'edit', title: 'Edit', icon: Edit, onClick: () => alert('Edit') },
         { id: 'copy', title: 'Copy', icon: Copy, onClick: () => alert('Copy') },
         { type: 'divider' },
-        { id: 'delete', title: 'Delete', icon: Trash2, hoverClass: 'hover:bg-red-50 hover:text-red-700', onClick: () => alert('Delete') }
+        { id: 'delete', title: 'Delete', icon: Trash2, hoverClass: 'hover:bg-ds-danger-subtle hover:text-ds-text-danger', onClick: () => alert('Delete') }
       ]}
     />
   </section>
@@ -32,7 +32,7 @@
     <DropdownMenu
       triggerText="User Menu"
       triggerIcon={User}
-      triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+      triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
       items={[
         {
           id: 'profile',
@@ -57,7 +57,7 @@
           subtitle: 'Sign out of your account',
           icon: LogOut,
           iconColor: '#ef4444',
-          hoverClass: 'hover:bg-red-50',
+          hoverClass: 'hover:bg-ds-danger-subtle',
           onClick: () => alert('Logout')
         }
       ]}
@@ -71,13 +71,13 @@
       triggerIcon={MoreHorizontal}
       iconOnly
       showChevron={false}
-      triggerClass="p-2 border rounded hover:bg-gray-50"
+      triggerClass="p-2 border rounded hover:bg-ds-background-neutral-hovered"
       items={[
         { id: 'edit', title: 'Edit', icon: Edit },
         { id: 'archive', title: 'Archive', icon: Archive },
         { id: 'star', title: 'Star', icon: Star },
         { type: 'divider' },
-        { id: 'delete', title: 'Delete', icon: Trash2, hoverClass: 'hover:bg-red-50 hover:text-red-700' }
+        { id: 'delete', title: 'Delete', icon: Trash2, hoverClass: 'hover:bg-ds-danger-subtle hover:text-ds-text-danger' }
       ]}
     />
   </section>
@@ -88,7 +88,7 @@
     <DropdownMenu
       triggerText="Select Item"
       triggerIcon={Filter}
-      triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+      triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
       items={[
         {
           type: 'search',
@@ -144,25 +144,25 @@
       <DropdownMenu
         triggerText="Bottom"
         placement="bottom"
-        triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+        triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
         items={[{ id: '1', title: 'Item 1' }, { id: '2', title: 'Item 2' }]}
       />
       <DropdownMenu
         triggerText="Top"
         placement="top"
-        triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+        triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
         items={[{ id: '1', title: 'Item 1' }, { id: '2', title: 'Item 2' }]}
       />
       <DropdownMenu
         triggerText="Left"
         placement="left"
-        triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+        triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
         items={[{ id: '1', title: 'Item 1' }, { id: '2', title: 'Item 2' }]}
       />
       <DropdownMenu
         triggerText="Right"
         placement="right"
-        triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+        triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
         items={[{ id: '1', title: 'Item 1' }, { id: '2', title: 'Item 2' }]}
       />
     </div>
@@ -174,7 +174,7 @@
     <DropdownMenu
       triggerText="Filters"
       triggerIcon={Filter}
-      triggerClass="px-4 py-2 border rounded hover:bg-gray-50"
+      triggerClass="px-4 py-2 border rounded hover:bg-ds-background-neutral-hovered"
       items={[
         { id: 'active', type: 'checkbox', title: 'Active', checked: true, onChange: () => {}, closeOnSelect: false },
         { id: 'pending', type: 'checkbox', title: 'Pending', checked: false, onChange: () => {}, closeOnSelect: false },

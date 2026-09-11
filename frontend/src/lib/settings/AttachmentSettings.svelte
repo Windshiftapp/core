@@ -340,7 +340,7 @@
                   size="small"
                   onclick={clearAllMimeTypes}
                   disabled={saving}
-                  class="text-red-600 hover:text-red-700"
+                  class="text-ds-text-danger hover:opacity-80"
                 >
                   {t('settings.attachments.clearAll')}
                 </Button>
@@ -405,7 +405,7 @@
 
         <!-- Error Messages -->
         {#if error}
-          <div class="flex items-center gap-2 text-red-600">
+          <div class="flex items-center gap-2 text-ds-text-danger">
             <AlertCircle class="w-4 h-4" />
             <span class="text-sm">{error}</span>
             <Button variant="ghost" icon={X} size="small" onclick={clearError} title="Dismiss" />

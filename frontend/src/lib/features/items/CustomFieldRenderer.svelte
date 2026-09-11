@@ -314,7 +314,7 @@
     {#if field.field_type === 'user'}
       {#if userData}
         <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
-          <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0">
+          <div class="w-4 h-4 rounded-full bg-ds-accent-blue flex items-center justify-center text-ds-text-inverse text-[9px] font-medium flex-shrink-0">
             {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
           </div>
           <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
@@ -380,7 +380,7 @@
     {:else if field.field_type === 'combobox'}
       <div class="flex items-center gap-1 flex-wrap {displayAlignment === 'end' ? 'justify-end' : ''}">
         {#each getComboboxLabels(value) as labelName}
-          <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+          <span class="inline-flex items-center px-2 py-0.5 bg-ds-accent-blue-subtle text-ds-text-accent-blue text-xs rounded-full">
             {labelName}
           </span>
         {/each}
@@ -442,7 +442,7 @@
     {#if onStartEdit && !disabled}
       <button
         type="button"
-        class="flex w-full min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {noPadding ? '' : 'px-3'} py-2 text-sm hover:bg-gray-50 transition-colors rounded"
+        class="flex w-full min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {noPadding ? '' : 'px-3'} py-2 text-sm hover:bg-ds-background-neutral-hovered transition-colors rounded"
         onclick={handleClick}
         data-testid={displayTestId}
       >
@@ -659,7 +659,7 @@
           value={formatDateForInput(value)}
           dataTestid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(formatDateFromInput(/** @type {HTMLInputElement} */ (e.target).value))}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           onkeydown={handleKeydown}
           {disabled}
@@ -674,7 +674,7 @@
           {value}
           data-testid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(/** @type {HTMLTextAreaElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           rows={3}
@@ -693,7 +693,7 @@
           {value}
           dataTestid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}
@@ -723,7 +723,7 @@
           {value}
           dataTestid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}
@@ -740,7 +740,7 @@
           {value}
           dataTestid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}
@@ -758,7 +758,7 @@
           {value}
           dataTestid={`custom-field-input-${field.id}`}
           oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}

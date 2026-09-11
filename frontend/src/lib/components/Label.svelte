@@ -24,6 +24,6 @@
 >
   {@render children?.()}
   {#if required}
-    <span class="text-red-500 ml-0.5">*</span>
+    <span class="text-ds-text-danger ml-0.5">*</span>
   {/if}
 </label>

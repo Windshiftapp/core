@@ -8,7 +8,7 @@
 
   let {
     value = '', placeholder = '', disabled = false, required = false,
-    className = '', editingClass = 'border-blue-500 ring-1 ring-blue-500',
+    className = '', editingClass = 'border-ds-interactive ring-1 ring-ds-border-focused',
     displayClass = 'hover-bg cursor-text', enableSingleClick = false,
     enableDoubleClick = false, onsave = null, onclick: onclickProp = null
   } = $props();
@@ -68,7 +68,7 @@
       bind:inputRef={inputElement}
       bind:value={editValue}
       type="date"
-      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-red-500' : ''}"
+      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-ds-border-danger' : ''}"
       disabled={saving}
       {onkeydown}
       {onblur}

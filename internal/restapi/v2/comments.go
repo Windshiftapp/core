@@ -19,6 +19,7 @@ func registerCommentRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/comments/{comment_id}", AuthAuthenticated, []string{"items:read"}, getComment(deps))
 	builder.JSON(http.MethodPatch, "/comments/{comment_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, updateComment(deps))
 	builder.Command(http.MethodDelete, "/comments/{comment_id}", AuthAuthenticated, []string{"items:delete"}, deleteComment(deps))
+	builder.JSON(http.MethodPost, "/comments/batch", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, commentsBatch(deps))
 }
 
 type commentFeedDTO struct {
@@ -38,6 +39,127 @@ type commentCursor struct {
 type commentCreateRequest struct {
 	Content   string `json:"content"`
 	IsPrivate bool   `json:"is_private"`
+}
+
+const maxCommentBatchItems = 500
+
+type commentBatchRequest struct {
+	ItemIDs  []int `json:"item_ids"`
+	PageSize int   `json:"page_size"`
+}
+
+type commentBatchEntry struct {
+	ItemID   int              `json:"item_id"`
+	Comments []models.Comment `json:"comments"`
+	HasMore  bool             `json:"has_more"`
+}
+
+func commentsBatch(deps Deps) jsonOperation[commentBatchRequest, []commentBatchEntry] {
+	return func(r *http.Request, input commentBatchRequest) ([]commentBatchEntry, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		itemIDs, err := normalizeCommentBatchItemIDs(input.ItemIDs)
+		if err != nil {
+			return nil, err
+		}
+		pageSize := services.DefaultCommentFeedLimit
+		if input.PageSize != 0 {
+			if input.PageSize < 1 || input.PageSize > services.MaxCommentFeedLimit {
+				return nil, newError(http.StatusBadRequest, "invalid_request", "page_size is out of range")
+			}
+			pageSize = input.PageSize
+		}
+		options := services.CommentFeedOptions{Limit: pageSize}
+		includeOwner, _ := deps.CommentAccess.HasGlobalPermission(user.ID, models.PermissionUserList)
+		if !includeOwner {
+			includeOwner, _ = deps.SystemAdmins.IsSystemAdmin(user.ID)
+		}
+
+		// Same visibility contract as the single-item feed: workspace item view
+		// or the approval-approver fallback. Unreadable items are omitted
+		// without revealing whether they are missing or unauthorized.
+		visible := make([]int, 0, len(itemIDs))
+		workspaceAllowed := make(map[int]bool)
+		for _, itemID := range itemIDs {
+			item, err := deps.Items.FindByID(itemID)
+			if err != nil {
+				if errors.Is(err, repository.ErrNotFound) {
+					continue
+				}
+				return nil, commentError(err)
+			}
+			allowed, ok := workspaceAllowed[item.WorkspaceID]
+			if !ok {
+				allowed, err = deps.CommentAccess.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemView)
+				if err != nil {
+					return nil, internalError(err)
+				}
+				workspaceAllowed[item.WorkspaceID] = allowed
+			}
+			if !allowed {
+				allowed, err = deps.Comments.UserCanReadItemAsApprover(r.Context(), user.ID, item.ID)
+				if err != nil {
+					return nil, internalError(err)
+				}
+			}
+			if allowed {
+				visible = append(visible, itemID)
+			}
+		}
+
+		pages, err := deps.Comments.GetFeedByItemIDs(visible, includeOwner, options)
+		if err != nil {
+			return nil, internalError(err)
+		}
+		entries := make([]commentBatchEntry, 0, len(visible))
+		for _, itemID := range visible {
+			page := pages[itemID]
+			comments := []models.Comment{}
+			hasMore := false
+			if page != nil {
+				comments = page.Comments
+				hasMore = page.HasMore
+			}
+			if comments == nil {
+				comments = []models.Comment{}
+			}
+			if err := renderCommentHTML(comments); err != nil {
+				return nil, internalError(err)
+			}
+			entries = append(entries, commentBatchEntry{ItemID: itemID, Comments: comments, HasMore: hasMore})
+		}
+		return entries, nil
+	}
+}
+
+func normalizeCommentBatchItemIDs(input []int) ([]int, error) {
+	if len(input) == 0 {
+		err := newError(http.StatusBadRequest, "invalid_request", "item_ids is required")
+		err.Details = map[string]string{"field": "item_ids"}
+		return nil, err
+	}
+	if len(input) > maxCommentBatchItems {
+		err := newError(http.StatusBadRequest, "invalid_request", "item_ids supports at most 500 values")
+		err.Details = map[string]string{"field": "item_ids"}
+		return nil, err
+	}
+	seen := make(map[int]struct{}, len(input))
+	ids := make([]int, 0, len(input))
+	for _, id := range input {
+		if id < 1 {
+			err := newError(http.StatusBadRequest, "invalid_request", "item_ids is invalid")
+			err.Details = map[string]string{"field": "item_ids"}
+			return nil, err
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 type commentPatchRequest struct {

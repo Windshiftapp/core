@@ -254,7 +254,7 @@
               aria-selected={index === activeIndex}
               class="flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left font-mono text-sm"
               style={index === activeIndex
-                ? 'background-color: var(--ds-surface-hover); color: var(--ds-text);'
+                ? 'background-color: var(--ds-surface-hovered); color: var(--ds-text);'
                 : 'color: var(--ds-text);'}
               onmouseenter={() => (activeIndex = index)}
               onmousedown={(event) => event.preventDefault()}

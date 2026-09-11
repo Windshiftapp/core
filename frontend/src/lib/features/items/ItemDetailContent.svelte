@@ -321,12 +321,12 @@
 {:else if error}
   <!-- Error State -->
   <div class="p-8 text-center" style="background-color: var(--ds-surface);">
-    <AlertCircle class="w-12 h-12 text-red-500 mx-auto mb-4" />
+    <AlertCircle class="w-12 h-12 text-ds-icon-danger mx-auto mb-4" />
     <h1 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('items.errorLoadingWorkItem')}</h1>
     <p class="mb-6" style="color: var(--ds-text-subtle);">{error}</p>
     <button
       onclick={() => onclose?.()}
-      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+      class="px-4 py-2 bg-ds-interactive text-white rounded hover:bg-ds-interactive-hovered transition-colors"
     >
       {t('common.close')}
     </button>
@@ -499,7 +499,7 @@
     <h1 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('items.workItemNotFound')}</h1>
     <button
       onclick={() => onclose?.()}
-      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+      class="px-4 py-2 bg-ds-interactive text-white rounded hover:bg-ds-interactive-hovered transition-colors"
     >
       {t('common.close')}
     </button>

@@ -33,18 +33,18 @@
 </script>
 
 {#if show}
-  <div class="bg-amber-50 border-b border-amber-200">
+  <div class="bg-ds-warning-subtle border-b border-ds-status-warning-border">
     <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3">
           <div class="flex-shrink-0">
-            <Mail class="h-5 w-5 text-amber-600" />
+            <Mail class="h-5 w-5 text-ds-icon-warning" />
           </div>
-          <div class="text-sm text-amber-800">
+          <div class="text-sm text-ds-text-warning">
             <p class="font-medium">
               {t('notifications.verifyEmail')}
             </p>
-            <p class="text-amber-700">
+            <p class="text-ds-text-warning opacity-90">
               {t('notifications.verifyEmailDescription')}
             </p>
           </div>
@@ -58,7 +58,7 @@
           <button
             onclick={handleResend}
             disabled={resending}
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 rounded-md hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-ds-text-warning bg-ds-accent-yellow-subtle rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-warning disabled:opacity-50"
           >
             {#if resending}
               <RefreshCw class="h-4 w-4 animate-spin" />
@@ -70,7 +70,7 @@
           </button>
           <button
             onclick={handleDismiss}
-            class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+            class="p-1.5 text-ds-icon-warning hover:opacity-80 hover:bg-ds-accent-yellow-subtle rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-warning"
             title={t('notifications.dismiss')}
           >
             <X class="h-4 w-4" />

@@ -283,9 +283,9 @@
 
   {#if statusCategories.length === 0 && !loadingCategories}
     <Panel padding="spacious" class="text-center">
-      <Circle class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-      <h3 class="text-lg font-medium text-gray-900 mb-2">{t('categories.noCategories')}</h3>
-      <p class="text-gray-500 mb-6">{t('statuses.noStatuses')}</p>
+      <Circle class="w-12 h-12 text-ds-icon-subtle mx-auto mb-4" />
+      <h3 class="text-lg font-medium text-ds-text mb-2">{t('categories.noCategories')}</h3>
+      <p class="text-ds-text-subtle mb-6">{t('statuses.noStatuses')}</p>
       <Button href="/admin/status-categories" variant="primary">
         {t('categories.title')}
       </Button>

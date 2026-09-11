@@ -788,9 +788,14 @@ func (s *CommentService) GetFeedByItemID(itemID int, includeAgentOwner bool, opt
 	if err != nil {
 		return nil, err
 	}
-	comments = append(comments, approvalRows...)
+	return mergeCommentFeed(comments, approvalRows, limit, order == "ASC"), nil
+}
 
-	asc := order == "ASC"
+// mergeCommentFeed combines human and approval comment rows into one stable
+// ordering truncated to limit. asc sorts oldest-first for since cursors;
+// the default is newest-first.
+func mergeCommentFeed(human, approval []models.Comment, limit int, asc bool) *CommentFeedPage {
+	comments := append(human, approval...)
 	sort.SliceStable(comments, func(i, j int) bool {
 		if comments[i].CreatedAt.Equal(comments[j].CreatedAt) {
 			if asc {
@@ -808,7 +813,115 @@ func (s *CommentService) GetFeedByItemID(itemID int, includeAgentOwner bool, opt
 	if hasMore {
 		comments = comments[:limit]
 	}
-	return &CommentFeedPage{Comments: comments, HasMore: hasMore}, nil
+	return &CommentFeedPage{Comments: comments, HasMore: hasMore}
+}
+
+// GetFeedByItemIDs returns the newest bounded feed page for each requested
+// item, merging approval decision comments per item exactly like
+// GetFeedByItemID. Cursor options are ignored: every page is the newest one,
+// newest first. Every requested ID gets an entry; items without comments
+// carry an empty page.
+func (s *CommentService) GetFeedByItemIDs(itemIDs []int, includeAgentOwner bool, options CommentFeedOptions) (map[int]*CommentFeedPage, error) {
+	limit := normalizeCommentFeedLimit(options.Limit)
+
+	seen := make(map[int]struct{}, len(itemIDs))
+	ids := make([]int, 0, len(itemIDs))
+	for _, id := range itemIDs {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	pages := make(map[int]*CommentFeedPage, len(ids))
+	for _, id := range ids {
+		pages[id] = &CommentFeedPage{Comments: []models.Comment{}}
+	}
+	if len(ids) == 0 {
+		return pages, nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]any, 0, len(ids)+1)
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	// One window query replaces per-item feed queries: rn bounds each item to
+	// its own newest limit+1 rows before the approval merge applies the shared
+	// limit.
+	query := fmt.Sprintf(`
+		SELECT feed_id, item_id, author_id, portal_customer_id, content, is_private,
+		       feed_created_at, updated_at, author_name, author_email, avatar_url,
+		       source, is_agent, agent_owner_name
+		FROM (
+			SELECT c.id AS feed_id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private,
+			       c.created_at AS feed_created_at, c.updated_at,
+			       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), pc.name, 'Unknown User') AS author_name,
+			       COALESCE(u.email, pc.email) AS author_email, u.avatar_url,
+			       'human' AS source, COALESCE(u.is_agent, FALSE) AS is_agent,
+			       COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
+			       ROW_NUMBER() OVER (PARTITION BY c.item_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+			FROM comments c
+			LEFT JOIN users u ON c.author_id = u.id
+			LEFT JOIN users owner ON owner.id = u.agent_owner_user_id
+			LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
+			WHERE c.item_id IN (%s)
+		) ranked
+		WHERE rn <= ?
+	`, strings.Join(placeholders, ","))
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get comment feeds for %d items: %w", len(ids), err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var comment models.Comment
+		var authorID, portalCustomerID sql.NullInt64
+		var authorName, authorEmail, authorAvatar, agentOwnerName sql.NullString
+		if err := rows.Scan(
+			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
+			&comment.CreatedAt, &comment.UpdatedAt, &authorName, &authorEmail, &authorAvatar,
+			&comment.Source, &comment.IsAgent, &agentOwnerName,
+		); err != nil {
+			return nil, fmt.Errorf("scan comment feed row: %w", err)
+		}
+		if authorID.Valid {
+			id := int(authorID.Int64)
+			comment.AuthorID = &id
+		}
+		if portalCustomerID.Valid {
+			id := int(portalCustomerID.Int64)
+			comment.PortalCustomerID = &id
+		}
+		comment.AuthorName = authorName.String
+		comment.AuthorEmail = authorEmail.String
+		comment.AuthorAvatar = authorAvatar.String
+		if includeAgentOwner {
+			comment.AgentOwnerName = agentOwnerName.String
+		}
+		page := pages[comment.ItemID]
+		page.Comments = append(page.Comments, comment)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read comment feeds: %w", err)
+	}
+
+	for _, id := range ids {
+		page := pages[id]
+		options.Limit = limit
+		approvalRows, err := s.approvalReader().GetDecisionCommentsForItem(id, includeAgentOwner, options)
+		if err != nil {
+			return nil, err
+		}
+		merged := mergeCommentFeed(page.Comments, approvalRows, limit, false)
+		page.Comments = merged.Comments
+		page.HasMore = merged.HasMore
+	}
+	return pages, nil
 }
 
 // CountFeedByItemID counts ordinary comments and approval decision comments in

@@ -7,6 +7,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import NotificationCard from '../features/notifications/NotificationCard.svelte';
   import Button from '../components/Button.svelte';
+  import Chip from '../components/Chip.svelte';
   import Select from '../components/Select.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import SearchInput from '../components/SearchInput.svelte';
@@ -201,28 +202,19 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm" style="color: var(--ds-text-subtle);">Active filters:</span>
               {#if searchQuery}
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md">
+                <Chip color="blue" removable onRemove={() => (searchQuery = '')}>
                   Search: "{searchQuery}"
-                  <button onclick={() => searchQuery = ''} class="hover:bg-blue-200 rounded">
-                    <X class="w-3 h-3" />
-                  </button>
-                </span>
+                </Chip>
               {/if}
               {#if selectedType !== 'all'}
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-md">
+                <Chip color="green" removable onRemove={() => (selectedType = 'all')}>
                   {typeOptions.find(opt => opt.value === selectedType)?.label}
-                  <button onclick={() => selectedType = 'all'} class="hover:bg-green-200 rounded">
-                    <X class="w-3 h-3" />
-                  </button>
-                </span>
+                </Chip>
               {/if}
               {#if selectedStatus !== 'all'}
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-md">
+                <Chip color="purple" removable onRemove={() => (selectedStatus = 'all')}>
                   {statusOptions.find(opt => opt.value === selectedStatus)?.label}
-                  <button onclick={() => selectedStatus = 'all'} class="hover:bg-purple-200 rounded">
-                    <X class="w-3 h-3" />
-                  </button>
-                </span>
+                </Chip>
               {/if}
             </div>
             <Button

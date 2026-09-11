@@ -304,7 +304,7 @@
     transition: background 120ms, color 120ms;
   }
   .trigger:hover {
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
     color: var(--ds-text);
   }
   .trigger-label {
@@ -360,7 +360,7 @@
   }
   .add-btn:hover {
     color: var(--ds-text);
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
   }
 
   .search-row {
@@ -424,7 +424,7 @@
   .row:hover,
   .row--link:hover,
   .row--highlighted {
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
   }
   .row-key {
     font-family: var(--ds-font-mono, ui-monospace, monospace);
@@ -456,6 +456,6 @@
   }
   .row-delete:hover {
     color: var(--ds-text-danger);
-    background: var(--ds-surface-hover);
+    background: var(--ds-surface-hovered);
   }
 </style>

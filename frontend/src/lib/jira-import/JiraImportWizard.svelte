@@ -325,7 +325,7 @@
                   {@const isDataCenter = conn.deployment_type === 'datacenter'}
                   <button
                     type="button"
-                    class="w-full p-4 rounded-lg border text-left transition-all hover:border-blue-400"
+                    class="w-full p-4 rounded-lg border text-left transition-all hover:border-ds-interactive"
                     style="border-color: var(--ds-border); background: var(--ds-surface);"
                     onclick={() => selectSavedConnection(conn)}
                   >
@@ -1406,24 +1406,24 @@
                 </p>
               {/if}
               {#if importData.progress?.failed_issues > 0}
-                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-failed-count">
+                <p class="text-sm mt-1 text-ds-text-warning" data-testid="jira-import-failed-count">
                   {t('jiraImport.import.failed', { count: importData.progress.failed_issues })}
                 </p>
               {/if}
               {#if importData.progress?.failed_tests > 0}
-                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-xray-failed-count">
+                <p class="text-sm mt-1 text-ds-text-warning" data-testid="jira-import-xray-failed-count">
                   {importData.progress.failed_tests} Xray test
                   {importData.progress.failed_tests === 1 ? ' case failed' : ' cases failed'} to import.
                 </p>
               {/if}
               {#if importData.progress?.failed_projects > 0}
-                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-failed-project-count">
+                <p class="text-sm mt-1 text-ds-text-warning" data-testid="jira-import-failed-project-count">
                   {importData.progress.failed_projects} Jira
                   {importData.progress.failed_projects === 1 ? ' project failed' : ' projects failed'} to import.
                 </p>
               {/if}
               {#if importData.progress?.failed_links > 0}
-                <p class="text-sm mt-1 text-amber-600" data-testid="jira-import-failed-link-count">
+                <p class="text-sm mt-1 text-ds-text-warning" data-testid="jira-import-failed-link-count">
                   Jira issue links could not be imported.
                 </p>
               {/if}

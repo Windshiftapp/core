@@ -261,7 +261,7 @@
         {@const required = isRequired(column.field_identifier)}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="flex items-center gap-2 px-2 py-2 rounded transition-colors {dragOverIndex === index ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
+          class="flex items-center gap-2 px-2 py-2 rounded transition-colors {dragOverIndex === index ? 'bg-ds-accent-blue-subtle' : ''}"
           draggable={!required}
           ondragstart={(e) => handleDragStart(e, index)}
           ondragover={(e) => handleDragOver(e, index)}
@@ -290,7 +290,7 @@
             {#each widthOptions as opt}
               <button
                 onclick={() => changeWidth(column.field_identifier, opt.value)}
-                class="w-6 h-6 text-xs rounded transition-colors {column.width === opt.value ? 'bg-blue-500 text-white' : 'hover:bg-[var(--ds-background-neutral-hovered)]'}"
+                class="w-6 h-6 text-xs rounded transition-colors {column.width === opt.value ? 'bg-ds-interactive text-white' : 'hover:bg-ds-background-neutral-hovered'}"
                 style="{column.width !== opt.value ? 'color: var(--ds-text-subtle);' : ''}"
                 title="Width: {opt.label}"
               >
@@ -303,7 +303,7 @@
           {#if !required}
               <button
                 onclick={() => toggleColumn(column.field_identifier)}
-                class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+                class="p-1 rounded hover:bg-ds-danger-subtle transition-colors"
                 style="color: var(--ds-text-subtle);"
                 title="Remove column"
                 data-testid={`remove-column-${column.field_identifier}`}
@@ -384,7 +384,7 @@
       </button>
       <button
         onclick={saveChanges}
-        class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white transition-colors hover:bg-blue-600"
+        class="px-3 py-1.5 text-sm rounded bg-ds-interactive text-white transition-colors hover:bg-ds-interactive-hovered"
         data-testid="column-selector-apply"
       >
         Apply

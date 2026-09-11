@@ -12,12 +12,12 @@
 <div class="p-6 text-center">
   <div class="max-w-md mx-auto">
     <div class="mb-8">
-      <div class="mb-4 text-gray-400 flex justify-center">
+      <div class="mb-4 text-ds-text-subtlest flex justify-center">
         <Telescope class="w-12 h-12" />
       </div>
-      <h1 class="text-6xl font-bold text-gray-400 mb-2">404</h1>
-      <h2 class="text-2xl font-semibold text-gray-700 mb-2">Page Not Found</h2>
-      <p class="text-gray-600">
+      <h1 class="text-6xl font-bold text-ds-text-subtlest mb-2">404</h1>
+      <h2 class="text-2xl font-semibold text-ds-text mb-2">Page Not Found</h2>
+      <p class="text-ds-text-subtle">
         {t('errors.NOT_FOUND')}
       </p>
     </div>

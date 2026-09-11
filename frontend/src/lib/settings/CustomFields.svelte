@@ -1105,7 +1105,7 @@
             {t('common.noData')}
           {/if}
         {:else}
-          <span class="text-gray-400">{t('common.loading')}</span>
+          <span class="text-ds-text-subtlest">{t('common.loading')}</span>
         {/if}
         </div>
       {/snippet}

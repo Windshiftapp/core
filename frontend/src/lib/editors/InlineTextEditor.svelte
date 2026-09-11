@@ -69,7 +69,7 @@
       bind:value={editValue}
       placeholder={effectivePlaceholder}
       maxlength={maxLength}
-      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-red-500' : ''}"
+      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-ds-border-danger' : ''}"
       disabled={saving}
       {onkeydown}
       {onblur}

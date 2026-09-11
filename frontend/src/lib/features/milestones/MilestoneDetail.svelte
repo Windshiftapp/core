@@ -233,7 +233,7 @@
       </div>
     {:else if error}
       <div class="text-center py-20">
-        <p class="text-red-500">{error}</p>
+        <p class="text-ds-text-danger">{error}</p>
         <Button onclick={loadProgress} class="mt-4">{t('common.retry')}</Button>
       </div>
     {:else if progress}

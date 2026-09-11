@@ -315,7 +315,7 @@
             {/if}
             {#if portalRequestsStore.openCount + portalApprovalsStore.pendingCount > 0}
               <span
-                class="sm:hidden absolute -top-1 -right-1 min-w-4 h-4 px-1 inline-flex items-center justify-center rounded-full text-[10px] font-semibold text-white bg-red-500"
+                class="sm:hidden absolute -top-1 -right-1 min-w-4 h-4 px-1 inline-flex items-center justify-center rounded-full text-[10px] font-semibold text-white bg-ds-background-danger-bold"
               >
                 {portalRequestsStore.openCount + portalApprovalsStore.pendingCount}
               </span>

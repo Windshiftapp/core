@@ -484,7 +484,7 @@
               style="{draggedWidget && isCustomizeMode
                 ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-border-focused)' : 'var(--ds-border)'};
                    ${dropZoneStates.get(section.id)?.isOver ? 'box-shadow: 0 0 0 2px var(--ds-border-focused);' : ''}
-                   background-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-surface-hover)' : 'transparent'};
+                   background-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-surface-hovered)' : 'transparent'};
                    padding: 0.5rem;`
                 : ''}"
               data-dashboard-drop-zone

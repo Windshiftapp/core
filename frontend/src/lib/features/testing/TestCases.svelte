@@ -1356,7 +1356,7 @@
                   {@const isAssigned = isLabelAssigned(label.id)}
                   <button
                     onclick={() => isAssigned ? removeLabelFromTestCase(label.id) : addLabelToTestCase(label.id)}
-                    class="flex items-center gap-3 p-3 border rounded transition-all hover:shadow-sm {isAssigned ? 'ring-2 ring-opacity-50' : 'hover:border-gray-300'}"
+                    class="flex items-center gap-3 p-3 border rounded transition-all hover:shadow-sm {isAssigned ? 'ring-2 ring-opacity-50' : 'hover:border-ds-border-bold'}"
                     style="
                       border-color: {isAssigned ? label.color : 'var(--ds-border)'};
                       ring-color: {isAssigned ? label.color : 'transparent'};

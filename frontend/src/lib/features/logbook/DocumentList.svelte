@@ -343,7 +343,7 @@
       <div class="px-6 py-4 space-y-4">
         <div>
           <label for="note-title" class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
-            {t('logbook.noteTitle')} <span class="text-red-500">*</span>
+            {t('logbook.noteTitle')} <span class="text-ds-text-danger">*</span>
           </label>
           <Input
             id="note-title"

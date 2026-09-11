@@ -33,7 +33,7 @@
   <div class="flex items-center justify-center h-full">
     <div class="text-center">
       <Spinner class="mx-auto mb-4" />
-      <p class="text-gray-600">{message}</p>
+      <p class="text-ds-text-subtle">{message}</p>
     </div>
   </div>
 {/snippet}
@@ -41,7 +41,7 @@
 {#snippet errorState(message, retryFn)}
   <div class="flex items-center justify-center h-full">
     <div class="text-center">
-      <p class="text-red-600">{message}</p>
+      <p class="text-ds-text-danger">{message}</p>
       <Button variant="primary" onclick={retryFn} class="mt-4">
         {t('nav.retry')}
       </Button>

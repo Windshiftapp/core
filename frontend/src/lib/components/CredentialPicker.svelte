@@ -83,11 +83,11 @@
 </script>
 
 {#if loading}
-  <div class="text-sm text-zinc-500 dark:text-zinc-400">Loading credentials…</div>
+  <div class="text-sm text-ds-text-subtle">Loading credentials…</div>
 {:else if loadError}
-  <div class="text-sm text-rose-600 dark:text-rose-400">{loadError}</div>
+  <div class="text-sm text-ds-text-danger">{loadError}</div>
 {:else if !options.length}
-  <div class="text-sm text-zinc-500 dark:text-zinc-400">
+  <div class="text-sm text-ds-text-subtle">
     No credentials available. Create one in <span class="font-medium">Action credentials</span>.
   </div>
 {:else}

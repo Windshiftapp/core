@@ -36,7 +36,7 @@
     <div>
       <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
       <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-        <IconFolder class="w-4 h-4 text-yellow-500" />
+        <IconFolder class="w-4 h-4 text-ds-accent-yellow" />
         {asset.category_name}
       </span>
     </div>

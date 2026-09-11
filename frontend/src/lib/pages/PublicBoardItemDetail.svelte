@@ -170,7 +170,7 @@
             <div class="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded">
               <Text variant="subtle" size="sm">Due Date</Text>
               <div class="flex items-center gap-2">
-                <span class="text-[13px]" class:text-red-500={isOverdue} class:font-medium={isOverdue}>
+                <span class="text-[13px]" class:text-ds-text-danger={isOverdue} class:font-medium={isOverdue}>
                   {formatDateOnly(item.due_date)}
                 </span>
               </div>

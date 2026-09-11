@@ -300,7 +300,7 @@
       <!-- Light Mode Colors -->
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
-          <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+          <span class="w-3 h-3 rounded-full bg-ds-warning"></span>
           {t('settings.lightMode')}
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -319,7 +319,7 @@
       <!-- Dark Mode Colors -->
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
-          <span class="w-3 h-3 rounded-full bg-gray-700"></span>
+          <span class="w-3 h-3 rounded-full bg-ds-text"></span>
           {t('settings.darkMode')}
         </h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -415,7 +415,7 @@
                 <!-- Light Mode Colors -->
                 <div class="mb-3">
                   <h5 class="text-xs font-semibold mb-2 flex items-center gap-1" style="color: var(--ds-text-subtle);">
-                    <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                    <span class="w-2 h-2 rounded-full bg-ds-warning"></span>
                     {t('settings.lightMode')}
                   </h5>
                   <div class="grid grid-cols-2 gap-3">
@@ -433,7 +433,7 @@
                 <!-- Dark Mode Colors -->
                 <div>
                   <h5 class="text-xs font-semibold mb-2 flex items-center gap-1" style="color: var(--ds-text-subtle);">
-                    <span class="w-2 h-2 rounded-full bg-gray-700"></span>
+                    <span class="w-2 h-2 rounded-full bg-ds-text"></span>
                     {t('settings.darkMode')}
                   </h5>
                   <div class="grid grid-cols-2 gap-3">
@@ -491,7 +491,7 @@
                 <!-- Light Mode Info -->
                 <div class="text-sm">
                   <h5 class="text-xs font-semibold mb-1 flex items-center gap-1" style="color: var(--ds-text-subtle);">
-                    <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                    <span class="w-2 h-2 rounded-full bg-ds-warning"></span>
                     {t('settings.lightMode')}
                   </h5>
                   <div class="space-y-1">
@@ -508,7 +508,7 @@
                 <!-- Dark Mode Info -->
                 <div class="text-sm">
                   <h5 class="text-xs font-semibold mb-1 flex items-center gap-1" style="color: var(--ds-text-subtle);">
-                    <span class="w-2 h-2 rounded-full bg-gray-700"></span>
+                    <span class="w-2 h-2 rounded-full bg-ds-text"></span>
                     {t('settings.darkMode')}
                   </h5>
                   <div class="space-y-1">

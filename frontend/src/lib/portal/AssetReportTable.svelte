@@ -282,8 +282,8 @@
         </div>
       {:else if error}
         <div class="flex items-center gap-2 py-4">
-          <AlertCircle class="w-5 h-5 text-red-500" />
-          <span class="text-sm text-red-500">{error}</span>
+          <AlertCircle class="w-5 h-5 text-ds-icon-danger" />
+          <span class="text-sm text-ds-text-danger">{error}</span>
         </div>
       {:else if formFields.length === 0}
         <p class="text-sm text-center py-6" style="color: var(--ds-text-subtle);">
@@ -299,7 +299,7 @@
                 style="color: var(--ds-text);"
               >
                 {field.field_label || field.field_name || field.field_identifier}
-                {#if field.is_required}<span class="text-red-500">*</span>{/if}
+                {#if field.is_required}<span class="text-ds-text-danger">*</span>{/if}
               </label>
               <Input
                 id={`ar-field-${field.id}`}
@@ -350,8 +350,8 @@
       </div>
     {:else if error}
       <div class="flex items-center justify-center py-12 gap-2">
-        <AlertCircle class="w-5 h-5 text-red-500" />
-        <span class="text-sm text-red-500">{error}</span>
+        <AlertCircle class="w-5 h-5 text-ds-icon-danger" />
+        <span class="text-sm text-ds-text-danger">{error}</span>
       </div>
     {:else if assets.length === 0}
       <div class="flex flex-col items-center justify-center py-12">

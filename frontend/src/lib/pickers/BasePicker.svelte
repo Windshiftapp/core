@@ -603,14 +603,14 @@
                     </div>
                   {/if}
                 </div>
-                {#if itemSelected}<Check class="w-4 h-4 text-blue-600 flex-shrink-0" />{/if}
+                {#if itemSelected}<Check class="w-4 h-4 text-ds-interactive flex-shrink-0" />{/if}
               </div>
             </div>
           {/each}
           {#if canCreateCurrentInput()}
             <div role="button" tabindex="0"
                  data-testid="picker-create-option"
-                 class="px-4 py-3 cursor-pointer border-t hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 flex items-center gap-2"
+                 class="px-4 py-3 cursor-pointer border-t hover:bg-ds-background-neutral-hovered transition-colors duration-150 flex items-center gap-2"
                  style="border-color: var(--ds-border); color: var(--ds-interactive);"
                  onclick={handleCreateOption}
                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCreateOption(); } }}>
@@ -625,7 +625,7 @@
       {:else if canCreateCurrentInput()}
         <!-- Keep creation discoverable when filtering leaves no options. -->
         <div role="button" tabindex="0"
-             class="px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 flex items-center gap-2"
+             class="px-4 py-3 cursor-pointer hover:bg-ds-background-neutral-hovered transition-colors duration-150 flex items-center gap-2"
              style="color: var(--ds-interactive);"
              onclick={handleCreateOption}
              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCreateOption(); } }}>
@@ -654,7 +654,7 @@
   {#if error && !popoverMode}
     <div class="absolute z-50 w-full mt-2 rounded border shadow-lg"
          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <div class="px-4 py-4 text-center text-sm text-red-600">{error}</div>
+      <div class="px-4 py-4 text-center text-sm text-ds-text-danger">{error}</div>
     </div>
   {/if}
 </div>

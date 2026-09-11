@@ -312,11 +312,11 @@
 
   function getPriorityColor(priority) {
     switch (priority?.toLowerCase()) {
-      case 'critical': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'critical': return 'bg-ds-status-danger-bg text-ds-text-danger';
+      case 'high': return 'bg-ds-accent-orange-subtle text-ds-text-accent-orange';
+      case 'medium': return 'bg-ds-status-warning-bg text-ds-text-warning';
+      case 'low': return 'bg-ds-status-success-bg text-ds-text-success';
+      default: return 'bg-ds-background-neutral text-ds-text-subtle';
     }
   }
 

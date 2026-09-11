@@ -586,7 +586,7 @@
     {/if}
 
     {#if error}
-      <div class="flex items-center justify-center h-full text-red-400 text-sm p-4">
+      <div class="flex items-center justify-center h-full text-ds-text-danger text-sm p-4">
         Failed to load terminal: {error}
       </div>
     {/if}

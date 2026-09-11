@@ -690,13 +690,13 @@
                   <span class="w-4"></span>
                 {/if}
                 {#if expandedCategories.has(category.id)}
-                  <IconFolderOpen class="w-4 h-4 text-yellow-500" />
+                  <IconFolderOpen class="w-4 h-4 text-ds-accent-yellow" />
                 {:else}
-                  <IconFolder class="w-4 h-4 text-yellow-500" />
+                  <IconFolder class="w-4 h-4 text-ds-accent-yellow" />
                 {/if}
                 <span class="truncate">{category.name}</span>
                 {#if category.asset_count > 0}
-                  <span class="text-xs text-gray-400 ml-auto">{category.asset_count}</span>
+                  <span class="text-xs text-ds-text-subtlest ml-auto">{category.asset_count}</span>
                 {/if}
               </div>
               {#if category.has_children && expandedCategories.has(category.id) && category.children}
@@ -805,7 +805,7 @@
 
       {#if loading}
         <div class="flex items-center justify-center h-full">
-          <div class="text-gray-500">{t('common.loading')}</div>
+          <div class="text-ds-text-subtle">{t('common.loading')}</div>
         </div>
       {:else if assetSets.length === 0}
         <EmptyState
@@ -859,7 +859,7 @@
           {#snippet category(item)}
             {#if item.category_name}
               <span class="inline-flex items-center gap-1">
-                <IconFolder class="w-3 h-3 text-yellow-500" />
+                <IconFolder class="w-3 h-3 text-ds-accent-yellow" />
                 {item.category_name}
               </span>
             {:else}

@@ -585,7 +585,7 @@
       </button>
       <button
         data-testid="workflow-save"
-        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+        class="px-4 py-2 text-sm font-medium text-white bg-ds-interactive border border-transparent rounded-md hover:bg-ds-interactive-hovered focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-border-focused disabled:opacity-50"
         onclick={saveWorkflowDesign}
         disabled={savingTransitions || nodes.length === 0}
       >

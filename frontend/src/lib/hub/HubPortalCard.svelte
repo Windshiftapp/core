@@ -76,7 +76,7 @@
         tabindex="-1"
         onclick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(portal.id); }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onRemove(portal.id); } }}
-        class="absolute top-2 right-2 p-1 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors cursor-pointer"
+        class="absolute top-2 right-2 p-1 rounded bg-ds-background-danger-bold/80 text-white hover:bg-ds-background-danger-bold transition-colors cursor-pointer"
         title={t('common.remove', 'Remove')}
       >
         <X class="w-4 h-4" />

@@ -122,7 +122,7 @@
       />
 
       {#if error}
-        <div class="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white px-2 py-1 border border-red-200 rounded shadow-sm z-10">
+        <div class="absolute top-full left-0 mt-1 text-xs text-ds-text-danger bg-ds-surface-raised px-2 py-1 border border-ds-status-danger-border rounded shadow-sm z-10">
           {error}
         </div>
       {/if}
@@ -135,7 +135,7 @@
         <button
           type="button"
           onclick={saveValue}
-          class="p-1 text-green-600 hover:bg-green-50 rounded"
+          class="p-1 text-ds-icon-success hover:bg-ds-success-subtle rounded"
           title={t('editors.saveEnter')}
         >
           <Check class="w-4 h-4" />

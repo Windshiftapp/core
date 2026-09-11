@@ -222,8 +222,9 @@
           <div class="space-y-3 mb-4">
             <!-- Delete All option -->
             <label
-              class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors {selectedMode === 'deleteAll' ? 'border-red-500' : ''}"
-              style="border-color: {selectedMode === 'deleteAll' ? 'var(--ds-border-danger)' : 'var(--ds-border)'}; background-color: {selectedMode === 'deleteAll' ? 'var(--ds-background-danger)' : 'transparent'};"
+              class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors {selectedMode === 'deleteAll'
+                ? 'border-ds-border-danger bg-ds-danger-subtle'
+                : 'border-ds-border'}"
             >
               <Radio
                 name="deleteMode"
@@ -247,8 +248,9 @@
 
             <!-- Reparent option -->
             <label
-              class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-              style="border-color: {selectedMode === 'reparent' ? 'var(--ds-border-selected)' : 'var(--ds-border)'}; background-color: {selectedMode === 'reparent' ? 'var(--ds-background-selected)' : 'transparent'};"
+              class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors {selectedMode === 'reparent'
+                ? 'border-ds-interactive bg-ds-surface-selected'
+                : 'border-ds-border'}"
             >
               <Radio
                 name="deleteMode"

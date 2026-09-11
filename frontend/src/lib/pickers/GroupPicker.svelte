@@ -43,7 +43,7 @@
     <div class="flex items-center gap-3 flex-1 min-w-0">
       <!-- Group Icon -->
       <div class="flex-shrink-0">
-        <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">
+        <div class="w-8 h-8 rounded-full bg-ds-accent-green flex items-center justify-center text-ds-text-inverse">
           <Users class="w-4 h-4" />
         </div>
       </div>

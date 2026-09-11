@@ -482,8 +482,8 @@
                 <button
                   data-testid="migration-tab-item-types"
                   class="px-4 py-2 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition-colors"
-                  class:border-blue-500={activeTab === 'itemType'}
-                  class:text-blue-600={activeTab === 'itemType'}
+                  class:border-ds-interactive={activeTab === 'itemType'}
+                  class:text-ds-interactive={activeTab === 'itemType'}
                   class:border-transparent={activeTab !== 'itemType'}
                   style={activeTab !== 'itemType' ? 'color: var(--ds-text-subtle);' : ''}
                   onclick={() => activeTab = 'itemType'}
@@ -491,14 +491,14 @@
                   <Type size={16} />
                   {t('migrationAssistant.itemTypes')}
                   {#if itemTypeCount > 0}
-                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{itemTypeCount}</span>
+                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-ds-accent-yellow-subtle text-ds-text-accent-yellow">{itemTypeCount}</span>
                   {/if}
                 </button>
                 <button
                   data-testid="migration-tab-fields"
                   class="px-4 py-2 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition-colors"
-                  class:border-blue-500={activeTab === 'fields'}
-                  class:text-blue-600={activeTab === 'fields'}
+                  class:border-ds-interactive={activeTab === 'fields'}
+                  class:text-ds-interactive={activeTab === 'fields'}
                   class:border-transparent={activeTab !== 'fields'}
                   style={activeTab !== 'fields' ? 'color: var(--ds-text-subtle);' : ''}
                   onclick={() => activeTab = 'fields'}
@@ -506,14 +506,14 @@
                   <FileText size={16} />
                   {t('migrationAssistant.fields')}
                   {#if fieldCount > 0}
-                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{fieldCount}</span>
+                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-ds-accent-yellow-subtle text-ds-text-accent-yellow">{fieldCount}</span>
                   {/if}
                 </button>
                 <button
                   data-testid="migration-tab-status"
                   class="px-4 py-2 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition-colors"
-                  class:border-blue-500={activeTab === 'status'}
-                  class:text-blue-600={activeTab === 'status'}
+                  class:border-ds-interactive={activeTab === 'status'}
+                  class:text-ds-interactive={activeTab === 'status'}
                   class:border-transparent={activeTab !== 'status'}
                   style={activeTab !== 'status' ? 'color: var(--ds-text-subtle);' : ''}
                   onclick={() => activeTab = 'status'}
@@ -521,14 +521,14 @@
                   <Activity size={16} />
                   {t('migrationAssistant.status')}
                   {#if statusCount > 0}
-                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{statusCount}</span>
+                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-ds-accent-yellow-subtle text-ds-text-accent-yellow">{statusCount}</span>
                   {/if}
                 </button>
                 <button
                   data-testid="migration-tab-priority"
                   class="px-4 py-2 text-sm font-medium flex items-center gap-2 border-b-2 -mb-px transition-colors"
-                  class:border-blue-500={activeTab === 'priority'}
-                  class:text-blue-600={activeTab === 'priority'}
+                  class:border-ds-interactive={activeTab === 'priority'}
+                  class:text-ds-interactive={activeTab === 'priority'}
                   class:border-transparent={activeTab !== 'priority'}
                   style={activeTab !== 'priority' ? 'color: var(--ds-text-subtle);' : ''}
                   onclick={() => activeTab = 'priority'}
@@ -536,7 +536,7 @@
                   <Flag size={16} />
                   {t('migrationAssistant.priority')}
                   {#if priorityCount > 0}
-                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">{priorityCount}</span>
+                    <span class="px-1.5 py-0.5 text-xs rounded-full bg-ds-accent-yellow-subtle text-ds-text-accent-yellow">{priorityCount}</span>
                   {/if}
                 </button>
               </div>
@@ -601,7 +601,7 @@
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
+                                <span class="text-ds-text-warning font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
@@ -713,7 +713,7 @@
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
+                                <span class="text-ds-text-warning font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
@@ -768,7 +768,7 @@
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
                               {mapping.item_count} item{mapping.item_count !== 1 ? 's' : ''}
                               {#if mapping.requires_migration}
-                                <span class="text-yellow-600 font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
+                                <span class="text-ds-text-warning font-medium"> - {t('migrationAssistant.requiresMigration')}</span>
                               {/if}
                             </p>
                           </div>
