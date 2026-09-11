@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS themes (
 	nav_text_color_light TEXT NOT NULL DEFAULT '#374151',
 	nav_background_color_dark TEXT NOT NULL DEFAULT '#1f2937',
 	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
+	logo_url TEXT,
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

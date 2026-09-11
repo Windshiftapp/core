@@ -2,6 +2,7 @@
   import { currentRoute, isWorkspaceRoute } from '../router.js';
   import { permissionStore, uiStore, workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { themeStore } from '../stores/theme.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspaceMenuItems } from '../navigation/workspaceMenu.js';
@@ -75,7 +76,15 @@
       onclick={closePopoverSurface}
       class="flex items-center justify-start px-4 w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
     >
-      <img src="windshift-3.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
+      {#if themeStore.activeTheme?.logo_url}
+        <img
+          src={themeStore.activeTheme.logo_url}
+          alt={themeStore.activeTheme.name || 'Windshift'}
+          class="max-w-8 max-h-8 object-contain flex-shrink-0"
+        />
+      {:else}
+        <img src="windshift-3.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
+      {/if}
       {#if $uiStore.navExpanded}
         <span class="ml-3 font-semibold text-sm whitespace-nowrap">Windshift</span>
       {/if}

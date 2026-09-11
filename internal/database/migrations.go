@@ -560,6 +560,14 @@ var Catalog = []Migration{
 		Postgres:      `ALTER TABLE users ADD COLUMN IF NOT EXISTS offboarded_at TIMESTAMPTZ`,
 	},
 	{
+		Version:       "20260911_users_scim_deleted_at",
+		Name:          "Add hidden SCIM deprovisioning tombstone state to users",
+		CheckSQLite:   sqliteColumnCheck("users", "scim_deleted_at"),
+		CheckPostgres: pgColumnCheck("users", "scim_deleted_at"),
+		SQLite:        `ALTER TABLE users ADD COLUMN scim_deleted_at DATETIME`,
+		Postgres:      `ALTER TABLE users ADD COLUMN IF NOT EXISTS scim_deleted_at TIMESTAMPTZ`,
+	},
+	{
 		Version:       "20260905_notification_email_claims",
 		Name:          "Add recoverable notification email claims",
 		CheckSQLite:   sqliteColumnCheck("notifications", "email_delivery_state"),
@@ -595,6 +603,22 @@ var Catalog = []Migration{
 		Postgres: `
 			ALTER TABLE notifications ADD COLUMN delivery_key TEXT;
 			CREATE UNIQUE INDEX uq_notifications_delivery_key ON notifications(delivery_key) WHERE delivery_key IS NOT NULL;
+		`,
+	},
+	{
+		Version: "20260911_theme_logo_url",
+		Name:    "Add an optional company logo URL to themes",
+		CheckSQLite: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM pragma_table_info('themes') WHERE name='logo_url') = 1
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN
+			(SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='themes' AND column_name='logo_url') = 1
+		THEN 1 ELSE 0 END`,
+		SQLite: `
+			ALTER TABLE themes ADD COLUMN logo_url TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE themes ADD COLUMN logo_url TEXT;
 		`,
 	},
 }

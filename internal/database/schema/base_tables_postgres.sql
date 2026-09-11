@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 	email_verification_expires TIMESTAMPTZ, -- Expiry time for verification token
 	scim_external_id TEXT, -- SCIM externalId from identity provider
 	scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
+	scim_deleted_at TIMESTAMPTZ, -- Set when the IdP deprovisioned the user via SCIM DELETE; row retained but hidden from every SCIM query (RFC 7644 §3.6)
 	offboarded_at TIMESTAMPTZ, -- Set when the account is administratively offboarded; never cleared, every activation path must reject it
 	is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
 	agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent
@@ -310,6 +311,7 @@ CREATE TABLE IF NOT EXISTS themes (
 	nav_text_color_light TEXT NOT NULL DEFAULT '#374151',
 	nav_background_color_dark TEXT NOT NULL DEFAULT '#1f2937',
 	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
+	logo_url TEXT,
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

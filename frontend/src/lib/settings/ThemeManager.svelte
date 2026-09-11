@@ -18,6 +18,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { objectDisplayValue } from '../utils/systemLabels.js';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
+  import LogoUploader from '../components/LogoUploader.svelte';
 
   // State management
   let themes = $state([]);
@@ -39,8 +40,10 @@
     nav_background_color_light: '#ffffff',
     nav_text_color_light: '#374151',
     nav_background_color_dark: '#1f2937',
-    nav_text_color_dark: '#f3f4f6'
+    nav_text_color_dark: '#f3f4f6',
+    logo_url: ''
   });
+  let uploadingLogo = $state(false);
 
   // Load themes and active theme
   onMount(async () => {
@@ -74,7 +77,7 @@
       error = null;
       const created = await api.themes.create(newTheme);
       themes = [...themes, created];
-      
+
       // Reset form
       newTheme = {
         name: '',
@@ -82,12 +85,39 @@
         nav_background_color_light: '#ffffff',
         nav_text_color_light: '#374151',
         nav_background_color_dark: '#1f2937',
-        nav_text_color_dark: '#f3f4f6'
+        nav_text_color_dark: '#f3f4f6',
+        logo_url: ''
       };
       showCreateForm = false;
     } catch (err) {
       error = t('settings.themeManager.failedToCreate');
       console.error('Error creating theme:', err);
+    }
+  }
+
+  /**
+   * Upload a logo attachment and bind its URL to the theme being created or
+   * edited. The attachment is stored independently; the URL is persisted with
+   * the theme on the next save, mirroring the hub-logo flow.
+   */
+  async function uploadThemeLogo(files, target) {
+    const file = files?.[0];
+    if (!file) return;
+
+    uploadingLogo = true;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('entity_type', 'theme_logo');
+      const result = await api.attachments.upload(formData);
+      if (result?.success && result.logo_url) {
+        target.logo_url = result.logo_url;
+      }
+    } catch (err) {
+      error = t('settings.themeManager.failedToUploadLogo');
+      console.error('Error uploading theme logo:', err);
+    } finally {
+      uploadingLogo = false;
     }
   }
 
@@ -183,6 +213,7 @@
       nav_text_color_light: editingTheme.nav_text_color_light,
       nav_background_color_dark: editingTheme.nav_background_color_dark,
       nav_text_color_dark: editingTheme.nav_text_color_dark,
+      logo_url: editingTheme.logo_url || '',
       is_active: editingTheme.is_active
     });
     await translationEditor?.save();
@@ -255,6 +286,17 @@
         </div>
       </div>
 
+      <!-- Logo -->
+      <div class="mb-4">
+        <LogoUploader
+          currentLogoUrl={newTheme.logo_url || null}
+          onUpload={(files) => uploadThemeLogo(files, newTheme)}
+          onRemove={() => (newTheme.logo_url = '')}
+          uploading={uploadingLogo}
+          maxHeight="40px"
+        />
+      </div>
+
       <!-- Light Mode Colors -->
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
@@ -319,7 +361,11 @@
               style="background-color: {theme.nav_background_color_light}; color: {theme.nav_text_color_light};"
             >
               <div class="flex items-center space-x-2">
-                <Palette class="w-4 h-4" />
+                {#if theme.logo_url}
+                  <img src={theme.logo_url} alt="" class="w-6 h-6 object-contain flex-shrink-0" />
+                {:else}
+                  <Palette class="w-4 h-4" />
+                {/if}
                 <span class="font-medium text-sm">{t('settings.lightMode')}</span>
               </div>
             </div>
@@ -328,7 +374,11 @@
               style="background-color: {theme.nav_background_color_dark}; color: {theme.nav_text_color_dark};"
             >
               <div class="flex items-center space-x-2">
-                <Palette class="w-4 h-4" />
+                {#if theme.logo_url}
+                  <img src={theme.logo_url} alt="" class="w-6 h-6 object-contain flex-shrink-0" />
+                {:else}
+                  <Palette class="w-4 h-4" />
+                {/if}
                 <span class="font-medium text-sm">{t('settings.darkMode')}</span>
               </div>
             </div>
@@ -350,6 +400,17 @@
                     displayDescription={editingTheme.display_description || editingTheme.description}
                   />
                 {/key}
+
+                <!-- Logo -->
+                <div class="mb-3">
+                  <LogoUploader
+                    currentLogoUrl={editingTheme.logo_url || null}
+                    onUpload={(files) => uploadThemeLogo(files, editingTheme)}
+                    onRemove={() => (editingTheme.logo_url = '')}
+                    uploading={uploadingLogo}
+                    maxHeight="40px"
+                  />
+                </div>
 
                 <!-- Light Mode Colors -->
                 <div class="mb-3">

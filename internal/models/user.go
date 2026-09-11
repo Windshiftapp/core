@@ -246,10 +246,12 @@ type Theme struct {
 	NavBackgroundColorLight string `json:"nav_background_color_light"` // CSS color value (hex, rgb, etc.)
 	NavTextColorLight       string `json:"nav_text_color_light"`       // CSS color value (hex, rgb, etc.)
 	// Navigation bar theme properties for dark mode
-	NavBackgroundColorDark string    `json:"nav_background_color_dark"` // CSS color value (hex, rgb, etc.)
-	NavTextColorDark       string    `json:"nav_text_color_dark"`       // CSS color value (hex, rgb, etc.)
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	NavBackgroundColorDark string `json:"nav_background_color_dark"` // CSS color value (hex, rgb, etc.)
+	NavTextColorDark       string `json:"nav_text_color_dark"`       // CSS color value (hex, rgb, etc.)
+	// Optional company logo shown instead of the product mark
+	LogoURL   string    `json:"logo_url,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ThemeCreateRequest represents the payload for creating a new theme
@@ -260,6 +262,7 @@ type ThemeCreateRequest struct {
 	NavTextColorLight       string `json:"nav_text_color_light"`
 	NavBackgroundColorDark  string `json:"nav_background_color_dark"`
 	NavTextColorDark        string `json:"nav_text_color_dark"`
+	LogoURL                 string `json:"logo_url"`
 }
 
 // ThemeUpdateRequest represents the payload for updating a theme
@@ -270,5 +273,6 @@ type ThemeUpdateRequest struct {
 	NavTextColorLight       string `json:"nav_text_color_light"`
 	NavBackgroundColorDark  string `json:"nav_background_color_dark"`
 	NavTextColorDark        string `json:"nav_text_color_dark"`
+	LogoURL                 string `json:"logo_url"`
 	IsActive                bool   `json:"is_active"`
 }

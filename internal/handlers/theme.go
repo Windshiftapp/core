@@ -62,12 +62,12 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 }
 
 // sanitizeThemeFields runs the canonical sanitize policies against the
-// six free-form text fields on a theme create/update payload (Name +
-// Description plus the four nav-color CSS values). Returns the labeled
-// warnings so the handler can surface them on the response. Colors are
-// short identifier-shaped CSS values (hex / rgb / hsl); HTML inside
-// them would corrupt the rendered CSS rule.
-func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark, navTextDark *string) []string {
+// free-form text fields on a theme create/update payload (Name +
+// Description, the four nav-color CSS values, and the optional logo URL).
+// Returns the labeled warnings so the handler can surface them on the
+// response. Colors are short identifier-shaped CSS values (hex / rgb / hsl);
+// HTML inside them would corrupt the rendered CSS rule.
+func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark, navTextDark, logoURL *string) []string {
 	return sanitize.ApplyAllWithWarnings(
 		sanitize.Pair{Target: name, Policy: sanitize.PlainTextField, Label: "Name"},
 		sanitize.Pair{Target: description, Policy: sanitize.RichText, Label: "Description"},
@@ -75,7 +75,17 @@ func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark,
 		sanitize.Pair{Target: navTextLight, Policy: sanitize.ShortIdentifier, Label: "Light navigation text color"},
 		sanitize.Pair{Target: navBgDark, Policy: sanitize.ShortIdentifier, Label: "Dark navigation background color"},
 		sanitize.Pair{Target: navTextDark, Policy: sanitize.ShortIdentifier, Label: "Dark navigation text color"},
+		sanitize.Pair{Target: logoURL, Policy: sanitize.PlainTextField, Label: "Logo URL"},
 	)
+}
+
+// validateLogoURL rejects logo URLs that are not same-origin paths or
+// HTTP(S) URLs, mirroring the hub-config logo contract.
+func validateLogoURL(logoURL string) string {
+	if err := utils.ValidateBrowserAssetURL(logoURL); err != nil {
+		return "Logo URL is invalid: " + err.Error()
+	}
+	return ""
 }
 
 // validateThemeFields checks the required color and name fields shared by create and update requests.
@@ -106,8 +116,12 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	warnings := sanitizeThemeFields(&req.Name, &req.Description,
 		&req.NavBackgroundColorLight, &req.NavTextColorLight,
-		&req.NavBackgroundColorDark, &req.NavTextColorDark)
+		&req.NavBackgroundColorDark, &req.NavTextColorDark, &req.LogoURL)
 	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL(req.LogoURL); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
@@ -143,8 +157,12 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	warnings := sanitizeThemeFields(&req.Name, &req.Description,
 		&req.NavBackgroundColorLight, &req.NavTextColorLight,
-		&req.NavBackgroundColorDark, &req.NavTextColorDark)
+		&req.NavBackgroundColorDark, &req.NavTextColorDark, &req.LogoURL)
 	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL(req.LogoURL); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
