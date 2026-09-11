@@ -9,7 +9,7 @@
   } from './dashboard/taskWidgetState.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { useEventListener } from 'runed';
-  import { ChevronDown } from '@lucide/svelte';
+  import { MoreHorizontal } from '@lucide/svelte';
 
   let {
     title = '',
@@ -234,9 +234,10 @@
     <div class="flex items-center gap-1 flex-shrink-0">
       <!-- Width presets menu (available outside edit mode too) -->
       <DropdownMenu
-        triggerIcon={ChevronDown}
+        triggerIcon={MoreHorizontal}
         triggerIconBgColor="transparent"
         iconOnly={true}
+        showChevron={false}
         triggerLabel={t('widgets.resizeAriaLabel')}
         triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hover rounded"
         triggerTestid="widget-width-menu"
