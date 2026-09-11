@@ -482,7 +482,7 @@ export default {
     collapseAll: 'Tout réduire',
     showTests: 'Afficher les tests',
     hideTests: 'Masquer les tests',
-    showingRootItems: 'Affichage de {start}-{end} sur {total} éléments racines',
+    showingRootItems: 'Éléments de premier niveau {start}-{end} sur {total}',
     page: 'Page',
     pageOfTotal: 'Page {current} sur {total}',
     itemKey: 'Clé d’élément',

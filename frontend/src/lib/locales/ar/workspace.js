@@ -383,7 +383,7 @@ export default {
     collapseAll: 'طي الكل',
     showTests: 'إظهار الاختبارات',
     hideTests: 'إخفاء الاختبارات',
-    showingRootItems: 'عرض {start}-{end} من {total} عنصر جذري',
+    showingRootItems: 'عناصر المستوى الأعلى {start}-{end} من {total}',
     page: 'صفحة',
     pageOfTotal: 'صفحة {current} من {total}',
     itemKey: 'مفتاح العنصر',

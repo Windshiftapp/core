@@ -48,6 +48,10 @@
     )
   );
   let hierarchyIndex = $derived(indexCollectionHierarchy(allItems));
+  // Filter-scoped item total from the server: everything the tree contains
+  // across all pages, independent of expansion state or the current page.
+  // Drives the header's "N shown" so it cannot be misread as per-page count.
+  let matchingItemCount = $derived(collectionStore.itemsPagination?.total_items ?? null);
   
   // Pagination state
   let currentPage = $state(1);
@@ -412,7 +416,7 @@
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
           itemCount={collectionStore.collectionTotal}
-          shownCount={collectionStore.loading ? null : treeData.filter(item => !item.isTestCase).length}
+          shownCount={collectionStore.loading ? null : matchingItemCount}
         />
       </div>
 

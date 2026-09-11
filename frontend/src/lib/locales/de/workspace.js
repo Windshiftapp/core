@@ -387,7 +387,7 @@ export default {
     collapseAll: 'Alle einklappen',
     showTests: 'Tests anzeigen',
     hideTests: 'Tests ausblenden',
-    showingRootItems: 'Zeige {start}-{end} von {total} Wurzelelementen',
+    showingRootItems: 'Top-Level-Elemente {start}-{end} von {total}',
     page: 'Seite',
     pageOfTotal: 'Seite {current} von {total}',
     itemKey: 'Vorgangsschlüssel',

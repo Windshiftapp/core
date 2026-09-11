@@ -482,7 +482,7 @@ export default {
     collapseAll: 'Collapse All',
     showTests: 'Show Tests',
     hideTests: 'Hide Tests',
-    showingRootItems: 'Showing {start}-{end} of {total} root items',
+    showingRootItems: 'Top-level items {start}-{end} of {total}',
     page: 'Page',
     pageOfTotal: 'Page {current} of {total}',
     itemKey: 'Item Key',

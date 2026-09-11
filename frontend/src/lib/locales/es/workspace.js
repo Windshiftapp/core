@@ -383,7 +383,7 @@ export default {
     collapseAll: 'Contraer todo',
     showTests: 'Mostrar pruebas',
     hideTests: 'Ocultar pruebas',
-    showingRootItems: 'Mostrando {start}-{end} de {total} elementos raíz',
+    showingRootItems: 'Elementos de nivel superior {start}-{end} de {total}',
     page: 'Página',
     pageOfTotal: 'Página {current} de {total}',
     itemKey: 'Clave del elemento',

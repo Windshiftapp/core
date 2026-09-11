@@ -387,7 +387,7 @@ export default {
     collapseAll: '全部折叠',
     showTests: '显示测试',
     hideTests: '隐藏测试',
-    showingRootItems: '显示 {start}-{end} / {total} 个根事项',
+    showingRootItems: '顶级事项 {start}-{end} / {total}',
     page: '页',
     pageOfTotal: '第 {current} 页 / 共 {total} 页',
     itemKey: '事项键',
