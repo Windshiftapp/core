@@ -12,6 +12,7 @@
    *   required?: boolean,
    *   size?: string,
    *   id?: string,
+   *   dataTestid?: string,
    *   class?: string,
    *   menuWidth?: string,
    *   portalOwner?: string,
@@ -29,6 +30,7 @@
     required = false,
     size = 'medium',
     id = undefined,
+    dataTestid = undefined,
     class: className = '',
     menuWidth = '',
     portalOwner = undefined,
@@ -176,6 +178,7 @@
     use:melt={$trigger}
     type="button"
     {id}
+    data-testid={dataTestid}
     {disabled}
     role="combobox"
     aria-required={required || undefined}
@@ -221,7 +224,7 @@
       {@const isHighlighted = highlightedIndex === index}
       <div
         id={optionId(opt, index)}
-        data-testid={id ? `${id}-option` : undefined}
+        data-testid={dataTestid ? `${dataTestid}-option-${String(opt.value).replace(/[^A-Za-z0-9_-]/g, '-')}` : undefined}
         data-option-id={opt.value}
         role="option"
         tabindex="-1"

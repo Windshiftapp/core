@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots, IconListCheck } from '@tabler/icons-svelte-runes';
+  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots, IconListCheck, IconFileImport, IconFileDownload } from '@tabler/icons-svelte-runes';
+  import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { api } from '../../api.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -81,8 +82,12 @@
     priority: 'medium',
     status: 'active',
     estimated_hours: 0,
-    estimated_minutes: 0
+    estimated_minutes: 0,
+    format: 'steps',
+    gherkin: ''
   });
+  let gherkinValidation = $state(null);
+  let gherkinValidating = $state(false);
 
   // Priority options for test cases
   const priorityOptions = $derived([
@@ -253,13 +258,16 @@
   function showAddCaseForm() {
     showCaseForm = true;
     editingCase = null;
+    gherkinValidation = null;
     caseFormData = {
       title: '',
       preconditions: '',
       priority: 'medium',
       status: 'active',
       estimated_hours: 0,
-      estimated_minutes: 0
+      estimated_minutes: 0,
+      format: 'steps',
+      gherkin: ''
     };
 
     // Auto-focus the title field after the modal renders
@@ -270,9 +278,10 @@
     }, 100);
   }
 
-  function showEditCaseForm(testCase) {
+  async function showEditCaseForm(testCase) {
     showCaseForm = true;
     editingCase = testCase;
+    gherkinValidation = null;
     const { hours, minutes } = secondsToHoursMinutes(testCase.estimated_duration || 0);
     caseFormData = {
       title: testCase.title,
@@ -280,8 +289,18 @@
       priority: testCase.priority || 'medium',
       status: testCase.status || 'active',
       estimated_hours: hours,
-      estimated_minutes: minutes
+      estimated_minutes: minutes,
+      format: testCase.format || 'steps',
+      gherkin: ''
     };
+    if (caseFormData.format === 'bdd') {
+      try {
+        const detail = await api.tests.testCases.get(workspaceId, testCase.id);
+        caseFormData.gherkin = detail?.bdd?.gherkin ?? '';
+      } catch (error) {
+        console.error('Failed to load BDD content:', error);
+      }
+    }
 
     // Auto-focus the title field after the modal renders
     setTimeout(() => {
@@ -313,6 +332,18 @@
     }
   }
 
+  async function validateGherkin() {
+    if (!caseFormData.gherkin.trim()) return;
+    gherkinValidating = true;
+    try {
+      gherkinValidation = await api.tests.testCases.validateFeature(workspaceId, caseFormData.gherkin);
+    } catch (error) {
+      gherkinValidation = { valid: false, errors: [{ line: 1, column: 1, message: error.message }] };
+    } finally {
+      gherkinValidating = false;
+    }
+  }
+
   async function handleCaseSubmit() {
     try {
       const payload = {
@@ -327,6 +358,19 @@
         folder_id: selectedFolder
       };
 
+      if (caseFormData.format === 'bdd') {
+        if (!caseFormData.gherkin.trim()) {
+          errorToast(t('testing.bddGherkinRequired'));
+          return;
+        }
+        payload.format = 'bdd';
+        payload.gherkin = caseFormData.gherkin;
+        // The scenario name is the authoritative title for BDD cases.
+        if (!payload.title && gherkinValidation?.document?.scenarios?.length === 1) {
+          payload.title = gherkinValidation.document.scenarios[0].name;
+        }
+      }
+
       if (editingCase) {
         await api.tests.testCases.update(workspaceId, editingCase.id, payload);
       } else {
@@ -339,7 +383,29 @@
       showCaseForm = false;
     } catch (error) {
       console.error('Failed to save test case:', error);
+      errorToast(error.message || t('common.error'));
     }
+  }
+
+  async function importFeatureFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const content = await file.text();
+      const result = await api.tests.testCases.importFeature(workspaceId, content, selectedFolder);
+      const created = result?.cases?.length ?? 0;
+      infoToast(t('testing.bddImportSuccess', { count: created }));
+      await loadTestCases(selectedFolder);
+      await loadFolders();
+    } catch (error) {
+      console.error('Feature import failed:', error);
+      errorToast(error.message || t('testing.bddImportFailed'));
+    }
+  }
+
+  async function exportFeature(testCase) {
+    window.open(api.tests.testCases.exportFeatureUrl(workspaceId, testCase.id), '_blank');
   }
 
   async function deleteFolder(id) {
@@ -478,6 +544,14 @@
 
   // Build dropdown menu items for test case actions
   function buildTestCaseActions(testCase) {
+    const exportAction = (testCase.format || 'steps') === 'bdd'
+      ? [{
+          id: 'export-feature',
+          icon: IconFileDownload,
+          title: t('testing.bddExportFeature'),
+          onClick: () => exportFeature(testCase)
+        }]
+      : [];
     return [
       {
         id: 'labels',
@@ -491,6 +565,7 @@
         title: t('common.edit'),
         onClick: () => showEditCaseForm(testCase)
       },
+      ...exportAction,
       { type: 'divider' },
       {
         id: 'delete',
@@ -821,6 +896,22 @@
           />
         </div>
         <Button
+          variant="default"
+          icon={IconFileImport}
+          size="medium"
+          onclick={() => document.getElementById('import-feature-input')?.click()}
+          dataTestid="test-case-import-feature"
+        >
+          {t('testing.bddImportFeature')}
+        </Button>
+        <input
+          id="import-feature-input"
+          type="file"
+          accept=".feature,text/x-gherkin"
+          class="hidden"
+          onchange={importFeatureFile}
+        />
+        <Button
           onclick={showAddCaseForm}
           variant="primary"
           icon={IconPlus}
@@ -996,6 +1087,11 @@
                     {#if testCase.status === 'draft'}
                       <Lozenge color="gray" text={t('testing.draft')} />
                     {/if}
+                    {#if (testCase.format || 'steps') === 'bdd'}
+                      <span data-testid={`test-case-format-badge-${testCase.id}`}>
+                        <Lozenge color="blue" text={t('testing.bddFormatBdd')} />
+                      </span>
+                    {/if}
                     <span class={testCase.status === 'inactive' ? 'line-through' : ''}>{testCase.title}</span>
                     <!-- Duration badge -->
                     {#if formatDuration(testCase.estimated_duration)}
@@ -1152,14 +1248,107 @@
   />
   <form onsubmit={(e) => { e.preventDefault(); handleCaseSubmit(); }}>
     <div class="p-6 pb-2">
-      <FormField label={t('common.title')} required>
-        <Input
-          bind:value={caseFormData.title}
-          required
-          size="small"
-          dataTestid="test-case-title"
-        />
-      </FormField>
+      <div class="grid {editingCase ? 'grid-cols-1' : 'grid-cols-2'} gap-4">
+        <FormField label={t('common.title')} required={caseFormData.format !== 'bdd'}>
+          <Input
+            bind:value={caseFormData.title}
+            required={caseFormData.format !== 'bdd'}
+            size="small"
+            placeholder={caseFormData.format === 'bdd' ? t('testing.bddTitlePlaceholder') : ''}
+            dataTestid="test-case-title"
+          />
+        </FormField>
+        {#if !editingCase}
+          <FormField label={t('testing.bddFormatLabel')} class="mb-0">
+            <Select
+              bind:value={caseFormData.format}
+              size="small"
+              dataTestid="test-case-format-select"
+              options={[
+                { value: 'steps', label: t('testing.bddFormatSteps') },
+                { value: 'bdd', label: t('testing.bddFormatBdd') }
+              ]}
+            />
+          </FormField>
+        {:else}
+          <div class="flex items-end pb-1">
+            {#if caseFormData.format === 'bdd'}
+              <Lozenge color="blue" text={t('testing.bddFormatBdd')} />
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      {#if caseFormData.format === 'bdd'}
+        <FormField label={t('testing.bddGherkinLabel')}>
+          <textarea
+            bind:value={caseFormData.gherkin}
+            rows={12}
+            class="w-full rounded-lg font-mono text-sm p-3 border focus:outline-none focus:ring-2"
+            style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
+            spellcheck="false"
+            placeholder={t('testing.bddGherkinPlaceholder')}
+            data-testid="test-case-gherkin-editor"
+          ></textarea>
+        </FormField>
+        <div class="flex items-center gap-3 mb-4">
+          <Button
+            variant="default"
+            size="small"
+            type="button"
+            disabled={gherkinValidating || !caseFormData.gherkin.trim()}
+            onclick={validateGherkin}
+            dataTestid="test-case-gherkin-validate"
+          >
+            {gherkinValidating ? t('common.loading') : t('testing.bddValidate')}
+          </Button>
+          {#if gherkinValidation}
+            {#if gherkinValidation.valid}
+              <Lozenge color="green" text={t('testing.bddValid')} />
+            {:else}
+              <Lozenge color="red" text={t('testing.bddInvalid')} />
+            {/if}
+          {/if}
+        </div>
+        {#if gherkinValidation && !gherkinValidation.valid && gherkinValidation.errors?.length > 0}
+          <div class="mb-4 rounded-lg p-3 text-sm font-mono" style="background-color: var(--ds-surface-raised); color: var(--ds-text-danger);" data-testid="test-case-gherkin-errors">
+            {#each gherkinValidation.errors as err}
+              <div>{t('testing.bddErrorLine')} {err.line}, {t('testing.bddErrorColumn')} {err.column}: {err.message}</div>
+            {/each}
+          </div>
+        {/if}
+        {#if gherkinValidation?.valid && gherkinValidation.document}
+          <div class="mb-4 rounded-lg p-4" style="background-color: var(--ds-surface-raised);" data-testid="test-case-gherkin-preview">
+            <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: var(--ds-text-subtle);">{t('testing.bddPreview')}</p>
+            {#if gherkinValidation.document.feature_name}
+              <p class="text-sm font-semibold mb-1" style="color: var(--ds-text);">{t('testing.bddFeature')}: {gherkinValidation.document.feature_name}</p>
+            {/if}
+            {#each gherkinValidation.document.scenarios as scenario}
+              <div class="mt-2">
+                <p class="text-sm font-medium" style="color: var(--ds-text);">{scenario.keyword}: {scenario.name}</p>
+                {#each scenario.steps as step}
+                  <p class="text-sm ml-3" style="color: var(--ds-text-subtle);">{step.keyword} {step.text}</p>
+                {/each}
+                {#each scenario.examples ?? [] as block}
+                  <div class="ml-3 mt-1">
+                    <p class="text-xs font-semibold" style="color: var(--ds-text-subtle);">{t('testing.bddExamples')}{block.name ? `: ${block.name}` : ''}</p>
+                    <table class="text-xs mt-1">
+                      <thead>
+                        <tr>{#each block.header ?? [] as cell}<th class="px-2 py-0.5 border-b text-left" style="border-color: var(--ds-border); color: var(--ds-text);">{cell}</th>{/each}</tr>
+                      </thead>
+                      <tbody>
+                        {#each block.rows ?? [] as row}
+                          <tr>{#each row as cell}<td class="px-2 py-0.5" style="color: var(--ds-text-subtle);">{cell}</td>{/each}</tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                {/each}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {/if}
 
       <!-- Priority, Status, and Duration row -->
       <div class="grid grid-cols-3 gap-4 mb-4">

@@ -43,12 +43,13 @@
       if (testRun.ended_at) {
         const testCases = detail.testCases;
         const stepResults = detail.stepResults;
-        
+        const exampleResults = detail.exampleResults ?? {};
+
         // Combine results with step results for display
         testResults = detail.results.map(result => {
           // Find the corresponding test case
           const testCase = testCases.find(tc => tc.id === result.test_case_id);
-          
+
           // Get step results that belong to this test case
           const caseStepResults = {};
           if (testCase && testCase.test_steps) {
@@ -60,11 +61,26 @@
               }
             });
           }
-          
+
+          // BDD cases: attach the per-example outcomes in row order
+          const examples = [];
+          if (testCase?.format === 'bdd') {
+            for (const [key, row] of Object.entries(exampleResults)) {
+              if (row.test_case_id !== result.test_case_id) continue;
+              examples.push({
+                index: row.example_index,
+                values: row.row_values ?? {},
+                status: row.status ?? 'not_run',
+              });
+            }
+            examples.sort((a, b) => a.index - b.index);
+          }
+
           return {
             ...result,
             test_steps: testCase?.test_steps || [],
-            stepResults: caseStepResults
+            stepResults: caseStepResults,
+            examples,
           };
         });
       }
@@ -374,6 +390,24 @@
                           </div>
                         </div>
                       {/if}
+                    {:else if result.examples && result.examples.length > 0}
+                      <!-- BDD example outcomes -->
+                      <div class="mt-4 pt-3 border-t" style="border-color: var(--ds-border);" data-testid={`test-run-examples-${result.test_case_id}`}>
+                        <h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">{t('testing.bddExampleOutcomes')}</h4>
+                        <div class="space-y-1">
+                          {#each result.examples as example}
+                            <div class="flex items-center gap-2 text-sm">
+                              <span style="color: var(--ds-text-subtle);">
+                                {t('testing.bddExampleRow', { row: example.index + 1 })}
+                                {#each Object.entries(example.values) as entry, vi}
+                                  {vi === 0 ? ' · ' : ', '}{entry[0]}: {entry[1]}
+                                {/each}
+                              </span>
+                              <Lozenge color={getStatusColor(example.status)} text={getStatusLabel(example.status)} size="sm" />
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
                     {:else}
                       <!-- Test case has no steps -->
                       <div class="mt-4 pt-3 border-t" style="border-color: var(--ds-border);">

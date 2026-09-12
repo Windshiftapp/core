@@ -37,6 +37,7 @@
   let error = $state(null);
   let testCase = $state(null);
   let testSteps = $state([]);
+  let bddSpec = $state(null);
   let executions = $state([]);
   let lastLoadedId = $state(null);
   const workspaceTestsBasePath = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
@@ -86,6 +87,14 @@
       testCase = caseData;
       testSteps = Array.isArray(stepsData) ? stepsData : [];
       executions = connections?.executions || [];
+      bddSpec = null;
+      if (testCase.format === 'bdd' && testCase.bdd?.spec) {
+        try {
+          bddSpec = JSON.parse(testCase.bdd.spec);
+        } catch (parseErr) {
+          console.warn('Unreadable BDD spec:', parseErr);
+        }
+      }
       lastLoadedId = numericId;
     } catch (err) {
       console.error('Failed to load test case detail:', err);
@@ -208,15 +217,17 @@
       <div class="space-y-6">
         <!-- Action Buttons -->
         <div class="flex flex-wrap gap-3">
-          <Button
-            variant="primary"
-            icon={Edit}
-            size="medium"
-            href={`${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
-            onclick={closeOnPlainClick}
-          >
-            {t('testCase.editTestSteps')}
-          </Button>
+          {#if testCase.format !== 'bdd'}
+            <Button
+              variant="primary"
+              icon={Edit}
+              size="medium"
+              href={`${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
+              onclick={closeOnPlainClick}
+            >
+              {t('testCase.editTestSteps')}
+            </Button>
+          {/if}
           <Button
             variant="default"
             icon={Play}
@@ -234,6 +245,84 @@
           </AlertBox>
         {/if}
 
+        <!-- BDD Scenario Section -->
+        {#if testCase.format === 'bdd'}
+          <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">
+            {#snippet header()}
+              <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
+                <ListOrdered class="w-5 h-5" style="color: var(--ds-interactive);" />
+                {t('testing.bddScenario')}
+              </h2>
+            {/snippet}
+            <div class="p-6" data-testid="test-case-bdd-view">
+              {#if !bddSpec}
+                <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.bddScenarioUnavailable')}</p>
+              {:else}
+                {#if bddSpec.feature_name}
+                  <p class="text-xs font-semibold uppercase tracking-wider mb-1" style="color: var(--ds-text-subtle);">{t('testing.bddFeature')}</p>
+                  <p class="text-sm font-semibold mb-1" style="color: var(--ds-text);">{bddSpec.feature_name}</p>
+                {/if}
+                {#if (bddSpec.feature_tags ?? []).length > 0}
+                  <div class="flex flex-wrap gap-1 mb-2">
+                    {#each bddSpec.feature_tags as tag}
+                      <Lozenge color="gray" text={tag} rounded="rounded-full" />
+                    {/each}
+                  </div>
+                {/if}
+                {#if (bddSpec.background ?? []).length > 0}
+                  <div class="mt-3">
+                    <p class="text-sm font-semibold" style="color: var(--ds-text);">{t('testing.bddBackground')}</p>
+                    {#each bddSpec.background as step}
+                      <p class="text-sm ml-3" style="color: var(--ds-text-subtle);">{step.keyword} {step.text}</p>
+                    {/each}
+                  </div>
+                {/if}
+                <div class="mt-3">
+                  {#if (bddSpec.scenario_tags ?? []).length > 0}
+                    <div class="flex flex-wrap gap-1 mb-1">
+                      {#each bddSpec.scenario_tags as tag}
+                        <Lozenge color="gray" text={tag} rounded="rounded-full" />
+                      {/each}
+                    </div>
+                  {/if}
+                  <p class="text-sm font-semibold" style="color: var(--ds-text);">{bddSpec.scenario_keyword}: {bddSpec.scenario_name}</p>
+                  {#each bddSpec.steps ?? [] as step}
+                    <div class="ml-3 mt-1">
+                      <p class="text-sm" style="color: var(--ds-text);"><span class="font-semibold">{step.keyword}</span> {step.text}</p>
+                      {#if step.doc_string}
+                        <pre class="ml-4 mt-1 p-2 rounded text-xs overflow-x-auto" style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);">{step.doc_string.content}</pre>
+                      {/if}
+                      {#if step.data_table}
+                        <table class="text-xs mt-1 ml-4">
+                          <tbody>
+                            {#each step.data_table.rows as row}
+                              <tr>{#each row as cell}<td class="px-2 py-0.5 border-b" style="border-color: var(--ds-border); color: var(--ds-text-subtle);">{cell}</td>{/each}</tr>
+                            {/each}
+                          </tbody>
+                        </table>
+                      {/if}
+                    </div>
+                  {/each}
+                  {#each bddSpec.examples ?? [] as block}
+                    <div class="ml-3 mt-3">
+                      <p class="text-xs font-semibold" style="color: var(--ds-text-subtle);">{t('testing.bddExamples')}{block.name ? `: ${block.name}` : ''}</p>
+                      <table class="text-xs mt-1" data-testid="bdd-examples-table">
+                        <thead>
+                          <tr>{#each block.header ?? [] as cell}<th class="px-2 py-0.5 border-b text-left" style="border-color: var(--ds-border); color: var(--ds-text);">{cell}</th>{/each}</tr>
+                        </thead>
+                        <tbody>
+                          {#each block.rows ?? [] as row}
+                            <tr>{#each row as cell}<td class="px-2 py-0.5" style="color: var(--ds-text-subtle);">{cell}</td>{/each}</tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </Card>
+        {:else}
         <!-- Test Steps Section -->
         <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">
           {#snippet header()}
@@ -311,6 +400,7 @@
             {/if}
           </div>
         </Card>
+        {/if}
 
         <!-- Recent Executions Section -->
         <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">

@@ -1,4 +1,4 @@
-import { fetchAllV2Pages, fetchAPIV2, fetchV2Data } from '../core.js';
+import { API_V2_BASE, fetchAllV2Pages, fetchAPIV2, fetchV2Data } from '../core.js';
 import { createCrudClient } from '../createCrudClient.js';
 
 export const testCases = {
@@ -41,6 +41,24 @@ export const testCases = {
     }),
   connections: (workspaceId, id) =>
     fetchV2Data(`/workspaces/${workspaceId}/test-cases/${id}/connections`),
+  // BDD feature-file surface (v2-only, text bodies)
+  validateFeature: (workspaceId, gherkin) =>
+    fetchV2Data(`/workspaces/${workspaceId}/test-cases/validate-feature`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/x-gherkin' },
+      body: gherkin,
+    }),
+  importFeature: (workspaceId, gherkin, folderId = null) => {
+    const suffix = folderId ? `?folder_id=${encodeURIComponent(folderId)}` : '';
+    return fetchV2Data(`/workspaces/${workspaceId}/test-cases/import-feature${suffix}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/x-gherkin' },
+      body: gherkin,
+    });
+  },
+  // Session-cookie download; GET is safe so no CSRF token is needed.
+  exportFeatureUrl: (workspaceId, testCaseId) =>
+    `${API_V2_BASE}/workspaces/${workspaceId}/test-cases/${testCaseId}/feature`,
   // Test Steps
   steps: {
     getAll: (workspaceId, testCaseId) =>

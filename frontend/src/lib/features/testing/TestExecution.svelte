@@ -21,6 +21,8 @@
   import { t } from '../../stores/i18n.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { loadTestRunDetail } from './testRunDetailData.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { exampleContexts, executionSteps } from './bddScenario.js';
 
   let testRun = $state(null);
   let testCases = $state([]);
@@ -34,6 +36,8 @@
   let pendingLinkStepId = $state(null);
   let sidebarCollapsed = $state(false);
   let previewImage = $state(null);
+  let exampleResults = $state({});
+  let selectedExampleIndex = $state(0);
 
   function getStatusColor(status) {
     return {
@@ -59,6 +63,96 @@
   let fromPage = $derived($currentRoute.query?.from);
   let currentCase = $derived((Array.isArray(testCases) && testCases[currentCaseIndex]) || null);
   let currentStep = $derived(currentCase?.test_steps?.[currentStepIndex] || null);
+
+  // BDD execution state: one execution context per Examples row (or a single
+  // implicit context for plain scenarios).
+  let currentBddSpec = $derived(currentCase?.format === 'bdd' ? currentCase.bddSpec ?? null : null);
+  let currentIsBdd = $derived(currentCase?.format === 'bdd' && !!currentBddSpec);
+  let currentContexts = $derived(currentIsBdd ? exampleContexts(currentBddSpec) : []);
+  let safeExampleIndex = $derived(Math.min(selectedExampleIndex, Math.max(currentContexts.length - 1, 0)));
+  let currentExample = $derived(currentContexts[safeExampleIndex] ?? null);
+  let currentBddSteps = $derived(currentExample ? executionSteps(currentBddSpec, currentExample.values) : []);
+
+  function exampleKey(caseId, exampleIndex) {
+    return `${caseId}_${exampleIndex}`;
+  }
+
+  let currentExampleResult = $derived(
+    currentCase && currentExample
+      ? exampleResults[exampleKey(currentCase.id, currentExample.index)] ?? null
+      : null
+  );
+
+  function exampleStepResult(stepNumber) {
+    return currentExampleResult?.step_results?.find((sr) => sr.step_number === stepNumber) ?? null;
+  }
+
+  async function refreshExampleResults() {
+    try {
+      const fresh = await api.tests.testRuns.getExampleResults(workspaceId, runId);
+      exampleResults = Object.fromEntries(
+        (fresh ?? []).map((result) => [`${result.test_case_id}_${result.example_index}`, result])
+      );
+    } catch (error) {
+      console.error('Failed to refresh example results:', error);
+    }
+  }
+
+  async function markExampleStepStatus(stepNumber, status) {
+    if (!currentCase || !currentExample) return;
+    try {
+      await api.tests.testRuns.updateExampleStepResult(
+        workspaceId, runId, currentCase.id, currentExample.index, stepNumber,
+        { status, actual_result: '', notes: '', item_id: null }
+      );
+      await refreshExampleResults();
+    } catch (error) {
+      console.error('Failed to save example step result:', error);
+      errorToast(error.message || t('common.error'));
+    }
+    if (status === 'passed' || status === 'skipped') {
+      setTimeout(() => nextBddStep(), 500);
+    }
+  }
+
+  function nextBddStep() {
+    const lastIndex = currentBddSteps.length - 1;
+    if (currentStepIndex < lastIndex) {
+      currentStepIndex++;
+    }
+  }
+
+  async function setExampleStatus(status) {
+    if (!currentCase || !currentExample) return;
+    try {
+      await api.tests.testRuns.updateExampleResult(
+        workspaceId, runId, currentCase.id, currentExample.index,
+        {
+          status,
+          actual_result: currentExampleResult?.actual_result ?? '',
+          notes: currentExampleResult?.notes ?? '',
+        }
+      );
+      await refreshExampleResults();
+    } catch (error) {
+      console.error('Failed to save example result:', error);
+      errorToast(error.message || t('common.error'));
+    }
+  }
+
+  function getExampleProgress(testCase) {
+    const contexts = testCase?.format === 'bdd' && testCase.bddSpec ? exampleContexts(testCase.bddSpec) : [];
+    if (contexts.length === 0) return { completed: 0, total: 0, percent: 0 };
+    const completed = contexts.filter((context) => {
+      const result = exampleResults[exampleKey(testCase.id, context.index)];
+      return result && result.status !== 'not_run';
+    }).length;
+    return {
+      completed,
+      total: contexts.length,
+      percent: Math.round((completed / contexts.length) * 100),
+    };
+  }
 
   function testPath(suffix = '') {
     const base = workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';
@@ -94,6 +188,8 @@
       // Initialize results
       initializeResults();
       applyExistingResults(detail.stepResults, detail.results);
+      exampleResults = detail.exampleResults ?? {};
+      selectedExampleIndex = 0;
 
     } catch (error) {
       console.error('Failed to load test run:', error);
@@ -205,10 +301,12 @@
       }
     }
 
-    // If all test cases are complete or no steps found, find first case with steps
+    // If all test cases are complete or no steps found, find the first
+    // executable case: step-based cases with steps, or any BDD case.
     for (let caseIndex = 0; caseIndex < testCases.length; caseIndex++) {
       const testCase = testCases[caseIndex];
-      if (testCase.test_steps && testCase.test_steps.length > 0) {
+      const isExecutable = (testCase.test_steps && testCase.test_steps.length > 0) || testCase.format === 'bdd';
+      if (isExecutable) {
         currentCaseIndex = caseIndex;
         currentStepIndex = 0;
         return;
@@ -358,6 +456,9 @@
 
   function getCaseProgress(testCase, currentStepResults = stepResults) {
     const steps = testCase.test_steps || [];
+    if (steps.length === 0 && testCase.format === 'bdd') {
+      return getExampleProgress(testCase);
+    }
     if (steps.length === 0) return { completed: 0, total: 0, percent: 0 };
     
     const completed = steps.filter(step => {
@@ -536,6 +637,179 @@
 
     <!-- Main Content - Step Execution -->
     <div class="min-w-0 flex-1 flex flex-col">
+    {#if currentIsBdd}
+      <!-- BDD Scenario Execution -->
+      <div class="flex-1 p-6 overflow-y-auto" data-testid="test-execution-bdd">
+        <div class="max-w-4xl">
+          <div class="mb-6">
+            <h1 class="text-xl font-semibold" style="color: var(--ds-text);" data-testid="bdd-execution-title">
+              {currentCase.title}
+            </h1>
+            <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+              {currentBddSpec.scenario_keyword}{currentBddSpec.feature_name ? ` · ${t('testing.bddFeature')}: ${currentBddSpec.feature_name}` : ''}
+            </p>
+            {#if currentCase.preconditions}
+              <AlertBox variant="info" class="mt-3">
+                <strong>{t('testing.preconditions')}:</strong> {currentCase.preconditions}
+              </AlertBox>
+            {/if}
+          </div>
+
+          {#if currentContexts.length > 1}
+            <div class="flex flex-wrap gap-2 mb-6" data-testid="bdd-example-selector">
+              {#each currentContexts as context, i}
+                {@const result = exampleResults[exampleKey(currentCase.id, context.index)]}
+                <button
+                  type="button"
+                  onclick={() => { selectedExampleIndex = i; currentStepIndex = 0; }}
+                  class="px-3 py-2 rounded-lg text-sm border transition cursor-pointer flex items-center gap-2"
+                  style={safeExampleIndex === i ? 'border-color: var(--ds-interactive); background: var(--ds-surface-raised); color: var(--ds-text);' : 'border-color: var(--ds-border); color: var(--ds-text-subtle);'}
+                  data-testid={`bdd-example-tab-${context.index}`}
+                >
+                  <Lozenge color={getStatusColor(result?.status || 'not_run')} text={getStatusLabel(result?.status || 'not_run')} />
+                  <span>
+                    {t('testing.bddExampleRow', { row: i + 1 })}
+                    {#each Object.entries(context.values) as entry, vi}
+                      {vi === 0 ? ' · ' : ', '}{entry[0]}: {entry[1]}
+                    {/each}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          <Card variant="raised" padding="spacious" shadow class="mb-6">
+            <h3 class="font-medium mb-4" style="color: var(--ds-text);">
+              {currentContexts.length > 1 ? t('testing.bddStepsForExample', { row: safeExampleIndex + 1 }) : t('testing.bddScenarioSteps')}
+            </h3>
+            <div class="space-y-3">
+              {#each currentBddSteps as step, stepIdx}
+                {@const stepNumber = stepIdx + 1}
+                {@const stepResult = exampleStepResult(stepNumber)}
+                <div class="flex items-start gap-3 p-3 rounded-lg" style="background-color: var(--ds-surface);" data-testid={`bdd-step-${stepNumber}`}>
+                  <span class="text-xs font-mono pt-1 w-6 text-right flex-shrink-0" style="color: var(--ds-text-subtle);">{stepNumber}</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm" style="color: var(--ds-text);"><span class="font-semibold">{step.keyword}</span> {step.text}</p>
+                    {#if step.doc_string}
+                      <pre class="mt-1 p-2 rounded text-xs overflow-x-auto" style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);">{step.doc_string.content}</pre>
+                    {/if}
+                    {#if step.data_table}
+                      <table class="text-xs mt-1">
+                        <tbody>
+                          {#each step.data_table.rows as row}
+                            <tr>{#each row as cell}<td class="px-2 py-0.5 border-b" style="border-color: var(--ds-border); color: var(--ds-text-subtle);">{cell}</td>{/each}</tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    {/if}
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onclick={() => markExampleStepStatus(stepNumber, 'passed')}
+                      data-testid={`bdd-step-status-passed-${stepNumber}`}
+                      class="flex items-center gap-1 px-3 py-1.5 rounded text-sm transition cursor-pointer"
+                      style={getStatusButtonStyle('passed', stepResult?.status === 'passed')}
+                    >
+                      <IconCheck class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onclick={() => markExampleStepStatus(stepNumber, 'failed')}
+                      data-testid={`bdd-step-status-failed-${stepNumber}`}
+                      class="flex items-center gap-1 px-3 py-1.5 rounded text-sm transition cursor-pointer"
+                      style={getStatusButtonStyle('failed', stepResult?.status === 'failed')}
+                    >
+                      <IconX class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onclick={() => markExampleStepStatus(stepNumber, 'blocked')}
+                      data-testid={`bdd-step-status-blocked-${stepNumber}`}
+                      class="flex items-center gap-1 px-3 py-1.5 rounded text-sm transition cursor-pointer"
+                      style={getStatusButtonStyle('blocked', stepResult?.status === 'blocked')}
+                    >
+                      <IconBug class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onclick={() => markExampleStepStatus(stepNumber, 'skipped')}
+                      data-testid={`bdd-step-status-skipped-${stepNumber}`}
+                      class="flex items-center gap-1 px-3 py-1.5 rounded text-sm transition cursor-pointer"
+                      style={getStatusButtonStyle('skipped', stepResult?.status === 'skipped')}
+                    >
+                      <IconPlayerSkipForward class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </Card>
+
+          <Card variant="raised" padding="spacious" shadow>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-medium" style="color: var(--ds-text);">
+                {currentContexts.length > 1 ? t('testing.bddResultForExample', { row: safeExampleIndex + 1 }) : t('testing.recordResult')}
+              </h3>
+              <span data-testid="bdd-example-result-status">
+                <Lozenge color={getStatusColor(currentExampleResult?.status || 'not_run')} text={getStatusLabel(currentExampleResult?.status || 'not_run')} />
+              </span>
+            </div>
+            <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">{t('testing.bddResultHint')}</p>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                onclick={() => setExampleStatus('passed')}
+                data-testid="bdd-example-status-passed"
+                class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
+                style={getStatusButtonStyle('passed', currentExampleResult?.status === 'passed')}
+              >
+                <IconCheck class="w-4 h-4" />
+                {t('testing.pass')}
+              </button>
+              <button
+                type="button"
+                onclick={() => setExampleStatus('failed')}
+                data-testid="bdd-example-status-failed"
+                class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
+                style={getStatusButtonStyle('failed', currentExampleResult?.status === 'failed')}
+              >
+                <IconX class="w-4 h-4" />
+                {t('testing.fail')}
+              </button>
+              <button
+                type="button"
+                onclick={() => setExampleStatus('blocked')}
+                data-testid="bdd-example-status-blocked"
+                class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
+                style={getStatusButtonStyle('blocked', currentExampleResult?.status === 'blocked')}
+              >
+                <IconBug class="w-4 h-4" />
+                {t('testing.blocked')}
+              </button>
+              <button
+                type="button"
+                onclick={() => setExampleStatus('skipped')}
+                data-testid="bdd-example-status-skipped"
+                class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
+                style={getStatusButtonStyle('skipped', currentExampleResult?.status === 'skipped')}
+              >
+                <IconPlayerSkipForward class="w-4 h-4" />
+                {t('testing.skip')}
+              </button>
+            </div>
+            {#if currentContexts.length > 1 && currentExample}
+              <div class="text-xs mt-4" style="color: var(--ds-text-subtle);" data-testid="bdd-example-row-values">
+                {t('testing.bddRowValues')}
+                {#each Object.entries(currentExample.values) as entry, vi}
+                  {vi === 0 ? '' : ' · '}{entry[0]}: {entry[1]}
+                {/each}
+              </div>
+            {/if}
+          </Card>
+        </div>
+      </div>
+    {:else}
       <!-- Step Header -->
       <div class="p-6 border-b" style="border-color: var(--ds-border);">
         <div class="flex items-center justify-between gap-6 mb-4">
@@ -891,6 +1165,7 @@
           </div>
         </div>
       {/if}
+    {/if}
     </div>
   </div>
 {:else}
