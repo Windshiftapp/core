@@ -1,17 +1,19 @@
 <script>
   import { api } from '../api.js';
-  import { navigate } from '../router.js';
+  import { currentRoute, navigate } from '../router.js';
   import { workspacesStore } from '../stores';
-  import Modal from '../dialogs/Modal.svelte';
+  import { FileText } from '@lucide/svelte';
   import Input from '../components/Input.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import { FileText } from '@lucide/svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import WorkspaceLabelCombobox from '../pickers/WorkspaceLabelCombobox.svelte';
+  import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
+  import MobileEditorPage from './MobileEditorPage.svelte';
+  import MobileConfirmSheet from './MobileConfirmSheet.svelte';
   import {
     isCreateSystemFieldAutoManaged,
     isCreateSystemFieldRenderable,
@@ -23,43 +25,25 @@
   import { isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
 
   /**
-   * @typedef {'work' | 'personal'} CreateMode
-   * 'personal' targets the user's personal workspace and submits a
-   * title-only task (no item type) - the same shape the desktop
-   * PersonalTasksPanel uses to add a personal task. 'work' is the
-   * default full work-item form for regular workspaces.
+   * Full-page create flow for the phone surface (replaces the old modal
+   * dialog). Modes come from the route:
+   *   /m/new                      → work item
+   *   /m/new?mode=personal        → personal task (title-only)
+   *   /m/new?parent=<id>          → sub-item under a parent (types locked)
+   *
+   * @typedef {{ id: number, title: string }} ParentItem
    */
-
-  /**
-   * @typedef {Object} ParentItem
-   * @property {number} id
-   * @property {string} title
-   */
-
-  /**
-   * @param {Object} opts
-   * @param {boolean} [opts.isOpen]
-   * @param {CreateMode} [opts.mode] - 'work' (default) or 'personal'.
-   * @param {(() => void) | null} [opts.onclose]
-   * @param {ParentItem | null} [opts.parent] - when set, the new item is
-   *   created as a child of this item and the type picker is locked to the
-   *   available sub-issue types for that item's level.
-   * @param {Array<{id: number, name?: string}> | null} [opts.availableItemTypes]
-   *   - sub-issue types allowed under `parent`; passed in by the caller (the
-   *   mobile item detail computes them the same way the desktop store does).
-   * @param {number | null} [opts.workspaceId] - the parent item's workspace,
-   *   used to lock the workspace picker when creating a child.
-   */
-  let {
-    isOpen = $bindable(false),
-    mode = 'work',
-    onclose = null,
-    parent = null,
-    availableItemTypes = null,
-    workspaceId: lockedWorkspaceId = null,
-  } = $props();
 
   const FIXED_SYSTEM_FIELDS = new Set(['title', 'description']);
+
+  const query = $derived($currentRoute.query);
+  const isPersonal = $derived(query.mode === 'personal');
+  const parentId = $derived(query.parent ? Number(query.parent) : null);
+
+  let parent = $state(/** @type {ParentItem | null} */ (null));
+  let parentErrored = $state(false);
+  // Loading while a parent id is set but context hasn't resolved (or failed).
+  const parentLoading = $derived(parentId !== null && !parent && !parentErrored);
 
   let title = $state('');
   let description = $state('');
@@ -71,10 +55,9 @@
   let error = $state('');
   let lastTypeWorkspace = null;
 
-  // Screen-configured create fields (WI-553): mobile uses the same effective
-  // create screen resolution as desktop, but renders fields as a vertical,
-  // scrollable form. Required fields are always visible; optional fields live
-  // in a collapsible section so large screens remain usable on phones.
+  // Screen-configured create fields (WI-553): the same effective create screen
+  // resolution as desktop, rendered as one vertical page. Required fields are
+  // always visible; optional fields live in a collapsible section.
   let allCustomFields = $state([]);
   let customFieldsLoaded = $state(false);
   let currentConfigSet = $state(null);
@@ -103,12 +86,11 @@
   let selectedLabels = $state([]);
   let labelsWorkspaceId = null;
 
-  // === Work item templates (WI-538). Mirrors the desktop create modal
+  // Work item templates (WI-538). Mirrors the desktop create modal
   // (workItemFormStore.loadTemplatesForCurrentType): load the templates valid
   // for the current (workspace, item type), auto-apply a mandatory template's
   // body into an empty description and lock the picker, or offer the
-  // selectable templates. PWA previously skipped this entirely, so templates
-  // were neither enforced nor visible on mobile. ===
+  // selectable templates.
   let templateOptions = $state([]);
   let mandatoryTemplate = $state(null);
   let selectedTemplateId = $state(null);
@@ -116,12 +98,14 @@
   let templatesInFlightKey = $state(null);
 
   const templateLocked = $derived(!!mandatoryTemplate);
-
   const isChild = $derived(!!parent);
   const workspaces = $derived($workspacesStore.regularWorkspaces ?? []);
   // Personal workspace is loaded on-demand; the store keeps it once fetched.
   const personalWorkspace = $derived($workspacesStore.personalWorkspace ?? null);
-  const isPersonal = $derived(mode === 'personal');
+
+  // Unsaved-input guard: leaving with a draft title asks for confirmation.
+  let confirmDiscardOpen = $state(false);
+  const isDirty = $derived(title.trim() !== '');
 
   const customFieldsById = $derived.by(() => {
     const map = new Map();
@@ -163,6 +147,10 @@
   );
   const optionalFieldCount = $derived(optionalSystemFields.length + optionalCustomFields.length);
 
+  const pageTitle = $derived(
+    isPersonal ? 'New personal task' : isChild ? 'New sub-item' : 'New item'
+  );
+
   const canSubmit = $derived(
     title.trim() !== '' &&
       !saving &&
@@ -172,15 +160,43 @@
       (isPersonal ? !!personalWorkspace : !!workspaceId && !!itemTypeId)
   );
 
-  // Default the workspace when the dialog opens (first regular workspace), or
-  // lock it to the parent item's workspace when creating a child. Personal
-  // mode targets the personal workspace and skips this entirely.
+  // Load parent context for sub-item creation: workspace + allowed sub-issue
+  // types come from the same summary endpoint the item detail uses.
   $effect(() => {
-    if (!isOpen || isPersonal) return;
-    if (isChild && lockedWorkspaceId) {
-      workspaceId = lockedWorkspaceId;
-      return;
-    }
+    const pid = parentId;
+    if (!pid) return;
+    let cancelled = false;
+    parentErrored = false;
+    loadMobileItemDetailSummary(pid)
+      .then((summary) => {
+        if (cancelled) return;
+        const item = summary?.item;
+        if (!item) throw new Error('Parent item not found');
+        parent = { id: item.id, title: item.title };
+        const allowed = Array.isArray(summary?.available_sub_issue_types)
+          ? summary.available_sub_issue_types
+          : [];
+        itemTypes = allowed;
+        if (!allowed.some((t) => t.id === itemTypeId)) {
+          itemTypeId = allowed[0]?.id ?? null;
+        }
+        workspaceId = item.workspace_id ?? null;
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load parent item:', err);
+        parentErrored = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // Default the workspace to the first regular workspace. Children get their
+  // workspace from the parent summary instead — skip everything until it
+  // resolves so the child types aren't clobbered by a workspace-default load.
+  $effect(() => {
+    if (isPersonal || parentId != null) return;
     if (!workspaceId && workspaces.length > 0) {
       workspaceId = workspaces[0].id;
     }
@@ -195,30 +211,18 @@
     labelsWorkspaceId = nextWorkspaceId;
   });
 
-  // Load the personal workspace on-demand when the dialog opens in personal
-  // mode (the mobile shell otherwise never touches it outside the Personal tab).
+  // Personal mode targets the personal workspace; load it on demand.
   $effect(() => {
-    if (isOpen && isPersonal && !personalWorkspace) {
+    if (isPersonal && !personalWorkspace) {
       workspacesStore.loadPersonalWorkspace();
     }
   });
 
-  // Resolve the item-type list. Personal mode submits a title-only task and
-  // needs no type. When creating a child the caller hands us the exact set of
-  // allowed sub-issue types (pre-computed from the hierarchy), so there's
-  // nothing to fetch - we just adopt them. Otherwise we load the full
-  // workspace-scoped list whenever the chosen workspace changes.
+  // Load the full workspace-scoped type list whenever the chosen workspace
+  // changes (children adopt the parent-provided set instead).
   $effect(() => {
-    if (!isOpen || isPersonal) return;
-    if (isChild) {
-      const allowed = Array.isArray(availableItemTypes) ? availableItemTypes : [];
-      itemTypes = allowed;
-      if (!allowed.some((t) => t.id === itemTypeId)) {
-        itemTypeId = allowed[0]?.id ?? null;
-      }
-      return;
-    }
     const wsId = workspaceId;
+    if (isPersonal || parentId != null) return;
     if (!wsId || wsId === lastTypeWorkspace) return;
     lastTypeWorkspace = wsId;
     loadTypes(wsId);
@@ -226,22 +230,21 @@
 
   // Load reference data and config whenever the workspace changes.
   $effect(() => {
-    if (!isOpen || isPersonal || !workspaceId) return;
+    if (isPersonal || !workspaceId) return;
     loadWorkspaceFieldData(workspaceId);
   });
 
   // Load the effective create screen whenever workspace/type are known.
   $effect(() => {
-    if (!isOpen || isPersonal || !workspaceId || !itemTypeId || !customFieldsLoaded) return;
+    if (isPersonal || !workspaceId || !itemTypeId || !customFieldsLoaded) return;
     if (configSetLoadedForWorkspace !== workspaceId) return;
     loadScreenFields(workspaceId, itemTypeId);
   });
 
-  // Reload templates whenever the (workspace, item type) the dialog is working
-  // with changes (WI-538). Tracks both ids reactively so it fires after
-  // loadTypes resolves a new default type too. Skipped in personal mode.
+  // Reload templates whenever the (workspace, item type) the page is working
+  // with changes (WI-538). Skipped in personal mode.
   $effect(() => {
-    if (!isOpen || isPersonal) return;
+    if (isPersonal) return;
     // Read both deps so the effect re-runs when either changes.
     const wsId = workspaceId;
     const typeId = itemTypeId;
@@ -393,8 +396,7 @@
   // Load the work item templates valid for the current (workspace, item type)
   // (WI-538). Auto-applies a mandatory template's body into an empty
   // description and locks the picker; otherwise offers the selectable
-  // templates for the type. No-op until both workspace and item type are set,
-  // and skipped entirely in personal mode (title-only task, no item type).
+  // templates for the type.
   async function loadTemplatesForCurrentType() {
     const wsId = workspaceId;
     const typeId = itemTypeId;
@@ -448,49 +450,6 @@
     if (!tmpl) return;
     description = tmpl.description_body || '';
     selectedTemplateId = templateId;
-  }
-
-  function resetConfiguredFields() {
-    screenFields = [];
-    screenFieldsLoadedForKey = null;
-    screenFieldsLoadingForKey = null;
-    customFieldValues = {};
-    showOptionalFields = false;
-    priorityId = null;
-    assigneeId = null;
-    milestoneIds = [];
-    iterationId = null;
-    projectId = null;
-    dueDate = '';
-    startDate = '';
-    endDate = '';
-    storyPoints = '';
-    estimate = '';
-    labelNames = [];
-    selectedLabels = [];
-  }
-
-  function reset() {
-    title = '';
-    description = '';
-    itemTypeId = null;
-    itemTypes = [];
-    error = '';
-    lastTypeWorkspace = null;
-    resetConfiguredFields();
-    // Reset template state so a new dialog doesn't inherit the prior type's
-    // picker options / mandatory lock (WI-538).
-    templateOptions = [];
-    mandatoryTemplate = null;
-    selectedTemplateId = null;
-    templatesInFlightKey = null;
-    // workspaceId is intentionally kept so repeated creates default to the same.
-  }
-
-  function handleClose() {
-    isOpen = false;
-    reset();
-    onclose?.();
   }
 
   function labelForSystemField(field) {
@@ -629,20 +588,18 @@
 
       const result = await api.items.create(createPayload());
       if (isPersonal) {
-        // The newly created personal task lives in this tab's list - let the
-        // active Personal view refresh itself. BroadcastChannel excludes the
-        // posting tab, so the same-tab notice is a window event instead.
-        window.dispatchEvent(new CustomEvent('personal-task-created'));
-        handleClose();
-        // Stay on the Personal checklist so the user can keep adding tasks,
-        // matching the desktop PersonalTasksPanel behavior.
+        // Back to the Personal checklist; the tab remounts and loads the new
+        // task, matching the desktop PersonalTasksPanel behavior of staying
+        // in the list after adding.
+        navigate('/m/personal', { replace: true });
       } else if (isChild) {
-        // When creating a child we stay on the parent's detail view and let the
-        // caller refresh the sub-item list rather than navigating away.
-        handleClose();
+        // Back to the parent's detail view; it remounts and shows the new
+        // sub-item in its list.
+        navigate(`/m/items/${parent.id}`, { replace: true });
       } else {
-        handleClose();
-        if (result?.id) navigate(`/m/items/${result.id}`);
+        // Replace so back from the new item doesn't return to a stale form.
+        if (result?.id) navigate(`/m/items/${result.id}`, { replace: true });
+        else navigate('/m', { replace: true });
       }
     } catch (err) {
       console.error('Failed to create item:', err);
@@ -651,154 +608,188 @@
       saving = false;
     }
   }
+
+  // Cancel / back: a draft title asks for confirmation before being discarded.
+  function requestCancel() {
+    if (isDirty) {
+      confirmDiscardOpen = true;
+      return;
+    }
+    leave();
+  }
+
+  function leave() {
+    // Explicit replace (not history.back) — deterministic even when the create
+    // page was reached via deep link, and it drops the stale form entry.
+    if (isPersonal) navigate('/m/personal', { replace: true });
+    else if (isChild && parent) navigate(`/m/items/${parent.id}`, { replace: true });
+    else navigate('/m', { replace: true });
+  }
 </script>
 
-<Modal bind:isOpen maxWidth="max-w-md" zIndexClass="z-[500]" onSubmit={submit} submitDisabled={!canSubmit} onclose={handleClose}>
-  <div class="create" data-testid="mobile-create-dialog">
-    <h2 class="title">{isPersonal ? 'New personal task' : isChild ? 'New sub-item' : 'New item'}</h2>
-
-    {#if isChild}
-      <p class="parent" data-testid="create-parent">
-        Under <strong>{parent.title}</strong>
-      </p>
-    {/if}
-
-    <label class="field">
-      <span>{isPersonal ? 'Task' : 'Title'}</span>
-      <Input
-        bind:value={title}
-        placeholder={isPersonal ? 'What do you need to do?' : 'What needs doing?'}
-        dataTestid="create-title"
-        autocomplete="off"
-        class="mobile-create-input"
-      />
-    </label>
-
-    {#if !isPersonal}
-      <div class="row">
-        <label class="field">
-          <span>Workspace</span>
-          <NativeSelect
-            bind:value={workspaceId}
-            disabled={isChild}
-            dataTestid="create-workspace"
-            class="mobile-create-select"
-            options={workspaces.map((ws) => ({ value: ws.id, label: ws.name }))}
-          />
-        </label>
-
-        <label class="field">
-          <span>Type</span>
-          <NativeSelect
-            bind:value={itemTypeId}
-            disabled={typesLoading || itemTypes.length === 0}
-            dataTestid="create-type"
-            class="mobile-create-select"
-            options={itemTypes.map((itemType) => ({ value: itemType.id, label: itemType.name }))}
-          />
-        </label>
-      </div>
+<MobileEditorPage
+  title={pageTitle}
+  saveLabel={isPersonal ? 'Add' : 'Create'}
+  canSave={canSubmit}
+  saving={saving}
+  {error}
+  onsave={submit}
+  oncancel={requestCancel}
+  dataTestid="mobile-create-page"
+>
+  {#if parentLoading}
+    <p class="loading" data-testid="create-parent-loading">Loading parent…</p>
+  {:else if parentErrored}
+    <p class="error" data-testid="create-parent-error">Couldn't load the parent item.</p>
+  {:else}
+    <div class="create" data-testid="create-form">
+      {#if isChild}
+        <p class="parent" data-testid="create-parent">
+          Under <strong>{parent?.title}</strong>
+        </p>
+      {/if}
 
       <label class="field">
-        <span>Description <em>(optional)</em></span>
-        <Textarea
-          bind:value={description}
-          rows={3}
-          placeholder="Add detail…"
-          data-testid="create-description"
-          readonly={templateLocked}
-          class="mobile-create-textarea"
+        <span>{isPersonal ? 'Task' : 'Title'}</span>
+        <Input
+          bind:value={title}
+          placeholder={isPersonal ? 'What do you need to do?' : 'What needs doing?'}
+          dataTestid="create-title"
+          autocomplete="off"
+          enterkeyhint="next"
+          class="mobile-create-input"
         />
       </label>
 
-      <!-- Work item templates (WI-538). When the selected type enforces a
-           mandatory template the body is auto-applied into the description
-           above (and locked); otherwise offer the selectable templates valid
-           for the type. Mirrors the desktop create modal. -->
-      {#if templateLocked}
-        <span
-          class="template-chip template-locked"
-          title={`This item type enforces the "${mandatoryTemplate?.name}" template`}
-          data-testid="template-picker-locked"
-        >
-          <FileText size={14} style="flex-shrink: 0;" />
-          <span>{mandatoryTemplate?.name} (enforced)</span>
-        </span>
-      {:else if templateOptions.length >= 1}
+      {#if !isPersonal}
+        <div class="row">
+          <label class="field">
+            <span>Workspace</span>
+            <NativeSelect
+              bind:value={workspaceId}
+              disabled={isChild}
+              dataTestid="create-workspace"
+              class="mobile-create-select"
+              options={workspaces.map((ws) => ({ value: ws.id, label: ws.name }))}
+            />
+          </label>
+
+          <label class="field">
+            <span>Type</span>
+            <NativeSelect
+              bind:value={itemTypeId}
+              disabled={typesLoading || itemTypes.length === 0}
+              dataTestid="create-type"
+              class="mobile-create-select"
+              options={itemTypes.map((itemType) => ({ value: itemType.id, label: itemType.name }))}
+            />
+          </label>
+        </div>
+
         <label class="field">
-          <span>Template</span>
-          <NativeSelect
-            value={selectedTemplateId ?? ''}
-            onchange={(value) => {
-              const id = value;
-              if (id === '') {
-                selectedTemplateId = null;
-                return;
-              }
-              applyTemplate(Number(id));
-            }}
-            disabled={templatesLoading}
-            dataTestid="template-picker"
-            class="mobile-create-select"
-            options={[
-              { value: '', label: 'No template' },
-              ...templateOptions.map((template) => ({ value: template.id, label: template.name })),
-            ]}
+          <span>Description <em>(optional)</em></span>
+          <Textarea
+            bind:value={description}
+            rows={5}
+            placeholder="Add detail…"
+            data-testid="create-description"
+            readonly={templateLocked}
+            class="mobile-create-textarea"
           />
         </label>
-      {/if}
 
-      {#if fieldsLoading}
-        <p class="loading">Loading configured fields…</p>
-      {/if}
-
-      {#if requiredSystemFields.length > 0 || requiredCustomFields.length > 0}
-        <section class="field-section" data-testid="configured-required-fields">
-          <h3>Required fields</h3>
-          {#each requiredSystemFields as field (field.field_identifier)}
-            {@render systemField(field, true)}
-          {/each}
-          {#each requiredCustomFields as entry (entry.screenField.field_identifier)}
-            {@render customField(entry, true)}
-          {/each}
-        </section>
-      {/if}
-
-      {#if optionalFieldCount > 0}
-        <section class="field-section optional" data-testid="configured-optional-fields">
-          <button
-            type="button"
-            class="optional-toggle"
-            data-testid="create-optional-toggle"
-            onclick={() => showOptionalFields = !showOptionalFields}
+        <!-- Work item templates (WI-538). When the selected type enforces a
+             mandatory template the body is auto-applied into the description
+             above (and locked); otherwise offer the selectable templates valid
+             for the type. Mirrors the desktop create modal. -->
+        {#if templateLocked}
+          <span
+            class="template-chip template-locked"
+            title={`This item type enforces the "${mandatoryTemplate?.name}" template`}
+            data-testid="template-picker-locked"
           >
-            <span>Optional fields ({optionalFieldCount})</span>
-            <span aria-hidden="true">{showOptionalFields ? '−' : '+'}</span>
-          </button>
-          {#if showOptionalFields}
-            <div class="optional-body">
-              {#each optionalSystemFields as field (field.field_identifier)}
-                {@render systemField(field, false)}
-              {/each}
-              {#each optionalCustomFields as entry (entry.screenField.field_identifier)}
-                {@render customField(entry, false)}
-              {/each}
-            </div>
-          {/if}
-        </section>
+            <FileText size={14} style="flex-shrink: 0;" />
+            <span>{mandatoryTemplate?.name} (enforced)</span>
+          </span>
+        {:else if templateOptions.length >= 1}
+          <label class="field">
+            <span>Template</span>
+            <NativeSelect
+              value={selectedTemplateId ?? ''}
+              onchange={(value) => {
+                const id = value;
+                if (id === '') {
+                  selectedTemplateId = null;
+                  return;
+                }
+                applyTemplate(Number(id));
+              }}
+              disabled={templatesLoading}
+              dataTestid="template-picker"
+              class="mobile-create-select"
+              options={[
+                { value: '', label: 'No template' },
+                ...templateOptions.map((template) => ({ value: template.id, label: template.name })),
+              ]}
+            />
+          </label>
+        {/if}
+
+        {#if fieldsLoading}
+          <p class="loading">Loading configured fields…</p>
+        {/if}
+
+        {#if requiredSystemFields.length > 0 || requiredCustomFields.length > 0}
+          <section class="field-section" data-testid="configured-required-fields">
+            <h3>Required fields</h3>
+            {#each requiredSystemFields as field (field.field_identifier)}
+              {@render systemField(field, true)}
+            {/each}
+            {#each requiredCustomFields as entry (entry.screenField.field_identifier)}
+              {@render customField(entry, true)}
+            {/each}
+          </section>
+        {/if}
+
+        {#if optionalFieldCount > 0}
+          <section class="field-section optional" data-testid="configured-optional-fields">
+            <button
+              type="button"
+              class="optional-toggle"
+              data-testid="create-optional-toggle"
+              onclick={() => showOptionalFields = !showOptionalFields}
+            >
+              <span>Optional fields ({optionalFieldCount})</span>
+              <span aria-hidden="true">{showOptionalFields ? '−' : '+'}</span>
+            </button>
+            {#if showOptionalFields}
+              <div class="optional-body">
+                {#each optionalSystemFields as field (field.field_identifier)}
+                  {@render systemField(field, false)}
+                {/each}
+                {#each optionalCustomFields as entry (entry.screenField.field_identifier)}
+                  {@render customField(entry, false)}
+                {/each}
+              </div>
+            {/if}
+          </section>
+        {/if}
       {/if}
-    {/if}
-
-    {#if error}<p class="error" data-testid="create-error">{error}</p>{/if}
-
-    <div class="actions">
-      <button class="btn-cancel" onclick={handleClose} type="button">Cancel</button>
-      <button class="btn-create" onclick={submit} disabled={!canSubmit} data-testid="create-submit" type="button">
-        {saving ? 'Creating…' : isPersonal ? 'Add task' : 'Create'}
-      </button>
     </div>
-  </div>
-</Modal>
+  {/if}
+</MobileEditorPage>
+
+<!-- Discard draft? Shown when cancelling with a non-empty title. -->
+<MobileConfirmSheet
+  bind:isOpen={confirmDiscardOpen}
+  title="Discard this item?"
+  message="What you typed will be lost."
+  confirmLabel="Discard"
+  cancelLabel="Keep editing"
+  destructive
+  onconfirm={leave}
+  dataTestid="create-discard-sheet"
+/>
 
 {#snippet systemField(field, required)}
   <div class="field configured-field" data-testid={`configured-system-${field.field_identifier}`}>
@@ -882,9 +873,7 @@
 {/snippet}
 
 <style>
-  .create { display: flex; flex-direction: column; gap: 0.85rem; padding: 1rem; }
-  .title { margin: 0; font-size: 1.0625rem; font-weight: var(--font-semibold, 600); color: var(--ds-text); }
-
+  .create { display: flex; flex-direction: column; gap: 0.85rem; }
   .parent { margin: -0.25rem 0 0; font-size: 0.8125rem; color: var(--ds-text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .row { display: flex; gap: 0.75rem; }
@@ -896,15 +885,10 @@
   .field :global(.mobile-create-input), .field :global(.mobile-create-select), .field :global(.mobile-create-textarea) {
     padding: 0.6rem; border: 1px solid var(--ds-border); border-radius: var(--radius-md, 6px);
     background-color: var(--ds-background-input, var(--ds-surface)); color: var(--ds-text);
-    font-size: 1rem; /* >=16px avoids iOS zoom-on-focus */
+    font-size: max(1rem, 16px); /* >=16px avoids iOS zoom-on-focus (WI-1325) */
   }
-  .field :global(.mobile-create-textarea) { resize: vertical; font-family: inherit; }
+  .field :global(.mobile-create-textarea) { resize: vertical; font-family: inherit; min-height: 7rem; }
   .field :global(.mobile-create-select):disabled { opacity: 0.7; }
-  .configured-field :global([role='combobox']),
-  .configured-field :global(button),
-  .configured-field :global(input),
-  .configured-field :global(select),
-  .configured-field :global(textarea) { min-height: 44px; }
 
   .field-section { border-top: 1px solid var(--ds-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem; }
   .field-section h3 { margin: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ds-text-subtle); }
@@ -913,23 +897,8 @@
   .optional-body { display: flex; flex-direction: column; gap: 0.75rem; }
   .loading { margin: 0; font-size: 0.8125rem; color: var(--ds-text-subtle); }
 
-  .template-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.5rem; border-radius: var(--radius-md, 6px); font-size: 0.8125rem; }
+  .template-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.5rem; border-radius: var(--radius-md, 6px); font-size: 0.8125rem; align-self: flex-start; }
   .template-locked {
-    align-self: flex-start;
     background-color: var(--ds-background-neutral); color: var(--ds-text-subtle); opacity: 0.8;
   }
-
-  .error { margin: 0; font-size: 0.8125rem; color: var(--ds-text-danger, var(--ds-danger)); }
-
-  .actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem; }
-  .btn-cancel {
-    padding: 0.6rem 1rem; border: 1px solid var(--ds-border); border-radius: var(--radius-md, 6px);
-    background: var(--ds-surface); color: var(--ds-text); cursor: pointer; min-height: 44px;
-  }
-  .btn-create {
-    padding: 0.6rem 1.5rem; border: none; border-radius: var(--radius-md, 6px);
-    background: var(--ds-interactive); color: var(--ds-text-inverse, #fff);
-    font-weight: var(--font-semibold, 600); cursor: pointer; min-height: 44px;
-  }
-  .btn-create:disabled { opacity: 0.6; }
 </style>

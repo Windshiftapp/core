@@ -21,7 +21,11 @@
       href="/apple-touch-startup-image-2048x2732.png"
       media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
     />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content: Android/Chromium shrinks the layout
+         viewport when the keyboard opens so focused inputs in sheets and
+         editors scroll into view instead of being covered (WI-1325). iOS
+         handles this natively and ignores the hint. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <!-- PWA: installable mobile surface (start_url = /m). Relative href so the
          link resolves against the injected <base href> on context-path deploys. -->
     <link rel="manifest" href="manifest.webmanifest" />

@@ -10,16 +10,23 @@
  */
 export function toMobileUrl(url) {
   if (!url) return url;
-  if (url === '/search') return '/m/search';
-  if (url === '/notifications') return '/m/notifications';
-  if (url === '/personal') return '/m/personal';
-  if (url === '/time' || url.startsWith('/time/')) return '/m/timer';
+  // Split off the query/hash so the patterns below match paths only, then
+  // re-attach whatever followed the path.
+  const match = url.match(/^([^?#]*)([?#].*)?$/);
+  const path = match[1];
+  const rest = match[2] ?? '';
+  const rewrite = (mobilePath) => mobilePath + rest;
 
-  let m = url.match(/^\/workspaces\/(\d+)\/items\/(\d+)/);
-  if (m) return `/m/items/${m[2]}`;
+  if (path === '/search') return rewrite('/m/search');
+  if (path === '/notifications') return rewrite('/m/notifications');
+  if (path === '/personal') return rewrite('/m/personal');
+  if (path === '/time' || path.startsWith('/time/')) return rewrite('/m/timer');
 
-  m = url.match(/^\/workspaces\/(\d+)\/pages\/(\d+)/);
-  if (m) return `/m/pages/${m[1]}/${m[2]}`;
+  let m = path.match(/^\/workspaces\/(\d+)\/items\/(\d+)/);
+  if (m) return rewrite(`/m/items/${m[2]}`);
+
+  m = path.match(/^\/workspaces\/(\d+)\/pages\/(\d+)/);
+  if (m) return rewrite(`/m/pages/${m[1]}/${m[2]}`);
 
   return url;
 }

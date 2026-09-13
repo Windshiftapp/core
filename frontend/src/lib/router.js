@@ -168,7 +168,9 @@ const routes = {
   '/m/notifications': 'mobile-notifications',
   '/m/search': 'mobile-search',
   '/m/chat': 'mobile-chat',
+  '/m/new': 'mobile-create',
   '/m/items/:id': 'mobile-item-detail',
+  '/m/items/:id/edit': 'mobile-item-edit',
   '/api-docs': 'api-docs',
   '/cli/authorize': 'cli-authorize',
   '/oauth/authorize': 'oauth-authorize',
@@ -210,12 +212,38 @@ export function navigate(path, { replace = false } = {}) {
   if (externalPath === window.location.pathname + window.location.search) {
     return;
   }
-  if (replace) {
-    window.history.replaceState({}, '', externalPath);
-  } else {
-    window.history.pushState({}, '', externalPath);
+  withMobileViewTransition('push', () => {
+    if (replace) {
+      window.history.replaceState({}, '', externalPath);
+    } else {
+      window.history.pushState({}, '', externalPath);
+    }
+    updateRoute();
+  });
+}
+
+// View-transition wrapper for the phone surface: animates push/pop between /m
+// routes when the browser supports the View Transitions API (Chrome 111+,
+// Safari 18+). Progressive enhancement everywhere else — the update just runs
+// directly, exactly as before. Direction is recorded on <html data-nav> so the
+// CSS can slide the old view out and the new one in from the correct side.
+function withMobileViewTransition(direction, update) {
+  const root = document.documentElement;
+  const canAnimate =
+    typeof document.startViewTransition === 'function' &&
+    root.classList.contains('mobile-shell-active') &&
+    !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (!canAnimate) {
+    update();
+    return;
   }
-  updateRoute();
+  root.dataset.nav = direction;
+  const before = window.location.pathname + window.location.search + window.location.hash;
+  const transition = document.startViewTransition(() => update());
+  // Sheet dismissals pop a sentinel entry without changing the route — nothing
+  // visually changed, so skip the crossfade to keep the sheet's own exit snappy.
+  const after = window.location.pathname + window.location.search + window.location.hash;
+  if (before === after) transition.skipTransition();
 }
 
 // Update query params without full navigation. Uses replaceState by default.
@@ -301,7 +329,9 @@ export function initRouter() {
   routerInitialized = true;
 
   // Handle browser back/forward buttons
-  window.addEventListener('popstate', updateRoute);
+  window.addEventListener('popstate', () => {
+    withMobileViewTransition('pop', updateRoute);
+  });
 
   // Handle link clicks
   document.addEventListener('click', (e) => {

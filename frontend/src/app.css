@@ -144,6 +144,59 @@ html.mobile-shell-active body {
   touch-action: manipulation;
 }
 
+/* WI-1325: iOS Safari auto-zooms any focused form control whose font-size is
+   below 16px. Floor every input on the mobile surface at 16px regardless of
+   the component styling it inherited from desktop-shared components. */
+html.mobile-shell-active input,
+html.mobile-shell-active select,
+html.mobile-shell-active textarea,
+html.mobile-shell-active [contenteditable] {
+  font-size: max(1rem, 16px);
+}
+
+/* Push/pop transitions between /m routes (View Transitions API, driven by
+   router.js which records the direction on <html data-nav>). Progressive
+   enhancement: without support the route swap is instant, as before. */
+@media (prefers-reduced-motion: no-preference) {
+  html.mobile-shell-active .mobile-scroll {
+    view-transition-name: mobile-scroll-surface;
+  }
+  html.mobile-shell-active[data-nav="push"]::view-transition-old(mobile-scroll-surface) {
+    animation: mobile-nav-out-left 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  html.mobile-shell-active[data-nav="push"]::view-transition-new(mobile-scroll-surface) {
+    animation: mobile-nav-in-right 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  html.mobile-shell-active[data-nav="pop"]::view-transition-old(mobile-scroll-surface) {
+    animation: mobile-nav-out-right 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  html.mobile-shell-active[data-nav="pop"]::view-transition-new(mobile-scroll-surface) {
+    animation: mobile-nav-in-left 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+}
+@keyframes mobile-nav-out-left {
+  to {
+    transform: translateX(-28%);
+    opacity: 0.6;
+  }
+}
+@keyframes mobile-nav-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes mobile-nav-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes mobile-nav-in-left {
+  from {
+    transform: translateX(-28%);
+    opacity: 0.6;
+  }
+}
+
 /* Clickable elements should have pointer cursor */
 button,
 a,

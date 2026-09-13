@@ -9,6 +9,7 @@
   import { i18n, SUPPORTED_LOCALES, t } from './lib/stores/i18n.svelte.js';
   import { safeLoginReturnPath } from './lib/utils/loginReturnPath.js';
   import { getStartupCopy } from './lib/utils/startupCopy.js';
+  import { toMobileUrl } from './lib/mobile/mobileUrls.js';
   import {
     loadAuthenticatedShellUI,
     resetAuthenticatedShellUILoad,
@@ -255,6 +256,42 @@
       navigate('/m');
     }
   }
+
+  // WI-1322: a phone following a deep link (AI-chat link, push notification,
+  // shared URL) must not land on the desktop shell. Whenever the route
+  // resolves to a desktop view that has a mobile equivalent, and the viewport
+  // is a phone and the user hasn't opted into desktop, redirect to /m. URLs
+  // without a mobile equivalent (settings, boards, …) stay on the desktop
+  // surface — those only exist there today. Public/auth/print surfaces are
+  // never redirected.
+  const MOBILE_REDIRECT_SKIP_VIEWS = new Set([
+    '404',
+    'portal',
+    'public-form',
+    'public-board',
+    'set-password',
+    'page-print',
+    'time-report-print',
+    'test-run-summary-print',
+    'oauth-authorize',
+    'cli-authorize',
+    'zammad-resolve',
+  ]);
+  $effect(() => {
+    const route = $currentRoute;
+    if (!route.view || isMobileRoute(route.view)) return;
+    if (MOBILE_REDIRECT_SKIP_VIEWS.has(route.view)) return;
+    try {
+      if (localStorage.getItem('windshift-prefer-desktop') === 'true') return;
+    } catch {
+      // localStorage unavailable — fall through to the viewport check.
+    }
+    if (!window.matchMedia?.('(max-width: 768px)').matches) return;
+    const target = toMobileUrl(route.path + window.location.search);
+    if (target !== route.path + window.location.search) {
+      navigate(target, { replace: true });
+    }
+  });
 
   async function checkSetupStatus() {
     // Always ask the backend. setup_completed is cheap to fetch and the

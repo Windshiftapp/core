@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Plus } from '@lucide/svelte';
-  import { currentRoute } from '../router.js';
+  import { currentRoute, navigate } from '../router.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { workspacesStore, aiStore, homepageStore } from '../stores';
   import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
@@ -16,29 +16,35 @@
   import MobileItemDetail from './MobileItemDetail.svelte';
   import SearchView from './SearchView.svelte';
   import MobileChatView from './MobileChatView.svelte';
-  import MobileCreateDialog from './MobileCreateDialog.svelte';
   import IosInstallSheet from './IosInstallSheet.svelte';
   import MobilePagesView from './MobilePagesView.svelte';
   import MobilePageDetail from './MobilePageDetail.svelte';
   import MobileCommandPalette from './MobileCommandPalette.svelte';
+  import MobileCreatePage from './MobileCreatePage.svelte';
+  import MobileItemEditPage from './MobileItemEditPage.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
 
   const view = $derived($currentRoute.view);
   const TAB_VIEWS = ['mobile-my-work', 'mobile-personal', 'mobile-timer', 'mobile-notifications'];
   const isTabView = $derived(TAB_VIEWS.includes(view));
-  // Full-screen "pushed" views (own back button) hide the bottom nav.
+  // Full-screen "pushed" views (own back/cancel affordance) hide the bottom nav.
   const showNav = $derived(
     view !== 'mobile-item-detail' &&
       view !== 'mobile-search' &&
       view !== 'mobile-chat' &&
-      view !== 'mobile-page-detail',
+      view !== 'mobile-page-detail' &&
+      view !== 'mobile-create' &&
+      view !== 'mobile-item-edit',
   );
   // The Personal tab creates personal tasks; every other tab uses the full
-  // work-item form. Drives the create dialog's mode. The Pages tab gets no
-  // FAB at all — pages are created from the desktop editor today.
-  const createMode = $derived(view === 'mobile-personal' ? 'personal' : 'work');
+  // work-item form. The Pages tab gets no FAB at all — pages are created from
+  // the desktop editor today.
   const showFab = $derived(isTabView && view !== 'mobile-pages');
-  let createOpen = $state(false);
+  function openCreate() {
+    // Dedicated create page (/m/new), not a dialog — composition gets a real
+    // route so back gestures and deep links behave like native apps.
+    navigate(view === 'mobile-personal' ? '/m/new?mode=personal' : '/m/new');
+  }
 
   onMount(() => {
     // Reuse the same singletons the desktop shell drives, so the active timer
@@ -84,11 +90,15 @@
       <MobileChatView />
     {:else if view === 'mobile-item-detail'}
       <MobileItemDetail itemId={Number($currentRoute.params.id)} />
+    {:else if view === 'mobile-create'}
+      <MobileCreatePage />
+    {:else if view === 'mobile-item-edit'}
+      <MobileItemEditPage />
     {/if}
   </main>
 
   {#if showFab}
-    <button class="fab" onclick={() => (createOpen = true)} data-testid="mobile-create-fab" aria-label="Create item" type="button">
+    <button class="fab" onclick={openCreate} data-testid="mobile-create-fab" aria-label="Create item" type="button">
       <Plus size={26} />
     </button>
   {/if}
@@ -101,9 +111,6 @@
 <!-- Global confirm host (the mobile shell bypasses MainApp, which normally
      mounts this) so confirm() dialogs render on the mobile surface. -->
 <GlobalConfirmDialog />
-
-<!-- Simple create dialog, reachable from the FAB on any tab. -->
-<MobileCreateDialog bind:isOpen={createOpen} mode={createMode} />
 
 <!-- iOS "Add to Home Screen" instructions (opened from the user menu via the
      install helper's store; no-op until triggered). -->

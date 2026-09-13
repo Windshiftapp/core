@@ -1,5 +1,5 @@
 <script>
-  import { Star, Play, Loader, ChevronDown, ChevronRight, GitPullRequest, Bot, RefreshCw, Plus, Check } from '@lucide/svelte';
+  import { Star, Play, Loader, ChevronDown, ChevronRight, GitPullRequest, Bot, RefreshCw, Plus, Check, Pencil } from '@lucide/svelte';
   import { api } from '../api.js';
   import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
   import { agentRuns as agentRunBus } from '../stores/agentRuns.svelte.js';
@@ -16,16 +16,13 @@
   import { workspacesStore } from '../stores';
   import MobileHeader from './MobileHeader.svelte';
   import MobileItemRow from './MobileItemRow.svelte';
-  import MobileCreateDialog from './MobileCreateDialog.svelte';
+  import MobileOptionSheet from './MobileOptionSheet.svelte';
   import StatusPill from '../components/StatusPill.svelte';
   import Comments from '../features/items/Comments.svelte';
   import ItemSCMLinks from '../features/items/ItemSCMLinks.svelte';
   import ItemAgentLog from '../features/items/ItemAgentLog.svelte';
-  import BasePicker from '../pickers/BasePicker.svelte';
-  import UserPicker from '../pickers/UserPicker.svelte';
   import Avatar from '../components/Avatar.svelte';
-  import Input from '../components/Input.svelte';
-  import ItemDetailDescription from '../features/items/ItemDetailDescription.svelte';
+  import SafeMarkdown from '../components/SafeMarkdown.svelte';
 
   let { itemId } = $props();
 
@@ -36,11 +33,6 @@
   let transitioning = $state(false);
   let isWatching = $state(false);
   let watchBusy = $state(false);
-  let saving = $state(false);
-  let editingTitle = $state(false);
-  let editTitle = $state('');
-  let editingDescription = $state(false);
-  let editDescription = $state('');
 
   // Workflow-less personal tasks use the permitted transition endpoint to toggle
   // globally stable Open/Done IDs, matching desktop and PWA personal views.
@@ -52,7 +44,35 @@
   let ancestors = $state([]);
   // One-level-deeper item types allowed as children; empty hides Add sub-item.
   let availableSubIssueTypes = $state([]);
-  let createChildOpen = $state(false);
+
+  // Property editing happens in bottom sheets (the mobile replacement for the
+  // desktop floating pickers). Status options come from the workflow's
+  // available-transitions endpoint; assignee options load lazily from the
+  // workspace-scoped assignable-users endpoint on first open.
+  let statusSheetOpen = $state(false);
+  let assigneeSheetOpen = $state(false);
+  let assigneeOptions = $state(null);
+  let assigneeLoading = $state(false);
+
+  function userLabel(user) {
+    if (!user) return '';
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.username || '';
+  }
+
+  async function openAssigneeSheet() {
+    assigneeSheetOpen = true;
+    if (assigneeOptions) return;
+    assigneeLoading = true;
+    try {
+      assigneeOptions = (await api.getAssignableUsers(item.workspace_id)) ?? [];
+    } catch (err) {
+      console.error('Failed to load assignable users:', err);
+      errorToast('Could not load assignees.');
+      assigneeOptions = [];
+    } finally {
+      assigneeLoading = false;
+    }
+  }
   // Prevent prior-item loads from writing stale state during in-place navigation.
   let loadToken = 0;
 
@@ -72,10 +92,6 @@
   // personalWorkspace is fetched on demand once an item resolves here.
   const personalWorkspaceId = $derived($workspacesStore?.personalWorkspace?.id ?? null);
   const isPersonalItem = $derived(!!item && personalWorkspaceId != null && item.workspace_id === personalWorkspaceId);
-  // Stable parent context for the create-child dialog (id + title), derived so
-  // it only gets a new reference when the underlying item actually changes —
-  // avoids re-triggering the dialog's effects on unrelated re-renders.
-  const childParent = $derived(item ? { id: item.id, title: item.title } : null);
 
   function normalizeChild(c) {
     return {
@@ -97,8 +113,6 @@
       const summary = await loadMobileItemDetailSummary(id);
       if (token !== loadToken) return;
       item = summary?.item ?? null;
-      editTitle = item?.title || '';
-      editDescription = item?.description || '';
       transitions = summary?.transitions?.available_transitions ?? [];
       isWatching = summary?.watching || false;
       personalTaskCount = summary?.personal_task_count ?? 0;
@@ -175,59 +189,6 @@
     }
   }
 
-  async function saveTitle() {
-    const title = editTitle.trim();
-    if (!title || title === item.title) {
-      editTitle = item.title || '';
-      editingTitle = false;
-      return;
-    }
-    saving = true;
-    try {
-      const updated = await api.items.update(itemId, { title });
-      item = { ...item, ...updated, title };
-      editingTitle = false;
-    } catch (err) {
-      console.error('Failed to save title:', err);
-    } finally {
-      saving = false;
-    }
-  }
-
-  function handleTitleKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveTitle();
-    } else if (event.key === 'Escape') {
-      editTitle = item.title || '';
-      editingTitle = false;
-    }
-  }
-
-  function handleSaveField({ field, value }) {
-    if (field !== 'description') return;
-    editDescription = value;
-    saveDescription();
-  }
-
-  async function saveDescription() {
-    saving = true;
-    try {
-      const updated = await api.items.update(itemId, { description: editDescription });
-      item = { ...item, ...updated, description: editDescription };
-      editingDescription = false;
-    } catch (err) {
-      console.error('Failed to save description:', err);
-    } finally {
-      saving = false;
-    }
-  }
-
-  function cancelDescription() {
-    editDescription = item.description || '';
-    editingDescription = false;
-  }
-
   async function updateAssignee(user) {
     const assigneeId = user?.id ?? null;
     if (assigneeId === (item.assignee_id ?? null)) return;
@@ -280,21 +241,9 @@
 
   function openCreateChild() {
     if (!canCreateChild) return;
-    createChildOpen = true;
-  }
-
-  // Called when the create-child dialog closes (both on submit and cancel).
-  // A silent refresh of the sub-item list is cheap and side-effect-free on
-  // cancel (the list is unchanged), so it doubles as the "new child appeared"
-  // handler without needing the dialog to report success.
-  async function handleCreateChildClose() {
-    try {
-      const res = await api.items.getChildren(itemId);
-      const list = Array.isArray(res) ? res : (res?.items ?? []);
-      children = list.filter((c) => c?.id).map(normalizeChild);
-    } catch {
-      /* keep prior list */
-    }
+    // Dedicated create page with the parent pinned via query param; returning
+    // to the detail remounts this view and picks up the new sub-item.
+    navigate(`/m/new?parent=${itemId}`);
   }
 
   // Reload whenever the item id changes — the component is not remounted when
@@ -315,7 +264,8 @@
     scmOpen = false;
     agentOpen = false;
     availableSubIssueTypes = [];
-    createChildOpen = false;
+    statusSheetOpen = false;
+    assigneeSheetOpen = false;
     loadItem(id, token).then(() => {
       if (token === loadToken && !errored) {
         // Clear notifications pointing at this item — viewing an item should
@@ -472,31 +422,24 @@
       <div class="status-line"><span class="type">{item.item_type_name}</span></div>
     {/if}
 
-    {#if editingTitle}
-      <Input
-        bind:value={editTitle}
-        class="title-input"
-        aria-label="Edit title"
-        dataTestid="mobile-title-editor"
-        onblur={saveTitle}
-        onkeydown={handleTitleKeydown}
-        disabled={saving}
-      />
-    {:else}
-      <h1 class="title" data-testid="detail-title">
-        <button
-          class="title-button"
-          type="button"
-          onclick={() => { editTitle = item.title || ''; editingTitle = true; }}
-          aria-label="Edit title"
-        >{item.title}</button>
-      </h1>
-    {/if}
+    <div class="title-row">
+      <h1 class="title" data-testid="detail-title">{item.title}</h1>
+      <button
+        class="edit-btn"
+        onclick={() => navigate(`/m/items/${item.id}/edit`)}
+        data-testid="detail-edit"
+        aria-label="Edit title and description"
+        type="button"
+      >
+        <Pencil size={16} />
+        <span>Edit</span>
+      </button>
+    </div>
 
-    <!-- Status + assignee pickers. Status options come from the workflow's
-         available-transitions endpoint (not hardcoded), so custom workflows
-         and custom statuses work as-is. Assignee users come from the
-         workspace-scoped assignable-users endpoint via UserPicker. -->
+    <!-- Status + assignee rows open bottom sheets. Status options come from
+         the workflow's available-transitions endpoint (not hardcoded), so
+         custom workflows and custom statuses work as-is. Assignee users come
+         from the workspace-scoped assignable-users endpoint. -->
     <div class="fields">
       {#if isPersonalItem}
         <!-- Personal (workflow-less) tasks: the available-transitions endpoint
@@ -520,76 +463,45 @@
           </span>
         </button>
       {:else}
-      <BasePicker
-        value={item.status_id ?? null}
-        items={transitions}
-        getValue={(s) => s.id}
-        getLabel={(s) => s.name}
+      <button
+        class="field"
+        onclick={() => (statusSheetOpen = true)}
         disabled={transitioning || transitions.length === 0}
-        allowClear={false}
-        positioning={{ strategy: 'fixed', placement: 'bottom-start', sameWidth: true }}
-        onSelect={(s) => s && changeStatus(s.id)}
+        data-testid="status-picker-trigger"
+        type="button"
       >
-        {#snippet children()}
-          <div class="field" data-testid="status-picker-trigger">
-            <span class="field-label">Status</span>
-            <span class="field-value" data-testid="detail-status">
-              <StatusPill name={item.status_name} color={item.status_color} />
-              <ChevronDown size={16} class="chev" />
-            </span>
-          </div>
-        {/snippet}
-        {#snippet itemSnippet({ item: opt })}
-          <span class="opt">
-            <span class="opt-dot" style={opt.category_color ? `background-color: ${opt.category_color};` : ''}></span>
-            {opt.name}
-          </span>
-        {/snippet}
-      </BasePicker>
+        <span class="field-label">Status</span>
+        <span class="field-value" data-testid="detail-status">
+          <StatusPill name={item.status_name} color={item.status_color} />
+          <ChevronDown size={16} class="chev" />
+        </span>
+      </button>
       {/if}
 
-      <UserPicker
-        value={item.assignee_id ?? null}
-        workspaceId={item.workspace_id}
-        showUnassigned={true}
-        positioning={{ strategy: 'fixed', placement: 'bottom-start', sameWidth: true }}
-        onSelect={updateAssignee}
+      <button
+        class="field"
+        onclick={openAssigneeSheet}
+        data-testid="assignee-picker-trigger"
+        type="button"
       >
-        {#snippet children()}
-          <div class="field" data-testid="assignee-picker-trigger">
-            <span class="field-label">Assignee</span>
-            <span class="field-value">
-              {#if item.assignee_id && item.assignee_name}
-                <Avatar src={item.assignee_avatar} name={item.assignee_name} size="xs" variant="teal" />
-                <span class="assignee-name">{item.assignee_name}</span>
-              {:else}
-                <span class="muted">Unassigned</span>
-              {/if}
-              <ChevronDown size={16} class="chev" />
-            </span>
-          </div>
-        {/snippet}
-      </UserPicker>
+        <span class="field-label">Assignee</span>
+        <span class="field-value">
+          {#if item.assignee_id && item.assignee_name}
+            <Avatar src={item.assignee_avatar} name={item.assignee_name} size="xs" variant="teal" />
+            <span class="assignee-name">{item.assignee_name}</span>
+          {:else}
+            <span class="muted">Unassigned</span>
+          {/if}
+          <ChevronDown size={16} class="chev" />
+        </span>
+      </button>
     </div>
 
-    <div class="desc" data-testid="detail-description">
-      <ItemDetailDescription
-        {item}
-        bind:editingDescription
-        bind:editDescription
-        {saving}
-        availableSubIssueTypes={[]}
-        showLinkButton={false}
-        showDiagramButton={false}
-        showAIActions={false}
-        onsavefield={handleSaveField}
-        oncanceledit={cancelDescription}
-        onstartEditingDescription={() => {
-          editDescription = item.description || '';
-          editingDescription = true;
-        }}
-      />
-    </div>
+    {#if item.description}
+      <div class="html-content desc" data-testid="detail-description">
+        <SafeMarkdown html={item.description_html} source={item.description} />
+      </div>
+    {/if}
 
     <!-- Meta -->
     {#if item.due_date || personalTaskCount > 0}
@@ -684,17 +596,50 @@
   </div>
 {/if}
 
-<!-- Create-child dialog. Mounted lazily once the item loads; the parent
-     context pins the new item under this one and locks the type picker to the
-     allowed sub-issue types. Closes silently refresh the sub-item list. -->
-{#if item && canCreateChild}
-  <MobileCreateDialog
-    bind:isOpen={createChildOpen}
-    onclose={handleCreateChildClose}
-    parent={childParent}
-    availableItemTypes={availableSubIssueTypes}
-    workspaceId={item.workspace_id}
-  />
+{#if item && transitions.length > 0}
+  <MobileOptionSheet
+    bind:isOpen={statusSheetOpen}
+    title="Status"
+    options={transitions}
+    getValue={(s) => s.id}
+    getLabel={(s) => s.name}
+    selectedValue={item.status_id ?? null}
+    onSelect={(s) => s && changeStatus(s.id)}
+    emptyText="No status options"
+    dataTestid="status-sheet"
+  >
+    {#snippet row(s)}
+      <span class="opt">
+        <span class="opt-dot" style={s.category_color ? `background-color: ${s.category_color};` : ''}></span>
+        {s.name}
+      </span>
+    {/snippet}
+  </MobileOptionSheet>
+{/if}
+
+{#if item}
+  <MobileOptionSheet
+    bind:isOpen={assigneeSheetOpen}
+    title="Assignee"
+    options={assigneeOptions ?? []}
+    loading={assigneeLoading}
+    getValue={(u) => u.id}
+    getLabel={userLabel}
+    selectedValue={item.assignee_id ?? null}
+    allowClear={true}
+    clearLabel="Unassigned"
+    onSelect={updateAssignee}
+    onClear={() => updateAssignee(null)}
+    emptyText="No assignable users"
+    dataTestid="assignee-sheet"
+  >
+    {#snippet row(user)}
+      <span class="opt">
+        <Avatar src={user.avatar_url} name={userLabel(user)} size="xs" variant="teal" />
+        <span class="assignee-option-label">{userLabel(user)}</span>
+      </span>
+    {/snippet}
+  </MobileOptionSheet>
 {/if}
 
 <style>
@@ -768,21 +713,44 @@
   .status-line { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
   .type { font-size: 0.75rem; color: var(--ds-text-subtle); text-transform: uppercase; letter-spacing: 0.02em; }
 
-  .title { font-size: 1.25rem; font-weight: var(--font-semibold, 600); color: var(--ds-text); margin: 0 0 1rem; line-height: 1.3; }
-  .title-button { display: block; width: 100%; padding: 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: text; }
-  .title-button:active { opacity: 0.7; }
-  .title-input { width: 100%; margin-bottom: 1rem; font-size: 1.25rem; font-weight: var(--font-semibold, 600); }
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+  }
+  .title { font-size: 1.25rem; font-weight: var(--font-semibold, 600); color: var(--ds-text); margin: 0; line-height: 1.3; }
+  .edit-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    padding: 0.25rem 0.5rem;
+    margin: -0.25rem -0.25rem 0 0;
+    border: none;
+    border-radius: var(--radius-md, 6px);
+    background: transparent;
+    color: var(--ds-interactive);
+    font-size: 0.8125rem;
+    font-weight: var(--font-medium, 500);
+    cursor: pointer;
+  }
+  .edit-btn:active { background-color: var(--ds-background-neutral-hovered); }
 
-  /* Status + assignee picker field rows */
+  /* Status + assignee rows (buttons styled as list rows) */
   .fields {
     margin-bottom: 1rem; border: 1px solid var(--ds-border); border-radius: var(--radius-lg, 8px); overflow: hidden;
   }
   .field {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    min-height: 48px; padding: 0.5rem 0.85rem; cursor: pointer;
+    width: 100%; min-height: 48px; padding: 0.5rem 0.85rem; cursor: pointer;
+    border: none; background: transparent; color: inherit; font: inherit; text-align: left;
   }
   .field:not(:last-child) { border-bottom: 1px solid var(--ds-border); }
   .field:active { background-color: var(--ds-background-neutral-hovered); }
+  .field:disabled { opacity: 0.6; cursor: default; }
   .field-label { font-size: 0.8125rem; color: var(--ds-text-subtle); }
   .field-value { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; color: var(--ds-text); font-size: 0.875rem; }
   .field-value :global(.chev) { color: var(--ds-icon-subtle, var(--ds-text-subtle)); flex-shrink: 0; }
@@ -797,8 +765,9 @@
     color: #fff; background: transparent;
   }
   .done-check.done { background-color: var(--ds-success, #4cb782); border-color: var(--ds-success, #4cb782); }
-  .opt { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .opt { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
   .opt-dot { width: 8px; height: 8px; border-radius: var(--radius-full, 9999px); background-color: var(--ds-icon-subtle, var(--ds-text-subtle)); flex-shrink: 0; }
+  .assignee-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .desc {
     padding: 0.5rem 0 1rem; border-bottom: 1px solid var(--ds-border); margin-bottom: 1rem;
