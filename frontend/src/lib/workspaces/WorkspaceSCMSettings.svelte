@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
-  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound, AlertTriangle, Settings } from '@lucide/svelte';
+  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound, AlertTriangle, Settings, Webhook, RotateCw } from '@lucide/svelte';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -11,6 +12,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Input from '../components/Input.svelte';
+  import CopyButton from '../components/CopyButton.svelte';
   import { safeHref } from '../utils/sanitize';
   import { loadWorkspaceSCMOverview } from './workspaceSCMData.js';
 
@@ -19,10 +21,12 @@
   let loading = $state(true);
   let availableProviders = $state([]);
   let connections = $state([]);
-  let expandedConnections = $state(new Set());
+  const expandedConnections = new SvelteSet();
   let linkedRepos = $state({}); // connId -> repos array
-  let loadingRepos = $state(new Set());
+  const loadingRepos = new SvelteSet();
   let authStatuses = $state({}); // connId -> auth status object
+  let webhookConfigs = $state({}); // repoId -> manual GitLab webhook config
+  const loadingWebhooks = new SvelteSet();
 
   // Modal state
   let showRepoSelector = $state(false);
@@ -133,7 +137,7 @@
         p.id === conn.scm_provider_id ? { ...p, is_connected: false } : p
       );
       // Clean up expanded state and repos
-      expandedConnections = new Set([...expandedConnections].filter(id => id !== conn.id));
+      expandedConnections.delete(conn.id);
       linkedRepos = Object.fromEntries(
         Object.entries(linkedRepos).filter(([id]) => id !== String(conn.id))
       );
@@ -146,9 +150,9 @@
 
   async function toggleExpanded(connId) {
     if (expandedConnections.has(connId)) {
-      expandedConnections = new Set([...expandedConnections].filter(id => id !== connId));
+      expandedConnections.delete(connId);
     } else {
-      expandedConnections = new Set(expandedConnections).add(connId);
+      expandedConnections.add(connId);
       // Load repos if not already loaded
       if (!linkedRepos[connId]) {
         await loadLinkedRepos(connId);
@@ -157,7 +161,7 @@
   }
 
   async function loadLinkedRepos(connId) {
-    loadingRepos = new Set(loadingRepos).add(connId);
+    loadingRepos.add(connId);
     try {
       const repos = await api.workspaceSCM.getLinkedRepos(workspaceId, connId);
       linkedRepos = { ...linkedRepos, [connId]: repos || [] };
@@ -166,7 +170,7 @@
       console.error('Failed to load repositories:', error);
       linkedRepos = { ...linkedRepos, [connId]: [] };
     } finally {
-      loadingRepos = new Set([...loadingRepos].filter(id => id !== connId));
+      loadingRepos.delete(connId);
     }
   }
 
@@ -240,6 +244,37 @@
     }
   }
 
+  async function loadWebhookConfig(repoId) {
+    if (webhookConfigs[repoId]) {
+      webhookConfigs = { ...webhookConfigs, [repoId]: null };
+      return;
+    }
+    loadingWebhooks.add(repoId);
+    try {
+      const config = await api.workspaceSCM.getWebhookConfig(repoId);
+      webhookConfigs = { ...webhookConfigs, [repoId]: config };
+    } catch (error) {
+      console.error('Failed to load GitLab webhook config:', error);
+      errorToast(t('scmSettings.webhookLoadFailed'));
+    } finally {
+      loadingWebhooks.delete(repoId);
+    }
+  }
+
+  async function rotateWebhookSecret(repoId) {
+    loadingWebhooks.add(repoId);
+    try {
+      const config = await api.workspaceSCM.rotateWebhookSecret(repoId);
+      webhookConfigs = { ...webhookConfigs, [repoId]: config };
+      successToast(t('scmSettings.webhookSecretRotated'));
+    } catch (error) {
+      console.error('Failed to rotate GitLab webhook secret:', error);
+      errorToast(t('scmSettings.webhookRotateFailed'));
+    } finally {
+      loadingWebhooks.delete(repoId);
+    }
+  }
+
   function showNotification(message, type = 'success') {
     if (type === 'success') {
       successToast(message);
@@ -281,7 +316,7 @@
       <div class="rounded-lg border p-4" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
         <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('scmSettings.availableProviders')}</h4>
         <div class="flex flex-wrap gap-2">
-          {#each availableProviders as provider}
+          {#each availableProviders as provider (provider.id)}
             <div
               data-testid={`scm-provider-${provider.id}`}
               class="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm"
@@ -321,7 +356,7 @@
       <div class="space-y-3">
         <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('scmSettings.connectedProviders')}</h4>
 
-        {#each connections as conn}
+        {#each connections as conn (conn.id)}
           <div data-testid={`scm-connection-${conn.id}`} class="rounded-lg border overflow-hidden" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
             <!-- Connection Header -->
             <div
@@ -400,10 +435,24 @@
                   </EmptyState>
                 {:else}
                   <div class="space-y-2">
-                    {#each linkedRepos[conn.id] as repo}
+                    {#each linkedRepos[conn.id] as repo (repo.id)}
                       <div class="rounded-md" style="background-color: var(--ds-surface);">
                         <div class="flex items-center justify-between px-3 py-2">
                           <div class="flex items-center gap-2">
+                            {#if conn.provider_type === 'gitlab'}
+                              <button
+                                class="p-1 rounded hover:bg-opacity-50"
+                                style="color: var(--ds-text-subtle);"
+                                title={t('scmSettings.gitlabWebhook')}
+                                onclick={() => loadWebhookConfig(repo.id)}
+                              >
+                                {#if loadingWebhooks.has(repo.id)}
+                                  <Loader2 class="w-4 h-4 animate-spin" />
+                                {:else}
+                                  <Webhook class="w-4 h-4" />
+                                {/if}
+                              </button>
+                            {/if}
                             <span class="font-mono text-sm" style="color: var(--ds-text);">{repo.repository_name}</span>
                             <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                               {repo.default_branch}
@@ -473,6 +522,33 @@
                               <Button size="sm" variant="ghost" onclick={closeRepoSettings}>{t('common.cancel')}</Button>
                               <Button size="sm" variant="primary" onclick={() => saveRepoSettings(conn.id)}>{t('common.save')}</Button>
                             </div>
+                          </div>
+                        {/if}
+                        {#if conn.provider_type === 'gitlab' && webhookConfigs[repo.id]}
+                          {@const webhookConfig = webhookConfigs[repo.id]}
+                          <div class="px-3 py-3 border-t space-y-3" style="border-color: var(--ds-border);">
+                            <div>
+                              <p class="text-sm font-medium" style="color: var(--ds-text);">{t('scmSettings.gitlabWebhook')}</p>
+                              <p class="text-xs" style="color: var(--ds-text-subtle);">{t('scmSettings.webhookHelp')}</p>
+                            </div>
+                            {#if webhookConfig.configured}
+                              <div class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                  <code class="flex-1 text-xs p-2 rounded break-all" style="background-color: var(--ds-background-input);">{webhookConfig.callback_url}</code>
+                                  <CopyButton text={webhookConfig.callback_url} size="sm" />
+                                </div>
+                                {#if webhookConfig.secret}
+                                  <div class="flex items-center gap-2">
+                                    <code class="flex-1 text-xs p-2 rounded break-all" style="background-color: var(--ds-background-input);">{webhookConfig.secret}</code>
+                                    <CopyButton text={webhookConfig.secret} size="sm" />
+                                  </div>
+                                  <p class="text-xs" style="color: var(--ds-text-warning);">{t('scmSettings.webhookSecretOnce')}</p>
+                                {/if}
+                              </div>
+                            {/if}
+                            <Button size="sm" variant="secondary" icon={RotateCw} onclick={() => rotateWebhookSecret(repo.id)} disabled={loadingWebhooks.has(repo.id)}>
+                              {webhookConfig.configured ? t('scmSettings.rotateWebhookSecret') : t('scmSettings.configureWebhook')}
+                            </Button>
                           </div>
                         {/if}
                       </div>

@@ -1,5 +1,5 @@
 -- SCM (Source Control Management) provider integration tables
--- Supports GitHub and Gitea/Forgejo
+-- Supports GitHub, GitLab, and Gitea/Forgejo
 
 -- SCM Providers (system-level configuration)
 -- Similar pattern to sso_providers table
@@ -120,6 +120,35 @@ CREATE TABLE IF NOT EXISTS workspace_repositories (
 CREATE INDEX IF NOT EXISTS idx_workspace_repos_connection ON workspace_repositories(workspace_scm_connection_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_repos_name ON workspace_repositories(repository_name);
 CREATE INDEX IF NOT EXISTS idx_workspace_repos_active ON workspace_repositories(is_active);
+
+CREATE TABLE IF NOT EXISTS scm_webhooks (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	workspace_repository_id INTEGER NOT NULL UNIQUE REFERENCES workspace_repositories(id) ON DELETE CASCADE,
+	webhook_key TEXT NOT NULL UNIQUE,
+	webhook_external_id TEXT,
+	webhook_secret_encrypted TEXT NOT NULL,
+	events TEXT NOT NULL DEFAULT '["push","tag_push","merge_request","note","release"]',
+	is_active BOOLEAN NOT NULL DEFAULT true,
+	last_delivery_at DATETIME,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS scm_webhook_deliveries (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	scm_webhook_id INTEGER NOT NULL REFERENCES scm_webhooks(id) ON DELETE CASCADE,
+	delivery_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	payload_summary TEXT,
+	status TEXT NOT NULL DEFAULT 'pending',
+	error_message TEXT,
+	processing_time_ms INTEGER,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(scm_webhook_id, delivery_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scm_webhook_deliveries_status ON scm_webhook_deliveries(status, created_at);
 
 -- Durable health snapshots for scheduled SCM operations. One row per
 -- connection and operation keeps diagnostics useful without retaining an

@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // MilestoneAttacher implements services.MilestoneCommitAttacher by
@@ -69,11 +69,10 @@ func (m *MilestoneAttacher) AttachCommitIssues(ctx context.Context, in services.
 		return result, errors.New("provider does not implement RefProvider (CompareCommits)")
 	}
 
-	parts := strings.SplitN(repoCtx.repositoryName, "/", 2)
-	if len(parts) != 2 {
+	owner, repo, ok := utils.SplitRepositoryPath(repoCtx.repositoryName)
+	if !ok {
 		return result, fmt.Errorf("invalid repository_name %q", repoCtx.repositoryName)
 	}
-	owner, repo := parts[0], parts[1]
 
 	commits, err := rp.CompareCommits(ctx, owner, repo, in.BaseRef, in.HeadRef)
 	if err != nil {

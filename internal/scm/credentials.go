@@ -506,6 +506,19 @@ func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, conn
 	var err error
 
 	switch creds.ProviderType {
+	case models.SCMProviderTypeGitLab:
+		var gitlabProvider *GitLabProvider
+		gitlabProvider, err = NewGitLabProvider(cfg)
+		if err != nil {
+			return "", fmt.Errorf("failed to create provider for refresh: %w", err)
+		}
+		newTokens, err = gitlabProvider.RefreshToken(ctx, creds.OAuthRefreshToken)
+		if err != nil {
+			if errors.Is(err, ErrRefreshTokenInvalid) {
+				r.invalidateStoredCredentials(ctx, creds, connectionID)
+			}
+			return "", fmt.Errorf("failed to refresh token: %w", err)
+		}
 	case models.SCMProviderTypeGitea:
 		var giteaProvider *GiteaProvider
 		giteaProvider, err = NewGiteaProvider(cfg)

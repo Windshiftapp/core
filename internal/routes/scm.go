@@ -67,6 +67,11 @@ func RegisterSCMRoutes(deps *Deps) {
 	api.HandleH("DELETE /workspaces/{id}/scm-connections/{connId}/auth", auth(wsAdmin(http.HandlerFunc(deps.SCM.Workspace.ClearWorkspaceCredentials))))
 	api.HandleH("GET /workspaces/{id}/scm-connections/{connId}/auth/status", auth(wsView(http.HandlerFunc(deps.SCM.Workspace.GetWorkspaceConnectionAuthStatus))))
 	api.HandleH("POST /workspace-repositories/{repoId}/sync", auth(http.HandlerFunc(deps.SCM.ItemLinks.SyncWorkspaceRepository)))
+	api.HandleH("GET /workspace-repositories/{repoId}/release-candidates", auth(http.HandlerFunc(deps.SCM.ItemLinks.ListReleaseCandidates)))
+	api.HandleH("GET /workspace-repositories/{repoId}/webhook", auth(http.HandlerFunc(deps.SCM.ItemLinks.GetGitLabWebhookConfig)))
+	api.HandleH("POST /workspace-repositories/{repoId}/webhook/rotate-secret", auth(http.HandlerFunc(deps.SCM.ItemLinks.RotateGitLabWebhookSecret)))
+	api.HandleH("DELETE /workspace-repositories/{repoId}/webhook", auth(http.HandlerFunc(deps.SCM.ItemLinks.DeleteGitLabWebhookConfig)))
+	api.HandleH("POST /scm/webhooks/gitlab/{webhookKey}", deps.WebhookLimiter.Limit(http.HandlerFunc(deps.SCM.ItemLinks.ReceiveGitLabWebhook)))
 
 	// Item SCM Links endpoints
 	api.HandleH("GET /items/{id}/scm-links", auth(http.HandlerFunc(deps.SCM.ItemLinks.GetItemSCMLinks)))

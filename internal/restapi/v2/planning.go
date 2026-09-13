@@ -135,6 +135,7 @@ type milestoneReorderResponse struct {
 }
 
 type releaseMilestoneRequest struct {
+	Mode            string `json:"mode"`
 	ConnectionID    int    `json:"connection_id"`
 	RepositoryID    int    `json:"repository_id"`
 	Repository      string `json:"repository"`
@@ -305,7 +306,7 @@ func releaseMilestone(planning planningApplication) jsonOperation[releaseMilesto
 			return models.Milestone{}, err
 		}
 		result, err := planning.ReleaseMilestone(r.Context(), user.ID, auditActor(r, user), id, services.ReleaseMilestoneInput{
-			ConnectionID: input.ConnectionID, RepositoryID: input.RepositoryID, Repository: input.Repository,
+			Mode: input.Mode, ConnectionID: input.ConnectionID, RepositoryID: input.RepositoryID, Repository: input.Repository,
 			IdempotencyKey: r.Header.Get("Idempotency-Key"), TagName: input.TagName, Name: input.Name, Body: input.Body,
 			IsDraft: input.IsDraft, IsPrerelease: input.IsPrerelease, TargetCommitish: input.TargetCommitish,
 		})
@@ -514,11 +515,33 @@ func milestoneModel(result *services.MilestoneResult) models.Milestone {
 	if result.TargetDate != "" {
 		targetDate = &result.TargetDate
 	}
-	return models.Milestone{
+	milestone := models.Milestone{
 		ID: result.ID, Name: result.Name, Description: result.Description, TargetDate: targetDate, Status: result.Status,
 		CategoryID: result.CategoryID, CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
 		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
 		ExternalKey: result.ExternalKey, Position: result.Position, CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+	}
+	if result.LatestRelease != nil {
+		latest := milestoneReleaseModel(*result.LatestRelease)
+		milestone.LatestRelease = &latest
+	}
+	if len(result.Releases) > 0 {
+		milestone.Releases = make([]models.MilestoneRelease, len(result.Releases))
+		for i := range result.Releases {
+			milestone.Releases[i] = milestoneReleaseModel(result.Releases[i])
+		}
+	}
+	return milestone
+}
+
+func milestoneReleaseModel(result services.MilestoneReleaseResult) models.MilestoneRelease {
+	return models.MilestoneRelease{
+		ID: result.ID, MilestoneID: result.MilestoneID, WorkspaceRepositoryID: result.WorkspaceRepositoryID,
+		TagName: result.TagName, TagURL: result.TagURL, ReleaseStatus: result.ReleaseStatus,
+		ReleasedAt: result.ReleasedAt, Assets: result.Assets, LastSyncedAt: result.LastSyncedAt,
+		Name: result.Name, Body: result.Body, IsDraft: result.IsDraft, IsPrerelease: result.IsPrerelease,
+		TargetCommitish: result.TargetCommitish, SCMReleaseID: result.SCMReleaseID,
+		SCMReleaseURL: result.SCMReleaseURL, CreatedBy: result.CreatedBy, CreatedAt: result.CreatedAt,
 	}
 }
 

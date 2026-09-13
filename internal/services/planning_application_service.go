@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"windshift/internal/models"
 	"windshift/internal/sanitize"
+	"windshift/internal/utils"
 )
 
 var ErrPlanningForbidden = errors.New("planning object forbidden")
@@ -25,14 +27,28 @@ type ExternalReleaseOptions struct {
 }
 
 type ExternalRelease struct {
-	ID      string
-	URL     string
-	TagName string
+	ID           string
+	URL          string
+	TagName      string
+	TagURL       string
+	Name         string
+	Body         string
+	Status       string
+	Assets       []models.SCMReleaseAsset
+	IsDraft      bool
+	IsPrerelease bool
+	ReleasedAt   *time.Time
+}
+
+type ExternalTag struct {
+	Name string
+	URL  string
 }
 
 type PlanningReleaseProvider interface {
 	CreateRelease(context.Context, string, string, ExternalReleaseOptions) (*ExternalRelease, error)
 	ListReleases(context.Context, string, string) ([]ExternalRelease, error)
+	ListTags(context.Context, string, string) ([]ExternalTag, error)
 }
 
 type PlanningReleaseResolver func(context.Context, int, int) (PlanningReleaseProvider, error)
@@ -73,6 +89,10 @@ func (s *PlanningApplicationService) GetMilestone(userID, id int) (*MilestoneRes
 		return nil, err
 	}
 	if err := s.requireRead(userID, result.IsGlobal, result.WorkspaceID); err != nil {
+		return nil, err
+	}
+	result.Releases, err = s.planning.ListMilestoneReleases(id)
+	if err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -152,6 +172,7 @@ func (s *PlanningApplicationService) GetMilestoneTestStatisticsBatch(userID int,
 }
 
 type ReleaseMilestoneInput struct {
+	Mode            string
 	ConnectionID    int
 	RepositoryID    int
 	Repository      string
@@ -175,11 +196,19 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 	if strings.TrimSpace(input.TagName) == "" {
 		return nil, planningValidationError("tag_name", "tag_name is required")
 	}
+	input.Mode = strings.ToLower(strings.TrimSpace(input.Mode))
+	if input.Mode == "" {
+		input.Mode = "create"
+	}
+	if input.Mode != "create" && input.Mode != "attach" {
+		return nil, planningValidationError("mode", "mode must be 'create' or 'attach'")
+	}
 	if len(input.IdempotencyKey) > 200 {
 		return nil, planningValidationError("idempotency_key", "Idempotency-Key must be at most 200 characters")
 	}
 
 	var connectionID *int
+	var workspaceRepositoryID *int
 	var repositoryName *string
 	var provider PlanningReleaseProvider
 	var owner, repo string
@@ -199,18 +228,50 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 		if err != nil {
 			return nil, err
 		}
-		parts := strings.SplitN(linked.RepositoryName, "/", 2)
-		if len(parts) != 2 {
-			return nil, planningValidationError("repository", "repository must be in owner/repo format")
+		var ok bool
+		owner, repo, ok = utils.SplitRepositoryPath(linked.RepositoryName)
+		if !ok {
+			return nil, planningValidationError("repository", "repository must be in namespace/project format")
 		}
-		owner, repo = parts[0], parts[1]
 		connectionID = &input.ConnectionID
+		workspaceRepositoryID = &linked.ID
 		repositoryName = &linked.RepositoryName
 		if s.releases != nil {
 			provider, err = s.releases(ctx, input.ConnectionID, userID)
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+	var existingRelease *ExternalRelease
+	if input.Mode == "attach" {
+		if provider == nil {
+			return nil, planningValidationError("connection_id", "attach mode requires an SCM connection and linked repository")
+		}
+		releases, err := provider.ListReleases(ctx, owner, repo)
+		if err != nil {
+			return nil, err
+		}
+		for i := range releases {
+			if releases[i].TagName == input.TagName {
+				existingRelease = &releases[i]
+				break
+			}
+		}
+		if existingRelease == nil {
+			tags, err := provider.ListTags(ctx, owner, repo)
+			if err != nil {
+				return nil, err
+			}
+			for _, tag := range tags {
+				if tag.Name == input.TagName {
+					existingRelease = &ExternalRelease{TagName: tag.Name, TagURL: tag.URL, Status: "tag_only"}
+					break
+				}
+			}
+		}
+		if existingRelease == nil {
+			return nil, planningValidationError("tag_name", "the selected tag or release no longer exists in the SCM repository")
 		}
 	}
 	key := strings.TrimSpace(input.IdempotencyKey)
@@ -221,7 +282,8 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 	params := ReleaseMilestoneParams{
 		ID: id, IdempotencyKey: key, TagName: input.TagName, Name: input.Name, Body: input.Body,
 		IsDraft: input.IsDraft, IsPrerelease: input.IsPrerelease, TargetCommitish: input.TargetCommitish,
-		SCMConnectionID: connectionID, SCMRepository: repositoryName, CreatedBy: &createdBy,
+		SCMConnectionID: connectionID, WorkspaceRepositoryID: workspaceRepositoryID,
+		SCMRepository: repositoryName, CreatedBy: &createdBy,
 	}
 	attempt, err := s.planning.BeginMilestoneRelease(ctx, params)
 	if err != nil {
@@ -231,7 +293,7 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 		return s.planning.GetMilestone(id)
 	}
 	if provider != nil {
-		var release *ExternalRelease
+		release := existingRelease
 		if attempt.NeedsReconcile {
 			releases, err := provider.ListReleases(ctx, owner, repo)
 			if err != nil {
@@ -245,7 +307,7 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 				}
 			}
 		}
-		if release == nil {
+		if release == nil && input.Mode == "create" {
 			release, err = provider.CreateRelease(ctx, owner, repo, ExternalReleaseOptions{
 				TagName: input.TagName, TargetCommitish: input.TargetCommitish, Name: input.Name, Body: input.Body,
 				IsDraft: input.IsDraft, IsPrerelease: input.IsPrerelease,
@@ -255,7 +317,25 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 				return nil, err
 			}
 		}
-		params.SCMReleaseID, params.SCMReleaseURL = &release.ID, &release.URL
+		if release.ID != "" {
+			params.SCMReleaseID = &release.ID
+		}
+		if release.URL != "" {
+			params.SCMReleaseURL = &release.URL
+		}
+		params.Name = release.Name
+		params.Body = release.Body
+		params.IsDraft = release.IsDraft
+		params.IsPrerelease = release.IsPrerelease
+		if release.TagURL != "" {
+			params.TagURL = &release.TagURL
+		}
+		params.ReleaseStatus = release.Status
+		params.Assets = release.Assets
+		if release.ReleasedAt != nil {
+			releasedAt := release.ReleasedAt.UTC().Format(time.RFC3339)
+			params.ReleasedAt = &releasedAt
+		}
 	}
 	result, err := s.planning.CompleteMilestoneRelease(ctx, attempt.ID, attempt.LeaseToken, params)
 	if err != nil {
@@ -271,7 +351,7 @@ func planningReleaseFallbackKey(id, userID int, input ReleaseMilestoneInput, rep
 	if repositoryName != nil {
 		repo = *repositoryName
 	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%d\n%d\n%d\n%s\n%s\n%s\n%s\n%t\n%t\n%s", id, userID, input.ConnectionID, repo, input.TagName, input.Name, input.Body, input.IsDraft, input.IsPrerelease, input.TargetCommitish)))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%d\n%d\n%s\n%d\n%s\n%s\n%s\n%s\n%t\n%t\n%s", id, userID, input.Mode, input.ConnectionID, repo, input.TagName, input.Name, input.Body, input.IsDraft, input.IsPrerelease, input.TargetCommitish)))
 	return "auto-" + hex.EncodeToString(sum[:])
 }
 

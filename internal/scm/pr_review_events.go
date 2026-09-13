@@ -226,7 +226,7 @@ func reviewInstruction(event prReviewEvent) string {
 		Path     string `json:"path"`
 		Line     int    `json:"line"`
 		Side     string `json:"side"`
-		ThreadID int64  `json:"thread_id"`
+		ThreadID string `json:"thread_id"`
 	}
 	if json.Unmarshal([]byte(event.ContextJSON), &reviewContext) != nil {
 		return event.Body
@@ -235,7 +235,7 @@ func reviewInstruction(event prReviewEvent) string {
 	if reviewContext.Line > 0 {
 		location += fmt.Sprintf(":%d", reviewContext.Line)
 	}
-	return fmt.Sprintf("PR %s request at %s (side=%s, thread=%d):\n\n%s", event.Kind, location, reviewContext.Side, reviewContext.ThreadID, event.Body)
+	return fmt.Sprintf("PR %s request at %s (side=%s, thread=%s):\n\n%s", event.Kind, location, reviewContext.Side, reviewContext.ThreadID, event.Body)
 }
 
 func eventMarker(eventID int64, phase string) string {

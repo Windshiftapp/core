@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS milestone_releases (
 	is_draft BOOLEAN NOT NULL DEFAULT false,
 	is_prerelease BOOLEAN NOT NULL DEFAULT false,
 	target_commitish TEXT,
+	workspace_repository_id INTEGER,
+	tag_url TEXT,
+	release_status TEXT NOT NULL DEFAULT 'tag_only',
+	released_at TIMESTAMPTZ,
+	assets_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+	last_synced_at TIMESTAMPTZ,
 	scm_connection_id INTEGER, -- FK added in scm_postgres.sql (circular dep: items→milestones→scm→items)
 	scm_repository TEXT,
 	scm_release_id TEXT,
@@ -73,6 +79,9 @@ CREATE INDEX IF NOT EXISTS idx_milestone_releases_milestone_id ON milestone_rele
 CREATE UNIQUE INDEX IF NOT EXISTS uq_milestone_releases_idempotency
 	ON milestone_releases(milestone_id, idempotency_key)
 	WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_milestone_releases_repository_tag
+	ON milestone_releases(workspace_repository_id, tag_name)
+	WHERE workspace_repository_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_item_milestones_item_id ON item_milestones(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_milestones_milestone_id ON item_milestones(milestone_id);
 -- Partial unique index: one external_key per workspace, but NULLs are unconstrained.

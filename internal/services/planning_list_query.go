@@ -17,7 +17,9 @@ const milestoneSelectQuery = `
 	       m.is_global, m.workspace_id, w.name as workspace_name,
 	       m.external_key, m.position,
 	       mr.id, mr.tag_name, mr.name, mr.body, mr.is_draft, mr.is_prerelease,
-	       mr.target_commitish, mr.scm_connection_id, mr.scm_repository,
+	       mr.target_commitish, mr.workspace_repository_id, mr.tag_url, mr.release_status,
+	       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
+	       mr.scm_connection_id, mr.scm_repository,
 	       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
 	       m.created_at, m.updated_at
 	FROM milestones m

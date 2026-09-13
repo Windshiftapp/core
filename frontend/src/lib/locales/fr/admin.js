@@ -468,7 +468,7 @@ export default {
       oauthClientId: 'ID client OAuth',
       oauthClientSecret: 'Secret client OAuth',
       leaveEmptyToKeep: 'Laissez vide pour conserver le secret actuel',
-      personalAccessToken: 'Jeton d\'accès personnel (PAT)',
+      accessToken: 'Jeton d\'accès',
       githubAppId: 'ID de l\'application GitHub',
       privateKeyPem: 'Clé privée (PEM)',
       orgInstallation: 'Installation d\'organisation',

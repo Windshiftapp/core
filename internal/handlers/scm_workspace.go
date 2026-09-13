@@ -813,6 +813,23 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 			url.QueryEscape(scopes),
 			state,
 		)
+	case models.SCMProviderTypeGitLab:
+		gitlabBaseURL := "https://gitlab.com"
+		if strings.TrimSpace(oauthCfg.BaseURL) != "" {
+			gitlabBaseURL = strings.TrimSuffix(strings.TrimSuffix(oauthCfg.BaseURL, "/"), "/api/v4")
+		}
+		scopes := "api"
+		if oauthCfg.Scopes != "" {
+			scopes = oauthCfg.Scopes
+		}
+		authURL = fmt.Sprintf(
+			"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
+			gitlabBaseURL,
+			oauthCfg.ClientID,
+			url.QueryEscape(redirectURI),
+			url.QueryEscape(scopes),
+			state,
+		)
 	default:
 		respondBadRequest(w, r, "OAuth not supported for this provider type")
 		return

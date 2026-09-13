@@ -59,7 +59,10 @@ import (
 )
 
 type planningReleaseProviderAdapter struct {
-	provider scm.ReleaseProvider
+	provider interface {
+		scm.ReleaseProvider
+		ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+	}
 }
 
 func (a planningReleaseProviderAdapter) CreateRelease(ctx context.Context, owner, repo string, input services.ExternalReleaseOptions) (*services.ExternalRelease, error) {
@@ -70,7 +73,7 @@ func (a planningReleaseProviderAdapter) CreateRelease(ctx context.Context, owner
 	if err != nil {
 		return nil, err
 	}
-	return &services.ExternalRelease{ID: release.ID, URL: release.URL, TagName: release.TagName}, nil
+	return externalPlanningRelease(release), nil
 }
 
 func (a planningReleaseProviderAdapter) ListReleases(ctx context.Context, owner, repo string) ([]services.ExternalRelease, error) {
@@ -80,9 +83,29 @@ func (a planningReleaseProviderAdapter) ListReleases(ctx context.Context, owner,
 	}
 	result := make([]services.ExternalRelease, len(releases))
 	for i := range releases {
-		result[i] = services.ExternalRelease{ID: releases[i].ID, URL: releases[i].URL, TagName: releases[i].TagName}
+		result[i] = *externalPlanningRelease(&releases[i])
 	}
 	return result, nil
+}
+
+func (a planningReleaseProviderAdapter) ListTags(ctx context.Context, owner, repo string) ([]services.ExternalTag, error) {
+	tags, err := a.provider.ListTags(ctx, owner, repo, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]services.ExternalTag, len(tags))
+	for i := range tags {
+		result[i] = services.ExternalTag{Name: tags[i].Name, URL: tags[i].URL}
+	}
+	return result, nil
+}
+
+func externalPlanningRelease(release *scm.Release) *services.ExternalRelease {
+	return &services.ExternalRelease{
+		ID: release.ID, URL: release.URL, TagName: release.TagName, TagURL: release.TagURL,
+		Name: release.Name, Body: release.Body, Status: release.Status, Assets: release.Assets,
+		IsDraft: release.IsDraft, IsPrerelease: release.IsPrerelease, ReleasedAt: release.ReleasedAt,
+	}
 }
 
 // Config is an alias to config.Config — the canonical, fully-resolved runtime
@@ -784,7 +807,7 @@ func (s *Server) initialize() error {
 	s.secretEncryption = scmProviderHandler.GetEncryption()
 	scmWorkspaceRepo := repository.NewSCMWorkspaceRepository(s.db)
 	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), permService, baseURL)
-	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
+	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService, baseURL)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(repository.NewUserSCMTokenRepository(s.db), scmProviderHandler.GetEncryption())
 	milestonePlanningService := services.NewPlanningService(s.db)
 	milestonePlanningService.SetSCMWorkspaceRepository(scmWorkspaceRepo)
@@ -1648,7 +1671,10 @@ func (s *Server) initialize() error {
 			if err != nil {
 				return nil, err
 			}
-			releaseProvider, ok := provider.(scm.ReleaseProvider)
+			releaseProvider, ok := provider.(interface {
+				scm.ReleaseProvider
+				ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+			})
 			if !ok {
 				return nil, errors.New("SCM provider does not support releases")
 			}

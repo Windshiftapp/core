@@ -21,6 +21,7 @@
   // svelte-ignore state_referenced_locally
   let prBody = $state(itemKey ? `Linked to ${itemKey}` : '');
   let baseBranch = $state('');
+  const isGitLab = $derived(branchLink?.provider_type === 'gitlab');
 
   async function submit() {
     if (!branchLink?.id) {
@@ -39,7 +40,7 @@
       };
 
       const result = await api.itemSCMLinks.createPRFromBranch(branchLink.id, data);
-      successToast(t('scm.prCreatedSuccess', { prNumber: result.pr_number }));
+      successToast(t(isGitLab ? 'scm.mrCreatedSuccess' : 'scm.prCreatedSuccess', { prNumber: result.pr_number }));
       oncreated?.(result);
     } catch (err) {
       console.error('Failed to create PR:', err);
@@ -55,9 +56,15 @@
   }
 </script>
 
-<Modal isOpen={true} maxWidth="max-w-md" onclose={close}>
+<Modal
+  isOpen={true}
+  maxWidth="max-w-md"
+  onSubmit={submit}
+  submitDisabled={submitting}
+  onclose={close}
+>
   <ModalHeader
-    title={t('scm.createPullRequest')}
+    title={t(isGitLab ? 'scm.createMergeRequest' : 'scm.createPullRequest')}
     subtitle={`${t('scm.createPRFrom', { branch: '' })} ${branchLink?.external_id || branchLink?.title || 'branch'}`}
     onClose={close}
   />
@@ -110,8 +117,9 @@
   <DialogFooter
     onCancel={close}
     onConfirm={submit}
-    confirmLabel={t('scm.createPR')}
+    confirmLabel={isGitLab ? 'Create MR' : t('scm.createPR')}
     loading={submitting}
     loadingLabel={t('scm.creating')}
+    showKeyboardHint={true}
   />
 </Modal>

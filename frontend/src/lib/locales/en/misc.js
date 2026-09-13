@@ -813,6 +813,7 @@ export default {
 
     // CreatePRFromBranchModal
     createPullRequest: 'Create Pull Request',
+    createMergeRequest: 'Create Merge Request',
     createPRFrom: 'Create PR from branch: {branch}',
     prTitle: 'PR Title',
     description: 'Description',
@@ -820,6 +821,7 @@ export default {
     baseBranchPRHelp: "Leave empty to use the repository's default branch.",
     createPR: 'Create PR',
     prCreatedSuccess: 'Pull request #{prNumber} created successfully',
+    mrCreatedSuccess: 'Merge request !{prNumber} created successfully',
     failedToCreatePR: 'Failed to create pull request',
     noBranchLink: 'No branch link provided',
 
@@ -849,6 +851,7 @@ export default {
     connect: 'Connect {provider}',
     noLinksYet: 'No development links yet',
     pullRequests: 'Pull requests',
+    mergeRequests: 'Merge requests',
     branches: 'Branches',
     commits: 'Commits',
     smartCommitsTitle: 'Process smart commits',

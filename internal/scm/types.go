@@ -1,5 +1,5 @@
 // Package scm provides SCM (Source Control Management) provider integration
-// for GitHub and Gitea/Forgejo.
+// for GitHub, GitLab, and Gitea/Forgejo.
 package scm
 
 import (
@@ -11,7 +11,7 @@ import (
 
 // Provider defines the interface that all SCM providers must implement
 type Provider interface {
-	// GetType returns the provider type (github, gitea)
+	// GetType returns the provider type (github, gitlab, gitea)
 	GetType() models.SCMProviderType
 
 	// TestConnection tests if the provider connection is working
@@ -188,6 +188,7 @@ type Branch struct {
 type Tag struct {
 	Name      string    `json:"name"`
 	SHA       string    `json:"sha"` // target commit SHA
+	URL       string    `json:"url,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -263,15 +264,29 @@ type GitHubAppInstallation struct {
 
 // Release represents a release from an SCM provider
 type Release struct {
-	ID           string     `json:"id"`
-	TagName      string     `json:"tag_name"`
-	Name         string     `json:"name"`
-	Body         string     `json:"body"`
-	URL          string     `json:"url"`
-	IsDraft      bool       `json:"is_draft"`
-	IsPrerelease bool       `json:"is_prerelease"`
-	CreatedAt    time.Time  `json:"created_at"`
-	PublishedAt  *time.Time `json:"published_at,omitempty"`
+	ID           string                   `json:"id"`
+	TagName      string                   `json:"tag_name"`
+	TagURL       string                   `json:"tag_url,omitempty"`
+	Name         string                   `json:"name"`
+	Body         string                   `json:"body"`
+	URL          string                   `json:"url"`
+	Status       string                   `json:"status,omitempty"`
+	Assets       []models.SCMReleaseAsset `json:"assets,omitempty"`
+	IsDraft      bool                     `json:"is_draft"`
+	IsPrerelease bool                     `json:"is_prerelease"`
+	CreatedAt    time.Time                `json:"created_at"`
+	PublishedAt  *time.Time               `json:"published_at,omitempty"`
+	ReleasedAt   *time.Time               `json:"released_at,omitempty"`
+}
+
+// ReleaseCandidate is an existing tag that can be attached to a milestone.
+// Release is populated when the provider has a first-class release for it.
+type ReleaseCandidate struct {
+	TagName string   `json:"tag_name"`
+	TagURL  string   `json:"tag_url,omitempty"`
+	SHA     string   `json:"sha,omitempty"`
+	Status  string   `json:"status"`
+	Release *Release `json:"release,omitempty"`
 }
 
 // CreateReleaseOptions contains options for creating a release
@@ -334,6 +349,8 @@ func NewProvider(cfg ProviderConfig) (Provider, error) {
 	switch cfg.ProviderType {
 	case models.SCMProviderTypeGitHub:
 		return NewGitHubProvider(cfg)
+	case models.SCMProviderTypeGitLab:
+		return NewGitLabProvider(cfg)
 	case models.SCMProviderTypeGitea:
 		return NewGiteaProvider(cfg)
 	default:
@@ -351,7 +368,7 @@ type IssueComment struct {
 	Path              string    `json:"path,omitempty"`
 	Line              int       `json:"line,omitempty"`
 	Side              string    `json:"side,omitempty"`
-	ThreadID          int64     `json:"thread_id,omitempty"`
+	ThreadID          string    `json:"thread_id,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -371,7 +388,7 @@ type IssueCommentProvider interface {
 	ListIssueComments(ctx context.Context, owner, repo string, number int) ([]IssueComment, error)
 
 	// UpdateIssueComment updates an existing comment on an issue/PR
-	UpdateIssueComment(ctx context.Context, owner, repo string, commentID int64, body string) error
+	UpdateIssueComment(ctx context.Context, owner, repo string, number int, commentID int64, body string) error
 }
 
 // PullRequestReviewProvider exposes the review surfaces that are distinct

@@ -266,7 +266,7 @@
         {/if}
         {#if milestone?.releases?.length > 0}
           <div class="flex flex-col gap-1.5 mt-2">
-            {#each milestone.releases as release}
+            {#each milestone.releases as release (release.id)}
               <div class="flex items-center gap-2 text-sm">
                 <Tag class="w-4 h-4 shrink-0" style="color: var(--ds-text-subtle);" />
                 <span class="font-mono text-xs" style="color: var(--ds-text);">{release.tag_name}</span>
@@ -280,9 +280,14 @@
                 {#if release.is_prerelease}
                   <Lozenge color="yellow" size="sm">Pre-release</Lozenge>
                 {/if}
-                {#if release.scm_release_url}
+                {#if release.release_status && release.release_status !== 'released'}
+                  <Lozenge color={release.release_status === 'missing' ? 'red' : 'blue'} size="sm">
+                    {release.release_status.replaceAll('_', ' ')}
+                  </Lozenge>
+                {/if}
+                {#if release.scm_release_url || release.tag_url}
                   <a
-                    href={safeHref(release.scm_release_url)}
+                    href={safeHref(release.scm_release_url || release.tag_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="hover:underline inline-flex items-center gap-1"
@@ -291,7 +296,10 @@
                     <ExternalLink class="w-3 h-3" />
                   </a>
                 {/if}
-                <span class="text-xs" style="color: var(--ds-text-subtlest);">{formatDateShort(release.created_at)}</span>
+                {#if release.assets?.length}
+                  <span class="text-xs" style="color: var(--ds-text-subtlest);">{release.assets.length} assets</span>
+                {/if}
+                <span class="text-xs" style="color: var(--ds-text-subtlest);">{formatDateShort(release.released_at || release.created_at)}</span>
               </div>
             {/each}
           </div>

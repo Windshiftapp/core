@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -25,7 +26,9 @@ type SCMItemLinksHandler struct {
 	db                database.Database
 	encryption        *sso.SecretEncryption
 	syncService       *scm.SyncService
+	webhookRepo       *repository.SCMWebhookRepository
 	permissionService *services.PermissionService
+	baseURL           string
 }
 
 // getItemURL constructs the URL to an item based on the request context
@@ -98,12 +101,14 @@ type CreateBranchForItemResponse struct {
 }
 
 // NewSCMItemLinksHandler creates a new item SCM links handler
-func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption, permissionService *services.PermissionService) *SCMItemLinksHandler {
+func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncryption, permissionService *services.PermissionService, baseURL string) *SCMItemLinksHandler {
 	return &SCMItemLinksHandler{
 		db:                db,
 		encryption:        encryption,
 		syncService:       scm.NewSyncService(db, encryption),
+		webhookRepo:       repository.NewSCMWebhookRepository(db),
 		permissionService: permissionService,
+		baseURL:           strings.TrimRight(baseURL, "/"),
 	}
 }
 
@@ -490,6 +495,41 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 		"success": true,
 		"message": "Repository sync completed",
 	})
+}
+
+// ListReleaseCandidates returns tags/releases that can be attached to a milestone.
+func (h *SCMItemLinksHandler) ListReleaseCandidates(w http.ResponseWriter, r *http.Request) {
+	repoID, ok := requireIDParam(w, r, "repoId")
+	if !ok {
+		return
+	}
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	var workspaceID int
+	err := h.db.QueryRow(`
+		SELECT wsc.workspace_id FROM workspace_repositories wr
+		JOIN workspace_scm_connections wsc ON wr.workspace_scm_connection_id = wsc.id
+		WHERE wr.id = ?
+	`, repoID).Scan(&workspaceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		respondNotFound(w, r, "repository")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionItemView, h.permissionService) {
+		return
+	}
+	candidates, err := h.syncService.ListReleaseCandidates(r.Context(), repoID, user.ID)
+	if err != nil {
+		respondBadRequest(w, r, "Failed to load tags and releases: "+err.Error())
+		return
+	}
+	respondJSONOK(w, candidates)
 }
 
 // GetWorkspaceRepositoriesForItem returns repositories available for linking to an item

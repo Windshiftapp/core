@@ -132,10 +132,11 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 
 	validTypes := map[models.SCMProviderType]bool{
 		models.SCMProviderTypeGitHub: true,
+		models.SCMProviderTypeGitLab: true,
 		models.SCMProviderTypeGitea:  true,
 	}
 	if !validTypes[req.ProviderType] {
-		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitea")
+		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitlab, gitea")
 		return
 	}
 
@@ -264,10 +265,11 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 
 	validTypes := map[models.SCMProviderType]bool{
 		models.SCMProviderTypeGitHub: true,
+		models.SCMProviderTypeGitLab: true,
 		models.SCMProviderTypeGitea:  true,
 	}
 	if req.ProviderType != "" && !validTypes[req.ProviderType] {
-		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitea")
+		respondBadRequest(w, r, "Invalid provider type. Supported: github, gitlab, gitea")
 		return
 	}
 
@@ -480,7 +482,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		} else {
 			respondJSONOK(w, map[string]any{
 				"success": false,
-				"error":   "Personal Access Token not configured",
+				"error":   "Access token not configured",
 			})
 			return
 		}
