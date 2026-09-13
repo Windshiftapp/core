@@ -24,7 +24,8 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import Avatar from '../components/Avatar.svelte';
-  import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import Input from '../components/Input.svelte';
+  import ItemDetailDescription from '../features/items/ItemDetailDescription.svelte';
 
   let { itemId } = $props();
 
@@ -35,6 +36,11 @@
   let transitioning = $state(false);
   let isWatching = $state(false);
   let watchBusy = $state(false);
+  let saving = $state(false);
+  let editingTitle = $state(false);
+  let editTitle = $state('');
+  let editingDescription = $state(false);
+  let editDescription = $state('');
 
   // Workflow-less personal tasks use the permitted transition endpoint to toggle
   // globally stable Open/Done IDs, matching desktop and PWA personal views.
@@ -91,6 +97,8 @@
       const summary = await loadMobileItemDetailSummary(id);
       if (token !== loadToken) return;
       item = summary?.item ?? null;
+      editTitle = item?.title || '';
+      editDescription = item?.description || '';
       transitions = summary?.transitions?.available_transitions ?? [];
       isWatching = summary?.watching || false;
       personalTaskCount = summary?.personal_task_count ?? 0;
@@ -165,6 +173,59 @@
     } finally {
       transitioning = false;
     }
+  }
+
+  async function saveTitle() {
+    const title = editTitle.trim();
+    if (!title || title === item.title) {
+      editTitle = item.title || '';
+      editingTitle = false;
+      return;
+    }
+    saving = true;
+    try {
+      const updated = await api.items.update(itemId, { title });
+      item = { ...item, ...updated, title };
+      editingTitle = false;
+    } catch (err) {
+      console.error('Failed to save title:', err);
+    } finally {
+      saving = false;
+    }
+  }
+
+  function handleTitleKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      saveTitle();
+    } else if (event.key === 'Escape') {
+      editTitle = item.title || '';
+      editingTitle = false;
+    }
+  }
+
+  function handleSaveField({ field, value }) {
+    if (field !== 'description') return;
+    editDescription = value;
+    saveDescription();
+  }
+
+  async function saveDescription() {
+    saving = true;
+    try {
+      const updated = await api.items.update(itemId, { description: editDescription });
+      item = { ...item, ...updated, description: editDescription };
+      editingDescription = false;
+    } catch (err) {
+      console.error('Failed to save description:', err);
+    } finally {
+      saving = false;
+    }
+  }
+
+  function cancelDescription() {
+    editDescription = item.description || '';
+    editingDescription = false;
   }
 
   async function updateAssignee(user) {
@@ -411,7 +472,26 @@
       <div class="status-line"><span class="type">{item.item_type_name}</span></div>
     {/if}
 
-    <h1 class="title" data-testid="detail-title">{item.title}</h1>
+    {#if editingTitle}
+      <Input
+        bind:value={editTitle}
+        class="title-input"
+        aria-label="Edit title"
+        dataTestid="mobile-title-editor"
+        onblur={saveTitle}
+        onkeydown={handleTitleKeydown}
+        disabled={saving}
+      />
+    {:else}
+      <h1 class="title" data-testid="detail-title">
+        <button
+          class="title-button"
+          type="button"
+          onclick={() => { editTitle = item.title || ''; editingTitle = true; }}
+          aria-label="Edit title"
+        >{item.title}</button>
+      </h1>
+    {/if}
 
     <!-- Status + assignee pickers. Status options come from the workflow's
          available-transitions endpoint (not hardcoded), so custom workflows
@@ -492,11 +572,24 @@
       </UserPicker>
     </div>
 
-    {#if item.description}
-      <div class="html-content desc" data-testid="detail-description">
-        <SafeMarkdown html={item.description_html} source={item.description} />
-      </div>
-    {/if}
+    <div class="desc" data-testid="detail-description">
+      <ItemDetailDescription
+        {item}
+        bind:editingDescription
+        bind:editDescription
+        {saving}
+        availableSubIssueTypes={[]}
+        showLinkButton={false}
+        showDiagramButton={false}
+        showAIActions={false}
+        onsavefield={handleSaveField}
+        oncanceledit={cancelDescription}
+        onstartEditingDescription={() => {
+          editDescription = item.description || '';
+          editingDescription = true;
+        }}
+      />
+    </div>
 
     <!-- Meta -->
     {#if item.due_date || personalTaskCount > 0}
@@ -676,6 +769,9 @@
   .type { font-size: 0.75rem; color: var(--ds-text-subtle); text-transform: uppercase; letter-spacing: 0.02em; }
 
   .title { font-size: 1.25rem; font-weight: var(--font-semibold, 600); color: var(--ds-text); margin: 0 0 1rem; line-height: 1.3; }
+  .title-button { display: block; width: 100%; padding: 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: text; }
+  .title-button:active { opacity: 0.7; }
+  .title-input { width: 100%; margin-bottom: 1rem; font-size: 1.25rem; font-weight: var(--font-semibold, 600); }
 
   /* Status + assignee picker field rows */
   .fields {
