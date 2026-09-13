@@ -18,16 +18,26 @@
   import MobileChatView from './MobileChatView.svelte';
   import MobileCreateDialog from './MobileCreateDialog.svelte';
   import IosInstallSheet from './IosInstallSheet.svelte';
+  import MobilePagesView from './MobilePagesView.svelte';
+  import MobilePageDetail from './MobilePageDetail.svelte';
+  import MobileCommandPalette from './MobileCommandPalette.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
 
   const view = $derived($currentRoute.view);
   const TAB_VIEWS = ['mobile-my-work', 'mobile-personal', 'mobile-timer', 'mobile-notifications'];
   const isTabView = $derived(TAB_VIEWS.includes(view));
   // Full-screen "pushed" views (own back button) hide the bottom nav.
-  const showNav = $derived(view !== 'mobile-item-detail' && view !== 'mobile-search' && view !== 'mobile-chat');
+  const showNav = $derived(
+    view !== 'mobile-item-detail' &&
+      view !== 'mobile-search' &&
+      view !== 'mobile-chat' &&
+      view !== 'mobile-page-detail',
+  );
   // The Personal tab creates personal tasks; every other tab uses the full
-  // work-item form. Drives the create dialog's mode.
+  // work-item form. Drives the create dialog's mode. The Pages tab gets no
+  // FAB at all — pages are created from the desktop editor today.
   const createMode = $derived(view === 'mobile-personal' ? 'personal' : 'work');
+  const showFab = $derived(isTabView && view !== 'mobile-pages');
   let createOpen = $state(false);
 
   onMount(() => {
@@ -57,6 +67,13 @@
       <MyWorkView />
     {:else if view === 'mobile-personal'}
       <PersonalView />
+    {:else if view === 'mobile-pages'}
+      <MobilePagesView />
+    {:else if view === 'mobile-page-detail'}
+      <MobilePageDetail
+        workspaceId={Number($currentRoute.params.workspaceId)}
+        pageId={Number($currentRoute.params.pageId)}
+      />
     {:else if view === 'mobile-timer'}
       <TimerView />
     {:else if view === 'mobile-notifications'}
@@ -70,7 +87,7 @@
     {/if}
   </main>
 
-  {#if isTabView}
+  {#if showFab}
     <button class="fab" onclick={() => (createOpen = true)} data-testid="mobile-create-fab" aria-label="Create item" type="button">
       <Plus size={26} />
     </button>
@@ -91,6 +108,9 @@
 <!-- iOS "Add to Home Screen" instructions (opened from the user menu via the
      install helper's store; no-op until triggered). -->
 <IosInstallSheet />
+<!-- Command palette sheet. Self-mounted from the shared mobilePalette store,
+     so any header button can open it without prop plumbing. -->
+<MobileCommandPalette />
 <ToastContainer />
 
 <style>

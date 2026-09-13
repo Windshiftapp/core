@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { Bell, Check, BellRing, BellOff } from '@lucide/svelte';
+  import { Bell, Check, BellRing, BellOff, Command as CommandIcon } from '@lucide/svelte';
   import { notifications, notificationActions } from '../stores/notifications.js';
   import { navigate } from '../router.js';
   import { getPushState, enablePush, disablePush } from './pushClient.js';
   import { mobileActionUrl } from '../utils/actionUrl.js';
   import MobileHeader from './MobileHeader.svelte';
+  import { mobilePalette } from './mobilePalette.svelte.js';
 
   let push = $state({ supported: false, installed: false, permission: 'default', subscribed: false });
   let pushBusy = $state(false);
@@ -42,6 +43,9 @@
 
 <MobileHeader title="Notifications">
   {#snippet right()}
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+      <CommandIcon size={20} />
+    </button>
     {#if hasUnread}
       <button class="mark-all" onclick={() => notificationActions.markAllAsRead()} data-testid="notifications-mark-all" type="button">
         <Check size={16} /> Mark all read
@@ -95,6 +99,11 @@
 </div>
 
 <style>
+  .hdr-palette {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: none; background: transparent;
+    color: var(--ds-text); cursor: pointer;
+  }
   .mark-all {
     display: inline-flex; align-items: center; gap: 0.25rem;
     padding: 0.35rem 0.6rem; border: none; background: transparent;

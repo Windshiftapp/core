@@ -2,9 +2,10 @@
   import { authStore } from '../stores';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { Check } from '@lucide/svelte';
+  import { Check, Command as CommandIcon } from '@lucide/svelte';
   import MobileHeader from './MobileHeader.svelte';
   import MobileListState from './MobileListState.svelte';
+  import { mobilePalette } from './mobilePalette.svelte.js';
 
   // Personal-workspace status ids: 1 = Open, 3 = Done (workspace default taxonomy).
   const STATUS_OPEN = 1;
@@ -91,7 +92,13 @@
   });
 </script>
 
-<MobileHeader title="Personal" />
+<MobileHeader title="Personal">
+  {#snippet right()}
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+      <CommandIcon size={20} />
+    </button>
+  {/snippet}
+</MobileHeader>
 
 <div class="list" data-testid="personal-list">
   <MobileListState
@@ -128,6 +135,11 @@
 </div>
 
 <style>
+  .hdr-palette {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: none; background: transparent;
+    color: var(--ds-text); cursor: pointer;
+  }
   .row {
     display: flex;
     align-items: center;

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Square, Clock, Plus, ExternalLink, Pencil, Trash2 } from '@lucide/svelte';
+  import { Square, Clock, Plus, ExternalLink, Pencil, Trash2, Command as CommandIcon } from '@lucide/svelte';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { timeEntryStore } from '../stores';
   import { confirm } from '../composables/useConfirm.js';
@@ -9,6 +9,7 @@
   import MobileHeader from './MobileHeader.svelte';
   import TimeLogModal from '../dialogs/TimeLogModal.svelte';
   import { formatAuthenticatedInstant } from '../utils/authenticatedDateFormatter.js';
+  import { mobilePalette } from './mobilePalette.svelte.js';
 
   const activeTimer = $derived(timerStore.activeTimer);
   // Most-recent-first; the worklog list/edit/delete + modal all come from the
@@ -48,7 +49,13 @@
   });
 </script>
 
-<MobileHeader title="Timer" />
+<MobileHeader title="Timer">
+  {#snippet right()}
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+      <CommandIcon size={20} />
+    </button>
+  {/snippet}
+</MobileHeader>
 
 <div class="content">
   <!-- Active timer card -->
@@ -130,6 +137,11 @@
 {/if}
 
 <style>
+  .hdr-palette {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: none; background: transparent;
+    color: var(--ds-text); cursor: pointer;
+  }
   .content { padding: 0.75rem; display: flex; flex-direction: column; gap: 1rem; }
 
   .timer-card {

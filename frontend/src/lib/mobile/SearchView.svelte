@@ -2,12 +2,15 @@
   import { ChevronLeft, Search, X } from '@lucide/svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
+  import { workspacesStore } from '../stores';
   import { formatItemKey } from '../utils/itemKey.js';
   import MobileItemRow from './MobileItemRow.svelte';
   import Input from '../components/Input.svelte';
+  import { searchPagesAcrossWorkspaces } from './mobilePagesData.js';
 
   let query = $state('');
   let results = $state([]);
+  let pageResults = $state([]);
   let loading = $state(false);
   let searched = $state(false);
   let inputEl = $state(null);
@@ -38,15 +41,27 @@
     const trimmed = q.trim();
     if (!trimmed) {
       results = [];
+      pageResults = [];
       searched = false;
       return;
     }
     const v = ++version;
     loading = true;
     try {
-      const res = await api.search.items({ query: trimmed, limit: 30 });
+      // Items and pages search in parallel; pages fan out per workspace and
+      // silently skip workspaces that fail (permission). MobileShell loads
+      // the workspace list eagerly, so it is already available here.
+      const workspaces = [
+        ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
+        ...$workspacesStore.regularWorkspaces,
+      ];
+      const [itemsRes, pagesRes] = await Promise.allSettled([
+        api.search.items({ query: trimmed, limit: 30 }),
+        searchPagesAcrossWorkspaces(workspaces, trimmed),
+      ]);
       if (v !== version) return;
-      results = normalize(res);
+      results = itemsRes.status === 'fulfilled' ? normalize(itemsRes.value) : [];
+      pageResults = pagesRes.status === 'fulfilled' ? (pagesRes.value ?? []) : [];
       searched = true;
     } catch (err) {
       if (v !== version) return;
@@ -66,6 +81,7 @@
   function clear() {
     query = '';
     results = [];
+    pageResults = [];
     searched = false;
     inputEl?.focus();
   }
@@ -87,7 +103,7 @@
       oninput={onInput}
       type="search"
       enterkeyhint="search"
-      placeholder="Search work items…"
+      placeholder="Search items and pages…"
       dataTestid="mobile-search-input"
       autocomplete="off"
       class="mobile-search-input !p-0"
@@ -99,13 +115,30 @@
 </header>
 
 <div class="results" data-testid="mobile-search-results">
-  {#if loading && results.length === 0}
+  {#if loading && results.length === 0 && pageResults.length === 0}
     <p class="msg">Searching…</p>
   {:else if !query.trim()}
-    <p class="msg" data-testid="search-prompt">Search by title, key, or text across items you can see.</p>
-  {:else if searched && results.length === 0}
-    <p class="msg" data-testid="search-empty">No items match “{query.trim()}”.</p>
+    <p class="msg" data-testid="search-prompt">Search by title, key, or text across items and pages you can see.</p>
+  {:else if searched && results.length === 0 && pageResults.length === 0}
+    <p class="msg" data-testid="search-empty">No items or pages match “{query.trim()}”.</p>
   {:else}
+    {#if pageResults.length > 0}
+      <h2 class="section" data-testid="mobile-search-pages-header">Pages</h2>
+      <div class="page-rows" data-testid="mobile-search-page-results">
+        {#each pageResults as page (page.workspace_id + '-' + page.id)}
+          <button
+            class="page-row"
+            onclick={() => navigate(`/m/pages/${page.workspace_id}/${page.id}`)}
+            data-testid="mobile-search-page-row"
+            data-page-id={page.id}
+            type="button"
+          >
+            <span class="page-title">{page.title}</span>
+            <span class="page-ws">{page.workspace_name}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
     {#each results as row (row.itemId)}
       <MobileItemRow {...row} />
     {/each}
@@ -150,4 +183,42 @@
   }
 
   .msg { padding: 2rem 1.25rem; text-align: center; color: var(--ds-text-subtle); font-size: 0.875rem; }
+
+  .section {
+    padding: 0.6rem 0.875rem 0.3rem;
+    font-size: 0.75rem;
+    font-weight: var(--font-semibold, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ds-text-subtle);
+    margin: 0;
+  }
+  .page-rows { display: flex; flex-direction: column; margin-bottom: 0.5rem; }
+  .page-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0.4rem 0.875rem;
+    border: none;
+    border-bottom: 1px solid var(--ds-border);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+  .page-row:active { background-color: var(--ds-background-neutral-hovered); }
+  .page-title {
+    font-size: 0.9375rem;
+    color: var(--ds-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-ws {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--ds-text-subtlest, var(--ds-text-subtle));
+  }
 </style>

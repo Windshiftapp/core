@@ -1,5 +1,5 @@
 <script>
-  import { ListChecks, SquareCheckBig, Timer, Bell } from '@lucide/svelte';
+  import { ListChecks, SquareCheckBig, BookOpen, Timer, Bell } from '@lucide/svelte';
   import { currentRoute } from '../router.js';
   import { notifications } from '../stores/notifications.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
@@ -7,6 +7,7 @@
   const tabs = [
     { view: 'mobile-my-work', href: '/m', label: 'My Work', icon: ListChecks, testid: 'mobile-nav-my-work' },
     { view: 'mobile-personal', href: '/m/personal', label: 'Personal', icon: SquareCheckBig, testid: 'mobile-nav-personal' },
+    { view: 'mobile-pages', href: '/m/pages', label: 'Pages', icon: BookOpen, testid: 'mobile-nav-pages' },
     { view: 'mobile-timer', href: '/m/timer', label: 'Timer', icon: Timer, testid: 'mobile-nav-timer' },
     { view: 'mobile-notifications', href: '/m/notifications', label: 'Alerts', icon: Bell, testid: 'mobile-nav-notifications' },
   ];
@@ -47,7 +48,7 @@
     bottom: 0;
     z-index: var(--z-sticky, 200);
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     background-color: var(--ds-surface-raised);
     border-top: 1px solid var(--ds-border);
     padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -1,5 +1,5 @@
 <script>
-  import { Search, Sparkles } from '@lucide/svelte';
+  import { Search, Sparkles, Command as CommandIcon } from '@lucide/svelte';
   import { authStore, aiStore } from '../stores';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
@@ -10,6 +10,7 @@
   import MobileItemRow from './MobileItemRow.svelte';
   import MobileListState from './MobileListState.svelte';
   import UserAvatar from '../components/UserAvatar.svelte';
+  import { mobilePalette } from './mobilePalette.svelte.js';
 
   const SEGMENTS = [
     { id: 'assigned', label: 'Assigned' },
@@ -128,6 +129,9 @@
 
 <MobileHeader title="My Work">
   {#snippet right()}
+    <button class="hdr-search" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+      <CommandIcon size={20} />
+    </button>
     {#if aiStore.chatAvailable}
       <button class="hdr-search" onclick={() => navigate('/m/chat')} data-testid="mobile-chat-open" aria-label="Assistant" type="button">
         <Sparkles size={20} />

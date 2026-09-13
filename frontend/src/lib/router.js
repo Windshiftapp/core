@@ -162,6 +162,8 @@ const routes = {
   // sequential-iteration match in updateRoute().
   '/m': 'mobile-my-work',
   '/m/personal': 'mobile-personal',
+  '/m/pages': 'mobile-pages',
+  '/m/pages/:workspaceId/:pageId': 'mobile-page-detail',
   '/m/timer': 'mobile-timer',
   '/m/notifications': 'mobile-notifications',
   '/m/search': 'mobile-search',

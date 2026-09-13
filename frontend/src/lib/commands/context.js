@@ -14,6 +14,7 @@
  *   activeTimer: any,
  *   t: (key:string, fallback?:any) => string,
  *   query: string,
+ *   pageResults?: any[],
  * }} input
  */
 export function buildContext({
@@ -27,6 +28,7 @@ export function buildContext({
   activeTimer,
   t,
   query,
+  pageResults,
 }) {
   const workspaceId = route?.params?.id ? Number(route.params.id) : null;
   const collectionId = route?.params?.collectionId ?? null;
@@ -44,6 +46,7 @@ export function buildContext({
     itemId,
     item: null,
     workItems: workItems || [],
+    pageResults: pageResults || [],
     activeTimer: activeTimer || null,
     t,
     query: query || '',

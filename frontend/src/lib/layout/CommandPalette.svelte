@@ -11,9 +11,9 @@
   import { t } from '../stores/i18n.svelte.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
-  import { scoreCommand, compareCommands } from '../commands/score.js';
-  import { BUCKET, BUCKET_LABELS, PER_BUCKET_CAP, TOTAL_CAP } from '../commands/buckets.js';
-  import { deriveLegacyBucket } from '../commands/types.js';
+  import { scoreCommand } from '../commands/score.js';
+  import { BUCKET, BUCKET_LABELS } from '../commands/buckets.js';
+  import { rankCommands } from '../commands/rank.js';
   import { buildContext } from '../commands/context.js';
   import { buildCommands } from '../commands/buildCommands.js';
   import { executeCommand as runCommand } from '../commands/executor.js';
@@ -136,39 +136,6 @@
     }),
     PROVIDERS,
   ));
-
-  // Score, sort by (bucket, score, insertion), cap per-bucket and overall.
-  // Providers set `bucket` explicitly; deriveLegacyBucket is the safety net
-  // for commands flowing in through makeExternalProvider that haven't been
-  // updated yet.
-  function rankCommands(query, commandsList) {
-    const annotated = commandsList.map((cmd, i) => {
-      const label = cmd.label ?? '';
-      const description = cmd.description ?? '';
-      const keywords = cmd.keywords ?? [];
-      const score = query.trim() ? scoreCommand(query, { label, description, keywords }) : 1;
-      return {
-        ...cmd,
-        bucket: cmd.bucket || deriveLegacyBucket(cmd),
-        _score: score,
-        _seq: cmd._seq ?? i,
-      };
-    });
-
-    const filtered = query.trim() ? annotated.filter((c) => c._score > 0) : annotated;
-    filtered.sort(compareCommands(query));
-
-    const counts = new Map();
-    const out = [];
-    for (const c of filtered) {
-      if (out.length >= TOTAL_CAP) break;
-      const n = counts.get(c.bucket) || 0;
-      if (n >= PER_BUCKET_CAP) continue;
-      counts.set(c.bucket, n + 1);
-      out.push(c);
-    }
-    return out;
-  }
 
   // Recently-viewed items mapped to command-shaped entries so the existing
   // render loop + keyboard handling drive navigation. No per-bucket cap is
