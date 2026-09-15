@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'لا توجد متطلبات تطابق التصفية.',
       detailLoadError: 'تعذّر تحميل المتطلب.',
       ownerUnset: 'غير معيّن',
+      emptyContent: 'لا يحتوي هذا المتطلب على محتوى بعد.',
     },
     columnKey: 'المفتاح',
     columnTitle: 'العنوان',

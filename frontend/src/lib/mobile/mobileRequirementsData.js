@@ -3,6 +3,20 @@ import { api } from '../api.js';
 const LIST_LIMIT = 100;
 
 /**
+ * @param {any} req
+ * @param {string} query
+ */
+export function requirementMatchesQuery(req, query) {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return true;
+  const haystack = [req.key, req.page_title, String(req.requirement_number)]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(trimmed);
+}
+
+/**
  * Fetch visible requirements for each workspace, grouped for list rendering.
  * Workspaces that fail (permission or deletion) are skipped.
  *
@@ -44,11 +58,7 @@ export async function searchRequirementsAcrossWorkspaces(workspaces, query, { ca
   const out = [];
   for (const section of sections) {
     for (const req of section.requirements) {
-      const haystack = [req.key, req.page_title, String(req.requirement_number)]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      if (!haystack.includes(trimmed)) continue;
+      if (!requirementMatchesQuery(req, trimmed)) continue;
       out.push({
         ...req,
         workspace_id: section.workspace.id,

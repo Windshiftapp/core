@@ -14,6 +14,8 @@
 
   let { workspaceId, requirementNumber } = $props();
 
+  // Read-first requirement detail: metadata from the registry API and page
+  // body from the backing page. Traceability editing stays on desktop in v1.
   let detail = $state(null);
   let page = $state(null);
   let assignableUsers = $state([]);
@@ -148,7 +150,7 @@
     {#if page?.content}
       <SafeMarkdown html={contentHtml} testid="mobile-requirement-content" />
     {:else}
-      <p class="empty">{t('requirements.emptyDescription')}</p>
+      <p class="empty">{t('requirements.mobile.emptyContent')}</p>
     {/if}
   </div>
 {/if}

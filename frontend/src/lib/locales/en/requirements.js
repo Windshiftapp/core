@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'No requirements match your filter.',
       detailLoadError: "Couldn't load this requirement.",
       ownerUnset: 'Unassigned',
+      emptyContent: 'This requirement has no content yet.',
     },
     columnKey: 'Key',
     columnTitle: 'Title',

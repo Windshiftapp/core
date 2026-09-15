@@ -31,6 +31,7 @@ export default {
       emptyFiltered: '没有符合筛选条件的需求。',
       detailLoadError: '无法加载该需求。',
       ownerUnset: '未分配',
+      emptyContent: '该需求尚无内容。',
     },
     columnKey: '键',
     columnTitle: '标题',

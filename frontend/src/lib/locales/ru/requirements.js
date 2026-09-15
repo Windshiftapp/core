@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'Нет требований по вашему фильтру.',
       detailLoadError: 'Не удалось загрузить требование.',
       ownerUnset: 'Не назначен',
+      emptyContent: 'У этого требования пока нет содержимого.',
     },
     columnKey: 'Ключ',
     columnTitle: 'Название',

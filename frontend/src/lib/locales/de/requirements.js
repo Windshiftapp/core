@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'Keine Anforderungen entsprechen Ihrem Filter.',
       detailLoadError: 'Anforderung konnte nicht geladen werden.',
       ownerUnset: 'Nicht zugewiesen',
+      emptyContent: 'Diese Anforderung hat noch keinen Inhalt.',
     },
     columnKey: 'Schlüssel',
     columnTitle: 'Titel',

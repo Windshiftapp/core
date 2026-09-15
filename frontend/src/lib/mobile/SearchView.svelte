@@ -74,6 +74,8 @@
       if (v !== version) return;
       console.error('Search failed:', err);
       results = [];
+      pageResults = [];
+      requirementResults = [];
       searched = true;
     } finally {
       if (v === version) loading = false;

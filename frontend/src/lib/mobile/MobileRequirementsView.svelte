@@ -9,9 +9,15 @@
   import { requirementStatusLozenge } from '../features/requirements/requirementStatuses.js';
   import MobileHeader from './MobileHeader.svelte';
   import MobileListState from './MobileListState.svelte';
-  import { fetchWorkspaceRequirementSections } from './mobileRequirementsData.js';
+  import {
+    fetchWorkspaceRequirementSections,
+    requirementMatchesQuery,
+  } from './mobileRequirementsData.js';
   import { mobilePalette } from './mobilePalette.svelte.js';
 
+  // Requirements registry across every workspace the user belongs to. Desktop
+  // is workspace-scoped; on the phone one grouped list plus filter/search is
+  // the primary navigation entry (palette and deep links).
   let sections = $state([]);
   let loading = $state(true);
   let errored = $state(false);
@@ -26,13 +32,7 @@
       : sections
           .map((s) => ({
             ...s,
-            requirements: s.requirements.filter((req) => {
-              const haystack = [req.key, req.page_title, String(req.requirement_number)]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
-              return haystack.includes(trimmedFilter);
-            }),
+            requirements: s.requirements.filter((req) => requirementMatchesQuery(req, trimmedFilter)),
           }))
           .filter((s) => s.requirements.length > 0)
   );
@@ -108,7 +108,7 @@
           <p class="ws-hint">{t('requirements.mobile.truncatedList', { count: section.totalItems })}</p>
         {/if}
         <div class="rows">
-          {#each section.requirements as req (req.requirement_number)}
+          {#each section.requirements as req (`${section.workspace.id}-${req.requirement_number}`)}
             <button
               class="row"
               onclick={() => openRequirement(section.workspace.id, req.requirement_number)}

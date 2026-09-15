@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'Aucune exigence ne correspond à votre filtre.',
       detailLoadError: "Impossible de charger l'exigence.",
       ownerUnset: 'Non assigné',
+      emptyContent: "Cette exigence n'a pas encore de contenu.",
     },
     columnKey: 'Clé',
     columnTitle: 'Titre',

@@ -31,6 +31,7 @@ export default {
       emptyFiltered: 'Ningún requisito coincide con su filtro.',
       detailLoadError: 'No se pudo cargar el requisito.',
       ownerUnset: 'Sin asignar',
+      emptyContent: 'Este requisito aún no tiene contenido.',
     },
     columnKey: 'Clave',
     columnTitle: 'Título',
