@@ -325,6 +325,15 @@ type pageReader interface {
 	GetByID(int) (*models.Page, error)
 }
 
+type requirementApplication interface {
+	List(int, int, services.RequirementListFilter) ([]services.RequirementView, error)
+	Get(int, int, int) (*services.RequirementView, error)
+	Create(services.AuditActor, services.CreateRequirementInput) (*services.RequirementView, error)
+	Promote(services.AuditActor, int, int, string, string, *int) (*services.RequirementView, error)
+	Update(services.AuditActor, int, int, services.RequirementUpdateInput) (*services.RequirementView, error)
+	ListHistory(int, int, int) ([]models.RequirementHistoryEntry, error)
+}
+
 type pageApplication interface {
 	List(int, int) ([]models.Page, error)
 	Get(int, int, int) (*models.Page, error)
@@ -544,6 +553,7 @@ type Deps struct {
 	ItemDiagrams                 itemDiagramApplication
 	Pages                        pageReader
 	PageApplication              pageApplication
+	RequirementApplication       requirementApplication
 	PageDiagrams                 pageDiagramApplication
 	PageAccess                   pageAccess
 	PageLabels                   pageLabelApplication
@@ -639,6 +649,9 @@ func RegisterRoutes(deps Deps) error {
 	}
 	if deps.PageApplication == nil {
 		return errors.New("v2: PageApplication is required")
+	}
+	if deps.RequirementApplication == nil {
+		return errors.New("v2: RequirementApplication is required")
 	}
 	if deps.PageDiagrams == nil {
 		return errors.New("v2: PageDiagrams is required")
@@ -797,6 +810,7 @@ func buildRoutes(deps Deps) []route {
 	registerAdminRoutes(&builder, deps)
 	registerAdminIntegrationRoutes(&builder, deps)
 	registerPageRoutes(&builder, deps)
+	registerRequirementRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)

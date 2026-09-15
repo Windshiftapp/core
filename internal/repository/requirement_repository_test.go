@@ -181,3 +181,90 @@ func TestRequirementAllocateRollsBackWithTransaction(t *testing.T) {
 		t.Fatalf("after rollback next number should be 1, got %d", number)
 	}
 }
+
+func TestRequirementListByWorkspaceExcludesArchivedPages(t *testing.T) {
+	f := newRequirementRepoFixture(t)
+	livePage := f.insertPage(t, 1, "Live")
+	archivedPage := f.insertPage(t, 1, "Archived")
+	if _, err := f.db.ExecWrite(`UPDATE pages SET archived_at = CURRENT_TIMESTAMP WHERE id = ?`, archivedPage); err != nil {
+		t.Fatal(err)
+	}
+
+	insert := func(pageID int) {
+		t.Helper()
+		err := database.WithTx(f.db, func(tx database.Tx) error {
+			n, err := f.repo.NextNumberTx(tx, 1)
+			if err != nil {
+				return err
+			}
+			_, err = f.repo.InsertTx(tx, &models.Requirement{
+				PageID:            pageID,
+				WorkspaceID:       1,
+				RequirementNumber: n,
+				RequirementType:   models.RequirementTypeUseCase,
+				Status:            models.RequirementStatusDraft,
+				CreatedBy:         1,
+			})
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert(livePage)
+	insert(archivedPage)
+
+	rows, err := f.repo.ListByWorkspace(1, RequirementListFilter{ExcludeArchived: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].PageTitle != "Live" {
+		t.Fatalf("expected only live requirement, got %+v", rows)
+	}
+}
+
+func TestRequirementUpdateTxPersistsMutableFields(t *testing.T) {
+	f := newRequirementRepoFixture(t)
+	pageID := f.insertPage(t, 1, "Mutable")
+	var reqID int
+	err := database.WithTx(f.db, func(tx database.Tx) error {
+		n, err := f.repo.NextNumberTx(tx, 1)
+		if err != nil {
+			return err
+		}
+		reqID, err = f.repo.InsertTx(tx, &models.Requirement{
+			PageID:            pageID,
+			WorkspaceID:       1,
+			RequirementNumber: n,
+			RequirementType:   models.RequirementTypeUseCase,
+			Status:            models.RequirementStatusDraft,
+			CreatedBy:         1,
+		})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ownerID := 1
+	err = database.WithTx(f.db, func(tx database.Tx) error {
+		return f.repo.UpdateTx(tx, reqID, RequirementUpdatePatch{
+			RequirementType: models.RequirementTypeBusinessRule,
+			Status:          models.RequirementStatusApproved,
+			OwnerID:         &ownerID,
+		}, 1)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.repo.GetByWorkspaceAndNumber(1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RequirementType != models.RequirementTypeBusinessRule ||
+		got.Status != models.RequirementStatusApproved ||
+		got.OwnerID == nil || *got.OwnerID != ownerID {
+		t.Fatalf("unexpected requirement after update: %+v", got)
+	}
+}

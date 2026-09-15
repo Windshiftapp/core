@@ -40,10 +40,11 @@ func newRequirementServiceFixture(t *testing.T) *requirementServiceFixture {
 	if _, err := db.ExecWrite(`INSERT INTO workspaces (id, name, key) VALUES (2, 'Other', 'OPS')`); err != nil {
 		t.Fatal(err)
 	}
+	pages := NewPageService(db)
 	return &requirementServiceFixture{
 		db:     db,
-		pages:  NewPageService(db),
-		reqs:   NewRequirementService(db),
+		pages:  pages,
+		reqs:   NewRequirementService(db, pages),
 		userID: 1,
 		source: 1,
 		dest:   2,
@@ -187,6 +188,88 @@ func TestMoveAcrossWorkspaceBlocksRequirementBackedPages(t *testing.T) {
 	}
 }
 
+func TestCreateRequirementIsAtomic(t *testing.T) {
+	f := newRequirementServiceFixture(t)
+	req, err := f.reqs.Create(f.userID, CreateRequirementInput{
+		WorkspaceID:     f.source,
+		Title:           "New requirement",
+		Content:         "Body",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.RequirementNumber != 1 || req.PageID == 0 {
+		t.Fatalf("unexpected requirement: %+v", req)
+	}
+	page, err := f.pages.GetByID(req.PageID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Title != "New requirement" {
+		t.Fatalf("page title %q", page.Title)
+	}
+}
+
+func TestUpdateRequirementWritesPerFieldHistory(t *testing.T) {
+	f := newRequirementServiceFixture(t)
+	created, err := f.reqs.Create(f.userID, CreateRequirementInput{
+		WorkspaceID:     f.source,
+		Title:           "Mutable",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID := 1
+	updated, err := f.reqs.Update(f.userID, f.source, created.RequirementNumber, RequirementUpdateInput{
+		Status:     stringPtr(models.RequirementStatusInReview),
+		OwnerIDSet: true,
+		OwnerID:    &ownerID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != models.RequirementStatusInReview || updated.OwnerID == nil || *updated.OwnerID != ownerID {
+		t.Fatalf("unexpected update: %+v", updated)
+	}
+
+	rows, err := f.db.Query(`SELECT field_name FROM requirement_history WHERE requirement_id = ? ORDER BY id`, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var fields []string
+	for rows.Next() {
+		var field string
+		if err := rows.Scan(&field); err != nil {
+			t.Fatal(err)
+		}
+		fields = append(fields, field)
+	}
+	if len(fields) != 3 {
+		t.Fatalf("expected promoted + status + owner history, got %v", fields)
+	}
+	if fields[0] != models.RequirementHistoryFieldPromoted {
+		t.Fatalf("first history field %q", fields[0])
+	}
+}
+
+func TestUpdateRequirementRejectsNoOpPatch(t *testing.T) {
+	f := newRequirementServiceFixture(t)
+	created, err := f.reqs.Create(f.userID, CreateRequirementInput{
+		WorkspaceID:     f.source,
+		Title:           "No changes",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.reqs.Update(f.userID, f.source, created.RequirementNumber, RequirementUpdateInput{}); !errors.Is(err, ErrRequirementNoChanges) {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestMoveAcrossWorkspaceAllowsOrdinaryPages(t *testing.T) {
 	f := newRequirementServiceFixture(t)
 	page := f.createPage(t, f.source, "Wiki")
@@ -197,4 +280,8 @@ func TestMoveAcrossWorkspaceAllowsOrdinaryPages(t *testing.T) {
 	if moved.WorkspaceID != f.dest {
 		t.Fatalf("expected workspace %d, got %d", f.dest, moved.WorkspaceID)
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

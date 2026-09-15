@@ -39,6 +39,7 @@ cx
 !internal/models/requirement_test.go
 !internal/repository/requirement_repository_test.go
 !internal/services/requirement_service_test.go
+!internal/services/requirement_application_service_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

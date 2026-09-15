@@ -53,6 +53,24 @@ const (
 // first becomes a requirement.
 const RequirementHistoryFieldPromoted = "promoted"
 
+const (
+	RequirementHistoryFieldType   = "requirement_type"
+	RequirementHistoryFieldStatus = "status"
+	RequirementHistoryFieldOwner  = "owner_id"
+)
+
+// RequirementHistoryEntry is an immutable audit row for requirement metadata
+// changes. Markdown content revisions stay on page_revisions.
+type RequirementHistoryEntry struct {
+	ID            int       `json:"id" db:"id"`
+	RequirementID int       `json:"requirement_id" db:"requirement_id"`
+	UserID        int       `json:"user_id" db:"user_id"`
+	FieldName     string    `json:"field_name" db:"field_name"`
+	OldValue      *string   `json:"old_value" db:"old_value"`
+	NewValue      *string   `json:"new_value" db:"new_value"`
+	ChangedAt     time.Time `json:"changed_at" db:"changed_at"`
+}
+
 // RequirementTypes is the closed set stored by CHECK constraints.
 var RequirementTypes = []string{
 	RequirementTypeBusinessRequirement,

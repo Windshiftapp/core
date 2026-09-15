@@ -674,6 +674,11 @@ const (
 	ActionPageInheritanceSet   = "page.inheritance_set"
 	ActionPageUnarchive        = "page.unarchive"
 
+	// Requirement lifecycle management.
+	ActionRequirementCreate  = "requirement.create"
+	ActionRequirementPromote = "requirement.promote"
+	ActionRequirementUpdate  = "requirement.update"
+
 	// Asset management
 	ActionAssetCreate = "asset.create"
 	ActionAssetUpdate = "asset.update"
@@ -859,6 +864,7 @@ const (
 	ResourceItemTemplate         = "item_template"
 	ResourcePage                 = "page"
 	ResourcePageLabel            = "page_label"
+	ResourceRequirement          = "requirement"
 	ResourceAsset                = "asset"
 	ResourceAssetType            = "asset_type"
 	ResourceAssetStatus          = "asset_status"
