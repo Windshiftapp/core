@@ -1057,7 +1057,8 @@ func applyParameterCorrections(route *Route) {
 		applyKnowledgeRequirementDocumentation(route, "Promote page to requirement")
 	case "GET /workspaces/{workspace_id}/test-coverage/requirements", "GET /collections/{collection_id}/test-coverage/requirements":
 		upsertParameter(route, enumQuery("covered", "Restricts results by coverage state.", "true", "false"))
-		upsertParameter(route, positiveIDQuery("item_type_id", "Restricts requirements to one item type."))
+		upsertParameter(route, positiveIDQuery("item_type_id", "Restricts legacy work-item requirements to one item type."))
+		upsertParameter(route, stringQuery("requirement_type", "Restricts page-backed requirements to one requirement type."))
 		upsertParameter(route, stringQuery("search", "Case-insensitive requirement search."))
 	case "GET /approvals/mine":
 		upsertParameter(route, stringQuery("status", "Restricts approvals to one decision status."))

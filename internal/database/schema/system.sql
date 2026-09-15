@@ -304,7 +304,8 @@ CREATE TABLE IF NOT EXISTS test_coverage_configurations (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	workspace_id INTEGER,
 	collection_id INTEGER,
-	requirement_item_type_ids TEXT, -- JSON array of item type IDs
+	requirement_item_type_ids TEXT, -- JSON array of item type IDs (legacy)
+	requirement_types TEXT, -- JSON array of page-backed requirement types
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

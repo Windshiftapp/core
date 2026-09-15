@@ -1794,7 +1794,7 @@ func (s *Server) initialize() error {
 		ConditionSets:                services.NewConditionSetApplicationService(s.db, permService),
 		Governance:                   governanceApplication,
 		Actions:                      actionApplication,
-		TestManagement:               services.NewTestManagementApplicationService(s.db, permService),
+		TestManagement:               services.NewTestManagementApplicationService(s.db, permService, pagePermissionService),
 		Assets:                       assetApplication,
 		ItemApplication:              itemApplication,
 		ItemDetail:                   itemDetailApplication,

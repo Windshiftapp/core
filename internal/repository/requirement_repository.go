@@ -26,10 +26,13 @@ const requirementLinkedItemCountSubquery = `
 	 WHERE (il.source_type = 'page' AND il.source_id = r.page_id AND il.target_type = 'item')
 	    OR (il.target_type = 'page' AND il.target_id = r.page_id AND il.source_type = 'item'))`
 
-const requirementLinkedTestCountSubquery = `
+// RequirementLinkedTestCountSubquery counts page↔test_case links for requirement row alias r.
+const RequirementLinkedTestCountSubquery = `
 	(SELECT COUNT(*) FROM item_links il
 	 WHERE (il.source_type = 'page' AND il.source_id = r.page_id AND il.target_type = 'test_case')
 	    OR (il.target_type = 'page' AND il.target_id = r.page_id AND il.source_type = 'test_case'))`
+
+const requirementLinkedTestCountSubquery = RequirementLinkedTestCountSubquery
 
 // RequirementRepository persists page-backed requirements and their
 // workspace-scoped number sequences.

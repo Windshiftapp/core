@@ -647,13 +647,25 @@ type TestCoverageConfiguration struct {
 	WorkspaceID            *int      `json:"workspace_id,omitempty"`
 	CollectionID           *int      `json:"collection_id,omitempty"`
 	RequirementItemTypeIDs []int     `json:"requirement_item_type_ids"`
+	RequirementTypes       []string  `json:"requirement_types"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 }
 
+// UsesPageBackedRequirements reports whether coverage is driven by the requirements registry.
+func (c *TestCoverageConfiguration) UsesPageBackedRequirements() bool {
+	return c != nil && len(c.RequirementTypes) > 0
+}
+
+// UsesLegacyItemRequirements reports whether coverage still uses work-item types.
+func (c *TestCoverageConfiguration) UsesLegacyItemRequirements() bool {
+	return c != nil && !c.UsesPageBackedRequirements() && len(c.RequirementItemTypeIDs) > 0
+}
+
 // TestCoverageConfigRequest represents the payload for creating/updating test coverage config
 type TestCoverageConfigRequest struct {
-	RequirementItemTypeIDs []int `json:"requirement_item_type_ids"`
+	RequirementItemTypeIDs []int    `json:"requirement_item_type_ids"`
+	RequirementTypes       []string `json:"requirement_types"`
 }
 
 // TestCoverageSummary represents the coverage statistics for pie chart
@@ -666,18 +678,23 @@ type TestCoverageSummary struct {
 
 // RequirementCoverageItem represents a single requirement with its coverage status
 type RequirementCoverageItem struct {
-	ItemID           int    `json:"item_id"`
-	WorkspaceKey     string `json:"workspace_key"`
-	WorkspaceItemNum int    `json:"workspace_item_number"`
-	Title            string `json:"title"`
-	ItemTypeID       int    `json:"item_type_id"`
-	ItemTypeName     string `json:"item_type_name"`
-	ItemTypeIcon     string `json:"item_type_icon"`
-	ItemTypeColor    string `json:"item_type_color"`
-	StatusID         *int   `json:"status_id,omitempty"`
-	StatusName       string `json:"status_name,omitempty"`
-	IsCovered        bool   `json:"is_covered"`
-	LinkedTestCount  int    `json:"linked_test_count"`
+	ItemID              int    `json:"item_id,omitempty"`
+	WorkspaceKey        string `json:"workspace_key"`
+	WorkspaceItemNum    int    `json:"workspace_item_number,omitempty"`
+	PageID              int    `json:"page_id,omitempty"`
+	RequirementNumber   int    `json:"requirement_number,omitempty"`
+	RequirementKey      string `json:"requirement_key,omitempty"`
+	RequirementType     string `json:"requirement_type,omitempty"`
+	Status              string `json:"status,omitempty"`
+	Title               string `json:"title"`
+	ItemTypeID          int    `json:"item_type_id,omitempty"`
+	ItemTypeName        string `json:"item_type_name,omitempty"`
+	ItemTypeIcon        string `json:"item_type_icon,omitempty"`
+	ItemTypeColor       string `json:"item_type_color,omitempty"`
+	StatusID            *int   `json:"status_id,omitempty"`
+	StatusName          string `json:"status_name,omitempty"`
+	IsCovered           bool   `json:"is_covered"`
+	LinkedTestCount     int    `json:"linked_test_count"`
 }
 
 // TestCoverageListResponse represents the paginated response for requirements list

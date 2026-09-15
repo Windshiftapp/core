@@ -1005,7 +1005,8 @@ func registerTestReportRoutes(builder *routeBuilder, app *services.TestManagemen
 }
 
 type coverageConfigRequest struct {
-	RequirementItemTypeIDs []int `json:"requirement_item_type_ids"`
+	RequirementItemTypeIDs []int    `json:"requirement_item_type_ids"`
+	RequirementTypes       []string `json:"requirement_types"`
 }
 
 type coverageMeta struct {
@@ -1045,7 +1046,10 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		if err != nil {
 			return nil, err
 		}
-		result, err := app.CreateCoverageConfig(user.ID, target, input.RequirementItemTypeIDs)
+		result, err := app.CreateCoverageConfig(user.ID, target, services.CoverageConfigInput{
+			RequirementItemTypeIDs: input.RequirementItemTypeIDs,
+			RequirementTypes:       input.RequirementTypes,
+		})
 		return result, testManagementError(err)
 	})
 	builder.JSON(http.MethodPatch, path+"/config/{config_id}", http.StatusOK, true, AuthAuthenticated, []string{"tests:write"}, func(r *http.Request, input coverageConfigRequest) (*models.TestCoverageConfiguration, error) {
@@ -1061,7 +1065,10 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 		if err != nil {
 			return nil, err
 		}
-		result, err := app.UpdateCoverageConfig(user.ID, target, configID, input.RequirementItemTypeIDs)
+		result, err := app.UpdateCoverageConfig(user.ID, target, configID, services.CoverageConfigInput{
+			RequirementItemTypeIDs: input.RequirementItemTypeIDs,
+			RequirementTypes:       input.RequirementTypes,
+		})
 		return result, testManagementError(err)
 	})
 	builder.Command(http.MethodDelete, path+"/config/{config_id}", AuthAuthenticated, []string{"tests:write"}, func(r *http.Request) error {
@@ -1109,7 +1116,12 @@ func registerTestCoverageScope(builder *routeBuilder, app *services.TestManageme
 			return nil, Pagination{}, 0, coverageMeta{}, err
 		}
 		items, total, summary, err := app.CoverageRequirements(user.ID, target, services.TestCoverageRequirementsFilter{
-			Covered: r.URL.Query().Get("covered"), ItemTypeID: itemTypeID, Search: r.URL.Query().Get("search"), Limit: page.PageSize, Offset: page.Offset,
+			Covered:         r.URL.Query().Get("covered"),
+			ItemTypeID:      itemTypeID,
+			RequirementType: r.URL.Query().Get("requirement_type"),
+			Search:          r.URL.Query().Get("search"),
+			Limit:           page.PageSize,
+			Offset:          page.Offset,
 		})
 		return items, page, total, coverageMeta{Summary: summary}, testManagementError(err)
 	})

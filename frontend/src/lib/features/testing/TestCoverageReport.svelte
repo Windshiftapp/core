@@ -24,6 +24,9 @@
     IconLink
   } from '@tabler/icons-svelte-runes';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
+  import { REQUIREMENT_TYPES } from '../requirements/requirementTypes.js';
+  import { requirementStatusLozenge } from '../requirements/requirementStatuses.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
 
@@ -49,6 +52,7 @@
   let pageSize = $state(15);
   let showConfigModal = $state(false);
   let selectedTypeIds = $state([]);
+  let selectedRequirementTypes = $state([]);
 
   // Expose state and handlers for external header controls
   export function getCollections() { return collections; }
@@ -71,59 +75,116 @@
   const coveredColor = 'var(--ds-status-success-solid, #10b981)';
   const notCoveredColor = 'var(--ds-status-danger-solid, #ef4444)';
 
+  const isLegacyMode = $derived(
+    (config?.requirement_item_type_ids?.length ?? 0) > 0 && (config?.requirement_types?.length ?? 0) === 0
+  );
+  const isPageMode = $derived((config?.requirement_types?.length ?? 0) > 0);
+  const isConfigured = $derived(
+    isPageMode || (config?.requirement_item_type_ids?.length ?? 0) > 0
+  );
+
   const workspaceTestBase = $derived.by(() =>
     workspaceId ? `/workspaces/${workspaceId}/items` : '/workspaces'
   );
+  const workspaceRequirementsBase = $derived.by(() =>
+    workspaceId ? `/workspaces/${workspaceId}/requirements` : '/workspaces'
+  );
 
   // Table columns
-  const columns = $derived.by(() => [
-    {
-      key: 'id',
-      label: t('common.id'),
-      width: '120px',
-      html: true,
-      render: (item) =>
-        `<a href="${workspaceTestBase}/${item.item_id}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${escapeHtml(item.workspace_key)}-${escapeHtml(item.workspace_item_number)}</a>`
-    },
-    {
-      key: 'title',
-      label: t('common.title'),
-      render: (item) => item.title || '—'
-    },
-    {
-      key: 'item_type_name',
-      label: t('common.type'),
-      width: '140px',
-      html: true,
-      render: (item) =>
-        `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${escapeHtml(item.item_type_color)}20; color: ${escapeHtml(item.item_type_color)};">${escapeHtml(item.item_type_name)}</span>`
-    },
-    {
-      key: 'status_name',
-      label: t('common.status'),
-      width: '120px',
-      render: (item) => item.status_name || '—'
-    },
-    {
-      key: 'is_covered',
-      label: t('testing.coverage'),
-      width: '100px',
-      html: true,
-      render: (item) =>
-        item.is_covered
-          ? `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-success-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>${t('testing.covered')}</span>`
-          : `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-danger-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>${t('testing.notCovered')}</span>`
-    },
-    {
-      key: 'linked_test_count',
-      label: t('testing.tests'),
-      width: '80px',
-      align: 'text-center',
-      html: true,
-      render: (item) =>
-        `<span class="inline-flex items-center gap-1" style="color: var(--ds-text-subtle);"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>${item.linked_test_count}</span>`
+  const columns = $derived.by(() => {
+    if (isPageMode) {
+      return [
+        {
+          key: 'requirement_key',
+          label: t('common.id'),
+          width: '140px',
+          html: true,
+          render: (item) =>
+            `<a href="${workspaceRequirementsBase}/${item.requirement_number}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${escapeHtml(item.requirement_key || '')}</a>`
+        },
+        {
+          key: 'title',
+          label: t('common.title'),
+          render: (item) => item.title || '—'
+        },
+        {
+          key: 'requirement_type',
+          label: t('common.type'),
+          width: '180px',
+          render: (item) => t(`requirements.type.${item.requirement_type}`)
+        },
+        {
+          key: 'status',
+          label: t('common.status'),
+          width: '120px',
+          slot: 'status'
+        },
+        {
+          key: 'is_covered',
+          label: t('testing.coverage'),
+          width: '100px',
+          slot: 'is_covered'
+        },
+        {
+          key: 'linked_test_count',
+          label: t('testing.tests'),
+          width: '80px',
+          align: 'text-center',
+          render: (item) => String(item.linked_test_count ?? 0)
+        }
+      ];
     }
-  ]);
+    return [
+      {
+        key: 'id',
+        label: t('common.id'),
+        width: '120px',
+        html: true,
+        render: (item) =>
+          `<a href="${workspaceTestBase}/${item.item_id}" style="color: var(--ds-text-link);" class="hover:underline font-medium">${escapeHtml(item.workspace_key)}-${escapeHtml(item.workspace_item_number)}</a>`
+      },
+      {
+        key: 'title',
+        label: t('common.title'),
+        render: (item) => item.title || '—'
+      },
+      {
+        key: 'item_type_name',
+        label: t('common.type'),
+        width: '140px',
+        html: true,
+        render: (item) =>
+          `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${escapeHtml(item.item_type_color)}20; color: ${escapeHtml(item.item_type_color)};">${escapeHtml(item.item_type_name)}</span>`
+      },
+      {
+        key: 'status_name',
+        label: t('common.status'),
+        width: '120px',
+        render: (item) => item.status_name || '—'
+      },
+      {
+        key: 'is_covered',
+        label: t('testing.coverage'),
+        width: '100px',
+        html: true,
+        render: (item) =>
+          item.is_covered
+            ? `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-success-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>${t('testing.covered')}</span>`
+            : `<span class="inline-flex items-center gap-1 text-xs font-medium" style="color: var(--ds-status-danger-solid);"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>${t('testing.notCovered')}</span>`
+      },
+      {
+        key: 'linked_test_count',
+        label: t('testing.tests'),
+        width: '80px',
+        align: 'text-center',
+        html: true,
+        render: (item) =>
+          `<span class="inline-flex items-center gap-1" style="color: var(--ds-text-subtle);"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>${item.linked_test_count}</span>`
+      }
+    ];
+  });
+
+  const tableKeyField = $derived(isPageMode ? 'requirement_number' : 'item_id');
 
   // Computed pie segments
   const pieSegments = $derived.by(() => {
@@ -168,10 +229,12 @@
       try {
         config = await api.tests.coverage.getConfig(id, workspaceId);
         selectedTypeIds = config?.requirement_item_type_ids || [];
+        selectedRequirementTypes = config?.requirement_types || [];
       } catch (e) {
         // No config exists yet
         config = null;
         selectedTypeIds = [];
+        selectedRequirementTypes = [];
       }
 
       // Load summary and requirements
@@ -219,6 +282,7 @@
 
   function openConfigModal() {
     selectedTypeIds = config?.requirement_item_type_ids || [];
+    selectedRequirementTypes = config?.requirement_types || [];
     showConfigModal = true;
   }
 
@@ -234,19 +298,30 @@
     }
   }
 
-  async function saveConfig() {
+  function toggleRequirementType(typeValue) {
+    if (selectedRequirementTypes.includes(typeValue)) {
+      selectedRequirementTypes = selectedRequirementTypes.filter((value) => value !== typeValue);
+    } else {
+      selectedRequirementTypes = [...selectedRequirementTypes, typeValue];
+    }
+  }
+
+  async function saveConfig(requirementTypesOverride = null) {
     try {
       configLoading = true;
       const id = selectedCollectionId || 'default';
-      const configData = { requirement_item_type_ids: selectedTypeIds };
+      const types = requirementTypesOverride ?? selectedRequirementTypes;
+      const configData = isLegacyMode && requirementTypesOverride == null
+        ? { requirement_item_type_ids: selectedTypeIds }
+        : { requirement_types: types };
 
       if (config?.id) {
         // Update existing config
         await api.tests.coverage.updateConfig(
           selectedCollectionId || 'default',
-		  config.id,
-		  configData,
-		  workspaceId
+          config.id,
+          configData,
+          workspaceId
         );
       } else {
         // Create new config
@@ -263,6 +338,10 @@
     } finally {
       configLoading = false;
     }
+  }
+
+  async function migrateToRegistry() {
+    await saveConfig([...REQUIREMENT_TYPES]);
   }
 </script>
 
@@ -292,9 +371,9 @@
         <Select
           id="filter-select"
           options={[
-            { value: 'all', label: 'All Requirements' },
-            { value: 'true', label: 'Covered Only' },
-            { value: 'false', label: 'Not Covered Only' },
+            { value: 'all', label: t('testing.allRequirements') },
+            { value: 'true', label: t('testing.coveredOnly') },
+            { value: 'false', label: t('testing.notCoveredOnly') },
           ]}
           value={filterCovered}
           onchange={(v) => handleFilterChange({ target: { value: v } })}
@@ -304,7 +383,7 @@
       <!-- Configure button -->
       <Button variant="default" onclick={openConfigModal}>
         <IconSettings class="w-4 h-4" />
-        Configure
+        {t('testing.configureRequirements')}
       </Button>
     </div>
   </Card>
@@ -313,11 +392,11 @@
   <!-- Content -->
   {#if loading}
     <StateDisplay type="loading" message={t('testing.loadingCoverageData')} size="lg" />
-  {:else if !config || selectedTypeIds.length === 0}
+  {:else if !config || !isConfigured}
     <EmptyState
       icon={IconShieldX}
       title={t('testing.noRequirementTypesConfigured')}
-      description={t('testing.selectItemTypesForCoverage')}
+      description={t('testing.selectRequirementTypesForCoverage')}
     >
       {#snippet action()}
         <Button variant="primary" onclick={openConfigModal}>
@@ -333,6 +412,19 @@
       description={t('testing.noItemsMatchingRequirements')}
     />
   {:else}
+    {#if isLegacyMode}
+      <Card variant="flat" padding="default" class="legacy-banner">
+        <div class="legacy-banner__content">
+          <div>
+            <h3>{t('testing.legacyCoverageConfigTitle')}</h3>
+            <p>{t('testing.legacyCoverageConfigDescription')}</p>
+          </div>
+          <Button variant="secondary" onclick={migrateToRegistry} disabled={configLoading}>
+            {t('testing.migrateCoverageToRegistry')}
+          </Button>
+        </div>
+      </Card>
+    {/if}
     <div class="coverage-content">
       <!-- Summary row -->
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-[180px_1fr]">
@@ -359,16 +451,33 @@
       <div class="table-section">
         <DataTable
           {columns}
-		  data={requirementsData?.data || []}
-          keyField="item_id"
+          data={requirementsData?.data || []}
+          keyField={tableKeyField}
           emptyMessage={t('testing.noRequirementsFound')}
           emptyIcon={IconShieldX}
           pagination={true}
           pageSize={pageSize}
           currentPage={currentPage}
-		  totalItems={requirementsData?.pagination?.total_items || 0}
+          totalItems={requirementsData?.pagination?.total_items || 0}
           onPageChange={handlePageChange}
-        />
+        >
+          {#snippet status(item)}
+            {#if item.status}
+              <Lozenge color={requirementStatusLozenge(item.status)}>
+                {t(`requirements.status.${item.status}`)}
+              </Lozenge>
+            {:else}
+              —
+            {/if}
+          {/snippet}
+          {#snippet is_covered(item)}
+            {#if item.is_covered}
+              <Lozenge color="green">{t('testing.covered')}</Lozenge>
+            {:else}
+              <Lozenge color="red">{t('testing.notCovered')}</Lozenge>
+            {/if}
+          {/snippet}
+        </DataTable>
       </div>
     </div>
   {/if}
@@ -384,24 +493,41 @@
 >
   <ModalHeader
     title={t('testing.configureRequirementTypes')}
-    subtitle={t('testing.selectItemTypesForCoverageAnalysis')}
+    subtitle={t('testing.selectRequirementTypesForCoverageAnalysis')}
     onClose={closeConfigModal}
   />
   <div class="p-6">
     <div class="type-selection">
-      {#if itemTypes.length === 0}
-        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noItemTypesAvailable')}</p>
+      {#if isLegacyMode}
+        {#if itemTypes.length === 0}
+          <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noItemTypesAvailable')}</p>
+        {:else}
+          <div class="type-grid">
+            {#each itemTypes as type (type.id)}
+              <button
+                class="type-option"
+                class:selected={selectedTypeIds.includes(type.id)}
+                onclick={() => toggleItemType(type.id)}
+              >
+                <ItemTypeIcon itemType={type} />
+                <span class="type-name">{type.name}</span>
+                {#if selectedTypeIds.includes(type.id)}
+                  <IconCircleCheck class="type-check" />
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
       {:else}
         <div class="type-grid">
-          {#each itemTypes as type (type.id)}
+          {#each REQUIREMENT_TYPES as typeValue (typeValue)}
             <button
               class="type-option"
-              class:selected={selectedTypeIds.includes(type.id)}
-              onclick={() => toggleItemType(type.id)}
+              class:selected={selectedRequirementTypes.includes(typeValue)}
+              onclick={() => toggleRequirementType(typeValue)}
             >
-              <ItemTypeIcon itemType={type} />
-              <span class="type-name">{type.name}</span>
-              {#if selectedTypeIds.includes(type.id)}
+              <span class="type-name">{t(`requirements.type.${typeValue}`)}</span>
+              {#if selectedRequirementTypes.includes(typeValue)}
                 <IconCircleCheck class="type-check" />
               {/if}
             </button>
@@ -513,6 +639,26 @@
     width: 1rem;
     height: 1rem;
     color: var(--ds-accent);
+  }
+
+  .legacy-banner__content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .legacy-banner__content h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .legacy-banner__content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--ds-text-subtle);
   }
 
 </style>

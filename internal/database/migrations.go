@@ -1448,6 +1448,30 @@ var Catalog = []Migration{
 			WHERE builtin_key = 'tests';
 		`,
 	},
+	{
+		Version: "20260916_test_coverage_requirement_types",
+		Name:    "Add page-backed requirement types to test coverage configuration",
+		CheckSQLite: `
+			SELECT CASE
+				WHEN EXISTS (
+					SELECT 1 FROM pragma_table_info('test_coverage_configurations')
+					WHERE name = 'requirement_types'
+				) THEN 1 ELSE 0 END
+		`,
+		CheckPostgres: `
+			SELECT CASE
+				WHEN EXISTS (
+					SELECT 1 FROM information_schema.columns
+					WHERE table_name = 'test_coverage_configurations' AND column_name = 'requirement_types'
+				) THEN 1 ELSE 0 END
+		`,
+		SQLite: `
+			ALTER TABLE test_coverage_configurations ADD COLUMN requirement_types TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE test_coverage_configurations ADD COLUMN requirement_types TEXT;
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {

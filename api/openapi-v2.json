@@ -6414,6 +6414,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -6429,6 +6436,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -6474,6 +6482,26 @@
                   "description": "The linked test count value.",
                   "type": "integer"
                 },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "requirement_key": {
+                  "description": "The requirement key value.",
+                  "type": "string"
+                },
+                "requirement_number": {
+                  "description": "The requirement number value.",
+                  "type": "integer"
+                },
+                "requirement_type": {
+                  "description": "The requirement type value.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status value.",
+                  "type": "string"
+                },
                 "status_id": {
                   "description": "The status id value.",
                   "nullable": true,
@@ -6498,14 +6526,8 @@
               },
               "required": [
                 "is_covered",
-                "item_id",
-                "item_type_color",
-                "item_type_icon",
-                "item_type_id",
-                "item_type_name",
                 "linked_test_count",
                 "title",
-                "workspace_item_number",
                 "workspace_key"
               ],
               "type": "object"
@@ -34573,6 +34595,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -34588,6 +34617,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -34633,6 +34663,26 @@
                   "description": "The linked test count value.",
                   "type": "integer"
                 },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "requirement_key": {
+                  "description": "The requirement key value.",
+                  "type": "string"
+                },
+                "requirement_number": {
+                  "description": "The requirement number value.",
+                  "type": "integer"
+                },
+                "requirement_type": {
+                  "description": "The requirement type value.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status value.",
+                  "type": "string"
+                },
                 "status_id": {
                   "description": "The status id value.",
                   "nullable": true,
@@ -34657,14 +34707,8 @@
               },
               "required": [
                 "is_covered",
-                "item_id",
-                "item_type_color",
-                "item_type_icon",
-                "item_type_id",
-                "item_type_name",
                 "linked_test_count",
                 "title",
-                "workspace_item_number",
                 "workspace_key"
               ],
               "type": "object"
@@ -46063,10 +46107,18 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "requirement_types": {
+            "description": "The requirement types value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
-          "requirement_item_type_ids"
+          "requirement_item_type_ids",
+          "requirement_types"
         ],
         "type": "object"
       },
@@ -46098,6 +46150,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -46113,6 +46172,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -53232,10 +53292,18 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "requirement_types": {
+            "description": "The requirement types value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
-          "requirement_item_type_ids"
+          "requirement_item_type_ids",
+          "requirement_types"
         ],
         "type": "object"
       },
@@ -53267,6 +53335,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -53282,6 +53357,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -57388,10 +57464,18 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "requirement_types": {
+            "description": "The requirement types value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
-          "requirement_item_type_ids"
+          "requirement_item_type_ids",
+          "requirement_types"
         ],
         "type": "object"
       },
@@ -57423,6 +57507,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -57438,6 +57529,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -77281,10 +77373,18 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "requirement_types": {
+            "description": "The requirement types value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
-          "requirement_item_type_ids"
+          "requirement_item_type_ids",
+          "requirement_types"
         ],
         "type": "object"
       },
@@ -77316,6 +77416,13 @@
                 },
                 "type": "array"
               },
+              "requirement_types": {
+                "description": "The requirement types value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "updated_at": {
                 "description": "The updated at value.",
                 "format": "date-time",
@@ -77331,6 +77438,7 @@
               "created_at",
               "id",
               "requirement_item_type_ids",
+              "requirement_types",
               "updated_at"
             ],
             "type": "object"
@@ -85537,7 +85645,7 @@
             }
           },
           {
-            "description": "Restricts requirements to one item type.",
+            "description": "Restricts legacy work-item requirements to one item type.",
             "in": "query",
             "name": "item_type_id",
             "required": false,
@@ -85550,6 +85658,15 @@
             "description": "Case-insensitive requirement search.",
             "in": "query",
             "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts page-backed requirements to one requirement type.",
+            "in": "query",
+            "name": "requirement_type",
             "required": false,
             "schema": {
               "type": "string"
@@ -106713,7 +106830,7 @@
             }
           },
           {
-            "description": "Restricts requirements to one item type.",
+            "description": "Restricts legacy work-item requirements to one item type.",
             "in": "query",
             "name": "item_type_id",
             "required": false,
@@ -106726,6 +106843,15 @@
             "description": "Case-insensitive requirement search.",
             "in": "query",
             "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts page-backed requirements to one requirement type.",
+            "in": "query",
+            "name": "requirement_type",
             "required": false,
             "schema": {
               "type": "string"
