@@ -80,7 +80,7 @@ func TestItemLinkServiceImplementsAllowsItemToPage(t *testing.T) {
 		SourceID:   itemID,
 		TargetType: "page",
 		TargetID:   pageID,
-		CreatedBy:  testUserID(),
+		CreatedBy:  linkTestUserID(),
 	})
 	if err != nil {
 		t.Fatalf("expected item→page implements link to succeed: %v", err)
@@ -98,7 +98,7 @@ func TestItemLinkServiceImplementsRejectsPageToPage(t *testing.T) {
 		SourceID:   childPage,
 		TargetType: "page",
 		TargetID:   parentPage,
-		CreatedBy:  testUserID(),
+		CreatedBy:  linkTestUserID(),
 	})
 	if !errors.Is(err, ErrInvalidLinkTypeForEntities) {
 		t.Fatalf("expected ErrInvalidLinkTypeForEntities, got %v", err)
@@ -116,7 +116,7 @@ func TestItemLinkServiceSpecifiesAllowsPageToPage(t *testing.T) {
 		SourceID:   childPage,
 		TargetType: "page",
 		TargetID:   parentPage,
-		CreatedBy:  testUserID(),
+		CreatedBy:  linkTestUserID(),
 	})
 	if err != nil {
 		t.Fatalf("expected page→page specifies link to succeed: %v", err)
@@ -134,14 +134,14 @@ func TestItemLinkServiceSpecifiesRejectsItemToPage(t *testing.T) {
 		SourceID:   itemID,
 		TargetType: "page",
 		TargetID:   pageID,
-		CreatedBy:  testUserID(),
+		CreatedBy:  linkTestUserID(),
 	})
 	if !errors.Is(err, ErrInvalidLinkTypeForEntities) {
 		t.Fatalf("expected ErrInvalidLinkTypeForEntities, got %v", err)
 	}
 }
 
-func testUserID() *int {
+func linkTestUserID() *int {
 	id := 1
 	return &id
 }

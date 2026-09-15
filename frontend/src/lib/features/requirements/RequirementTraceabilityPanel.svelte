@@ -11,7 +11,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import { buildRequirementKeyByPageId, pageHref } from './requirementKeyMap.js';
-  import { linkDirectionLabel } from './requirementLinkLabels.js';
+  import { linkDirectionLabel, pageToPagePeerDirection } from './requirementLinkLabels.js';
 
   let { workspaceId, pageId, canEdit = false } = $props();
 
@@ -51,7 +51,9 @@
   let relatedPageSearchVersion = 0;
   let assetSearchVersion = 0;
 
-  const pageLinkTypeId = $derived(linkTypesCache.find((lt) => lt?.name === 'Page')?.id ?? null);
+  const pageLinkTypeId = $derived(
+    linkTypesCache.find((lt) => lt?.builtin_key === 'page' || lt?.name === 'Page')?.id ?? null
+  );
   const testsLinkTypeId = $derived(
     linkTypesCache.find((lt) => lt?.builtin_key === 'tests' || lt?.name === 'Tests')?.id ?? null
   );
@@ -88,36 +90,24 @@
     })
   );
 
-  function pageToPagePeer(link) {
-    const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
-    const pageIsTarget = link.target_type === 'page' && link.target_id === pageId;
-    if (pageIsSource && link.target_type === 'page' && link.target_id !== pageId) {
-      return { direction: 'outgoing' };
-    }
-    if (pageIsTarget && link.source_type === 'page' && link.source_id !== pageId) {
-      return { direction: 'incoming' };
-    }
-    return null;
-  }
-
   const specifiesOutgoingLinks = $derived(
     pageLinks.filter((link) => {
       if (link.link_type_id !== specifiesLinkTypeId) return false;
-      return pageToPagePeer(link)?.direction === 'outgoing';
+      return pageToPagePeerDirection(link, pageId) === 'outgoing';
     })
   );
 
   const specifiedByLinks = $derived(
     pageLinks.filter((link) => {
       if (link.link_type_id !== specifiesLinkTypeId) return false;
-      return pageToPagePeer(link)?.direction === 'incoming';
+      return pageToPagePeerDirection(link, pageId) === 'incoming';
     })
   );
 
   const genericRelatedPageLinks = $derived(
     pageLinks.filter((link) => {
       if (link.link_type_id !== relatesToLinkTypeId) return false;
-      return pageToPagePeer(link) != null;
+      return pageToPagePeerDirection(link, pageId) != null;
     })
   );
 
@@ -372,12 +362,30 @@
     }
   }
 
-  async function linkSpecifiesPage(relatedPage) {
-    if (!specifiesLinkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
+  function clearRelatedPageSearch() {
+    relatedPageSearchQuery = '';
+    relatedPageSearchResults = [];
+    relatedPageSearching = false;
+  }
+
+  function openSpecifiesPageAdd() {
+    genericPageMode = 'list';
+    clearRelatedPageSearch();
+    specifiesPageMode = 'add';
+  }
+
+  function openGenericPageAdd() {
+    specifiesPageMode = 'list';
+    clearRelatedPageSearch();
+    genericPageMode = 'add';
+  }
+
+  async function linkPageToPage(linkTypeId, relatedPage, onLinked) {
+    if (!linkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
     relatedPageSubmitting = true;
     try {
       const link = await api.links.create({
-        link_type_id: specifiesLinkTypeId,
+        link_type_id: linkTypeId,
         source_type: 'page',
         source_id: pageId,
         target_type: 'page',
@@ -388,9 +396,8 @@
       } else {
         await loadPageLinks();
       }
-      specifiesPageMode = 'list';
-      relatedPageSearchQuery = '';
-      relatedPageSearchResults = [];
+      onLinked();
+      clearRelatedPageSearch();
     } catch (err) {
       errorToast(err?.message || t('requirements.traceability.linkPageError'));
     } finally {
@@ -398,30 +405,16 @@
     }
   }
 
+  async function linkSpecifiesPage(relatedPage) {
+    await linkPageToPage(specifiesLinkTypeId, relatedPage, () => {
+      specifiesPageMode = 'list';
+    });
+  }
+
   async function linkGenericRelatedPage(relatedPage) {
-    if (!relatesToLinkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
-    relatedPageSubmitting = true;
-    try {
-      const link = await api.links.create({
-        link_type_id: relatesToLinkTypeId,
-        source_type: 'page',
-        source_id: pageId,
-        target_type: 'page',
-        target_id: relatedPage.id,
-      });
-      if (link && !pageLinks.some((l) => l.id === link.id)) {
-        pageLinks = [link, ...pageLinks];
-      } else {
-        await loadPageLinks();
-      }
+    await linkPageToPage(relatesToLinkTypeId, relatedPage, () => {
       genericPageMode = 'list';
-      relatedPageSearchQuery = '';
-      relatedPageSearchResults = [];
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.linkPageError'));
-    } finally {
-      relatedPageSubmitting = false;
-    }
+    });
   }
 
   function handleAssetSearchInput(event) {
@@ -631,7 +624,7 @@
         <div class="traceability-section__header">
           <h4>{t('requirements.traceability.specifiesTitle')}</h4>
           {#if canEdit && specifiesLinkTypeId && specifiesPageMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (specifiesPageMode = 'add')}>
+            <Button variant="ghost" size="sm" onclick={openSpecifiesPageAdd}>
               <IconPlus size={14} />
               {t('requirements.traceability.specifiesAdd')}
             </Button>
@@ -647,7 +640,7 @@
               placeholder={t('requirements.traceability.searchPages')}
               size="small"
             />
-            <Button variant="ghost" size="sm" onclick={() => { specifiesPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
+            <Button variant="ghost" size="sm" onclick={() => { specifiesPageMode = 'list'; clearRelatedPageSearch(); }}>
               {t('common.cancel')}
             </Button>
           </div>
@@ -740,7 +733,7 @@
         <div class="traceability-section__header">
           <h4>{t('requirements.traceability.relatedGenericTitle')}</h4>
           {#if canEdit && relatesToLinkTypeId && genericPageMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (genericPageMode = 'add')}>
+            <Button variant="ghost" size="sm" onclick={openGenericPageAdd}>
               <IconPlus size={14} />
               {t('requirements.traceability.addPage')}
             </Button>
@@ -756,7 +749,7 @@
               placeholder={t('requirements.traceability.searchPages')}
               size="small"
             />
-            <Button variant="ghost" size="sm" onclick={() => { genericPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
+            <Button variant="ghost" size="sm" onclick={() => { genericPageMode = 'list'; clearRelatedPageSearch(); }}>
               {t('common.cancel')}
             </Button>
           </div>
