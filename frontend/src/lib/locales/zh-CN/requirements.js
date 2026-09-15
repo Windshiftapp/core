@@ -106,5 +106,43 @@ export default {
       approved: '已批准',
       deprecated: '已弃用',
     },
+    templates: {
+      reset: '重置为模板',
+      replaceConfirm: '是否用此类型的模板替换当前内容？',
+      insertOnPromote: '将起始模板插入页面内容',
+      use_case: {
+        body: '## 参与者\n\n\n## 前置条件\n\n\n## 主流程\n\n1. \n\n## 后置条件\n\n',
+      },
+      functional_requirement: {
+        body: '## 描述\n\n\n## 验收标准\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## 类别\n\n\n## 需求\n\n\n## 度量\n\n',
+      },
+      business_requirement: {
+        body: '## 目标\n\n\n## 利益相关方\n\n\n## 成功标准\n\n- \n',
+      },
+      business_rule: {
+        body: '## 规则陈述\n\n\n## 条件\n\n\n## 例外\n\n',
+      },
+      business_process: {
+        body: '## 目的\n\n\n## 步骤\n\n1. \n\n## 输入与输出\n\n',
+      },
+      system_specification: {
+        body: '## 范围\n\n\n## 组件\n\n\n## 约束\n\n',
+      },
+      api_specification: {
+        body: '## 端点\n\n\n## 请求\n\n\n## 响应\n\n\n## 错误\n\n',
+      },
+      data_model: {
+        body: '## 实体\n\n\n## 关系\n\n\n## 约束\n\n',
+      },
+      architecture_decision: {
+        body: '## 背景\n\n\n## 决策\n\n\n## 后果\n\n',
+      },
+      glossary_entry: {
+        body: '## 术语\n\n\n## 定义\n\n\n## 相关术语\n\n',
+      },
+    },
   },
 };

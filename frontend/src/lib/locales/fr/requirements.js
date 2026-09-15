@@ -106,5 +106,43 @@ export default {
       approved: 'Approuvé',
       deprecated: 'Obsolète',
     },
+    templates: {
+      reset: 'Réinitialiser le modèle',
+      replaceConfirm: 'Remplacer le contenu actuel par le modèle de ce type ?',
+      insertOnPromote: 'Insérer le modèle de départ dans le contenu de la page',
+      use_case: {
+        body: '## Acteurs\n\n\n## Préconditions\n\n\n## Scénario principal\n\n1. \n\n## Postconditions\n\n',
+      },
+      functional_requirement: {
+        body: '## Description\n\n\n## Critères d’acceptation\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Catégorie\n\n\n## Exigence\n\n\n## Mesure\n\n',
+      },
+      business_requirement: {
+        body: '## Objectif\n\n\n## Parties prenantes\n\n\n## Critères de succès\n\n- \n',
+      },
+      business_rule: {
+        body: '## Énoncé de la règle\n\n\n## Conditions\n\n\n## Exceptions\n\n',
+      },
+      business_process: {
+        body: '## Objectif\n\n\n## Étapes\n\n1. \n\n## Entrées et sorties\n\n',
+      },
+      system_specification: {
+        body: '## Périmètre\n\n\n## Composants\n\n\n## Contraintes\n\n',
+      },
+      api_specification: {
+        body: '## Point de terminaison\n\n\n## Requête\n\n\n## Réponse\n\n\n## Erreurs\n\n',
+      },
+      data_model: {
+        body: '## Entités\n\n\n## Relations\n\n\n## Contraintes\n\n',
+      },
+      architecture_decision: {
+        body: '## Contexte\n\n\n## Décision\n\n\n## Conséquences\n\n',
+      },
+      glossary_entry: {
+        body: '## Terme\n\n\n## Définition\n\n\n## Termes associés\n\n',
+      },
+    },
   },
 };

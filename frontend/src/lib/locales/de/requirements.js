@@ -106,5 +106,43 @@ export default {
       approved: 'Genehmigt',
       deprecated: 'Veraltet',
     },
+    templates: {
+      reset: 'Auf Vorlage zurücksetzen',
+      replaceConfirm: 'Aktuellen Inhalt durch die Vorlage für diesen Typ ersetzen?',
+      insertOnPromote: 'Startervorlage in den Seiteninhalt einfügen',
+      use_case: {
+        body: '## Akteure\n\n\n## Vorbedingungen\n\n\n## Hauptablauf\n\n1. \n\n## Nachbedingungen\n\n',
+      },
+      functional_requirement: {
+        body: '## Beschreibung\n\n\n## Akzeptanzkriterien\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Kategorie\n\n\n## Anforderung\n\n\n## Messung\n\n',
+      },
+      business_requirement: {
+        body: '## Ziel\n\n\n## Stakeholder\n\n\n## Erfolgskriterien\n\n- \n',
+      },
+      business_rule: {
+        body: '## Regelaussage\n\n\n## Bedingungen\n\n\n## Ausnahmen\n\n',
+      },
+      business_process: {
+        body: '## Zweck\n\n\n## Schritte\n\n1. \n\n## Eingaben und Ausgaben\n\n',
+      },
+      system_specification: {
+        body: '## Umfang\n\n\n## Komponenten\n\n\n## Einschränkungen\n\n',
+      },
+      api_specification: {
+        body: '## Endpoint\n\n\n## Anfrage\n\n\n## Antwort\n\n\n## Fehler\n\n',
+      },
+      data_model: {
+        body: '## Entitäten\n\n\n## Beziehungen\n\n\n## Einschränkungen\n\n',
+      },
+      architecture_decision: {
+        body: '## Kontext\n\n\n## Entscheidung\n\n\n## Folgen\n\n',
+      },
+      glossary_entry: {
+        body: '## Begriff\n\n\n## Definition\n\n\n## Verwandte Begriffe\n\n',
+      },
+    },
   },
 };

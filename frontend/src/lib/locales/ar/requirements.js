@@ -106,5 +106,43 @@ export default {
       approved: 'معتمد',
       deprecated: 'مهمل',
     },
+    templates: {
+      reset: 'إعادة تعيين القالب',
+      replaceConfirm: 'هل تريد استبدال المحتوى الحالي بقالب هذا النوع؟',
+      insertOnPromote: 'إدراج قالب البداية في محتوى الصفحة',
+      use_case: {
+        body: '## الجهات الفاعلة\n\n\n## الشروط المسبقة\n\n\n## التدفق الرئيسي\n\n1. \n\n## الشروط اللاحقة\n\n',
+      },
+      functional_requirement: {
+        body: '## الوصف\n\n\n## معايير القبول\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## الفئة\n\n\n## المتطلب\n\n\n## القياس\n\n',
+      },
+      business_requirement: {
+        body: '## الهدف\n\n\n## أصحاب المصلحة\n\n\n## معايير النجاح\n\n- \n',
+      },
+      business_rule: {
+        body: '## صياغة القاعدة\n\n\n## الشروط\n\n\n## الاستثناءات\n\n',
+      },
+      business_process: {
+        body: '## الغرض\n\n\n## الخطوات\n\n1. \n\n## المدخلات والمخرجات\n\n',
+      },
+      system_specification: {
+        body: '## النطاق\n\n\n## المكونات\n\n\n## القيود\n\n',
+      },
+      api_specification: {
+        body: '## نقطة النهاية\n\n\n## الطلب\n\n\n## الاستجابة\n\n\n## الأخطاء\n\n',
+      },
+      data_model: {
+        body: '## الكيانات\n\n\n## العلاقات\n\n\n## القيود\n\n',
+      },
+      architecture_decision: {
+        body: '## السياق\n\n\n## القرار\n\n\n## العواقب\n\n',
+      },
+      glossary_entry: {
+        body: '## المصطلح\n\n\n## التعريف\n\n\n## مصطلحات ذات صلة\n\n',
+      },
+    },
   },
 };

@@ -106,5 +106,43 @@ export default {
       approved: 'Aprovado',
       deprecated: 'Obsoleto',
     },
+    templates: {
+      reset: 'Restaurar modelo',
+      replaceConfirm: 'Substituir o conteúdo atual pelo modelo deste tipo?',
+      insertOnPromote: 'Inserir modelo inicial no conteúdo da página',
+      use_case: {
+        body: '## Atores\n\n\n## Pré-condições\n\n\n## Fluxo principal\n\n1. \n\n## Pós-condições\n\n',
+      },
+      functional_requirement: {
+        body: '## Descrição\n\n\n## Critérios de aceitação\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Categoria\n\n\n## Requisito\n\n\n## Medição\n\n',
+      },
+      business_requirement: {
+        body: '## Objetivo\n\n\n## Partes interessadas\n\n\n## Critérios de sucesso\n\n- \n',
+      },
+      business_rule: {
+        body: '## Enunciado da regra\n\n\n## Condições\n\n\n## Exceções\n\n',
+      },
+      business_process: {
+        body: '## Propósito\n\n\n## Etapas\n\n1. \n\n## Entradas e saídas\n\n',
+      },
+      system_specification: {
+        body: '## Escopo\n\n\n## Componentes\n\n\n## Restrições\n\n',
+      },
+      api_specification: {
+        body: '## Endpoint\n\n\n## Requisição\n\n\n## Resposta\n\n\n## Erros\n\n',
+      },
+      data_model: {
+        body: '## Entidades\n\n\n## Relacionamentos\n\n\n## Restrições\n\n',
+      },
+      architecture_decision: {
+        body: '## Contexto\n\n\n## Decisão\n\n\n## Consequências\n\n',
+      },
+      glossary_entry: {
+        body: '## Termo\n\n\n## Definição\n\n\n## Termos relacionados\n\n',
+      },
+    },
   },
 };

@@ -106,5 +106,43 @@ export default {
       approved: 'Approved',
       deprecated: 'Deprecated',
     },
+    templates: {
+      reset: 'Reset to template',
+      replaceConfirm: 'Replace current content with the template for this type?',
+      insertOnPromote: 'Insert starter template into page content',
+      use_case: {
+        body: '## Actors\n\n\n## Preconditions\n\n\n## Main flow\n\n1. \n\n## Postconditions\n\n',
+      },
+      functional_requirement: {
+        body: '## Description\n\n\n## Acceptance criteria\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Category\n\n\n## Requirement\n\n\n## Measurement\n\n',
+      },
+      business_requirement: {
+        body: '## Goal\n\n\n## Stakeholders\n\n\n## Success criteria\n\n- \n',
+      },
+      business_rule: {
+        body: '## Rule statement\n\n\n## Conditions\n\n\n## Exceptions\n\n',
+      },
+      business_process: {
+        body: '## Purpose\n\n\n## Steps\n\n1. \n\n## Inputs and outputs\n\n',
+      },
+      system_specification: {
+        body: '## Scope\n\n\n## Components\n\n\n## Constraints\n\n',
+      },
+      api_specification: {
+        body: '## Endpoint\n\n\n## Request\n\n\n## Response\n\n\n## Errors\n\n',
+      },
+      data_model: {
+        body: '## Entities\n\n\n## Relationships\n\n\n## Constraints\n\n',
+      },
+      architecture_decision: {
+        body: '## Context\n\n\n## Decision\n\n\n## Consequences\n\n',
+      },
+      glossary_entry: {
+        body: '## Term\n\n\n## Definition\n\n\n## Related terms\n\n',
+      },
+    },
   },
 };

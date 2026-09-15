@@ -106,5 +106,43 @@ export default {
       approved: 'Aprobado',
       deprecated: 'Obsoleto',
     },
+    templates: {
+      reset: 'Restablecer plantilla',
+      replaceConfirm: '¿Reemplazar el contenido actual por la plantilla de este tipo?',
+      insertOnPromote: 'Insertar plantilla inicial en el contenido de la página',
+      use_case: {
+        body: '## Actores\n\n\n## Precondiciones\n\n\n## Flujo principal\n\n1. \n\n## Postcondiciones\n\n',
+      },
+      functional_requirement: {
+        body: '## Descripción\n\n\n## Criterios de aceptación\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Categoría\n\n\n## Requisito\n\n\n## Medición\n\n',
+      },
+      business_requirement: {
+        body: '## Objetivo\n\n\n## Interesados\n\n\n## Criterios de éxito\n\n- \n',
+      },
+      business_rule: {
+        body: '## Enunciado de la regla\n\n\n## Condiciones\n\n\n## Excepciones\n\n',
+      },
+      business_process: {
+        body: '## Propósito\n\n\n## Pasos\n\n1. \n\n## Entradas y salidas\n\n',
+      },
+      system_specification: {
+        body: '## Alcance\n\n\n## Componentes\n\n\n## Restricciones\n\n',
+      },
+      api_specification: {
+        body: '## Endpoint\n\n\n## Solicitud\n\n\n## Respuesta\n\n\n## Errores\n\n',
+      },
+      data_model: {
+        body: '## Entidades\n\n\n## Relaciones\n\n\n## Restricciones\n\n',
+      },
+      architecture_decision: {
+        body: '## Contexto\n\n\n## Decisión\n\n\n## Consecuencias\n\n',
+      },
+      glossary_entry: {
+        body: '## Término\n\n\n## Definición\n\n\n## Términos relacionados\n\n',
+      },
+    },
   },
 };

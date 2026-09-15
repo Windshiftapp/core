@@ -11,8 +11,10 @@
   import PagePicker from '../../pickers/PagePicker.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions } from './requirementStatuses.js';
+  import { getRequirementStarterContent } from './requirementStarterTemplates.js';
 
   let {
     workspaceId,
@@ -28,19 +30,75 @@
   let parentId = $state(null);
   let saving = $state(false);
   let error = $state('');
+  let previousRequirementType = $state('use_case');
+  let contentTouched = $state(false);
 
   const typeOptions = $derived(requirementTypeOptions(t));
   const statusOptions = $derived(requirementStatusOptions(t));
 
+  function applyTemplate(type) {
+    content = getRequirementStarterContent(type, t);
+    contentTouched = false;
+  }
+
   function resetForm() {
     title = '';
-    content = '';
     requirementType = 'use_case';
     status = 'draft';
     ownerId = null;
     parentId = null;
     error = '';
+    previousRequirementType = 'use_case';
+    applyTemplate('use_case');
   }
+
+  async function confirmReplace() {
+    return confirm({
+      title: t('requirements.fieldType'),
+      message: t('requirements.templates.replaceConfirm'),
+      confirmText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      variant: 'primary',
+    });
+  }
+
+  async function handleTypeChange() {
+    const newType = requirementType;
+    const oldType = previousRequirementType;
+    if (newType === oldType) return;
+
+    if (content.trim() && contentTouched) {
+      const ok = await confirmReplace();
+      if (!ok) {
+        requirementType = oldType;
+        return;
+      }
+    }
+
+    applyTemplate(newType);
+    previousRequirementType = newType;
+  }
+
+  async function resetToTemplate() {
+    if (content.trim() && contentTouched) {
+      const ok = await confirmReplace();
+      if (!ok) return;
+    }
+    applyTemplate(requirementType);
+  }
+
+  function onContentInput() {
+    contentTouched = true;
+  }
+
+  function handleClose() {
+    open = false;
+    resetForm();
+  }
+
+  $effect(() => {
+    if (open) resetForm();
+  });
 
   async function submit() {
     if (!title.trim()) {
@@ -69,8 +127,8 @@
   }
 </script>
 
-<Modal bind:isOpen={open} maxWidth="max-w-lg" onclose={resetForm}>
-  <ModalHeader title={t('requirements.create')} onclose={() => (open = false)} />
+<Modal bind:isOpen={open} maxWidth="max-w-lg" onclose={handleClose}>
+  <ModalHeader title={t('requirements.create')} onclose={handleClose} />
   <div class="flex flex-col gap-4 p-4">
     {#if error}
       <p class="text-sm text-[var(--ds-text-danger)]">{error}</p>
@@ -79,10 +137,15 @@
       <Input bind:value={title} />
     </FormField>
     <FormField label={t('requirements.fieldContent')}>
-      <Textarea bind:value={content} rows={4} />
+      <div class="content-field">
+        <Textarea bind:value={content} rows={8} oninput={onContentInput} />
+        <Button variant="ghost" size="sm" onclick={resetToTemplate} disabled={saving}>
+          {t('requirements.templates.reset')}
+        </Button>
+      </div>
     </FormField>
     <FormField label={t('requirements.fieldType')} required>
-      <Select bind:value={requirementType} options={typeOptions} />
+      <Select bind:value={requirementType} options={typeOptions} onchange={handleTypeChange} />
     </FormField>
     <FormField label={t('requirements.fieldStatus')}>
       <Select bind:value={status} options={statusOptions} />
@@ -95,7 +158,7 @@
     </FormField>
   </div>
   <DialogFooter>
-    <Button variant="secondary" onclick={() => (open = false)} disabled={saving}>
+    <Button variant="secondary" onclick={handleClose} disabled={saving}>
       {t('common.cancel')}
     </Button>
     <Button onclick={submit} disabled={saving}>
@@ -103,3 +166,12 @@
     </Button>
   </DialogFooter>
 </Modal>
+
+<style>
+  .content-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+</style>

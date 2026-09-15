@@ -106,5 +106,43 @@ export default {
       approved: 'Утверждено',
       deprecated: 'Устарело',
     },
+    templates: {
+      reset: 'Сбросить к шаблону',
+      replaceConfirm: 'Заменить текущее содержимое шаблоном для этого типа?',
+      insertOnPromote: 'Вставить стартовый шаблон в содержимое страницы',
+      use_case: {
+        body: '## Участники\n\n\n## Предусловия\n\n\n## Основной сценарий\n\n1. \n\n## Постусловия\n\n',
+      },
+      functional_requirement: {
+        body: '## Описание\n\n\n## Критерии приёмки\n\n- \n',
+      },
+      non_functional_requirement: {
+        body: '## Категория\n\n\n## Требование\n\n\n## Измерение\n\n',
+      },
+      business_requirement: {
+        body: '## Цель\n\n\n## Заинтересованные стороны\n\n\n## Критерии успеха\n\n- \n',
+      },
+      business_rule: {
+        body: '## Формулировка правила\n\n\n## Условия\n\n\n## Исключения\n\n',
+      },
+      business_process: {
+        body: '## Назначение\n\n\n## Шаги\n\n1. \n\n## Входы и выходы\n\n',
+      },
+      system_specification: {
+        body: '## Область\n\n\n## Компоненты\n\n\n## Ограничения\n\n',
+      },
+      api_specification: {
+        body: '## Endpoint\n\n\n## Запрос\n\n\n## Ответ\n\n\n## Ошибки\n\n',
+      },
+      data_model: {
+        body: '## Сущности\n\n\n## Связи\n\n\n## Ограничения\n\n',
+      },
+      architecture_decision: {
+        body: '## Контекст\n\n\n## Решение\n\n\n## Последствия\n\n',
+      },
+      glossary_entry: {
+        body: '## Термин\n\n\n## Определение\n\n\n## Связанные термины\n\n',
+      },
+    },
   },
 };
