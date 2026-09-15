@@ -326,7 +326,8 @@ type pageReader interface {
 }
 
 type requirementApplication interface {
-	List(int, int, services.RequirementListFilter) ([]services.RequirementView, error)
+	List(int, int, services.RequirementListFilter) ([]services.RequirementView, int, error)
+	ListKeys(int, int) ([]services.RequirementKeyView, error)
 	Get(int, int, int) (*services.RequirementView, error)
 	GetByPage(int, int, int) (*services.RequirementView, error)
 	Create(services.AuditActor, services.CreateRequirementInput) (*services.RequirementView, error)
@@ -1034,6 +1035,8 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, booleanQuery("include_ended", "Whether ended test runs are included.", false))
 	case "GET /workspaces/{workspace_id}/requirements":
 		applyKnowledgeRequirementDocumentation(route, "List requirements")
+	case "GET /workspaces/{workspace_id}/requirements/keys":
+		applyKnowledgeRequirementDocumentation(route, "List requirement keys")
 		upsertParameter(route, stringQuery("q", "Case-insensitive requirement search."))
 		upsertParameter(route, stringQuery("requirement_type", "Restricts results to one requirement type."))
 		upsertParameter(route, stringQuery("status", "Restricts results to one requirement status."))

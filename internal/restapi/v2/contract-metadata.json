@@ -13065,6 +13065,29 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -13104,6 +13127,123 @@
           "500": {}
         },
         "summary": "Create requirement",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/keys": {
+      "get": {
+        "description": "List requirement keys. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive requirement search.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "requirement_type",
+            "In": "query",
+            "Description": "Restricts results to one requirement type.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "status",
+            "In": "query",
+            "Description": "Restricts results to one requirement status.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "owner_id",
+            "In": "query",
+            "Description": "Restricts results to one owner.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "has_item_links",
+            "In": "query",
+            "Description": "Whether the backing page has linked work items.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "has_test_links",
+            "In": "query",
+            "Description": "Whether the backing page has linked test cases.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "label_ids",
+            "In": "query",
+            "Description": "Comma-separated page label IDs.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum number of requirements.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "offset",
+            "In": "query",
+            "Description": "Number of requirements to skip.",
+            "Required": false,
+            "Schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List requirement keys",
         "tags": [
           "Knowledge"
         ]

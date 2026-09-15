@@ -1,10 +1,9 @@
-import { fetchV2Data } from './core.js';
+import { fetchAPIV2, fetchV2Data } from './core.js';
 import { buildQueryString } from './utils.js';
 
 /**
  * Workspace requirements API client (page-backed managed documents).
- */
-/**
+ *
  * @typedef {Object} RequirementListParams
  * @property {string} [q]
  * @property {string} [requirement_type]
@@ -19,8 +18,17 @@ import { buildQueryString } from './utils.js';
 
 export const requirements = {
   /** @param {number} workspaceId @param {RequirementListParams} [params] */
-  list: (workspaceId, params = {}) =>
-    fetchV2Data(`/workspaces/${workspaceId}/requirements${buildQueryString(params)}`),
+  list: async (workspaceId, params = {}) => {
+    const document = await fetchAPIV2(
+      `/workspaces/${workspaceId}/requirements${buildQueryString(params)}`
+    );
+    return {
+      items: Array.isArray(document?.data) ? document.data : [],
+      pagination: document?.pagination ?? null,
+    };
+  },
+
+  listKeys: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/requirements/keys`),
 
   get: (workspaceId, requirementNumber) =>
     fetchV2Data(`/workspaces/${workspaceId}/requirements/${requirementNumber}`),

@@ -22,6 +22,7 @@ export default {
     createTitleRequired: 'Укажите название.',
     promoteError: 'Не удалось повысить страницу до требования.',
     pageIndicator: 'Страница {page}',
+    pageRange: '{start}–{end} из {total}',
     columnKey: 'Ключ',
     columnTitle: 'Название',
     columnType: 'Тип',

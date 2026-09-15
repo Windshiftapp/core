@@ -193,12 +193,49 @@ func TestRequirementApplicationListExcludesHiddenPages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	views, err := f.app.List(f.viewer, f.wsID, RequirementListFilter{})
+	views, total, err := f.app.List(f.viewer, f.wsID, RequirementListFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(views) != 1 || views[0].RequirementNumber != open.RequirementNumber {
-		t.Fatalf("expected only open requirement, got %+v", views)
+	if total != 1 || len(views) != 1 || views[0].RequirementNumber != open.RequirementNumber {
+		t.Fatalf("expected only open requirement, got total=%d views=%+v", total, views)
+	}
+}
+
+func TestRequirementApplicationListKeysExcludesHiddenPages(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	open, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Open key",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidden, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Hidden key",
+		RequirementType: models.RequirementTypeBusinessRule,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pages.SetInheritPermissions(f.adminID, hidden.PageID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO page_permissions (page_id, principal_type, principal_id, permission_level, granted_by)
+		VALUES (?, 'user', ?, 'view', ?)
+	`, hidden.PageID, f.adminID, f.adminID); err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err := f.app.ListKeys(f.viewer, f.wsID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 || keys[0].PageID != open.PageID || keys[0].Key != open.Key {
+		t.Fatalf("expected only open key, got %+v", keys)
 	}
 }
 

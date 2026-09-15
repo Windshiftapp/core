@@ -246,17 +246,13 @@ func (r *RequirementRepository) GetLinkCountsByPageID(pageID int) (RequirementLi
 	return counts, nil
 }
 
-// ListByWorkspace returns requirements in a workspace with optional filters.
-func (r *RequirementRepository) ListByWorkspace(workspaceID int, filter RequirementListFilter) ([]RequirementListRow, error) {
-	query := `
-		SELECT ` + requirementAliasedColumns + `, p.title, p.archived_at,
-			` + requirementLinkedItemCountSubquery + ` AS linked_item_count,
-			` + requirementLinkedTestCountSubquery + ` AS linked_test_count
-		FROM requirements r
-		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
-		WHERE r.workspace_id = ?`
-	args := []any{workspaceID}
+// RequirementKeyRow is a minimal requirement identity for key maps.
+type RequirementKeyRow struct {
+	PageID            int
+	RequirementNumber int
+}
 
+func (r *RequirementRepository) appendListWhere(query string, args []any, filter RequirementListFilter) (queryOut string, argsOut []any) {
 	if filter.ExcludeArchived {
 		query += ` AND p.archived_at IS NULL`
 	}
@@ -302,7 +298,112 @@ func (r *RequirementRepository) ListByWorkspace(workspaceID int, filter Requirem
 		query += ` AND (LOWER(p.title) LIKE ? OR CAST(r.requirement_number AS TEXT) LIKE ?)`
 		args = append(args, like, like)
 	}
+	queryOut = query
+	argsOut = args
+	return
+}
 
+// ListPageIDsByWorkspace returns backing page IDs matching filters in requirement-number order.
+func (r *RequirementRepository) ListPageIDsByWorkspace(workspaceID int, filter RequirementListFilter) ([]int, error) {
+	query := `
+		SELECT r.page_id
+		FROM requirements r
+		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
+		WHERE r.workspace_id = ?`
+	args := []any{workspaceID}
+	query, args = r.appendListWhere(query, args, filter)
+	query += ` ORDER BY r.requirement_number ASC`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list requirement page ids in workspace %d: %w", workspaceID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []int
+	for rows.Next() {
+		var pageID int
+		if err := rows.Scan(&pageID); err != nil {
+			return nil, fmt.Errorf("scan requirement page id: %w", err)
+		}
+		out = append(out, pageID)
+	}
+	return out, rows.Err()
+}
+
+// ListKeysByWorkspace returns minimal requirement identity rows for key maps.
+func (r *RequirementRepository) ListKeysByWorkspace(workspaceID int) ([]RequirementKeyRow, error) {
+	filter := RequirementListFilter{ExcludeArchived: true}
+	query := `
+		SELECT r.page_id, r.requirement_number
+		FROM requirements r
+		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
+		WHERE r.workspace_id = ?`
+	args := []any{workspaceID}
+	query, args = r.appendListWhere(query, args, filter)
+	query += ` ORDER BY r.requirement_number ASC`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list requirement keys in workspace %d: %w", workspaceID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []RequirementKeyRow
+	for rows.Next() {
+		var row RequirementKeyRow
+		if err := rows.Scan(&row.PageID, &row.RequirementNumber); err != nil {
+			return nil, fmt.Errorf("scan requirement key row: %w", err)
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// ListByPageIDs returns full list rows for the given backing pages in requirement-number order.
+func (r *RequirementRepository) ListByPageIDs(workspaceID int, pageIDs []int) ([]RequirementListRow, error) {
+	if len(pageIDs) == 0 {
+		return nil, nil
+	}
+	clause, args := inPlaceholders(pageIDs)
+	query := `
+		SELECT ` + requirementAliasedColumns + `, p.title, p.archived_at,
+			` + requirementLinkedItemCountSubquery + ` AS linked_item_count,
+			` + requirementLinkedTestCountSubquery + ` AS linked_test_count
+		FROM requirements r
+		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
+		WHERE r.workspace_id = ? AND r.page_id IN (` + clause + `)
+		ORDER BY r.requirement_number ASC`
+	args = append([]any{workspaceID}, args...)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list requirements by page ids in workspace %d: %w", workspaceID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []RequirementListRow
+	for rows.Next() {
+		row, scanErr := scanRequirementListRow(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan requirement list row: %w", scanErr)
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// ListByWorkspace returns requirements in a workspace with optional filters.
+func (r *RequirementRepository) ListByWorkspace(workspaceID int, filter RequirementListFilter) ([]RequirementListRow, error) {
+	query := `
+		SELECT ` + requirementAliasedColumns + `, p.title, p.archived_at,
+			` + requirementLinkedItemCountSubquery + ` AS linked_item_count,
+			` + requirementLinkedTestCountSubquery + ` AS linked_test_count
+		FROM requirements r
+		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
+		WHERE r.workspace_id = ?`
+	args := []any{workspaceID}
+	query, args = r.appendListWhere(query, args, filter)
 	query += ` ORDER BY r.requirement_number ASC`
 	if filter.Limit > 0 {
 		query += ` LIMIT ?`

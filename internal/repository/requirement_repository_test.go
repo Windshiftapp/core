@@ -401,4 +401,28 @@ func TestRequirementListByWorkspaceLinkFiltersAndCounts(t *testing.T) {
 	if counts.LinkedItemCount != 1 || counts.LinkedTestCount != 0 {
 		t.Fatalf("unexpected link counts: %+v", counts)
 	}
+
+	pageIDs, err := f.repo.ListPageIDsByWorkspace(1, RequirementListFilter{ExcludeArchived: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pageIDs) != 4 {
+		t.Fatalf("expected four requirement page IDs, got %d", len(pageIDs))
+	}
+
+	pageIDs, err = f.repo.ListPageIDsByWorkspace(1, RequirementListFilter{ExcludeArchived: true, HasItemLinks: &hasItems})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pageIDs) != 1 || pageIDs[0] != linkedPage {
+		t.Fatalf("expected one page ID with item links, got %+v", pageIDs)
+	}
+
+	keys, err := f.repo.ListKeysByWorkspace(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 4 {
+		t.Fatalf("expected four requirement keys, got %d", len(keys))
+	}
 }

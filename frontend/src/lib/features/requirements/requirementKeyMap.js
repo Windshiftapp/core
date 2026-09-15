@@ -1,7 +1,5 @@
 import { api } from '../../api.js';
 
-const LIST_LIMIT = 500;
-
 /**
  * @typedef {{ key: string, requirement_number: number }} RequirementPageMeta
  */
@@ -14,7 +12,7 @@ const LIST_LIMIT = 500;
 export async function buildRequirementKeyByPageId(workspaceId) {
   if (!workspaceId) return new Map();
   try {
-    const rows = await api.requirements.list(workspaceId, { limit: LIST_LIMIT });
+    const rows = await api.requirements.listKeys(workspaceId);
     const map = new Map();
     for (const row of rows || []) {
       if (row?.page_id && row?.key) {

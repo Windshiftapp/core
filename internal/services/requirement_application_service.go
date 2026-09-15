@@ -19,6 +19,13 @@ type RequirementView struct {
 	IsTestCovered   bool   `json:"is_test_covered"`
 }
 
+// RequirementKeyView is a minimal requirement identity for navigation maps.
+type RequirementKeyView struct {
+	PageID            int    `json:"page_id"`
+	RequirementNumber int    `json:"requirement_number"`
+	Key               string `json:"key"`
+}
+
 // RequirementApplicationService composes requirement domain operations with
 // page ACL checks and audit emission.
 type RequirementApplicationService struct {
@@ -46,38 +53,102 @@ func NewRequirementApplicationService(
 	}
 }
 
-// List returns visible requirements in a workspace.
-func (s *RequirementApplicationService) List(userID, workspaceID int, filter RequirementListFilter) ([]RequirementView, error) {
-	rows, err := s.requirements.List(workspaceID, filter)
+// List returns visible requirements in a workspace and the ACL-aware total for the filter.
+func (s *RequirementApplicationService) List(userID, workspaceID int, filter RequirementListFilter) ([]RequirementView, int, error) {
+	visiblePageIDs, err := s.visiblePageIDsForFilter(userID, workspaceID, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	total := len(visiblePageIDs)
+	if total == 0 {
+		return []RequirementView{}, 0, nil
+	}
+
+	start := filter.Offset
+	if start > total {
+		start = total
+	}
+	end := total
+	if filter.Limit > 0 && start+filter.Limit < end {
+		end = start + filter.Limit
+	}
+	pageSlice := visiblePageIDs[start:end]
+	if len(pageSlice) == 0 {
+		return []RequirementView{}, total, nil
+	}
+
+	rows, err := s.requirements.ListByPageIDs(workspaceID, pageSlice)
+	if err != nil {
+		return nil, 0, err
+	}
+	workspaceKey, err := s.workspaces.GetKey(workspaceID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	views := make([]RequirementView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, requirementViewFromRow(row, workspaceKey))
+	}
+	return views, total, nil
+}
+
+// ListKeys returns visible requirement keys for navigation maps.
+func (s *RequirementApplicationService) ListKeys(userID, workspaceID int) ([]RequirementKeyView, error) {
+	rows, err := s.requirements.ListKeys(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
-		return []RequirementView{}, nil
+		return []RequirementKeyView{}, nil
 	}
 
 	pageIDs := make([]int, len(rows))
 	for i := range rows {
-		pageIDs[i] = rows[i].Requirement.PageID
+		pageIDs[i] = rows[i].PageID
 	}
 	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, pageIDs)
 	if err != nil {
 		return nil, err
 	}
-
 	workspaceKey, err := s.workspaces.GetKey(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 
-	views := make([]RequirementView, 0, len(rows))
+	out := make([]RequirementKeyView, 0, len(rows))
 	for _, row := range rows {
-		if !visible[row.Requirement.PageID] {
+		if !visible[row.PageID] {
 			continue
 		}
-		views = append(views, requirementViewFromRow(row, workspaceKey))
+		out = append(out, RequirementKeyView{
+			PageID:            row.PageID,
+			RequirementNumber: row.RequirementNumber,
+			Key:               models.FormatRequirementKey(workspaceKey, row.RequirementNumber),
+		})
 	}
-	return views, nil
+	return out, nil
+}
+
+func (s *RequirementApplicationService) visiblePageIDsForFilter(userID, workspaceID int, filter RequirementListFilter) ([]int, error) {
+	pageIDs, err := s.requirements.ListPageIDs(workspaceID, filter)
+	if err != nil {
+		return nil, err
+	}
+	if len(pageIDs) == 0 {
+		return nil, nil
+	}
+	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, pageIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if visible[pageID] {
+			out = append(out, pageID)
+		}
+	}
+	return out, nil
 }
 
 // GetByPage returns the requirement backing a page when the caller can view it.

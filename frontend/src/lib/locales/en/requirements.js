@@ -22,6 +22,7 @@ export default {
     createTitleRequired: 'Title is required.',
     promoteError: 'Failed to promote page to requirement.',
     pageIndicator: 'Page {page}',
+    pageRange: '{start}–{end} of {total}',
     columnKey: 'Key',
     columnTitle: 'Title',
     columnType: 'Type',

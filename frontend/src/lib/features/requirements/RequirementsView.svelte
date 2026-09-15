@@ -7,7 +7,6 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import EmptyState from '../../components/EmptyState.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import Select from '../../components/Select.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
@@ -38,7 +37,7 @@
   let filterTestLinks = $state('');
   let selectedLabelIds = $state(new Set());
   let pageIndex = $state(0);
-  let hasNextPage = $state(false);
+  let totalItems = $state(0);
   let showCreateDialog = $state(false);
   let assignableUsers = $state([]);
 
@@ -93,6 +92,10 @@
     { value: 'false', label: t('requirements.filters.uncovered') },
   ]);
 
+  const pageStart = $derived(totalItems === 0 ? 0 : pageIndex * PAGE_SIZE + 1);
+  const pageEnd = $derived(Math.min(totalItems, (pageIndex + 1) * PAGE_SIZE));
+  const hasNextPage = $derived(pageEnd < totalItems);
+
   const userLabelById = $derived(
     new Map(
       assignableUsers.map((user) => [
@@ -141,11 +144,12 @@
         limit: PAGE_SIZE,
         offset: pageIndex * PAGE_SIZE,
       });
-      rows = Array.isArray(result) ? result : [];
-      hasNextPage = rows.length === PAGE_SIZE;
+      rows = result.items ?? [];
+      totalItems = result.pagination?.total_items ?? rows.length;
     } catch (err) {
       error = err?.message || t('requirements.loadError');
       rows = [];
+      totalItems = 0;
     } finally {
       loading = false;
     }
@@ -404,7 +408,7 @@
         {t('common.previous')}
       </Button>
       <span class="text-sm text-[var(--ds-text-subtle)]">
-        {t('requirements.pageIndicator', { page: pageIndex + 1 })}
+        {t('requirements.pageRange', { start: pageStart, end: pageEnd, total: totalItems })}
       </span>
       <Button variant="secondary" size="sm" onclick={nextPage} disabled={!hasNextPage || loading}>
         {t('common.next')}

@@ -14,7 +14,8 @@ import (
 
 func registerRequirementRoutes(builder *routeBuilder, deps Deps) {
 	requirements := deps.RequirementApplication
-	builder.Read("/workspaces/{workspace_id}/requirements", AuthAuthenticated, []string{"pages:read"}, listRequirements(requirements))
+	builder.Page("/workspaces/{workspace_id}/requirements", AuthAuthenticated, []string{"pages:read"}, listRequirements(requirements))
+	builder.Read("/workspaces/{workspace_id}/requirements/keys", AuthAuthenticated, []string{"pages:read"}, listRequirementKeys(requirements))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/requirements", http.StatusCreated, false, AuthAuthenticated, []string{"pages:write"}, createRequirement(requirements))
 	builder.Read("/workspaces/{workspace_id}/requirements/{requirement_number}", AuthAuthenticated, []string{"pages:read"}, getRequirement(requirements))
 	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/requirements/{requirement_number}", http.StatusOK, true, AuthAuthenticated, []string{"pages:write"}, updateRequirement(requirements))
@@ -45,49 +46,83 @@ type promoteRequirementRequest struct {
 	OwnerID         *int   `json:"owner_id"`
 }
 
-func listRequirements(requirements requirementApplication) readOperation[[]services.RequirementView] {
-	return func(r *http.Request) ([]services.RequirementView, error) {
+func listRequirements(requirements requirementApplication) pageOperation[services.RequirementView] {
+	return func(r *http.Request) ([]services.RequirementView, Pagination, int, error) {
+		user, workspaceID, err := principalAndWorkspace(r)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		page, err := parseRequirementListPagination(r)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		filter, err := parseRequirementListFilter(r, page)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		result, total, err := requirements.List(user.ID, workspaceID, filter)
+		if err != nil {
+			return nil, Pagination{}, 0, requirementError(err)
+		}
+		return result, page, total, nil
+	}
+}
+
+func listRequirementKeys(requirements requirementApplication) readOperation[[]services.RequirementKeyView] {
+	return func(r *http.Request) ([]services.RequirementKeyView, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
 			return nil, err
 		}
-		limit, err := parsePositiveInt(r, "limit", 50, 100)
-		if err != nil {
-			return nil, err
-		}
-		offset, err := parseNonNegativeQueryInt(r, "offset", 0)
-		if err != nil {
-			return nil, err
-		}
-		ownerID, err := optionalPositiveQuery(r, "owner_id")
-		if err != nil {
-			return nil, err
-		}
-		hasItemLinks, err := optionalBoolPtrQuery(r, "has_item_links")
-		if err != nil {
-			return nil, err
-		}
-		hasTestLinks, err := optionalBoolPtrQuery(r, "has_test_links")
-		if err != nil {
-			return nil, err
-		}
-		labelIDs, err := parseCommaSeparatedPositiveInts(r, "label_ids")
-		if err != nil {
-			return nil, err
-		}
-		result, err := requirements.List(user.ID, workspaceID, services.RequirementListFilter{
-			Query:           r.URL.Query().Get("q"),
-			RequirementType: r.URL.Query().Get("requirement_type"),
-			Status:          r.URL.Query().Get("status"),
-			OwnerID:         ownerID,
-			HasItemLinks:    hasItemLinks,
-			HasTestLinks:    hasTestLinks,
-			LabelIDs:        labelIDs,
-			Limit:           limit,
-			Offset:          offset,
-		})
+		result, err := requirements.ListKeys(user.ID, workspaceID)
 		return result, requirementError(err)
 	}
+}
+
+func parseRequirementListPagination(r *http.Request) (Pagination, error) {
+	limit, err := parsePositiveInt(r, "limit", 50, 100)
+	if err != nil {
+		return Pagination{}, err
+	}
+	offset, err := parseNonNegativeQueryInt(r, "offset", 0)
+	if err != nil {
+		return Pagination{}, err
+	}
+	page := offset/limit + 1
+	if limit == 0 {
+		page = 1
+	}
+	return Pagination{Page: page, PageSize: limit, Offset: offset}, nil
+}
+
+func parseRequirementListFilter(r *http.Request, page Pagination) (services.RequirementListFilter, error) {
+	ownerID, err := optionalPositiveQuery(r, "owner_id")
+	if err != nil {
+		return services.RequirementListFilter{}, err
+	}
+	hasItemLinks, err := optionalBoolPtrQuery(r, "has_item_links")
+	if err != nil {
+		return services.RequirementListFilter{}, err
+	}
+	hasTestLinks, err := optionalBoolPtrQuery(r, "has_test_links")
+	if err != nil {
+		return services.RequirementListFilter{}, err
+	}
+	labelIDs, err := parseCommaSeparatedPositiveInts(r, "label_ids")
+	if err != nil {
+		return services.RequirementListFilter{}, err
+	}
+	return services.RequirementListFilter{
+		Query:           r.URL.Query().Get("q"),
+		RequirementType: r.URL.Query().Get("requirement_type"),
+		Status:          r.URL.Query().Get("status"),
+		OwnerID:         ownerID,
+		HasItemLinks:    hasItemLinks,
+		HasTestLinks:    hasTestLinks,
+		LabelIDs:        labelIDs,
+		Limit:           page.PageSize,
+		Offset:          page.Offset,
+	}, nil
 }
 
 func createRequirement(requirements requirementApplication) jsonOperation[createRequirementRequest, services.RequirementView] {

@@ -33348,6 +33348,41 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdRequirementsKeysResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "description": "The key value.",
+                  "type": "string"
+                },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "requirement_number": {
+                  "description": "The requirement number value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "page_id",
+                "requirement_number"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdRequirementsRequirementNumberHistoryResult": {
         "additionalProperties": false,
         "properties": {
@@ -33598,10 +33633,14 @@
               "type": "object"
             },
             "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
           }
         },
         "required": [
-          "data"
+          "data",
+          "pagination"
         ],
         "type": "object"
       },
@@ -104629,6 +104668,29 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -104743,6 +104805,152 @@
         ],
         "x-required-scopes": [
           "pages:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/keys": {
+      "get": {
+        "description": "List requirement keys. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdRequirementsKeys",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive requirement search.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one requirement type.",
+            "in": "query",
+            "name": "requirement_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one requirement status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one owner.",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Whether the backing page has linked work items.",
+            "in": "query",
+            "name": "has_item_links",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether the backing page has linked test cases.",
+            "in": "query",
+            "name": "has_test_links",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Comma-separated page label IDs.",
+            "in": "query",
+            "name": "label_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of requirements.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of requirements to skip.",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdRequirementsKeysResult"
+                }
+              }
+            },
+            "description": "List requirement keys response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List requirement keys",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
         ]
       }
     },

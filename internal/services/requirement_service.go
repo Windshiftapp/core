@@ -213,6 +213,30 @@ func (s *RequirementService) Update(actorID, workspaceID, number int, patch Requ
 	})
 }
 
+// ListPageIDs returns backing page IDs matching filters without ACL filtering.
+func (s *RequirementService) ListPageIDs(workspaceID int, filter RequirementListFilter) ([]int, error) {
+	return s.requirements.ListPageIDsByWorkspace(workspaceID, repository.RequirementListFilter{
+		Query:           filter.Query,
+		RequirementType: filter.RequirementType,
+		Status:          filter.Status,
+		OwnerID:         filter.OwnerID,
+		HasItemLinks:    filter.HasItemLinks,
+		HasTestLinks:    filter.HasTestLinks,
+		LabelIDs:        filter.LabelIDs,
+		ExcludeArchived: true,
+	})
+}
+
+// ListKeys returns minimal requirement identity rows without ACL filtering.
+func (s *RequirementService) ListKeys(workspaceID int) ([]repository.RequirementKeyRow, error) {
+	return s.requirements.ListKeysByWorkspace(workspaceID)
+}
+
+// ListByPageIDs returns full list rows for backing pages without ACL filtering.
+func (s *RequirementService) ListByPageIDs(workspaceID int, pageIDs []int) ([]repository.RequirementListRow, error) {
+	return s.requirements.ListByPageIDs(workspaceID, pageIDs)
+}
+
 // List returns workspace requirements without ACL filtering.
 func (s *RequirementService) List(workspaceID int, filter RequirementListFilter) ([]repository.RequirementListRow, error) {
 	return s.requirements.ListByWorkspace(workspaceID, repository.RequirementListFilter{
