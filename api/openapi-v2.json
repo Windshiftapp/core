@@ -32486,6 +32486,105 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdPagesPageIdRequirementResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_test_covered": {
+                "description": "The is test covered value.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The key value.",
+                "type": "string"
+              },
+              "linked_item_count": {
+                "description": "The linked item count value.",
+                "type": "integer"
+              },
+              "linked_test_count": {
+                "description": "The linked test count value.",
+                "type": "integer"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "requirement_number": {
+                "description": "The requirement number value.",
+                "type": "integer"
+              },
+              "requirement_type": {
+                "description": "The requirement type value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "The updated by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "created_by",
+              "id",
+              "is_test_covered",
+              "key",
+              "linked_item_count",
+              "linked_test_count",
+              "page_id",
+              "page_title",
+              "requirement_number",
+              "requirement_type",
+              "status",
+              "updated_at",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdPagesPageIdResult": {
         "additionalProperties": false,
         "properties": {
@@ -33216,6 +33315,263 @@
                 "workspace_id",
                 "workspace_key",
                 "workspace_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdRequirementsRequirementNumberHistoryResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "changed_at": {
+                  "description": "The changed at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "field_name": {
+                  "description": "The field name value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "new_value": {
+                  "description": "The new value value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "old_value": {
+                  "description": "The old value value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "requirement_id": {
+                  "description": "The requirement id value.",
+                  "type": "integer"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "changed_at",
+                "field_name",
+                "id",
+                "requirement_id",
+                "user_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdRequirementsRequirementNumberResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_test_covered": {
+                "description": "The is test covered value.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The key value.",
+                "type": "string"
+              },
+              "linked_item_count": {
+                "description": "The linked item count value.",
+                "type": "integer"
+              },
+              "linked_test_count": {
+                "description": "The linked test count value.",
+                "type": "integer"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "requirement_number": {
+                "description": "The requirement number value.",
+                "type": "integer"
+              },
+              "requirement_type": {
+                "description": "The requirement type value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "The updated by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "created_by",
+              "id",
+              "is_test_covered",
+              "key",
+              "linked_item_count",
+              "linked_test_count",
+              "page_id",
+              "page_title",
+              "requirement_number",
+              "requirement_type",
+              "status",
+              "updated_at",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdRequirementsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "description": "The created by value.",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "is_test_covered": {
+                  "description": "The is test covered value.",
+                  "type": "boolean"
+                },
+                "key": {
+                  "description": "The key value.",
+                  "type": "string"
+                },
+                "linked_item_count": {
+                  "description": "The linked item count value.",
+                  "type": "integer"
+                },
+                "linked_test_count": {
+                  "description": "The linked test count value.",
+                  "type": "integer"
+                },
+                "owner_id": {
+                  "description": "The owner id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "page_title": {
+                  "description": "The page title value.",
+                  "type": "string"
+                },
+                "requirement_number": {
+                  "description": "The requirement number value.",
+                  "type": "integer"
+                },
+                "requirement_type": {
+                  "description": "The requirement type value.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "updated_by": {
+                  "description": "The updated by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "created_at",
+                "created_by",
+                "id",
+                "is_test_covered",
+                "key",
+                "linked_item_count",
+                "linked_test_count",
+                "page_id",
+                "page_title",
+                "requirement_number",
+                "requirement_type",
+                "status",
+                "updated_at",
+                "workspace_id"
               ],
               "type": "object"
             },
@@ -52277,6 +52633,126 @@
             "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdRequirementsRequirementNumberPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_id": {
+            "description": "The owner id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "requirement_type": {
+            "description": "The requirement type value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdRequirementsRequirementNumberResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_test_covered": {
+                "description": "The is test covered value.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The key value.",
+                "type": "string"
+              },
+              "linked_item_count": {
+                "description": "The linked item count value.",
+                "type": "integer"
+              },
+              "linked_test_count": {
+                "description": "The linked test count value.",
+                "type": "integer"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "requirement_number": {
+                "description": "The requirement number value.",
+                "type": "integer"
+              },
+              "requirement_type": {
+                "description": "The requirement type value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "The updated by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "created_by",
+              "id",
+              "is_test_covered",
+              "key",
+              "linked_item_count",
+              "linked_test_count",
+              "page_id",
+              "page_title",
+              "requirement_number",
+              "requirement_type",
+              "status",
+              "updated_at",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
         "type": "object"
       },
       "PatchWorkspacesWorkspaceIdResult": {
@@ -75084,6 +75560,128 @@
         ],
         "type": "object"
       },
+      "PostWorkspacesWorkspaceIdPagesPageIdPromoteToRequirementPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "owner_id": {
+            "description": "The owner id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "requirement_type": {
+            "description": "The requirement type value.",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement_type",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdPagesPageIdPromoteToRequirementResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_test_covered": {
+                "description": "The is test covered value.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The key value.",
+                "type": "string"
+              },
+              "linked_item_count": {
+                "description": "The linked item count value.",
+                "type": "integer"
+              },
+              "linked_test_count": {
+                "description": "The linked test count value.",
+                "type": "integer"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "requirement_number": {
+                "description": "The requirement number value.",
+                "type": "integer"
+              },
+              "requirement_type": {
+                "description": "The requirement type value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "The updated by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "created_by",
+              "id",
+              "is_test_covered",
+              "key",
+              "linked_item_count",
+              "linked_test_count",
+              "page_id",
+              "page_title",
+              "requirement_number",
+              "requirement_type",
+              "status",
+              "updated_at",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostWorkspacesWorkspaceIdPagesPageIdUnarchiveResult": {
         "additionalProperties": false,
         "properties": {
@@ -75449,6 +76047,149 @@
               "path",
               "slug",
               "title",
+              "updated_at",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdRequirementsPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "description": "The content value.",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "The metadata value.",
+            "format": "byte",
+            "type": "string"
+          },
+          "owner_id": {
+            "description": "The owner id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "parent_id": {
+            "description": "The parent id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "requirement_type": {
+            "description": "The requirement type value.",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status value.",
+            "type": "string"
+          },
+          "title": {
+            "description": "The title value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "metadata",
+          "requirement_type",
+          "status",
+          "title"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdRequirementsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_test_covered": {
+                "description": "The is test covered value.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The key value.",
+                "type": "string"
+              },
+              "linked_item_count": {
+                "description": "The linked item count value.",
+                "type": "integer"
+              },
+              "linked_test_count": {
+                "description": "The linked test count value.",
+                "type": "integer"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "requirement_number": {
+                "description": "The requirement number value.",
+                "type": "integer"
+              },
+              "requirement_type": {
+                "description": "The requirement type value.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "The updated by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "created_by",
+              "id",
+              "is_test_covered",
+              "key",
+              "linked_item_count",
+              "linked_test_count",
+              "page_id",
+              "page_title",
+              "requirement_number",
+              "requirement_type",
+              "status",
               "updated_at",
               "workspace_id"
             ],
@@ -103267,6 +104008,92 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/pages/{page_id}/promote-to-requirement": {
+      "post": {
+        "description": "Promote page to requirement. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdPagesPageIdPromoteToRequirement",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The page identifier.",
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdPagesPageIdPromoteToRequirementPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdPagesPageIdPromoteToRequirementResult"
+                }
+              }
+            },
+            "description": "Promote page to requirement response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Promote page to requirement",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:write"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/pages/{page_id}/publication": {
       "get": {
         "description": "Get page publication. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -103326,6 +104153,73 @@
           }
         ],
         "summary": "Get page publication",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/pages/{page_id}/requirement": {
+      "get": {
+        "description": "Get page requirement. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdPagesPageIdRequirement",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The page identifier.",
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdPagesPageIdRequirementResult"
+                }
+              }
+            },
+            "description": "Get page requirement response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get page requirement",
         "tags": [
           "Knowledge"
         ],
@@ -103512,6 +104406,444 @@
         ],
         "x-required-scopes": [
           "items:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements": {
+      "get": {
+        "description": "List requirements. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdRequirements",
+        "parameters": [
+          {
+            "description": "Case-insensitive requirement search.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one requirement type.",
+            "in": "query",
+            "name": "requirement_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one requirement status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to one owner.",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Whether the backing page has linked work items.",
+            "in": "query",
+            "name": "has_item_links",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Whether the backing page has linked test cases.",
+            "in": "query",
+            "name": "has_test_links",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Comma-separated page label IDs.",
+            "in": "query",
+            "name": "label_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of requirements.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of requirements to skip.",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdRequirementsResult"
+                }
+              }
+            },
+            "description": "List requirements response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List requirements",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
+        ]
+      },
+      "post": {
+        "description": "Create requirement. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdRequirements",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdRequirementsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdRequirementsResult"
+                }
+              }
+            },
+            "description": "Create requirement response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create requirement",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/{requirement_number}": {
+      "get": {
+        "description": "Get requirement. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdRequirementsRequirementNumber",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The requirement number within the workspace.",
+            "in": "path",
+            "name": "requirement_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdRequirementsRequirementNumberResult"
+                }
+              }
+            },
+            "description": "Get requirement response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get requirement",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
+        ]
+      },
+      "patch": {
+        "description": "Update requirement. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdRequirementsRequirementNumber",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The requirement number within the workspace.",
+            "in": "path",
+            "name": "requirement_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdRequirementsRequirementNumberPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdRequirementsRequirementNumberResult"
+                }
+              }
+            },
+            "description": "Update requirement response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update requirement",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/{requirement_number}/history": {
+      "get": {
+        "description": "List requirement history. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdRequirementsRequirementNumberHistory",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The requirement number within the workspace.",
+            "in": "path",
+            "name": "requirement_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdRequirementsRequirementNumberHistoryResult"
+                }
+              }
+            },
+            "description": "List requirement history response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List requirement history",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
         ]
       }
     },

@@ -21,6 +21,16 @@ const requirementColumns = `id, page_id, workspace_id, requirement_number, requi
 const requirementAliasedColumns = `r.id, r.page_id, r.workspace_id, r.requirement_number, r.requirement_type, r.status,
 	r.owner_id, r.created_by, r.created_at, r.updated_by, r.updated_at`
 
+const requirementLinkedItemCountSubquery = `
+	(SELECT COUNT(*) FROM item_links il
+	 WHERE (il.source_type = 'page' AND il.source_id = r.page_id AND il.target_type = 'item')
+	    OR (il.target_type = 'page' AND il.target_id = r.page_id AND il.source_type = 'item'))`
+
+const requirementLinkedTestCountSubquery = `
+	(SELECT COUNT(*) FROM item_links il
+	 WHERE (il.source_type = 'page' AND il.source_id = r.page_id AND il.target_type = 'test_case')
+	    OR (il.target_type = 'page' AND il.target_id = r.page_id AND il.source_type = 'test_case'))`
+
 // RequirementRepository persists page-backed requirements and their
 // workspace-scoped number sequences.
 type RequirementRepository struct {
@@ -164,6 +174,9 @@ type RequirementListFilter struct {
 	RequirementType string
 	Status          string
 	OwnerID         *int
+	HasItemLinks    *bool
+	HasTestLinks    *bool
+	LabelIDs        []int
 	ExcludeArchived bool
 	Limit           int
 	Offset          int
@@ -171,9 +184,17 @@ type RequirementListFilter struct {
 
 // RequirementListRow is a requirement joined with its backing page metadata.
 type RequirementListRow struct {
-	Requirement    models.Requirement
-	PageTitle      string
-	PageArchivedAt *time.Time
+	Requirement     models.Requirement
+	PageTitle       string
+	PageArchivedAt  *time.Time
+	LinkedItemCount int
+	LinkedTestCount int
+}
+
+// RequirementLinkCounts holds traceability aggregates for a backing page.
+type RequirementLinkCounts struct {
+	LinkedItemCount int
+	LinkedTestCount int
 }
 
 // RequirementUpdatePatch carries mutable requirement metadata fields.
@@ -204,10 +225,30 @@ func (r *RequirementRepository) UpdateTx(tx database.Tx, id int, patch Requireme
 	return nil
 }
 
+// GetLinkCountsByPageID returns traceability aggregates for a backing page.
+func (r *RequirementRepository) GetLinkCountsByPageID(pageID int) (RequirementLinkCounts, error) {
+	var counts RequirementLinkCounts
+	err := r.db.QueryRow(`
+		SELECT
+			(SELECT COUNT(*) FROM item_links il
+			 WHERE (il.source_type = 'page' AND il.source_id = ? AND il.target_type = 'item')
+			    OR (il.target_type = 'page' AND il.target_id = ? AND il.source_type = 'item')),
+			(SELECT COUNT(*) FROM item_links il
+			 WHERE (il.source_type = 'page' AND il.source_id = ? AND il.target_type = 'test_case')
+			    OR (il.target_type = 'page' AND il.target_id = ? AND il.source_type = 'test_case'))
+	`, pageID, pageID, pageID, pageID).Scan(&counts.LinkedItemCount, &counts.LinkedTestCount)
+	if err != nil {
+		return RequirementLinkCounts{}, fmt.Errorf("get requirement link counts for page %d: %w", pageID, err)
+	}
+	return counts, nil
+}
+
 // ListByWorkspace returns requirements in a workspace with optional filters.
 func (r *RequirementRepository) ListByWorkspace(workspaceID int, filter RequirementListFilter) ([]RequirementListRow, error) {
 	query := `
-		SELECT ` + requirementAliasedColumns + `, p.title, p.archived_at
+		SELECT ` + requirementAliasedColumns + `, p.title, p.archived_at,
+			` + requirementLinkedItemCountSubquery + ` AS linked_item_count,
+			` + requirementLinkedTestCountSubquery + ` AS linked_test_count
 		FROM requirements r
 		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
 		WHERE r.workspace_id = ?`
@@ -227,6 +268,31 @@ func (r *RequirementRepository) ListByWorkspace(workspaceID int, filter Requirem
 	if filter.OwnerID != nil {
 		query += ` AND r.owner_id = ?`
 		args = append(args, *filter.OwnerID)
+	}
+	if filter.HasItemLinks != nil {
+		if *filter.HasItemLinks {
+			query += ` AND ` + requirementLinkedItemCountSubquery + ` > 0`
+		} else {
+			query += ` AND ` + requirementLinkedItemCountSubquery + ` = 0`
+		}
+	}
+	if filter.HasTestLinks != nil {
+		if *filter.HasTestLinks {
+			query += ` AND ` + requirementLinkedTestCountSubquery + ` > 0`
+		} else {
+			query += ` AND ` + requirementLinkedTestCountSubquery + ` = 0`
+		}
+	}
+	if len(filter.LabelIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(filter.LabelIDs))
+		placeholders = placeholders[:len(placeholders)-1]
+		query += ` AND EXISTS (
+			SELECT 1 FROM page_label_assignments pla
+			WHERE pla.page_id = r.page_id AND pla.page_label_id IN (` + placeholders + `)
+		)`
+		for _, labelID := range filter.LabelIDs {
+			args = append(args, labelID)
+		}
 	}
 	if q := strings.TrimSpace(filter.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"
@@ -329,7 +395,7 @@ func scanRequirementListRow(rows *sql.Rows) (RequirementListRow, error) {
 		&row.Requirement.ID, &row.Requirement.PageID, &row.Requirement.WorkspaceID,
 		&row.Requirement.RequirementNumber, &row.Requirement.RequirementType, &row.Requirement.Status,
 		&ownerID, &row.Requirement.CreatedBy, &row.Requirement.CreatedAt, &updatedBy, &row.Requirement.UpdatedAt,
-		&row.PageTitle, &archivedAt,
+		&row.PageTitle, &archivedAt, &row.LinkedItemCount, &row.LinkedTestCount,
 	); err != nil {
 		return RequirementListRow{}, err
 	}

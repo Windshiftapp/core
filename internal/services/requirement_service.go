@@ -74,6 +74,9 @@ type RequirementListFilter struct {
 	RequirementType string
 	Status          string
 	OwnerID         *int
+	HasItemLinks    *bool
+	HasTestLinks    *bool
+	LabelIDs        []int
 	Limit           int
 	Offset          int
 }
@@ -217,10 +220,18 @@ func (s *RequirementService) List(workspaceID int, filter RequirementListFilter)
 		RequirementType: filter.RequirementType,
 		Status:          filter.Status,
 		OwnerID:         filter.OwnerID,
+		HasItemLinks:    filter.HasItemLinks,
+		HasTestLinks:    filter.HasTestLinks,
+		LabelIDs:        filter.LabelIDs,
 		ExcludeArchived: true,
 		Limit:           filter.Limit,
 		Offset:          filter.Offset,
 	})
+}
+
+// GetLinkCountsByPageID returns traceability aggregates for a backing page.
+func (s *RequirementService) GetLinkCountsByPageID(pageID int) (repository.RequirementLinkCounts, error) {
+	return s.requirements.GetLinkCountsByPageID(pageID)
 }
 
 // ListHistory returns metadata history for a requirement.

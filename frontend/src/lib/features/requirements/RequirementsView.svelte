@@ -16,6 +16,8 @@
   import PagesView from '../pages/PagesView.svelte';
   import RequirementCreateDialog from './RequirementCreateDialog.svelte';
   import RequirementHistoryDrawer from './RequirementHistoryDrawer.svelte';
+  import RequirementTraceabilityPanel from './RequirementTraceabilityPanel.svelte';
+  import PageLabelPicker from '../pages/PageLabelPicker.svelte';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions, requirementStatusLozenge } from './requirementStatuses.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
@@ -32,6 +34,9 @@
   let filterType = $state('');
   let filterStatus = $state('');
   let filterOwnerId = $state(null);
+  let filterItemLinks = $state('');
+  let filterTestLinks = $state('');
+  let selectedLabelIds = $state(new Set());
   let pageIndex = $state(0);
   let hasNextPage = $state(false);
   let showCreateDialog = $state(false);
@@ -72,7 +77,20 @@
     { key: 'requirement_type', label: t('requirements.columnType'), slot: 'requirement_type' },
     { key: 'status', label: t('requirements.columnStatus'), slot: 'status' },
     { key: 'owner_id', label: t('requirements.columnOwner'), slot: 'owner_id' },
+    { key: 'linked_item_count', label: t('requirements.columnLinkedItems'), slot: 'linked_item_count' },
+    { key: 'linked_test_count', label: t('requirements.columnTests'), slot: 'linked_test_count' },
     { key: 'updated_at', label: t('requirements.columnUpdated'), sortable: true, slot: 'updated_at' },
+  ]);
+
+  const linkFilterOptions = $derived([
+    { value: '', label: t('requirements.filters.anyLinks') },
+    { value: 'true', label: t('requirements.filters.hasLinks') },
+    { value: 'false', label: t('requirements.filters.noLinks') },
+  ]);
+  const testLinkFilterOptions = $derived([
+    { value: '', label: t('requirements.filters.anyCoverage') },
+    { value: 'true', label: t('requirements.filters.hasTestLinks') },
+    { value: 'false', label: t('requirements.filters.uncovered') },
   ]);
 
   const userLabelById = $derived(
@@ -117,6 +135,9 @@
         requirement_type: filterType || undefined,
         status: filterStatus || undefined,
         owner_id: filterOwnerId || undefined,
+        has_item_links: filterItemLinks || undefined,
+        has_test_links: filterTestLinks || undefined,
+        label_ids: selectedLabelIds.size > 0 ? [...selectedLabelIds].join(',') : undefined,
         limit: PAGE_SIZE,
         offset: pageIndex * PAGE_SIZE,
       });
@@ -214,6 +235,14 @@
     if (!ownerId) return '—';
     return userLabelById.get(ownerId) || `#${ownerId}`;
   }
+
+  function onLabelToggle(label) {
+    const next = new Set(selectedLabelIds);
+    if (next.has(label.id)) next.delete(label.id);
+    else next.add(label.id);
+    selectedLabelIds = next;
+    applyFilters();
+  }
 </script>
 
 {#if requirementNumber}
@@ -277,6 +306,9 @@
         </div>
       {/if}
     </div>
+    {#if detail?.page_id}
+      <RequirementTraceabilityPanel {workspaceId} pageId={detail.page_id} {canEdit} />
+    {/if}
     <div class="requirements-detail__editor min-h-0 flex-1">
       {#if detail?.page_id}
         <PagesView {workspaceId} pageId={detail.page_id} />
@@ -313,6 +345,15 @@
       <div class="min-w-[180px]">
         <UserPicker bind:value={filterOwnerId} {workspaceId} onSelect={applyFilters} />
       </div>
+      <Select bind:value={filterItemLinks} options={linkFilterOptions} onchange={applyFilters} />
+      <Select bind:value={filterTestLinks} options={testLinkFilterOptions} onchange={applyFilters} />
+      <PageLabelPicker
+        {workspaceId}
+        selectedIds={selectedLabelIds}
+        allowCreate={false}
+        triggerLabel={t('requirements.filters.labels')}
+        onToggle={onLabelToggle}
+      />
       <Button variant="secondary" onclick={applyFilters}>{t('common.apply')}</Button>
     </div>
 
@@ -342,6 +383,16 @@
       {/snippet}
       {#snippet owner_id(item)}
         {ownerLabel(item.owner_id)}
+      {/snippet}
+      {#snippet linked_item_count(item)}
+        {item.linked_item_count ?? 0}
+      {/snippet}
+      {#snippet linked_test_count(item)}
+        {#if (item.linked_test_count ?? 0) > 0}
+          <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
+        {:else}
+          <Lozenge color="red">{t('requirements.traceability.uncovered')}</Lozenge>
+        {/if}
       {/snippet}
       {#snippet updated_at(item)}
         {formatDateShort(item.updated_at)}

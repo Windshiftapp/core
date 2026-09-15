@@ -273,6 +273,8 @@ func autoLinkTypeNameForPair(srcType, tgtType string) string {
 		return "Page"
 	case a == "item" && b == "test_case":
 		return "Tests"
+	case a == "page" && b == "test_case":
+		return "Tests"
 	case a == "item" && b == "item":
 		return "Relates To"
 	default:

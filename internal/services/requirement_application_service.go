@@ -11,9 +11,12 @@ import (
 // RequirementView is the application-level response envelope for requirements.
 type RequirementView struct {
 	models.Requirement
-	Key       string `json:"key"`
-	PageTitle string `json:"page_title"`
-	PageID    int    `json:"page_id"`
+	Key             string `json:"key"`
+	PageTitle       string `json:"page_title"`
+	PageID          int    `json:"page_id"`
+	LinkedItemCount int    `json:"linked_item_count"`
+	LinkedTestCount int    `json:"linked_test_count"`
+	IsTestCovered   bool   `json:"is_test_covered"`
 }
 
 // RequirementApplicationService composes requirement domain operations with
@@ -72,12 +75,7 @@ func (s *RequirementApplicationService) List(userID, workspaceID int, filter Req
 		if !visible[row.Requirement.PageID] {
 			continue
 		}
-		views = append(views, RequirementView{
-			Requirement: row.Requirement,
-			Key:         models.FormatRequirementKey(workspaceKey, row.Requirement.RequirementNumber),
-			PageTitle:   row.PageTitle,
-			PageID:      row.Requirement.PageID,
-		})
+		views = append(views, requirementViewFromRow(row, workspaceKey))
 	}
 	return views, nil
 }
@@ -208,12 +206,31 @@ func (s *RequirementApplicationService) buildView(req *models.Requirement) (*Req
 	if err != nil {
 		return nil, err
 	}
+	counts, err := s.requirements.GetLinkCountsByPageID(req.PageID)
+	if err != nil {
+		return nil, err
+	}
 	return &RequirementView{
-		Requirement: *req,
-		Key:         models.FormatRequirementKey(workspaceKey, req.RequirementNumber),
-		PageTitle:   page.Title,
-		PageID:      req.PageID,
+		Requirement:     *req,
+		Key:             models.FormatRequirementKey(workspaceKey, req.RequirementNumber),
+		PageTitle:       page.Title,
+		PageID:          req.PageID,
+		LinkedItemCount: counts.LinkedItemCount,
+		LinkedTestCount: counts.LinkedTestCount,
+		IsTestCovered:   counts.LinkedTestCount > 0,
 	}, nil
+}
+
+func requirementViewFromRow(row repository.RequirementListRow, workspaceKey string) RequirementView {
+	return RequirementView{
+		Requirement:     row.Requirement,
+		Key:             models.FormatRequirementKey(workspaceKey, row.Requirement.RequirementNumber),
+		PageTitle:       row.PageTitle,
+		PageID:          row.Requirement.PageID,
+		LinkedItemCount: row.LinkedItemCount,
+		LinkedTestCount: row.LinkedTestCount,
+		IsTestCovered:   row.LinkedTestCount > 0,
+	}
 }
 
 func (s *RequirementApplicationService) canCreate(userID, workspaceID int) (bool, error) {

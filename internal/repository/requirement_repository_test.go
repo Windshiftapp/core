@@ -268,3 +268,137 @@ func TestRequirementUpdateTxPersistsMutableFields(t *testing.T) {
 		t.Fatalf("unexpected requirement after update: %+v", got)
 	}
 }
+
+func TestRequirementListByWorkspaceLinkFiltersAndCounts(t *testing.T) {
+	f := newRequirementRepoFixture(t)
+	linkedPage := f.insertPage(t, 1, "Linked")
+	barePage := f.insertPage(t, 1, "Bare")
+	testedPage := f.insertPage(t, 1, "Tested")
+	labeledPage := f.insertPage(t, 1, "Labeled")
+
+	insertRequirement := func(pageID int) {
+		t.Helper()
+		err := database.WithTx(f.db, func(tx database.Tx) error {
+			n, err := f.repo.NextNumberTx(tx, 1)
+			if err != nil {
+				return err
+			}
+			_, err = f.repo.InsertTx(tx, &models.Requirement{
+				PageID:            pageID,
+				WorkspaceID:       1,
+				RequirementNumber: n,
+				RequirementType:   models.RequirementTypeUseCase,
+				Status:            models.RequirementStatusDraft,
+				CreatedBy:         1,
+			})
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, pageID := range []int{linkedPage, barePage, testedPage, labeledPage} {
+		insertRequirement(pageID)
+	}
+
+	var itemID int
+	var statusID int
+	if err := f.db.QueryRow(`SELECT id FROM statuses ORDER BY id LIMIT 1`).Scan(&statusID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.QueryRow(`
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, frac_index, status_id, creator_id, last_active_at)
+		VALUES (1, 1, 'Linked item', '', 'a0', ?, 1, CURRENT_TIMESTAMP)
+		RETURNING id
+	`, statusID).Scan(&itemID); err != nil {
+		t.Fatal(err)
+	}
+	var pageLinkTypeID int
+	if err := f.db.QueryRow(`SELECT id FROM link_types WHERE name = 'Page'`).Scan(&pageLinkTypeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by)
+		VALUES (?, 'item', ?, 'page', ?, 1)
+	`, pageLinkTypeID, itemID, linkedPage); err != nil {
+		t.Fatal(err)
+	}
+
+	var testsLinkTypeID int
+	if err := f.db.QueryRow(`SELECT id FROM link_types WHERE builtin_key = 'tests'`).Scan(&testsLinkTypeID); err != nil {
+		t.Fatal(err)
+	}
+
+	var testCaseID int
+	if err := f.db.QueryRow(`
+		INSERT INTO test_cases (workspace_id, title, name)
+		VALUES (1, 'Login test', 'Login test')
+		RETURNING id
+	`).Scan(&testCaseID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by)
+		VALUES (?, 'page', ?, 'test_case', ?, 1)
+	`, testsLinkTypeID, testedPage, testCaseID); err != nil {
+		t.Fatal(err)
+	}
+
+	var labelID int
+	if err := f.db.QueryRow(`
+		INSERT INTO page_labels (name, color, workspace_id)
+		VALUES ('Spec', '#3B82F6', 1)
+		RETURNING id
+	`).Scan(&labelID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO page_label_assignments (page_id, page_label_id)
+		VALUES (?, ?)
+	`, labeledPage, labelID); err != nil {
+		t.Fatal(err)
+	}
+
+	hasItems := true
+	rows, err := f.repo.ListByWorkspace(1, RequirementListFilter{ExcludeArchived: true, HasItemLinks: &hasItems})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Requirement.PageID != linkedPage || rows[0].LinkedItemCount != 1 {
+		t.Fatalf("expected one item-linked requirement, got %+v", rows)
+	}
+
+	hasTests := true
+	rows, err = f.repo.ListByWorkspace(1, RequirementListFilter{ExcludeArchived: true, HasTestLinks: &hasTests})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Requirement.PageID != testedPage || rows[0].LinkedTestCount != 1 {
+		t.Fatalf("expected one test-linked requirement, got %+v", rows)
+	}
+
+	noTests := false
+	rows, err = f.repo.ListByWorkspace(1, RequirementListFilter{ExcludeArchived: true, HasTestLinks: &noTests})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected three requirements without test links, got %d", len(rows))
+	}
+
+	rows, err = f.repo.ListByWorkspace(1, RequirementListFilter{ExcludeArchived: true, LabelIDs: []int{labelID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Requirement.PageID != labeledPage {
+		t.Fatalf("expected one labeled requirement, got %+v", rows)
+	}
+
+	counts, err := f.repo.GetLinkCountsByPageID(linkedPage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.LinkedItemCount != 1 || counts.LinkedTestCount != 0 {
+		t.Fatalf("unexpected link counts: %+v", counts)
+	}
+}

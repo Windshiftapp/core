@@ -1424,6 +1424,30 @@ var Catalog = []Migration{
 				ON requirement_history(requirement_id, changed_at DESC);
 		`,
 	},
+	{
+		Version: "20260916_tests_link_type_page",
+		Name:    "Allow Tests link type to connect pages and test cases",
+		CheckSQLite: `
+			SELECT CASE
+				WHEN (SELECT allowed_entity_types FROM link_types WHERE builtin_key = 'tests') = '["item","test_case","page"]'
+				THEN 1 ELSE 0 END
+		`,
+		CheckPostgres: `
+			SELECT CASE
+				WHEN (SELECT allowed_entity_types FROM link_types WHERE builtin_key = 'tests') = '["item","test_case","page"]'
+				THEN 1 ELSE 0 END
+		`,
+		SQLite: `
+			UPDATE link_types
+			SET allowed_entity_types = '["item","test_case","page"]'
+			WHERE builtin_key = 'tests';
+		`,
+		Postgres: `
+			UPDATE link_types
+			SET allowed_entity_types = '["item","test_case","page"]'
+			WHERE builtin_key = 'tests';
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {

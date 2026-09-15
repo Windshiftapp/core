@@ -77,7 +77,7 @@ type defaultLinkType struct {
 }
 
 var defaultLinkTypes = []defaultLinkType{
-	{"tests", "Tests", "Test case tests work item", "tests", "tested by", "#10b981", true, strPtr(`["item","test_case"]`)},
+	{"tests", "Tests", "Test case tests work item or requirement page", "tests", "tested by", "#10b981", true, strPtr(`["item","test_case","page"]`)},
 	{"implements", "Implements", "Work item implements another work item", "implements", "implemented by", "#3b82f6", true, nil},
 	{"depends_on", "Depends On", "Work item depends on another work item", "depends on", "blocks", "#f59e0b", true, nil},
 	{"relates_to", "Relates To", "General bidirectional relationship", "relates to", "relates to", "#6b7280", true, nil},

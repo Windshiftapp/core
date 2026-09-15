@@ -288,7 +288,18 @@
     "/admin/groups/{group_id}": {
       "delete": {
         "description": ". The server verifies resource ownership and deletion preconditions before removing the resource.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "group_id",
+            "In": "path",
+            "Description": "The group id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -303,7 +314,18 @@
       },
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "group_id",
+            "In": "path",
+            "Description": "The group id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -318,7 +340,18 @@
       },
       "patch": {
         "description": ". The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "group_id",
+            "In": "path",
+            "Description": "The group id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "400": {},
           "401": {},
@@ -602,7 +635,18 @@
     "/admin/users/{user_id}": {
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -617,7 +661,18 @@
       },
       "patch": {
         "description": ". The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "400": {},
           "401": {},
@@ -1265,7 +1320,18 @@
     "/asset-categories/{category_id}/move": {
       "post": {
         "description": ". The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "category_id",
+            "In": "path",
+            "Description": "The category id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "400": {},
           "401": {},
@@ -2067,6 +2133,26 @@
                 "group"
               ],
               "type": "string"
+            }
+          },
+          {
+            "Name": "asset_set_id",
+            "In": "path",
+            "Description": "The asset set id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "assignment_id",
+            "In": "path",
+            "Description": "The assignment id.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
             }
           }
         ],
@@ -12657,6 +12743,47 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/pages/{page_id}/promote-to-requirement": {
+      "post": {
+        "description": "Promote page to requirement. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_id",
+            "In": "path",
+            "Description": "The page identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Promote page to requirement",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/pages/{page_id}/publication": {
       "get": {
         "description": "Get page publication. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -12690,6 +12817,44 @@
           "500": {}
         },
         "summary": "Get page publication",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/pages/{page_id}/requirement": {
+      "get": {
+        "description": "Get page requirement. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_id",
+            "In": "path",
+            "Description": "The page identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get page requirement",
         "tags": [
           "Knowledge"
         ]
@@ -12786,6 +12951,267 @@
         "summary": "List workspace recurrences",
         "tags": [
           "Work items"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements": {
+      "get": {
+        "description": "List requirements. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive requirement search.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "requirement_type",
+            "In": "query",
+            "Description": "Restricts results to one requirement type.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "status",
+            "In": "query",
+            "Description": "Restricts results to one requirement status.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "owner_id",
+            "In": "query",
+            "Description": "Restricts results to one owner.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "has_item_links",
+            "In": "query",
+            "Description": "Whether the backing page has linked work items.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "has_test_links",
+            "In": "query",
+            "Description": "Whether the backing page has linked test cases.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "label_ids",
+            "In": "query",
+            "Description": "Comma-separated page label IDs.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum number of requirements.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "offset",
+            "In": "query",
+            "Description": "Number of requirements to skip.",
+            "Required": false,
+            "Schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List requirements",
+        "tags": [
+          "Knowledge"
+        ]
+      },
+      "post": {
+        "description": "Create requirement. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Create requirement",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/{requirement_number}": {
+      "get": {
+        "description": "Get requirement. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "requirement_number",
+            "In": "path",
+            "Description": "The requirement number within the workspace.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get requirement",
+        "tags": [
+          "Knowledge"
+        ]
+      },
+      "patch": {
+        "description": "Update requirement. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "requirement_number",
+            "In": "path",
+            "Description": "The requirement number within the workspace.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update requirement",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/requirements/{requirement_number}/history": {
+      "get": {
+        "description": "List requirement history. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "requirement_number",
+            "In": "path",
+            "Description": "The requirement number within the workspace.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List requirement history",
+        "tags": [
+          "Knowledge"
         ]
       }
     },

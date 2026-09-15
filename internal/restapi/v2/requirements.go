@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -61,11 +63,26 @@ func listRequirements(requirements requirementApplication) readOperation[[]servi
 		if err != nil {
 			return nil, err
 		}
+		hasItemLinks, err := optionalBoolPtrQuery(r, "has_item_links")
+		if err != nil {
+			return nil, err
+		}
+		hasTestLinks, err := optionalBoolPtrQuery(r, "has_test_links")
+		if err != nil {
+			return nil, err
+		}
+		labelIDs, err := parseCommaSeparatedPositiveInts(r, "label_ids")
+		if err != nil {
+			return nil, err
+		}
 		result, err := requirements.List(user.ID, workspaceID, services.RequirementListFilter{
 			Query:           r.URL.Query().Get("q"),
 			RequirementType: r.URL.Query().Get("requirement_type"),
 			Status:          r.URL.Query().Get("status"),
 			OwnerID:         ownerID,
+			HasItemLinks:    hasItemLinks,
+			HasTestLinks:    hasTestLinks,
+			LabelIDs:        labelIDs,
 			Limit:           limit,
 			Offset:          offset,
 		})
@@ -183,6 +200,39 @@ func derefRequirementView(view *services.RequirementView) services.RequirementVi
 		return services.RequirementView{}
 	}
 	return *view
+}
+
+func optionalBoolPtrQuery(r *http.Request, name string) (*bool, error) {
+	value := r.URL.Query().Get(name)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return nil, newError(http.StatusBadRequest, "invalid_request", name+" must be a boolean")
+	}
+	return &parsed, nil
+}
+
+func parseCommaSeparatedPositiveInts(r *http.Request, name string) ([]int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get(name))
+	if raw == "" {
+		return nil, nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]int, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		id, err := strconv.Atoi(part)
+		if err != nil || id <= 0 {
+			return nil, newError(http.StatusBadRequest, "invalid_request", name+" must be a comma-separated list of positive integers")
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func requirementError(err error) error {
