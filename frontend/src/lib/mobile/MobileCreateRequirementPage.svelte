@@ -63,7 +63,7 @@
     const user = assignableUsers.find((u) => u.id === ownerId);
     return formatRequirementOwnerLabel(user) || `#${ownerId}`;
   });
-  const isDirty = $derived(title.trim() !== '' || content.trim() !== '');
+  const isDirty = $derived(title.trim() !== '' || contentTouched);
   const canSave = $derived(
     Boolean(workspaceId) && title.trim() !== '' && !saving
   );
@@ -80,7 +80,7 @@
   $effect(() => {
     const userId = $authStore?.currentUser?.id;
     if (!userId) return;
-    void workspacePermissions.loadPermissions(userId).then(() => {
+    void workspacePermissions.loadPermissions(userId).finally(() => {
       permissionsReady = true;
     });
   });
@@ -133,10 +133,13 @@
     requirementType = newType;
   }
 
-  function handleTypeChange(newType) {
-    if (newType === requirementType) return;
+  function handleTypeChange() {
+    const newType = requirementType;
+    const oldType = previousRequirementType;
+    if (newType === oldType) return;
     if (shouldConfirmTemplateReplace(content, contentTouched)) {
       pendingRequirementType = newType;
+      requirementType = oldType;
       confirmTemplateOpen = true;
       return;
     }
@@ -152,7 +155,6 @@
   }
 
   function cancelTemplateReplace() {
-    requirementType = previousRequirementType;
     pendingRequirementType = null;
     confirmTemplateOpen = false;
   }
@@ -176,6 +178,7 @@
         status,
         owner_id: ownerId,
       });
+      setNavigationInterceptor(null);
       successToast(t('requirements.mobile.createSuccess'));
       navigate(`/m/requirements/${workspaceId}/${created.requirement_number}`, { replace: true });
     } catch (err) {
@@ -265,8 +268,8 @@
           </div>
           <div class="chip chip-control">
             <NativeSelect
-              value={requirementType}
-              onchange={(value) => handleTypeChange(value)}
+              bind:value={requirementType}
+              onchange={handleTypeChange}
               dataTestid="mobile-requirement-create-type"
               ariaLabel={t('requirements.fieldType')}
               options={typeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}

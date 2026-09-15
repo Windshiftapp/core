@@ -10,6 +10,7 @@
   import SafeMarkdown from '../components/SafeMarkdown.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { requirementStatusLozenge } from '../features/requirements/requirementStatuses.js';
+  import { formatRequirementOwnerLabel } from '../features/requirements/requirementFormHelpers.js';
   import MobileHeader from './MobileHeader.svelte';
 
   let { workspaceId, requirementNumber } = $props();
@@ -37,7 +38,7 @@
     if (!detail?.owner_id) return t('requirements.mobile.ownerUnset');
     const user = assignableUsers.find((u) => u.id === detail.owner_id);
     if (!user) return `#${detail.owner_id}`;
-    return [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || user.email;
+    return formatRequirementOwnerLabel(user) || `#${detail.owner_id}`;
   });
 
   function back() {
