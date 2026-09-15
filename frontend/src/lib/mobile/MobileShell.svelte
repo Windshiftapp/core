@@ -19,6 +19,8 @@
   import IosInstallSheet from './IosInstallSheet.svelte';
   import MobilePagesView from './MobilePagesView.svelte';
   import MobilePageDetail from './MobilePageDetail.svelte';
+  import MobileRequirementsView from './MobileRequirementsView.svelte';
+  import MobileRequirementDetail from './MobileRequirementDetail.svelte';
   import MobileCommandPalette from './MobileCommandPalette.svelte';
   import MobileCreatePage from './MobileCreatePage.svelte';
   import MobileItemEditPage from './MobileItemEditPage.svelte';
@@ -33,13 +35,16 @@
       view !== 'mobile-search' &&
       view !== 'mobile-chat' &&
       view !== 'mobile-page-detail' &&
+      view !== 'mobile-requirement-detail' &&
       view !== 'mobile-create' &&
       view !== 'mobile-item-edit',
   );
   // The Personal tab creates personal tasks; every other tab uses the full
-  // work-item form. The Pages tab gets no FAB at all — pages are created from
-  // the desktop editor today.
-  const showFab = $derived(isTabView && view !== 'mobile-pages');
+  // work-item form. Pages and requirements have no FAB — create flows are
+  // desktop-only today.
+  const showFab = $derived(
+    isTabView && view !== 'mobile-pages' && view !== 'mobile-requirements'
+  );
   function openCreate() {
     // Dedicated create page (/m/new), not a dialog — composition gets a real
     // route so back gestures and deep links behave like native apps.
@@ -79,6 +84,13 @@
       <MobilePageDetail
         workspaceId={Number($currentRoute.params.workspaceId)}
         pageId={Number($currentRoute.params.pageId)}
+      />
+    {:else if view === 'mobile-requirements'}
+      <MobileRequirementsView />
+    {:else if view === 'mobile-requirement-detail'}
+      <MobileRequirementDetail
+        workspaceId={Number($currentRoute.params.workspaceId)}
+        requirementNumber={Number($currentRoute.params.requirementNumber)}
       />
     {:else if view === 'mobile-timer'}
       <TimerView />

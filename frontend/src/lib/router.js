@@ -167,6 +167,8 @@ const routes = {
   '/m/personal': 'mobile-personal',
   '/m/pages': 'mobile-pages',
   '/m/pages/:workspaceId/:pageId': 'mobile-page-detail',
+  '/m/requirements': 'mobile-requirements',
+  '/m/requirements/:workspaceId/:requirementNumber': 'mobile-requirement-detail',
   '/m/timer': 'mobile-timer',
   '/m/notifications': 'mobile-notifications',
   '/m/search': 'mobile-search',

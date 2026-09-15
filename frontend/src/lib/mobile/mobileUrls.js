@@ -28,5 +28,11 @@ export function toMobileUrl(url) {
   m = path.match(/^\/workspaces\/(\d+)\/pages\/(\d+)/);
   if (m) return rewrite(`/m/pages/${m[1]}/${m[2]}`);
 
+  m = path.match(/^\/workspaces\/(\d+)\/requirements\/(\d+)/);
+  if (m) return rewrite(`/m/requirements/${m[1]}/${m[2]}`);
+
+  m = path.match(/^\/workspaces\/(\d+)\/requirements$/);
+  if (m) return rewrite('/m/requirements');
+
   return url;
 }

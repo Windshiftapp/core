@@ -34,6 +34,14 @@ export function mobileNavigationProvider(_ctx) {
       url: '/m/pages',
     }),
     createCommand({
+      id: 'm-requirements',
+      label: 'Requirements',
+      description: 'Requirements registry',
+      bucket: BUCKET.GLOBAL_NAVIGATION,
+      keywords: ['requirements', 'registry', 'spec', 'specification', 'traceability'],
+      url: '/m/requirements',
+    }),
+    createCommand({
       id: 'm-timer',
       label: 'Timer',
       description: 'Time tracking',

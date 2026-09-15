@@ -1,4 +1,6 @@
+import { get } from 'svelte/store';
 import { api } from '../../api.js';
+import { currentRoute, isMobileRoute } from '../../router.js';
 
 /**
  * @typedef {{ key: string, requirement_number: number }} RequirementPageMeta
@@ -34,8 +36,16 @@ export async function buildRequirementKeyByPageId(workspaceId) {
  * @param {RequirementPageMeta | null | undefined} meta
  */
 export function pageHref(workspaceId, pageId, meta) {
+  const route = get(currentRoute);
+  const onMobile = isMobileRoute(route?.view);
   if (meta?.requirement_number != null) {
+    if (onMobile) {
+      return `/m/requirements/${workspaceId}/${meta.requirement_number}`;
+    }
     return `/workspaces/${workspaceId}/requirements/${meta.requirement_number}`;
+  }
+  if (onMobile) {
+    return `/m/pages/${workspaceId}/${pageId}`;
   }
   return `/workspaces/${workspaceId}/pages/${pageId}`;
 }
