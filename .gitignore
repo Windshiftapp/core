@@ -36,10 +36,14 @@ cx
 !frontend/src/lib/features/items/ZammadLinkResolver.spec.js
 !internal/repository/zammad_repository_test.go
 !internal/database/requirements_schema_test.go
+!internal/database/requirements_postgres_test.go
 !internal/models/requirement_test.go
 !internal/repository/requirement_repository_test.go
+!internal/repository/requirement_repository_postgres_test.go
 !internal/repository/test_coverage_repository_test.go
+!internal/repository/test_coverage_repository_postgres_test.go
 !internal/services/requirement_service_test.go
+!internal/services/requirement_service_postgres_test.go
 !internal/services/requirement_application_service_test.go
 !internal/services/test_management_application_service_coverage_test.go
 !internal/services/item_link_page_asset_test.go

@@ -182,6 +182,10 @@ openapi-v2-client-smoke:
 		go get github.com/oapi-codegen/runtime@v$(OAPI_RUNTIME_VERSION) >/dev/null && \
 		go test ./...
 
+# Optional PostgreSQL integration tests (skip when POSTGRES_* is unset or unreachable).
+test-postgres:
+	go test ./internal/database ./internal/repository ./internal/services -run Postgres -count=1
+
 # Run static analysis
 lint:
 	@echo "Running static analysis..."
