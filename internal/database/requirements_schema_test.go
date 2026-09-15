@@ -42,4 +42,18 @@ func TestFreshSQLiteSchemaIncludesRequirementsTables(t *testing.T) {
 	if migrationCount != 1 {
 		t.Fatal("20260917_test_coverage_legacy_sunset migration was not applied")
 	}
+
+	var legacyOnlyCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*) FROM test_coverage_configurations
+		WHERE requirement_item_type_ids IS NOT NULL
+			AND requirement_item_type_ids != ''
+			AND requirement_item_type_ids != '[]'
+			AND (requirement_types IS NULL OR requirement_types = '' OR requirement_types = '[]')
+	`).Scan(&legacyOnlyCount); err != nil {
+		t.Fatal(err)
+	}
+	if legacyOnlyCount != 0 {
+		t.Fatalf("expected no legacy-only coverage configs after migration, got %d", legacyOnlyCount)
+	}
 }

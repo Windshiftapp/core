@@ -1524,9 +1524,9 @@ var Catalog = []Migration{
 				WHEN NOT EXISTS (
 					SELECT 1 FROM test_coverage_configurations
 					WHERE requirement_item_type_ids IS NOT NULL
-						AND requirement_item_type_ids::text != ''
-						AND requirement_item_type_ids::text != '[]'
-						AND (requirement_types IS NULL OR requirement_types::text = '' OR requirement_types::text = '[]')
+						AND requirement_item_type_ids != ''
+						AND requirement_item_type_ids != '[]'
+						AND (requirement_types IS NULL OR requirement_types = '' OR requirement_types = '[]')
 				) THEN 1 ELSE 0 END
 		`,
 		SQLite: `
@@ -1545,9 +1545,9 @@ var Catalog = []Migration{
 				requirement_item_type_ids = NULL,
 				updated_at = CURRENT_TIMESTAMP
 			WHERE requirement_item_type_ids IS NOT NULL
-				AND requirement_item_type_ids::text != ''
-				AND requirement_item_type_ids::text != '[]'
-				AND (requirement_types IS NULL OR requirement_types::text = '' OR requirement_types::text = '[]');
+				AND requirement_item_type_ids != ''
+				AND requirement_item_type_ids != '[]'
+				AND (requirement_types IS NULL OR requirement_types = '' OR requirement_types = '[]');
 		`,
 	},
 }

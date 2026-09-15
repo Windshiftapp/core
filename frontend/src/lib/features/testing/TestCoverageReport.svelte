@@ -289,9 +289,23 @@
     }
   }
 
+  async function confirmLegacyMigration() {
+    return confirm({
+      title: t('testing.migrateCoverageConfirmTitle'),
+      message: t('testing.migrateCoverageConfirmMessage'),
+      confirmText: t('testing.migrateCoverageToRegistry'),
+      cancelText: t('common.cancel'),
+      variant: 'default',
+    });
+  }
+
   async function saveConfig(requirementTypesOverride = null) {
     const types = requirementTypesOverride ?? selectedRequirementTypes;
     if (types.length === 0) {
+      return false;
+    }
+    const switchingFromLegacy = isLegacyMode;
+    if (switchingFromLegacy && !(await confirmLegacyMigration())) {
       return false;
     }
     try {
@@ -316,6 +330,9 @@
       loading = true;
       await loadCoverageData();
       loading = false;
+      if (switchingFromLegacy) {
+        successToast(t('testing.migrateCoverageSuccess'));
+      }
       return true;
     } catch (error) {
       console.error('Failed to save config:', error);
@@ -327,19 +344,7 @@
   }
 
   async function migrateToRegistry() {
-    const accepted = await confirm({
-      title: t('testing.migrateCoverageConfirmTitle'),
-      message: t('testing.migrateCoverageConfirmMessage'),
-      confirmText: t('testing.migrateCoverageToRegistry'),
-      cancelText: t('common.cancel'),
-      variant: 'default',
-    });
-    if (!accepted) return;
-
-    const migrated = await saveConfig([...REQUIREMENT_TYPES]);
-    if (migrated) {
-      successToast(t('testing.migrateCoverageSuccess'));
-    }
+    await saveConfig([...REQUIREMENT_TYPES]);
   }
 </script>
 

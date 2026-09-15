@@ -646,8 +646,8 @@ type TestCoverageConfiguration struct {
 	ID                     int       `json:"id"`
 	WorkspaceID            *int      `json:"workspace_id,omitempty"`
 	CollectionID           *int      `json:"collection_id,omitempty"`
-	RequirementItemTypeIDs []int     `json:"requirement_item_type_ids"`
-	RequirementTypes       []string  `json:"requirement_types"`
+	RequirementItemTypeIDs []int    `json:"requirement_item_type_ids"` // Deprecated: legacy work-item scope; retained for read compatibility.
+	RequirementTypes       []string `json:"requirement_types"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 }
@@ -664,7 +664,7 @@ func (c *TestCoverageConfiguration) UsesLegacyItemRequirements() bool {
 
 // TestCoverageConfigRequest represents the payload for creating/updating test coverage config
 type TestCoverageConfigRequest struct {
-	RequirementItemTypeIDs []int    `json:"requirement_item_type_ids"`
+	RequirementItemTypeIDs []int    `json:"requirement_item_type_ids"` // Deprecated: rejected on write; use requirement_types.
 	RequirementTypes       []string `json:"requirement_types"`
 }
 
