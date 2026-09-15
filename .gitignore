@@ -42,6 +42,7 @@ cx
 !internal/services/requirement_service_test.go
 !internal/services/requirement_application_service_test.go
 !internal/services/test_management_application_service_coverage_test.go
+!internal/services/item_link_page_asset_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

@@ -11,6 +11,8 @@
   import { t } from '../../stores/i18n.svelte.js';
   import ItemKey from './ItemKey.svelte';
   import StatusBadge from '../../components/StatusBadge.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
+  import { buildRequirementKeyByPageId, pageHref } from '../requirements/requirementKeyMap.js';
 
   let {
     item,
@@ -53,6 +55,16 @@
   let pageLinkTypeId = $derived(
     linkTypes.find((lt) => lt?.name === 'Page')?.id ?? null
   );
+  let requirementKeyByPageId = $state(new Map());
+
+  $effect(() => {
+    if (!workspaceId) return;
+    void loadRequirementKeys();
+  });
+
+  async function loadRequirementKeys() {
+    requirementKeyByPageId = await buildRequirementKeyByPageId(workspaceId);
+  }
 
   function getLinkLabel(link) {
     const isCurrentSource = currentItemId === link.source_id;
@@ -402,7 +414,8 @@
           {@const linkedPageId = isCurrentSource ? link.target_id : link.source_id}
           {@const linkedPageWorkspaceId = isCurrentSource ? link.target_workspace_id : link.source_workspace_id}
           {@const linkedPageTitle = isCurrentSource ? link.target_title : link.source_title}
-          {@const linkedPageHref = `/workspaces/${linkedPageWorkspaceId || workspaceId}/pages/${linkedPageId}`}
+          {@const linkedPageReqMeta = requirementKeyByPageId.get(linkedPageId)}
+          {@const linkedPageHref = pageHref(linkedPageWorkspaceId || workspaceId, linkedPageId, linkedPageReqMeta)}
           <div
             class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors"
             style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -417,14 +430,19 @@
               >
                 <FileText class="w-3.5 h-3.5" />
               </div>
-              <LinkComponent
-                href={linkedPageHref}
-                class="text-sm hover:text-ds-text-link cursor-pointer truncate"
-                onClick={(event) => handleLinkClick(event, 'page', linkedPageId, linkedPageWorkspaceId, linkedPageHref)}
-                style="color: var(--ds-text);"
-              >
-                {linkedPageTitle}
-              </LinkComponent>
+              <div class="flex items-center gap-2 min-w-0">
+                {#if linkedPageReqMeta?.key}
+                  <Lozenge color="blue">{linkedPageReqMeta.key}</Lozenge>
+                {/if}
+                <LinkComponent
+                  href={linkedPageHref}
+                  class="text-sm hover:text-ds-text-link cursor-pointer truncate"
+                  onClick={(event) => handleLinkClick(event, 'page', linkedPageId, linkedPageWorkspaceId, linkedPageHref)}
+                  style="color: var(--ds-text);"
+                >
+                  {linkedPageTitle}
+                </LinkComponent>
+              </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <button

@@ -34,6 +34,7 @@
   import { pagesTreeRefresh } from './pagesTreeRefresh.svelte.js';
   import { pagesFocusTitle } from './pagesFocusTitle.svelte.js';
   import { pagesFilter } from './pagesFilter.svelte.js';
+  import { buildRequirementKeyByPageId } from '../requirements/requirementKeyMap.js';
 
   let { workspaceId, embedded = false } = $props();
 
@@ -363,18 +364,10 @@
   });
 
   async function loadRequirementKeys() {
-    try {
-      const rows = await api.requirements.list(workspaceId, { limit: 500 });
-      const next = new Map();
-      for (const row of rows || []) {
-        if (row?.page_id && row?.key) {
-          next.set(row.page_id, row.key);
-        }
-      }
-      requirementKeysByPageId = next;
-    } catch {
-      requirementKeysByPageId = new Map();
-    }
+    const next = await buildRequirementKeyByPageId(workspaceId);
+    requirementKeysByPageId = new Map(
+      [...next.entries()].map(([pageId, meta]) => [pageId, meta.key])
+    );
   }
 
   async function loadTree() {

@@ -10,6 +10,7 @@
   import StatusBadge from '../../components/StatusBadge.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
+  import { buildRequirementKeyByPageId, pageHref } from './requirementKeyMap.js';
 
   let { workspaceId, pageId, canEdit = false } = $props();
 
@@ -18,8 +19,11 @@
   let linkTypesCache = $state([]);
   let loadRequestSeq = 0;
 
+  let requirementKeyByPageId = $state(new Map());
   let itemMode = $state('list');
   let testMode = $state('list');
+  let relatedPageMode = $state('list');
+  let assetMode = $state('list');
   let itemSearchQuery = $state('');
   let testSearchQuery = $state('');
   let itemSearchResults = $state([]);
@@ -28,14 +32,29 @@
   let testSearching = $state(false);
   let itemSubmitting = $state(false);
   let testSubmitting = $state(false);
+  let relatedPageSearchQuery = $state('');
+  let assetSearchQuery = $state('');
+  let relatedPageSearchResults = $state([]);
+  let assetSearchResults = $state([]);
+  let relatedPageSearching = $state(false);
+  let assetSearching = $state(false);
+  let relatedPageSubmitting = $state(false);
+  let assetSubmitting = $state(false);
   let itemSearchTimer;
   let testSearchTimer;
+  let relatedPageSearchTimer;
+  let assetSearchTimer;
   let itemSearchVersion = 0;
   let testSearchVersion = 0;
+  let relatedPageSearchVersion = 0;
+  let assetSearchVersion = 0;
 
   const pageLinkTypeId = $derived(linkTypesCache.find((lt) => lt?.name === 'Page')?.id ?? null);
   const testsLinkTypeId = $derived(
     linkTypesCache.find((lt) => lt?.builtin_key === 'tests' || lt?.name === 'Tests')?.id ?? null
+  );
+  const relatesToLinkTypeId = $derived(
+    linkTypesCache.find((lt) => lt?.builtin_key === 'relates_to' || lt?.name === 'Relates To')?.id ?? null
   );
 
   const itemLinks = $derived(
@@ -60,18 +79,52 @@
     })
   );
 
+  const relatedPageLinks = $derived(
+    pageLinks.filter((link) => {
+      const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
+      const pageIsTarget = link.target_type === 'page' && link.target_id === pageId;
+      if (pageIsSource && link.target_type === 'page' && link.target_id !== pageId) return true;
+      if (pageIsTarget && link.source_type === 'page' && link.source_id !== pageId) return true;
+      return false;
+    })
+  );
+
+  const assetLinks = $derived(
+    pageLinks.filter((link) => {
+      const otherType = link.source_type === 'page' && link.source_id === pageId
+        ? link.target_type
+        : link.target_type === 'page' && link.target_id === pageId
+          ? link.source_type
+          : null;
+      return otherType === 'asset';
+    })
+  );
+
   $effect(() => {
     if (!pageId) return;
     void ensureLinkTypesLoaded();
     void loadPageLinks();
   });
 
+  $effect(() => {
+    if (!workspaceId) return;
+    void loadRequirementKeys();
+  });
+
   onDestroy(() => {
     clearTimeout(itemSearchTimer);
     clearTimeout(testSearchTimer);
+    clearTimeout(relatedPageSearchTimer);
+    clearTimeout(assetSearchTimer);
     itemSearchVersion += 1;
     testSearchVersion += 1;
+    relatedPageSearchVersion += 1;
+    assetSearchVersion += 1;
   });
+
+  async function loadRequirementKeys() {
+    requirementKeyByPageId = await buildRequirementKeyByPageId(workspaceId);
+  }
 
   async function ensureLinkTypesLoaded() {
     if (linkTypesCache.length > 0) return;
@@ -258,6 +311,114 @@
       testSubmitting = false;
     }
   }
+
+  function handleRelatedPageSearchInput(event) {
+    const q = event.currentTarget.value;
+    relatedPageSearchQuery = q;
+    clearTimeout(relatedPageSearchTimer);
+    const version = ++relatedPageSearchVersion;
+    if (q.trim().length < 2) {
+      relatedPageSearchResults = [];
+      relatedPageSearching = false;
+      return;
+    }
+    relatedPageSearching = true;
+    relatedPageSearchTimer = setTimeout(() => searchRelatedPages(q.trim(), version), 250);
+  }
+
+  async function searchRelatedPages(q, version) {
+    try {
+      const results = await api.pages.searchPages(workspaceId, q, { limit: 10 });
+      if (version !== relatedPageSearchVersion) return;
+      const rows = Array.isArray(results) ? results : (results?.data ?? []);
+      relatedPageSearchResults = rows.filter((page) => page?.id !== pageId);
+    } catch (err) {
+      if (version !== relatedPageSearchVersion) return;
+      relatedPageSearchResults = [];
+    } finally {
+      if (version === relatedPageSearchVersion) relatedPageSearching = false;
+    }
+  }
+
+  async function linkRelatedPage(relatedPage) {
+    if (!relatesToLinkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
+    relatedPageSubmitting = true;
+    try {
+      const link = await api.links.create({
+        link_type_id: relatesToLinkTypeId,
+        source_type: 'page',
+        source_id: pageId,
+        target_type: 'page',
+        target_id: relatedPage.id,
+      });
+      if (link && !pageLinks.some((l) => l.id === link.id)) {
+        pageLinks = [link, ...pageLinks];
+      } else {
+        await loadPageLinks();
+      }
+      relatedPageMode = 'list';
+      relatedPageSearchQuery = '';
+      relatedPageSearchResults = [];
+    } catch (err) {
+      errorToast(err?.message || t('requirements.traceability.linkPageError'));
+    } finally {
+      relatedPageSubmitting = false;
+    }
+  }
+
+  function handleAssetSearchInput(event) {
+    const q = event.currentTarget.value;
+    assetSearchQuery = q;
+    clearTimeout(assetSearchTimer);
+    const version = ++assetSearchVersion;
+    if (q.trim().length < 2) {
+      assetSearchResults = [];
+      assetSearching = false;
+      return;
+    }
+    assetSearching = true;
+    assetSearchTimer = setTimeout(() => searchAssets(q.trim(), version), 250);
+  }
+
+  async function searchAssets(q, version) {
+    try {
+      const results = await api.links.search(q, 'asset', 10);
+      if (version !== assetSearchVersion) return;
+      assetSearchResults = Array.isArray(results) ? results : [];
+    } catch (err) {
+      if (version !== assetSearchVersion) return;
+      assetSearchResults = [];
+    } finally {
+      if (version === assetSearchVersion) assetSearching = false;
+    }
+  }
+
+  async function linkAsset(asset) {
+    if (!relatesToLinkTypeId || assetSubmitting) return;
+    assetSubmitting = true;
+    try {
+      const link = await api.links.create({
+        link_type_id: relatesToLinkTypeId,
+        source_type: 'page',
+        source_id: pageId,
+        target_type: 'asset',
+        target_id: asset.id,
+      });
+      if (link && !pageLinks.some((l) => l.id === link.id)) {
+        pageLinks = [link, ...pageLinks];
+      } else {
+        await loadPageLinks();
+      }
+      assetMode = 'list';
+      assetSearchQuery = '';
+      assetSearchResults = [];
+    } catch (err) {
+      errorToast(err?.message || t('requirements.traceability.linkAssetError'));
+    } finally {
+      assetSubmitting = false;
+    }
+  }
+
 </script>
 
 <section class="traceability-panel" aria-label={t('requirements.traceability.title')}>
@@ -391,6 +552,138 @@
                   <a class="traceability-row traceability-row--link" href={`/workspaces/${workspaceId}/tests/${entity.id}`}>
                     <span class="traceability-row__title">{entity.title}</span>
                     <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
+                  </a>
+                  {#if canEdit}
+                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
+                      <IconTrash size={14} />
+                    </button>
+                  {/if}
+                </li>
+              {/if}
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="traceability-section">
+        <div class="traceability-section__header">
+          <h4>{t('requirements.traceability.linkedPages')}</h4>
+          {#if canEdit && relatesToLinkTypeId && relatedPageMode === 'list'}
+            <Button variant="ghost" size="sm" onclick={() => (relatedPageMode = 'add')}>
+              <IconPlus size={14} />
+              {t('requirements.traceability.addPage')}
+            </Button>
+          {/if}
+        </div>
+
+        {#if relatedPageMode === 'add'}
+          <div class="traceability-search">
+            <Input
+              type="text"
+              value={relatedPageSearchQuery}
+              oninput={handleRelatedPageSearchInput}
+              placeholder={t('requirements.traceability.searchPages')}
+              size="small"
+            />
+            <Button variant="ghost" size="sm" onclick={() => { relatedPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+          {#if relatedPageSearching}
+            <p class="traceability-empty">{t('common.loading')}</p>
+          {:else if relatedPageSearchResults.length === 0}
+            <p class="traceability-empty">{t('pickers.noResultsFor', { query: relatedPageSearchQuery || '…' })}</p>
+          {:else}
+            <ul class="traceability-list">
+              {#each relatedPageSearchResults as relatedPage (relatedPage.id)}
+                {@const relatedPageReqMeta = requirementKeyByPageId.get(relatedPage.id)}
+                <li>
+                  <button type="button" class="traceability-row" onclick={() => linkRelatedPage(relatedPage)} disabled={relatedPageSubmitting}>
+                    {#if relatedPageReqMeta?.key}
+                      <span class="traceability-row__key">{relatedPageReqMeta.key}</span>
+                    {/if}
+                    <span class="traceability-row__title">{relatedPage.title}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if relatedPageLinks.length === 0}
+          <p class="traceability-empty">{t('requirements.traceability.noPages')}</p>
+        {:else}
+          <ul class="traceability-list">
+            {#each relatedPageLinks as link (link.id)}
+              {@const entity = linkedEntity(link)}
+              {#if entity}
+                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
+                <li class="traceability-row-li">
+                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
+                    {#if reqMeta?.key}
+                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
+                    {/if}
+                    <span class="traceability-row__title">{entity.title}</span>
+                  </a>
+                  {#if canEdit}
+                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
+                      <IconTrash size={14} />
+                    </button>
+                  {/if}
+                </li>
+              {/if}
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="traceability-section">
+        <div class="traceability-section__header">
+          <h4>{t('requirements.traceability.linkedAssets')}</h4>
+          {#if canEdit && relatesToLinkTypeId && assetMode === 'list'}
+            <Button variant="ghost" size="sm" onclick={() => (assetMode = 'add')}>
+              <IconPlus size={14} />
+              {t('requirements.traceability.addAsset')}
+            </Button>
+          {/if}
+        </div>
+
+        {#if assetMode === 'add'}
+          <div class="traceability-search">
+            <Input
+              type="text"
+              value={assetSearchQuery}
+              oninput={handleAssetSearchInput}
+              placeholder={t('requirements.traceability.searchAssets')}
+              size="small"
+            />
+            <Button variant="ghost" size="sm" onclick={() => { assetMode = 'list'; assetSearchQuery = ''; assetSearchResults = []; }}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+          {#if assetSearching}
+            <p class="traceability-empty">{t('common.loading')}</p>
+          {:else if assetSearchResults.length === 0}
+            <p class="traceability-empty">{t('pickers.noResultsFor', { query: assetSearchQuery || '…' })}</p>
+          {:else}
+            <ul class="traceability-list">
+              {#each assetSearchResults as asset (asset.id)}
+                <li>
+                  <button type="button" class="traceability-row" onclick={() => linkAsset(asset)} disabled={assetSubmitting}>
+                    <span class="traceability-row__title">{asset.title}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if assetLinks.length === 0}
+          <p class="traceability-empty">{t('requirements.traceability.noAssets')}</p>
+        {:else}
+          <ul class="traceability-list">
+            {#each assetLinks as link (link.id)}
+              {@const entity = linkedEntity(link)}
+              {#if entity}
+                <li class="traceability-row-li">
+                  <a class="traceability-row traceability-row--link" href={`/assets/${entity.id}`}>
+                    <span class="traceability-row__title">{entity.title}</span>
                   </a>
                   {#if canEdit}
                     <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
