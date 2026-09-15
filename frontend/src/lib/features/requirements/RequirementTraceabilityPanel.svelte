@@ -11,6 +11,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import { buildRequirementKeyByPageId, pageHref } from './requirementKeyMap.js';
+  import { linkDirectionLabel } from './requirementLinkLabels.js';
 
   let { workspaceId, pageId, canEdit = false } = $props();
 
@@ -22,7 +23,8 @@
   let requirementKeyByPageId = $state(new Map());
   let itemMode = $state('list');
   let testMode = $state('list');
-  let relatedPageMode = $state('list');
+  let specifiesPageMode = $state('list');
+  let genericPageMode = $state('list');
   let assetMode = $state('list');
   let itemSearchQuery = $state('');
   let testSearchQuery = $state('');
@@ -56,6 +58,13 @@
   const relatesToLinkTypeId = $derived(
     linkTypesCache.find((lt) => lt?.builtin_key === 'relates_to' || lt?.name === 'Relates To')?.id ?? null
   );
+  const implementsLinkTypeId = $derived(
+    linkTypesCache.find((lt) => lt?.builtin_key === 'implements')?.id ?? null
+  );
+  const specifiesLinkTypeId = $derived(
+    linkTypesCache.find((lt) => lt?.builtin_key === 'specifies')?.id ?? null
+  );
+  const itemLinkTypeId = $derived(implementsLinkTypeId ?? pageLinkTypeId);
 
   const itemLinks = $derived(
     pageLinks.filter((link) => {
@@ -79,13 +88,36 @@
     })
   );
 
-  const relatedPageLinks = $derived(
+  function pageToPagePeer(link) {
+    const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
+    const pageIsTarget = link.target_type === 'page' && link.target_id === pageId;
+    if (pageIsSource && link.target_type === 'page' && link.target_id !== pageId) {
+      return { direction: 'outgoing' };
+    }
+    if (pageIsTarget && link.source_type === 'page' && link.source_id !== pageId) {
+      return { direction: 'incoming' };
+    }
+    return null;
+  }
+
+  const specifiesOutgoingLinks = $derived(
     pageLinks.filter((link) => {
-      const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
-      const pageIsTarget = link.target_type === 'page' && link.target_id === pageId;
-      if (pageIsSource && link.target_type === 'page' && link.target_id !== pageId) return true;
-      if (pageIsTarget && link.source_type === 'page' && link.source_id !== pageId) return true;
-      return false;
+      if (link.link_type_id !== specifiesLinkTypeId) return false;
+      return pageToPagePeer(link)?.direction === 'outgoing';
+    })
+  );
+
+  const specifiedByLinks = $derived(
+    pageLinks.filter((link) => {
+      if (link.link_type_id !== specifiesLinkTypeId) return false;
+      return pageToPagePeer(link)?.direction === 'incoming';
+    })
+  );
+
+  const genericRelatedPageLinks = $derived(
+    pageLinks.filter((link) => {
+      if (link.link_type_id !== relatesToLinkTypeId) return false;
+      return pageToPagePeer(link) != null;
     })
   );
 
@@ -234,11 +266,11 @@
   }
 
   async function linkItem(item) {
-    if (!pageLinkTypeId || itemSubmitting) return;
+    if (!itemLinkTypeId || itemSubmitting) return;
     itemSubmitting = true;
     try {
       const link = await api.links.create({
-        link_type_id: pageLinkTypeId,
+        link_type_id: itemLinkTypeId,
         source_type: 'item',
         source_id: item.id,
         target_type: 'page',
@@ -340,7 +372,33 @@
     }
   }
 
-  async function linkRelatedPage(relatedPage) {
+  async function linkSpecifiesPage(relatedPage) {
+    if (!specifiesLinkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
+    relatedPageSubmitting = true;
+    try {
+      const link = await api.links.create({
+        link_type_id: specifiesLinkTypeId,
+        source_type: 'page',
+        source_id: pageId,
+        target_type: 'page',
+        target_id: relatedPage.id,
+      });
+      if (link && !pageLinks.some((l) => l.id === link.id)) {
+        pageLinks = [link, ...pageLinks];
+      } else {
+        await loadPageLinks();
+      }
+      specifiesPageMode = 'list';
+      relatedPageSearchQuery = '';
+      relatedPageSearchResults = [];
+    } catch (err) {
+      errorToast(err?.message || t('requirements.traceability.linkPageError'));
+    } finally {
+      relatedPageSubmitting = false;
+    }
+  }
+
+  async function linkGenericRelatedPage(relatedPage) {
     if (!relatesToLinkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
     relatedPageSubmitting = true;
     try {
@@ -356,7 +414,7 @@
       } else {
         await loadPageLinks();
       }
-      relatedPageMode = 'list';
+      genericPageMode = 'list';
       relatedPageSearchQuery = '';
       relatedPageSearchResults = [];
     } catch (err) {
@@ -433,11 +491,11 @@
     <div class="traceability-panel__grid">
       <div class="traceability-section">
         <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.linkedItems')}</h4>
-          {#if canEdit && pageLinkTypeId && itemMode === 'list'}
+          <h4>{t('requirements.traceability.implementsTitle')}</h4>
+          {#if canEdit && itemLinkTypeId && itemMode === 'list'}
             <Button variant="ghost" size="sm" onclick={() => (itemMode = 'add')}>
               <IconPlus size={14} />
-              {t('requirements.traceability.addItem')}
+              {t('requirements.traceability.implementsAdd')}
             </Button>
           {/if}
         </div>
@@ -472,15 +530,19 @@
             </ul>
           {/if}
         {:else if itemLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.noItems')}</p>
+          <p class="traceability-empty">{t('requirements.traceability.implementsEmpty')}</p>
         {:else}
           <ul class="traceability-list">
             {#each itemLinks as link (link.id)}
               {@const entity = linkedEntity(link)}
+              {@const relationLabel = linkDirectionLabel(link, pageId)}
               {#if entity}
                 <li class="traceability-row-li">
                   <a class="traceability-row traceability-row--link" href={`/workspaces/${entity.workspaceId || workspaceId}/items/${entity.id}`}>
                     <ItemTypeIcon icon={entity.itemTypeIcon} color={entity.itemTypeColor} />
+                    {#if relationLabel}
+                      <span class="traceability-row__relation">{relationLabel}</span>
+                    {/if}
                     <span class="traceability-row__key">{entity.workspaceKey || 'WORK'}-{entity.itemNumber ?? entity.id}</span>
                     <span class="traceability-row__title">{entity.title}</span>
                     {#if entity.statusName}
@@ -567,16 +629,16 @@
 
       <div class="traceability-section">
         <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.linkedPages')}</h4>
-          {#if canEdit && relatesToLinkTypeId && relatedPageMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (relatedPageMode = 'add')}>
+          <h4>{t('requirements.traceability.specifiesTitle')}</h4>
+          {#if canEdit && specifiesLinkTypeId && specifiesPageMode === 'list'}
+            <Button variant="ghost" size="sm" onclick={() => (specifiesPageMode = 'add')}>
               <IconPlus size={14} />
-              {t('requirements.traceability.addPage')}
+              {t('requirements.traceability.specifiesAdd')}
             </Button>
           {/if}
         </div>
 
-        {#if relatedPageMode === 'add'}
+        {#if specifiesPageMode === 'add'}
           <div class="traceability-search">
             <Input
               type="text"
@@ -585,7 +647,7 @@
               placeholder={t('requirements.traceability.searchPages')}
               size="small"
             />
-            <Button variant="ghost" size="sm" onclick={() => { relatedPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
+            <Button variant="ghost" size="sm" onclick={() => { specifiesPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
               {t('common.cancel')}
             </Button>
           </div>
@@ -598,7 +660,7 @@
               {#each relatedPageSearchResults as relatedPage (relatedPage.id)}
                 {@const relatedPageReqMeta = requirementKeyByPageId.get(relatedPage.id)}
                 <li>
-                  <button type="button" class="traceability-row" onclick={() => linkRelatedPage(relatedPage)} disabled={relatedPageSubmitting}>
+                  <button type="button" class="traceability-row" onclick={() => linkSpecifiesPage(relatedPage)} disabled={relatedPageSubmitting}>
                     {#if relatedPageReqMeta?.key}
                       <span class="traceability-row__key">{relatedPageReqMeta.key}</span>
                     {/if}
@@ -608,11 +670,120 @@
               {/each}
             </ul>
           {/if}
-        {:else if relatedPageLinks.length === 0}
+        {:else if specifiesOutgoingLinks.length === 0}
+          <p class="traceability-empty">{t('requirements.traceability.specifiesEmpty')}</p>
+        {:else}
+          <ul class="traceability-list">
+            {#each specifiesOutgoingLinks as link (link.id)}
+              {@const entity = linkedEntity(link)}
+              {@const relationLabel = linkDirectionLabel(link, pageId)}
+              {#if entity}
+                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
+                <li class="traceability-row-li">
+                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
+                    {#if relationLabel}
+                      <span class="traceability-row__relation">{relationLabel}</span>
+                    {/if}
+                    {#if reqMeta?.key}
+                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
+                    {/if}
+                    <span class="traceability-row__title">{entity.title}</span>
+                  </a>
+                  {#if canEdit}
+                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
+                      <IconTrash size={14} />
+                    </button>
+                  {/if}
+                </li>
+              {/if}
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="traceability-section">
+        <div class="traceability-section__header">
+          <h4>{t('requirements.traceability.specifiedByTitle')}</h4>
+        </div>
+        {#if specifiedByLinks.length === 0}
+          <p class="traceability-empty">{t('requirements.traceability.specifiedByEmpty')}</p>
+        {:else}
+          <ul class="traceability-list">
+            {#each specifiedByLinks as link (link.id)}
+              {@const entity = linkedEntity(link)}
+              {@const relationLabel = linkDirectionLabel(link, pageId)}
+              {#if entity}
+                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
+                <li class="traceability-row-li">
+                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
+                    {#if relationLabel}
+                      <span class="traceability-row__relation">{relationLabel}</span>
+                    {/if}
+                    {#if reqMeta?.key}
+                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
+                    {/if}
+                    <span class="traceability-row__title">{entity.title}</span>
+                  </a>
+                  {#if canEdit}
+                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
+                      <IconTrash size={14} />
+                    </button>
+                  {/if}
+                </li>
+              {/if}
+            {/each}
+          </ul>
+        {/if}
+      </div>
+
+      <div class="traceability-section">
+        <div class="traceability-section__header">
+          <h4>{t('requirements.traceability.relatedGenericTitle')}</h4>
+          {#if canEdit && relatesToLinkTypeId && genericPageMode === 'list'}
+            <Button variant="ghost" size="sm" onclick={() => (genericPageMode = 'add')}>
+              <IconPlus size={14} />
+              {t('requirements.traceability.addPage')}
+            </Button>
+          {/if}
+        </div>
+
+        {#if genericPageMode === 'add'}
+          <div class="traceability-search">
+            <Input
+              type="text"
+              value={relatedPageSearchQuery}
+              oninput={handleRelatedPageSearchInput}
+              placeholder={t('requirements.traceability.searchPages')}
+              size="small"
+            />
+            <Button variant="ghost" size="sm" onclick={() => { genericPageMode = 'list'; relatedPageSearchQuery = ''; relatedPageSearchResults = []; }}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+          {#if relatedPageSearching}
+            <p class="traceability-empty">{t('common.loading')}</p>
+          {:else if relatedPageSearchResults.length === 0}
+            <p class="traceability-empty">{t('pickers.noResultsFor', { query: relatedPageSearchQuery || '…' })}</p>
+          {:else}
+            <ul class="traceability-list">
+              {#each relatedPageSearchResults as relatedPage (relatedPage.id)}
+                {@const relatedPageReqMeta = requirementKeyByPageId.get(relatedPage.id)}
+                <li>
+                  <button type="button" class="traceability-row" onclick={() => linkGenericRelatedPage(relatedPage)} disabled={relatedPageSubmitting}>
+                    {#if relatedPageReqMeta?.key}
+                      <span class="traceability-row__key">{relatedPageReqMeta.key}</span>
+                    {/if}
+                    <span class="traceability-row__title">{relatedPage.title}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {:else if genericRelatedPageLinks.length === 0}
           <p class="traceability-empty">{t('requirements.traceability.noPages')}</p>
         {:else}
           <ul class="traceability-list">
-            {#each relatedPageLinks as link (link.id)}
+            {#each genericRelatedPageLinks as link (link.id)}
               {@const entity = linkedEntity(link)}
               {#if entity}
                 {@const reqMeta = requirementKeyByPageId.get(entity.id)}
@@ -786,6 +957,13 @@
   .traceability-row:hover {
     border-color: var(--ds-border);
     background: var(--ds-background-neutral-hovered);
+  }
+  .traceability-row__relation {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--ds-text-subtle);
+    text-transform: lowercase;
   }
   .traceability-row__key {
     flex-shrink: 0;

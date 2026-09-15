@@ -416,6 +416,8 @@
           {@const linkedPageTitle = isCurrentSource ? link.target_title : link.source_title}
           {@const linkedPageReqMeta = requirementKeyByPageId.get(linkedPageId)}
           {@const linkedPageHref = pageHref(linkedPageWorkspaceId || workspaceId, linkedPageId, linkedPageReqMeta)}
+          {@const pageLinkTypeLabel = getLinkLabel(link)}
+          {@const pageLinkTypeColor = link.link_type_color || 'var(--ds-text-subtle)'}
           <div
             class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors"
             style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -445,6 +447,16 @@
               </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
+              {#if pageLinkTypeLabel}
+                <span
+                  data-testid="linked-page-link-type"
+                  class="text-xs flex-shrink-0 px-2 py-0.5 rounded-full border whitespace-nowrap"
+                  style="color: {pageLinkTypeColor}; background-color: color-mix(in srgb, {pageLinkTypeColor} 8%, transparent); border-color: color-mix(in srgb, {pageLinkTypeColor} 20%, transparent);"
+                  title={link.link_type_name || pageLinkTypeLabel}
+                >
+                  {pageLinkTypeLabel}
+                </span>
+              {/if}
               <button
                 data-testid="linked-page-delete"
                 class="delete-button p-1 rounded hidden group-hover:flex cursor-pointer"

@@ -1472,6 +1472,40 @@ var Catalog = []Migration{
 			ALTER TABLE test_coverage_configurations ADD COLUMN requirement_types TEXT;
 		`,
 	},
+	{
+		Version: "20260916_requirement_typed_links",
+		Name:    "Add Specifies link type and extend Implements for requirement pages",
+		CheckSQLite: `
+			SELECT CASE
+				WHEN EXISTS (SELECT 1 FROM link_types WHERE builtin_key = 'specifies')
+				 AND (SELECT allowed_entity_types FROM link_types WHERE builtin_key = 'implements') = '["item","item","page"]'
+				THEN 1 ELSE 0 END
+		`,
+		CheckPostgres: `
+			SELECT CASE
+				WHEN EXISTS (SELECT 1 FROM link_types WHERE builtin_key = 'specifies')
+				 AND (SELECT allowed_entity_types FROM link_types WHERE builtin_key = 'implements') = '["item","item","page"]'
+				THEN 1 ELSE 0 END
+		`,
+		SQLite: `
+			INSERT INTO link_types (builtin_key, name, description, forward_label, reverse_label, color, is_system, active, allowed_entity_types)
+			SELECT 'specifies', 'Specifies', 'Requirement page specifies another requirement page', 'specifies', 'specified by', '#6366f1', 1, 1, '["page","page"]'
+			WHERE NOT EXISTS (SELECT 1 FROM link_types WHERE builtin_key = 'specifies');
+			UPDATE link_types
+			SET allowed_entity_types = '["item","item","page"]',
+				description = 'Work item implements another work item or requirement page'
+			WHERE builtin_key = 'implements';
+		`,
+		Postgres: `
+			INSERT INTO link_types (builtin_key, name, description, forward_label, reverse_label, color, is_system, active, allowed_entity_types)
+			SELECT 'specifies', 'Specifies', 'Requirement page specifies another requirement page', 'specifies', 'specified by', '#6366f1', true, true, '["page","page"]'
+			WHERE NOT EXISTS (SELECT 1 FROM link_types WHERE builtin_key = 'specifies');
+			UPDATE link_types
+			SET allowed_entity_types = '["item","item","page"]',
+				description = 'Work item implements another work item or requirement page'
+			WHERE builtin_key = 'implements';
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {
