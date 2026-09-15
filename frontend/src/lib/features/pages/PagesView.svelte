@@ -9,6 +9,8 @@
   import PagesHistoryDrawer from './PagesHistoryDrawer.svelte';
   import PageLabelPicker from './PageLabelPicker.svelte';
   import PageWorkItemsButton from './PageWorkItemsButton.svelte';
+  import RequirementPromoteDialog from '../requirements/RequirementPromoteDialog.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import IconSelector from '../../pickers/IconSelector.svelte';
   import { workspaceIconMap } from '../../utils/icons.js';
   import {
@@ -56,6 +58,9 @@
   let permsDialogOpen = $state(false);
   let moveDialogOpen = $state(false);
   let historyDrawerOpen = $state(false);
+  let promoteDialogOpen = $state(false);
+  let pageRequirement = $state(null);
+  let pageRequirementRequestSeq = 0;
   let titleInputEl = $state(null);
   let pageEffectiveLevel = $state('');
   let pagePermissionsLoaded = $state(false);
@@ -218,6 +223,7 @@
       pageEffectiveLevel = '';
       pagePermissionsLoaded = false;
       pagePublication = null;
+      pageRequirement = null;
     }
   });
 
@@ -258,6 +264,7 @@
       void ensurePageEffectiveLevel(id);
       void ensureLinkTypesLoaded();
       void loadPagePublication(id);
+      void loadPageRequirement(id);
     } catch (err) {
       if (requestSeq !== loadPageRequestSeq) return;
       error = err?.message || t('pages.errorLoadPage');
@@ -265,9 +272,32 @@
       pageEffectiveLevel = '';
       pagePermissionsLoaded = false;
       pagePublication = null;
+      pageRequirement = null;
     } finally {
       if (requestSeq === loadPageRequestSeq) loadingPage = false;
     }
+  }
+
+  async function loadPageRequirement(id) {
+    const requestSeq = ++pageRequirementRequestSeq;
+    try {
+      const view = await api.requirements.getByPage(workspaceId, id);
+      if (requestSeq !== pageRequirementRequestSeq) return;
+      pageRequirement = view;
+    } catch {
+      if (requestSeq !== pageRequirementRequestSeq) return;
+      pageRequirement = null;
+    }
+  }
+
+  function openRequirementRegistry() {
+    if (!pageRequirement) return;
+    navigate(`/workspaces/${workspaceId}/requirements/${pageRequirement.requirement_number}`);
+  }
+
+  function handleRequirementPromoted(promoted) {
+    pageRequirement = promoted;
+    pagesTreeRefresh.bump();
   }
 
   // Portal knowledge-base publication state. Non-fatal: a failed lookup
@@ -586,6 +616,17 @@
           'noopener'
         ),
     },
+    ...(!pageRequirement && canEditPage
+      ? [
+          {
+            id: 'promote-requirement',
+            type: 'regular',
+            title: t('pages.menuPromoteToRequirement'),
+            testid: 'page-menu-promote-requirement',
+            onClick: () => (promoteDialogOpen = true),
+          },
+        ]
+      : []),
     { id: 'divider', type: 'divider' },
     {
       id: 'archive',
@@ -776,6 +817,17 @@
             placeholder={t('pages.titlePlaceholder')}
             disabled={!canEditPage}
           />
+          {#if pageRequirement?.key}
+            <button
+              type="button"
+              class="requirement-key-badge"
+              onclick={openRequirementRegistry}
+              title={t('requirements.openInRegistry')}
+              data-testid="page-requirement-key"
+            >
+              <Lozenge color="blue">{pageRequirement.key}</Lozenge>
+            </button>
+          {/if}
         </div>
       </div>
       <div class="label-row" data-testid="page-label-row">
@@ -915,6 +967,12 @@
       if (selectedPage) await loadPage(selectedPage.id);
     }}
   />
+  <RequirementPromoteDialog
+    {workspaceId}
+    pageId={selectedPage.id}
+    bind:open={promoteDialogOpen}
+    onPromoted={handleRequirementPromoted}
+  />
 {/if}
 
 <style>
@@ -1034,6 +1092,14 @@
 
   :global(.title-icon) {
     flex-shrink: 0;
+  }
+
+  .requirement-key-badge {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
   }
 
   :global(.title-input) {

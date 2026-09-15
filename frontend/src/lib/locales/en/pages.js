@@ -25,6 +25,7 @@ export default {
     menuHistory: 'History',
     menuPrint: 'Print',
     menuArchive: 'Archive',
+    menuPromoteToRequirement: 'Promote to requirement',
 
     // Chrome-free print / save-to-PDF view (opened in a new tab)
     print: {

@@ -328,6 +328,7 @@ type pageReader interface {
 type requirementApplication interface {
 	List(int, int, services.RequirementListFilter) ([]services.RequirementView, error)
 	Get(int, int, int) (*services.RequirementView, error)
+	GetByPage(int, int, int) (*services.RequirementView, error)
 	Create(services.AuditActor, services.CreateRequirementInput) (*services.RequirementView, error)
 	Promote(services.AuditActor, int, int, string, string, *int) (*services.RequirementView, error)
 	Update(services.AuditActor, int, int, services.RequirementUpdateInput) (*services.RequirementView, error)

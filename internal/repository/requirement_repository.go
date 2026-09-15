@@ -96,6 +96,15 @@ func (r *RequirementRepository) GetByIDTx(tx database.Tx, id int) (*models.Requi
 	return req, nil
 }
 
+// GetByPageID loads the requirement backing pageID, or ErrNotFound.
+func (r *RequirementRepository) GetByPageID(pageID int) (*models.Requirement, error) {
+	req, err := scanRequirement(r.db.QueryRow("SELECT "+requirementColumns+" FROM requirements WHERE page_id = ?", pageID))
+	if err != nil {
+		return nil, notFoundOrWrap(err, fmt.Sprintf("get requirement for page %d", pageID))
+	}
+	return req, nil
+}
+
 // GetByPageIDTx loads the requirement backing pageID, or ErrNotFound.
 func (r *RequirementRepository) GetByPageIDTx(tx database.Tx, pageID int) (*models.Requirement, error) {
 	req, err := scanRequirement(tx.QueryRow("SELECT "+requirementColumns+" FROM requirements WHERE page_id = ?", pageID))

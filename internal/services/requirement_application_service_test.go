@@ -102,6 +102,40 @@ func TestRequirementApplicationCreateAndGet(t *testing.T) {
 	}
 }
 
+func TestRequirementApplicationGetByPage(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	view, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Backed page",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := f.pages.Create(f.adminID, CreatePageInput{WorkspaceID: f.wsID, Title: "Plain page"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.app.GetByPage(f.adminID, f.wsID, view.PageID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Key != view.Key || got.PageID != view.PageID {
+		t.Fatalf("unexpected view %+v", got)
+	}
+
+	_, err = f.app.GetByPage(f.adminID, f.wsID, plain.ID)
+	if !errors.Is(err, ErrRequirementNotFound) {
+		t.Fatalf("expected ErrRequirementNotFound for plain page, got %v", err)
+	}
+
+	_, err = f.app.GetByPage(f.adminID, 999, view.PageID)
+	if !errors.Is(err, ErrRequirementNotFound) {
+		t.Fatalf("expected opaque not-found for wrong workspace, got %v", err)
+	}
+}
+
 func TestRequirementApplicationGetDeniedIsOpaque(t *testing.T) {
 	f := newRequirementApplicationFixture(t)
 	view, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
@@ -124,6 +158,10 @@ func TestRequirementApplicationGetDeniedIsOpaque(t *testing.T) {
 
 	if _, err := f.app.Get(f.viewer, f.wsID, view.RequirementNumber); !errors.Is(err, ErrRequirementNotFound) {
 		t.Fatalf("expected opaque not found, got %v", err)
+	}
+
+	if _, err := f.app.GetByPage(f.viewer, f.wsID, view.PageID); !errors.Is(err, ErrRequirementNotFound) {
+		t.Fatalf("expected opaque not found for GetByPage, got %v", err)
 	}
 }
 

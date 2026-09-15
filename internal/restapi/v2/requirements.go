@@ -17,6 +17,7 @@ func registerRequirementRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/workspaces/{workspace_id}/requirements/{requirement_number}", AuthAuthenticated, []string{"pages:read"}, getRequirement(requirements))
 	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}/requirements/{requirement_number}", http.StatusOK, true, AuthAuthenticated, []string{"pages:write"}, updateRequirement(requirements))
 	builder.Read("/workspaces/{workspace_id}/requirements/{requirement_number}/history", AuthAuthenticated, []string{"pages:read"}, listRequirementHistory(requirements))
+	builder.Read("/workspaces/{workspace_id}/pages/{page_id}/requirement", AuthAuthenticated, []string{"pages:read"}, getPageRequirement(requirements))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/promote-to-requirement", http.StatusCreated, false, AuthAuthenticated, []string{"pages:write"}, promotePageToRequirement(requirements))
 }
 
@@ -135,6 +136,21 @@ func listRequirementHistory(requirements requirementApplication) readOperation[[
 		}
 		result, err := requirements.ListHistory(user.ID, workspaceID, number)
 		return result, requirementError(err)
+	}
+}
+
+func getPageRequirement(requirements requirementApplication) readOperation[services.RequirementView] {
+	return func(r *http.Request) (services.RequirementView, error) {
+		user, workspaceID, err := principalAndWorkspace(r)
+		if err != nil {
+			return services.RequirementView{}, err
+		}
+		pageID, err := pathID(r, "page_id")
+		if err != nil {
+			return services.RequirementView{}, err
+		}
+		view, err := requirements.GetByPage(user.ID, workspaceID, pageID)
+		return derefRequirementView(view), requirementError(err)
 	}
 }
 

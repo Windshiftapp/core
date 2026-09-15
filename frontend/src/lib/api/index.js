@@ -104,6 +104,7 @@ import {
 } from './portal.js';
 import { queryLanguage } from './queryLanguage.js';
 import { recurrence } from './recurrence.js';
+import { requirements } from './requirements.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
 import { teams } from './teams.js';
@@ -460,6 +461,9 @@ export const api = {
   // Workspace knowledge pages (wiki)
   pages,
   pageLabels,
+
+  // Workspace requirements (page-backed managed documents)
+  requirements,
 
   // AI features
   ai,

@@ -133,6 +133,18 @@ func (s *RequirementService) Create(actorID int, in CreateRequirementInput) (*mo
 	})
 }
 
+// GetByPageID loads the requirement backing pageID without ACL checks.
+func (s *RequirementService) GetByPageID(pageID int) (*models.Requirement, error) {
+	req, err := s.requirements.GetByPageID(pageID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrRequirementNotFound
+		}
+		return nil, err
+	}
+	return req, nil
+}
+
 // GetByWorkspaceAndNumber loads a requirement without ACL checks.
 func (s *RequirementService) GetByWorkspaceAndNumber(workspaceID, number int) (*models.Requirement, error) {
 	req, err := s.requirements.GetByWorkspaceAndNumber(workspaceID, number)

@@ -20,6 +20,7 @@ import ui from './ui.js';
 import workflows from './workflows.js';
 import workspace from './workspace.js';
 import pages from './pages.js';
+import requirements from './requirements.js';
 import adminOperations from './adminOperations.js';
 import agents from './agents.js';
 import dashboard from './dashboard.js';
@@ -42,6 +43,7 @@ export default createLocale({
   analytics,
   teams,
   pages,
+  requirements,
   adminOperations,
   agents,
   dashboard,

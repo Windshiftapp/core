@@ -82,6 +82,21 @@ func (s *RequirementApplicationService) List(userID, workspaceID int, filter Req
 	return views, nil
 }
 
+// GetByPage returns the requirement backing a page when the caller can view it.
+func (s *RequirementApplicationService) GetByPage(userID, workspaceID, pageID int) (*RequirementView, error) {
+	if err := s.requirePageOp(userID, workspaceID, pageID, PageOpView); err != nil {
+		return nil, err
+	}
+	req, err := s.requirements.GetByPageID(pageID)
+	if err != nil {
+		return nil, err
+	}
+	if req.WorkspaceID != workspaceID {
+		return nil, ErrRequirementNotFound
+	}
+	return s.buildView(req)
+}
+
 // Get returns one requirement when the caller can view its backing page.
 func (s *RequirementApplicationService) Get(userID, workspaceID, number int) (*RequirementView, error) {
 	req, err := s.requirements.GetByWorkspaceAndNumber(workspaceID, number)

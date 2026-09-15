@@ -101,6 +101,12 @@ export const workspaceOnlyViews = [
     icon: Book,
     activeViews: ['workspace-pages'],
   },
+  {
+    id: 'requirements',
+    labelKey: 'requirements.navTitle',
+    icon: FileStack,
+    activeViews: ['workspace-requirements'],
+  },
 ];
 
 /**
