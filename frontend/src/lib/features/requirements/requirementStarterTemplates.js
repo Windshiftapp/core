@@ -1,7 +1,7 @@
 import { REQUIREMENT_TYPES } from './requirementTypes.js';
 
 /** @param {string} type */
-export function isKnownRequirementType(type) {
+function isKnownRequirementType(type) {
   return REQUIREMENT_TYPES.includes(type);
 }
 

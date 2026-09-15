@@ -58,7 +58,7 @@
       message: t('requirements.templates.replaceConfirm'),
       confirmText: t('common.confirm'),
       cancelText: t('common.cancel'),
-      variant: 'primary',
+      variant: 'info',
     });
   }
 
@@ -91,11 +91,6 @@
     contentTouched = true;
   }
 
-  function handleClose() {
-    open = false;
-    resetForm();
-  }
-
   $effect(() => {
     if (open) resetForm();
   });
@@ -117,7 +112,6 @@
         parent_id: parentId,
       });
       open = false;
-      resetForm();
       onCreated(created);
     } catch (err) {
       error = err?.message || t('requirements.createError');
@@ -127,8 +121,8 @@
   }
 </script>
 
-<Modal bind:isOpen={open} maxWidth="max-w-lg" onclose={handleClose}>
-  <ModalHeader title={t('requirements.create')} onclose={handleClose} />
+<Modal bind:isOpen={open} maxWidth="max-w-lg">
+  <ModalHeader title={t('requirements.create')} onclose={() => (open = false)} />
   <div class="flex flex-col gap-4 p-4">
     {#if error}
       <p class="text-sm text-[var(--ds-text-danger)]">{error}</p>
@@ -158,7 +152,7 @@
     </FormField>
   </div>
   <DialogFooter>
-    <Button variant="secondary" onclick={handleClose} disabled={saving}>
+    <Button variant="secondary" onclick={() => (open = false)} disabled={saving}>
       {t('common.cancel')}
     </Button>
     <Button onclick={submit} disabled={saving}>

@@ -61,6 +61,13 @@
       ownerId = null;
       void loadPage();
     }
+    if (!open) {
+      loadSeq += 1;
+      error = '';
+      pageContent = '';
+      pageLoading = false;
+      insertTemplate = true;
+    }
   });
 
   async function submit() {
