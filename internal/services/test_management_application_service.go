@@ -113,6 +113,29 @@ type CoverageConfigInput struct {
 	RequirementTypes       []string
 }
 
+func validateCoverageConfigInput(input CoverageConfigInput) (CoverageConfigInput, error) {
+	if len(input.RequirementTypes) == 0 {
+		if len(input.RequirementItemTypeIDs) > 0 {
+			return CoverageConfigInput{}, &TestManagementValidationError{
+				Msg: "legacy requirement item types are no longer supported; use requirement_types",
+			}
+		}
+		return CoverageConfigInput{}, &TestManagementValidationError{
+			Msg: "at least one requirement type is required",
+		}
+	}
+	for _, typ := range input.RequirementTypes {
+		if !models.IsValidRequirementType(typ) {
+			return CoverageConfigInput{}, &TestManagementValidationError{
+				Msg: "invalid requirement type: " + typ,
+			}
+		}
+	}
+	return CoverageConfigInput{
+		RequirementTypes: input.RequirementTypes,
+	}, nil
+}
+
 func (s *TestManagementApplicationService) requireCoverage(userID int, scope TestCoverageScope, permission string) error {
 	workspaceID := scope.WorkspaceID
 	if scope.CollectionID != nil {
@@ -142,9 +165,13 @@ func (s *TestManagementApplicationService) CreateCoverageConfig(userID int, scop
 	if err := s.requireCoverage(userID, scope, models.PermissionTestManage); err != nil {
 		return nil, err
 	}
+	normalized, err := validateCoverageConfigInput(input)
+	if err != nil {
+		return nil, err
+	}
 	write := repository.CoverageConfigWrite{
-		RequirementItemTypeIDs: input.RequirementItemTypeIDs,
-		RequirementTypes:       input.RequirementTypes,
+		RequirementItemTypeIDs: normalized.RequirementItemTypeIDs,
+		RequirementTypes:       normalized.RequirementTypes,
 	}
 	if scope.CollectionID != nil {
 		return s.coverage.CreateConfigForCollection(*scope.CollectionID, write)
@@ -159,9 +186,13 @@ func (s *TestManagementApplicationService) UpdateCoverageConfig(userID int, scop
 	if err := s.requireCoverageConfigScope(scope, configID); err != nil {
 		return nil, err
 	}
+	normalized, err := validateCoverageConfigInput(input)
+	if err != nil {
+		return nil, err
+	}
 	return s.coverage.UpdateConfig(configID, repository.CoverageConfigWrite{
-		RequirementItemTypeIDs: input.RequirementItemTypeIDs,
-		RequirementTypes:       input.RequirementTypes,
+		RequirementItemTypeIDs: normalized.RequirementItemTypeIDs,
+		RequirementTypes:       normalized.RequirementTypes,
 	})
 }
 

@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -80,6 +82,87 @@ func (f *testCoverageApplicationFixture) createRequirement(t *testing.T, title, 
 	return view
 }
 
+func TestCoverageConfigRejectsLegacyItemTypesOnly(t *testing.T) {
+	f := newTestCoverageApplicationFixture(t)
+	_, err := f.app.CreateCoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID}, CoverageConfigInput{
+		RequirementItemTypeIDs: []int{1},
+	})
+	var validation *TestManagementValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestCoverageConfigRejectsEmptyPayload(t *testing.T) {
+	f := newTestCoverageApplicationFixture(t)
+	_, err := f.app.CreateCoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID}, CoverageConfigInput{})
+	var validation *TestManagementValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestCoverageConfigRejectsInvalidRequirementType(t *testing.T) {
+	f := newTestCoverageApplicationFixture(t)
+	_, err := f.app.CreateCoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID}, CoverageConfigInput{
+		RequirementTypes: []string{"not_a_real_type"},
+	})
+	var validation *TestManagementValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestCoverageConfigCreatePageBackedClearsLegacyIDs(t *testing.T) {
+	f := newTestCoverageApplicationFixture(t)
+	cfg, err := f.app.CreateCoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID}, CoverageConfigInput{
+		RequirementItemTypeIDs: []int{9},
+		RequirementTypes:       []string{models.RequirementTypeUseCase, models.RequirementTypeBusinessRule},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.UsesPageBackedRequirements() {
+		t.Fatalf("expected page-backed config, got %#v", cfg)
+	}
+	if len(cfg.RequirementItemTypeIDs) != 0 {
+		t.Fatalf("expected legacy IDs cleared, got %#v", cfg.RequirementItemTypeIDs)
+	}
+}
+
+func TestCoverageConfigUpdateSwitchesLegacyRowToRequirementTypes(t *testing.T) {
+	f := newTestCoverageApplicationFixture(t)
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO test_coverage_configurations (workspace_id, requirement_item_type_ids, requirement_types)
+		VALUES (?, '[1,2]', NULL)
+	`, f.wsID); err != nil {
+		t.Fatal(err)
+	}
+	existing, err := f.app.CoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !existing.UsesLegacyItemRequirements() {
+		t.Fatalf("expected legacy config, got %#v", existing)
+	}
+
+	updated, err := f.app.UpdateCoverageConfig(
+		f.adminID,
+		TestCoverageScope{WorkspaceID: f.wsID},
+		existing.ID,
+		CoverageConfigInput{RequirementTypes: []string{models.RequirementTypeFunctionalRequirement}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.UsesPageBackedRequirements() {
+		t.Fatalf("expected page-backed config, got %#v", updated)
+	}
+	if len(updated.RequirementItemTypeIDs) != 0 {
+		t.Fatalf("expected legacy IDs cleared, got %#v", updated.RequirementItemTypeIDs)
+	}
+}
+
 func TestCoverageApplicationPageBackedExcludesHiddenPages(t *testing.T) {
 	f := newTestCoverageApplicationFixture(t)
 	open := f.createRequirement(t, "Open", models.RequirementTypeUseCase)
@@ -117,7 +200,7 @@ func TestCoverageApplicationPageBackedExcludesHiddenPages(t *testing.T) {
 	}
 }
 
-func TestCoverageApplicationLegacyItemModeStillWorks(t *testing.T) {
+func TestCoverageApplicationLegacyItemModeStillReadable(t *testing.T) {
 	f := newTestCoverageApplicationFixture(t)
 	var itemTypeID int
 	if err := f.db.QueryRow(`SELECT id FROM item_types ORDER BY id LIMIT 1`).Scan(&itemTypeID); err != nil {
@@ -133,11 +216,10 @@ func TestCoverageApplicationLegacyItemModeStillWorks(t *testing.T) {
 	`, itemTypeID, statusID); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err := f.app.CreateCoverageConfig(f.adminID, TestCoverageScope{WorkspaceID: f.wsID}, CoverageConfigInput{
-		RequirementItemTypeIDs: []int{itemTypeID},
-	})
-	if err != nil {
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO test_coverage_configurations (workspace_id, requirement_item_type_ids, requirement_types)
+		VALUES (?, ?, NULL)
+	`, f.wsID, fmt.Sprintf("[%d]", itemTypeID)); err != nil {
 		t.Fatal(err)
 	}
 

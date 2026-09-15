@@ -292,6 +292,10 @@ export default {
     legacyCoverageConfigTitle: 'Устаревшая конфигурация по work items',
     legacyCoverageConfigDescription: 'Отчёт всё ещё использует типы элементов. Переключитесь на реестр требований для согласованности с трассируемостью.',
     migrateCoverageToRegistry: 'Перейти на реестр требований',
+    migrateCoverageConfirmTitle: 'Перейти на реестр требований?',
+    migrateCoverageConfirmMessage:
+      'Покрытие будет считаться по реестру требований вместо типов work items. Будут включены все типы требований.',
+    migrateCoverageSuccess: 'Конфигурация покрытия переключена на реестр требований',
     saveConfiguration: 'Сохранить настройки',
     overview: 'Обзор',
     failures: 'Неудачные тесты',

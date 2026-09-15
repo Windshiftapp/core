@@ -297,6 +297,10 @@ export default {
     legacyCoverageConfigTitle: 'Legacy work-item coverage configuration',
     legacyCoverageConfigDescription: 'This report still uses work item types. Switch to the requirements registry to align with traceability.',
     migrateCoverageToRegistry: 'Switch to requirements registry',
+    migrateCoverageConfirmTitle: 'Switch to requirements registry?',
+    migrateCoverageConfirmMessage:
+      'Coverage will use the requirements registry instead of work item types. All requirement types will be included.',
+    migrateCoverageSuccess: 'Coverage configuration switched to the requirements registry',
     saveConfiguration: 'Save Configuration',
     overview: 'Overview',
     failures: 'Failures',

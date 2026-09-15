@@ -23,12 +23,12 @@
     IconCircleX,
     IconLink
   } from '@tabler/icons-svelte-runes';
-  import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { REQUIREMENT_TYPES } from '../requirements/requirementTypes.js';
   import { requirementStatusLozenge } from '../requirements/requirementStatuses.js';
+  import { confirm } from '../../composables/useConfirm.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast, successToast } from '../../stores/toasts.svelte.js';
 
   let {
     workspaceId = null,
@@ -42,7 +42,6 @@
   let summaryData = $state(null);
   let requirementsData = $state(null);
   let collections = $state([]);
-  let itemTypes = $state([]);
   let config = $state(null);
 
   // UI state
@@ -51,7 +50,6 @@
   let currentPage = $state(1);
   let pageSize = $state(15);
   let showConfigModal = $state(false);
-  let selectedTypeIds = $state([]);
   let selectedRequirementTypes = $state([]);
 
   // Expose state and handlers for external header controls
@@ -204,13 +202,8 @@
   async function loadInitialData() {
     try {
       loading = true;
-      // Load collections and item types in parallel
-      const [collectionsRes, itemTypesRes] = await Promise.all([
-        api.collections.getAll(),
-        api.itemTypes.getAll()
-      ]);
+      const collectionsRes = await api.collections.getAll();
       collections = collectionsRes || [];
-      itemTypes = itemTypesRes || [];
 
       // Load coverage data
       await loadCoverageData();
@@ -228,12 +221,10 @@
       // Load config first
       try {
         config = await api.tests.coverage.getConfig(id, workspaceId);
-        selectedTypeIds = config?.requirement_item_type_ids || [];
         selectedRequirementTypes = config?.requirement_types || [];
       } catch (e) {
         // No config exists yet
         config = null;
-        selectedTypeIds = [];
         selectedRequirementTypes = [];
       }
 
@@ -281,21 +272,13 @@
   }
 
   function openConfigModal() {
-    selectedTypeIds = config?.requirement_item_type_ids || [];
-    selectedRequirementTypes = config?.requirement_types || [];
+    const existingTypes = config?.requirement_types || [];
+    selectedRequirementTypes = existingTypes.length > 0 ? [...existingTypes] : [...REQUIREMENT_TYPES];
     showConfigModal = true;
   }
 
   function closeConfigModal() {
     showConfigModal = false;
-  }
-
-  function toggleItemType(typeId) {
-    if (selectedTypeIds.includes(typeId)) {
-      selectedTypeIds = selectedTypeIds.filter((id) => id !== typeId);
-    } else {
-      selectedTypeIds = [...selectedTypeIds, typeId];
-    }
   }
 
   function toggleRequirementType(typeValue) {
@@ -307,13 +290,14 @@
   }
 
   async function saveConfig(requirementTypesOverride = null) {
+    const types = requirementTypesOverride ?? selectedRequirementTypes;
+    if (types.length === 0) {
+      return false;
+    }
     try {
       configLoading = true;
       const id = selectedCollectionId || 'default';
-      const types = requirementTypesOverride ?? selectedRequirementTypes;
-      const configData = isLegacyMode && requirementTypesOverride == null
-        ? { requirement_item_type_ids: selectedTypeIds }
-        : { requirement_types: types };
+      const configData = { requirement_types: types };
 
       if (config?.id) {
         // Update existing config
@@ -332,16 +316,30 @@
       loading = true;
       await loadCoverageData();
       loading = false;
+      return true;
     } catch (error) {
       console.error('Failed to save config:', error);
       errorToast(t('testing.failedToSaveConfig'));
+      return false;
     } finally {
       configLoading = false;
     }
   }
 
   async function migrateToRegistry() {
-    await saveConfig([...REQUIREMENT_TYPES]);
+    const accepted = await confirm({
+      title: t('testing.migrateCoverageConfirmTitle'),
+      message: t('testing.migrateCoverageConfirmMessage'),
+      confirmText: t('testing.migrateCoverageToRegistry'),
+      cancelText: t('common.cancel'),
+      variant: 'default',
+    });
+    if (!accepted) return;
+
+    const migrated = await saveConfig([...REQUIREMENT_TYPES]);
+    if (migrated) {
+      successToast(t('testing.migrateCoverageSuccess'));
+    }
   }
 </script>
 
@@ -488,7 +486,7 @@
   isOpen={showConfigModal}
   onclose={closeConfigModal}
   onSubmit={saveConfig}
-  submitDisabled={configLoading}
+  submitDisabled={configLoading || selectedRequirementTypes.length === 0}
   maxWidth="max-w-xl"
 >
   <ModalHeader
@@ -498,42 +496,20 @@
   />
   <div class="p-6">
     <div class="type-selection">
-      {#if isLegacyMode}
-        {#if itemTypes.length === 0}
-          <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noItemTypesAvailable')}</p>
-        {:else}
-          <div class="type-grid">
-            {#each itemTypes as type (type.id)}
-              <button
-                class="type-option"
-                class:selected={selectedTypeIds.includes(type.id)}
-                onclick={() => toggleItemType(type.id)}
-              >
-                <ItemTypeIcon itemType={type} />
-                <span class="type-name">{type.name}</span>
-                {#if selectedTypeIds.includes(type.id)}
-                  <IconCircleCheck class="type-check" />
-                {/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      {:else}
-        <div class="type-grid">
-          {#each REQUIREMENT_TYPES as typeValue (typeValue)}
-            <button
-              class="type-option"
-              class:selected={selectedRequirementTypes.includes(typeValue)}
-              onclick={() => toggleRequirementType(typeValue)}
-            >
-              <span class="type-name">{t(`requirements.type.${typeValue}`)}</span>
-              {#if selectedRequirementTypes.includes(typeValue)}
-                <IconCircleCheck class="type-check" />
-              {/if}
-            </button>
-          {/each}
-        </div>
-      {/if}
+      <div class="type-grid">
+        {#each REQUIREMENT_TYPES as typeValue (typeValue)}
+          <button
+            class="type-option"
+            class:selected={selectedRequirementTypes.includes(typeValue)}
+            onclick={() => toggleRequirementType(typeValue)}
+          >
+            <span class="type-name">{t(`requirements.type.${typeValue}`)}</span>
+            {#if selectedRequirementTypes.includes(typeValue)}
+              <IconCircleCheck class="type-check" />
+            {/if}
+          </button>
+        {/each}
+      </div>
     </div>
 
   </div>
@@ -544,6 +520,7 @@
     onCancel={closeConfigModal}
     onConfirm={saveConfig}
     loading={configLoading}
+    confirmDisabled={selectedRequirementTypes.length === 0}
     showKeyboardHint={true}
   />
 </Modal>

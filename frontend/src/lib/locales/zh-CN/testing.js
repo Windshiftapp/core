@@ -247,6 +247,16 @@ export default {
     noRequirementTypesConfigured: '未配置需求类型',
     selectItemTypesForCoverage: '选择要跟踪覆盖报告的事项类型',
     selectItemTypesForCoverageAnalysis: '选择要纳入覆盖分析的事项类型',
+    selectRequirementTypesForCoverage: '选择要跟踪覆盖报告的需求类型',
+    selectRequirementTypesForCoverageAnalysis: '选择要纳入覆盖分析的需求类型',
+    legacyCoverageConfigTitle: '旧版工作项覆盖配置',
+    legacyCoverageConfigDescription:
+      '此报告仍使用工作项类型。请切换到需求注册表以与可追溯性保持一致。',
+    migrateCoverageToRegistry: '切换到需求注册表',
+    migrateCoverageConfirmTitle: '切换到需求注册表？',
+    migrateCoverageConfirmMessage:
+      '覆盖将使用需求注册表而非工作项类型。将包含所有需求类型。',
+    migrateCoverageSuccess: '覆盖配置已切换到需求注册表',
     saveConfiguration: '保存配置',
     overview: '概览',
     failures: '失败',

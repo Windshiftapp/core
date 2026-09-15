@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -99,6 +100,53 @@ func (f *testCoverageRepoFixture) linkPageToTestCase(t *testing.T, pageID int) {
 		VALUES (?, 'page', ?, 'test_case', ?, 1)
 	`, testsLinkTypeID, pageID, testCaseID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEncodeCoverageConfigWritePageBackedClearsLegacyIDs(t *testing.T) {
+	itemIDs, typesJSON, err := encodeCoverageConfigWrite(CoverageConfigWrite{
+		RequirementItemTypeIDs: []int{1, 2},
+		RequirementTypes:       []string{models.RequirementTypeUseCase},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if itemIDs != nil {
+		t.Fatalf("expected legacy item type IDs to be cleared, got %#v", itemIDs)
+	}
+	typesBytes, ok := typesJSON.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte requirement types JSON, got %T", typesJSON)
+	}
+	var types []string
+	if err := json.Unmarshal(typesBytes, &types); err != nil {
+		t.Fatal(err)
+	}
+	if len(types) != 1 || types[0] != models.RequirementTypeUseCase {
+		t.Fatalf("unexpected types %#v", types)
+	}
+}
+
+func TestEncodeCoverageConfigWriteLegacyIDsOnly(t *testing.T) {
+	itemIDs, typesJSON, err := encodeCoverageConfigWrite(CoverageConfigWrite{
+		RequirementItemTypeIDs: []int{3},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typesJSON != nil {
+		t.Fatalf("expected nil requirement types JSON, got %#v", typesJSON)
+	}
+	idBytes, ok := itemIDs.([]byte)
+	if !ok {
+		t.Fatalf("expected []byte legacy item type IDs JSON, got %T", itemIDs)
+	}
+	var ids []int
+	if err := json.Unmarshal(idBytes, &ids); err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || ids[0] != 3 {
+		t.Fatalf("unexpected ids %#v", ids)
 	}
 }
 

@@ -1506,6 +1506,50 @@ var Catalog = []Migration{
 			WHERE builtin_key = 'implements';
 		`,
 	},
+	{
+		Version: "20260917_test_coverage_legacy_sunset",
+		Name:    "Migrate legacy test coverage configs to page-backed requirement types",
+		CheckSQLite: `
+			SELECT CASE
+				WHEN NOT EXISTS (
+					SELECT 1 FROM test_coverage_configurations
+					WHERE requirement_item_type_ids IS NOT NULL
+						AND requirement_item_type_ids != ''
+						AND requirement_item_type_ids != '[]'
+						AND (requirement_types IS NULL OR requirement_types = '' OR requirement_types = '[]')
+				) THEN 1 ELSE 0 END
+		`,
+		CheckPostgres: `
+			SELECT CASE
+				WHEN NOT EXISTS (
+					SELECT 1 FROM test_coverage_configurations
+					WHERE requirement_item_type_ids IS NOT NULL
+						AND requirement_item_type_ids::text != ''
+						AND requirement_item_type_ids::text != '[]'
+						AND (requirement_types IS NULL OR requirement_types::text = '' OR requirement_types::text = '[]')
+				) THEN 1 ELSE 0 END
+		`,
+		SQLite: `
+			UPDATE test_coverage_configurations
+			SET requirement_types = '["business_requirement","functional_requirement","non_functional_requirement","business_rule","use_case","business_process","system_specification","api_specification","data_model","architecture_decision","glossary_entry"]',
+				requirement_item_type_ids = NULL,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE requirement_item_type_ids IS NOT NULL
+				AND requirement_item_type_ids != ''
+				AND requirement_item_type_ids != '[]'
+				AND (requirement_types IS NULL OR requirement_types = '' OR requirement_types = '[]');
+		`,
+		Postgres: `
+			UPDATE test_coverage_configurations
+			SET requirement_types = '["business_requirement","functional_requirement","non_functional_requirement","business_rule","use_case","business_process","system_specification","api_specification","data_model","architecture_decision","glossary_entry"]',
+				requirement_item_type_ids = NULL,
+				updated_at = CURRENT_TIMESTAMP
+			WHERE requirement_item_type_ids IS NOT NULL
+				AND requirement_item_type_ids::text != ''
+				AND requirement_item_type_ids::text != '[]'
+				AND (requirement_types IS NULL OR requirement_types::text = '' OR requirement_types::text = '[]');
+		`,
+	},
 }
 
 func applySQLiteSSOAttributeMappingDefault(db Database) (retErr error) {

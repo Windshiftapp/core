@@ -281,6 +281,18 @@ export default {
       'Seleccione tipos de elementos para rastrear en los reportes de cobertura',
     selectItemTypesForCoverageAnalysis:
       'Seleccione tipos de elementos para incluir en el analisis de cobertura',
+    selectRequirementTypesForCoverage:
+      'Seleccione tipos de requisitos para el informe de cobertura',
+    selectRequirementTypesForCoverageAnalysis:
+      'Seleccione tipos de requisitos para el analisis de cobertura',
+    legacyCoverageConfigTitle: 'Configuracion de cobertura legacy por work items',
+    legacyCoverageConfigDescription:
+      'Este informe aun usa tipos de elementos. Cambie al registro de requisitos para alinear la trazabilidad.',
+    migrateCoverageToRegistry: 'Cambiar al registro de requisitos',
+    migrateCoverageConfirmTitle: 'Cambiar al registro de requisitos?',
+    migrateCoverageConfirmMessage:
+      'La cobertura usara el registro de requisitos en lugar de tipos de work items. Se incluiran todos los tipos de requisitos.',
+    migrateCoverageSuccess: 'Configuracion de cobertura cambiada al registro de requisitos',
     saveConfiguration: 'Guardar configuracion',
     overview: 'Resumen',
     failures: 'Fallos',

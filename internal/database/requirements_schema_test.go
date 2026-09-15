@@ -32,4 +32,14 @@ func TestFreshSQLiteSchemaIncludesRequirementsTables(t *testing.T) {
 	if indexCount != 1 {
 		t.Fatal("idx_pages_id_workspace_id is missing")
 	}
+
+	var migrationCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*) FROM schema_migrations WHERE version = '20260917_test_coverage_legacy_sunset'
+	`).Scan(&migrationCount); err != nil {
+		t.Fatal(err)
+	}
+	if migrationCount != 1 {
+		t.Fatal("20260917_test_coverage_legacy_sunset migration was not applied")
+	}
 }
