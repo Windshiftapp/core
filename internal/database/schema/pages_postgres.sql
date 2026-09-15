@@ -60,6 +60,11 @@ CREATE INDEX IF NOT EXISTS idx_pages_workspace_parent_rank ON pages(workspace_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_frac_index_scoped
     ON pages(workspace_id, COALESCE(parent_id, -1), frac_index)
     WHERE frac_index IS NOT NULL AND archived_at IS NULL;
+-- Composite uniqueness so requirements can FOREIGN KEY (page_id, workspace_id)
+-- and the database (not just services) rejects a page/workspace mismatch.
+-- migration: 20260915_requirements
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_id_workspace_id
+    ON pages (id, workspace_id);
 CREATE INDEX IF NOT EXISTS idx_pages_fts ON pages USING GIN (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(excerpt, '')));
 
 CREATE TABLE IF NOT EXISTS page_revisions (

@@ -154,6 +154,9 @@ var pagesSchemaPostgres string
 //go:embed schema/page_labels_postgres.sql
 var pageLabelsSchemaPostgres string
 
+//go:embed schema/requirements_postgres.sql
+var requirementsSchemaPostgres string
+
 //go:embed schema/agents_postgres.sql
 var agentsSchemaPostgres string
 
@@ -554,6 +557,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"integrations_postgres.sql", integrationsSchemaPostgres},
 		{"pages_postgres.sql", pagesSchemaPostgres},
 		{"page_labels_postgres.sql", pageLabelsSchemaPostgres},
+		{"requirements_postgres.sql", requirementsSchemaPostgres},
 		{"agents_postgres.sql", agentsSchemaPostgres},
 		{"events_postgres.sql", eventsSchemaPostgres},
 		{"action_event_targets_postgres.sql", actionEventTargetsSchemaPostgres},

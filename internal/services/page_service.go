@@ -27,16 +27,18 @@ import (
 
 // PageService is the entry point for all page CRUD and tree operations.
 type PageService struct {
-	db         database.Database
-	pages      *repository.PageRepository
-	pageLabels *repository.PageLabelRepository
+	db           database.Database
+	pages        *repository.PageRepository
+	pageLabels   *repository.PageLabelRepository
+	requirements *repository.RequirementRepository
 }
 
 // NewPageService creates a PageService backed by the provided database.
 func NewPageService(db database.Database) *PageService {
 	return &PageService{
-		db:    db,
-		pages: repository.NewPageRepository(db),
+		db:           db,
+		pages:        repository.NewPageRepository(db),
+		requirements: repository.NewRequirementRepository(db),
 	}
 }
 
@@ -353,6 +355,9 @@ func (s *PageService) MoveAcrossWorkspace(actorID, pageID, destinationWorkspaceI
 		if len(subtree) == 0 {
 			return nil, ErrPageNotFound
 		}
+		if err := s.rejectRequirementCrossWorkspaceMoveTx(tx, subtree); err != nil {
+			return nil, err
+		}
 
 		destination, err := s.resolvePageMoveDestinationTx(tx, pageID, destinationWorkspaceID, newParentID, false)
 		if err != nil {
@@ -486,6 +491,21 @@ func pageMoveError(err error) error {
 		return ErrPageUniqueConflict
 	}
 	return err
+}
+
+func (s *PageService) rejectRequirementCrossWorkspaceMoveTx(tx database.Tx, subtree []models.Page) error {
+	ids := make([]int, len(subtree))
+	for i := range subtree {
+		ids[i] = subtree[i].ID
+	}
+	blocked, err := s.requirements.ExistsInPageIDsTx(tx, ids)
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return ErrRequirementCrossWorkspaceMove
+	}
+	return nil
 }
 
 // rehomePageSubtreeRelationsTx applies the explicit cross-workspace policy:
