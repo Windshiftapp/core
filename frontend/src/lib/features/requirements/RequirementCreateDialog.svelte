@@ -14,7 +14,12 @@
   import { confirm } from '../../composables/useConfirm.js';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions } from './requirementStatuses.js';
-  import { getRequirementStarterContent } from './requirementStarterTemplates.js';
+  import {
+    DEFAULT_REQUIREMENT_STATUS,
+    DEFAULT_REQUIREMENT_TYPE,
+    applyStarterTemplate,
+    shouldConfirmTemplateReplace,
+  } from './requirementFormHelpers.js';
 
   let {
     workspaceId,
@@ -24,32 +29,32 @@
 
   let title = $state('');
   let content = $state('');
-  let requirementType = $state('use_case');
-  let status = $state('draft');
+  let requirementType = $state(DEFAULT_REQUIREMENT_TYPE);
+  let status = $state(DEFAULT_REQUIREMENT_STATUS);
   let ownerId = $state(null);
   let parentId = $state(null);
   let saving = $state(false);
   let error = $state('');
-  let previousRequirementType = $state('use_case');
+  let previousRequirementType = $state(DEFAULT_REQUIREMENT_TYPE);
   let contentTouched = $state(false);
 
   const typeOptions = $derived(requirementTypeOptions(t));
   const statusOptions = $derived(requirementStatusOptions(t));
 
   function applyTemplate(type) {
-    content = getRequirementStarterContent(type, t);
+    content = applyStarterTemplate(type, t);
     contentTouched = false;
   }
 
   function resetForm() {
     title = '';
-    requirementType = 'use_case';
-    status = 'draft';
+    requirementType = DEFAULT_REQUIREMENT_TYPE;
+    status = DEFAULT_REQUIREMENT_STATUS;
     ownerId = null;
     parentId = null;
     error = '';
-    previousRequirementType = 'use_case';
-    applyTemplate('use_case');
+    previousRequirementType = DEFAULT_REQUIREMENT_TYPE;
+    applyTemplate(DEFAULT_REQUIREMENT_TYPE);
   }
 
   async function confirmReplace() {
@@ -67,7 +72,7 @@
     const oldType = previousRequirementType;
     if (newType === oldType) return;
 
-    if (content.trim() && contentTouched) {
+    if (shouldConfirmTemplateReplace(content, contentTouched)) {
       const ok = await confirmReplace();
       if (!ok) {
         requirementType = oldType;
@@ -80,7 +85,7 @@
   }
 
   async function resetToTemplate() {
-    if (content.trim() && contentTouched) {
+    if (shouldConfirmTemplateReplace(content, contentTouched)) {
       const ok = await confirmReplace();
       if (!ok) return;
     }

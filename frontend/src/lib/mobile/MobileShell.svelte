@@ -3,7 +3,8 @@
   import { Plus } from '@lucide/svelte';
   import { currentRoute, navigate } from '../router.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
-  import { workspacesStore, aiStore, homepageStore } from '../stores';
+  import { authStore, workspacesStore, aiStore, homepageStore } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
   import { resetAuthenticatedShellState } from '../services/authenticatedShellBootstrap.js';
   import { registerMobileServiceWorker } from './pushClient.js';
@@ -23,6 +24,7 @@
   import MobileRequirementDetail from './MobileRequirementDetail.svelte';
   import MobileCommandPalette from './MobileCommandPalette.svelte';
   import MobileCreatePage from './MobileCreatePage.svelte';
+  import MobileCreateRequirementPage from './MobileCreateRequirementPage.svelte';
   import MobileItemEditPage from './MobileItemEditPage.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
 
@@ -37,11 +39,12 @@
       view !== 'mobile-page-detail' &&
       view !== 'mobile-requirement-detail' &&
       view !== 'mobile-create' &&
+      view !== 'mobile-requirement-create' &&
       view !== 'mobile-item-edit',
   );
   // The Personal tab creates personal tasks; every other tab uses the full
-  // work-item form. Pages and requirements have no FAB — create flows are
-  // desktop-only today.
+  // work-item form. Pages have no FAB; requirements use a dedicated create
+  // route (/m/requirements/new) instead of the global FAB.
   const showFab = $derived(
     isTabView && view !== 'mobile-pages' && view !== 'mobile-requirements'
   );
@@ -63,6 +66,8 @@
     // and the AI-chat availability gate.
     workspacesStore.load();
     aiStore.load();
+    const userId = authStore.currentUser?.id;
+    if (userId) void workspacePermissions.loadPermissions(userId);
 
     return () => {
       stopNotificationPoller();
@@ -104,6 +109,8 @@
       <MobileItemDetail itemId={Number($currentRoute.params.id)} />
     {:else if view === 'mobile-create'}
       <MobileCreatePage />
+    {:else if view === 'mobile-requirement-create'}
+      <MobileCreateRequirementPage />
     {:else if view === 'mobile-item-edit'}
       <MobileItemEditPage />
     {/if}

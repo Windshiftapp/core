@@ -1,9 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronRight, Command as CommandIcon, Search } from '@lucide/svelte';
+  import { ChevronRight, Command as CommandIcon, Plus, Search } from '@lucide/svelte';
   import { navigate } from '../router.js';
   import { workspacesStore } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { canCreateRequirementInAnyWorkspace } from '../features/requirements/requirementFormHelpers.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import Lozenge from '../components/Lozenge.svelte';
   import { requirementStatusLozenge } from '../features/requirements/requirementStatuses.js';
@@ -24,6 +26,13 @@
   let filter = $state('');
   let loadSeq = 0;
 
+  const workspaces = $derived([
+    ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
+    ...$workspacesStore.regularWorkspaces,
+  ]);
+  const canCreate = $derived(
+    canCreateRequirementInAnyWorkspace(workspacePermissions, workspaces)
+  );
   const trimmedFilter = $derived(filter.trim().toLowerCase());
 
   const visibleSections = $derived(
@@ -39,6 +48,10 @@
 
   function openRequirement(workspaceId, requirementNumber) {
     navigate(`/m/requirements/${workspaceId}/${requirementNumber}`);
+  }
+
+  function openCreate() {
+    navigate('/m/requirements/new');
   }
 
   async function load() {
@@ -67,6 +80,17 @@
 
 <MobileHeader title={t('requirements.navTitle')}>
   {#snippet right()}
+    {#if canCreate}
+      <button
+        class="hdr-btn"
+        onclick={openCreate}
+        data-testid="mobile-requirements-create"
+        aria-label={t('requirements.create')}
+        type="button"
+      >
+        <Plus size={20} />
+      </button>
+    {/if}
     <button
       class="hdr-btn"
       onclick={() => mobilePalette.open()}

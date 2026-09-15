@@ -12,7 +12,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions } from './requirementStatuses.js';
-  import { getRequirementStarterContent } from './requirementStarterTemplates.js';
+  import { DEFAULT_REQUIREMENT_STATUS, DEFAULT_REQUIREMENT_TYPE, applyStarterTemplate } from './requirementFormHelpers.js';
 
   let {
     workspaceId,
@@ -21,8 +21,8 @@
     onPromoted = () => {},
   } = $props();
 
-  let requirementType = $state('use_case');
-  let status = $state('draft');
+  let requirementType = $state(DEFAULT_REQUIREMENT_TYPE);
+  let status = $state(DEFAULT_REQUIREMENT_STATUS);
   let ownerId = $state(null);
   let saving = $state(false);
   let error = $state('');
@@ -56,8 +56,8 @@
 
   $effect(() => {
     if (open && workspaceId && pageId) {
-      requirementType = 'use_case';
-      status = 'draft';
+      requirementType = DEFAULT_REQUIREMENT_TYPE;
+      status = DEFAULT_REQUIREMENT_STATUS;
       ownerId = null;
       void loadPage();
     }
@@ -75,7 +75,7 @@
     error = '';
     try {
       if (pageIsEmpty && insertTemplate) {
-        const template = getRequirementStarterContent(requirementType, t);
+        const template = applyStarterTemplate(requirementType, t);
         if (template) {
           await api.pages.updatePage(workspaceId, pageId, { content: template });
         }

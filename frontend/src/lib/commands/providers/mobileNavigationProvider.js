@@ -1,4 +1,6 @@
-import { aiStore } from '../../stores';
+import { canCreateRequirementInAnyWorkspace } from '../../features/requirements/requirementFormHelpers.js';
+import { aiStore, workspacesStore } from '../../stores';
+import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 
@@ -66,6 +68,23 @@ export function mobileNavigationProvider(_ctx) {
       url: '/m/search',
     }),
   ];
+
+  const workspaces = [
+    ...(workspacesStore.personalWorkspace ? [workspacesStore.personalWorkspace] : []),
+    ...workspacesStore.regularWorkspaces,
+  ];
+  if (canCreateRequirementInAnyWorkspace(workspacePermissions, workspaces)) {
+    out.push(
+      createCommand({
+        id: 'm-requirements-create',
+        label: 'Create requirement',
+        description: 'New requirement in the registry',
+        bucket: BUCKET.GLOBAL_NAVIGATION,
+        keywords: ['create', 'requirement', 'new', 'spec', 'specification'],
+        url: '/m/requirements/new',
+      })
+    );
+  }
 
   if (aiStore.chatAvailable) {
     out.push(
