@@ -21,11 +21,11 @@
   } from '../features/requirements/requirementFormHelpers.js';
   import MobileHeader from './MobileHeader.svelte';
   import MobileOptionSheet from './MobileOptionSheet.svelte';
+  import MobileRequirementTraceability from './MobileRequirementTraceability.svelte';
 
   let { workspaceId, requirementNumber } = $props();
 
-  // Requirement detail: editable metadata mirrors desktop RequirementsView.
-  // Traceability editing stays on desktop in v1.
+  // Requirement detail: editable metadata and traceability mirror desktop RequirementsView.
   let detail = $state(null);
   let page = $state(null);
   let assignableUsers = $state([]);
@@ -274,18 +274,11 @@
       {t('requirements.openInPages')}
     </button>
 
-    <section class="traceability" data-testid="mobile-requirement-traceability">
-      <h2 class="section-title">{t('requirements.mobile.traceabilitySummary')}</h2>
-      <div class="trace-stats">
-        <span>{t('requirements.traceability.linkedItems')}: {detail.linked_item_count ?? 0}</span>
-        <span>{t('requirements.traceability.linkedTests')}: {detail.linked_test_count ?? 0}</span>
-        {#if (detail.linked_test_count ?? 0) > 0}
-          <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
-        {:else}
-          <Lozenge color="red">{t('requirements.traceability.uncovered')}</Lozenge>
-        {/if}
-      </div>
-    </section>
+    <MobileRequirementTraceability
+      {workspaceId}
+      pageId={detail.page_id}
+      canEdit={permissionsReady && canEditMeta}
+    />
 
     {#if page?.content}
       <SafeMarkdown html={contentHtml} testid="mobile-requirement-content" />
@@ -457,28 +450,6 @@
     color: var(--ds-text-link, var(--ds-interactive));
     font-size: 0.875rem;
     cursor: pointer;
-  }
-
-  .traceability {
-    margin-bottom: 1.25rem;
-    padding: 0.75rem;
-    border: 1px solid var(--ds-border);
-    border-radius: var(--radius-lg, 8px);
-    background: var(--ds-surface-raised);
-  }
-  .section-title {
-    font-size: 0.875rem;
-    font-weight: var(--font-semibold, 600);
-    color: var(--ds-text);
-    margin: 0 0 0.5rem;
-  }
-  .trace-stats {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    color: var(--ds-text-subtle);
   }
 
   .empty { color: var(--ds-text-subtle); font-size: 0.875rem; }

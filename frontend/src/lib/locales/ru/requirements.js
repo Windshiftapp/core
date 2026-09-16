@@ -38,6 +38,8 @@ export default {
       createForbidden: 'У вас нет прав на создание требований.',
       promoteAction: 'Повысить',
       openRequirement: 'Открыть в реестре требований',
+      traceabilityLoadError: 'Не удалось загрузить связи трассируемости.',
+      traceabilityUnlinkConfirm: 'Удалить эту связь с требованием?',
     },
     columnKey: 'Ключ',
     columnTitle: 'Название',

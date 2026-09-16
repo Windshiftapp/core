@@ -11,7 +11,23 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import { buildRequirementKeyByPageId, pageHref } from './requirementKeyMap.js';
-  import { linkDirectionLabel, pageToPagePeerDirection } from './requirementLinkLabels.js';
+  import { linkDirectionLabel } from './requirementLinkLabels.js';
+  import {
+    mergePageLinks,
+    resolveLinkTypeIds,
+    linkedEntity as resolveLinkedEntity,
+    filterItemLinks,
+    filterTestLinks,
+    filterSpecifiesOutgoing,
+    filterSpecifiedBy,
+    filterGenericPageLinks,
+    filterAssetLinks,
+    buildItemLinkCreate,
+    buildTestLinkCreate,
+    buildSpecifiesLinkCreate,
+    buildGenericPageLinkCreate,
+    buildAssetLinkCreate,
+  } from './requirementTraceabilityModel.js';
 
   let { workspaceId, pageId, canEdit = false } = $props();
 
@@ -51,76 +67,19 @@
   let relatedPageSearchVersion = 0;
   let assetSearchVersion = 0;
 
-  const pageLinkTypeId = $derived(
-    linkTypesCache.find((lt) => lt?.builtin_key === 'page' || lt?.name === 'Page')?.id ?? null
-  );
-  const testsLinkTypeId = $derived(
-    linkTypesCache.find((lt) => lt?.builtin_key === 'tests' || lt?.name === 'Tests')?.id ?? null
-  );
-  const relatesToLinkTypeId = $derived(
-    linkTypesCache.find((lt) => lt?.builtin_key === 'relates_to' || lt?.name === 'Relates To')?.id ?? null
-  );
-  const implementsLinkTypeId = $derived(
-    linkTypesCache.find((lt) => lt?.builtin_key === 'implements')?.id ?? null
-  );
-  const specifiesLinkTypeId = $derived(
-    linkTypesCache.find((lt) => lt?.builtin_key === 'specifies')?.id ?? null
-  );
-  const itemLinkTypeId = $derived(implementsLinkTypeId ?? pageLinkTypeId);
+  const linkTypeIds = $derived(resolveLinkTypeIds(linkTypesCache));
+  const pageLinkTypeId = $derived(linkTypeIds.pageLinkTypeId);
+  const testsLinkTypeId = $derived(linkTypeIds.testsLinkTypeId);
+  const relatesToLinkTypeId = $derived(linkTypeIds.relatesToLinkTypeId);
+  const specifiesLinkTypeId = $derived(linkTypeIds.specifiesLinkTypeId);
+  const itemLinkTypeId = $derived(linkTypeIds.itemLinkTypeId);
 
-  const itemLinks = $derived(
-    pageLinks.filter((link) => {
-      const otherType = link.source_type === 'page' && link.source_id === pageId
-        ? link.target_type
-        : link.target_type === 'page' && link.target_id === pageId
-          ? link.source_type
-          : null;
-      return otherType === 'item';
-    })
-  );
-
-  const testLinks = $derived(
-    pageLinks.filter((link) => {
-      const otherType = link.source_type === 'page' && link.source_id === pageId
-        ? link.target_type
-        : link.target_type === 'page' && link.target_id === pageId
-          ? link.source_type
-          : null;
-      return otherType === 'test_case';
-    })
-  );
-
-  const specifiesOutgoingLinks = $derived(
-    pageLinks.filter((link) => {
-      if (link.link_type_id !== specifiesLinkTypeId) return false;
-      return pageToPagePeerDirection(link, pageId) === 'outgoing';
-    })
-  );
-
-  const specifiedByLinks = $derived(
-    pageLinks.filter((link) => {
-      if (link.link_type_id !== specifiesLinkTypeId) return false;
-      return pageToPagePeerDirection(link, pageId) === 'incoming';
-    })
-  );
-
-  const genericRelatedPageLinks = $derived(
-    pageLinks.filter((link) => {
-      if (link.link_type_id !== relatesToLinkTypeId) return false;
-      return pageToPagePeerDirection(link, pageId) != null;
-    })
-  );
-
-  const assetLinks = $derived(
-    pageLinks.filter((link) => {
-      const otherType = link.source_type === 'page' && link.source_id === pageId
-        ? link.target_type
-        : link.target_type === 'page' && link.target_id === pageId
-          ? link.source_type
-          : null;
-      return otherType === 'asset';
-    })
-  );
+  const itemLinks = $derived(filterItemLinks(pageLinks, pageId));
+  const testLinks = $derived(filterTestLinks(pageLinks, pageId));
+  const specifiesOutgoingLinks = $derived(filterSpecifiesOutgoing(pageLinks, pageId, specifiesLinkTypeId));
+  const specifiedByLinks = $derived(filterSpecifiedBy(pageLinks, pageId, specifiesLinkTypeId));
+  const genericRelatedPageLinks = $derived(filterGenericPageLinks(pageLinks, pageId, relatesToLinkTypeId));
+  const assetLinks = $derived(filterAssetLinks(pageLinks, pageId));
 
   $effect(() => {
     if (!pageId) return;
@@ -165,17 +124,7 @@
     try {
       const resp = await api.links.getForPage(pageId);
       if (requestSeq !== loadRequestSeq) return;
-      const outgoing = Array.isArray(resp?.outgoing) ? resp.outgoing : [];
-      const incoming = Array.isArray(resp?.incoming) ? resp.incoming : [];
-      const seen = new Set();
-      const merged = [];
-      for (const link of [...incoming, ...outgoing]) {
-        if (link && link.id != null && !seen.has(link.id)) {
-          seen.add(link.id);
-          merged.push(link);
-        }
-      }
-      pageLinks = merged;
+      pageLinks = mergePageLinks(resp);
     } catch (err) {
       if (requestSeq !== loadRequestSeq) return;
       console.error('failed to load page links', err);
@@ -186,37 +135,7 @@
   }
 
   function linkedEntity(link) {
-    const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
-    const pageIsTarget = link.target_type === 'page' && link.target_id === pageId;
-    if (pageIsSource) {
-      return {
-        type: link.target_type,
-        id: link.target_id,
-        title: link.target_title,
-        workspaceId: link.target_workspace_id,
-        workspaceKey: link.target_workspace_key,
-        itemNumber: link.target_item_number,
-        statusName: link.target_status_name,
-        statusColor: link.target_status_color,
-        itemTypeIcon: link.target_item_type_icon,
-        itemTypeColor: link.target_item_type_color,
-      };
-    }
-    if (pageIsTarget) {
-      return {
-        type: link.source_type,
-        id: link.source_id,
-        title: link.source_title,
-        workspaceId: link.source_workspace_id,
-        workspaceKey: link.source_workspace_key,
-        itemNumber: link.source_item_number,
-        statusName: link.source_status_name,
-        statusColor: link.source_status_color,
-        itemTypeIcon: link.source_item_type_icon,
-        itemTypeColor: link.source_item_type_color,
-      };
-    }
-    return null;
+    return resolveLinkedEntity(link, pageId);
   }
 
   async function unlink(linkId) {
@@ -259,13 +178,7 @@
     if (!itemLinkTypeId || itemSubmitting) return;
     itemSubmitting = true;
     try {
-      const link = await api.links.create({
-        link_type_id: itemLinkTypeId,
-        source_type: 'item',
-        source_id: item.id,
-        target_type: 'page',
-        target_id: pageId,
-      });
+      const link = await api.links.create(buildItemLinkCreate(pageId, item, itemLinkTypeId));
       if (link && !pageLinks.some((l) => l.id === link.id)) {
         pageLinks = [link, ...pageLinks];
       } else {
@@ -312,13 +225,7 @@
     if (!testsLinkTypeId || testSubmitting) return;
     testSubmitting = true;
     try {
-      const link = await api.links.create({
-        link_type_id: testsLinkTypeId,
-        source_type: 'page',
-        source_id: pageId,
-        target_type: 'test_case',
-        target_id: testCase.id,
-      });
+      const link = await api.links.create(buildTestLinkCreate(pageId, testCase, testsLinkTypeId));
       if (link && !pageLinks.some((l) => l.id === link.id)) {
         pageLinks = [link, ...pageLinks];
       } else {
@@ -384,13 +291,11 @@
     if (!linkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
     relatedPageSubmitting = true;
     try {
-      const link = await api.links.create({
-        link_type_id: linkTypeId,
-        source_type: 'page',
-        source_id: pageId,
-        target_type: 'page',
-        target_id: relatedPage.id,
-      });
+      const payload =
+        linkTypeId === specifiesLinkTypeId
+          ? buildSpecifiesLinkCreate(pageId, relatedPage, linkTypeId)
+          : buildGenericPageLinkCreate(pageId, relatedPage, linkTypeId);
+      const link = await api.links.create(payload);
       if (link && !pageLinks.some((l) => l.id === link.id)) {
         pageLinks = [link, ...pageLinks];
       } else {
@@ -448,13 +353,7 @@
     if (!relatesToLinkTypeId || assetSubmitting) return;
     assetSubmitting = true;
     try {
-      const link = await api.links.create({
-        link_type_id: relatesToLinkTypeId,
-        source_type: 'page',
-        source_id: pageId,
-        target_type: 'asset',
-        target_id: asset.id,
-      });
+      const link = await api.links.create(buildAssetLinkCreate(pageId, asset, relatesToLinkTypeId));
       if (link && !pageLinks.some((l) => l.id === link.id)) {
         pageLinks = [link, ...pageLinks];
       } else {

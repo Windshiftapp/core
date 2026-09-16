@@ -38,6 +38,8 @@ export default {
       createForbidden: "You don't have permission to create requirements.",
       promoteAction: 'Promote',
       openRequirement: 'Open in requirements registry',
+      traceabilityLoadError: "Couldn't load traceability links.",
+      traceabilityUnlinkConfirm: 'Remove this link from the requirement?',
     },
     columnKey: 'Key',
     columnTitle: 'Title',

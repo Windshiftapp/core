@@ -49,3 +49,20 @@ export function pageHref(workspaceId, pageId, meta) {
   }
   return `/workspaces/${workspaceId}/pages/${pageId}`;
 }
+
+/**
+ * Mobile navigation href for a traceability peer entity, or null when no mobile route exists.
+ * @param {{ type?: string, id?: number, workspaceId?: number }} entity
+ * @param {number} workspaceId
+ * @param {RequirementPageMeta | null | undefined} pageMeta
+ */
+export function traceabilityEntityHref(entity, workspaceId, pageMeta) {
+  if (!entity?.id) return null;
+  if (entity.type === 'item') {
+    return `/m/items/${entity.id}`;
+  }
+  if (entity.type === 'page') {
+    return pageHref(workspaceId, entity.id, pageMeta);
+  }
+  return null;
+}
