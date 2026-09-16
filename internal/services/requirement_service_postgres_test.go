@@ -139,3 +139,85 @@ func TestMoveAcrossWorkspaceBlocksRequirementBackedPagesPostgres(t *testing.T) {
 		t.Fatalf("expected cross-workspace block, got %v", err)
 	}
 }
+
+func TestPromoteAllocatesStableWorkspaceNumbersPostgres(t *testing.T) {
+	f := newRequirementServicePostgresFixture(t)
+	first := f.createPage(t, f.source, "First")
+	second := f.createPage(t, f.source, "Second")
+
+	got, err := f.reqs.Promote(f.userID, first.ID, models.RequirementTypeUseCase, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RequirementNumber != 1 || got.WorkspaceID != first.WorkspaceID || got.PageID != first.ID {
+		t.Fatalf("unexpected first requirement: %+v", got)
+	}
+	if got.Status != models.RequirementStatusDraft {
+		t.Fatalf("empty status should default to draft, got %q", got.Status)
+	}
+
+	if _, err := f.reqs.Promote(f.userID, first.ID, models.RequirementTypeUseCase, "", nil); !errors.Is(err, ErrRequirementAlreadyExists) {
+		t.Fatalf("second promote of same page: %v", err)
+	}
+
+	got, err = f.reqs.Promote(f.userID, second.ID, models.RequirementTypeBusinessRule, models.RequirementStatusInReview, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RequirementNumber != 2 {
+		t.Fatalf("second page should be 2, got %d", got.RequirementNumber)
+	}
+
+	var historyField string
+	if err := f.db.QueryRow(`SELECT field_name FROM requirement_history WHERE requirement_id = ?`, got.ID).Scan(&historyField); err != nil {
+		t.Fatal(err)
+	}
+	if historyField != models.RequirementHistoryFieldPromoted {
+		t.Fatalf("history field %q", historyField)
+	}
+}
+
+func TestUpdateRequirementWritesPerFieldHistoryPostgres(t *testing.T) {
+	f := newRequirementServicePostgresFixture(t)
+	created, err := f.reqs.Create(f.userID, CreateRequirementInput{
+		WorkspaceID:     f.source,
+		Title:           "Mutable",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID := f.userID
+	status := models.RequirementStatusInReview
+	updated, err := f.reqs.Update(f.userID, f.source, created.RequirementNumber, RequirementUpdateInput{
+		Status:     &status,
+		OwnerIDSet: true,
+		OwnerID:    &ownerID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != models.RequirementStatusInReview || updated.OwnerID == nil || *updated.OwnerID != ownerID {
+		t.Fatalf("unexpected update: %+v", updated)
+	}
+
+	rows, err := f.db.Query(`SELECT field_name FROM requirement_history WHERE requirement_id = ? ORDER BY id`, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var fields []string
+	for rows.Next() {
+		var field string
+		if err := rows.Scan(&field); err != nil {
+			t.Fatal(err)
+		}
+		fields = append(fields, field)
+	}
+	if len(fields) != 3 {
+		t.Fatalf("expected promoted + status + owner history, got %v", fields)
+	}
+	if fields[0] != models.RequirementHistoryFieldPromoted {
+		t.Fatalf("first history field %q", fields[0])
+	}
+}

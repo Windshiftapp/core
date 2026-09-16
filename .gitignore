@@ -34,6 +34,10 @@ cx
 !frontend/src/lib/api/integrations.spec.js
 !frontend/src/lib/features/items/zammadPanelContext.spec.js
 !frontend/src/lib/features/items/ZammadLinkResolver.spec.js
+!frontend/src/lib/features/requirements/requirementTraceabilityModel.spec.js
+!frontend/src/lib/features/requirements/requirementFormHelpers.spec.js
+!frontend/src/lib/features/requirements/requirementKeyMap.spec.js
+!frontend/src/lib/mobile/mobileRequirementsData.spec.js
 !internal/repository/zammad_repository_test.go
 !internal/database/requirements_schema_test.go
 !internal/database/requirements_postgres_test.go
@@ -48,6 +52,7 @@ cx
 !internal/services/test_management_application_service_coverage_test.go
 !internal/services/item_link_page_asset_test.go
 !internal/services/item_link_service_test.go
+!internal/restapi/v2/requirements_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

@@ -198,3 +198,182 @@ func TestRequirementAllocateRollsBackWithTransactionPostgres(t *testing.T) {
 		t.Fatalf("after rollback next number should be 1, got %d", number)
 	}
 }
+
+func TestRequirementListByWorkspaceExcludesArchivedPagesPostgres(t *testing.T) {
+	f := newRequirementRepoPostgresFixture(t)
+	livePage := f.insertPage(t, f.sourceWS, "Live")
+	archivedPage := f.insertPage(t, f.sourceWS, "Archived")
+	if _, err := f.db.ExecWrite(`UPDATE pages SET archived_at = CURRENT_TIMESTAMP WHERE id = ?`, archivedPage); err != nil {
+		t.Fatal(err)
+	}
+
+	insert := func(pageID int) {
+		t.Helper()
+		err := database.WithTx(f.db, func(tx database.Tx) error {
+			n, err := f.repo.NextNumberTx(tx, f.sourceWS)
+			if err != nil {
+				return err
+			}
+			_, err = f.repo.InsertTx(tx, &models.Requirement{
+				PageID:            pageID,
+				WorkspaceID:       f.sourceWS,
+				RequirementNumber: n,
+				RequirementType:   models.RequirementTypeUseCase,
+				Status:            models.RequirementStatusDraft,
+				CreatedBy:         f.userID,
+			})
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert(livePage)
+	insert(archivedPage)
+
+	rows, err := f.repo.ListByWorkspace(f.sourceWS, RequirementListFilter{ExcludeArchived: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].PageTitle != "Live" {
+		t.Fatalf("expected only live requirement, got %+v", rows)
+	}
+}
+
+func TestRequirementUpdateTxPersistsMutableFieldsPostgres(t *testing.T) {
+	f := newRequirementRepoPostgresFixture(t)
+	pageID := f.insertPage(t, f.sourceWS, "Mutable")
+	var reqID int
+	err := database.WithTx(f.db, func(tx database.Tx) error {
+		n, err := f.repo.NextNumberTx(tx, f.sourceWS)
+		if err != nil {
+			return err
+		}
+		reqID, err = f.repo.InsertTx(tx, &models.Requirement{
+			PageID:            pageID,
+			WorkspaceID:       f.sourceWS,
+			RequirementNumber: n,
+			RequirementType:   models.RequirementTypeUseCase,
+			Status:            models.RequirementStatusDraft,
+			CreatedBy:         f.userID,
+		})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ownerID := f.userID
+	err = database.WithTx(f.db, func(tx database.Tx) error {
+		return f.repo.UpdateTx(tx, reqID, RequirementUpdatePatch{
+			RequirementType: models.RequirementTypeBusinessRule,
+			Status:          models.RequirementStatusApproved,
+			OwnerID:         &ownerID,
+		}, f.userID)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.repo.GetByWorkspaceAndNumber(f.sourceWS, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RequirementType != models.RequirementTypeBusinessRule ||
+		got.Status != models.RequirementStatusApproved ||
+		got.OwnerID == nil || *got.OwnerID != ownerID {
+		t.Fatalf("unexpected requirement after update: %+v", got)
+	}
+}
+
+func TestRequirementListByWorkspaceLinkFiltersAndCountsPostgres(t *testing.T) {
+	f := newRequirementRepoPostgresFixture(t)
+	linkedPage := f.insertPage(t, f.sourceWS, "Linked")
+	barePage := f.insertPage(t, f.sourceWS, "Bare")
+	testedPage := f.insertPage(t, f.sourceWS, "Tested")
+
+	insertRequirement := func(pageID int) {
+		t.Helper()
+		err := database.WithTx(f.db, func(tx database.Tx) error {
+			n, err := f.repo.NextNumberTx(tx, f.sourceWS)
+			if err != nil {
+				return err
+			}
+			_, err = f.repo.InsertTx(tx, &models.Requirement{
+				PageID:            pageID,
+				WorkspaceID:       f.sourceWS,
+				RequirementNumber: n,
+				RequirementType:   models.RequirementTypeUseCase,
+				Status:            models.RequirementStatusDraft,
+				CreatedBy:         f.userID,
+			})
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, pageID := range []int{linkedPage, barePage, testedPage} {
+		insertRequirement(pageID)
+	}
+
+	var itemID int
+	var statusID int
+	if err := f.db.QueryRow(`SELECT id FROM statuses ORDER BY id LIMIT 1`).Scan(&statusID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.QueryRow(`
+		INSERT INTO items (workspace_id, workspace_item_number, title, description, frac_index, status_id, creator_id, last_active_at)
+		VALUES (?, 1, 'Linked item', '', 'a0', ?, ?, CURRENT_TIMESTAMP)
+		RETURNING id
+	`, f.sourceWS, statusID, f.userID).Scan(&itemID); err != nil {
+		t.Fatal(err)
+	}
+	var pageLinkTypeID int
+	if err := f.db.QueryRow(`SELECT id FROM link_types WHERE name = 'Page'`).Scan(&pageLinkTypeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by)
+		VALUES (?, 'item', ?, 'page', ?, ?)
+	`, pageLinkTypeID, itemID, linkedPage, f.userID); err != nil {
+		t.Fatal(err)
+	}
+
+	var testsLinkTypeID int
+	if err := f.db.QueryRow(`SELECT id FROM link_types WHERE builtin_key = 'tests'`).Scan(&testsLinkTypeID); err != nil {
+		t.Fatal(err)
+	}
+	var testCaseID int
+	if err := f.db.QueryRow(`
+		INSERT INTO test_cases (workspace_id, title, name)
+		VALUES (?, 'Login test', 'Login test')
+		RETURNING id
+	`, f.sourceWS).Scan(&testCaseID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by)
+		VALUES (?, 'page', ?, 'test_case', ?, ?)
+	`, testsLinkTypeID, testedPage, testCaseID, f.userID); err != nil {
+		t.Fatal(err)
+	}
+
+	hasItems := true
+	rows, err := f.repo.ListByWorkspace(f.sourceWS, RequirementListFilter{ExcludeArchived: true, HasItemLinks: &hasItems})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Requirement.PageID != linkedPage || rows[0].LinkedItemCount != 1 {
+		t.Fatalf("expected one item-linked requirement, got %+v", rows)
+	}
+
+	hasTests := true
+	rows, err = f.repo.ListByWorkspace(f.sourceWS, RequirementListFilter{ExcludeArchived: true, HasTestLinks: &hasTests})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Requirement.PageID != testedPage || rows[0].LinkedTestCount != 1 {
+		t.Fatalf("expected one test-linked requirement, got %+v", rows)
+	}
+}

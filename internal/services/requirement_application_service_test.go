@@ -278,3 +278,118 @@ func TestRequirementApplicationCreateRequiresPermission(t *testing.T) {
 		t.Fatalf("expected opaque denial, got %v", err)
 	}
 }
+
+func TestRequirementApplicationPromote(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	page, err := f.pages.Create(f.adminID, CreatePageInput{WorkspaceID: f.wsID, Title: "Promote me"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := f.app.Promote(AuditActor{UserID: f.adminID}, f.wsID, page.ID, models.RequirementTypeUseCase, models.RequirementStatusDraft, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Key != "CRM-DOC-1" || view.PageID != page.ID {
+		t.Fatalf("unexpected promote view %+v", view)
+	}
+
+	plain, err := f.pages.Create(f.adminID, CreatePageInput{WorkspaceID: f.wsID, Title: "Hidden promote"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pages.SetInheritPermissions(f.adminID, plain.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecWrite(`
+		INSERT INTO page_permissions (page_id, principal_type, principal_id, permission_level, granted_by)
+		VALUES (?, 'user', ?, 'view', ?)
+	`, plain.ID, f.adminID, f.adminID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.app.Promote(AuditActor{UserID: f.viewer}, f.wsID, plain.ID, models.RequirementTypeUseCase, "", nil); !errors.Is(err, ErrRequirementNotFound) {
+		t.Fatalf("expected opaque promote denial, got %v", err)
+	}
+}
+
+func TestRequirementApplicationUpdateHappyPath(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	created, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Mutable",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := models.RequirementStatusApproved
+	updated, err := f.app.Update(AuditActor{UserID: f.adminID}, f.wsID, created.RequirementNumber, RequirementUpdateInput{
+		Status: &status,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != models.RequirementStatusApproved {
+		t.Fatalf("unexpected status %q", updated.Status)
+	}
+}
+
+func TestRequirementApplicationListHistory(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	created, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "History",
+		RequirementType: models.RequirementTypeUseCase,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := models.RequirementStatusInReview
+	if _, err := f.app.Update(AuditActor{UserID: f.adminID}, f.wsID, created.RequirementNumber, RequirementUpdateInput{
+		Status: &status,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	history, err := f.app.ListHistory(f.adminID, f.wsID, created.RequirementNumber)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) < 2 {
+		t.Fatalf("expected promoted + status history, got %d entries", len(history))
+	}
+
+	if _, err := f.app.ListHistory(f.viewer, f.wsID, created.RequirementNumber); err != nil {
+		t.Fatalf("viewer should read history on inherited page: %v", err)
+	}
+}
+
+func TestRequirementApplicationListFiltersByTypeAndStatus(t *testing.T) {
+	f := newRequirementApplicationFixture(t)
+	if _, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Draft use case",
+		RequirementType: models.RequirementTypeUseCase,
+		Status:          models.RequirementStatusDraft,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.app.Create(AuditActor{UserID: f.adminID}, CreateRequirementInput{
+		WorkspaceID:     f.wsID,
+		Title:           "Approved rule",
+		RequirementType: models.RequirementTypeBusinessRule,
+		Status:          models.RequirementStatusApproved,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	views, total, err := f.app.List(f.adminID, f.wsID, RequirementListFilter{
+		RequirementType: models.RequirementTypeBusinessRule,
+		Status:          models.RequirementStatusApproved,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(views) != 1 || views[0].RequirementType != models.RequirementTypeBusinessRule {
+		t.Fatalf("expected one approved business rule, got total=%d views=%+v", total, views)
+	}
+}
