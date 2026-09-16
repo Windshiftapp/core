@@ -3,6 +3,7 @@ import {
   canCreateRequirement,
   canCreateRequirementInAnyWorkspace,
   canEditRequirement,
+  defaultRequirementOwnerId,
   formatRequirementOwnerLabel,
   shouldConfirmTemplateReplace,
 } from './requirementFormHelpers.js';
@@ -37,6 +38,15 @@ describe('canCreateRequirementInAnyWorkspace', () => {
     const perms = mockPermissions({ grants: { '3:page.create': true } });
     expect(canCreateRequirementInAnyWorkspace(perms, [{ id: 1 }, { id: 3 }])).toBe(true);
     expect(canCreateRequirementInAnyWorkspace(perms, [{ id: 1 }])).toBe(false);
+  });
+});
+
+describe('defaultRequirementOwnerId', () => {
+  it('returns the creator when they are assignable', () => {
+    expect(defaultRequirementOwnerId(42, [{ id: 42 }, { id: 7 }])).toBe(42);
+    expect(defaultRequirementOwnerId(42, [])).toBe(42);
+    expect(defaultRequirementOwnerId(null, [{ id: 42 }])).toBe(null);
+    expect(defaultRequirementOwnerId(99, [{ id: 42 }])).toBe(null);
   });
 });
 

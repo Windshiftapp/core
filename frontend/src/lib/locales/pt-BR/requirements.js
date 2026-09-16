@@ -57,6 +57,10 @@ export default {
     fieldParent: 'Página pai',
     filters: {
       search: 'Pesquisar requisitos…',
+      panelTitle: 'Filtros',
+      active: 'Filtros ativos',
+      clearAll: 'Limpar tudo',
+      searchChip: 'Pesquisa: {query}',
       allTypes: 'Todos os tipos',
       allStatuses: 'Todos os status',
       anyLinks: 'Qualquer vínculo com itens',
@@ -68,7 +72,10 @@ export default {
       labels: 'Etiquetas',
     },
     traceability: {
+      empty: 'Ainda não há vínculos. Vincule itens de trabalho, casos de teste ou requisitos relacionados.',
+      searchError: 'Não foi possível pesquisar. Tente novamente.',
       title: 'Rastreabilidade',
+      summaryStats: '{items} itens · {tests} testes',
       linkedItems: 'Itens de trabalho vinculados',
       linkedTests: 'Casos de teste vinculados',
       addItem: 'Vincular item',

@@ -250,6 +250,7 @@ func (r *RequirementRepository) GetLinkCountsByPageID(pageID int) (RequirementLi
 type RequirementKeyRow struct {
 	PageID            int
 	RequirementNumber int
+	RequirementType   string
 }
 
 func (r *RequirementRepository) appendListWhere(query string, args []any, filter RequirementListFilter) (queryOut string, argsOut []any) {
@@ -335,7 +336,7 @@ func (r *RequirementRepository) ListPageIDsByWorkspace(workspaceID int, filter R
 func (r *RequirementRepository) ListKeysByWorkspace(workspaceID int) ([]RequirementKeyRow, error) {
 	filter := RequirementListFilter{ExcludeArchived: true}
 	query := `
-		SELECT r.page_id, r.requirement_number
+		SELECT r.page_id, r.requirement_number, r.requirement_type
 		FROM requirements r
 		JOIN pages p ON p.id = r.page_id AND p.workspace_id = r.workspace_id
 		WHERE r.workspace_id = ?`
@@ -352,7 +353,7 @@ func (r *RequirementRepository) ListKeysByWorkspace(workspaceID int) ([]Requirem
 	var out []RequirementKeyRow
 	for rows.Next() {
 		var row RequirementKeyRow
-		if err := rows.Scan(&row.PageID, &row.RequirementNumber); err != nil {
+		if err := rows.Scan(&row.PageID, &row.RequirementNumber, &row.RequirementType); err != nil {
 			return nil, fmt.Errorf("scan requirement key row: %w", err)
 		}
 		out = append(out, row)

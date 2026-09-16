@@ -212,7 +212,7 @@
       case 'item':
         return api.links.search(q, 'item', 10);
       case 'test': {
-        const results = await api.tests.testCases.getAll(workspaceId, { q, limit: 10 });
+        const results = await api.tests.testCases.getAll(workspaceId, { all: true, q, limit: 10 });
         return Array.isArray(results) ? results : (results?.data ?? []);
       }
       case 'specifies':
@@ -319,8 +319,8 @@
                     <button class="link-main" type="button" onclick={() => navigateToEntity(entity)}>
                       <ItemTypeIcon icon={entity.itemTypeIcon} color={entity.itemTypeColor} />
                       <span class="link-text">
-                        {#if linkDirectionLabel(link, pageId)}
-                          <span class="relation">{linkDirectionLabel(link, pageId)}</span>
+                        {#if linkDirectionLabel(link, pageId, linkTypesCache)}
+                          <span class="relation">{linkDirectionLabel(link, pageId, linkTypesCache)}</span>
                         {/if}
                         <span class="key">{entity.workspaceKey || 'WORK'}-{entity.itemNumber ?? entity.id}</span>
                         <span class="title">{entity.title}</span>
@@ -421,8 +421,8 @@
                   {#if traceabilityEntityHref(entity, workspaceId, reqMeta)}
                     <button class="link-main" type="button" onclick={() => navigateToEntity(entity)}>
                       <span class="link-text">
-                        {#if linkDirectionLabel(link, pageId)}
-                          <span class="relation">{linkDirectionLabel(link, pageId)}</span>
+                        {#if linkDirectionLabel(link, pageId, linkTypesCache)}
+                          <span class="relation">{linkDirectionLabel(link, pageId, linkTypesCache)}</span>
                         {/if}
                         {#if reqMeta?.key}<Lozenge color="blue">{reqMeta.key}</Lozenge>{/if}
                         <span class="title">{entity.title}</span>
@@ -466,8 +466,8 @@
                   {#if traceabilityEntityHref(entity, workspaceId, reqMeta)}
                     <button class="link-main" type="button" onclick={() => navigateToEntity(entity)}>
                       <span class="link-text">
-                        {#if linkDirectionLabel(link, pageId)}
-                          <span class="relation">{linkDirectionLabel(link, pageId)}</span>
+                        {#if linkDirectionLabel(link, pageId, linkTypesCache)}
+                          <span class="relation">{linkDirectionLabel(link, pageId, linkTypesCache)}</span>
                         {/if}
                         {#if reqMeta?.key}<Lozenge color="blue">{reqMeta.key}</Lozenge>{/if}
                         <span class="title">{entity.title}</span>

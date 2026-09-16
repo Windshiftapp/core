@@ -57,6 +57,10 @@ export default {
     fieldParent: '父页面',
     filters: {
       search: '搜索需求…',
+      panelTitle: '筛选',
+      active: '已选筛选',
+      clearAll: '全部清除',
+      searchChip: '搜索：{query}',
       allTypes: '所有类型',
       allStatuses: '所有状态',
       anyLinks: '任意工作项链接',
@@ -68,7 +72,10 @@ export default {
       labels: '标签',
     },
     traceability: {
+      empty: '暂无关联。添加工作项、测试用例或相关需求。',
+      searchError: '搜索失败，请重试。',
       title: '可追溯性',
+      summaryStats: '{items} 个工作项 · {tests} 个测试',
       linkedItems: '关联的工作项',
       linkedTests: '关联的测试用例',
       addItem: '关联工作项',

@@ -425,4 +425,9 @@ func TestRequirementListByWorkspaceLinkFiltersAndCounts(t *testing.T) {
 	if len(keys) != 4 {
 		t.Fatalf("expected four requirement keys, got %d", len(keys))
 	}
+	for _, key := range keys {
+		if key.RequirementType != models.RequirementTypeUseCase {
+			t.Fatalf("expected requirement type in key metadata, got %+v", key)
+		}
+	}
 }

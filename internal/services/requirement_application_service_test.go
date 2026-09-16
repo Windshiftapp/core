@@ -237,6 +237,9 @@ func TestRequirementApplicationListKeysExcludesHiddenPages(t *testing.T) {
 	if len(keys) != 1 || keys[0].PageID != open.PageID || keys[0].Key != open.Key {
 		t.Fatalf("expected only open key, got %+v", keys)
 	}
+	if keys[0].RequirementType != models.RequirementTypeUseCase {
+		t.Fatalf("expected visible requirement type in key metadata, got %+v", keys[0])
+	}
 }
 
 func TestRequirementApplicationUpdateDeniedIsOpaque(t *testing.T) {

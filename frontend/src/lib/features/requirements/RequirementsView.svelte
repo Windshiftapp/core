@@ -1,5 +1,13 @@
 <script>
-  import { IconPlus, IconChevronLeft, IconExternalLink, IconHistory } from '@tabler/icons-svelte-runes';
+  import {
+    IconPlus,
+    IconChevronLeft,
+    IconExternalLink,
+    IconHistory,
+    IconCopy,
+    IconChevronDown,
+    IconUser,
+  } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -7,15 +15,15 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import SearchInput from '../../components/SearchInput.svelte';
-  import Select from '../../components/Select.svelte';
+  import Avatar from '../../components/Avatar.svelte';
+  import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import PagesView from '../pages/PagesView.svelte';
   import RequirementHistoryDrawer from './RequirementHistoryDrawer.svelte';
   import RequirementTraceabilityPanel from './RequirementTraceabilityPanel.svelte';
-  import PageLabelPicker from '../pages/PageLabelPicker.svelte';
+  import RequirementListFilters from './RequirementListFilters.svelte';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions, requirementStatusLozenge } from './requirementStatuses.js';
   import { canEditRequirement } from './requirementFormHelpers.js';
@@ -39,6 +47,7 @@
   let pageIndex = $state(0);
   let totalItems = $state(0);
   let assignableUsers = $state([]);
+  let assignableUsersLoading = $state(true);
 
   let detail = $state(null);
   let detailLoading = $state(false);
@@ -55,35 +64,14 @@
 
   const canEdit = $derived(canEditRequirement(workspacePermissions, workspaceId));
 
-  const typeOptions = $derived([
-    { value: '', label: t('requirements.filters.allTypes') },
-    ...requirementTypeOptions(t),
-  ]);
-  const statusOptions = $derived([
-    { value: '', label: t('requirements.filters.allStatuses') },
-    ...requirementStatusOptions(t),
-  ]);
-
   const columns = $derived([
     { key: 'key', label: t('requirements.columnKey'), sortable: true, slot: 'key' },
     { key: 'page_title', label: t('requirements.columnTitle'), sortable: true },
     { key: 'requirement_type', label: t('requirements.columnType'), slot: 'requirement_type' },
     { key: 'status', label: t('requirements.columnStatus'), slot: 'status' },
     { key: 'owner_id', label: t('requirements.columnOwner'), slot: 'owner_id' },
-    { key: 'linked_item_count', label: t('requirements.columnLinkedItems'), slot: 'linked_item_count' },
     { key: 'linked_test_count', label: t('requirements.columnTests'), slot: 'linked_test_count' },
     { key: 'updated_at', label: t('requirements.columnUpdated'), sortable: true, slot: 'updated_at' },
-  ]);
-
-  const linkFilterOptions = $derived([
-    { value: '', label: t('requirements.filters.anyLinks') },
-    { value: 'true', label: t('requirements.filters.hasLinks') },
-    { value: 'false', label: t('requirements.filters.noLinks') },
-  ]);
-  const testLinkFilterOptions = $derived([
-    { value: '', label: t('requirements.filters.anyCoverage') },
-    { value: 'true', label: t('requirements.filters.hasTestLinks') },
-    { value: 'false', label: t('requirements.filters.uncovered') },
   ]);
 
   const pageStart = $derived(totalItems === 0 ? 0 : pageIndex * PAGE_SIZE + 1);
@@ -99,20 +87,15 @@
     )
   );
 
-  let metaType = $state('');
-  let metaStatus = $state('');
+  let metaType = $derived(detail?.requirement_type ?? '');
+  let metaStatus = $derived(detail?.status ?? '');
+  const owner = $derived(assignableUsers.find((user) => user.id === detail?.owner_id));
 
   $effect(() => {
-    if (detail) {
-      metaType = detail.requirement_type;
-      metaStatus = detail.status;
-    }
-  });
-
-  $effect(() => {
-    void api.getAssignableUsers(workspaceId).then((users) => {
-      assignableUsers = users || [];
-    });
+    assignableUsersLoading = true;
+    void api.getAssignableUsers(workspaceId)
+      .then((users) => { assignableUsers = users || []; })
+      .finally(() => { assignableUsersLoading = false; });
   });
 
   $effect(() => {
@@ -200,10 +183,13 @@
   async function patchDetail(patch) {
     if (!detail || !canEdit) return;
     savingMeta = true;
+    detailError = '';
     try {
       detail = await api.requirements.update(workspaceId, detail.requirement_number, patch);
     } catch (err) {
       detailError = err?.message || t('requirements.updateError');
+      metaType = detail.requirement_type;
+      metaStatus = detail.status;
     } finally {
       savingMeta = false;
     }
@@ -225,31 +211,39 @@
     void patchDetail({ owner_id: ownerId });
   }
 
-  function onSearchKeydown(event) {
-    if (event.key === 'Enter') applyFilters();
-  }
-
   function ownerLabel(ownerId) {
     if (!ownerId) return '—';
     return userLabelById.get(ownerId) || `#${ownerId}`;
   }
 
-  function onLabelToggle(label) {
-    const next = new Set(selectedLabelIds);
-    if (next.has(label.id)) next.delete(label.id);
-    else next.add(label.id);
-    selectedLabelIds = next;
-    applyFilters();
-  }
 </script>
 
 {#if requirementNumber}
   <div class="requirements-detail flex h-full min-h-0 flex-col">
-    <div class="requirements-detail__meta border-b px-4 py-3">
-      <div class="mb-3 flex items-center gap-2">
+    <header class="requirements-detail__navigation">
+      <div class="requirements-detail__breadcrumb">
         <Button variant="ghost" size="sm" onclick={() => navigate(`/workspaces/${workspaceId}/requirements`)}>
-          <IconChevronLeft size={16} />
-          {t('requirements.backToList')}
+          <IconChevronLeft size={16} aria-hidden="true" />
+          {t('requirements.navTitle')}
+        </Button>
+        {#if detail}
+          <span class="requirements-detail__separator" aria-hidden="true">/</span>
+          <button
+            type="button"
+            class="requirements-key"
+            onclick={() => copyKey(detail.key)}
+            title={t('requirements.copyKey')}
+            aria-label={`${t('requirements.copyKey')}: ${detail.key}`}
+          >
+            {detail.key}
+            <IconCopy size={14} aria-hidden="true" />
+          </button>
+        {/if}
+      </div>
+      <div class="requirements-detail__actions">
+        <Button variant="ghost" size="sm" onclick={() => (historyOpen = true)} disabled={!detail}>
+          <IconHistory size={16} aria-hidden="true" />
+          {t('requirements.historyTitle')}
         </Button>
         <Button
           variant="ghost"
@@ -257,59 +251,92 @@
           onclick={() => navigate(`/workspaces/${workspaceId}/pages/${detail?.page_id}`)}
           disabled={!detail}
         >
-          <IconExternalLink size={16} />
+          <IconExternalLink size={16} aria-hidden="true" />
           {t('requirements.openInPages')}
         </Button>
-        <Button variant="ghost" size="sm" onclick={() => (historyOpen = true)} disabled={!detail}>
-          <IconHistory size={16} />
-          {t('requirements.historyTitle')}
-        </Button>
       </div>
-      {#if detailLoading}
-        <div class="flex justify-center py-4"><Spinner /></div>
-      {:else if detailError}
-        <p class="text-sm text-[var(--ds-text-danger)]">{detailError}</p>
-      {:else if detail}
-        <div class="flex flex-wrap items-end gap-4">
-          <button type="button" class="requirements-key" onclick={() => copyKey(detail.key)} title={t('requirements.copyKey')}>
-            <Lozenge color="blue">{detail.key}</Lozenge>
-          </button>
-          <div class="meta-field">
-            <span class="meta-label">{t('requirements.fieldType')}</span>
-            <Select
-              bind:value={metaType}
-              options={requirementTypeOptions(t)}
-              disabled={!canEdit || savingMeta}
-              onchange={onTypeChange}
-            />
-          </div>
-          <div class="meta-field">
-            <span class="meta-label">{t('requirements.fieldStatus')}</span>
-            <Select
-              bind:value={metaStatus}
-              options={requirementStatusOptions(t)}
-              disabled={!canEdit || savingMeta}
-              onchange={onStatusChange}
-            />
-          </div>
-          <div class="meta-field meta-field--owner">
-            <span class="meta-label">{t('requirements.fieldOwner')}</span>
-            <UserPicker
-              value={detail.owner_id}
-              {workspaceId}
-              disabled={!canEdit || savingMeta}
-              onSelect={onOwnerChange}
-            />
-          </div>
-        </div>
-      {/if}
-    </div>
-    {#if detail?.page_id}
-      <RequirementTraceabilityPanel {workspaceId} pageId={detail.page_id} {canEdit} />
+    </header>
+    {#if detailError}
+      <p class="requirements-detail__error" role="alert">{detailError}</p>
     {/if}
     <div class="requirements-detail__editor min-h-0 flex-1">
       {#if detail?.page_id}
-        <PagesView {workspaceId} pageId={detail.page_id} />
+        <PagesView {workspaceId} pageId={detail.page_id} requirementContext>
+          {#snippet documentMeta({ canEdit: canEditPage })}
+            {@const disabled = !canEdit || !canEditPage || savingMeta}
+            <div class="requirements-detail__properties" aria-busy={savingMeta}>
+              <div class="meta-field">
+                <ItemPicker
+                  bind:value={metaType}
+                  items={requirementTypeOptions(t)}
+                  ariaLabel={`${t('requirements.fieldType')}: ${t(`requirements.type.${metaType}`)}`}
+                  config={{ getValue: (option) => option.value }}
+                  allowClear={false}
+                  {disabled}
+                  onSelect={onTypeChange}
+                >
+                  <div class="meta-value" title={t('requirements.fieldType')}>
+                    <span class="meta-value__text">{t(`requirements.type.${metaType}`)}</span>
+                    {#if !disabled}<IconChevronDown size={12} aria-hidden="true" />{/if}
+                  </div>
+                </ItemPicker>
+              </div>
+              <div class="meta-field">
+                <ItemPicker
+                  bind:value={metaStatus}
+                  items={requirementStatusOptions(t)}
+                  ariaLabel={`${t('requirements.fieldStatus')}: ${t(`requirements.status.${metaStatus}`)}`}
+                  config={{ getValue: (option) => option.value }}
+                  allowClear={false}
+                  {disabled}
+                  onSelect={onStatusChange}
+                >
+                  <div class="meta-value" title={t('requirements.fieldStatus')}>
+                    <Lozenge color={requirementStatusLozenge(metaStatus)}>
+                      {t(`requirements.status.${metaStatus}`)}
+                    </Lozenge>
+                    {#if !disabled}<IconChevronDown size={12} aria-hidden="true" />{/if}
+                  </div>
+                </ItemPicker>
+              </div>
+              <div class="meta-field">
+                <UserPicker
+                  value={detail.owner_id}
+                  users={assignableUsers}
+                  loading={assignableUsersLoading}
+                  placeholder={t('pickers.unassigned')}
+                  ariaLabel={`${t('requirements.fieldOwner')}: ${detail.owner_id ? ownerLabel(detail.owner_id) : t('pickers.unassigned')}`}
+                  showUnassigned
+                  {disabled}
+                  onSelect={onOwnerChange}
+                >
+                  <div class="meta-value" title={t('requirements.fieldOwner')}>
+                    <span class="meta-value__avatar" aria-hidden="true">
+                      {#if detail.owner_id}
+                        <Avatar src={owner?.avatar_url} name={ownerLabel(detail.owner_id)} size="2xs" variant="neutral" />
+                      {:else}
+                        <IconUser size={16} />
+                      {/if}
+                    </span>
+                    <span class="meta-value__text">{detail.owner_id ? ownerLabel(detail.owner_id) : t('pickers.unassigned')}</span>
+                    {#if !disabled}<IconChevronDown size={12} aria-hidden="true" />{/if}
+                  </div>
+                </UserPicker>
+              </div>
+            </div>
+          {/snippet}
+          {#snippet documentFooter({ canEdit: canEditPage })}
+            {#key detail.page_id}
+              <RequirementTraceabilityPanel
+                {workspaceId}
+                pageId={detail.page_id}
+                canEdit={canEdit && canEditPage}
+              />
+            {/key}
+          {/snippet}
+        </PagesView>
+      {:else if detailLoading}
+        <div class="flex justify-center py-8"><Spinner /></div>
       {/if}
     </div>
     <RequirementHistoryDrawer
@@ -319,7 +346,7 @@
     />
   </div>
 {:else}
-  <div class="requirements-list flex h-full min-h-0 flex-col p-4">
+  <div class="requirements-list flex h-full min-h-0 flex-col min-w-0 p-4">
     <PageHeader title={t('requirements.navTitle')}>
       {#snippet actions()}
         {#if canCreate}
@@ -331,34 +358,23 @@
       {/snippet}
     </PageHeader>
 
-    <div class="mb-4 flex flex-wrap items-end gap-3">
-      <SearchInput
-        bind:value={searchQuery}
-        placeholder={t('requirements.filters.search')}
-        on_keydown={onSearchKeydown}
-        class="min-w-[200px] flex-1"
-      />
-      <Select bind:value={filterType} options={typeOptions} onchange={applyFilters} />
-      <Select bind:value={filterStatus} options={statusOptions} onchange={applyFilters} />
-      <div class="min-w-[180px]">
-        <UserPicker bind:value={filterOwnerId} {workspaceId} onSelect={applyFilters} />
-      </div>
-      <Select bind:value={filterItemLinks} options={linkFilterOptions} onchange={applyFilters} />
-      <Select bind:value={filterTestLinks} options={testLinkFilterOptions} onchange={applyFilters} />
-      <PageLabelPicker
-        {workspaceId}
-        selectedIds={selectedLabelIds}
-        allowCreate={false}
-        triggerLabel={t('requirements.filters.labels')}
-        onToggle={onLabelToggle}
-      />
-      <Button variant="secondary" onclick={applyFilters}>{t('common.apply')}</Button>
-    </div>
+    <RequirementListFilters
+      {workspaceId}
+      bind:searchQuery
+      bind:filterType
+      bind:filterStatus
+      bind:filterOwnerId
+      bind:filterItemLinks
+      bind:filterTestLinks
+      bind:selectedLabelIds
+      onchange={applyFilters}
+    />
 
     {#if error}
       <p class="mb-3 text-sm text-[var(--ds-text-danger)]">{error}</p>
     {/if}
 
+    <div class="requirements-list__table min-h-0 min-w-0 flex-1">
     <DataTable
       {columns}
       data={rows}
@@ -382,9 +398,6 @@
       {#snippet owner_id(item)}
         {ownerLabel(item.owner_id)}
       {/snippet}
-      {#snippet linked_item_count(item)}
-        {item.linked_item_count ?? 0}
-      {/snippet}
       {#snippet linked_test_count(item)}
         {#if (item.linked_test_count ?? 0) > 0}
           <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
@@ -396,6 +409,7 @@
         {formatDateShort(item.updated_at)}
       {/snippet}
     </DataTable>
+    </div>
 
     <div class="mt-4 flex items-center justify-end gap-2">
       <Button variant="secondary" size="sm" onclick={prevPage} disabled={pageIndex === 0 || loading}>
@@ -413,26 +427,95 @@
 {/if}
 
 <style>
+  .requirements-detail {
+    min-width: 0;
+  }
+  .requirements-detail__navigation,
+  .requirements-detail__breadcrumb,
+  .requirements-detail__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .requirements-detail__navigation {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--ds-border);
+  }
+  .requirements-detail__separator {
+    color: var(--ds-text-subtlest);
+  }
   .requirements-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
     border: none;
+    border-radius: 0.25rem;
     background: transparent;
-    padding: 0;
+    padding: 0.25rem 0.5rem;
+    color: var(--ds-text-link);
+    font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
   }
-  .meta-field {
+  .requirements-key:hover {
+    background: var(--ds-background-neutral-hovered);
+  }
+  .requirements-key:focus-visible {
+    outline: 2px solid var(--ds-border-focused);
+    outline-offset: 2px;
+  }
+  .requirements-detail__error {
+    margin: 0;
+    padding: 0.75rem 1.5rem;
+    color: var(--ds-text-danger);
+    font-size: 0.875rem;
+  }
+  .requirements-detail__properties {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 160px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
   }
-  .meta-field--owner {
-    min-width: 200px;
+  .meta-field {
+    min-width: 0;
+    max-width: 100%;
   }
-  .meta-label {
-    font-size: 0.75rem;
+  .meta-value {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.8125rem;
     color: var(--ds-text-subtle);
   }
-  .requirements-detail__editor :global(.pages-shell) {
-    height: 100%;
+  .meta-value__text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .meta-value__avatar {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .meta-value :global(svg) {
+    flex-shrink: 0;
+  }
+  .meta-field :global([role='combobox']) {
+    border-radius: 0.25rem;
+  }
+  .meta-field :global([role='combobox'][aria-disabled='false']) {
+    cursor: pointer;
+  }
+  .meta-field :global([role='combobox'][aria-disabled='false']:hover),
+  .meta-field :global([role='combobox'][aria-expanded='true']) {
+    background: var(--ds-background-neutral-hovered);
+  }
+  .meta-field :global([role='combobox']:focus-visible) {
+    outline: 2px solid var(--ds-border-focused);
+    outline-offset: 2px;
   }
 </style>

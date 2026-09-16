@@ -3,6 +3,7 @@
   import { IconArrowLeft as ArrowLeft, IconFileStack as FileStack } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
+  import { authStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -13,6 +14,7 @@
     DEFAULT_REQUIREMENT_STATUS,
     DEFAULT_REQUIREMENT_TYPE,
     canCreateRequirement,
+    defaultRequirementOwnerId,
   } from './requirementFormHelpers.js';
 
   let { workspaceId } = $props();
@@ -31,12 +33,21 @@
   const listUrl = $derived(`/workspaces/${workspaceId}/requirements`);
   const isDirty = $derived(title.trim() !== '' || contentTouched);
 
-  onMount(() => {
+  onMount(async () => {
     if (!canCreateRequirement(workspacePermissions, workspaceId)) {
       navigate(listUrl, { replace: true });
       return;
     }
-    formRef?.resetForm();
+    await tick();
+    const currentUserId = authStore.currentUser?.id ?? null;
+    let defaultOwnerId = currentUserId;
+    try {
+      const assignableUsers = await api.getAssignableUsers(workspaceId);
+      defaultOwnerId = defaultRequirementOwnerId(currentUserId, assignableUsers ?? []);
+    } catch {
+      defaultOwnerId = currentUserId;
+    }
+    formRef?.resetForm(defaultOwnerId);
   });
 
   $effect(() => {
@@ -95,9 +106,10 @@
 </script>
 
 <section
-  class="requirement-create-page flex h-full min-h-0 flex-col p-4"
+  class="requirement-create-page flex h-full min-h-0 flex-col px-6 py-4 sm:px-8"
   data-testid="requirement-create-page"
 >
+  <div class="mx-auto flex h-full w-full max-w-5xl min-h-0 flex-col">
   <Button
     variant="subtle"
     size="small"
@@ -114,7 +126,7 @@
     <p class="mb-4 text-sm text-[var(--ds-text-danger)]">{error}</p>
   {/if}
 
-  <div class="requirement-create-page__form min-h-0 flex-1 overflow-y-auto">
+  <div class="requirement-create-page__form min-h-0 flex-1 overflow-y-auto px-1">
     <RequirementCreateForm
       bind:this={formRef}
       {workspaceId}
@@ -136,5 +148,6 @@
     <Button onclick={submit} disabled={saving} dataTestid="requirement-create-submit">
       {t('requirements.create')}
     </Button>
+  </div>
   </div>
 </section>

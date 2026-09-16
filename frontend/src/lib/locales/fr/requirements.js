@@ -57,6 +57,10 @@ export default {
     fieldParent: 'Page parente',
     filters: {
       search: 'Rechercher des exigences…',
+      panelTitle: 'Filtres',
+      active: 'Filtres actifs',
+      clearAll: 'Tout effacer',
+      searchChip: 'Recherche : {query}',
       allTypes: 'Tous les types',
       allStatuses: 'Tous les statuts',
       anyLinks: 'Tous les liens vers des éléments',
@@ -68,7 +72,10 @@ export default {
       labels: 'Labels',
     },
     traceability: {
+      empty: 'Aucun lien pour le moment. Associez des éléments de travail, des cas de test ou des exigences connexes.',
+      searchError: 'La recherche a échoué. Réessayez.',
       title: 'Traçabilité',
+      summaryStats: '{items} éléments · {tests} tests',
       linkedItems: 'Éléments de travail liés',
       linkedTests: 'Cas de test liés',
       addItem: 'Lier un élément',

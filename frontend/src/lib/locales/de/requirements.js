@@ -57,6 +57,10 @@ export default {
     fieldParent: 'Übergeordnete Seite',
     filters: {
       search: 'Anforderungen suchen…',
+      panelTitle: 'Filter',
+      active: 'Aktive Filter',
+      clearAll: 'Alle löschen',
+      searchChip: 'Suche: {query}',
       allTypes: 'Alle Typen',
       allStatuses: 'Alle Status',
       anyLinks: 'Beliebige Arbeitselement-Verknüpfungen',
@@ -68,7 +72,10 @@ export default {
       labels: 'Labels',
     },
     traceability: {
+      empty: 'Noch keine Verknüpfungen. Verknüpfen Sie Arbeitselemente, Testfälle oder zugehörige Anforderungen.',
+      searchError: 'Die Suche ist fehlgeschlagen. Versuchen Sie es erneut.',
       title: 'Rückverfolgbarkeit',
+      summaryStats: '{items} Arbeitselemente · {tests} Tests',
       linkedItems: 'Verknüpfte Arbeitselemente',
       linkedTests: 'Verknüpfte Testfälle',
       addItem: 'Arbeitselement verknüpfen',

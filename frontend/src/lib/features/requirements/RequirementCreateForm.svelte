@@ -35,11 +35,11 @@
   const typeOptions = $derived(requirementTypeOptions(t));
   const statusOptions = $derived(requirementStatusOptions(t));
 
-  export function resetForm() {
+  export function resetForm(defaultOwnerId = null) {
     title = '';
     requirementType = DEFAULT_REQUIREMENT_TYPE;
     status = DEFAULT_REQUIREMENT_STATUS;
-    ownerId = null;
+    ownerId = defaultOwnerId;
     parentId = null;
     contentTouched = false;
     previousRequirementType = DEFAULT_REQUIREMENT_TYPE;
@@ -151,6 +151,8 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    /* Keep focus rings from being clipped by the scroll container. */
+    padding-inline: 3px;
   }
 
   .content-field {

@@ -1,3 +1,5 @@
+import { linkTypeDisplayValue } from '../../utils/systemLabels.js';
+
 /**
  * @param {Record<string, unknown>} link
  * @param {number} pageId
@@ -18,9 +20,9 @@ export function pageToPagePeerDirection(link, pageId) {
 /**
  * @param {Record<string, unknown>} link
  * @param {number} pageId
+ * @param {Array<Record<string, unknown>>} [linkTypes]
  */
-export function linkDirectionLabel(link, pageId) {
+export function linkDirectionLabel(link, pageId, linkTypes = []) {
   const pageIsSource = link.source_type === 'page' && link.source_id === pageId;
-  const label = pageIsSource ? link.link_type_forward_label : link.link_type_reverse_label;
-  return typeof label === 'string' ? label : '';
+  return linkTypeDisplayValue(link, linkTypes, pageIsSource ? 'forward_label' : 'reverse_label');
 }

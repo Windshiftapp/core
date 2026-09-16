@@ -199,13 +199,13 @@ func appendTestCaseListFilters(query string, args []any, params TestCaseListPara
 		args = append(args, *params.LabelID)
 	}
 	if search := strings.TrimSpace(params.Search); search != "" {
-		pattern := "%" + strings.ToLower(search) + "%"
+		pattern := "%" + search + "%"
 		query += ` AND (
-			LOWER(tc.title) LIKE ? OR LOWER(COALESCE(tc.preconditions, '')) LIKE ? OR
-			LOWER(COALESCE(tc.priority, '')) LIKE ? OR LOWER(COALESCE(tc.status, '')) LIKE ? OR
+			LOWER(tc.title) LIKE LOWER(?) OR LOWER(COALESCE(tc.preconditions, '')) LIKE LOWER(?) OR
+			LOWER(COALESCE(tc.priority, '')) LIKE LOWER(?) OR LOWER(COALESCE(tc.status, '')) LIKE LOWER(?) OR
 			EXISTS (SELECT 1 FROM test_case_labels search_tcl
 				JOIN test_labels search_tl ON search_tl.id = search_tcl.label_id
-				WHERE search_tcl.test_case_id = tc.id AND LOWER(search_tl.name) LIKE ?)
+				WHERE search_tcl.test_case_id = tc.id AND LOWER(search_tl.name) LIKE LOWER(?))
 		)`
 		args = append(args, pattern, pattern, pattern, pattern, pattern)
 	}

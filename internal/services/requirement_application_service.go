@@ -23,6 +23,7 @@ type RequirementView struct {
 type RequirementKeyView struct {
 	PageID            int    `json:"page_id"`
 	RequirementNumber int    `json:"requirement_number"`
+	RequirementType   string `json:"requirement_type"`
 	Key               string `json:"key"`
 }
 
@@ -124,6 +125,7 @@ func (s *RequirementApplicationService) ListKeys(userID, workspaceID int) ([]Req
 		out = append(out, RequirementKeyView{
 			PageID:            row.PageID,
 			RequirementNumber: row.RequirementNumber,
+			RequirementType:   row.RequirementType,
 			Key:               models.FormatRequirementKey(workspaceKey, row.RequirementNumber),
 		})
 	}

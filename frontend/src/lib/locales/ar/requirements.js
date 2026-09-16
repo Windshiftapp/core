@@ -57,6 +57,10 @@ export default {
     fieldParent: 'الصفحة الأصل',
     filters: {
       search: 'البحث في المتطلبات…',
+      panelTitle: 'المرشحات',
+      active: 'المرشحات النشطة',
+      clearAll: 'مسح الكل',
+      searchChip: 'بحث: {query}',
       allTypes: 'كل الأنواع',
       allStatuses: 'كل الحالات',
       anyLinks: 'أي روابط بعناصر العمل',
@@ -68,7 +72,10 @@ export default {
       labels: 'التصنيفات',
     },
     traceability: {
+      empty: 'لا توجد روابط بعد. اربط عناصر العمل أو حالات الاختبار أو المتطلبات ذات الصلة.',
+      searchError: 'تعذر البحث. حاول مرة أخرى.',
       title: 'التتبع',
+      summaryStats: '{items} عناصر عمل · {tests} اختبارات',
       linkedItems: 'عناصر العمل المرتبطة',
       linkedTests: 'حالات الاختبار المرتبطة',
       addItem: 'ربط عنصر',

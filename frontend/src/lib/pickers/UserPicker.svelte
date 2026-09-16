@@ -11,6 +11,7 @@
   let {
     value = $bindable(null),
     placeholder = '',
+    ariaLabel = undefined,
     showUnassigned = false,
     unassignedLabel = '',
     disabled = false,
@@ -77,6 +78,7 @@
   items={usersList}
   loading={users === null ? loader.loading : loading}
   placeholder={resolvedPlaceholder}
+  {ariaLabel}
   {showUnassigned}
   unassignedLabel={resolvedUnassignedLabel}
   {disabled}

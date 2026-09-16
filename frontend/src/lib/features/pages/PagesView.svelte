@@ -37,7 +37,13 @@
 
   /** Right-pane knowledge-page editor with sidebar-owned tree/actions and
    * debounced autosave instead of an explicit Save button. */
-  let { workspaceId, pageId = null } = $props();
+  let {
+    workspaceId,
+    pageId = null,
+    requirementContext = false,
+    documentMeta = undefined,
+    documentFooter = undefined,
+  } = $props();
 
   // Coalesce typing without noticeably delaying autosave.
   const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -683,7 +689,7 @@
   });
 </script>
 
-<main class="page-pane" data-testid="pages-view">
+<main class="page-pane" class:requirement-context={requirementContext} data-testid="pages-view">
   {#if error}
     <div class="error" role="alert" data-testid="page-error">{error}</div>
   {/if}
@@ -700,6 +706,7 @@
     <div
       class="page-frame"
       class:canvas-expanded={canvasExpanded}
+      class:has-document-footer={!!documentFooter}
       data-testid="page-canvas"
       data-width={canvasExpanded ? 'wide' : 'comfortable'}
     >
@@ -724,7 +731,7 @@
               {statusLabel}
             </span>
           {/if}
-          {#if selectedPage}
+          {#if selectedPage && !requirementContext}
             <PageWorkItemsButton
               workspaceId={selectedPage.workspace_id ?? workspaceId}
               pageId={selectedPage.id}
@@ -817,7 +824,7 @@
             placeholder={t('pages.titlePlaceholder')}
             disabled={!canEditPage}
           />
-          {#if pageRequirement?.key}
+          {#if pageRequirement?.key && !requirementContext}
             <button
               type="button"
               class="requirement-key-badge"
@@ -830,68 +837,75 @@
           {/if}
         </div>
       </div>
-      <div class="label-row" data-testid="page-label-row">
-        {#if mode === 'edit' && canEditPage}
-          <div class="appearance-actions" aria-label="Page icon">
-            <IconSelector
-              dataTestid="page-icon-picker"
-              bind:selectedIcon={pickerIcon}
-              bind:selectedColor={pickerColor}
-              compact
-              hideLabel
-              label=""
-              triggerVariant="badge"
-              triggerTitle={selectedPage.metadata?.icon ? 'Change page icon' : 'Add page icon'}
-              onchange={(event) => updatePageAppearance(event.detail)}
-            />
-            {#if selectedPage.metadata?.icon}
-              <button
-                type="button"
-                class="clear-icon-button"
-                onclick={() => updatePageAppearance({ clear: true })}
-                disabled={appearanceSaving}
-                aria-label="Remove page icon"
-                title="Remove page icon"
-              >
-                <IconX size={12} />
-              </button>
-            {/if}
+      <div class="page-properties">
+        {#if documentMeta}
+          <div class="document-meta">
+            {@render documentMeta({ title: draftTitle, canEdit: canEditPage })}
           </div>
         {/if}
-        {#each selectedPage.labels || [] as label (label.id)}
-          <span
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
-            style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); border: 1px solid {label.color || '#3B82F6'};"
-            data-testid="page-label-chip"
-            data-label-id={label.id}
-          >
+        <div class="label-row" data-testid="page-label-row">
+          {#if mode === 'edit' && canEditPage}
+            <div class="appearance-actions" aria-label="Page icon">
+              <IconSelector
+                dataTestid="page-icon-picker"
+                bind:selectedIcon={pickerIcon}
+                bind:selectedColor={pickerColor}
+                compact
+                hideLabel
+                label=""
+                triggerVariant="badge"
+                triggerTitle={selectedPage.metadata?.icon ? 'Change page icon' : 'Add page icon'}
+                onchange={(event) => updatePageAppearance(event.detail)}
+              />
+              {#if selectedPage.metadata?.icon}
+                <button
+                  type="button"
+                  class="clear-icon-button"
+                  onclick={() => updatePageAppearance({ clear: true })}
+                  disabled={appearanceSaving}
+                  aria-label="Remove page icon"
+                  title="Remove page icon"
+                >
+                  <IconX size={12} />
+                </button>
+              {/if}
+            </div>
+          {/if}
+          {#each selectedPage.labels || [] as label (label.id)}
             <span
-              class="inline-block w-2 h-2 rounded-full"
-              style="background-color: {label.color || '#3B82F6'};"
-              aria-hidden="true"
-            ></span>
-            {label.name}
-            {#if mode === 'edit' && canEditPage}
-              <button
-                type="button"
-                class="label-chip__remove"
-                onclick={() => removeLabel(label)}
-                aria-label={t('pages.labelsRemoveAria', { name: label.name })}
-                data-testid="page-label-chip-remove"
-              >
-                <IconX size={12} />
-              </button>
-            {/if}
-          </span>
-        {/each}
-        {#if mode === 'edit' && canEditPage}
-          <PageLabelPicker
-            {workspaceId}
-            selectedIds={selectedLabelIds}
-            onToggle={onLabelToggle}
-            triggerLabel={t('pages.labelsAdd')}
-          />
-        {/if}
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
+              style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); border: 1px solid {label.color || '#3B82F6'};"
+              data-testid="page-label-chip"
+              data-label-id={label.id}
+            >
+              <span
+                class="inline-block w-2 h-2 rounded-full"
+                style="background-color: {label.color || '#3B82F6'};"
+                aria-hidden="true"
+              ></span>
+              {label.name}
+              {#if mode === 'edit' && canEditPage}
+                <button
+                  type="button"
+                  class="label-chip__remove"
+                  onclick={() => removeLabel(label)}
+                  aria-label={t('pages.labelsRemoveAria', { name: label.name })}
+                  data-testid="page-label-chip-remove"
+                >
+                  <IconX size={12} />
+                </button>
+              {/if}
+            </span>
+          {/each}
+          {#if mode === 'edit' && canEditPage}
+            <PageLabelPicker
+              {workspaceId}
+              selectedIds={selectedLabelIds}
+              onToggle={onLabelToggle}
+              triggerLabel={t('pages.labelsAdd')}
+            />
+          {/if}
+        </div>
       </div>
       <div class="editor-row">
         <div class="editor-frame" data-testid="page-editor">
@@ -933,6 +947,11 @@
           </aside>
         {/if}
       </div>
+      {#if documentFooter}
+        <div class="document-footer">
+          {@render documentFooter({ canEdit: canEditPage })}
+        </div>
+      {/if}
     </div>
   {/if}
 </main>
@@ -1007,6 +1026,66 @@
     .page-frame:not(.canvas-expanded) {
       max-width: 75%;
     }
+  }
+
+  .page-pane.requirement-context {
+    padding-top: 1rem;
+  }
+
+  .requirement-context .page-frame:not(.canvas-expanded) {
+    max-width: 68rem;
+  }
+
+  @container (min-width: 52rem) {
+    .requirement-context .page-frame:not(.canvas-expanded) {
+      max-width: min(75%, 68rem);
+    }
+  }
+
+  .document-meta {
+    padding: 0 var(--page-gutter);
+  }
+
+  .page-properties {
+    display: contents;
+  }
+
+  .requirement-context .page-frame,
+  .requirement-context .toolbar {
+    gap: 0.75rem;
+  }
+
+  .requirement-context .page-properties {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.75rem;
+    padding: 0 var(--page-gutter);
+  }
+
+  .requirement-context .document-meta {
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .requirement-context .label-row {
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+  }
+
+  .document-footer {
+    padding: 0 var(--page-gutter) 1rem;
+    margin-top: 1rem;
+  }
+
+  .has-document-footer .editor-row {
+    flex: 0 0 auto;
+  }
+
+  .has-document-footer .editor-frame :global(.milkdown-wrapper .milkdown-editor .ProseMirror) {
+    min-height: 8rem;
   }
 
   .empty-page {

@@ -68,6 +68,10 @@ export default {
     fieldParent: 'Parent page',
     filters: {
       search: 'Search requirements…',
+      panelTitle: 'Filters',
+      active: 'Active filters',
+      clearAll: 'Clear all',
+      searchChip: 'Search: {query}',
       allTypes: 'All types',
       allStatuses: 'All statuses',
       anyLinks: 'Any work item links',
@@ -79,7 +83,10 @@ export default {
       labels: 'Labels',
     },
     traceability: {
+      empty: 'No links yet. Link work items, test cases, or related requirements.',
+      searchError: 'Could not search. Try again.',
       title: 'Traceability',
+      summaryStats: '{items} work items · {tests} tests',
       linkedItems: 'Linked work items',
       linkedTests: 'Linked test cases',
       addItem: 'Link item',

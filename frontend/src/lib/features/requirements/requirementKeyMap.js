@@ -3,7 +3,7 @@ import { api } from '../../api.js';
 import { currentRoute, isMobileRoute } from '../../router.js';
 
 /**
- * @typedef {{ key: string, requirement_number: number }} RequirementPageMeta
+ * @typedef {{ key: string, requirement_number: number, requirement_type?: string }} RequirementPageMeta
  */
 
 /**
@@ -21,6 +21,7 @@ export async function buildRequirementKeyByPageId(workspaceId) {
         map.set(row.page_id, {
           key: row.key,
           requirement_number: row.requirement_number,
+          requirement_type: row.requirement_type,
         });
       }
     }

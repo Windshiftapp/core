@@ -32,6 +32,13 @@ export function objectDisplayDescription(record, objectType = '') {
   return objectDisplayValue(record, 'description', objectType);
 }
 
+/** Read localized link-type copy while retaining raw labels for older APIs. */
+export function linkTypeDisplayValue(link, linkTypes = [], field = 'name') {
+  const linkType = linkTypes.find((type) => type.id === link.link_type_id);
+  const label = objectDisplayValue(linkType, field) || link[`link_type_${field}`];
+  return typeof label === 'string' ? label : '';
+}
+
 function permissionLocaleKey(permissionKey) {
   return permissionKey.replaceAll('.', '_');
 }

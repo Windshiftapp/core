@@ -8,6 +8,7 @@
   import Input from '../components/Input.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
   import { useEventListener } from 'runed';
   import { onDestroy } from 'svelte';
 
@@ -269,7 +270,8 @@
           showUnassigned={true}
           unassignedLabel={t('items.chooseRelationshipType')}
           getValue={(item) => item.id}
-          getLabel={(item) => item.name}
+          getLabel={(item) => objectDisplayName(item)}
+          searchFields={['display_name', 'name']}
           optionTestid={(opt) => `link-type-option-${opt.value}`}
         />
         {#if isTestLinkTypeSelected}

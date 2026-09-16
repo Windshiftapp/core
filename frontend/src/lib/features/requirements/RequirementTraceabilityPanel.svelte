@@ -1,6 +1,6 @@
 <script>
-  import { onDestroy } from 'svelte';
-  import { IconPlus, IconTrash, IconLink } from '@tabler/icons-svelte-runes';
+  import { onDestroy, tick, untrack } from 'svelte';
+  import { Link2, Plus, Trash2, FileText, CheckSquare, Package } from '@lucide/svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -8,14 +8,13 @@
   import Input from '../../components/Input.svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import StatusBadge from '../../components/StatusBadge.svelte';
-  import Lozenge from '../../components/Lozenge.svelte';
-  import Spinner from '../../components/Spinner.svelte';
+  import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { buildRequirementKeyByPageId, pageHref } from './requirementKeyMap.js';
   import { linkDirectionLabel } from './requirementLinkLabels.js';
   import {
     mergePageLinks,
     resolveLinkTypeIds,
-    linkedEntity as resolveLinkedEntity,
+    linkedEntity,
     filterItemLinks,
     filterTestLinks,
     filterSpecifiesOutgoing,
@@ -31,867 +30,674 @@
 
   let { workspaceId, pageId, canEdit = false } = $props();
 
-  let loading = $state(false);
+  let loading = $state(true);
+  let loadError = $state(false);
+  let linkTypesError = $state(false);
   let pageLinks = $state([]);
-  let linkTypesCache = $state([]);
-  let loadRequestSeq = 0;
-
+  let linkTypes = $state([]);
   let requirementKeyByPageId = $state(new Map());
-  let itemMode = $state('list');
-  let testMode = $state('list');
-  let specifiesPageMode = $state('list');
-  let genericPageMode = $state('list');
-  let assetMode = $state('list');
-  let itemSearchQuery = $state('');
-  let testSearchQuery = $state('');
-  let itemSearchResults = $state([]);
-  let testSearchResults = $state([]);
-  let itemSearching = $state(false);
-  let testSearching = $state(false);
-  let itemSubmitting = $state(false);
-  let testSubmitting = $state(false);
-  let relatedPageSearchQuery = $state('');
-  let assetSearchQuery = $state('');
-  let relatedPageSearchResults = $state([]);
-  let assetSearchResults = $state([]);
-  let relatedPageSearching = $state(false);
-  let assetSearching = $state(false);
-  let relatedPageSubmitting = $state(false);
-  let assetSubmitting = $state(false);
-  let itemSearchTimer;
-  let testSearchTimer;
-  let relatedPageSearchTimer;
-  let assetSearchTimer;
-  let itemSearchVersion = 0;
-  let testSearchVersion = 0;
-  let relatedPageSearchVersion = 0;
-  let assetSearchVersion = 0;
+  let activeAction = $state(null);
+  let searchQuery = $state('');
+  let searchResults = $state([]);
+  let searching = $state(false);
+  let searchError = $state(false);
+  let submitting = $state(false);
+  let removingLinkIds = $state(new Set());
+  let panelElement = $state(null);
+  let searchInput = $state(null);
+  let resultsElement = $state(null);
+  let searchTimer;
+  let searchVersion = 0;
+  let loadVersion = 0;
+  let keyVersion = 0;
+  const searchId = $props.id();
 
-  const linkTypeIds = $derived(resolveLinkTypeIds(linkTypesCache));
-  const testsLinkTypeId = $derived(linkTypeIds.testsLinkTypeId);
-  const relatesToLinkTypeId = $derived(linkTypeIds.relatesToLinkTypeId);
-  const specifiesLinkTypeId = $derived(linkTypeIds.specifiesLinkTypeId);
-  const itemLinkTypeId = $derived(linkTypeIds.itemLinkTypeId);
-
+  const linkTypeIds = $derived(
+    /** @type {Record<string, number | null>} */ (resolveLinkTypeIds(linkTypes))
+  );
   const itemLinks = $derived(filterItemLinks(pageLinks, pageId));
   const testLinks = $derived(filterTestLinks(pageLinks, pageId));
-  const specifiesOutgoingLinks = $derived(filterSpecifiesOutgoing(pageLinks, pageId, specifiesLinkTypeId));
-  const specifiedByLinks = $derived(filterSpecifiedBy(pageLinks, pageId, specifiesLinkTypeId));
-  const genericRelatedPageLinks = $derived(filterGenericPageLinks(pageLinks, pageId, relatesToLinkTypeId));
-  const assetLinks = $derived(filterAssetLinks(pageLinks, pageId));
+  const groups = $derived([
+    {
+      id: 'items',
+      title: t('requirements.traceability.implementsTitle'),
+      links: itemLinks,
+    },
+    {
+      id: 'tests',
+      title: t('requirements.traceability.linkedTests'),
+      links: testLinks,
+    },
+    {
+      id: 'specifies',
+      title: t('requirements.traceability.specifiesTitle'),
+      links: filterSpecifiesOutgoing(pageLinks, pageId, linkTypeIds.specifiesLinkTypeId),
+    },
+    {
+      id: 'specifiedBy',
+      title: t('requirements.traceability.specifiedByTitle'),
+      links: filterSpecifiedBy(pageLinks, pageId, linkTypeIds.specifiesLinkTypeId),
+    },
+    {
+      id: 'pages',
+      title: t('requirements.traceability.relatedGenericTitle'),
+      links: filterGenericPageLinks(pageLinks, pageId, linkTypeIds.relatesToLinkTypeId),
+    },
+    {
+      id: 'assets',
+      title: t('requirements.traceability.linkedAssets'),
+      links: filterAssetLinks(pageLinks, pageId),
+    },
+  ].filter((group) => group.links.length > 0));
+  const actions = $derived([
+    {
+      id: 'items',
+      label: t('requirements.traceability.implementsAdd'),
+      placeholder: t('requirements.traceability.searchItems'),
+      error: t('requirements.traceability.linkItemError'),
+      linkTypeId: linkTypeIds.itemLinkTypeId,
+      entityType: 'item',
+      build: buildItemLinkCreate,
+    },
+    {
+      id: 'tests',
+      label: t('requirements.traceability.addTest'),
+      placeholder: t('requirements.traceability.searchTests'),
+      error: t('requirements.traceability.linkTestError'),
+      linkTypeId: linkTypeIds.testsLinkTypeId,
+      entityType: 'test_case',
+      build: buildTestLinkCreate,
+    },
+    {
+      id: 'specifies',
+      label: t('requirements.traceability.specifiesAdd'),
+      placeholder: t('requirements.traceability.searchPages'),
+      error: t('requirements.traceability.linkPageError'),
+      linkTypeId: linkTypeIds.specifiesLinkTypeId,
+      entityType: 'page',
+      build: buildSpecifiesLinkCreate,
+    },
+    {
+      id: 'pages',
+      label: t('requirements.traceability.addPage'),
+      placeholder: t('requirements.traceability.searchPages'),
+      error: t('requirements.traceability.linkPageError'),
+      linkTypeId: linkTypeIds.relatesToLinkTypeId,
+      entityType: 'page',
+      build: buildGenericPageLinkCreate,
+    },
+    {
+      id: 'assets',
+      label: t('requirements.traceability.addAsset'),
+      placeholder: t('requirements.traceability.searchAssets'),
+      error: t('requirements.traceability.linkAssetError'),
+      linkTypeId: linkTypeIds.relatesToLinkTypeId,
+      entityType: 'asset',
+      build: buildAssetLinkCreate,
+    },
+  ].filter((action) => action.linkTypeId));
+  const selectedAction = $derived(actions.find((action) => action.id === activeAction));
+  const addMenuItems = $derived(actions.map((action) => ({
+    id: action.id,
+    title: action.label,
+    onClick: () => openSearch(action.id),
+  })));
 
   $effect(() => {
-    if (!pageId) return;
-    void ensureLinkTypesLoaded();
-    void loadPageLinks();
+    const id = pageId;
+    untrack(() => {
+      clearSearch();
+      activeAction = null;
+      submitting = false;
+      removingLinkIds = new Set();
+      pageLinks = [];
+      if (id) void loadPageLinks(id, true);
+    });
   });
 
   $effect(() => {
-    if (!workspaceId) return;
-    void loadRequirementKeys();
+    const id = workspaceId;
+    void loadRequirementKeys(id);
+  });
+
+  $effect(() => {
+    void loadLinkTypes();
   });
 
   onDestroy(() => {
-    clearTimeout(itemSearchTimer);
-    clearTimeout(testSearchTimer);
-    clearTimeout(relatedPageSearchTimer);
-    clearTimeout(assetSearchTimer);
-    itemSearchVersion += 1;
-    testSearchVersion += 1;
-    relatedPageSearchVersion += 1;
-    assetSearchVersion += 1;
+    clearTimeout(searchTimer);
+    searchVersion += 1;
+    loadVersion += 1;
+    keyVersion += 1;
   });
 
-  async function loadRequirementKeys() {
-    requirementKeyByPageId = await buildRequirementKeyByPageId(workspaceId);
-  }
-
-  async function ensureLinkTypesLoaded() {
-    if (linkTypesCache.length > 0) return;
+  async function loadPageLinks(id = pageId, initial = false) {
+    const version = ++loadVersion;
+    if (initial) loading = true;
+    loadError = false;
     try {
-      const resp = await api.linkTypes.getAll();
-      linkTypesCache = Array.isArray(resp) ? resp : (resp?.data ?? []);
-    } catch (err) {
-      console.error('failed to load link types', err);
-    }
-  }
-
-  async function loadPageLinks() {
-    if (!pageId) return;
-    const requestSeq = ++loadRequestSeq;
-    loading = true;
-    try {
-      const resp = await api.links.getForPage(pageId);
-      if (requestSeq !== loadRequestSeq) return;
-      pageLinks = mergePageLinks(resp);
-    } catch (err) {
-      if (requestSeq !== loadRequestSeq) return;
-      console.error('failed to load page links', err);
-      pageLinks = [];
+      const response = await api.links.getForPage(id);
+      if (version === loadVersion && id === pageId) pageLinks = mergePageLinks(response);
+    } catch {
+      if (version === loadVersion && id === pageId) loadError = true;
     } finally {
-      if (requestSeq === loadRequestSeq) loading = false;
+      if (version === loadVersion && id === pageId) loading = false;
     }
   }
 
-  function linkedEntity(link) {
-    return resolveLinkedEntity(link, pageId);
+  async function loadLinkTypes() {
+    linkTypesError = false;
+    try {
+      const response = await api.linkTypes.getAll();
+      linkTypes = Array.isArray(response) ? response : (response?.data ?? []);
+    } catch {
+      linkTypesError = true;
+    }
+  }
+
+  async function loadRequirementKeys(id) {
+    const version = ++keyVersion;
+    const keys = await buildRequirementKeyByPageId(id);
+    if (version === keyVersion) requirementKeyByPageId = keys;
+  }
+
+  function clearSearch() {
+    clearTimeout(searchTimer);
+    searchVersion += 1;
+    searchQuery = '';
+    searchResults = [];
+    searching = false;
+    searchError = false;
+  }
+
+  async function openSearch(actionId) {
+    clearSearch();
+    activeAction = actionId;
+    await tick();
+    searchInput?.focus();
+  }
+
+  function closeSearch() {
+    if (submitting) return;
+    clearSearch();
+    activeAction = null;
+    panelElement?.querySelector('[data-testid="requirement-add-link"]')?.focus();
+  }
+
+  function handleSearchInput(event) {
+    searchQuery = event.currentTarget.value;
+    clearTimeout(searchTimer);
+    const version = ++searchVersion;
+    const query = searchQuery.trim();
+    searchResults = [];
+    searchError = false;
+    searching = query.length >= 2;
+    if (searching) searchTimer = setTimeout(() => searchTargets(query, version), 250);
+  }
+
+  async function searchTargets(query, version = ++searchVersion) {
+    const action = selectedAction;
+    if (!action) return;
+    searching = true;
+    searchError = false;
+    try {
+      const response = action.entityType === 'page'
+        ? await api.pages.searchPages(workspaceId, query, { limit: 10 })
+        : action.entityType === 'test_case'
+          ? await api.tests.testCases.getAll(workspaceId, { all: true, q: query, limit: 10 })
+          : await api.links.search(query, action.entityType, 10);
+      if (version !== searchVersion) return;
+      const rows = Array.isArray(response) ? response : (response?.results ?? response?.data ?? []);
+      searchResults = rows.filter((row) => !(action.entityType === 'page' && row.id === pageId));
+    } catch {
+      if (version === searchVersion) searchError = true;
+    } finally {
+      if (version === searchVersion) searching = false;
+    }
+  }
+
+  function handleSearchKeydown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeSearch();
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    const buttons = [...(resultsElement?.querySelectorAll('button:not(:disabled)') || [])];
+    if (buttons.length === 0) return;
+    const index = buttons.indexOf(event.target);
+    if (event.key === 'Enter') {
+      if (event.target === searchInput) {
+        event.preventDefault();
+        buttons[0].click();
+      }
+      return;
+    }
+    event.preventDefault();
+    if (event.key === 'ArrowUp' && index <= 0) searchInput?.focus();
+    else buttons[Math.min(buttons.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1))]?.focus();
+  }
+
+  async function linkTarget(target) {
+    const action = selectedAction;
+    if (!canEdit || !action || submitting || (action.entityType === 'page' && target.id === pageId)) return;
+    const id = pageId;
+    submitting = true;
+    try {
+      await api.links.create(action.build(id, target, action.linkTypeId));
+      if (id !== pageId) return;
+      clearSearch();
+      activeAction = null;
+      await loadPageLinks(id);
+      panelElement?.querySelector('[data-testid="requirement-add-link"]')?.focus();
+    } catch (error) {
+      errorToast(error?.message || action.error);
+    } finally {
+      if (id === pageId) submitting = false;
+    }
   }
 
   async function unlink(linkId) {
+    if (!canEdit || removingLinkIds.has(linkId)) return;
+    const id = pageId;
+    removingLinkIds = new Set([...removingLinkIds, linkId]);
     try {
       await api.links.delete(linkId);
-      pageLinks = pageLinks.filter((link) => link.id !== linkId);
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.unlinkError'));
-    }
-  }
-
-  function handleItemSearchInput(event) {
-    const q = event.currentTarget.value;
-    itemSearchQuery = q;
-    clearTimeout(itemSearchTimer);
-    const version = ++itemSearchVersion;
-    if (q.trim().length < 2) {
-      itemSearchResults = [];
-      itemSearching = false;
-      return;
-    }
-    itemSearching = true;
-    itemSearchTimer = setTimeout(() => searchItems(q.trim(), version), 250);
-  }
-
-  async function searchItems(q, version) {
-    try {
-      const results = await api.links.search(q, 'item', 10);
-      if (version !== itemSearchVersion) return;
-      itemSearchResults = Array.isArray(results) ? results : [];
-    } catch (err) {
-      if (version !== itemSearchVersion) return;
-      itemSearchResults = [];
+      if (id === pageId) pageLinks = pageLinks.filter((link) => link.id !== linkId);
+    } catch (error) {
+      errorToast(error?.message || t('requirements.traceability.unlinkError'));
     } finally {
-      if (version === itemSearchVersion) itemSearching = false;
+      if (id === pageId) removingLinkIds = new Set([...removingLinkIds].filter((value) => value !== linkId));
     }
   }
 
-  async function linkItem(item) {
-    if (!itemLinkTypeId || itemSubmitting) return;
-    itemSubmitting = true;
-    try {
-      const link = await api.links.create(buildItemLinkCreate(pageId, item, itemLinkTypeId));
-      if (link && !pageLinks.some((l) => l.id === link.id)) {
-        pageLinks = [link, ...pageLinks];
-      } else {
-        await loadPageLinks();
-      }
-      itemMode = 'list';
-      itemSearchQuery = '';
-      itemSearchResults = [];
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.linkItemError'));
-    } finally {
-      itemSubmitting = false;
-    }
+  function entityHref(entity) {
+    const linkedWorkspaceId = entity.workspaceId || workspaceId;
+    if (entity.type === 'item') return `/workspaces/${linkedWorkspaceId}/items/${entity.id}`;
+    if (entity.type === 'test_case') return `/workspaces/${linkedWorkspaceId}/tests/cases/${entity.id}`;
+    if (entity.type === 'asset') return `/assets/${entity.id}`;
+    return pageHref(linkedWorkspaceId, entity.id, requirementKeyByPageId.get(entity.id));
   }
 
-  function handleTestSearchInput(event) {
-    const q = event.currentTarget.value;
-    testSearchQuery = q;
-    clearTimeout(testSearchTimer);
-    const version = ++testSearchVersion;
-    if (q.trim().length < 2) {
-      testSearchResults = [];
-      testSearching = false;
-      return;
-    }
-    testSearching = true;
-    testSearchTimer = setTimeout(() => searchTests(q.trim(), version), 250);
+  function entityKey(entity) {
+    if (entity.type === 'item') return `${entity.workspaceKey || 'WORK'}-${entity.itemNumber ?? entity.id}`;
+    if (entity.type === 'test_case') return `TC-${entity.itemNumber ?? entity.id}`;
+    return entity.type === 'page' ? requirementKeyByPageId.get(entity.id)?.key : '';
   }
-
-  async function searchTests(q, version) {
-    try {
-      const results = await api.tests.testCases.getAll(workspaceId, { q, limit: 10 });
-      if (version !== testSearchVersion) return;
-      testSearchResults = Array.isArray(results) ? results : (results?.data ?? []);
-    } catch (err) {
-      if (version !== testSearchVersion) return;
-      testSearchResults = [];
-    } finally {
-      if (version === testSearchVersion) testSearching = false;
-    }
-  }
-
-  async function linkTestCase(testCase) {
-    if (!testsLinkTypeId || testSubmitting) return;
-    testSubmitting = true;
-    try {
-      const link = await api.links.create(buildTestLinkCreate(pageId, testCase, testsLinkTypeId));
-      if (link && !pageLinks.some((l) => l.id === link.id)) {
-        pageLinks = [link, ...pageLinks];
-      } else {
-        await loadPageLinks();
-      }
-      testMode = 'list';
-      testSearchQuery = '';
-      testSearchResults = [];
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.linkTestError'));
-    } finally {
-      testSubmitting = false;
-    }
-  }
-
-  function handleRelatedPageSearchInput(event) {
-    const q = event.currentTarget.value;
-    relatedPageSearchQuery = q;
-    clearTimeout(relatedPageSearchTimer);
-    const version = ++relatedPageSearchVersion;
-    if (q.trim().length < 2) {
-      relatedPageSearchResults = [];
-      relatedPageSearching = false;
-      return;
-    }
-    relatedPageSearching = true;
-    relatedPageSearchTimer = setTimeout(() => searchRelatedPages(q.trim(), version), 250);
-  }
-
-  async function searchRelatedPages(q, version) {
-    try {
-      const results = await api.pages.searchPages(workspaceId, q, { limit: 10 });
-      if (version !== relatedPageSearchVersion) return;
-      const rows = Array.isArray(results) ? results : (results?.data ?? []);
-      relatedPageSearchResults = rows.filter((page) => page?.id !== pageId);
-    } catch (err) {
-      if (version !== relatedPageSearchVersion) return;
-      relatedPageSearchResults = [];
-    } finally {
-      if (version === relatedPageSearchVersion) relatedPageSearching = false;
-    }
-  }
-
-  function clearRelatedPageSearch() {
-    relatedPageSearchQuery = '';
-    relatedPageSearchResults = [];
-    relatedPageSearching = false;
-  }
-
-  function openSpecifiesPageAdd() {
-    genericPageMode = 'list';
-    clearRelatedPageSearch();
-    specifiesPageMode = 'add';
-  }
-
-  function openGenericPageAdd() {
-    specifiesPageMode = 'list';
-    clearRelatedPageSearch();
-    genericPageMode = 'add';
-  }
-
-  async function linkPageToPage(linkTypeId, relatedPage, onLinked) {
-    if (!linkTypeId || relatedPageSubmitting || relatedPage.id === pageId) return;
-    relatedPageSubmitting = true;
-    try {
-      const payload =
-        linkTypeId === specifiesLinkTypeId
-          ? buildSpecifiesLinkCreate(pageId, relatedPage, linkTypeId)
-          : buildGenericPageLinkCreate(pageId, relatedPage, linkTypeId);
-      const link = await api.links.create(payload);
-      if (link && !pageLinks.some((l) => l.id === link.id)) {
-        pageLinks = [link, ...pageLinks];
-      } else {
-        await loadPageLinks();
-      }
-      onLinked();
-      clearRelatedPageSearch();
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.linkPageError'));
-    } finally {
-      relatedPageSubmitting = false;
-    }
-  }
-
-  async function linkSpecifiesPage(relatedPage) {
-    await linkPageToPage(specifiesLinkTypeId, relatedPage, () => {
-      specifiesPageMode = 'list';
-    });
-  }
-
-  async function linkGenericRelatedPage(relatedPage) {
-    await linkPageToPage(relatesToLinkTypeId, relatedPage, () => {
-      genericPageMode = 'list';
-    });
-  }
-
-  function handleAssetSearchInput(event) {
-    const q = event.currentTarget.value;
-    assetSearchQuery = q;
-    clearTimeout(assetSearchTimer);
-    const version = ++assetSearchVersion;
-    if (q.trim().length < 2) {
-      assetSearchResults = [];
-      assetSearching = false;
-      return;
-    }
-    assetSearching = true;
-    assetSearchTimer = setTimeout(() => searchAssets(q.trim(), version), 250);
-  }
-
-  async function searchAssets(q, version) {
-    try {
-      const results = await api.links.search(q, 'asset', 10);
-      if (version !== assetSearchVersion) return;
-      assetSearchResults = Array.isArray(results) ? results : [];
-    } catch (err) {
-      if (version !== assetSearchVersion) return;
-      assetSearchResults = [];
-    } finally {
-      if (version === assetSearchVersion) assetSearching = false;
-    }
-  }
-
-  async function linkAsset(asset) {
-    if (!relatesToLinkTypeId || assetSubmitting) return;
-    assetSubmitting = true;
-    try {
-      const link = await api.links.create(buildAssetLinkCreate(pageId, asset, relatesToLinkTypeId));
-      if (link && !pageLinks.some((l) => l.id === link.id)) {
-        pageLinks = [link, ...pageLinks];
-      } else {
-        await loadPageLinks();
-      }
-      assetMode = 'list';
-      assetSearchQuery = '';
-      assetSearchResults = [];
-    } catch (err) {
-      errorToast(err?.message || t('requirements.traceability.linkAssetError'));
-    } finally {
-      assetSubmitting = false;
-    }
-  }
-
 </script>
 
-<section class="traceability-panel" aria-label={t('requirements.traceability.title')}>
-  <header class="traceability-panel__header">
-    <IconLink size={16} aria-hidden="true" />
-    <h3>{t('requirements.traceability.title')}</h3>
+<section bind:this={panelElement} class="traceability" aria-label={t('requirements.traceability.title')}>
+  <header class="traceability__header">
+    <div class="traceability__heading">
+      <h3><Link2 size={16} aria-hidden="true" />{t('requirements.traceability.title')}</h3>
+      {#if !loading && !loadError}
+        <span class="traceability__summary">{t('requirements.traceability.summaryStats', { items: itemLinks.length, tests: testLinks.length })}</span>
+      {/if}
+    </div>
+    {#if canEdit && actions.length > 0}
+      <DropdownMenu
+        triggerText={t('items.addLink')}
+        triggerIcon={Plus}
+        items={addMenuItems}
+        disabled={submitting}
+        showChevron={false}
+        placement="bottom-end"
+        triggerClass="traceability-add"
+        triggerTestid="requirement-add-link"
+      />
+    {/if}
   </header>
 
   {#if loading}
-    <div class="traceability-panel__loading"><Spinner /></div>
-  {:else}
-    <div class="traceability-panel__grid">
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.implementsTitle')}</h4>
-          {#if canEdit && itemLinkTypeId && itemMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (itemMode = 'add')}>
-              <IconPlus size={14} />
-              {t('requirements.traceability.implementsAdd')}
-            </Button>
-          {/if}
-        </div>
-
-        {#if itemMode === 'add'}
-          <div class="traceability-search">
-            <Input
-              type="text"
-              value={itemSearchQuery}
-              oninput={handleItemSearchInput}
-              placeholder={t('requirements.traceability.searchItems')}
-              size="small"
-            />
-            <Button variant="ghost" size="sm" onclick={() => { itemMode = 'list'; itemSearchQuery = ''; itemSearchResults = []; }}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-          {#if itemSearching}
-            <p class="traceability-empty">{t('common.loading')}</p>
-          {:else if itemSearchResults.length === 0}
-            <p class="traceability-empty">{t('pickers.noResultsFor', { query: itemSearchQuery || '…' })}</p>
-          {:else}
-            <ul class="traceability-list">
-              {#each itemSearchResults as item (item.id)}
-                <li>
-                  <button type="button" class="traceability-row" onclick={() => linkItem(item)} disabled={itemSubmitting}>
-                    <ItemTypeIcon icon={item.item_type_icon} color={item.item_type_color} />
-                    <span class="traceability-row__title">{item.title}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        {:else if itemLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.implementsEmpty')}</p>
-        {:else}
-          <ul class="traceability-list">
-            {#each itemLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {@const relationLabel = linkDirectionLabel(link, pageId)}
-              {#if entity}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={`/workspaces/${entity.workspaceId || workspaceId}/items/${entity.id}`}>
-                    <ItemTypeIcon icon={entity.itemTypeIcon} color={entity.itemTypeColor} />
-                    {#if relationLabel}
-                      <span class="traceability-row__relation">{relationLabel}</span>
-                    {/if}
-                    <span class="traceability-row__key">{entity.workspaceKey || 'WORK'}-{entity.itemNumber ?? entity.id}</span>
-                    <span class="traceability-row__title">{entity.title}</span>
-                    {#if entity.statusName}
-                      <StatusBadge status={{ label: entity.statusName, categoryColor: entity.statusColor }} uppercase={false} showDot={false} />
-                    {/if}
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.linkedTests')}</h4>
-          {#if canEdit && testsLinkTypeId && testMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (testMode = 'add')}>
-              <IconPlus size={14} />
-              {t('requirements.traceability.addTest')}
-            </Button>
-          {/if}
-        </div>
-
-        {#if testMode === 'add'}
-          <div class="traceability-search">
-            <Input
-              type="text"
-              value={testSearchQuery}
-              oninput={handleTestSearchInput}
-              placeholder={t('requirements.traceability.searchTests')}
-              size="small"
-            />
-            <Button variant="ghost" size="sm" onclick={() => { testMode = 'list'; testSearchQuery = ''; testSearchResults = []; }}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-          {#if testSearching}
-            <p class="traceability-empty">{t('common.loading')}</p>
-          {:else if testSearchResults.length === 0}
-            <p class="traceability-empty">{t('pickers.noResultsFor', { query: testSearchQuery || '…' })}</p>
-          {:else}
-            <ul class="traceability-list">
-              {#each testSearchResults as testCase (testCase.id)}
-                <li>
-                  <button type="button" class="traceability-row" onclick={() => linkTestCase(testCase)} disabled={testSubmitting}>
-                    <span class="traceability-row__title">{testCase.title}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        {:else if testLinks.length === 0}
-          <p class="traceability-empty">
-            {t('requirements.traceability.noTests')}
-            <Lozenge color="red" class="traceability-uncovered">{t('requirements.traceability.uncovered')}</Lozenge>
-          </p>
-        {:else}
-          <ul class="traceability-list">
-            {#each testLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {#if entity}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={`/workspaces/${workspaceId}/tests/cases/${entity.id}`}>
-                    <span class="traceability-row__title">{entity.title}</span>
-                    <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.specifiesTitle')}</h4>
-          {#if canEdit && specifiesLinkTypeId && specifiesPageMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={openSpecifiesPageAdd}>
-              <IconPlus size={14} />
-              {t('requirements.traceability.specifiesAdd')}
-            </Button>
-          {/if}
-        </div>
-
-        {#if specifiesPageMode === 'add'}
-          <div class="traceability-search">
-            <Input
-              type="text"
-              value={relatedPageSearchQuery}
-              oninput={handleRelatedPageSearchInput}
-              placeholder={t('requirements.traceability.searchPages')}
-              size="small"
-            />
-            <Button variant="ghost" size="sm" onclick={() => { specifiesPageMode = 'list'; clearRelatedPageSearch(); }}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-          {#if relatedPageSearching}
-            <p class="traceability-empty">{t('common.loading')}</p>
-          {:else if relatedPageSearchResults.length === 0}
-            <p class="traceability-empty">{t('pickers.noResultsFor', { query: relatedPageSearchQuery || '…' })}</p>
-          {:else}
-            <ul class="traceability-list">
-              {#each relatedPageSearchResults as relatedPage (relatedPage.id)}
-                {@const relatedPageReqMeta = requirementKeyByPageId.get(relatedPage.id)}
-                <li>
-                  <button type="button" class="traceability-row" onclick={() => linkSpecifiesPage(relatedPage)} disabled={relatedPageSubmitting}>
-                    {#if relatedPageReqMeta?.key}
-                      <span class="traceability-row__key">{relatedPageReqMeta.key}</span>
-                    {/if}
-                    <span class="traceability-row__title">{relatedPage.title}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        {:else if specifiesOutgoingLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.specifiesEmpty')}</p>
-        {:else}
-          <ul class="traceability-list">
-            {#each specifiesOutgoingLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {@const relationLabel = linkDirectionLabel(link, pageId)}
-              {#if entity}
-                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
-                    {#if relationLabel}
-                      <span class="traceability-row__relation">{relationLabel}</span>
-                    {/if}
-                    {#if reqMeta?.key}
-                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
-                    {/if}
-                    <span class="traceability-row__title">{entity.title}</span>
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.specifiedByTitle')}</h4>
-        </div>
-        {#if specifiedByLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.specifiedByEmpty')}</p>
-        {:else}
-          <ul class="traceability-list">
-            {#each specifiedByLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {@const relationLabel = linkDirectionLabel(link, pageId)}
-              {#if entity}
-                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
-                    {#if relationLabel}
-                      <span class="traceability-row__relation">{relationLabel}</span>
-                    {/if}
-                    {#if reqMeta?.key}
-                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
-                    {/if}
-                    <span class="traceability-row__title">{entity.title}</span>
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.relatedGenericTitle')}</h4>
-          {#if canEdit && relatesToLinkTypeId && genericPageMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={openGenericPageAdd}>
-              <IconPlus size={14} />
-              {t('requirements.traceability.addPage')}
-            </Button>
-          {/if}
-        </div>
-
-        {#if genericPageMode === 'add'}
-          <div class="traceability-search">
-            <Input
-              type="text"
-              value={relatedPageSearchQuery}
-              oninput={handleRelatedPageSearchInput}
-              placeholder={t('requirements.traceability.searchPages')}
-              size="small"
-            />
-            <Button variant="ghost" size="sm" onclick={() => { genericPageMode = 'list'; clearRelatedPageSearch(); }}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-          {#if relatedPageSearching}
-            <p class="traceability-empty">{t('common.loading')}</p>
-          {:else if relatedPageSearchResults.length === 0}
-            <p class="traceability-empty">{t('pickers.noResultsFor', { query: relatedPageSearchQuery || '…' })}</p>
-          {:else}
-            <ul class="traceability-list">
-              {#each relatedPageSearchResults as relatedPage (relatedPage.id)}
-                {@const relatedPageReqMeta = requirementKeyByPageId.get(relatedPage.id)}
-                <li>
-                  <button type="button" class="traceability-row" onclick={() => linkGenericRelatedPage(relatedPage)} disabled={relatedPageSubmitting}>
-                    {#if relatedPageReqMeta?.key}
-                      <span class="traceability-row__key">{relatedPageReqMeta.key}</span>
-                    {/if}
-                    <span class="traceability-row__title">{relatedPage.title}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        {:else if genericRelatedPageLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.noPages')}</p>
-        {:else}
-          <ul class="traceability-list">
-            {#each genericRelatedPageLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {#if entity}
-                {@const reqMeta = requirementKeyByPageId.get(entity.id)}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={pageHref(workspaceId, entity.id, reqMeta)}>
-                    {#if reqMeta?.key}
-                      <Lozenge color="blue">{reqMeta.key}</Lozenge>
-                    {/if}
-                    <span class="traceability-row__title">{entity.title}</span>
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="traceability-section">
-        <div class="traceability-section__header">
-          <h4>{t('requirements.traceability.linkedAssets')}</h4>
-          {#if canEdit && relatesToLinkTypeId && assetMode === 'list'}
-            <Button variant="ghost" size="sm" onclick={() => (assetMode = 'add')}>
-              <IconPlus size={14} />
-              {t('requirements.traceability.addAsset')}
-            </Button>
-          {/if}
-        </div>
-
-        {#if assetMode === 'add'}
-          <div class="traceability-search">
-            <Input
-              type="text"
-              value={assetSearchQuery}
-              oninput={handleAssetSearchInput}
-              placeholder={t('requirements.traceability.searchAssets')}
-              size="small"
-            />
-            <Button variant="ghost" size="sm" onclick={() => { assetMode = 'list'; assetSearchQuery = ''; assetSearchResults = []; }}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-          {#if assetSearching}
-            <p class="traceability-empty">{t('common.loading')}</p>
-          {:else if assetSearchResults.length === 0}
-            <p class="traceability-empty">{t('pickers.noResultsFor', { query: assetSearchQuery || '…' })}</p>
-          {:else}
-            <ul class="traceability-list">
-              {#each assetSearchResults as asset (asset.id)}
-                <li>
-                  <button type="button" class="traceability-row" onclick={() => linkAsset(asset)} disabled={assetSubmitting}>
-                    <span class="traceability-row__title">{asset.title}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        {:else if assetLinks.length === 0}
-          <p class="traceability-empty">{t('requirements.traceability.noAssets')}</p>
-        {:else}
-          <ul class="traceability-list">
-            {#each assetLinks as link (link.id)}
-              {@const entity = linkedEntity(link)}
-              {#if entity}
-                <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={`/assets/${entity.id}`}>
-                    <span class="traceability-row__title">{entity.title}</span>
-                  </a>
-                  {#if canEdit}
-                    <button type="button" class="traceability-unlink" onclick={() => unlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
-                      <IconTrash size={14} />
-                    </button>
-                  {/if}
-                </li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-      </div>
+    <p class="traceability__message" role="status">{t('common.loading')}</p>
+  {/if}
+  {#if loadError || (canEdit && linkTypesError)}
+    <div class="traceability__error" role="alert">
+      <span>{t('requirements.mobile.traceabilityLoadError')}</span>
+      <Button variant="ghost" size="sm" onclick={() => { if (loadError) void loadPageLinks(); if (linkTypesError) void loadLinkTypes(); }}>{t('common.retry')}</Button>
     </div>
   {/if}
+
+  {#if canEdit && selectedAction}
+    <div class="traceability-search">
+      <label for={searchId} class="traceability-search__label">{selectedAction.label}</label>
+      <div class="traceability-search__controls">
+        <Input
+          id={searchId}
+          bind:inputRef={searchInput}
+          value={searchQuery}
+          oninput={handleSearchInput}
+          onkeydown={handleSearchKeydown}
+          placeholder={selectedAction.placeholder}
+          disabled={submitting}
+          size="small"
+          autocomplete="off"
+        />
+        <Button variant="ghost" size="sm" disabled={submitting} onclick={closeSearch}>{t('common.cancel')}</Button>
+      </div>
+      {#if searching || submitting}
+        <p class="traceability__message" role="status">{t('common.loading')}</p>
+      {:else if searchError}
+        <div class="traceability__error" role="alert">
+          <span>{t('requirements.traceability.searchError')}</span>
+          <Button variant="ghost" size="sm" onclick={() => searchTargets(searchQuery.trim())}>{t('common.retry')}</Button>
+        </div>
+      {:else if searchQuery.trim().length < 2}
+        <p class="traceability__message">{t('pickers.startTypingToSearch')}</p>
+      {:else if searchResults.length === 0}
+        <p class="traceability__message" role="status">{t('pickers.noResultsFor', { query: searchQuery })}</p>
+      {:else}
+        <ul bind:this={resultsElement} class="traceability-search__results" aria-label={selectedAction.placeholder}>
+          {#each searchResults as result (result.id)}
+            <li>
+              <button type="button" class="traceability-result" onclick={() => linkTarget(result)} onkeydown={handleSearchKeydown}>
+                {#if selectedAction.entityType === 'item'}
+                  <ItemTypeIcon icon={result.item_type_icon} color={result.item_type_color} />
+                {:else if selectedAction.entityType === 'test_case'}
+                  <CheckSquare size={16} aria-hidden="true" />
+                {:else if selectedAction.entityType === 'asset'}
+                  <Package size={16} aria-hidden="true" />
+                {:else}
+                  <FileText size={16} aria-hidden="true" />
+                {/if}
+                <span>{result.title}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/if}
+
+  {#if !loading && !loadError && groups.length === 0 && !selectedAction}
+    <p class="traceability__message traceability__empty">{t('requirements.traceability.empty')}</p>
+  {/if}
+
+  {#each groups as group (group.id)}
+    <div class="traceability-group" data-section={group.id}>
+      <h4>{group.title}<span>{group.links.length}</span></h4>
+      <ul class="traceability-list">
+        {#each group.links as link (link.id)}
+          {@const entity = linkedEntity(link, pageId)}
+          {#if entity}
+            {@const key = entityKey(entity)}
+            {@const relation = linkDirectionLabel(link, pageId, linkTypes)}
+            <li class="traceability-row" data-link-id={link.id}>
+              <a class="traceability-row__link" href={entityHref(entity)}>
+                {#if entity.type === 'item'}
+                  <ItemTypeIcon icon={entity.itemTypeIcon} color={entity.itemTypeColor} />
+                {:else if entity.type === 'test_case'}
+                  <CheckSquare size={16} aria-hidden="true" />
+                {:else if entity.type === 'asset'}
+                  <Package size={16} aria-hidden="true" />
+                {:else}
+                  <FileText size={16} aria-hidden="true" />
+                {/if}
+                {#if key}<span class="traceability-row__key">{key}</span>{/if}
+                <span class="traceability-row__title">{entity.title}</span>
+              </a>
+              {#if relation || entity.statusName || canEdit}
+                <div class="traceability-row__details">
+                  {#if relation}<span class="traceability-row__relation">{relation}</span>{/if}
+                  {#if entity.statusName}
+                    <StatusBadge status={{ label: entity.statusName, categoryColor: entity.statusColor }} uppercase={false} showDot={false} />
+                  {/if}
+                  {#if canEdit}
+                    <button
+                      type="button"
+                      class="traceability-unlink"
+                      disabled={removingLinkIds.has(link.id)}
+                      onclick={() => unlink(link.id)}
+                      aria-label={`${t('requirements.traceability.unlink')}: ${entity.title}`}
+                      title={t('requirements.traceability.unlink')}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  {/if}
+                </div>
+              {/if}
+            </li>
+          {/if}
+        {/each}
+      </ul>
+    </div>
+  {/each}
 </section>
 
 <style>
-  .traceability-panel {
-    border-bottom: 1px solid var(--ds-border);
-    padding: 0.75rem 1rem 1rem;
-    background: var(--ds-surface-sunken);
+  .traceability {
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--ds-border);
+    color: var(--ds-text);
   }
-  .traceability-panel__header {
+  .traceability__header,
+  .traceability__heading,
+  .traceability__header h3,
+  .traceability__error,
+  .traceability-search__controls,
+  .traceability-result,
+  .traceability-row,
+  .traceability-row__link,
+  .traceability-row__details {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: 0.625rem;
+    min-width: 0;
   }
-  .traceability-panel__header h3 {
+  .traceability__header {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+  .traceability__heading {
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+  }
+  .traceability__header h3 {
     margin: 0;
     font-size: 0.875rem;
     font-weight: 600;
   }
-  .traceability-panel__loading {
-    display: flex;
-    justify-content: center;
-    padding: 1rem;
-  }
-  .traceability-panel__grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-  @media (max-width: 900px) {
-    .traceability-panel__grid {
-      grid-template-columns: 1fr;
-    }
-  }
-  .traceability-section__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .traceability-section__header h4 {
-    margin: 0;
-    font-size: 0.8125rem;
-    font-weight: 600;
+  .traceability__header h3 :global(svg),
+  .traceability-row__link > :global(svg),
+  .traceability-result > :global(svg) {
+    flex-shrink: 0;
     color: var(--ds-text-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+  }
+  .traceability__summary {
+    color: var(--ds-text-subtle);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .traceability :global(.traceability-add) {
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    color: var(--ds-text-subtle);
+    font-size: 0.8125rem;
+  }
+  .traceability :global(.traceability-add:hover) {
+    background: var(--ds-background-neutral-hovered);
+    color: var(--ds-text);
+  }
+  .traceability__message {
+    margin: 0.625rem 0 0;
+    color: var(--ds-text-subtle);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+  .traceability__empty {
+    margin-top: 0.875rem;
+  }
+  .traceability__error {
+    flex-wrap: wrap;
+    margin-top: 0.625rem;
+    color: var(--ds-text-danger);
+    font-size: 0.8125rem;
   }
   .traceability-search {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--ds-border);
+    border-radius: 0.375rem;
   }
+  .traceability-search__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+  .traceability-search__controls > :global(input) {
+    flex: 1;
+    min-width: 0;
+  }
+  .traceability-search__results,
   .traceability-list {
     list-style: none;
-    margin: 0;
+    margin: 0.625rem 0 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
   }
-  .traceability-row-li {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
+  .traceability-search__results {
+    max-height: 16rem;
+    overflow-y: auto;
+    scrollbar-color: var(--ds-border) transparent;
   }
-  .traceability-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  .traceability-result {
     width: 100%;
-    min-width: 0;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background: var(--ds-surface-raised);
-    color: inherit;
+    min-height: 2.5rem;
+    padding: 0.625rem 0.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--ds-text);
     text-align: left;
+    font-size: 0.875rem;
     cursor: pointer;
   }
-  .traceability-row--link {
-    text-decoration: none;
+  .traceability-result span {
+    overflow-wrap: anywhere;
   }
-  .traceability-row:hover {
-    border-color: var(--ds-border);
+  .traceability-result:hover,
+  .traceability-result:focus-visible {
     background: var(--ds-background-neutral-hovered);
   }
-  .traceability-row__relation {
-    flex-shrink: 0;
-    font-size: 0.6875rem;
-    font-weight: 500;
+  .traceability-group {
+    margin-top: 1.5rem;
+  }
+  .traceability-group h4 {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0;
     color: var(--ds-text-subtle);
-    text-transform: lowercase;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .traceability-group h4 span {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  .traceability-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .traceability-row {
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ds-border);
+    border-radius: 0.5rem;
+    background: var(--ds-surface-raised);
+  }
+  .traceability-row__link {
+    flex: 1;
+    gap: 0.625rem;
+    min-height: 2rem;
+    color: var(--ds-text);
+    text-decoration: none;
+    text-underline-offset: 0.2em;
+  }
+  .traceability-row__link:hover .traceability-row__title {
+    color: var(--ds-text-link);
+    text-decoration: underline;
   }
   .traceability-row__key {
     flex-shrink: 0;
-    font-size: 0.75rem;
     color: var(--ds-text-subtle);
-    font-family: var(--ds-font-family-mono, monospace);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .traceability-row__title {
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875rem;
   }
+  .traceability-row__details {
+    flex-shrink: 0;
+    gap: 0.5rem;
+  }
+  .traceability-row__relation {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--ds-border);
+    border-radius: 999px;
+    color: var(--ds-text-subtle);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
   .traceability-unlink {
     display: inline-flex;
-    padding: 0.25rem;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
     border: none;
+    border-radius: 0.25rem;
     background: transparent;
     color: var(--ds-text-subtle);
     cursor: pointer;
-    border-radius: 0.25rem;
   }
   .traceability-unlink:hover {
     color: var(--ds-text-danger);
     background: var(--ds-background-danger-subtle);
   }
-  .traceability-empty {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--ds-text-subtle);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+  .traceability-unlink:disabled {
+    opacity: 0.5;
+    cursor: wait;
   }
-  :global(.traceability-uncovered) {
-    flex-shrink: 0;
+  .traceability-unlink:focus-visible,
+  .traceability-row__link:focus-visible,
+  .traceability-result:focus-visible {
+    outline: 2px solid var(--ds-border-focused);
+    outline-offset: 2px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .traceability-unlink {
+      opacity: 0;
+    }
+    .traceability-row:hover .traceability-unlink,
+    .traceability-row:focus-within .traceability-unlink {
+      opacity: 1;
+    }
+  }
+  @container (max-width: 700px) {
+    .traceability-row {
+      flex-wrap: wrap;
+    }
+    .traceability-row__link {
+      flex-basis: 100%;
+    }
+    .traceability-row__title {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .traceability-row__details {
+      flex: 1;
+      flex-wrap: wrap;
+      padding-left: 1.625rem;
+    }
+    .traceability-unlink {
+      margin-left: auto;
+    }
   }
 </style>

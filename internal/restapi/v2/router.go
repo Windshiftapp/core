@@ -817,7 +817,7 @@ func buildRoutes(deps Deps) []route {
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
 	registerPlanningRoutes(&builder, deps.Planning)
-	registerLinkRoutes(&builder, deps.Links, deps.CatalogMutations)
+	registerLinkRoutes(&builder, deps.Links, deps.CatalogMutations, deps.ObjectTranslations)
 	registerAgentRunRoutes(&builder, deps.AgentRuns)
 	registerAgentSkillRoutes(&builder, deps.AgentSkills)
 	registerGovernanceRoutes(&builder, deps.ConditionSets, deps.Governance)

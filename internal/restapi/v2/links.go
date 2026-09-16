@@ -10,11 +10,11 @@ import (
 	"windshift/internal/services"
 )
 
-func registerLinkRoutes(builder *routeBuilder, links linkApplication, catalogs catalogMutationApplication) {
-	builder.Read("/link-types", AuthAuthenticated, []string{"links:read"}, listLinkTypes(links))
-	builder.JSON(http.MethodPost, "/link-types", http.StatusCreated, false, AuthAuthenticated, []string{"links:write"}, createLinkType(catalogs))
-	builder.Read("/link-types/{link_type_id}", AuthAuthenticated, []string{"links:read"}, getLinkType(catalogs))
-	builder.JSON(http.MethodPatch, "/link-types/{link_type_id}", http.StatusOK, true, AuthAuthenticated, []string{"links:write"}, patchLinkType(catalogs))
+func registerLinkRoutes(builder *routeBuilder, links linkApplication, catalogs catalogMutationApplication, localizer objectLocalizer) {
+	builder.Read("/link-types", AuthAuthenticated, []string{"links:read"}, listLinkTypes(links, localizer))
+	builder.JSON(http.MethodPost, "/link-types", http.StatusCreated, false, AuthAuthenticated, []string{"links:write"}, createLinkType(catalogs, localizer))
+	builder.Read("/link-types/{link_type_id}", AuthAuthenticated, []string{"links:read"}, getLinkType(catalogs, localizer))
+	builder.JSON(http.MethodPatch, "/link-types/{link_type_id}", http.StatusOK, true, AuthAuthenticated, []string{"links:write"}, patchLinkType(catalogs, localizer))
 	builder.Command(http.MethodDelete, "/link-types/{link_type_id}", AuthAuthenticated, []string{"links:write"}, deleteLinkType(catalogs))
 	builder.Read("/items/{item_id}/links", AuthAuthenticated, []string{"items:read"}, listEntityLinks(links, "item", "item_id"))
 	builder.Read("/pages/{page_id}/links", AuthAuthenticated, []string{"pages:read"}, listEntityLinks(links, "page", "page_id"))
@@ -26,7 +26,7 @@ func registerLinkRoutes(builder *routeBuilder, links linkApplication, catalogs c
 	builder.Read("/items/{item_id}/fields/{field_id}/links", AuthAuthenticated, []string{"items:read"}, listFieldLinks(links))
 }
 
-func getLinkType(catalogs catalogMutationApplication) readOperation[models.LinkType] {
+func getLinkType(catalogs catalogMutationApplication, localizer objectLocalizer) readOperation[models.LinkType] {
 	return func(r *http.Request) (models.LinkType, error) {
 		id, err := pathID(r, "link_type_id")
 		if err != nil {
@@ -36,11 +36,14 @@ func getLinkType(catalogs catalogMutationApplication) readOperation[models.LinkT
 		if err != nil {
 			return models.LinkType{}, catalogMutationError(err)
 		}
+		if err := localizeCatalog(r, localizer, "link_type", item); err != nil {
+			return models.LinkType{}, err
+		}
 		return *item, nil
 	}
 }
 
-func createLinkType(catalogs catalogMutationApplication) jsonOperation[models.LinkType, models.LinkType] {
+func createLinkType(catalogs catalogMutationApplication, localizer objectLocalizer) jsonOperation[models.LinkType, models.LinkType] {
 	return func(r *http.Request, input models.LinkType) (models.LinkType, error) {
 		user, err := principal(r)
 		if err != nil {
@@ -50,11 +53,14 @@ func createLinkType(catalogs catalogMutationApplication) jsonOperation[models.Li
 		if err != nil {
 			return models.LinkType{}, catalogMutationError(err)
 		}
+		if err := localizeCatalog(r, localizer, "link_type", item); err != nil {
+			return models.LinkType{}, err
+		}
 		return *item, nil
 	}
 }
 
-func patchLinkType(catalogs catalogMutationApplication) jsonOperation[linkTypePatchRequest, models.LinkType] {
+func patchLinkType(catalogs catalogMutationApplication, localizer objectLocalizer) jsonOperation[linkTypePatchRequest, models.LinkType] {
 	return func(r *http.Request, input linkTypePatchRequest) (models.LinkType, error) {
 		user, id, err := catalogPrincipalAndID(r, "link_type_id")
 		if err != nil {
@@ -68,6 +74,9 @@ func patchLinkType(catalogs catalogMutationApplication) jsonOperation[linkTypePa
 		if err != nil {
 			return models.LinkType{}, catalogMutationError(err)
 		}
+		if err := localizeCatalog(r, localizer, "link_type", item); err != nil {
+			return models.LinkType{}, err
+		}
 		return *item, nil
 	}
 }
@@ -78,7 +87,7 @@ func deleteLinkType(catalogs catalogMutationApplication) commandOperation {
 	})
 }
 
-func listLinkTypes(links linkApplication) readOperation[[]models.LinkType] {
+func listLinkTypes(links linkApplication, localizer objectLocalizer) readOperation[[]models.LinkType] {
 	return func(r *http.Request) ([]models.LinkType, error) {
 		includeInactive := false
 		if value := r.URL.Query().Get("include_inactive"); value != "" {
@@ -89,7 +98,13 @@ func listLinkTypes(links linkApplication) readOperation[[]models.LinkType] {
 			}
 		}
 		result, err := links.ListLinkTypes(includeInactive)
-		return result, linkError(err)
+		if err != nil {
+			return nil, linkError(err)
+		}
+		if err := localizeCatalog(r, localizer, "link_type", &result); err != nil {
+			return nil, err
+		}
+		return result, nil
 	}
 }
 

@@ -42,6 +42,17 @@ export function canCreateRequirementInAnyWorkspace(workspacePermissions, workspa
   return workspaces.some((ws) => canCreateRequirement(workspacePermissions, ws.id));
 }
 
+/**
+ * Default owner for a new requirement: the creator when they can be assigned.
+ * @param {number | null | undefined} currentUserId
+ * @param {Array<{ id: number }>} assignableUsers
+ */
+export function defaultRequirementOwnerId(currentUserId, assignableUsers) {
+  if (!currentUserId) return null;
+  if (!assignableUsers?.length) return currentUserId;
+  return assignableUsers.some((user) => user.id === currentUserId) ? currentUserId : null;
+}
+
 /** @param {{ first_name?: string, last_name?: string, username?: string, email?: string }} user */
 export function formatRequirementOwnerLabel(user) {
   if (!user) return '';
