@@ -502,7 +502,7 @@
               {@const entity = linkedEntity(link)}
               {#if entity}
                 <li class="traceability-row-li">
-                  <a class="traceability-row traceability-row--link" href={`/workspaces/${workspaceId}/tests/${entity.id}`}>
+                  <a class="traceability-row traceability-row--link" href={`/workspaces/${workspaceId}/tests/cases/${entity.id}`}>
                     <span class="traceability-row__title">{entity.title}</span>
                     <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
                   </a>

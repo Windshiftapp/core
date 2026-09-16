@@ -368,10 +368,19 @@
               {@const entity = linkedEntity(link, pageId)}
               {#if entity}
                 <li class="link-row">
-                  <div class="link-main static">
-                    <span class="title">{entity.title}</span>
-                    <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
-                  </div>
+                  {#if traceabilityEntityHref(entity, workspaceId, null)}
+                    <button class="link-main" type="button" onclick={() => navigateToEntity(entity)}>
+                      <span class="link-text">
+                        <span class="title">{entity.title}</span>
+                        <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
+                      </span>
+                    </button>
+                  {:else}
+                    <div class="link-main static">
+                      <span class="title">{entity.title}</span>
+                      <Lozenge color="green">{t('requirements.traceability.covered')}</Lozenge>
+                    </div>
+                  {/if}
                   {#if canEdit}
                     <button class="unlink-btn" type="button" onclick={() => requestUnlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
                       <Trash2 size={16} />
@@ -550,9 +559,15 @@
               {@const entity = linkedEntity(link, pageId)}
               {#if entity}
                 <li class="link-row">
-                  <div class="link-main static">
-                    <span class="title">{entity.title}</span>
-                  </div>
+                  {#if traceabilityEntityHref(entity, workspaceId, null)}
+                    <button class="link-main" type="button" onclick={() => navigateToEntity(entity)}>
+                      <span class="title">{entity.title}</span>
+                    </button>
+                  {:else}
+                    <div class="link-main static">
+                      <span class="title">{entity.title}</span>
+                    </div>
+                  {/if}
                   {#if canEdit}
                     <button class="unlink-btn" type="button" onclick={() => requestUnlink(link.id)} aria-label={t('requirements.traceability.unlink')}>
                       <Trash2 size={16} />

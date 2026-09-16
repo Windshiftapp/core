@@ -1,5 +1,5 @@
 <script>
-  import { ChevronDown, ExternalLink, Loader } from '@lucide/svelte';
+  import { ChevronDown, ExternalLink, History, Loader } from '@lucide/svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { authStore, workspacesStore } from '../stores';
@@ -22,6 +22,7 @@
   import MobileHeader from './MobileHeader.svelte';
   import MobileOptionSheet from './MobileOptionSheet.svelte';
   import MobileRequirementTraceability from './MobileRequirementTraceability.svelte';
+  import MobileRequirementHistorySheet from './MobileRequirementHistorySheet.svelte';
 
   let { workspaceId, requirementNumber } = $props();
 
@@ -37,6 +38,7 @@
   let typeSheetOpen = $state(false);
   let statusSheetOpen = $state(false);
   let ownerSheetOpen = $state(false);
+  let historySheetOpen = $state(false);
   let loadToken = 0;
 
   const workspaceName = $derived.by(() => {
@@ -161,11 +163,26 @@
     typeSheetOpen = false;
     statusSheetOpen = false;
     ownerSheetOpen = false;
+    historySheetOpen = false;
     load(token);
   });
 </script>
 
-<MobileHeader title={detail?.page_title ?? detail?.key ?? t('requirements.navTitle')} onback={back} />
+<MobileHeader title={detail?.page_title ?? detail?.key ?? t('requirements.navTitle')} onback={back}>
+  {#snippet right()}
+    {#if detail}
+      <button
+        class="hdr-btn"
+        onclick={() => (historySheetOpen = true)}
+        data-testid="mobile-requirement-history"
+        aria-label={t('requirements.historyTitle')}
+        type="button"
+      >
+        <History size={20} />
+      </button>
+    {/if}
+  {/snippet}
+</MobileHeader>
 
 {#if loading}
   <div class="center" data-testid="mobile-requirement-loading"><Loader class="spin" size={22} /></div>
@@ -327,7 +344,24 @@
   dataTestid="mobile-requirement-owner-sheet"
 />
 
+<MobileRequirementHistorySheet
+  bind:isOpen={historySheetOpen}
+  {workspaceId}
+  requirementNumber={detail?.requirement_number ?? requirementNumber}
+/>
+
 <style>
+  .hdr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--ds-text);
+    cursor: pointer;
+  }
   .center { display: flex; justify-content: center; padding: 3rem; color: var(--ds-text-subtle); }
   :global(.spin) { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }

@@ -64,5 +64,11 @@ export function traceabilityEntityHref(entity, workspaceId, pageMeta) {
   if (entity.type === 'page') {
     return pageHref(workspaceId, entity.id, pageMeta);
   }
+  if (entity.type === 'test_case') {
+    return `/m/tests/${workspaceId}/${entity.id}`;
+  }
+  if (entity.type === 'asset') {
+    return `/m/assets/${entity.id}`;
+  }
   return null;
 }

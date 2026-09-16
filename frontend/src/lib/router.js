@@ -170,6 +170,8 @@ const routes = {
   '/m/requirements': 'mobile-requirements',
   '/m/requirements/new': 'mobile-requirement-create',
   '/m/requirements/:workspaceId/:requirementNumber': 'mobile-requirement-detail',
+  '/m/tests/:workspaceId/:testId': 'mobile-test-case-detail',
+  '/m/assets/:id': 'mobile-asset-detail',
   '/m/timer': 'mobile-timer',
   '/m/notifications': 'mobile-notifications',
   '/m/search': 'mobile-search',

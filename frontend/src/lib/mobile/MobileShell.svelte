@@ -22,6 +22,8 @@
   import MobilePageDetail from './MobilePageDetail.svelte';
   import MobileRequirementsView from './MobileRequirementsView.svelte';
   import MobileRequirementDetail from './MobileRequirementDetail.svelte';
+  import MobileTestCaseDetail from './MobileTestCaseDetail.svelte';
+  import MobileAssetDetail from './MobileAssetDetail.svelte';
   import MobileCommandPalette from './MobileCommandPalette.svelte';
   import MobileCreatePage from './MobileCreatePage.svelte';
   import MobileCreateRequirementPage from './MobileCreateRequirementPage.svelte';
@@ -38,6 +40,8 @@
       view !== 'mobile-chat' &&
       view !== 'mobile-page-detail' &&
       view !== 'mobile-requirement-detail' &&
+      view !== 'mobile-test-case-detail' &&
+      view !== 'mobile-asset-detail' &&
       view !== 'mobile-create' &&
       view !== 'mobile-requirement-create' &&
       view !== 'mobile-item-edit',
@@ -97,6 +101,13 @@
         workspaceId={Number($currentRoute.params.workspaceId)}
         requirementNumber={Number($currentRoute.params.requirementNumber)}
       />
+    {:else if view === 'mobile-test-case-detail'}
+      <MobileTestCaseDetail
+        workspaceId={Number($currentRoute.params.workspaceId)}
+        testId={Number($currentRoute.params.testId)}
+      />
+    {:else if view === 'mobile-asset-detail'}
+      <MobileAssetDetail assetId={Number($currentRoute.params.id)} />
     {:else if view === 'mobile-timer'}
       <TimerView />
     {:else if view === 'mobile-notifications'}
