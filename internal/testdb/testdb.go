@@ -50,20 +50,6 @@ func OpenPostgres(t *testing.T) database.Database {
 	return db
 }
 
-// OpenSQLite opens an isolated SQLite database for tests.
-func OpenSQLite(t *testing.T, name string) database.Database {
-	t.Helper()
-	db, err := database.NewSQLiteDB(t.TempDir() + "/" + name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Initialize(); err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	return db
-}
-
 // RunPostgres opens PostgreSQL, runs fn, and closes the database afterward.
 func RunPostgres(t *testing.T, fn func(database.Database)) {
 	t.Helper()
