@@ -2,11 +2,10 @@
   import { ChevronDown, ExternalLink, Loader } from '@lucide/svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { authStore } from '../stores';
+  import { authStore, workspacesStore } from '../stores';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { successToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { workspacesStore } from '../stores';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import { renderMarkdown } from '../utils/render-markdown.js';
   import SafeMarkdown from '../components/SafeMarkdown.svelte';
@@ -48,9 +47,7 @@
     return '';
   });
 
-  const canEdit = $derived(
-    permissionsReady && canEditRequirement(workspacePermissions, workspaceId),
-  );
+  const canEditMeta = $derived(canEditRequirement(workspacePermissions, workspaceId));
   const typeOptions = $derived(requirementTypeOptions(t));
   const statusOptions = $derived(requirementStatusOptions(t));
   const contentHtml = $derived(page ? renderMarkdown(page.content) : '');
@@ -91,7 +88,7 @@
   }
 
   async function patchDetail(patch) {
-    if (!detail || !canEdit) return;
+    if (!detail || !permissionsReady || !canEditMeta) return;
     savingMeta = true;
     metaError = '';
     try {
@@ -161,6 +158,9 @@
     detail = null;
     page = null;
     assignableUsers = [];
+    typeSheetOpen = false;
+    statusSheetOpen = false;
+    ownerSheetOpen = false;
     load(token);
   });
 </script>
@@ -191,7 +191,12 @@
     {/if}
 
     <div class="fields" data-testid="mobile-requirement-meta">
-      {#if canEdit}
+      {#if !permissionsReady}
+        <div class="field field-readonly fields-loading" data-testid="mobile-requirement-meta-loading">
+          <Loader class="spin" size={16} />
+          <span class="field-label">{t('common.loading')}</span>
+        </div>
+      {:else if canEditMeta}
         <button
           class="field"
           type="button"
@@ -396,6 +401,12 @@
 
   .field-readonly {
     cursor: default;
+  }
+
+  .fields-loading {
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--ds-text-subtle);
   }
 
   .field-label { font-size: 0.8125rem; color: var(--ds-text-subtle); }

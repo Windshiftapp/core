@@ -19,6 +19,7 @@
   import PageLabelPicker from '../pages/PageLabelPicker.svelte';
   import { requirementTypeOptions } from './requirementTypes.js';
   import { requirementStatusOptions, requirementStatusLozenge } from './requirementStatuses.js';
+  import { canEditRequirement } from './requirementFormHelpers.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { successToast } from '../../stores/toasts.svelte.js';
 
@@ -54,12 +55,7 @@
       workspacePermissions.hasPermission(workspaceId, 'workspace.admin')
   );
 
-  const canEdit = $derived(
-    workspacePermissions.isSystemAdmin ||
-      workspacePermissions.hasPermission(workspaceId, 'page.edit') ||
-      workspacePermissions.hasPermission(workspaceId, 'page.admin') ||
-      workspacePermissions.hasPermission(workspaceId, 'workspace.admin')
-  );
+  const canEdit = $derived(canEditRequirement(workspacePermissions, workspaceId));
 
   const typeOptions = $derived([
     { value: '', label: t('requirements.filters.allTypes') },
