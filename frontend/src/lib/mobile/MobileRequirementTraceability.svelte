@@ -101,6 +101,10 @@
 
   $effect(() => {
     if (!pageId) return;
+    addKind = null;
+    addSheetOpen = false;
+    unlinkTarget = null;
+    unlinkSheetOpen = false;
     void ensureLinkTypesLoaded();
     void loadPageLinks();
   });
@@ -200,7 +204,6 @@
               ? t('requirements.traceability.linkAssetError')
               : t('requirements.traceability.linkPageError');
       errorToast(err?.message || message);
-      throw err;
     }
   }
 

@@ -68,7 +68,6 @@
   let assetSearchVersion = 0;
 
   const linkTypeIds = $derived(resolveLinkTypeIds(linkTypesCache));
-  const pageLinkTypeId = $derived(linkTypeIds.pageLinkTypeId);
   const testsLinkTypeId = $derived(linkTypeIds.testsLinkTypeId);
   const relatesToLinkTypeId = $derived(linkTypeIds.relatesToLinkTypeId);
   const specifiesLinkTypeId = $derived(linkTypeIds.specifiesLinkTypeId);

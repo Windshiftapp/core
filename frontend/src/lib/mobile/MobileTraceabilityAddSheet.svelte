@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { Loader } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import MobileSheet from './MobileSheet.svelte';
@@ -45,6 +46,11 @@
     }
   });
 
+  onDestroy(() => {
+    clearTimeout(searchTimer);
+    searchVersion += 1;
+  });
+
   function handleInput(event) {
     const q = event.currentTarget.value;
     query = q;
@@ -78,6 +84,8 @@
     try {
       await onPick(option);
       isOpen = false;
+    } catch {
+      // Parent surfaces errors; keep the sheet open for retry.
     } finally {
       picking = false;
     }
