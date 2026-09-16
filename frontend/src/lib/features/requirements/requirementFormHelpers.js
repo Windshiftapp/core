@@ -23,6 +23,16 @@ export function canCreateRequirement(workspacePermissions, workspaceId) {
   );
 }
 
+/** @param {import('../../stores/workspacePermissions.svelte.js').workspacePermissions} workspacePermissions @param {number} workspaceId */
+export function canEditRequirement(workspacePermissions, workspaceId) {
+  return (
+    workspacePermissions.isSystemAdmin ||
+    workspacePermissions.hasPermission(workspaceId, 'page.edit') ||
+    workspacePermissions.hasPermission(workspaceId, 'page.admin') ||
+    workspacePermissions.hasPermission(workspaceId, 'workspace.admin')
+  );
+}
+
 /**
  * @param {import('../../stores/workspacePermissions.svelte.js').workspacePermissions} workspacePermissions
  * @param {Array<{ id: number }>} workspaces

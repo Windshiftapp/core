@@ -1,7 +1,9 @@
 <script>
-  import { ExternalLink, Loader } from '@lucide/svelte';
+  import { ChevronDown, ExternalLink, Loader } from '@lucide/svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
+  import { authStore } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { successToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { workspacesStore } from '../stores';
@@ -9,19 +11,33 @@
   import { renderMarkdown } from '../utils/render-markdown.js';
   import SafeMarkdown from '../components/SafeMarkdown.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import { requirementStatusLozenge } from '../features/requirements/requirementStatuses.js';
-  import { formatRequirementOwnerLabel } from '../features/requirements/requirementFormHelpers.js';
+  import {
+    requirementStatusLozenge,
+    requirementStatusOptions,
+  } from '../features/requirements/requirementStatuses.js';
+  import { requirementTypeOptions } from '../features/requirements/requirementTypes.js';
+  import {
+    canEditRequirement,
+    formatRequirementOwnerLabel,
+  } from '../features/requirements/requirementFormHelpers.js';
   import MobileHeader from './MobileHeader.svelte';
+  import MobileOptionSheet from './MobileOptionSheet.svelte';
 
   let { workspaceId, requirementNumber } = $props();
 
-  // Read-first requirement detail: metadata from the registry API and page
-  // body from the backing page. Traceability editing stays on desktop in v1.
+  // Requirement detail: editable metadata mirrors desktop RequirementsView.
+  // Traceability editing stays on desktop in v1.
   let detail = $state(null);
   let page = $state(null);
   let assignableUsers = $state([]);
   let loading = $state(true);
   let errored = $state(false);
+  let savingMeta = $state(false);
+  let metaError = $state('');
+  let permissionsReady = $state(false);
+  let typeSheetOpen = $state(false);
+  let statusSheetOpen = $state(false);
+  let ownerSheetOpen = $state(false);
   let loadToken = 0;
 
   const workspaceName = $derived.by(() => {
@@ -32,6 +48,11 @@
     return '';
   });
 
+  const canEdit = $derived(
+    permissionsReady && canEditRequirement(workspacePermissions, workspaceId),
+  );
+  const typeOptions = $derived(requirementTypeOptions(t));
+  const statusOptions = $derived(requirementStatusOptions(t));
   const contentHtml = $derived(page ? renderMarkdown(page.content) : '');
 
   const ownerLabel = $derived.by(() => {
@@ -39,6 +60,14 @@
     const user = assignableUsers.find((u) => u.id === detail.owner_id);
     if (!user) return `#${detail.owner_id}`;
     return formatRequirementOwnerLabel(user) || `#${detail.owner_id}`;
+  });
+
+  $effect(() => {
+    const userId = $authStore?.currentUser?.id;
+    if (!userId) return;
+    void workspacePermissions.loadPermissions(userId).finally(() => {
+      permissionsReady = true;
+    });
   });
 
   function back() {
@@ -61,9 +90,48 @@
     }
   }
 
+  async function patchDetail(patch) {
+    if (!detail || !canEdit) return;
+    savingMeta = true;
+    metaError = '';
+    try {
+      detail = await api.requirements.update(workspaceId, detail.requirement_number, patch);
+    } catch (err) {
+      metaError = err?.message || t('requirements.updateError');
+    } finally {
+      savingMeta = false;
+    }
+  }
+
+  async function onTypeSelect(option) {
+    typeSheetOpen = false;
+    if (!detail || option.value === detail.requirement_type) return;
+    await patchDetail({ requirement_type: option.value });
+  }
+
+  async function onStatusSelect(option) {
+    statusSheetOpen = false;
+    if (!detail || option.value === detail.status) return;
+    await patchDetail({ status: option.value });
+  }
+
+  async function onOwnerSelect(user) {
+    ownerSheetOpen = false;
+    const ownerId = user?.id ?? null;
+    if (!detail || ownerId === detail.owner_id) return;
+    await patchDetail({ owner_id: ownerId });
+  }
+
+  async function onOwnerClear() {
+    ownerSheetOpen = false;
+    if (!detail || detail.owner_id == null) return;
+    await patchDetail({ owner_id: null });
+  }
+
   async function load(token) {
     loading = true;
     errored = false;
+    metaError = '';
     try {
       const [detailRes, usersRes] = await Promise.allSettled([
         api.requirements.get(workspaceId, requirementNumber),
@@ -114,21 +182,87 @@
       <Lozenge color="blue">{detail.key}</Lozenge>
     </button>
 
-    <p class="meta" data-testid="mobile-requirement-meta">
-      {#if workspaceName}{workspaceName} · {/if}
-      {t('requirements.fieldType')}: {t(`requirements.type.${detail.requirement_type}`)} ·
-      {t('requirements.fieldStatus')}:
-      <Lozenge color={requirementStatusLozenge(detail.status)}>
-        {t(`requirements.status.${detail.status}`)}
-      </Lozenge>
-      {#if detail.updated_at}
-        · {formatRelativeCompact(new Date(detail.updated_at))}
-      {/if}
-    </p>
+    {#if workspaceName || detail.updated_at}
+      <p class="context" data-testid="mobile-requirement-context">
+        {#if workspaceName}{workspaceName}{/if}
+        {#if workspaceName && detail.updated_at} · {/if}
+        {#if detail.updated_at}{formatRelativeCompact(new Date(detail.updated_at))}{/if}
+      </p>
+    {/if}
 
-    <p class="owner" data-testid="mobile-requirement-owner">
-      {t('requirements.fieldOwner')}: {ownerLabel}
-    </p>
+    <div class="fields" data-testid="mobile-requirement-meta">
+      {#if canEdit}
+        <button
+          class="field"
+          type="button"
+          onclick={() => (typeSheetOpen = true)}
+          disabled={savingMeta}
+          data-testid="mobile-requirement-type"
+        >
+          <span class="field-label">{t('requirements.fieldType')}</span>
+          <span class="field-value">
+            {t(`requirements.type.${detail.requirement_type}`)}
+            <ChevronDown size={16} class="chev" />
+          </span>
+        </button>
+        <button
+          class="field"
+          type="button"
+          onclick={() => (statusSheetOpen = true)}
+          disabled={savingMeta}
+          data-testid="mobile-requirement-status"
+        >
+          <span class="field-label">{t('requirements.fieldStatus')}</span>
+          <span class="field-value">
+            <Lozenge color={requirementStatusLozenge(detail.status)}>
+              {t(`requirements.status.${detail.status}`)}
+            </Lozenge>
+            <ChevronDown size={16} class="chev" />
+          </span>
+        </button>
+        <button
+          class="field"
+          type="button"
+          onclick={() => (ownerSheetOpen = true)}
+          disabled={savingMeta}
+          data-testid="mobile-requirement-owner"
+        >
+          <span class="field-label">{t('requirements.fieldOwner')}</span>
+          <span class="field-value">
+            <span class="owner-name">{ownerLabel}</span>
+            <ChevronDown size={16} class="chev" />
+          </span>
+        </button>
+      {:else}
+        <div class="field field-readonly" data-testid="mobile-requirement-type">
+          <span class="field-label">{t('requirements.fieldType')}</span>
+          <span class="field-value">{t(`requirements.type.${detail.requirement_type}`)}</span>
+        </div>
+        <div class="field field-readonly" data-testid="mobile-requirement-status">
+          <span class="field-label">{t('requirements.fieldStatus')}</span>
+          <span class="field-value">
+            <Lozenge color={requirementStatusLozenge(detail.status)}>
+              {t(`requirements.status.${detail.status}`)}
+            </Lozenge>
+          </span>
+        </div>
+        <div class="field field-readonly" data-testid="mobile-requirement-owner">
+          <span class="field-label">{t('requirements.fieldOwner')}</span>
+          <span class="field-value owner-name">{ownerLabel}</span>
+        </div>
+      {/if}
+    </div>
+
+    {#if savingMeta}
+      <p class="saving-meta" data-testid="mobile-requirement-saving">
+        <Loader class="spin" size={14} />
+        {t('common.saving')}
+      </p>
+    {/if}
+
+    {#if metaError}
+      <p class="meta-error" data-testid="mobile-requirement-meta-error">{metaError}</p>
+    {/if}
 
     <button class="pages-link" onclick={openInPages} data-testid="mobile-requirement-open-pages" type="button">
       <ExternalLink size={16} />
@@ -155,6 +289,45 @@
     {/if}
   </div>
 {/if}
+
+<MobileOptionSheet
+  bind:isOpen={typeSheetOpen}
+  title={t('requirements.fieldType')}
+  options={typeOptions}
+  getValue={(option) => option.value}
+  getLabel={(option) => option.label}
+  selectedValue={detail?.requirement_type ?? null}
+  searchable={false}
+  onSelect={onTypeSelect}
+  dataTestid="mobile-requirement-type-sheet"
+/>
+
+<MobileOptionSheet
+  bind:isOpen={statusSheetOpen}
+  title={t('requirements.fieldStatus')}
+  options={statusOptions}
+  getValue={(option) => option.value}
+  getLabel={(option) => option.label}
+  selectedValue={detail?.status ?? null}
+  searchable={false}
+  onSelect={onStatusSelect}
+  dataTestid="mobile-requirement-status-sheet"
+/>
+
+<MobileOptionSheet
+  bind:isOpen={ownerSheetOpen}
+  title={t('requirements.fieldOwner')}
+  options={assignableUsers}
+  getValue={(user) => user.id}
+  getLabel={(user) => formatRequirementOwnerLabel(user) || `#${user.id}`}
+  selectedValue={detail?.owner_id ?? null}
+  allowClear
+  clearLabel={t('requirements.mobile.ownerUnset')}
+  emptyText={t('requirements.mobile.ownerUnset')}
+  onSelect={onOwnerSelect}
+  onClear={onOwnerClear}
+  dataTestid="mobile-requirement-owner-sheet"
+/>
 
 <style>
   .center { display: flex; justify-content: center; padding: 3rem; color: var(--ds-text-subtle); }
@@ -187,12 +360,79 @@
     cursor: pointer;
   }
 
-  .meta,
-  .owner {
+  .context {
     font-size: 0.8125rem;
     color: var(--ds-text-subtle);
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.75rem;
     line-height: 1.45;
+  }
+
+  .fields {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg, 8px);
+    overflow: hidden;
+  }
+
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .field:not(:last-child) { border-bottom: 1px solid var(--ds-border); }
+  .field:active { background-color: var(--ds-background-neutral-hovered); }
+  .field:disabled { opacity: 0.6; cursor: default; }
+
+  .field-readonly {
+    cursor: default;
+  }
+
+  .field-label { font-size: 0.8125rem; color: var(--ds-text-subtle); }
+  .field-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    color: var(--ds-text);
+    font-size: 0.875rem;
+  }
+
+  .field-value :global(.chev) {
+    color: var(--ds-icon-subtle, var(--ds-text-subtle));
+    flex-shrink: 0;
+  }
+
+  .owner-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 11rem;
+  }
+
+  .saving-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--ds-text-subtle);
+  }
+
+  .meta-error {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--ds-text-danger);
   }
 
   .pages-link {
