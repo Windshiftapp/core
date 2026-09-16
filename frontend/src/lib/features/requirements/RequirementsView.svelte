@@ -13,7 +13,6 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import PagesView from '../pages/PagesView.svelte';
-  import RequirementCreateDialog from './RequirementCreateDialog.svelte';
   import RequirementHistoryDrawer from './RequirementHistoryDrawer.svelte';
   import RequirementTraceabilityPanel from './RequirementTraceabilityPanel.svelte';
   import PageLabelPicker from '../pages/PageLabelPicker.svelte';
@@ -39,7 +38,6 @@
   let selectedLabelIds = $state(new Set());
   let pageIndex = $state(0);
   let totalItems = $state(0);
-  let showCreateDialog = $state(false);
   let assignableUsers = $state([]);
 
   let detail = $state(null);
@@ -169,8 +167,8 @@
     navigate(`/workspaces/${workspaceId}/requirements/${row.requirement_number}`);
   }
 
-  function handleCreated(created) {
-    navigate(`/workspaces/${workspaceId}/requirements/${created.requirement_number}`);
+  function openCreate() {
+    navigate(`/workspaces/${workspaceId}/requirements/new`);
   }
 
   function applyFilters() {
@@ -325,7 +323,7 @@
     <PageHeader title={t('requirements.navTitle')}>
       {#snippet actions()}
         {#if canCreate}
-          <Button onclick={() => (showCreateDialog = true)}>
+          <Button onclick={openCreate}>
             <IconPlus size={16} />
             {t('requirements.create')}
           </Button>
@@ -411,7 +409,6 @@
       </Button>
     </div>
 
-    <RequirementCreateDialog {workspaceId} bind:open={showCreateDialog} onCreated={handleCreated} />
   </div>
 {/if}
 

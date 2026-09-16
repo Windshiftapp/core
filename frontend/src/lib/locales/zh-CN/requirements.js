@@ -4,6 +4,7 @@
 export default {
   requirements: {
     navTitle: '需求',
+    navSection: '需求',
     emptyTitle: '暂无需求',
     emptyDescription: '创建需求或将现有页面提升为需求。',
     create: '创建需求',

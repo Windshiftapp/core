@@ -66,6 +66,7 @@ const routes = {
   '/workspaces/:id/pages/:pageId/print': 'page-print',
   // Requirements registry (page-backed managed documents)
   '/workspaces/:id/requirements': 'workspace-requirements',
+  '/workspaces/:id/requirements/new': 'workspace-requirement-create',
   '/workspaces/:id/requirements/:requirementNumber': 'workspace-requirements',
   // Routes with collection ID filtering
   '/workspaces/:id/collections/:collectionId/board': 'workspace-board',

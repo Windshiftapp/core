@@ -4,6 +4,7 @@
 export default {
   requirements: {
     navTitle: 'Requisitos',
+    navSection: 'Requisitos',
     emptyTitle: 'Nenhum requisito ainda',
     emptyDescription: 'Crie um requisito ou promova uma página existente.',
     create: 'Criar requisito',

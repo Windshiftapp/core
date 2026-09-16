@@ -4,6 +4,7 @@
 export default {
   requirements: {
     navTitle: 'Требования',
+    navSection: 'Требования',
     emptyTitle: 'Требований пока нет',
     emptyDescription: 'Создайте требование или повысьте существующую страницу до требования.',
     create: 'Создать требование',

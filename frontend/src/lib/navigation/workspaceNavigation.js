@@ -101,11 +101,20 @@ export const workspaceOnlyViews = [
     icon: Book,
     activeViews: ['workspace-pages'],
   },
+];
+
+/**
+ * Requirements registry navigation (workspace-scoped, not collection-scoped).
+ * @type {WorkspaceView[]}
+ */
+export const requirementsNavigationItems = [
   {
     id: 'requirements',
     labelKey: 'requirements.navTitle',
+    tooltipKey: 'requirements.navTitle',
     icon: FileStack,
-    activeViews: ['workspace-requirements'],
+    testId: 'workspace-nav-requirements',
+    activeViews: ['workspace-requirements', 'workspace-requirement-create'],
   },
 ];
 

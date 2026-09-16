@@ -4,6 +4,7 @@
 export default {
   requirements: {
     navTitle: 'المتطلبات',
+    navSection: 'المتطلبات',
     emptyTitle: 'لا توجد متطلبات بعد',
     emptyDescription: 'أنشئ متطلبًا أو رقِّ صفحة موجودة إلى متطلب.',
     create: 'إنشاء متطلب',
