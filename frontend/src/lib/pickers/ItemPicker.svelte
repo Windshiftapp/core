@@ -10,6 +10,7 @@
     items = [],
     config = {},
     placeholder = '',
+    ariaLabel = undefined,
     showUnassigned = false,
     unassignedLabel = '',
     disabled = false,
@@ -61,6 +62,7 @@
   {items}
   {loading}
   placeholder={placeholder || t('pickers.select')}
+  {ariaLabel}
   {showUnassigned}
   unassignedLabel={unassignedLabel || t('common.none')}
   {disabled}

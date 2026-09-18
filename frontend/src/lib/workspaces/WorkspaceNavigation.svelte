@@ -14,7 +14,7 @@
     IconSparkles as Sparkles,
     IconPencil as Pencil,
   } from '@tabler/icons-svelte-runes';
-  import { workspaceViewItems, workspaceOnlyViews, testNavigationItems, workspaceSettingsItems, workspaceSettingsViews, workspaceSettingsRoute } from '../navigation/workspaceNavigation.js';
+  import { workspaceViewItems, workspaceOnlyViews, testNavigationItems, requirementsNavigationItems, workspaceSettingsItems, workspaceSettingsViews, workspaceSettingsRoute } from '../navigation/workspaceNavigation.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
   import { moduleSettings } from '../stores/moduleSettings.js';
@@ -61,6 +61,7 @@
   let collectionDisplayName = $derived(currentCollectionId ? currentCollectionName : t('collections.allItems'));
   let collectionDropdownItems = $state([]);
   let testsExpanded = $state(true);
+  let requirementsExpanded = $state(true);
   let workspaceToolsExpanded = $state(true);
   let lastCollectionId = undefined; // Plain variable to prevent infinite loop in $effect
 
@@ -68,6 +69,13 @@
   const workspaceOnlyViewIds = new Set(
     workspaceOnlyViews.map(view => view.id)
   );
+  const requirementsOnlyViewIds = new Set(
+    requirementsNavigationItems.map(view => view.id)
+  );
+  const requirementsViewIds = new Set([
+    'workspace-requirements',
+    'workspace-requirement-create',
+  ]);
   const workspaceTestViewIds = new Set([
     'test-cases',
     'test-case-detail',
@@ -134,6 +142,11 @@
     if (currentCollectionId !== lastCollectionId) {
       lastCollectionId = currentCollectionId;
       workspaceToolsExpanded = currentCollectionId === null;
+    }
+  });
+  $effect(() => {
+    if (requirementsViewIds.has($currentRoute.view)) {
+      requirementsExpanded = true;
     }
   });
 
@@ -258,6 +271,10 @@
     testsExpanded = !testsExpanded;
   }
 
+  function toggleRequirementsSection() {
+    requirementsExpanded = !requirementsExpanded;
+  }
+
   function viewLabel(view) {
     return t(view.labelKey);
   }
@@ -312,11 +329,17 @@
         const url = getTestNavigationUrl(getTestNavIdFromView(currentView));
         navigate(url);
       }
+    } else if (currentView && requirementsViewIds.has(currentView)) {
+      if (currentCollectionId !== null) {
+        navigate(getNavigationUrl(defaultCollectionView));
+      } else {
+        navigate(`/workspaces/${workspaceId}/requirements`);
+      }
     }
   }
 
   function getNavigationUrl(view) {
-    if (workspaceOnlyViewIds.has(view) || !currentCollectionId) {
+    if (workspaceOnlyViewIds.has(view) || requirementsOnlyViewIds.has(view) || !currentCollectionId) {
       return `/workspaces/${workspaceId}/${view}`;
     }
     return `/workspaces/${workspaceId}/collections/${currentCollectionId}/${view}`;
@@ -369,6 +392,11 @@
   }
 
   function isWorkspaceViewActive(view) {
+    return view.activeViews?.includes($currentRoute.view)
+      || $currentRoute.view === `workspace-${view.id}`;
+  }
+
+  function isRequirementsViewActive(view) {
     return view.activeViews?.includes($currentRoute.view)
       || $currentRoute.view === `workspace-${view.id}`;
   }
@@ -485,6 +513,13 @@
         {@render sectionDivider()}
         {#each testNavigationItems as view (view.id)}
           {@render collapsedNavIcon({ href: getTestNavigationUrl(view.id), label: viewLabel(view), icon: view.icon, isActive: activeTestNavId === view.id })}
+        {/each}
+      {/if}
+
+      {#if !currentCollectionId}
+        {@render sectionDivider()}
+        {#each requirementsNavigationItems as view (view.id)}
+          {@render collapsedNavIcon({ href: getNavigationUrl(view.id), label: viewLabel(view), icon: view.icon, testId: view.testId, isActive: isRequirementsViewActive(view) })}
         {/each}
       {/if}
 
@@ -615,6 +650,30 @@
             <div id="workspace-tests-navigation" class="space-y-1" data-testid="workspace-tests-navigation">
               {#each testNavigationItems as view (view.id)}
                 {@render navLink({ href: getTestNavigationUrl(view.id), label: viewLabel(view), tooltip: viewTooltip(view), icon: view.icon, isActive: activeTestNavId === view.id })}
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if !currentCollectionId}
+        <div class="mt-4 pt-4 border-t space-y-1" style="border-color: var(--ds-border);">
+          <button
+            type="button"
+            class="section-toggle w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide transition-colors"
+            aria-controls="workspace-requirements-navigation"
+            aria-expanded={requirementsExpanded}
+            data-testid="workspace-requirements-toggle"
+            onclick={toggleRequirementsSection}
+          >
+            <span>{t('requirements.navSection')}</span>
+            <ChevronDown class={`w-4 h-4 transition-transform ${requirementsExpanded ? 'rotate-180' : ''}`} />
+          </button>
+
+          {#if requirementsExpanded}
+            <div id="workspace-requirements-navigation" class="space-y-1" data-testid="workspace-requirements-navigation">
+              {#each requirementsNavigationItems as view (view.id)}
+                {@render navLink({ href: getNavigationUrl(view.id), label: viewLabel(view), tooltip: viewTooltip(view), icon: view.icon, testId: view.testId, isActive: isRequirementsViewActive(view) })}
               {/each}
             </div>
           {/if}

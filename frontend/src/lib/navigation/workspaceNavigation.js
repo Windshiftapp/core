@@ -105,6 +105,21 @@ export const workspaceOnlyViews = [
 ];
 
 /**
+ * Requirements registry navigation (workspace-scoped, not collection-scoped).
+ * @type {WorkspaceView[]}
+ */
+export const requirementsNavigationItems = [
+  {
+    id: 'requirements',
+    labelKey: 'requirements.navTitle',
+    tooltipKey: 'requirements.navTitle',
+    icon: FileStack,
+    testId: 'workspace-nav-requirements',
+    activeViews: ['workspace-requirements', 'workspace-requirement-create'],
+  },
+];
+
+/**
  * Test management navigation items, visible only when the test-management
  * module is enabled AND the user has view permission.
  * @type {WorkspaceView[]}

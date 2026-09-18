@@ -38,6 +38,7 @@ export const coverage = {
     if (options.limit) params.append('page_size', options.limit);
     if (options.covered !== undefined) params.append('covered', options.covered);
     if (options.itemTypeId) params.append('item_type_id', options.itemTypeId);
+    if (options.requirementType) params.append('requirement_type', options.requirementType);
     if (options.search) params.append('search', options.search);
     const queryString = params.toString();
     return fetchAPIV2(

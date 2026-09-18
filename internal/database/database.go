@@ -146,6 +146,9 @@ var pagesSchema string
 //go:embed schema/page_labels.sql
 var pageLabelsSchema string
 
+//go:embed schema/requirements.sql
+var requirementsSchema string
+
 //go:embed schema/agents.sql
 var agentsSchema string
 

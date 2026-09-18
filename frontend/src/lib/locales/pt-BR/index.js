@@ -19,6 +19,7 @@ import workflows from './workflows.js';
 import workspace from './workspace.js';
 import teams from './teams.js';
 import pages from './pages.js';
+import requirements from './requirements.js';
 import supplemental from './supplemental.js';
 import quality from './quality.js';
 import adminOperations from './adminOperations.js';
@@ -41,6 +42,7 @@ export default createLocale({
   logbook,
   analytics,
   pages,
+  requirements,
   teams,
   supplemental,
   quality,

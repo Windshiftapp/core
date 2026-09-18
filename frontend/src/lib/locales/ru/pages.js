@@ -19,6 +19,7 @@ export default {
     menuHistory: 'История',
     menuPrint: 'Печать',
     menuArchive: 'В архив',
+    menuPromoteToRequirement: 'Повысить до требования',
 
     print: {
       button: 'Печать',

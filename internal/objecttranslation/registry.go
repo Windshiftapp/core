@@ -9,6 +9,8 @@ import (
 const (
 	FieldName         = "name"
 	FieldDescription  = "description"
+	FieldForwardLabel = "forward_label"
+	FieldReverseLabel = "reverse_label"
 	MaxResolveTargets = 500
 
 	SourceSystem   = "system"
@@ -35,7 +37,7 @@ var registry = []objectSpec{
 	{objectType: "configuration_set", table: "configuration_sets", fields: []string{FieldName, FieldDescription}},
 	{objectType: "hierarchy_level", table: "hierarchy_levels", fields: []string{FieldName, FieldDescription}},
 	{objectType: "item_type", table: "item_types", fields: []string{FieldName, FieldDescription}},
-	{objectType: "link_type", table: "link_types", fields: []string{FieldName, FieldDescription}},
+	{objectType: "link_type", table: "link_types", fields: []string{FieldName, FieldDescription, FieldForwardLabel, FieldReverseLabel}},
 	{objectType: "notification_setting", table: "notification_settings", fields: []string{FieldName, FieldDescription}},
 	{objectType: "priority", table: "priorities", fields: []string{FieldName, FieldDescription}},
 	{objectType: "screen", table: "screens", fields: []string{FieldName, FieldDescription}},

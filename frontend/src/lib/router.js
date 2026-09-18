@@ -64,6 +64,10 @@ const routes = {
   '/workspaces/:id/pages/:pageId': 'workspace-pages',
   // Chrome-free print/PDF view for a single page (opened in a new tab).
   '/workspaces/:id/pages/:pageId/print': 'page-print',
+  // Requirements registry (page-backed managed documents)
+  '/workspaces/:id/requirements': 'workspace-requirements',
+  '/workspaces/:id/requirements/new': 'workspace-requirement-create',
+  '/workspaces/:id/requirements/:requirementNumber': 'workspace-requirements',
   // Routes with collection ID filtering
   '/workspaces/:id/collections/:collectionId/board': 'workspace-board',
   '/workspaces/:id/collections/:collectionId/board/configure': 'workspace-board-config',
@@ -164,6 +168,11 @@ const routes = {
   '/m/personal': 'mobile-personal',
   '/m/pages': 'mobile-pages',
   '/m/pages/:workspaceId/:pageId': 'mobile-page-detail',
+  '/m/requirements': 'mobile-requirements',
+  '/m/requirements/new': 'mobile-requirement-create',
+  '/m/requirements/:workspaceId/:requirementNumber': 'mobile-requirement-detail',
+  '/m/tests/:workspaceId/:testId': 'mobile-test-case-detail',
+  '/m/assets/:id': 'mobile-asset-detail',
   '/m/timer': 'mobile-timer',
   '/m/notifications': 'mobile-notifications',
   '/m/search': 'mobile-search',

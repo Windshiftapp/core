@@ -325,6 +325,17 @@ type pageReader interface {
 	GetByID(int) (*models.Page, error)
 }
 
+type requirementApplication interface {
+	List(int, int, services.RequirementListFilter) ([]services.RequirementView, int, error)
+	ListKeys(int, int) ([]services.RequirementKeyView, error)
+	Get(int, int, int) (*services.RequirementView, error)
+	GetByPage(int, int, int) (*services.RequirementView, error)
+	Create(services.AuditActor, services.CreateRequirementInput) (*services.RequirementView, error)
+	Promote(services.AuditActor, int, int, string, string, *int) (*services.RequirementView, error)
+	Update(services.AuditActor, int, int, services.RequirementUpdateInput) (*services.RequirementView, error)
+	ListHistory(int, int, int) ([]models.RequirementHistoryEntry, error)
+}
+
 type pageApplication interface {
 	List(int, int) ([]models.Page, error)
 	Get(int, int, int) (*models.Page, error)
@@ -544,6 +555,7 @@ type Deps struct {
 	ItemDiagrams                 itemDiagramApplication
 	Pages                        pageReader
 	PageApplication              pageApplication
+	RequirementApplication       requirementApplication
 	PageDiagrams                 pageDiagramApplication
 	PageAccess                   pageAccess
 	PageLabels                   pageLabelApplication
@@ -639,6 +651,9 @@ func RegisterRoutes(deps Deps) error {
 	}
 	if deps.PageApplication == nil {
 		return errors.New("v2: PageApplication is required")
+	}
+	if deps.RequirementApplication == nil {
+		return errors.New("v2: RequirementApplication is required")
 	}
 	if deps.PageDiagrams == nil {
 		return errors.New("v2: PageDiagrams is required")
@@ -797,11 +812,12 @@ func buildRoutes(deps Deps) []route {
 	registerAdminRoutes(&builder, deps)
 	registerAdminIntegrationRoutes(&builder, deps)
 	registerPageRoutes(&builder, deps)
+	registerRequirementRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
 	registerPlanningRoutes(&builder, deps.Planning)
-	registerLinkRoutes(&builder, deps.Links, deps.CatalogMutations)
+	registerLinkRoutes(&builder, deps.Links, deps.CatalogMutations, deps.ObjectTranslations)
 	registerAgentRunRoutes(&builder, deps.AgentRuns)
 	registerAgentSkillRoutes(&builder, deps.AgentSkills)
 	registerGovernanceRoutes(&builder, deps.ConditionSets, deps.Governance)
@@ -1017,9 +1033,35 @@ func applyParameterCorrections(route *Route) {
 		}
 		upsertParameter(route, booleanQuery("unassigned", "Restricts results to unassigned test runs.", false))
 		upsertParameter(route, booleanQuery("include_ended", "Whether ended test runs are included.", false))
+	case "GET /workspaces/{workspace_id}/requirements":
+		applyKnowledgeRequirementDocumentation(route, "List requirements")
+	case "GET /workspaces/{workspace_id}/requirements/keys":
+		applyKnowledgeRequirementDocumentation(route, "List requirement keys")
+		upsertParameter(route, stringQuery("q", "Case-insensitive requirement search."))
+		upsertParameter(route, stringQuery("requirement_type", "Restricts results to one requirement type."))
+		upsertParameter(route, stringQuery("status", "Restricts results to one requirement status."))
+		upsertParameter(route, positiveIDQuery("owner_id", "Restricts results to one owner."))
+		upsertParameter(route, booleanQuery("has_item_links", "Whether the backing page has linked work items.", false))
+		upsertParameter(route, booleanQuery("has_test_links", "Whether the backing page has linked test cases.", false))
+		upsertParameter(route, stringQuery("label_ids", "Comma-separated page label IDs."))
+		upsertParameter(route, integerQuery("limit", "Maximum number of requirements.", 100, 50))
+		upsertParameter(route, ParameterMetadata{Name: "offset", In: "query", Description: "Number of requirements to skip.", Schema: map[string]any{"type": "integer", "minimum": 0, "default": 0}})
+	case "POST /workspaces/{workspace_id}/requirements":
+		applyKnowledgeRequirementDocumentation(route, "Create requirement")
+	case "GET /workspaces/{workspace_id}/requirements/{requirement_number}":
+		applyKnowledgeRequirementDocumentation(route, "Get requirement")
+	case "PATCH /workspaces/{workspace_id}/requirements/{requirement_number}":
+		applyKnowledgeRequirementDocumentation(route, "Update requirement")
+	case "GET /workspaces/{workspace_id}/requirements/{requirement_number}/history":
+		applyKnowledgeRequirementDocumentation(route, "List requirement history")
+	case "GET /workspaces/{workspace_id}/pages/{page_id}/requirement":
+		applyKnowledgeRequirementDocumentation(route, "Get page requirement")
+	case "POST /workspaces/{workspace_id}/pages/{page_id}/promote-to-requirement":
+		applyKnowledgeRequirementDocumentation(route, "Promote page to requirement")
 	case "GET /workspaces/{workspace_id}/test-coverage/requirements", "GET /collections/{collection_id}/test-coverage/requirements":
 		upsertParameter(route, enumQuery("covered", "Restricts results by coverage state.", "true", "false"))
-		upsertParameter(route, positiveIDQuery("item_type_id", "Restricts requirements to one item type."))
+		upsertParameter(route, positiveIDQuery("item_type_id", "Restricts legacy work-item requirements to one item type."))
+		upsertParameter(route, stringQuery("requirement_type", "Restricts page-backed requirements to one requirement type."))
 		upsertParameter(route, stringQuery("search", "Case-insensitive requirement search."))
 	case "GET /approvals/mine":
 		upsertParameter(route, stringQuery("status", "Restricts approvals to one decision status."))
@@ -1109,6 +1151,66 @@ func applyParameterCorrections(route *Route) {
 		route.Description = "Returns an authorization-checked item-detail bootstrap projection from committed state. Independent optional sections report deterministic section_errors when they fail, so partial data is distinguishable from an empty section."
 	case "GET /workspaces/{workspace_id}/test-reports/summary":
 		route.Description = "Computes an authorization-checked test summary from committed runs within the bounded 1-to-365-day window. The response is atomic and includes overall, trend, recent-failure, and recent-blocked projections."
+	}
+	ensureDeclaredPathParameters(route)
+}
+
+func applyKnowledgeRequirementDocumentation(route *Route, summary string) {
+	route.Tag = "Knowledge"
+	route.Summary = summary
+	route.Description = semanticRouteDescription(route.Method, summary)
+}
+
+func ensureDeclaredPathParameters(route *Route) {
+	for _, name := range pathTemplateParameters(route.Path) {
+		alreadyDeclared := false
+		for _, parameter := range route.Parameters {
+			if parameter.In == "path" && parameter.Name == name {
+				alreadyDeclared = true
+				break
+			}
+		}
+		if !alreadyDeclared {
+			upsertParameter(route, canonicalPathParameter(name))
+		}
+	}
+}
+
+func pathTemplateParameters(path string) []string {
+	var names []string
+	for start := 0; start < len(path); {
+		open := strings.Index(path[start:], "{")
+		if open < 0 {
+			break
+		}
+		open += start
+		closeIdx := strings.Index(path[open:], "}")
+		if closeIdx < 0 {
+			break
+		}
+		closeIdx += open
+		names = append(names, path[open+1:closeIdx])
+		start = closeIdx + 1
+	}
+	return names
+}
+
+func canonicalPathParameter(name string) ParameterMetadata {
+	switch name {
+	case "workspace_id":
+		return ParameterMetadata{Name: name, In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}}
+	case "page_id":
+		return ParameterMetadata{Name: name, In: "path", Required: true, Description: "The page identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}}
+	case "requirement_number":
+		return ParameterMetadata{Name: name, In: "path", Required: true, Description: "The requirement number within the workspace.", Schema: map[string]any{"type": "integer", "minimum": 1}}
+	case "workspace_key":
+		return ParameterMetadata{Name: name, In: "path", Required: true, Description: "The workspace key.", Schema: map[string]any{"type": "string", "minLength": 1}}
+	default:
+		description := "The " + strings.ReplaceAll(name, "_", " ") + "."
+		if strings.HasSuffix(name, "_id") || strings.HasSuffix(name, "_number") {
+			return ParameterMetadata{Name: name, In: "path", Required: true, Description: description, Schema: map[string]any{"type": "integer", "minimum": 1}}
+		}
+		return ParameterMetadata{Name: name, In: "path", Required: true, Description: description, Schema: map[string]any{"type": "string", "minLength": 1}}
 	}
 }
 

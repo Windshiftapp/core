@@ -687,6 +687,14 @@ func (s *Server) initialize() error {
 	pagePermissionService := services.NewPagePermissionService(s.db, permService)
 	itemLinkService.WithPagePermissionChecker(pagePermissionService)
 	pageApplication := services.NewPageApplicationService(pageService, pagePermissionService)
+	requirementService := services.NewRequirementService(s.db, pageService)
+	requirementApplication := services.NewRequirementApplicationService(
+		requirementService,
+		pageService,
+		pagePermissionService,
+		repository.NewWorkspaceRepository(s.db),
+		logger.NewAuditor(s.db),
+	)
 	pageDiagramService := services.NewPageDiagramService(
 		s.db,
 		cfg.AttachmentPath,
@@ -1757,6 +1765,7 @@ func (s *Server) initialize() error {
 		ItemDiagrams:                 itemDiagramService,
 		Pages:                        pageService,
 		PageApplication:              pageApplication,
+		RequirementApplication:       requirementApplication,
 		PageDiagrams:                 pageDiagramService,
 		PageAccess:                   pagePermissionService,
 		PageLabels:                   pageLabelService,
@@ -1785,7 +1794,7 @@ func (s *Server) initialize() error {
 		ConditionSets:                services.NewConditionSetApplicationService(s.db, permService),
 		Governance:                   governanceApplication,
 		Actions:                      actionApplication,
-		TestManagement:               services.NewTestManagementApplicationService(s.db, permService),
+		TestManagement:               services.NewTestManagementApplicationService(s.db, permService, pagePermissionService),
 		Assets:                       assetApplication,
 		ItemApplication:              itemApplication,
 		ItemDetail:                   itemDetailApplication,

@@ -64,6 +64,20 @@ For a standalone development build:
 make dev-build
 ```
 
+### PostgreSQL integration tests (optional)
+
+Requirements numbering and promote tests can run against a live PostgreSQL
+instance. Tests skip automatically when no database is configured or reachable.
+
+```bash
+# Start PostgreSQL via ./dev.sh or deploy/docker-compose-main.yml, then:
+export POSTGRES_CONNECTION_STRING="postgresql://windshift:YOUR_PASSWORD@localhost:5432/windshift?sslmode=disable"
+make test-postgres
+```
+
+Use a dedicated test database when possible; tests insert workspace and page
+fixtures with unique keys.
+
 ## Project Structure
 
 ```

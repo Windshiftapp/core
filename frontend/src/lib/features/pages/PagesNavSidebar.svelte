@@ -23,6 +23,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ScrollableSidebar from '../../layout/ScrollableSidebar.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import Input from '../../components/Input.svelte';
   import PageMoveDialog from './PageMoveDialog.svelte';
@@ -33,6 +34,7 @@
   import { pagesTreeRefresh } from './pagesTreeRefresh.svelte.js';
   import { pagesFocusTitle } from './pagesFocusTitle.svelte.js';
   import { pagesFilter } from './pagesFilter.svelte.js';
+  import { buildRequirementKeyByPageId } from '../requirements/requirementKeyMap.js';
 
   let { workspaceId, embedded = false } = $props();
 
@@ -52,6 +54,7 @@
   // Lets the filter row render colored chips for active filters even when
   // the picker popover is closed.
   let labelLookup = $state(/** @type {Map<number, any>} */ (new Map()));
+  let requirementKeysByPageId = $state(/** @type {Map<number, string>} */ (new Map()));
 
   // Set of page ids whose subtree is currently shown. Persisted to
   // localStorage per workspace; first visit defaults to "every root
@@ -360,10 +363,18 @@
     }
   });
 
+  async function loadRequirementKeys() {
+    const next = await buildRequirementKeyByPageId(workspaceId);
+    requirementKeysByPageId = new Map(
+      [...next.entries()].map(([pageId, meta]) => [pageId, meta.key])
+    );
+  }
+
   async function loadTree() {
     loading = true;
     try {
       pages = orderPagesDepthFirst((await api.pages.getAll(workspaceId)) || []);
+      void loadRequirementKeys();
       // Cache every label we encounter so the filter row can render names
       // + colors for active filters without an extra round-trip.
       for (const page of pages) {
@@ -850,6 +861,11 @@
               <PageIcon size={14} class="page-button__icon" style="color: {pageColor};" aria-hidden="true" />
             {/if}
             <span class="page-button__title">{page.title}</span>
+            {#if requirementKeysByPageId.get(page.id)}
+              <Lozenge color="blue" class="page-button__requirement-key">
+                {requirementKeysByPageId.get(page.id)}
+              </Lozenge>
+            {/if}
           </button>
           <span class="kebab-slot">
             <Tooltip content={t('common.actions')} placement="bottom" class="inline-flex">
@@ -1147,6 +1163,11 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  :global(.page-button__requirement-key) {
+    flex-shrink: 0;
+    font-size: 0.625rem;
   }
 
   .page-button:hover {

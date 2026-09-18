@@ -50,6 +50,9 @@ export const MAIN_APP_COMPONENT_LOADERS = {
   'workspace-roadmap': () => import('../features/collections/CollectionRoadmap.svelte'),
   'workspace-pages': () => import('../features/pages/PagesView.svelte'),
   'workspace-pages-archived': () => import('../features/pages/ArchivedPagesPage.svelte'),
+  'workspace-requirements': () => import('../features/requirements/RequirementsView.svelte'),
+  'workspace-requirement-create': () =>
+    import('../features/requirements/RequirementCreatePage.svelte'),
   'collection-board': () => import('../features/collections/CollectionBoard.svelte'),
   'collection-board-config': () => import('../settings/BoardConfigurationPage.svelte'),
   'collection-backlog': () => import('../features/collections/CollectionBacklog.svelte'),
@@ -289,6 +292,25 @@ export const MAIN_APP_ROUTE_CONFIG = {
     wrapper: 'none',
     getProps: (currentRoute) => ({ workspaceId: Number(currentRoute.params.id) }),
   }),
+  'workspace-requirements': route('Loading Requirements...', 'Failed to load Requirements', {
+    wrapper: 'none',
+    getProps: (currentRoute) => ({
+      workspaceId: Number(currentRoute.params.id),
+      requirementNumber: currentRoute.params.requirementNumber
+        ? Number(currentRoute.params.requirementNumber)
+        : null,
+    }),
+  }),
+  'workspace-requirement-create': route(
+    'Loading Create Requirement...',
+    'Failed to load Create Requirement',
+    {
+      wrapper: 'none',
+      getProps: (currentRoute) => ({
+        workspaceId: Number(currentRoute.params.id),
+      }),
+    }
+  ),
   'collection-board': route('Loading Board View...', 'Failed to load Board View', {
     getProps: globalCollectionProps,
   }),

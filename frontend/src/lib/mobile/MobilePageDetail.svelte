@@ -4,10 +4,13 @@
   import { navigate } from '../router.js';
   import { errorToast, infoToast } from '../stores/toasts.svelte.js';
   import { workspacesStore } from '../stores';
+  import { t } from '../stores/i18n.svelte.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import { renderMarkdown } from '../utils/render-markdown.js';
   import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import Lozenge from '../components/Lozenge.svelte';
   import MobileHeader from './MobileHeader.svelte';
+  import MobilePromoteRequirementSheet from './MobilePromoteRequirementSheet.svelte';
   import { autoGrow, enterMovesFocus } from './autoGrowTextarea.js';
   import { pageAncestors, pageChildren } from './mobilePagesData.js';
 
@@ -26,6 +29,8 @@
   let draftContent = $state('');
   let draftContentField = $state(null);
   let saving = $state(false);
+  let pageRequirement = $state(null);
+  let promoteSheetOpen = $state(false);
   // Guard in-place navigation (page → sub-page) against out-of-order loads.
   let loadToken = 0;
 
@@ -47,6 +52,16 @@
 
   function openSubPage(id) {
     navigate(`/m/pages/${workspaceId}/${id}`);
+  }
+
+  function openRequirementRegistry() {
+    if (!pageRequirement) return;
+    navigate(`/m/requirements/${workspaceId}/${pageRequirement.requirement_number}`);
+  }
+
+  function handleRequirementPromoted(promoted) {
+    pageRequirement = promoted;
+    navigate(`/m/requirements/${workspaceId}/${promoted.requirement_number}`);
   }
 
   function startEditing() {
@@ -90,10 +105,11 @@
     try {
       // Fetch the page and the workspace tree in parallel; the tree powers
       // breadcrumbs + sub-page rows and may be permission-denied on its own.
-      const [pageRes, listRes, permsRes] = await Promise.allSettled([
+      const [pageRes, listRes, permsRes, reqRes] = await Promise.allSettled([
         api.pages.getPage(workspaceId, pageId),
         api.pages.getAll(workspaceId),
         api.pages.getPermissions(workspaceId, pageId),
+        api.requirements.getByPage(workspaceId, pageId),
       ]);
       if (token !== loadToken) return;
       if (pageRes.status === 'rejected') throw pageRes.reason;
@@ -101,6 +117,7 @@
       flatPages = listRes.status === 'fulfilled' ? (listRes.value ?? []) : [];
       const level = permsRes.status === 'fulfilled' ? (permsRes.value?.effective_level ?? '') : '';
       canEdit = level === 'edit' || level === 'admin';
+      pageRequirement = reqRes.status === 'fulfilled' ? reqRes.value : null;
     } catch (err) {
       console.error('Failed to load page:', err);
       if (token === loadToken) errored = true;
@@ -119,6 +136,8 @@
     page = null;
     flatPages = [];
     canEdit = false;
+    pageRequirement = null;
+    promoteSheetOpen = false;
     load(token);
   });
 </script>
@@ -129,10 +148,30 @@
       <button class="hdr-btn" onclick={cancelEditing} data-testid="mobile-page-cancel" aria-label="Cancel editing" type="button">
         <X size={20} />
       </button>
-    {:else if canEdit && page}
-      <button class="hdr-btn" onclick={startEditing} data-testid="mobile-page-edit" aria-label="Edit page" type="button">
-        <Pencil size={18} />
-      </button>
+    {:else if page}
+      {#if pageRequirement?.key}
+        <button
+          class="hdr-btn requirement-link"
+          onclick={openRequirementRegistry}
+          data-testid="mobile-page-open-requirement"
+          aria-label={t('requirements.mobile.openRequirement')}
+          type="button"
+        >
+          <Lozenge color="blue">{pageRequirement.key}</Lozenge>
+        </button>
+      {:else if canEdit}
+        <button
+          class="hdr-btn promote-btn"
+          onclick={() => (promoteSheetOpen = true)}
+          data-testid="mobile-page-promote-requirement"
+          type="button"
+        >
+          {t('requirements.mobile.promoteAction')}
+        </button>
+        <button class="hdr-btn" onclick={startEditing} data-testid="mobile-page-edit" aria-label="Edit page" type="button">
+          <Pencil size={18} />
+        </button>
+      {/if}
     {/if}
   {/snippet}
 </MobileHeader>
@@ -229,6 +268,13 @@
   </div>
 {/if}
 
+<MobilePromoteRequirementSheet
+  {workspaceId}
+  {pageId}
+  bind:isOpen={promoteSheetOpen}
+  onPromoted={handleRequirementPromoted}
+/>
+
 <style>
   .hdr-btn {
     display: inline-flex;
@@ -240,6 +286,17 @@
     background: transparent;
     color: var(--ds-text);
     cursor: pointer;
+  }
+  .promote-btn {
+    width: auto;
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: var(--font-semibold, 600);
+    color: var(--ds-text-link, var(--ds-interactive));
+  }
+  .requirement-link {
+    width: auto;
+    padding: 0 0.25rem;
   }
 
   .center { display: flex; justify-content: center; padding: 3rem; color: var(--ds-text-subtle); }

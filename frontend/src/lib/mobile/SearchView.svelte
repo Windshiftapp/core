@@ -6,11 +6,14 @@
   import { formatItemKey } from '../utils/itemKey.js';
   import MobileItemRow from './MobileItemRow.svelte';
   import Input from '../components/Input.svelte';
+  import { t } from '../stores/i18n.svelte.js';
   import { searchPagesAcrossWorkspaces } from './mobilePagesData.js';
+  import { searchRequirementsAcrossWorkspaces } from './mobileRequirementsData.js';
 
   let query = $state('');
   let results = $state([]);
   let pageResults = $state([]);
+  let requirementResults = $state([]);
   let loading = $state(false);
   let searched = $state(false);
   let inputEl = $state(null);
@@ -42,6 +45,7 @@
     if (!trimmed) {
       results = [];
       pageResults = [];
+      requirementResults = [];
       searched = false;
       return;
     }
@@ -55,18 +59,23 @@
         ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
         ...$workspacesStore.regularWorkspaces,
       ];
-      const [itemsRes, pagesRes] = await Promise.allSettled([
+      const [itemsRes, pagesRes, requirementsRes] = await Promise.allSettled([
         api.search.items({ query: trimmed, limit: 30 }),
         searchPagesAcrossWorkspaces(workspaces, trimmed),
+        searchRequirementsAcrossWorkspaces(workspaces, trimmed),
       ]);
       if (v !== version) return;
       results = itemsRes.status === 'fulfilled' ? normalize(itemsRes.value) : [];
       pageResults = pagesRes.status === 'fulfilled' ? (pagesRes.value ?? []) : [];
+      requirementResults =
+        requirementsRes.status === 'fulfilled' ? (requirementsRes.value ?? []) : [];
       searched = true;
     } catch (err) {
       if (v !== version) return;
       console.error('Search failed:', err);
       results = [];
+      pageResults = [];
+      requirementResults = [];
       searched = true;
     } finally {
       if (v === version) loading = false;
@@ -82,6 +91,7 @@
     query = '';
     results = [];
     pageResults = [];
+    requirementResults = [];
     searched = false;
     inputEl?.focus();
   }
@@ -115,13 +125,30 @@
 </header>
 
 <div class="results" data-testid="mobile-search-results">
-  {#if loading && results.length === 0 && pageResults.length === 0}
+  {#if loading && results.length === 0 && pageResults.length === 0 && requirementResults.length === 0}
     <p class="msg">Searching…</p>
   {:else if !query.trim()}
     <p class="msg" data-testid="search-prompt">Search by title, key, or text across items and pages you can see.</p>
-  {:else if searched && results.length === 0 && pageResults.length === 0}
+  {:else if searched && results.length === 0 && pageResults.length === 0 && requirementResults.length === 0}
     <p class="msg" data-testid="search-empty">No items or pages match “{query.trim()}”.</p>
   {:else}
+    {#if requirementResults.length > 0}
+      <h2 class="section" data-testid="mobile-search-requirements-header">{t('requirements.navTitle')}</h2>
+      <div class="page-rows" data-testid="mobile-search-requirement-results">
+        {#each requirementResults as req (`${req.workspace_id}-${req.requirement_number}`)}
+          <button
+            class="page-row"
+            onclick={() => navigate(`/m/requirements/${req.workspace_id}/${req.requirement_number}`)}
+            data-testid="mobile-search-requirement-row"
+            data-requirement-number={req.requirement_number}
+            type="button"
+          >
+            <span class="page-title">{req.key} · {req.page_title}</span>
+            <span class="page-ws">{req.workspace_name}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
     {#if pageResults.length > 0}
       <h2 class="section" data-testid="mobile-search-pages-header">Pages</h2>
       <div class="page-rows" data-testid="mobile-search-page-results">

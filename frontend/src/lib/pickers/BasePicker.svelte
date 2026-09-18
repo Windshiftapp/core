@@ -510,6 +510,7 @@
         aria-controls={$menu.id}
         aria-haspopup="listbox"
         aria-disabled={disabled}
+        aria-label={ariaLabel}
         onclick={handleTriggerClick}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTriggerClick(); } }}
       >

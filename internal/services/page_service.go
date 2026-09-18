@@ -27,16 +27,18 @@ import (
 
 // PageService is the entry point for all page CRUD and tree operations.
 type PageService struct {
-	db         database.Database
-	pages      *repository.PageRepository
-	pageLabels *repository.PageLabelRepository
+	db           database.Database
+	pages        *repository.PageRepository
+	pageLabels   *repository.PageLabelRepository
+	requirements *repository.RequirementRepository
 }
 
 // NewPageService creates a PageService backed by the provided database.
 func NewPageService(db database.Database) *PageService {
 	return &PageService{
-		db:    db,
-		pages: repository.NewPageRepository(db),
+		db:           db,
+		pages:        repository.NewPageRepository(db),
+		requirements: repository.NewRequirementRepository(db),
 	}
 }
 
@@ -116,6 +118,12 @@ type CreatePageInput struct {
 // Create inserts a new page after sanitizing inputs and computing derived
 // columns. Returns the persisted page.
 func (s *PageService) Create(actorID int, in CreatePageInput) (*models.Page, error) {
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
+		return s.createPageTx(tx, actorID, in)
+	})
+}
+
+func (s *PageService) createPageTx(tx database.Tx, actorID int, in CreatePageInput) (*models.Page, error) {
 	title := sanitize.PlainTextField.Sanitize(in.Title)
 	if title == "" {
 		return nil, ErrPageTitleRequired
@@ -124,61 +132,55 @@ func (s *PageService) Create(actorID int, in CreatePageInput) (*models.Page, err
 	if err != nil {
 		return nil, err
 	}
-
 	content := sanitize.LongDocument.Sanitize(in.Content)
 	excerpt := deriveExcerpt(content)
 	hash := contentHash(content)
-
-	// Creation always inherits permissions; admins can change this later.
 	inherit := true
 
-	return database.WithTxResult(s.db, func(tx database.Tx) (*models.Page, error) {
-		parentID, parentPath, parentDepth, err := s.resolveParent(tx, in.WorkspaceID, in.ParentID)
-		if err != nil {
-			return nil, err
-		}
-		depth := parentDepth + 1
-		if in.ParentID == nil {
-			depth = 0
-		}
-		if depth >= repository.MaxPageDepth {
-			return nil, ErrPageDepthExceeded
-		}
+	parentID, parentPath, parentDepth, err := s.resolveParent(tx, in.WorkspaceID, in.ParentID)
+	if err != nil {
+		return nil, err
+	}
+	depth := parentDepth + 1
+	if in.ParentID == nil {
+		depth = 0
+	}
+	if depth >= repository.MaxPageDepth {
+		return nil, ErrPageDepthExceeded
+	}
 
-		id, err := s.pages.CreateTx(tx, repository.CreateInput{
-			WorkspaceID:        in.WorkspaceID,
-			ParentID:           parentID,
-			Title:              title,
-			Slug:               makeSlug(title),
-			Metadata:           metadata,
-			Content:            content,
-			ContentHash:        hash,
-			Excerpt:            excerpt,
-			CreatedBy:          actorID,
-			IsHome:             in.IsHome,
-			InheritPermissions: inherit,
-			Rank:               in.Rank,
-			FracIndex:          in.FracIndex,
-			Path:               parentPath,
-			Depth:              depth,
-		})
-		if err != nil {
-			if errors.Is(err, repository.ErrDuplicateEntry) {
-				return nil, ErrPageUniqueConflict
-			}
-			return nil, err
-		}
-
-		page, err := s.pages.GetByIDTx(tx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := s.snapshotAndRebuildChunks(tx, page, actorID, models.PageRevisionChangeTypeCreate, ""); err != nil {
-			return nil, err
-		}
-		return page, nil
+	id, err := s.pages.CreateTx(tx, repository.CreateInput{
+		WorkspaceID:        in.WorkspaceID,
+		ParentID:           parentID,
+		Title:              title,
+		Slug:               makeSlug(title),
+		Metadata:           metadata,
+		Content:            content,
+		ContentHash:        hash,
+		Excerpt:            excerpt,
+		CreatedBy:          actorID,
+		IsHome:             in.IsHome,
+		InheritPermissions: inherit,
+		Rank:               in.Rank,
+		FracIndex:          in.FracIndex,
+		Path:               parentPath,
+		Depth:              depth,
 	})
+	if err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
+			return nil, ErrPageUniqueConflict
+		}
+		return nil, err
+	}
+
+	page, err := s.pages.GetByIDTx(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.snapshotAndRebuildChunks(tx, page, actorID, models.PageRevisionChangeTypeCreate, ""); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 // GetByID returns a single page, or ErrPageNotFound when no row matches.
@@ -353,6 +355,9 @@ func (s *PageService) MoveAcrossWorkspace(actorID, pageID, destinationWorkspaceI
 		if len(subtree) == 0 {
 			return nil, ErrPageNotFound
 		}
+		if err := s.rejectRequirementCrossWorkspaceMoveTx(tx, subtree); err != nil {
+			return nil, err
+		}
 
 		destination, err := s.resolvePageMoveDestinationTx(tx, pageID, destinationWorkspaceID, newParentID, false)
 		if err != nil {
@@ -486,6 +491,21 @@ func pageMoveError(err error) error {
 		return ErrPageUniqueConflict
 	}
 	return err
+}
+
+func (s *PageService) rejectRequirementCrossWorkspaceMoveTx(tx database.Tx, subtree []models.Page) error {
+	ids := make([]int, len(subtree))
+	for i := range subtree {
+		ids[i] = subtree[i].ID
+	}
+	blocked, err := s.requirements.ExistsInPageIDsTx(tx, ids)
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return ErrRequirementCrossWorkspaceMove
+	}
+	return nil
 }
 
 // rehomePageSubtreeRelationsTx applies the explicit cross-workspace policy:

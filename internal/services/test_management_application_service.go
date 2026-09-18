@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -67,6 +68,7 @@ type TestRunPatch struct {
 type TestManagementApplicationService struct {
 	db          database.Database
 	permissions *PermissionService
+	pageAuth    *PagePermissionService
 	folders     *TestFolderService
 	cases       *TestCaseService
 	sets        *TestSetService
@@ -76,10 +78,11 @@ type TestManagementApplicationService struct {
 	coverage    *repository.TestCoverageRepository
 }
 
-func NewTestManagementApplicationService(db database.Database, permissions *PermissionService) *TestManagementApplicationService {
+func NewTestManagementApplicationService(db database.Database, permissions *PermissionService, pageAuth *PagePermissionService) *TestManagementApplicationService {
 	return &TestManagementApplicationService{
 		db:          db,
 		permissions: permissions,
+		pageAuth:    pageAuth,
 		folders:     NewTestFolderService(db),
 		cases:       NewTestCaseService(db),
 		sets:        NewTestSetService(db),
@@ -96,11 +99,41 @@ type TestCoverageScope struct {
 }
 
 type TestCoverageRequirementsFilter struct {
-	Covered    string
-	ItemTypeID *int
-	Search     string
-	Limit      int
-	Offset     int
+	Covered         string
+	ItemTypeID      *int
+	RequirementType string
+	Search          string
+	Limit           int
+	Offset          int
+}
+
+// CoverageConfigInput stores create/update payload for test coverage configuration.
+type CoverageConfigInput struct {
+	RequirementItemTypeIDs []int
+	RequirementTypes       []string
+}
+
+func validateCoverageConfigInput(input CoverageConfigInput) (CoverageConfigInput, error) {
+	if len(input.RequirementTypes) == 0 {
+		if len(input.RequirementItemTypeIDs) > 0 {
+			return CoverageConfigInput{}, &TestManagementValidationError{
+				Msg: "legacy requirement item types are no longer supported; use requirement_types",
+			}
+		}
+		return CoverageConfigInput{}, &TestManagementValidationError{
+			Msg: "at least one requirement type is required",
+		}
+	}
+	for _, typ := range input.RequirementTypes {
+		if !models.IsValidRequirementType(typ) {
+			return CoverageConfigInput{}, &TestManagementValidationError{
+				Msg: "invalid requirement type: " + typ,
+			}
+		}
+	}
+	return CoverageConfigInput{
+		RequirementTypes: input.RequirementTypes,
+	}, nil
 }
 
 func (s *TestManagementApplicationService) requireCoverage(userID int, scope TestCoverageScope, permission string) error {
@@ -128,24 +161,39 @@ func (s *TestManagementApplicationService) CoverageConfig(userID int, scope Test
 	return s.coverage.FindConfigForWorkspace(scope.WorkspaceID)
 }
 
-func (s *TestManagementApplicationService) CreateCoverageConfig(userID int, scope TestCoverageScope, typeIDs []int) (*models.TestCoverageConfiguration, error) {
+func (s *TestManagementApplicationService) CreateCoverageConfig(userID int, scope TestCoverageScope, input CoverageConfigInput) (*models.TestCoverageConfiguration, error) {
 	if err := s.requireCoverage(userID, scope, models.PermissionTestManage); err != nil {
 		return nil, err
 	}
-	if scope.CollectionID != nil {
-		return s.coverage.CreateConfigForCollection(*scope.CollectionID, typeIDs)
+	normalized, err := validateCoverageConfigInput(input)
+	if err != nil {
+		return nil, err
 	}
-	return s.coverage.CreateConfigForWorkspace(scope.WorkspaceID, typeIDs)
+	write := repository.CoverageConfigWrite{
+		RequirementItemTypeIDs: normalized.RequirementItemTypeIDs,
+		RequirementTypes:       normalized.RequirementTypes,
+	}
+	if scope.CollectionID != nil {
+		return s.coverage.CreateConfigForCollection(*scope.CollectionID, write)
+	}
+	return s.coverage.CreateConfigForWorkspace(scope.WorkspaceID, write)
 }
 
-func (s *TestManagementApplicationService) UpdateCoverageConfig(userID int, scope TestCoverageScope, configID int, typeIDs []int) (*models.TestCoverageConfiguration, error) {
+func (s *TestManagementApplicationService) UpdateCoverageConfig(userID int, scope TestCoverageScope, configID int, input CoverageConfigInput) (*models.TestCoverageConfiguration, error) {
 	if err := s.requireCoverage(userID, scope, models.PermissionTestManage); err != nil {
 		return nil, err
 	}
 	if err := s.requireCoverageConfigScope(scope, configID); err != nil {
 		return nil, err
 	}
-	return s.coverage.UpdateConfig(configID, typeIDs)
+	normalized, err := validateCoverageConfigInput(input)
+	if err != nil {
+		return nil, err
+	}
+	return s.coverage.UpdateConfig(configID, repository.CoverageConfigWrite{
+		RequirementItemTypeIDs: normalized.RequirementItemTypeIDs,
+		RequirementTypes:       normalized.RequirementTypes,
+	})
 }
 
 func (s *TestManagementApplicationService) DeleteCoverageConfig(userID int, scope TestCoverageScope, configID int) error {
@@ -176,14 +224,23 @@ func (s *TestManagementApplicationService) CoverageSummary(userID int, scope Tes
 	if err := s.requireCoverage(userID, scope, models.PermissionTestView); err != nil {
 		return models.TestCoverageSummary{}, err
 	}
-	typeIDs, workspaceID, err := s.coverageTypeIDs(scope)
-	if errors.Is(err, repository.ErrNotFound) || len(typeIDs) == 0 {
+	mode, err := s.resolveCoverageMode(scope)
+	if errors.Is(err, repository.ErrNotFound) || !mode.configured {
 		return models.TestCoverageSummary{}, nil
 	}
 	if err != nil {
 		return models.TestCoverageSummary{}, err
 	}
-	total, covered, err := s.coverage.GetCoverageSummary(workspaceID, typeIDs)
+	if mode.pageBacked {
+		items, err := s.coverage.ListAllPageBackedRequirements(mode.workspaceID, mode.requirementTypes)
+		if err != nil {
+			return models.TestCoverageSummary{}, err
+		}
+		filtered, summary := s.filterPageBackedCoverageItems(userID, mode.workspaceID, items, TestCoverageRequirementsFilter{})
+		_ = filtered
+		return summary, nil
+	}
+	total, covered, err := s.coverage.GetCoverageSummary(mode.workspaceID, mode.itemTypeIDs)
 	return coverageSummary(total, covered), err
 }
 
@@ -191,13 +248,31 @@ func (s *TestManagementApplicationService) CoverageRequirements(userID int, scop
 	if err := s.requireCoverage(userID, scope, models.PermissionTestView); err != nil {
 		return nil, 0, models.TestCoverageSummary{}, err
 	}
-	typeIDs, workspaceID, err := s.coverageTypeIDs(scope)
-	if errors.Is(err, repository.ErrNotFound) || len(typeIDs) == 0 {
+	mode, err := s.resolveCoverageMode(scope)
+	if errors.Is(err, repository.ErrNotFound) || !mode.configured {
 		return []models.RequirementCoverageItem{}, 0, models.TestCoverageSummary{}, nil
 	}
 	if err != nil {
 		return nil, 0, models.TestCoverageSummary{}, err
 	}
+	if mode.pageBacked {
+		items, err := s.coverage.ListAllPageBackedRequirements(mode.workspaceID, mode.requirementTypes)
+		if err != nil {
+			return nil, 0, models.TestCoverageSummary{}, err
+		}
+		filtered, summary := s.filterPageBackedCoverageItems(userID, mode.workspaceID, items, filter)
+		total := len(filtered)
+		if filter.Offset >= total {
+			return []models.RequirementCoverageItem{}, total, summary, nil
+		}
+		end := filter.Offset + filter.Limit
+		if end > total {
+			end = total
+		}
+		return filtered[filter.Offset:end], total, summary, nil
+	}
+
+	typeIDs := mode.itemTypeIDs
 	if filter.ItemTypeID != nil {
 		matched := false
 		for _, id := range typeIDs {
@@ -211,7 +286,7 @@ func (s *TestManagementApplicationService) CoverageRequirements(userID int, scop
 		}
 		typeIDs = []int{*filter.ItemTypeID}
 	}
-	params := repository.RequirementListParams{WorkspaceID: workspaceID, TypeIDs: typeIDs, CoveredFilter: filter.Covered, Search: filter.Search, Limit: filter.Limit, Offset: filter.Offset}
+	params := repository.RequirementListParams{WorkspaceID: mode.workspaceID, TypeIDs: typeIDs, CoveredFilter: filter.Covered, Search: filter.Search, Limit: filter.Limit, Offset: filter.Offset}
 	total, err := s.coverage.CountRequirements(params)
 	if err != nil {
 		return nil, 0, models.TestCoverageSummary{}, err
@@ -220,16 +295,113 @@ func (s *TestManagementApplicationService) CoverageRequirements(userID int, scop
 	if err != nil {
 		return nil, 0, models.TestCoverageSummary{}, err
 	}
-	summaryTotal, summaryCovered, err := s.coverage.GetCoverageSummary(workspaceID, typeIDs)
+	summaryTotal, summaryCovered, err := s.coverage.GetCoverageSummary(mode.workspaceID, typeIDs)
 	return items, total, coverageSummary(summaryTotal, summaryCovered), err
 }
 
-func (s *TestManagementApplicationService) coverageTypeIDs(scope TestCoverageScope) (ids []int, workspaceID int, err error) {
-	if scope.CollectionID != nil {
-		return s.coverage.GetRequirementTypeIDsForCollection(*scope.CollectionID)
+type coverageMode struct {
+	workspaceID      int
+	itemTypeIDs      []int
+	requirementTypes []string
+	pageBacked       bool
+	configured       bool
+}
+
+func (s *TestManagementApplicationService) resolveCoverageMode(scope TestCoverageScope) (coverageMode, error) {
+	config, workspaceID, err := s.loadCoverageConfig(scope)
+	if errors.Is(err, repository.ErrNotFound) {
+		return coverageMode{}, nil
 	}
-	ids, err = s.coverage.GetRequirementTypeIDsForWorkspace(scope.WorkspaceID)
-	return ids, scope.WorkspaceID, err
+	if err != nil {
+		return coverageMode{}, err
+	}
+	if config.UsesPageBackedRequirements() {
+		return coverageMode{
+			workspaceID:      workspaceID,
+			requirementTypes: config.RequirementTypes,
+			pageBacked:       true,
+			configured:       true,
+		}, nil
+	}
+	return coverageMode{
+		workspaceID: workspaceID,
+		itemTypeIDs: config.RequirementItemTypeIDs,
+		configured:  len(config.RequirementItemTypeIDs) > 0,
+	}, nil
+}
+
+func (s *TestManagementApplicationService) loadCoverageConfig(scope TestCoverageScope) (*models.TestCoverageConfiguration, int, error) {
+	if scope.CollectionID != nil {
+		config, err := s.coverage.FindConfigForCollection(*scope.CollectionID)
+		if err == nil {
+			workspaceID, err := s.coverage.GetCollectionWorkspaceID(*scope.CollectionID)
+			if err != nil {
+				return nil, 0, err
+			}
+			return config, workspaceID, nil
+		}
+		if !errors.Is(err, repository.ErrNotFound) {
+			return nil, 0, err
+		}
+		workspaceID, err := s.coverage.GetCollectionWorkspaceID(*scope.CollectionID)
+		if err != nil {
+			return nil, 0, err
+		}
+		config, err = s.coverage.FindConfigForWorkspace(workspaceID)
+		return config, workspaceID, err
+	}
+	config, err := s.coverage.FindConfigForWorkspace(scope.WorkspaceID)
+	return config, scope.WorkspaceID, err
+}
+
+func (s *TestManagementApplicationService) filterPageBackedCoverageItems(userID, workspaceID int, items []models.RequirementCoverageItem, filter TestCoverageRequirementsFilter) ([]models.RequirementCoverageItem, models.TestCoverageSummary) {
+	if len(items) == 0 {
+		return []models.RequirementCoverageItem{}, models.TestCoverageSummary{}
+	}
+	pageIDs := make([]int, len(items))
+	for i, item := range items {
+		pageIDs[i] = item.PageID
+	}
+	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, pageIDs)
+	if err != nil {
+		return []models.RequirementCoverageItem{}, models.TestCoverageSummary{}
+	}
+
+	filtered := make([]models.RequirementCoverageItem, 0, len(items))
+	search := strings.ToLower(strings.TrimSpace(filter.Search))
+	for _, item := range items {
+		if !visible[item.PageID] {
+			continue
+		}
+		if filter.RequirementType != "" && item.RequirementType != filter.RequirementType {
+			continue
+		}
+		switch filter.Covered {
+		case "true":
+			if !item.IsCovered {
+				continue
+			}
+		case "false":
+			if item.IsCovered {
+				continue
+			}
+		}
+		if search != "" {
+			haystack := strings.ToLower(item.Title + " " + item.RequirementKey)
+			if !strings.Contains(haystack, search) {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+
+	covered := 0
+	for _, item := range filtered {
+		if item.IsCovered {
+			covered++
+		}
+	}
+	return filtered, coverageSummary(len(filtered), covered)
 }
 
 func coverageSummary(total, covered int) models.TestCoverageSummary {

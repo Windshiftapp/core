@@ -6,5 +6,5 @@ import "slices"
 
 // ShippedSystemTranslations returns the translations bundled with this build.
 func ShippedSystemTranslations() []SystemTranslation {
-	return slices.Clone(shippedSystemTranslations)
+	return append(slices.Clone(shippedSystemTranslations), shippedLinkLabelTranslations...)
 }

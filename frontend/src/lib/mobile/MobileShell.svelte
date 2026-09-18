@@ -3,7 +3,8 @@
   import { Plus } from '@lucide/svelte';
   import { currentRoute, navigate } from '../router.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
-  import { workspacesStore, aiStore, homepageStore } from '../stores';
+  import { authStore, workspacesStore, aiStore, homepageStore } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
   import { resetAuthenticatedShellState } from '../services/authenticatedShellBootstrap.js';
   import { registerMobileServiceWorker } from './pushClient.js';
@@ -19,8 +20,13 @@
   import IosInstallSheet from './IosInstallSheet.svelte';
   import MobilePagesView from './MobilePagesView.svelte';
   import MobilePageDetail from './MobilePageDetail.svelte';
+  import MobileRequirementsView from './MobileRequirementsView.svelte';
+  import MobileRequirementDetail from './MobileRequirementDetail.svelte';
+  import MobileTestCaseDetail from './MobileTestCaseDetail.svelte';
+  import MobileAssetDetail from './MobileAssetDetail.svelte';
   import MobileCommandPalette from './MobileCommandPalette.svelte';
   import MobileCreatePage from './MobileCreatePage.svelte';
+  import MobileCreateRequirementPage from './MobileCreateRequirementPage.svelte';
   import MobileItemEditPage from './MobileItemEditPage.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
 
@@ -33,13 +39,19 @@
       view !== 'mobile-search' &&
       view !== 'mobile-chat' &&
       view !== 'mobile-page-detail' &&
+      view !== 'mobile-requirement-detail' &&
+      view !== 'mobile-test-case-detail' &&
+      view !== 'mobile-asset-detail' &&
       view !== 'mobile-create' &&
+      view !== 'mobile-requirement-create' &&
       view !== 'mobile-item-edit',
   );
   // The Personal tab creates personal tasks; every other tab uses the full
-  // work-item form. The Pages tab gets no FAB at all — pages are created from
-  // the desktop editor today.
-  const showFab = $derived(isTabView && view !== 'mobile-pages');
+  // work-item form. Pages have no FAB; requirements use a dedicated create
+  // route (/m/requirements/new) instead of the global FAB.
+  const showFab = $derived(
+    isTabView && view !== 'mobile-pages' && view !== 'mobile-requirements'
+  );
   function openCreate() {
     // Dedicated create page (/m/new), not a dialog — composition gets a real
     // route so back gestures and deep links behave like native apps.
@@ -58,6 +70,8 @@
     // and the AI-chat availability gate.
     workspacesStore.load();
     aiStore.load();
+    const userId = authStore.currentUser?.id;
+    if (userId) void workspacePermissions.loadPermissions(userId);
 
     return () => {
       stopNotificationPoller();
@@ -80,6 +94,20 @@
         workspaceId={Number($currentRoute.params.workspaceId)}
         pageId={Number($currentRoute.params.pageId)}
       />
+    {:else if view === 'mobile-requirements'}
+      <MobileRequirementsView />
+    {:else if view === 'mobile-requirement-detail'}
+      <MobileRequirementDetail
+        workspaceId={Number($currentRoute.params.workspaceId)}
+        requirementNumber={Number($currentRoute.params.requirementNumber)}
+      />
+    {:else if view === 'mobile-test-case-detail'}
+      <MobileTestCaseDetail
+        workspaceId={Number($currentRoute.params.workspaceId)}
+        testId={Number($currentRoute.params.testId)}
+      />
+    {:else if view === 'mobile-asset-detail'}
+      <MobileAssetDetail assetId={Number($currentRoute.params.id)} />
     {:else if view === 'mobile-timer'}
       <TimerView />
     {:else if view === 'mobile-notifications'}
@@ -92,6 +120,8 @@
       <MobileItemDetail itemId={Number($currentRoute.params.id)} />
     {:else if view === 'mobile-create'}
       <MobileCreatePage />
+    {:else if view === 'mobile-requirement-create'}
+      <MobileCreateRequirementPage />
     {:else if view === 'mobile-item-edit'}
       <MobileItemEditPage />
     {/if}

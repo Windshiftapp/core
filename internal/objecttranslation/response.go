@@ -18,9 +18,20 @@ func RequestLocale(r *http.Request) string {
 	return "en"
 }
 
-// LocalizeResponse populates DisplayName and DisplayDescription on structs with
-// ID, Name, and Description fields. Value may be a struct pointer or a slice of
-// structs, pointers, or interfaces containing either.
+var responseFields = []struct {
+	canonical string
+	display   string
+	field     string
+}{
+	{"Name", "DisplayName", FieldName},
+	{"Description", "DisplayDescription", FieldDescription},
+	{"ForwardLabel", "DisplayForwardLabel", FieldForwardLabel},
+	{"ReverseLabel", "DisplayReverseLabel", FieldReverseLabel},
+}
+
+// LocalizeResponse populates display fields for names, descriptions, and link
+// direction labels while retaining canonical values. Value may be a struct
+// pointer or a slice of structs, pointers, or interfaces containing either.
 func (s *Service) LocalizeResponse(ctx context.Context, locale, objectType string, value any) error {
 	objects, err := responseObjects(value)
 	if err != nil {
@@ -30,20 +41,17 @@ func (s *Service) LocalizeResponse(ctx context.Context, locale, objectType strin
 		return nil
 	}
 
-	targets := make([]Target, 0, len(objects)*2)
+	targets := make([]Target, 0, len(objects)*len(responseFields))
 	for _, object := range objects {
-		targets = append(targets, Target{
-			ObjectType: objectType,
-			ObjectID:   int(object.FieldByName("ID").Int()),
-			Field:      FieldName,
-			Fallback:   object.FieldByName("Name").String(),
-		})
-		if object.FieldByName("DisplayDescription").IsValid() {
+		for _, field := range responseFields {
+			if !object.FieldByName(field.display).IsValid() {
+				continue
+			}
 			targets = append(targets, Target{
 				ObjectType: objectType,
 				ObjectID:   int(object.FieldByName("ID").Int()),
-				Field:      FieldDescription,
-				Fallback:   object.FieldByName("Description").String(),
+				Field:      field.field,
+				Fallback:   object.FieldByName(field.canonical).String(),
 			})
 		}
 	}
@@ -58,10 +66,12 @@ func (s *Service) LocalizeResponse(ctx context.Context, locale, objectType strin
 	}
 	resolvedIndex := 0
 	for _, object := range objects {
-		object.FieldByName("DisplayName").SetString(resolved[resolvedIndex].Value)
-		resolvedIndex++
-		if displayDescription := object.FieldByName("DisplayDescription"); displayDescription.IsValid() {
-			displayDescription.SetString(resolved[resolvedIndex].Value)
+		for _, field := range responseFields {
+			display := object.FieldByName(field.display)
+			if !display.IsValid() {
+				continue
+			}
+			display.SetString(resolved[resolvedIndex].Value)
 			resolvedIndex++
 		}
 	}
@@ -106,11 +116,13 @@ func responseObjects(value any) ([]reflect.Value, error) {
 			!displayName.IsValid() || displayName.Kind() != reflect.String || !displayName.CanSet() {
 			return nil, fmt.Errorf("localize response: value must expose settable ID, Name, and DisplayName fields")
 		}
-		if displayDescription := candidate.FieldByName("DisplayDescription"); displayDescription.IsValid() {
-			description := candidate.FieldByName("Description")
-			if displayDescription.Kind() != reflect.String || !displayDescription.CanSet() ||
-				!description.IsValid() || description.Kind() != reflect.String {
-				return nil, fmt.Errorf("localize response: DisplayDescription requires a string Description field")
+		for _, field := range responseFields[1:] {
+			if display := candidate.FieldByName(field.display); display.IsValid() {
+				canonical := candidate.FieldByName(field.canonical)
+				if display.Kind() != reflect.String || !display.CanSet() ||
+					!canonical.IsValid() || canonical.Kind() != reflect.String {
+					return nil, fmt.Errorf("localize response: %s requires a string %s field", field.display, field.canonical)
+				}
 			}
 		}
 		objects = append(objects, candidate)

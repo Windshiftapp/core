@@ -1,5 +1,5 @@
 <script>
-  import { Link2, Trash2, Plus, GripVertical, FileText } from '@lucide/svelte';
+  import { Link2, Trash2, Plus, GripVertical, FileText, ClipboardList } from '@lucide/svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import Button from '../../components/Button.svelte';
   import LinkComponent from '../../components/Link.svelte';
@@ -11,6 +11,9 @@
   import { t } from '../../stores/i18n.svelte.js';
   import ItemKey from './ItemKey.svelte';
   import StatusBadge from '../../components/StatusBadge.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
+  import { buildRequirementKeyByPageId, pageHref } from '../requirements/requirementKeyMap.js';
+  import { linkTypeDisplayValue } from '../../utils/systemLabels.js';
 
   let {
     item,
@@ -38,10 +41,8 @@
 
   let currentItemId = $derived(parseInt(itemId));
 
-  // Partition links into the work-item group (items / test_cases / assets)
-  // and the page group. Pages render differently — no status badge, no
-  // workspace-key prefix, page-icon instead of item-type icon — so the
-  // markup forks below.
+  // Page-backed links share row rendering, but requirements have their own
+  // section and registry route, identified by requirement metadata.
   let workItemLinks = $derived(
     itemLinks.filter((l) => l.source_type !== 'page' && l.target_type !== 'page')
   );
@@ -53,13 +54,42 @@
   let pageLinkTypeId = $derived(
     linkTypes.find((lt) => lt?.name === 'Page')?.id ?? null
   );
+  let requirementLinkTypeId = $derived(
+    linkTypes.find((lt) => lt?.builtin_key === 'implements')?.id ?? pageLinkTypeId
+  );
+  let requirementKeyByPageId = $state(new Map());
+  let pageLinkGroups = $derived([
+    {
+      id: 'requirements',
+      title: t('requirements.navTitle'),
+      icon: ClipboardList,
+      linkTypeId: requirementLinkTypeId,
+      links: pageLinks.filter((link) => requirementKeyByPageId.has(link.source_type === 'page' ? link.source_id : link.target_id)),
+    },
+    {
+      id: 'pages',
+      title: t('items.linkedPages'),
+      icon: FileText,
+      linkTypeId: pageLinkTypeId,
+      links: pageLinks.filter((link) => !requirementKeyByPageId.has(link.source_type === 'page' ? link.source_id : link.target_id)),
+    },
+  ].filter((group) => group.links.length > 0));
+
+  $effect(() => {
+    if (!workspaceId) return;
+    void loadRequirementKeys();
+  });
+
+  async function loadRequirementKeys() {
+    requirementKeyByPageId = await buildRequirementKeyByPageId(workspaceId);
+  }
 
   function getLinkLabel(link) {
-    const isCurrentSource = currentItemId === link.source_id;
+    const isCurrentSource = link.source_type === 'item' && currentItemId === link.source_id;
     if (link.link_type_id === TEST_LINK_TYPE_ID && isCurrentSource && link.source_type === 'item' && link.target_type === 'test_case') {
-      return link.link_type_reverse_label;
+      return linkTypeDisplayValue(link, linkTypes, 'reverse_label');
     }
-    return isCurrentSource ? link.link_type_forward_label : link.link_type_reverse_label;
+    return linkTypeDisplayValue(link, linkTypes, isCurrentSource ? 'forward_label' : 'reverse_label');
   }
 
   function handleLinkClick(event, linkedItemType, linkedItemId, linkedItemWorkspaceId, linkedItemHref) {
@@ -298,7 +328,7 @@
           {@const linkedItemTypeColor = isCurrentSource ? link.target_item_type_color : link.source_item_type_color}
           {@const linkedItemStatusName = isCurrentSource ? link.target_status_name : link.source_status_name}
           {@const linkedItemStatusColor = isCurrentSource ? link.target_status_color : link.source_status_color}
-          {@const linkTypeName = link.link_type_name}
+          {@const linkTypeName = linkTypeDisplayValue(link, linkTypes)}
           {@const linkTypeLabel = getLinkLabel(link)}
           {@const linkTypeColor = link.link_type_color || 'var(--ds-text-subtle)'}
           <!-- Item row with card styling and hover-reveal delete -->
@@ -374,21 +404,22 @@
 </div>
 {/if}
 
-<!-- Pages Section (item ↔ page links) -->
-{#if pageLinks.length > 0}
-  <div class="mt-6">
+<!-- Requirements and ordinary pages (item ↔ page links) -->
+{#each pageLinkGroups as group (group.id)}
+  {@const GroupIcon = group.icon}
+  <section class="mt-6" aria-label={group.title} data-testid={`linked-${group.id}-section`}>
     <div class="pt-2">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedPages')}</h3>
+          <GroupIcon class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{group.title}</h3>
         </div>
-        {#if pageLinkTypeId != null}
+        {#if group.linkTypeId != null}
           <button
             type="button"
-            data-testid="add-page-link-button"
+            data-testid={group.id === 'requirements' ? 'add-requirement-link-button' : 'add-page-link-button'}
             class="add-link-btn inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer"
-            onclick={() => handleShowLinkModal(pageLinkTypeId)}
+            onclick={() => handleShowLinkModal(group.linkTypeId)}
           >
             <Plus class="w-3 h-3" />
             {t('common.add')}
@@ -397,12 +428,15 @@
       </div>
 
       <div class="space-y-2">
-        {#each pageLinks as link}
+        {#each group.links as link (link.id)}
           {@const isCurrentSource = link.source_id === currentItemId && link.source_type === 'item'}
           {@const linkedPageId = isCurrentSource ? link.target_id : link.source_id}
           {@const linkedPageWorkspaceId = isCurrentSource ? link.target_workspace_id : link.source_workspace_id}
           {@const linkedPageTitle = isCurrentSource ? link.target_title : link.source_title}
-          {@const linkedPageHref = `/workspaces/${linkedPageWorkspaceId || workspaceId}/pages/${linkedPageId}`}
+          {@const linkedPageReqMeta = requirementKeyByPageId.get(linkedPageId)}
+          {@const linkedPageHref = pageHref(linkedPageWorkspaceId || workspaceId, linkedPageId, linkedPageReqMeta)}
+          {@const pageLinkTypeLabel = getLinkLabel(link)}
+          {@const pageLinkTypeColor = link.link_type_color || 'var(--ds-text-subtle)'}
           <div
             class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors"
             style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -415,18 +449,40 @@
                 class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                 style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
               >
-                <FileText class="w-3.5 h-3.5" />
+                <GroupIcon class="w-3.5 h-3.5" />
               </div>
-              <LinkComponent
-                href={linkedPageHref}
-                class="text-sm hover:text-ds-text-link cursor-pointer truncate"
-                onClick={(event) => handleLinkClick(event, 'page', linkedPageId, linkedPageWorkspaceId, linkedPageHref)}
-                style="color: var(--ds-text);"
-              >
-                {linkedPageTitle}
-              </LinkComponent>
+              <div class="flex flex-col gap-1 min-w-0">
+                <div class="flex items-center gap-2 min-w-0">
+                  {#if linkedPageReqMeta?.key}
+                    <Lozenge color="blue">{linkedPageReqMeta.key}</Lozenge>
+                  {/if}
+                  <LinkComponent
+                    href={linkedPageHref}
+                    class="text-sm hover:text-ds-text-link cursor-pointer truncate"
+                    onClick={(event) => handleLinkClick(event, 'page', linkedPageId, linkedPageWorkspaceId, linkedPageHref)}
+                    style="color: var(--ds-text);"
+                  >
+                    {linkedPageTitle}
+                  </LinkComponent>
+                </div>
+                {#if linkedPageReqMeta?.requirement_type}
+                  <span class="text-xs text-ds-text-subtle" data-testid="linked-requirement-type">
+                    {t(`requirements.type.${linkedPageReqMeta.requirement_type}`)}
+                  </span>
+                {/if}
+              </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
+              {#if pageLinkTypeLabel}
+                <span
+                  data-testid="linked-page-link-type"
+                  class="text-xs flex-shrink-0 px-2 py-0.5 rounded-full border whitespace-nowrap"
+                  style="color: {pageLinkTypeColor}; background-color: color-mix(in srgb, {pageLinkTypeColor} 8%, transparent); border-color: color-mix(in srgb, {pageLinkTypeColor} 20%, transparent);"
+                  title={linkTypeDisplayValue(link, linkTypes) || pageLinkTypeLabel}
+                >
+                  {pageLinkTypeLabel}
+                </span>
+              {/if}
               <button
                 data-testid="linked-page-delete"
                 class="delete-button p-1 rounded hidden group-hover:flex cursor-pointer"
@@ -440,8 +496,8 @@
         {/each}
       </div>
     </div>
-  </div>
-{/if}
+  </section>
+{/each}
 
 <!-- Child Work Items Section -->
 {#if childItems.length > 0}

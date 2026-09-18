@@ -10,7 +10,8 @@
     ListOrdered,
     ClipboardList,
     History,
-    Copy
+    Copy,
+    FileText
   } from '@lucide/svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
@@ -26,6 +27,7 @@
   import { parseScenarioSpec } from '../features/testing/bddSpec.js';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../utils/authenticatedDateFormatter.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { buildRequirementKeyByPageId, pageHref } from '../features/requirements/requirementKeyMap.js';
 
   let {
     isOpen = $bindable(false),
@@ -41,6 +43,8 @@
   let testCase = $state(null);
   let testSteps = $state([]);
   let executions = $state([]);
+  let pageLinks = $state([]);
+  let requirementKeyByPageId = $state(new Map());
   let lastLoadedId = $state(null);
   const workspaceTestsBasePath = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
 
@@ -69,6 +73,8 @@
 
     loading = true;
     error = null;
+    pageLinks = [];
+    requirementKeyByPageId = new Map();
 
     try {
       const caseData = await api.tests.testCases.get(workspaceId, numericId);
@@ -90,12 +96,63 @@
       testSteps = Array.isArray(stepsData) ? stepsData : [];
       executions = connections?.executions || [];
       lastLoadedId = numericId;
+
+      if (workspaceId) {
+        const [keys, linksResp] = await Promise.all([
+          buildRequirementKeyByPageId(workspaceId),
+          api.links.getForItem('test-cases', numericId).catch((linkErr) => {
+            console.warn('Failed to load test case page links:', linkErr);
+            return null;
+          }),
+        ]);
+        requirementKeyByPageId = keys;
+        pageLinks = linksResp ? pageLinksForTestCase(linksResp, numericId) : [];
+      }
     } catch (err) {
       console.error('Failed to load test case detail:', err);
       error = err?.message || 'Failed to load test case';
     } finally {
       loading = false;
     }
+  }
+
+  function pageLinksForTestCase(linksResp, testCaseId) {
+    const outgoing = Array.isArray(linksResp?.outgoing) ? linksResp.outgoing : [];
+    const incoming = Array.isArray(linksResp?.incoming) ? linksResp.incoming : [];
+    const seen = new Set();
+    const merged = [];
+    for (const link of [...incoming, ...outgoing]) {
+      if (!link || link.id == null || seen.has(link.id)) continue;
+      const otherType = link.source_type === 'test_case' && link.source_id === testCaseId
+        ? link.target_type
+        : link.target_type === 'test_case' && link.target_id === testCaseId
+          ? link.source_type
+          : null;
+      if (otherType !== 'page') continue;
+      seen.add(link.id);
+      merged.push(link);
+    }
+    return merged;
+  }
+
+  function linkedPageFromTestLink(link) {
+    const testIsSource = link.source_type === 'test_case' && link.source_id === testCase?.id;
+    const testIsTarget = link.target_type === 'test_case' && link.target_id === testCase?.id;
+    if (testIsSource) {
+      return {
+        id: link.target_id,
+        title: link.target_title,
+        workspaceId: link.target_workspace_id,
+      };
+    }
+    if (testIsTarget) {
+      return {
+        id: link.source_id,
+        title: link.source_title,
+        workspaceId: link.source_workspace_id,
+      };
+    }
+    return null;
   }
 
   let isBdd = $derived(testCase?.format === 'bdd');
@@ -377,6 +434,48 @@
           </div>
         </Card>
         {/if}
+
+        <!-- Linked requirements / pages -->
+        <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">
+          {#snippet header()}
+            <h2 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
+              <FileText class="w-5 h-5" style="color: var(--ds-interactive);" />
+              {t('requirements.traceability.linkedPages')} ({pageLinks.length})
+            </h2>
+          {/snippet}
+          <div class="p-6">
+            {#if pageLinks.length === 0}
+              <EmptyState icon={FileText} title={t('requirements.traceability.noPages')} />
+            {:else}
+              <div class="space-y-2">
+                {#each pageLinks as link (link.id)}
+                  {@const linkedPage = linkedPageFromTestLink(link)}
+                  {#if linkedPage}
+                    {@const reqMeta = requirementKeyByPageId.get(linkedPage.id)}
+                    {@const href = pageHref(linkedPage.workspaceId || workspaceId, linkedPage.id, reqMeta)}
+                    <Panel
+                      href={href}
+                      style="border-color: var(--ds-border); background-color: var(--ds-surface);"
+                      padding="default"
+                      rounded="lg"
+                      interactive
+                      onclick={closeOnPlainClick}
+                    >
+                      <div class="flex items-center gap-2 min-w-0">
+                        {#if reqMeta?.key}
+                          <Lozenge color="blue">{reqMeta.key}</Lozenge>
+                        {/if}
+                        <span class="text-sm font-medium truncate" style="color: var(--ds-text);">
+                          {linkedPage.title}
+                        </span>
+                      </div>
+                    </Panel>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </Card>
 
         <!-- Recent Executions Section -->
         <Card variant="raised" padding="none" rounded="xl" shadow class="overflow-hidden">

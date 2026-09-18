@@ -268,20 +268,22 @@ type AttachmentSettingsRequest struct {
 
 // LinkType represents a type of link between items
 type LinkType struct {
-	ID                 int       `json:"id"`
-	BuiltinKey         string    `json:"builtin_key,omitempty"`
-	Name               string    `json:"name"`
-	DisplayName        string    `json:"display_name"`
-	Description        string    `json:"description"`
-	DisplayDescription string    `json:"display_description,omitempty"`
-	ForwardLabel       string    `json:"forward_label"`
-	ReverseLabel       string    `json:"reverse_label"`
-	Color              string    `json:"color"`
-	IsSystem           bool      `json:"is_system"`
-	Active             bool      `json:"active"`
-	AllowedEntityTypes []string  `json:"allowed_entity_types"` // nil = all types allowed; e.g. ["item","test_case"]
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                  int       `json:"id"`
+	BuiltinKey          string    `json:"builtin_key,omitempty"`
+	Name                string    `json:"name"`
+	DisplayName         string    `json:"display_name"`
+	Description         string    `json:"description"`
+	DisplayDescription  string    `json:"display_description,omitempty"`
+	ForwardLabel        string    `json:"forward_label"`
+	ReverseLabel        string    `json:"reverse_label"`
+	DisplayForwardLabel string    `json:"display_forward_label,omitempty"`
+	DisplayReverseLabel string    `json:"display_reverse_label,omitempty"`
+	Color               string    `json:"color"`
+	IsSystem            bool      `json:"is_system"`
+	Active              bool      `json:"active"`
+	AllowedEntityTypes  []string  `json:"allowed_entity_types"` // nil = all types allowed; e.g. ["item","test_case"]
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // ItemLink represents a link between two items or test cases

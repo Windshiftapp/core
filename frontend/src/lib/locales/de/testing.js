@@ -269,6 +269,18 @@ export default {
     selectItemTypesForCoverage:
       'Wählen Sie Elementtypen aus, die für die Abdeckungsberichte verfolgt werden sollen',
     selectItemTypesForCoverageAnalysis: 'Wählen Sie Elementtypen für die Abdeckungsanalyse aus',
+    selectRequirementTypesForCoverage:
+      'Wählen Sie Anforderungstypen für Abdeckungsberichte aus',
+    selectRequirementTypesForCoverageAnalysis:
+      'Wählen Sie Anforderungstypen für die Abdeckungsanalyse aus',
+    legacyCoverageConfigTitle: 'Legacy-Abdeckungskonfiguration für Work Items',
+    legacyCoverageConfigDescription:
+      'Dieser Bericht verwendet noch Elementtypen. Wechseln Sie zum Anforderungsregister für konsistente Traceability.',
+    migrateCoverageToRegistry: 'Zum Anforderungsregister wechseln',
+    migrateCoverageConfirmTitle: 'Zum Anforderungsregister wechseln?',
+    migrateCoverageConfirmMessage:
+      'Die Abdeckung wird über das Anforderungsregister statt über Work-Item-Typen berechnet. Alle Anforderungstypen werden einbezogen.',
+    migrateCoverageSuccess: 'Abdeckungskonfiguration auf das Anforderungsregister umgestellt',
     saveConfiguration: 'Konfiguration speichern',
     overview: 'Übersicht',
     failures: 'Fehlschläge',

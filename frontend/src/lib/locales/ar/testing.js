@@ -267,6 +267,16 @@ export default {
     noRequirementTypesConfigured: 'لم يتم تكوين أنواع متطلبات',
     selectItemTypesForCoverage: 'اختر أنواع العناصر لتتبعها في تقارير التغطية',
     selectItemTypesForCoverageAnalysis: 'اختر أنواع العناصر لتضمينها في تحليل التغطية',
+    selectRequirementTypesForCoverage: 'اختر أنواع المتطلبات لتتبع تقارير التغطية',
+    selectRequirementTypesForCoverageAnalysis: 'اختر أنواع المتطلبات لتضمينها في تحليل التغطية',
+    legacyCoverageConfigTitle: 'تكوين تغطية legacy لعناصر العمل',
+    legacyCoverageConfigDescription:
+      'لا يزال هذا التقرير يستخدم أنواع العناصر. انتقل إلى سجل المتطلبات لمواءمة التتبع.',
+    migrateCoverageToRegistry: 'الانتقال إلى سجل المتطلبات',
+    migrateCoverageConfirmTitle: 'الانتقال إلى سجل المتطلبات؟',
+    migrateCoverageConfirmMessage:
+      'ستُحسب التغطية من سجل المتطلبات بدلاً من أنواع عناصر العمل. سيتم تضمين جميع أنواع المتطلبات.',
+    migrateCoverageSuccess: 'تم تحويل تكوين التغطية إلى سجل المتطلبات',
     saveConfiguration: 'حفظ التكوين',
     overview: 'نظرة عامة',
     failures: 'حالات الفشل',
