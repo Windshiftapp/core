@@ -55,6 +55,7 @@ func (r *ItemRepository) GetChildrenContext(ctx context.Context, parentID int) (
 		       w.name as workspace_name, w.key as workspace_key,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
 		       s.name as status_name, sc.color as status_color,
+		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
@@ -107,6 +108,7 @@ func (r *ItemRepository) GetDescendantsWithMaxDepthContext(ctx context.Context, 
 		       w.name as workspace_name, w.key as workspace_key,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
 		       s.name as status_name, sc.color as status_color,
+		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name,
 		       d.level
 		FROM items i
@@ -149,6 +151,7 @@ func (r *ItemRepository) GetAncestors(itemID int) ([]*models.Item, error) {
 		       w.name as workspace_name, w.key as workspace_key,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
 		       s.name as status_name, sc.color as status_color,
+		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name
 		FROM items i
 		INNER JOIN ancestors a ON i.id = a.id
@@ -384,6 +387,7 @@ func (r *ItemRepository) GetRootItems(workspaceID int) ([]*models.Item, error) {
 		       w.name as workspace_name, w.key as workspace_key,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
 		       s.name as status_name, sc.color as status_color,
+		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
@@ -793,7 +797,7 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 	var assigneeID, creatorID sql.NullInt64
 	var dueDate sql.NullTime
 	var priorityName, priorityIcon, priorityColor sql.NullString
-	var statusName, statusColor sql.NullString
+	var statusName, statusBuiltinKey, statusColor sql.NullString
 	var itemTypeName sql.NullString
 
 	dests := []any{
@@ -803,7 +807,7 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 		&parentID, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 		&item.WorkspaceName, &item.WorkspaceKey,
 		&priorityName, &priorityIcon, &priorityColor,
-		&statusName, &statusColor,
+		&statusName, &statusColor, &statusBuiltinKey,
 		&itemTypeName,
 	}
 	if level != nil {
@@ -831,6 +835,7 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 	assignNullableString(&item.PriorityIcon, priorityIcon)
 	assignNullableString(&item.PriorityColor, priorityColor)
 	assignNullableString(&item.StatusName, statusName)
+	assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
 	assignNullableString(&item.StatusColor, statusColor)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
 

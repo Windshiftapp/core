@@ -184,11 +184,14 @@ func (r *ItemLinkRepository) FindLinkedItems(itemID int, linkTypeID *int, direct
 		       w.name as workspace_name, w.key as workspace_key,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color,
 		       s.name as status_name,
+		       sc.color as status_color,
+		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN priorities pri ON i.priority_id = pri.id
 		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
 		WHERE i.id IN (
 		    SELECT CASE WHEN il.source_id = ? THEN il.target_id ELSE il.source_id END

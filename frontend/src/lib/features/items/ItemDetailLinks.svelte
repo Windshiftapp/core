@@ -8,6 +8,7 @@
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import { api } from '../../api.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemKey from './ItemKey.svelte';
   import StatusBadge from '../../components/StatusBadge.svelte';
@@ -498,7 +499,7 @@
               <div class="flex items-center gap-2 flex-shrink-0">
                 {#if childItem.status_name}
                   <StatusBadge
-                    status={{ label: childItem.status_name, categoryColor: childItem.status_color }}
+                    status={{ label: objectDisplayName({ name: childItem.status_name, builtin_key: childItem.status_builtin_key }, 'status'), categoryColor: childItem.status_color }}
                     uppercase={false}
                     showDot={false}
                   />
