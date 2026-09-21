@@ -42,6 +42,13 @@ It ships as a single Go binary with the Svelte frontend built in.
 
 Windshift ships with nine built-in languages — English, Deutsch, Español, Français, Português (Brasil), العربية, Русский, 简体中文, and 한국어 — including right-to-left support for Arabic.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-rtl-ar-framed.webp">
+    <img src=".github/assets/screenshots/hero-rtl-ar-framed-dark.webp" alt="A Windshift work item rendered in Arabic, showing the fully mirrored right-to-left interface">
+  </picture>
+</p>
+
 ## Get started
 
 [Download the latest release](https://windshift.sh/download), then follow the [quick start guide](https://windshift.sh/self-hosting/01-getting-started/02-quick-start). Windshift is designed to run comfortably on anything from a Raspberry Pi to a dedicated server.
