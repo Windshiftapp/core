@@ -33,4 +33,8 @@ export default withEnglishAdminOperations({
     providers: { loadFailed: '无法加载集成提供商', saveFailed: '无法保存提供商', deleteMessage: '这会删除集成提供商并断开所有用户的连接。', deleteFailed: '无法删除提供商', namePlaceholder: '我的 Notion 集成' },
     oauthClients: { title: 'OAuth 客户端', subtitle: '注册使用 OAuth 2.0 和 PKCE 授权 Windshift 用户并创建用户级 API 令牌的第三方应用。', empty: '尚未注册 OAuth 客户端', emptyDescription: '点击“注册客户端”添加第三方应用。', loadFailed: '无法加载 OAuth 客户端', updated: 'OAuth 客户端已更新', publicCreated: '公共 OAuth 客户端已创建', saveFailed: '无法保存 OAuth 客户端', rotateTitle: '替换“{name}”的机密值？', rotateMessage: '旧机密值会立即失效。现有令牌可继续使用至过期；后续使用旧机密值的令牌交换会失败。', rotateFailed: '无法替换机密值', deleteMessage: '为此客户端签发的所有访问和刷新令牌都会立即撤销。已连接用户需要重新连接。', deleted: 'OAuth 客户端已删除', deleteFailed: '无法删除 OAuth 客户端', scopeHelp: '签发的访问令牌是用户级 Windshift API 令牌。它继承请求用户的权限，并受所选范围限制。', redirectCount: '重定向 URI：{count}', rotateSecret: '替换客户端机密值', editTitle: '编辑 OAuth 客户端', registerTitle: '注册 OAuth 客户端', confidential: '机密客户端（服务器到服务器，有机密值）', public: '公共客户端（仅 PKCE，无机密值）', clientTypeHelp: '机密客户端在服务器端存储 client_secret。公共客户端每次交换令牌都必须使用 PKCE。', redirectHelp: '每行输入一个 URI。授权请求中的 redirect_uri 必须与其中一个完全匹配。', copySecretNow: '立即复制此机密值', secretWarning: '客户端机密值只显示一次。Windshift 仅存储其 bcrypt 哈希，请在关闭前复制；如果丢失，请替换它。' },
   },
+  systemCatalog: {
+    statuses: { open: '待处理', inProgress: '进行中', done: '已完成' },
+    statusCategories: { toDo: '待办', inProgress: '进行中', done: '已完成' },
+  },
 });

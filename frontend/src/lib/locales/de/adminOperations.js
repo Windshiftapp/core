@@ -76,4 +76,8 @@ export default withEnglishAdminOperations({
       redirectHelp: 'Eine URI pro Zeile. redirect_uri in der Autorisierungsanfrage muss exakt mit einem Eintrag übereinstimmen.', copySecretNow: 'Geheimwert jetzt kopieren', secretWarning: 'Der Client-Geheimwert wird genau einmal angezeigt. Windshift speichert nur den bcrypt-Hash; kopieren Sie ihn vor dem Schließen. Bei Verlust muss er ersetzt werden.',
     },
   },
+  systemCatalog: {
+    statuses: { open: 'Offen', inProgress: 'In Bearbeitung', done: 'Erledigt' },
+    statusCategories: { toDo: 'Zu erledigen', inProgress: 'In Bearbeitung', done: 'Erledigt' },
+  },
 });
