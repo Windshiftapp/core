@@ -944,7 +944,7 @@
   .page-pane {
     height: 100%;
     overflow-y: auto;
-    padding: 1.5rem 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
