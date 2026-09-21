@@ -44,10 +44,6 @@ export default {
         "name": "내 담당 작업",
         "description": "전체 워크스페이스에서 나에게 배정된 미완료 작업"
       },
-      "storyPointsByAssignee": {
-        "name": "담당자별 스토리 포인트",
-        "description": "스프린트 업무량을 조정하기 위한 담당자별 미완료 스토리 포인트"
-      },
       "watchedItems": {
         "name": "관찰 중인 작업",
         "description": "내가 지켜보는 작업"

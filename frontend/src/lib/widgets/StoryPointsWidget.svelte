@@ -1,15 +1,14 @@
 <script>
-  import { api } from '../../api.js';
-  import { t } from '../../stores/i18n.svelte.js';
+  import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
 
-  let { config = {} } = $props();
+  let { workspaceId } = $props();
 
   let rows = $state([]);
   let loading = $state(false);
   let errored = $state(false);
   let version = 0;
 
-  const workspaceFilter = $derived(config.workspace_id || null);
   const maxPoints = $derived(rows.reduce((max, row) => Math.max(max, row.total_points), 0));
 
   $effect(() => {
@@ -21,9 +20,7 @@
     loading = true;
     errored = false;
     try {
-      const response = await api.items.getStoryPointsByAssignee(
-        workspaceFilter ? { workspace_id: workspaceFilter } : {}
-      );
+      const response = await api.items.getStoryPointsByAssignee({ workspace_id: workspaceId });
       if (v !== version) return;
       rows = response || [];
     } catch (err) {

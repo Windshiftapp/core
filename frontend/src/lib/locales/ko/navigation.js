@@ -515,6 +515,10 @@ export default {
         "name": "마일스톤 진행 상황",
         "description": "활성 마일스톤 및 진행 상황"
       },
+      "storyPointsByAssignee": {
+        "name": "담당자별 스토리 포인트",
+        "description": "각 담당자에게 배정된 미완료 스토리 포인트"
+      },
       "recentItems": {
         "name": "최근 작업",
         "description": "이 워크스페이스에서 최근 수정한 작업"

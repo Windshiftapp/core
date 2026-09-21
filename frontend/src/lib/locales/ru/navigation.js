@@ -327,6 +327,7 @@ export default {
       completionChart: { name: 'Завершённые элементы', description: 'Сколько элементов завершено за последние четыре недели' },
       createdChart: { name: 'Созданные элементы', description: 'Сколько элементов создано за последние семь дней' },
       milestoneProgress: { name: 'Ход этапов', description: 'Текущие этапы и степень их выполнения' },
+      storyPointsByAssignee: { name: 'Стори-поинты по исполнителям', description: 'Открытые стори-поинты, назначенные на каждого исполнителя' },
       recentItems: { name: 'Недавние элементы', description: 'Недавно обновлённые элементы этого пространства' },
       myTasks: { name: 'Мои задачи', description: 'Назначенные вам элементы' },
       savedSearch: { name: 'Сохранённый поиск', description: 'Рабочие элементы из сохранённой коллекции' },

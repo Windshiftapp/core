@@ -43,10 +43,6 @@ export default {
         name: 'Assigned to Me',
         description: 'Open items assigned to you across all workspaces',
       },
-      storyPointsByAssignee: {
-        name: 'Story Points by Assignee',
-        description: 'Open story points per assignee to balance sprint workload',
-      },
       watchedItems: {
         name: 'Watched Items',
         description: 'Items you are following',

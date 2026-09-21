@@ -58,6 +58,18 @@ export const widgetRegistry = [
     defaultWidth: 3,
     maxWidth: 3,
   },
+  {
+    type: 'story-points-by-assignee',
+    name: 'Story Points by Assignee',
+    description: 'Open story points assigned to each member',
+    nameKey: 'workspaceDashboard.widgets.storyPointsByAssignee.name',
+    descriptionKey: 'workspaceDashboard.widgets.storyPointsByAssignee.description',
+    category: widgetCategories.BUILT_IN,
+    icon: 'BarChart3',
+    minWidth: 1,
+    defaultWidth: 2,
+    maxWidth: 3,
+  },
 
   // Additional widgets (list widgets)
   {

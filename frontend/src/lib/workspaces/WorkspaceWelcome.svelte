@@ -51,6 +51,7 @@
   import IterationTimelineWidget from '../widgets/IterationTimelineWidget.svelte';
   import TestCoverageWidget from '../widgets/TestCoverageWidget.svelte';
   import SavedSearchWidget from '../widgets/dashboard/SavedSearchWidget.svelte';
+  import StoryPointsWidget from '../widgets/StoryPointsWidget.svelte';
 
   // Customization sidebar
   import WorkspaceCustomizationSidebar from './WorkspaceCustomizationSidebar.svelte';
@@ -842,6 +843,8 @@
                       <CreatedChartWidget chartData={createdLast7DaysData} />
                     {:else if widget.type === 'milestone-progress'}
                       <MilestoneProgressWidget {milestones} />
+                    {:else if widget.type === 'story-points-by-assignee'}
+                      <StoryPointsWidget {workspaceId} />
                     {:else if widget.type === 'recent-items'}
                       <RecentItemsWidget {workspaceId} {collectionFilter} />
                     {:else if widget.type === 'my-tasks'}

@@ -167,17 +167,18 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	// frontend/src/lib/services/widgetRegistry.js — types missing a frontend
 	// component would render as empty cards.
 	validTypes := map[string]bool{
-		"stats":              true,
-		"completion-chart":   true,
-		"created-chart":      true,
-		"milestone-progress": true,
-		"recent-items":       true,
-		"my-tasks":           true,
-		"overdue-items":      true,
-		"upcoming-deadlines": true,
-		"iteration-timeline": true,
-		"test-coverage":      true,
-		"saved-search":       true,
+		"stats":                    true,
+		"completion-chart":         true,
+		"created-chart":            true,
+		"milestone-progress":       true,
+		"story-points-by-assignee": true,
+		"recent-items":             true,
+		"my-tasks":                 true,
+		"overdue-items":            true,
+		"upcoming-deadlines":       true,
+		"iteration-timeline":       true,
+		"test-coverage":            true,
+		"saved-search":             true,
 	}
 
 	const (

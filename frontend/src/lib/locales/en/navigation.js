@@ -337,6 +337,7 @@ export default {
       completionChart: { name: 'Completion Chart', description: 'Items completed during the last four weeks' },
       createdChart: { name: 'Creation Chart', description: 'Items created during the last seven days' },
       milestoneProgress: { name: 'Milestone Progress', description: 'Active milestones and their progress' },
+      storyPointsByAssignee: { name: 'Story Points by Assignee', description: 'Open story points assigned to each member' },
       recentItems: { name: 'Recent Items', description: 'Recently updated items in this workspace' },
       myTasks: { name: 'My Tasks', description: 'Items assigned to you' },
       savedSearch: { name: 'Saved Search', description: 'Work items from a saved collection' },
