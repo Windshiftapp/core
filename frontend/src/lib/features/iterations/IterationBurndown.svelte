@@ -11,18 +11,20 @@
     ...point, remaining: point.remaining_points ?? 0, completed: point.completed_points ?? 0, ideal: point.ideal_points ?? 0
   } : point)}
   {@const fmtD = (s) => { const d = new Date(s); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }}
-  <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+  <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);" data-testid="iteration-burndown-card">
     <div class="flex items-center justify-between gap-4 mb-4">
       <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('iterations.burndownChart')}</h3>
-      <NativeSelect
-        dataTestid="iteration-burndown-metric"
-        ariaLabel={t('iterations.burndownChart')}
-        bind:value={metric}
-        options={[
-          { value: 'items', label: t('iterations.totalItems') },
-          { value: 'points', label: t('items.storyPoints') }
-        ]}
-      />
+      <div class="w-44 shrink-0">
+        <NativeSelect
+          dataTestid="iteration-burndown-metric"
+          ariaLabel={t('iterations.burndownChart')}
+          bind:value={metric}
+          options={[
+            { value: 'items', label: t('iterations.totalItems') },
+            { value: 'points', label: t('items.storyPoints') }
+          ]}
+        />
+      </div>
     </div>
     <Chart
       type="line"

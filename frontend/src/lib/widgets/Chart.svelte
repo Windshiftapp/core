@@ -335,6 +335,7 @@
                   class="chart-point"
                   tabindex="-1"
                   aria-label="{categories[idx]}: {pt.value}"
+                  data-testid="chart-point-{ld.key}-{idx}"
                   onmouseenter={() => showTip(idx, pt.x, pt.y, ld.key)}
                   onfocus={() => showTip(idx, pt.x, pt.y, ld.key)}
                   onmouseleave={hideTip}
