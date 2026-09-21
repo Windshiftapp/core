@@ -38,74 +38,59 @@ It ships as a single Go binary with the Svelte frontend built in.
 
 ## Take a look
 
-<table>
-  <tr>
-    <td width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-backlog-framed.webp">
-        <img src=".github/assets/screenshots/hero-backlog-framed-dark.webp" alt="Backlog grouped into sprints, with items ready to schedule">
-      </picture>
-    </td>
-    <td width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-tree-framed.webp">
-        <img src=".github/assets/screenshots/hero-tree-framed-dark.webp" alt="Hierarchy tree view showing epics, stories, and sub-tasks">
-      </picture>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <p align="center">Plan sprints on the backlog</p>
-    </td>
-    <td>
-      <p align="center">See every level of the work</p>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-roadmap-framed.webp">
-        <img src=".github/assets/screenshots/hero-roadmap-framed-dark.webp" alt="Roadmap timeline with bars spanning start and due dates">
-      </picture>
-    </td>
-    <td>
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-milestone-framed.webp">
-        <img src=".github/assets/screenshots/hero-milestone-framed-dark.webp" alt="Milestone detail with completion progress and work items">
-      </picture>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <p align="center">Track the timeline</p>
-    </td>
-    <td>
-      <p align="center">Measure milestone progress</p>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-item-detail-framed.webp">
-        <img src=".github/assets/screenshots/hero-item-detail-framed-dark.webp" alt="Work item with rich description, fields, and discussion">
-      </picture>
-    </td>
-    <td>
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-test-run-framed.webp">
-        <img src=".github/assets/screenshots/hero-test-run-framed-dark.webp" alt="Test run with per-case results and success rate">
-      </picture>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <p align="center">Keep context on the work</p>
-    </td>
-    <td>
-      <p align="center">Verify releases with test runs</p>
-    </td>
-  </tr>
-</table>
+<p align="center"><strong>Plan sprints on the backlog</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-backlog-framed.webp">
+    <img src=".github/assets/screenshots/hero-backlog-framed-dark.webp" alt="Backlog grouped into sprints, with items ready to schedule" width="100%">
+  </picture>
+</p>
+
+<p align="center"><strong>See every level of the work</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-tree-framed.webp">
+    <img src=".github/assets/screenshots/hero-tree-framed-dark.webp" alt="Hierarchy tree view showing epics, stories, and sub-tasks" width="100%">
+  </picture>
+</p>
+
+<p align="center"><strong>Track the timeline</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-roadmap-framed.webp">
+    <img src=".github/assets/screenshots/hero-roadmap-framed-dark.webp" alt="Roadmap timeline with bars spanning start and due dates" width="100%">
+  </picture>
+</p>
+
+<p align="center"><strong>Measure milestone progress</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-milestone-framed.webp">
+    <img src=".github/assets/screenshots/hero-milestone-framed-dark.webp" alt="Milestone detail with completion progress and work items" width="100%">
+  </picture>
+</p>
+
+<p align="center"><strong>Keep context on the work</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-item-detail-framed.webp">
+    <img src=".github/assets/screenshots/hero-item-detail-framed-dark.webp" alt="Work item with rich description, fields, and discussion" width="100%">
+  </picture>
+</p>
+
+<p align="center"><strong>Verify releases with test runs</strong></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-test-run-framed.webp">
+    <img src=".github/assets/screenshots/hero-test-run-framed-dark.webp" alt="Test run with per-case results and success rate" width="100%">
+  </picture>
+</p>
 
 ## Language support
 
