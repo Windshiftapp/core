@@ -5,8 +5,7 @@
   import { errorToast, infoToast } from '../stores/toasts.svelte.js';
   import { workspacesStore } from '../stores';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
-  import { renderMarkdown } from '../utils/render-markdown.js';
-  import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import MobileHeader from './MobileHeader.svelte';
   import { autoGrow, enterMovesFocus } from './autoGrowTextarea.js';
   import { pageAncestors, pageChildren } from './mobilePagesData.js';
@@ -38,7 +37,6 @@
   });
   const ancestors = $derived(pageAncestors(flatPages, page));
   const children = $derived(pageChildren(flatPages, pageId));
-  const contentHtml = $derived(page ? renderMarkdown(page.content) : '');
 
   function back() {
     if (window.history.length > 1) window.history.back();
@@ -202,7 +200,14 @@
     </p>
 
     {#if page.content}
-      <SafeMarkdown html={contentHtml} testid="mobile-page-content" />
+      <LazyMilkdownEditor
+        content={page.content}
+        readonly={true}
+        showToolbar={false}
+        testId="mobile-page-content"
+        enableDiagrams={true}
+        {workspaceId}
+      />
     {:else}
       <p class="empty" data-testid="mobile-page-empty">This page is empty.</p>
     {/if}

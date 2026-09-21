@@ -1,10 +1,10 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { ChevronLeft, Send, Sparkles, Loader, Trash2 } from '@lucide/svelte';
-  import { chatStore } from '../stores/chatStore.svelte.js';
+  import { chatStore, preprocessItemKeys } from '../stores/chatStore.svelte.js';
   import { buildChatContext } from '../features/chat/chatContext.js';
   import { currentRoute, navigate } from '../router.js';
-  import { renderMarkdown } from '../utils/render-markdown.js';
+  import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import Textarea from '../components/Textarea.svelte';
 
   let text = $state('');
@@ -78,7 +78,14 @@
           {#if msg.error}
             <p class="err">{msg.error}</p>
           {:else}
-            <div class="html-content">{@html renderMarkdown(msg.content)}</div>
+            <div class="html-content">
+              <LazyMilkdownEditor
+                content={preprocessItemKeys(msg.content)}
+                readonly={true}
+                showToolbar={false}
+                compact={true}
+              />
+            </div>
             {#if msg.needsReview}
               <p class="review">⚠ This answer may need review.</p>
             {/if}

@@ -3,7 +3,6 @@
   import { tick } from 'svelte';
   import Button from '../../components/Button.svelte';
   import FileInput from '../../components/FileInput.svelte';
-  import SafeMarkdown from '../../components/SafeMarkdown.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import AIActionsDropdown from './AIActionsDropdown.svelte';
@@ -184,7 +183,7 @@
         title={t('items.clickToEditDescription')}
         data-testid="item-description-display"
       >
-        <SafeMarkdown html={item.description_html} source={item.description} />
+        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} />
       </div>
     {:else}
       <div
@@ -192,7 +191,7 @@
         style="color: var(--ds-text);"
         data-testid="item-description-display"
       >
-        <SafeMarkdown html={item.description_html} source={item.description} />
+        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} />
       </div>
     {/if}
   {:else if canEdit}

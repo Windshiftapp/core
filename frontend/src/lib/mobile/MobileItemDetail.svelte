@@ -22,7 +22,7 @@
   import ItemSCMLinks from '../features/items/ItemSCMLinks.svelte';
   import ItemAgentLog from '../features/items/ItemAgentLog.svelte';
   import Avatar from '../components/Avatar.svelte';
-  import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
 
   let { itemId } = $props();
 
@@ -499,7 +499,7 @@
 
     {#if item.description}
       <div class="html-content desc" data-testid="detail-description">
-        <SafeMarkdown html={item.description_html} source={item.description} />
+        <LazyMilkdownEditor content={item.description} readonly={true} showToolbar={false} />
       </div>
     {/if}
 

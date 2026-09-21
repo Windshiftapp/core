@@ -15,7 +15,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import { portalRequestsStore } from '../stores/portalActivity.svelte.js';
   import { iconMap } from '../stores/portalPresentation.js';
   import { formatDateSimple, formatDateTimeLocale } from '../utils/dateFormatter.js';
@@ -68,7 +68,7 @@
               </h1>
               {#if request.description}
                 <div class="text-base mt-4 leading-relaxed max-w-3xl" style="color: var(--ds-text-subtle);">
-                  <SafeMarkdown html={request.description_html} source={request.description} />
+                  <LazyMilkdownEditor content={request.description} readonly={true} showToolbar={false} />
                 </div>
               {/if}
             </div>
@@ -115,7 +115,7 @@
                       </time>
                     </div>
                     <div class="text-sm leading-relaxed" style="color: var(--ds-text);">
-                      <SafeMarkdown html={comment.content_html} source={comment.content} compact={true} />
+                      <LazyMilkdownEditor content={comment.content} readonly={true} showToolbar={false} compact={true} />
                     </div>
                   </div>
                 </article>

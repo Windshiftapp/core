@@ -7,7 +7,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import Text from '../components/Text.svelte';
-  import SafeMarkdown from '../components/SafeMarkdown.svelte';
+  import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
 
   let { slug, itemKey, onclose } = $props();
 
@@ -59,7 +59,7 @@
           <h4 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--ds-text-subtle);">Description</h4>
           {#if item.description}
             <div class="rounded-md p-3" style="border: 1px solid var(--ds-border);">
-              <SafeMarkdown html={item.description_html} source={item.description} />
+              <LazyMilkdownEditor content={item.description} readonly={true} showToolbar={false} />
             </div>
           {:else}
             <p class="text-xs italic" style="color: var(--ds-text-disabled);">No description</p>
@@ -95,7 +95,7 @@
                     </div>
                     <!-- Content -->
                     <div class="comment-content">
-                      <SafeMarkdown html={comment.content_html} source={comment.content} compact={true} />
+                      <LazyMilkdownEditor content={comment.content} readonly={true} showToolbar={false} compact={true} />
                     </div>
                   </div>
                 </div>

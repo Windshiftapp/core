@@ -10,8 +10,9 @@ marked.setOptions({
 /**
  * Render a Markdown string to sanitized HTML.
  *
- * Intended for short Markdown blurbs in OpenAPI `description` fields and
- * similar non-editable contexts. For full editing use Milkdown.
+ * Only for static, non-editor contexts such as OpenAPI `description` fields
+ * in the API docs. App markdown views render through MilkdownEditor in
+ * readonly mode so editing and viewing stay visually identical.
  */
 export function renderMarkdown(input) {
   if (!input) return '';

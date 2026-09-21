@@ -1,76 +1,124 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pre-commit hook: runs Go and frontend linting before allowing a commit.
+# Pre-commit hook: runs only the checks relevant to the staged changes.
 # Bypass with: git commit --no-verify
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 FAILED=0
+
+STAGED="$(git diff --cached --name-only)"
+if [[ -z "$STAGED" ]]; then
+    echo "No staged changes; skipping pre-commit checks."
+    exit 0
+fi
+
+RUN_GO=0
+RUN_OPENAPI=0
+RUN_FRONTEND=0
+RUN_SCHEMA=0
+
+# A single file can matter to several buckets (e.g. a restapi handler needs
+# both linting and OpenAPI validation), so test each trigger set separately
+# instead of stopping at the first match.
+while IFS= read -r path; do
+    case "$path" in *.go|*.sql|go.mod|go.sum|.golangci*) RUN_GO=1 ;; esac
+    # v1 spec: swag annotations in internal/restapi, internal/metrics,
+    # internal/health. v2 checks: route inventory in internal/restapi/v2,
+    # specs in api/, and the guard scripts themselves. Annotation-unrelated
+    # Go changes elsewhere are caught by CI instead of every local commit.
+    case "$path" in internal/restapi/*|internal/metrics/*|internal/health/*|api/*|scripts/openapi-*|scripts/check-frontend-v2-fields.mjs) RUN_OPENAPI=1 ;; esac
+    case "$path" in frontend/*)  RUN_FRONTEND=1 ;; esac
+    case "$path" in internal/database/*) RUN_SCHEMA=1 ;; esac
+done <<< "$STAGED"
+
+SKIPPED=()
 
 echo "Running pre-commit checks..."
 
 # --- Fresh schema / upgrade migration pairing ---
 # Blocks schema-only changes that would work on fresh installs but leave
 # existing databases behind.
-echo "  Running schema/migration pairing guard..."
-if ! "$REPO_ROOT/scripts/check-schema-migration-pairing.sh" --staged; then
-    FAILED=1
-fi
-
-echo "  Running SQL boolean literal guard..."
-if ! node "$REPO_ROOT/scripts/check-sql-boolean-literals.mjs" "$REPO_ROOT/internal"; then
-    FAILED=1
-fi
-
-# --- Go linting ---
-if command -v golangci-lint >/dev/null 2>&1; then
-    echo "  Running golangci-lint..."
-    if ! "$REPO_ROOT/scripts/run-golangci-lint.sh" run --timeout=5m; then
-        echo "FAIL: golangci-lint found issues."
+if [[ "$RUN_SCHEMA" -eq 1 ]]; then
+    echo "  Running schema/migration pairing guard..."
+    if ! "$REPO_ROOT/scripts/check-schema-migration-pairing.sh" --staged; then
         FAILED=1
     fi
 else
-    echo "FAIL: golangci-lint is required (run 'make dev-tools' to install the CI-pinned version)."
-    FAILED=1
+    SKIPPED+=("schema/migration pairing")
 fi
 
-# --- Frontend linting ---
-if [ -d "$REPO_ROOT/frontend" ]; then
-    echo "  Running frontend checks..."
-    if ! (cd "$REPO_ROOT/frontend" && npm run check); then
-        echo "FAIL: frontend check found issues."
+# --- Go linting and guards ---
+if [[ "$RUN_GO" -eq 1 ]]; then
+    echo "  Running SQL boolean literal guard..."
+    if ! node "$REPO_ROOT/scripts/check-sql-boolean-literals.mjs" "$REPO_ROOT/internal"; then
         FAILED=1
     fi
-    if ! (cd "$REPO_ROOT/frontend" && npm run typecheck); then
-        echo "FAIL: frontend typecheck found issues."
+
+    if command -v golangci-lint >/dev/null 2>&1; then
+        echo "  Running golangci-lint..."
+        if ! "$REPO_ROOT/scripts/run-golangci-lint.sh" run --timeout=5m; then
+            echo "FAIL: golangci-lint found issues."
+            FAILED=1
+        fi
+    else
+        echo "FAIL: golangci-lint is required (run 'make dev-tools' to install the CI-pinned version)."
+        FAILED=1
+    fi
+
+    # Blocks new direct SQL/database/sql use in HTTP handler surfaces.
+    echo "  Running handler DB access guard..."
+    if ! "$REPO_ROOT/scripts/check-handler-db-access.sh"; then
+        FAILED=1
+    fi
+
+    # Blocks new violations of architectural import rules (see scripts/check-layering.sh).
+    # Existing violations are recorded in scripts/.layering-baseline so the guard
+    # can land without an upfront migration.
+    echo "  Running layering guard..."
+    if ! "$REPO_ROOT/scripts/check-layering.sh"; then
         FAILED=1
     fi
 else
-    echo "  WARNING: frontend/ directory not found, skipping frontend checks"
-fi
-
-# --- Handler DB access guard ---
-# Blocks new direct SQL/database/sql use in HTTP handler surfaces.
-echo "  Running handler DB access guard..."
-if ! "$REPO_ROOT/scripts/check-handler-db-access.sh"; then
-    FAILED=1
-fi
-
-# --- Layering guard ---
-# Blocks new violations of architectural import rules (see scripts/check-layering.sh).
-# Existing violations are recorded in scripts/.layering-baseline so the guard
-# can land without an upfront migration.
-echo "  Running layering guard..."
-if ! "$REPO_ROOT/scripts/check-layering.sh"; then
-    FAILED=1
+    SKIPPED+=("Go lint/guards")
 fi
 
 # --- OpenAPI spec freshness ---
 # Uses the swag version pinned by go.mod through `go tool swag`.
-echo "  Validating OpenAPI generation..."
-if ! (cd "$REPO_ROOT" && make -s openapi-check); then
-    echo "FAIL: OpenAPI annotations do not generate a valid specification."
-    FAILED=1
+if [[ "$RUN_OPENAPI" -eq 1 ]]; then
+    echo "  Validating OpenAPI generation..."
+    if ! (cd "$REPO_ROOT" && make -s openapi-check); then
+        echo "FAIL: OpenAPI annotations do not generate a valid specification."
+        FAILED=1
+    fi
+else
+    SKIPPED+=("OpenAPI checks")
+fi
+
+# --- Frontend linting ---
+if [[ "$RUN_FRONTEND" -eq 1 ]]; then
+    if [ -d "$REPO_ROOT/frontend" ]; then
+        echo "  Running frontend checks..."
+        if ! (cd "$REPO_ROOT/frontend" && npm run check); then
+            echo "FAIL: frontend check found issues."
+            FAILED=1
+        fi
+        if ! (cd "$REPO_ROOT/frontend" && npm run typecheck); then
+            echo "FAIL: frontend typecheck found issues."
+            FAILED=1
+        fi
+        # Frontend writes must match the v2 spec; this is the cheap
+        # node-only slice of openapi-check that frontend edits can break.
+        echo "  Running frontend v2 field guard..."
+        if ! node "$REPO_ROOT/scripts/check-frontend-v2-fields.mjs"; then
+            echo "FAIL: frontend sends fields missing from the v2 OpenAPI spec."
+            FAILED=1
+        fi
+    else
+        echo "  WARNING: frontend/ directory not found, skipping frontend checks"
+    fi
+else
+    SKIPPED+=("frontend checks")
 fi
 
 if [ "$FAILED" -ne 0 ]; then
@@ -79,4 +127,7 @@ if [ "$FAILED" -ne 0 ]; then
     exit 1
 fi
 
+if [[ "${#SKIPPED[@]}" -gt 0 ]]; then
+    echo "Skipped (not affected by staged changes): ${SKIPPED[*]}."
+fi
 echo "All pre-commit checks passed."

@@ -334,6 +334,17 @@ function clearHistory() {
   itemKeyMap = {};
 }
 
+// Rewrite bare item keys (ACME-123) into markdown links when a prior item
+// search resolved the key, so read-only chat rendering links them.
+export function preprocessItemKeys(text) {
+  if (!text) return '';
+  return text.replace(/\b([A-Z]{2,10}-\d+)\b/g, (_match, key) => {
+    const item = itemKeyMap?.[key];
+    const href = item ? `/workspaces/${item.workspaceId}/items/${item.id}` : '#';
+    return `[${key}](${href})`;
+  });
+}
+
 export const chatStore = {
   get open() {
     return open;

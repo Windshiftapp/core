@@ -3,7 +3,7 @@
   import { useEventListener } from 'runed';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import ChatToolTrace from './ChatToolTrace.svelte';
-  import { chatStore } from '../../stores/chatStore.svelte.js';
+  import { chatStore, preprocessItemKeys } from '../../stores/chatStore.svelte.js';
   import { workspacePermissions } from '../../stores';
   import { currentRoute } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -225,15 +225,6 @@
     if (!chatStore.itemKeyMap[key]) {
       e.preventDefault();
     }
-  }
-
-  function preprocessItemKeys(text) {
-    if (!text) return '';
-    return text.replace(/\b([A-Z]{2,10}-\d+)\b/g, (match, key) => {
-      const item = chatStore.itemKeyMap?.[key];
-      const href = item ? `/workspaces/${item.workspaceId}/items/${item.id}` : '#';
-      return `[${key}](${href})`;
-    });
   }
 
   const activeConnection = $derived.by(() => {

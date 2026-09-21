@@ -1310,11 +1310,11 @@ var Catalog = []Migration{
 		SQLite: `
 			-- Duplicates from the racy get-or-create keep their oldest row; the
 			-- rest become inactive regular workspaces so no data is lost.
-			UPDATE workspaces SET is_personal = 0, active = 0
-			WHERE is_personal = 1 AND id NOT IN (
-				SELECT MIN(id) FROM workspaces WHERE is_personal = 1 GROUP BY owner_id
+			UPDATE workspaces SET is_personal = FALSE, active = FALSE
+			WHERE is_personal = TRUE AND id NOT IN (
+				SELECT MIN(id) FROM workspaces WHERE is_personal = TRUE GROUP BY owner_id
 			);
-			CREATE UNIQUE INDEX IF NOT EXISTS uq_workspaces_personal_owner ON workspaces(owner_id) WHERE is_personal = 1;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_workspaces_personal_owner ON workspaces(owner_id) WHERE is_personal = TRUE;
 		`,
 		Postgres: `
 			UPDATE workspaces SET is_personal = false, active = false
