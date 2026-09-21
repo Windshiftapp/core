@@ -107,9 +107,9 @@ It ships as a single Go binary with the Svelte frontend built in.
   </tr>
 </table>
 
-## Available in many languages
+## Language support
 
-<p align="center"><strong>Available in many languages · متوفر بالعديد من اللغات · 支持多种语言 · Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
+<p align="center"><strong>Available in many languages · متوفر بالعديد من اللغات · 支持多种语言<br>Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
 
 Windshift ships with nine built-in languages — English, Deutsch, Español, Français, Português (Brasil), العربية, Русский, 简体中文, and 한국어 — including right-to-left support for Arabic.
 
