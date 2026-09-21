@@ -38,3 +38,35 @@ func RewritePageLinks(html string, resolve func(pageID int) (href string, ok boo
 		return `<a href="` + href + `">` + parts[2] + `</a>`
 	})
 }
+
+// markdownPageLinkPattern matches the markdown link form `[text](page:<id>)`
+// as authored through the editor's page-link picker.
+var markdownPageLinkPattern = regexp.MustCompile(`\[([^\]\n]+)\]\(page:(\d+)\)`)
+
+// RewritePageLinksInMarkdown rewrites markdown page links the same way
+// RewritePageLinks rewrites their sanitized HTML form: resolvable links get
+// their destination replaced, unresolvable ones degrade to plain link text so
+// no dead or existence-leaking anchor survives. Markdown-level rewriting is
+// what portal surfaces that render the raw markdown through the shared
+// read-only editor need — the readonly pipeline renders markdown structure
+// and treats raw HTML as inert text.
+func RewritePageLinksInMarkdown(md string, resolve func(pageID int) (href string, ok bool)) string {
+	if md == "" || resolve == nil || !strings.Contains(md, "](page:") {
+		return md
+	}
+	return markdownPageLinkPattern.ReplaceAllStringFunc(md, func(match string) string {
+		parts := markdownPageLinkPattern.FindStringSubmatch(match)
+		if parts == nil {
+			return match
+		}
+		pageID, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return parts[1]
+		}
+		href, ok := resolve(pageID)
+		if !ok {
+			return parts[1]
+		}
+		return "[" + parts[1] + "](" + href + ")"
+	})
+}

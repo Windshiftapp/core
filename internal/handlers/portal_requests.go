@@ -129,8 +129,12 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 
 	// Page links in the description resolve to in-portal KB articles when the
 	// page is published through this portal; otherwise they lose the anchor so
-	// customers never see a dead or existence-leaking link.
-	detail.DescriptionHTML = markdown.RewritePageLinks(detail.DescriptionHTML, h.portalKBPageLinkResolver(config))
+	// customers never see a dead or existence-leaking link. Both the raw
+	// markdown (rendered client-side through the shared read-only editor) and
+	// the sanitized HTML form are rewritten.
+	resolver := h.portalKBPageLinkResolver(config)
+	detail.Description = markdown.RewritePageLinksInMarkdown(detail.Description, resolver)
+	detail.DescriptionHTML = markdown.RewritePageLinks(detail.DescriptionHTML, resolver)
 
 	respondJSONOK(w, detail)
 }
@@ -152,9 +156,12 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 
 	// Rewrite agent-inserted page links the same way as the description:
 	// published-through-this-portal pages become in-portal article links,
-	// anything else degrades to plain text.
+	// anything else degrades to plain text. Both the raw markdown (rendered
+	// client-side through the shared read-only editor) and the sanitized HTML
+	// form are rewritten.
 	resolver := h.portalKBPageLinkResolver(config)
 	for i := range comments {
+		comments[i].Content = markdown.RewritePageLinksInMarkdown(comments[i].Content, resolver)
 		comments[i].ContentHTML = markdown.RewritePageLinks(comments[i].ContentHTML, resolver)
 	}
 
