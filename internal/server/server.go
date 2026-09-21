@@ -1643,6 +1643,7 @@ func (s *Server) initialize() error {
 	if os.Getenv("WINDSHIFT_E2E_TEST_HOOKS") == "1" {
 		mux.Handle("POST /api/test/scm/setup-mock-repo", handlers.NewTestSetupMockRepo(services.NewTestSCMHookService(s.db, nil)))
 		mux.Handle("POST /api/test/scm/inject-ref", handlers.NewTestSCMInjectRef(services.NewTestSCMHookService(s.db, s.actionService)))
+		mux.Handle("POST /api/test/history/backdate", handlers.NewTestHistoryBackdate(services.NewTestHistoryHookService(s.db)))
 		slog.Warn("WINDSHIFT_E2E_TEST_HOOKS enabled — test hook routes are mounted; never enable in production")
 	}
 
