@@ -36,6 +36,77 @@ It ships as a single Go binary with the Svelte frontend built in.
 - Connect the tools you already use - integrate GitHub, Gitea, and Forgejo, import Jira projects, and send email or webhook notifications.
 - Add the capabilities you need - extend work management with test management, time tracking, or asset management.
 
+## Take a look
+
+<table>
+  <tr>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-backlog-framed.webp">
+        <img src=".github/assets/screenshots/hero-backlog-framed-dark.webp" alt="Backlog grouped into sprints, with items ready to schedule">
+      </picture>
+    </td>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-tree-framed.webp">
+        <img src=".github/assets/screenshots/hero-tree-framed-dark.webp" alt="Hierarchy tree view showing epics, stories, and sub-tasks">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center">Plan sprints on the backlog</p>
+    </td>
+    <td>
+      <p align="center">See every level of the work</p>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-roadmap-framed.webp">
+        <img src=".github/assets/screenshots/hero-roadmap-framed-dark.webp" alt="Roadmap timeline with bars spanning start and due dates">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-milestone-framed.webp">
+        <img src=".github/assets/screenshots/hero-milestone-framed-dark.webp" alt="Milestone detail with completion progress and work items">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center">Track the timeline</p>
+    </td>
+    <td>
+      <p align="center">Measure milestone progress</p>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-item-detail-framed.webp">
+        <img src=".github/assets/screenshots/hero-item-detail-framed-dark.webp" alt="Work item with rich description, fields, and discussion">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/hero-test-run-framed.webp">
+        <img src=".github/assets/screenshots/hero-test-run-framed-dark.webp" alt="Test run with per-case results and success rate">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p align="center">Keep context on the work</p>
+    </td>
+    <td>
+      <p align="center">Verify releases with test runs</p>
+    </td>
+  </tr>
+</table>
+
 ## Available in many languages
 
 <p align="center"><strong>Available in many languages · متوفر بالعديد من اللغات · 支持多种语言 · Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
