@@ -17,6 +17,10 @@ export default {
       searchDescription: 'Find items and pages',
       chatDescription: 'AI chat',
     },
+    settings: {
+      title: 'Settings',
+      saveFailed: 'Could not save the language.',
+    },
     myWork: {
       title: 'My Work',
       watched: 'Watched',

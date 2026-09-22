@@ -22,6 +22,7 @@
   import MobileCommandPalette from './MobileCommandPalette.svelte';
   import MobileCreatePage from './MobileCreatePage.svelte';
   import MobileItemEditPage from './MobileItemEditPage.svelte';
+  import MobileSettingsView from './MobileSettingsView.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -35,7 +36,8 @@
       view !== 'mobile-chat' &&
       view !== 'mobile-page-detail' &&
       view !== 'mobile-create' &&
-      view !== 'mobile-item-edit',
+      view !== 'mobile-item-edit' &&
+      view !== 'mobile-settings',
   );
   // The Personal tab creates personal tasks; every other tab uses the full
   // work-item form. The Pages tab gets no FAB at all — pages are created from
@@ -98,6 +100,8 @@
       <MobileCreatePage />
     {:else if view === 'mobile-item-edit'}
       <MobileItemEditPage />
+    {:else if view === 'mobile-settings'}
+      <MobileSettingsView />
     {/if}
   </main>
 

@@ -17,6 +17,10 @@ export default {
       searchDescription: '항목과 페이지 찾기',
       chatDescription: 'AI와 대화',
     },
+    settings: {
+      title: '설정',
+      saveFailed: '언어를 저장하지 못했습니다.',
+    },
     myWork: {
       title: '내 작업',
       watched: '관심 항목',

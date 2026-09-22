@@ -2,7 +2,7 @@
   import { authStore, workspacesStore, attachmentStatus } from '../stores';
   import { navigate } from '../router.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
-  import { User, Home, Shield, Sun, Moon, Monitor, Download } from '@lucide/svelte';
+  import { User, Home, Shield, Sun, Moon, Monitor, Download, Settings } from '@lucide/svelte';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api';
@@ -150,6 +150,20 @@
       onClick: () => navigate('/security')
     },
     { type: 'divider' }] : []),
+    ...(minimal
+      ? [
+          {
+            id: 'mobile-settings',
+            testid: 'mobile-settings-menu-item',
+            type: 'regular',
+            icon: Settings,
+            iconColor: '#3b82f6',
+            title: t('mobile.settings.title'),
+            onClick: () => navigate('/m/settings'),
+          },
+          { type: 'divider' },
+        ]
+      : []),
     {
       id: 'theme',
       testid: 'theme-menu',

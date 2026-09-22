@@ -17,6 +17,10 @@ export default {
       searchDescription: 'Поиск задач и страниц',
       chatDescription: 'Чат с ИИ',
     },
+    settings: {
+      title: 'Настройки',
+      saveFailed: 'Не удалось сохранить язык.',
+    },
     myWork: {
       title: 'Моя работа',
       watched: 'Отслеживаемые',

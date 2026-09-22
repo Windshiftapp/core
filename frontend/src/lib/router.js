@@ -174,6 +174,7 @@ const routes = {
   '/m/new': 'mobile-create',
   '/m/items/:id': 'mobile-item-detail',
   '/m/items/:id/edit': 'mobile-item-edit',
+  '/m/settings': 'mobile-settings',
   '/api-docs': 'api-docs',
   '/cli/authorize': 'cli-authorize',
   '/oauth/authorize': 'oauth-authorize',
