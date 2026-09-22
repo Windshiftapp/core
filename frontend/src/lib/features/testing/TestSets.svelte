@@ -115,7 +115,7 @@
   async function loadData() {
     try {
       const [sets, milestonesData] = await Promise.all([
-        api.tests.testPlans.getAll(workspaceId),
+        api.tests.testPlans.getAll(workspaceId, { page_size: 200 }),
         api.milestones.getAll({ workspace_id: workspaceId })
       ]);
       testSets.set(sets || []);

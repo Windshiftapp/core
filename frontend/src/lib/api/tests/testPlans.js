@@ -2,7 +2,7 @@ import { fetchV2Data } from '../core.js';
 import { createCrudClient } from '../createCrudClient.js';
 
 export const testPlans = {
-  ...createCrudClient('/test-plans', { parentPath: '/workspaces', v2: true, allV2: true }),
+  ...createCrudClient('/test-plans', { parentPath: '/workspaces', v2: true }),
   getTestCases: (workspaceId, id) =>
     fetchV2Data(`/workspaces/${workspaceId}/test-plans/${id}/test-cases`),
   addTestCase: (workspaceId, planId, testCaseId) =>

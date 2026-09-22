@@ -174,7 +174,7 @@
 
   async function loadFolders() {
     try {
-      const folders = await api.tests.testFolders.getAll(workspaceId);
+      const folders = await api.tests.testFolders.getAll(workspaceId, { page_size: 200 });
       testFolders.set(folders || []);
 
       const countResult = await api.tests.testCases.count(workspaceId);
