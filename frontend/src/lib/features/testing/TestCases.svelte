@@ -62,12 +62,17 @@
   let stepsShortcutInput = $state('');
   let stepsShortcutTimeout = null;
   const TEST_CASE_BATCH_SIZE = 100;
+  // DOM cap (WI-1450): mounted rows are bounded; "Load more" first reveals
+  // already-fetched rows, then fetches the next batch from the server.
+  const RENDER_WINDOW_STEP = 300;
+  let renderedTestCaseLimit = $state(RENDER_WINDOW_STEP);
   let testCaseSearchQuery = $state('');
   let testCaseSearchTimeout = null;
   let hasMoreTestCases = $state(false);
   let loadingMoreTestCases = $state(false);
   let testCaseLoadRequest = 0;
-  const visibleTestCases = $derived($testCases);
+  const visibleTestCases = $derived($testCases.slice(0, renderedTestCaseLimit));
+  const hiddenTestCaseCount = $derived($testCases.length - visibleTestCases.length);
   const stepsShortcutCodes = $derived(createStepsShortcutCodes(visibleTestCases.length));
 
   // Focus management
@@ -179,6 +184,16 @@
     }
   }
 
+  // "Load more": reveal already-fetched rows first (bounded render window),
+  // then fetch the next batch from the server.
+  function showMoreTestCases() {
+    if (hiddenTestCaseCount > 0) {
+      renderedTestCaseLimit += RENDER_WINDOW_STEP;
+      return;
+    }
+    loadTestCases(selectedFolder, { append: true });
+  }
+
   async function loadTestCases(folderId = null, { append = false } = {}) {
     const requestId = append ? testCaseLoadRequest : ++testCaseLoadRequest;
     if (append) loadingMoreTestCases = true;
@@ -193,6 +208,7 @@
       const nextCases = cases || [];
       testCases.set(append ? [...$testCases, ...nextCases] : nextCases);
       hasMoreTestCases = nextCases.length === TEST_CASE_BATCH_SIZE;
+      if (!append) renderedTestCaseLimit = RENDER_WINDOW_STEP;
     } catch (error) {
       console.error('Failed to load test cases:', error);
     } finally {
@@ -1012,6 +1028,11 @@
         on_input={handleTestCaseSearchInput}
       />
     </div>
+    {#if $testCases.length > 0 && ($testCases.length !== visibleTestCases.length || testCaseSearchQuery.trim())}
+      <div class="px-4 py-2 text-xs" style="color: var(--ds-text-subtle);" data-testid="test-case-count">
+        {t('common.showingOfTotal', { count: visibleTestCases.length, total: $testCases.length })}
+      </div>
+    {/if}
     <Card variant="flat" padding="none" class="overflow-hidden">
     <table class="min-w-full text-sm">
       <thead style="border-bottom: 1px solid var(--ds-border);">
@@ -1120,13 +1141,13 @@
       </tbody>
     </table>
     </Card>
-    {#if hasMoreTestCases}
+    {#if hasMoreTestCases || hiddenTestCaseCount > 0}
       <div class="flex justify-center py-6">
         <Button
           variant="default"
           size="small"
           disabled={loadingMoreTestCases}
-          onclick={() => loadTestCases(selectedFolder, { append: true })}
+          onclick={showMoreTestCases}
         >
           {loadingMoreTestCases ? t('common.loadingMore') : t('common.loadMore')}
         </Button>
