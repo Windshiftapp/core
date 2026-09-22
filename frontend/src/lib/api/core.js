@@ -333,15 +333,18 @@ export async function fetchV2Text(endpoint, options = {}) {
 }
 
 export async function fetchAllV2Pages(endpoint, options = {}) {
+  // Fat payloads can raise pageSize per call to cut round trips; the v2 API
+  // caps page_size at 1000.
+  const { pageSize = 100, ...fetchOptions } = options;
   const url = new URL(endpoint, 'https://windshift.invalid');
-  url.searchParams.set('page_size', '100');
+  url.searchParams.set('page_size', String(pageSize));
   const items = [];
   const seenIds = new Set();
   let page = 1;
   let totalPages = 1;
   do {
     url.searchParams.set('page', String(page));
-    const document = await fetchAPIV2(`${url.pathname}${url.search}`, options);
+    const document = await fetchAPIV2(`${url.pathname}${url.search}`, fetchOptions);
     for (const item of document?.data ?? []) {
       // Offset pagination drifts when rows shift between page fetches, so the
       // same row can appear on two consecutive pages. Keep the first copy.

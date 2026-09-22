@@ -9784,6 +9784,15 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "Name": "search",
+            "In": "query",
+            "Description": "Case-insensitive substring match on workspace name, key, and description.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

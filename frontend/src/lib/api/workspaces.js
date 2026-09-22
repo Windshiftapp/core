@@ -1,4 +1,4 @@
-import { fetchAllV2Pages, fetchAPI, fetchV2Data } from './core.js';
+import { fetchAllV2Pages, fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 import { normalizeStatuses } from './workflows.js';
@@ -9,6 +9,11 @@ export const workspaces = {
   ...workspaceCRUD,
   getAll: (filters = {}, requestOptions = {}) =>
     fetchAllV2Pages(`/workspaces${buildQueryString(filters)}`, requestOptions),
+  // Single paged directory read: { page, page_size, search, sort, order } in,
+  // { data, pagination } out. Server-side search keeps tenants larger than
+  // the cached first page reachable without fetch-all loops (WI-1442).
+  getPage: (filters = {}, requestOptions = {}) =>
+    fetchAPIV2(`/workspaces${buildQueryString(filters)}`, requestOptions),
   get: (id, requestOptions = {}) => fetchV2Data(`/workspaces/${id}`, requestOptions),
   getBootstrap: (id) => fetchAPI(`/workspaces/${id}/bootstrap`),
   getProjects: (id) => fetchV2Data(`/workspaces/${id}/time-projects`),

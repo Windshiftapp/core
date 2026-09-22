@@ -98148,6 +98148,15 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "description": "Case-insensitive substring match on workspace name, key, and description.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

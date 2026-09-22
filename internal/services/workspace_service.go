@@ -58,6 +58,7 @@ func NewWorkspaceServiceWithAccess(db database.Database, access WorkspaceSourceA
 // WorkspaceListParams contains the parameters for listing workspaces.
 type WorkspaceListParams struct {
 	WorkspaceIDs []int
+	Search       string
 	Limit        int
 	Offset       int
 }
@@ -67,31 +68,45 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]models.Workspace,
 	if len(params.WorkspaceIDs) == 0 {
 		return []models.Workspace{}, 0, nil
 	}
+	// The ID set is the caller's authorized scope, bounded by the user's
+	// accessible workspace count — far below SQLite's 32k and Postgres' 65k
+	// parameter limits at the 10k-workspace target.
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(params.WorkspaceIDs)), ",")
-	workspaceArgs := make([]any, len(params.WorkspaceIDs))
-	for i, workspaceID := range params.WorkspaceIDs {
-		workspaceArgs[i] = workspaceID
+	workspaceArgs := make([]any, 0, len(params.WorkspaceIDs)+6)
+	for _, workspaceID := range params.WorkspaceIDs {
+		workspaceArgs = append(workspaceArgs, workspaceID)
 	}
-	listArgs := append(append([]any{}, workspaceArgs...), params.Limit, params.Offset)
+	where := " WHERE w.id IN (" + placeholders + ")"
+	if search := strings.TrimSpace(params.Search); search != "" {
+		pattern := "%" + escapeLikePattern(search) + "%"
+		where += " AND (LOWER(w.name) LIKE LOWER(?) ESCAPE '\\'"
+		where += " OR LOWER(w.key) LIKE LOWER(?) ESCAPE '\\'"
+		where += " OR LOWER(w.description) LIKE LOWER(?) ESCAPE '\\')"
+		workspaceArgs = append(workspaceArgs, pattern, pattern, pattern)
+	}
+	// COUNT(*) OVER () returns the filtered total with the page in one query
+	// instead of a separate COUNT per fetched page.
 	rows, err := s.db.Query(`
 		SELECT w.id, w.name, w.key, w.description, w.active, w.is_template, w.is_personal,
-		       w.icon, w.color, w.internal_comments_enabled, w.created_at, w.updated_at
+		       w.icon, w.color, w.internal_comments_enabled, w.created_at, w.updated_at,
+		       COUNT(*) OVER ()
 		FROM workspaces w
-		WHERE w.id IN (`+placeholders+`)
+		`+where+`
 		ORDER BY w.name
 		LIMIT ? OFFSET ?
-	`, listArgs...)
+	`, append(workspaceArgs, params.Limit, params.Offset)...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list workspaces: %w", err)
 	}
 	defer rows.Close()
 
 	var workspaces []models.Workspace
+	total := 0
 	for rows.Next() {
 		var ws models.Workspace
 		var icon, color sql.NullString
 		err = rows.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description, &ws.Active, &ws.IsTemplate, &ws.IsPersonal,
-			&icon, &color, &ws.InternalCommentsEnabled, &ws.CreatedAt, &ws.UpdatedAt)
+			&icon, &color, &ws.InternalCommentsEnabled, &ws.CreatedAt, &ws.UpdatedAt, &total)
 		if err != nil {
 			continue
 		}
@@ -107,13 +122,14 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]models.Workspace,
 		workspaces = []models.Workspace{}
 	}
 
-	var total int
-	err = s.db.QueryRow("SELECT COUNT(*) FROM workspaces WHERE id IN ("+placeholders+")", workspaceArgs...).Scan(&total)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count workspaces: %w", err)
-	}
-
 	return workspaces, total, nil
+}
+
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
 
 // GetByID retrieves a workspace by ID.

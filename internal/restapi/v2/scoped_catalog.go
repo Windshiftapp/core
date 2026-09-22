@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/contextkeys"
@@ -135,11 +136,16 @@ func listWorkspaces(catalog catalogReader) pageOperation[workspaceDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
+		// Server-side directory search over name, key, and description —
+		// the same fields the client-side filter matches, so results are
+		// consistent whether they come from cache or the server.
+		pageParams := catalogPage(page)
+		pageParams.Search = clampSearch(r.URL.Query().Get("search"))
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		items, total, err := catalog.ListWorkspaces(user.ID, catalogPage(page))
+		items, total, err := catalog.ListWorkspaces(user.ID, pageParams)
 		if err != nil {
 			return nil, Pagination{}, 0, scopedReadError(err, "Workspace was not found")
 		}
@@ -149,6 +155,16 @@ func listWorkspaces(catalog catalogReader) pageOperation[workspaceDTO] {
 		}
 		return result, page, total, nil
 	}
+}
+
+// clampSearch trims surrounding whitespace and caps runaway queries instead
+// of erroring; an empty result matches everything.
+func clampSearch(raw string) string {
+	search := strings.TrimSpace(raw)
+	if len(search) > 200 {
+		return search[:200]
+	}
+	return search
 }
 
 func listWorkspaceTemplates(catalog catalogReader) readOperation[[]workspaceTemplateDTO] {

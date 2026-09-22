@@ -124,6 +124,7 @@ func toWorkspaceResponse(ws *models.Workspace) WorkspaceResponse {
 // @Security     BearerAuth
 // @Param        page   query     int     false  "Page number (1-based)"
 // @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        search query     string  false  "Case-insensitive substring match on name, key, and description"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
 // @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.WorkspaceResponse}
@@ -146,6 +147,7 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	results, total, err := h.workspaceService.List(services.WorkspaceListParams{
 		WorkspaceIDs: accessibleWorkspaceIDs,
+		Search:       r.URL.Query().Get("search"),
 		Limit:        pagination.Limit,
 		Offset:       pagination.Offset,
 	})

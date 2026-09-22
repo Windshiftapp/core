@@ -57,42 +57,35 @@ type CatalogPageParams struct {
 	Offset int
 	Sort   string
 	Desc   bool
+	Search string
 }
 
 func (s *CatalogReadService) ListWorkspaces(userID int, page CatalogPageParams) ([]models.Workspace, int, error) {
-	candidates, err := s.workspaceRepo.FindAll(userID, false)
+	candidates, err := s.workspaceRepo.ListCandidateStatuses(userID)
 	if err != nil {
 		return nil, 0, err
 	}
-	visible := make([]models.Workspace, 0, len(candidates))
-	for _, workspace := range candidates {
-		allowed, err := s.workspaceVisible(userID, &workspace)
+	// Visibility decisions come from the per-user permission snapshot (map
+	// lookups); only the visible IDs are handed to the paged query, so request
+	// cost no longer materializes every workspace row.
+	visibleIDs := make([]int, 0, len(candidates))
+	for _, candidate := range candidates {
+		allowed, err := s.workspaceVisibleByID(userID, candidate.ID, candidate.Active)
 		if err != nil {
 			return nil, 0, err
 		}
 		if allowed {
-			visible = append(visible, workspace)
+			visibleIDs = append(visibleIDs, candidate.ID)
 		}
 	}
-	slices.SortStableFunc(visible, func(a, b models.Workspace) int {
-		var order int
-		switch page.Sort {
-		case "key":
-			order = strings.Compare(strings.ToLower(a.Key), strings.ToLower(b.Key))
-		case "created_at":
-			order = a.CreatedAt.Compare(b.CreatedAt)
-		default:
-			order = strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-		}
-		if page.Desc {
-			order = -order
-		}
-		if order == 0 {
-			order = a.ID - b.ID
-		}
-		return order
+	return s.workspaceRepo.FindByIDsPage(repository.WorkspaceIDPageParams{
+		IDs:    visibleIDs,
+		Search: page.Search,
+		Sort:   page.Sort,
+		Desc:   page.Desc,
+		Limit:  page.Limit,
+		Offset: page.Offset,
 	})
-	return pageSlice(visible, page), len(visible), nil
 }
 
 func (s *CatalogReadService) ListWorkspaceTemplates(ctx context.Context, userID int) ([]models.WorkspaceTemplateSummary, error) {
@@ -339,10 +332,17 @@ func (s *CatalogReadService) GetItemTemplate(userID, workspaceID, templateID int
 }
 
 func (s *CatalogReadService) workspaceVisible(userID int, workspace *models.Workspace) (bool, error) {
-	if workspace.Active {
-		return s.access.CanViewWorkspace(userID, workspace.ID)
+	return s.workspaceVisibleByID(userID, workspace.ID, workspace.Active)
+}
+
+// workspaceVisibleByID applies the list visibility rule: active workspaces
+// need item.view, inactive ones need workspace administration rights (only
+// admins may see deactivated workspaces).
+func (s *CatalogReadService) workspaceVisibleByID(userID, workspaceID int, active bool) (bool, error) {
+	if active {
+		return s.access.CanViewWorkspace(userID, workspaceID)
 	}
-	return s.access.CanAdminWorkspace(userID, workspace.ID)
+	return s.access.CanAdminWorkspace(userID, workspaceID)
 }
 
 func (s *CatalogReadService) requireEffectiveItemType(workspaceID, itemTypeID int) error {

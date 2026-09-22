@@ -23,9 +23,26 @@
   // Use centralized icon map for workspace icons
   const iconMap = workspaceIconMap;
 
-  onMount(async () => {
-    // Load workspaces from store
-    await workspacesStore.load();
+  // The admin directory needs the complete list, not the store's cached first
+  // page, so it fetches all pages itself at the v2 page-size cap. WI-1446
+  // replaces this with server-side paging and search.
+  let workspaceRows = $state([]);
+
+  async function loadWorkspaceRows() {
+    try {
+      const all = await api.workspaces.getAll({}, { pageSize: 1000 });
+      workspaceRows = (all || []).filter((ws) => !ws.is_personal);
+    } catch (error) {
+      console.error('Failed to load workspaces:', error);
+      workspaceRows = [];
+    }
+  }
+
+  onMount(() => {
+    // Refresh the shared directory cache alongside the admin table so other
+    // surfaces pick up workspaces created outside this session.
+    workspacesStore.load({ force: true });
+    return loadWorkspaceRows();
   });
 
   function startCreate() {
@@ -43,7 +60,8 @@
     if (confirmed) {
       try {
         await api.workspaces.delete(workspace.id);
-        await workspacesStore.reload();
+        workspacesStore.remove(workspace.id);
+        await loadWorkspaceRows();
       } catch (error) {
         console.error('Failed to delete workspace:', error);
         errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
@@ -131,7 +149,7 @@
     <div class="{noPadding ? '' : 'px-6 pb-6'}">
       <DataTable
         columns={workspaceColumns}
-        data={$workspacesStore.regularWorkspaces}
+        data={workspaceRows}
         keyField="id"
         emptyMessage={t('workspaces.empty')}
         emptyIcon={Circle}

@@ -32,13 +32,46 @@
   const isTauri = getIsTauri();
 
   let workspaceSearchQuery = $state('');
+  let searchedWorkspaces = $state(null);
+  let workspaceSearchGeneration = 0;
+  let workspaceSearchTimer = null;
+
+  // When the cached directory page is partial, typing extends the matches to
+  // the rest of the directory via the server. Until the first server result
+  // arrives, the local filter over the cached page still applies.
+  const directoryWorkspaces = $derived(
+    workspaceSearchQuery && $workspacesStore.truncated && searchedWorkspaces
+      ? searchedWorkspaces
+      : ($workspacesStore.regularWorkspaces || [])
+  );
 
   const workspacesDropdownItems = $derived(workspaceMenuItems(
-    $workspacesStore.regularWorkspaces,
+    directoryWorkspaces,
     workspaceSearchQuery,
-    (value) => workspaceSearchQuery = value,
+    onWorkspaceSearchInput,
     t
   ));
+
+  function onWorkspaceSearchInput(value) {
+    workspaceSearchQuery = value;
+    if (workspaceSearchTimer) {
+      clearTimeout(workspaceSearchTimer);
+      workspaceSearchTimer = null;
+    }
+    workspaceSearchGeneration += 1;
+    const generation = workspaceSearchGeneration;
+    const query = value.trim();
+    if (!query || !$workspacesStore.truncated) {
+      searchedWorkspaces = null;
+      return;
+    }
+    workspaceSearchTimer = setTimeout(async () => {
+      workspaceSearchTimer = null;
+      const result = await workspacesStore.searchWorkspaces(query);
+      if (generation !== workspaceSearchGeneration) return;
+      searchedWorkspaces = result.workspaces;
+    }, 150);
+  }
 
   // Filter nav items based on permissions (registry: navigation/mainNavigation.js)
   const filteredMainNav = $derived(
