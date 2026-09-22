@@ -26996,6 +26996,120 @@
         ],
         "type": "object"
       },
+      "GetTimeWorklogsAggregateResult": {
+        "additionalProperties": false,
+        "properties": {
+          "daily": {
+            "description": "The daily value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "customer_id": {
+                  "description": "The customer id value.",
+                  "type": "integer"
+                },
+                "customer_name": {
+                  "description": "The customer name value.",
+                  "type": "string"
+                },
+                "day": {
+                  "description": "The day value.",
+                  "type": "string"
+                },
+                "minutes": {
+                  "description": "The minutes value.",
+                  "type": "integer"
+                },
+                "project_id": {
+                  "description": "The project id value.",
+                  "type": "integer"
+                },
+                "project_name": {
+                  "description": "The project name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "user_name": {
+                  "description": "The user name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id",
+                "customer_name",
+                "day",
+                "minutes",
+                "project_id",
+                "project_name",
+                "user_id",
+                "user_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "totals": {
+            "description": "The totals value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "customer_id": {
+                  "description": "The customer id value.",
+                  "type": "integer"
+                },
+                "customer_name": {
+                  "description": "The customer name value.",
+                  "type": "string"
+                },
+                "duration_minutes": {
+                  "description": "The duration minutes value.",
+                  "type": "integer"
+                },
+                "entries": {
+                  "description": "The entries value.",
+                  "type": "integer"
+                },
+                "project_id": {
+                  "description": "The project id value.",
+                  "type": "integer"
+                },
+                "project_name": {
+                  "description": "The project name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "user_name": {
+                  "description": "The user name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id",
+                "customer_name",
+                "duration_minutes",
+                "entries",
+                "project_id",
+                "project_name",
+                "user_id",
+                "user_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "daily",
+          "totals"
+        ],
+        "type": "object"
+      },
       "GetTimeWorklogsResult": {
         "additionalProperties": false,
         "properties": {
@@ -96799,6 +96913,98 @@
         ],
         "x-required-scopes": [
           "time:write"
+        ]
+      }
+    },
+    "/time/worklogs/aggregate": {
+      "get": {
+        "description": "Aggregate worklogs for reports. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getTimeWorklogsAggregate",
+        "parameters": [
+          {
+            "description": "Range start as YYYY-MM-DD in the reporting timezone.",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Range end (exclusive) as YYYY-MM-DD in the reporting timezone.",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "IANA timezone used to bucket civil days; defaults to the caller's profile timezone.",
+            "in": "query",
+            "name": "timezone",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restrict the aggregation to one project.",
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restrict the aggregation to one customer.",
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTimeWorklogsAggregateResult"
+                }
+              }
+            },
+            "description": "Aggregate worklogs for reports response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Aggregate worklogs for reports",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:read"
         ]
       }
     },

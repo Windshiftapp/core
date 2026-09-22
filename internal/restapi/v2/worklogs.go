@@ -12,6 +12,7 @@ import (
 )
 
 func registerWorklogRoutes(builder *routeBuilder, deps Deps) {
+	builder.RawResponse[services.WorklogAggregate](http.MethodGet, "/time/worklogs/aggregate", http.StatusOK, "application/json", AuthAuthenticated, []string{"time:read"}, aggregateWorklogs(deps))
 	builder.Page("/time/worklogs", AuthAuthenticated, []string{"time:read"}, listWorklogs(deps))
 	builder.Read("/time/worklogs/{worklog_id}", AuthAuthenticated, []string{"time:read"}, getWorklog(deps))
 	builder.JSON(http.MethodPost, "/time/worklogs", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, createWorklog(deps))
@@ -68,6 +69,46 @@ type worklogDTO struct {
 	ProjectMaxHours     *float64 `json:"project_max_hours"`
 	ProjectTotalHours   *float64 `json:"project_total_hours"`
 	Warnings            []string `json:"warnings,omitempty"`
+}
+
+// aggregateWorklogs serves the report document: day-split minute groups and
+// per-(user, project, customer) totals. A bounded civil-date range is
+// required — unbounded aggregation would scan the whole table.
+func aggregateWorklogs(deps Deps) Handler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		user, err := principal(r)
+		if err != nil {
+			return err
+		}
+		location, err := reportTimezone(r, user)
+		if err != nil {
+			return err
+		}
+		if r.URL.Query().Get("from") == "" || r.URL.Query().Get("to") == "" {
+			return newError(http.StatusBadRequest, "invalid_request", "from and to (YYYY-MM-DD) are required")
+		}
+		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
+		if err != nil {
+			return internalError(err)
+		}
+		if accessible != nil && len(accessible) == 0 {
+			return writeJSON(w, http.StatusOK, services.WorklogAggregate{
+				Daily: []services.WorklogDailyAggregate{}, Totals: []services.WorklogTotalAggregate{},
+			})
+		}
+		filter := repository.WorklogDetailFilter{AccessibleProjectIDs: accessible}
+		if err := applyWorklogFilters(r, user, &filter); err != nil {
+			return err
+		}
+		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+			return err
+		}
+		result, err := deps.Worklogs.Aggregate(filter, location.String())
+		if err != nil {
+			return internalError(err)
+		}
+		return writeJSON(w, http.StatusOK, result)
+	}
 }
 
 func listWorklogs(deps Deps) pageOperation[worklogDTO] {

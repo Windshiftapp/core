@@ -1,4 +1,4 @@
-import { fetchAllV2Pages, fetchV2Data } from './core.js';
+import { fetchAllV2Pages, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 
@@ -25,11 +25,17 @@ export const time = {
     ...createCrudClient('/time/projects', { v2: true }),
     getByWorkspace: (workspaceId, requestOptions = {}) =>
       fetchV2Data(`/workspaces/${workspaceId}/time-projects`, requestOptions),
-    getWorklogs: (id, filters = {}) => {
+    getWorklogs: (id, filters = {}, requestOptions = {}) => {
       return fetchAllV2Pages(
-        `/time/projects/${id}/worklogs${buildQueryString(v2WorklogFilters(filters))}`
+        `/time/projects/${id}/worklogs${buildQueryString(v2WorklogFilters(filters))}`,
+        requestOptions
       );
     },
+    getWorklogsPage: (id, filters = {}, requestOptions = {}) =>
+      fetchAPIV2(
+        `/time/projects/${id}/worklogs${buildQueryString(v2WorklogFilters(filters))}`,
+        requestOptions
+      ),
 
     // Project Managers
     getManagers: (id) => fetchV2Data(`/time/projects/${id}/managers`),
@@ -57,8 +63,21 @@ export const time = {
   },
 
   worklogs: {
-    getAll: (filters = {}) =>
-      fetchAllV2Pages(`/time/worklogs${buildQueryString(v2WorklogFilters(filters))}`),
+    getAll: (filters = {}, requestOptions = {}) =>
+      fetchAllV2Pages(
+        `/time/worklogs${buildQueryString(v2WorklogFilters(filters))}`,
+        requestOptions
+      ),
+    // Single paged read: { data, pagination } for entry tables and exports.
+    getPage: (filters = {}, requestOptions = {}) =>
+      fetchAPIV2(`/time/worklogs${buildQueryString(v2WorklogFilters(filters))}`, requestOptions),
+    // Server-side report aggregates (day-split minutes + duration/entry
+    // totals). Requires from/to; see GET /time/worklogs/aggregate.
+    aggregate: (filters = {}, requestOptions = {}) =>
+      fetchV2Data(
+        `/time/worklogs/aggregate${buildQueryString(v2WorklogFilters(filters))}`,
+        requestOptions
+      ),
     get: (id, requestOptions = {}) => fetchV2Data(`/time/worklogs/${id}`, requestOptions),
     create: (data) => fetchV2Data('/time/worklogs', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) =>

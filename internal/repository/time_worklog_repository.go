@@ -177,6 +177,55 @@ type WorklogDetailFilter struct {
 	Offset               int
 }
 
+// WorklogAggregateInput is the slim projection feeding server-side report
+// aggregation: no description, item, or label columns.
+type WorklogAggregateInput struct {
+	StartTimeUnix   int64
+	EndTimeUnix     int64
+	DurationMinutes int
+	UserID          int
+	UserName        string
+	ProjectID       int
+	ProjectName     string
+	CustomerID      int
+	CustomerName    string
+}
+
+// ListAggregateInputs returns the slim projection for every worklog matching
+// the filter, ordered for deterministic aggregation.
+func (r *TimeWorklogRepository) ListAggregateInputs(filter WorklogDetailFilter) ([]WorklogAggregateInput, error) {
+	if filter.AccessibleProjectIDs != nil && len(filter.AccessibleProjectIDs) == 0 {
+		return []WorklogAggregateInput{}, nil
+	}
+	where, args := worklogDetailWhere(filter)
+	query := `SELECT w.start_time, w.end_time, w.duration_minutes,
+	       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, ''),
+	       w.project_id, p.name, w.customer_id, c.name
+	FROM time_worklogs w
+	JOIN customer_organisations c ON w.customer_id = c.id
+	JOIN time_projects p ON w.project_id = p.id
+	LEFT JOIN users u ON w.user_id = u.id
+	` + where + "\n ORDER BY w.start_time ASC, w.id ASC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list worklog aggregate inputs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]WorklogAggregateInput, 0)
+	for rows.Next() {
+		var item WorklogAggregateInput
+		if scanErr := rows.Scan(&item.StartTimeUnix, &item.EndTimeUnix, &item.DurationMinutes,
+			&item.UserID, &item.UserName, &item.ProjectID, &item.ProjectName,
+			&item.CustomerID, &item.CustomerName); scanErr != nil {
+			return nil, fmt.Errorf("scan worklog aggregate input: %w", scanErr)
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 // ListDetails returns joined worklogs ordered newest-first.
 func (r *TimeWorklogRepository) ListDetails(filter WorklogDetailFilter) ([]models.Worklog, error) {
 	if filter.AccessibleProjectIDs != nil && len(filter.AccessibleProjectIDs) == 0 {

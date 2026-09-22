@@ -9156,6 +9156,69 @@
         ]
       }
     },
+    "/time/worklogs/aggregate": {
+      "get": {
+        "description": "Aggregate worklogs for reports. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "from",
+            "In": "query",
+            "Description": "Range start as YYYY-MM-DD in the reporting timezone.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "to",
+            "In": "query",
+            "Description": "Range end (exclusive) as YYYY-MM-DD in the reporting timezone.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "timezone",
+            "In": "query",
+            "Description": "IANA timezone used to bucket civil days; defaults to the caller's profile timezone.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "project_id",
+            "In": "query",
+            "Description": "Restrict the aggregation to one project.",
+            "Required": false,
+            "Schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "customer_id",
+            "In": "query",
+            "Description": "Restrict the aggregation to one customer.",
+            "Required": false,
+            "Schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Aggregate worklogs for reports",
+        "tags": [
+          "Time tracking"
+        ]
+      }
+    },
     "/time/worklogs/{worklog_id}": {
       "delete": {
         "description": "Delete worklog. The server verifies resource ownership and deletion preconditions before removing the resource.",

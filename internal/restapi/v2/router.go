@@ -378,6 +378,7 @@ type worklogApplication interface {
 	ListMine(repository.WorklogListFilter) ([]models.Worklog, int, error)
 	List(repository.WorklogDetailFilter) ([]models.Worklog, error)
 	ListPage(repository.WorklogDetailFilter) ([]models.Worklog, int, error)
+	Aggregate(repository.WorklogDetailFilter, string) (*services.WorklogAggregate, error)
 }
 
 type timeAccess interface {

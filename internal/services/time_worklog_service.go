@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"windshift/internal/database"
@@ -129,6 +130,154 @@ func (s *TimeWorklogService) List(filter repository.WorklogDetailFilter) ([]mode
 // ListPage returns a repository-bounded joined worklog page.
 func (s *TimeWorklogService) ListPage(filter repository.WorklogDetailFilter) ([]models.Worklog, int, error) {
 	return s.worklogs.ListDetailsPage(filter)
+}
+
+// WorklogDailyAggregate splits one worklog's elapsed minutes across the civil
+// days it touches, in the reporting timezone.
+type WorklogDailyAggregate struct {
+	Day          string `json:"day"`
+	UserID       int    `json:"user_id"`
+	UserName     string `json:"user_name"`
+	ProjectID    int    `json:"project_id"`
+	ProjectName  string `json:"project_name"`
+	CustomerID   int    `json:"customer_id"`
+	CustomerName string `json:"customer_name"`
+	Minutes      int64  `json:"minutes"`
+}
+
+// WorklogTotalAggregate sums booked duration and entry counts per
+// (user, project, customer) — not day-partitioned, matching the stored
+// duration_minutes contract.
+type WorklogTotalAggregate struct {
+	UserID          int    `json:"user_id"`
+	UserName        string `json:"user_name"`
+	ProjectID       int    `json:"project_id"`
+	ProjectName     string `json:"project_name"`
+	CustomerID      int    `json:"customer_id"`
+	CustomerName    string `json:"customer_name"`
+	DurationMinutes int64  `json:"duration_minutes"`
+	Entries         int64  `json:"entries"`
+}
+
+// WorklogAggregate is the report document: day-split minutes for charts and
+// per-member averages, plus duration/entry totals for summaries and top lists.
+type WorklogAggregate struct {
+	Daily  []WorklogDailyAggregate `json:"daily"`
+	Totals []WorklogTotalAggregate `json:"totals"`
+}
+
+// SplitWorklogMinutesByDay slices [start, end) into minutes per civil date
+// key (YYYY-MM-DD) in the location. It mirrors the frontend utility
+// (splitWorklogMinutesByDay) exactly — including midnight splitting and
+// half-open boundaries — so server aggregates and legacy client math agree.
+func SplitWorklogMinutesByDay(start, end int64, location *time.Location) []struct {
+	Day     string
+	Minutes int64
+} {
+	type daySlice = struct {
+		Day     string
+		Minutes int64
+	}
+	slices := []daySlice{}
+	if end <= start {
+		return slices
+	}
+	cursor := time.Unix(start, 0).In(location)
+	endT := time.Unix(end, 0).In(location)
+	for cursor.Before(endT) {
+		year, month, day := cursor.Date()
+		boundary := time.Date(year, month, day+1, 0, 0, 0, 0, location)
+		if !boundary.After(cursor) {
+			boundary = time.Date(year, month, day+2, 0, 0, 0, 0, location)
+		}
+		sliceEnd := boundary
+		if endT.Before(sliceEnd) {
+			sliceEnd = endT
+		}
+		minutes := int64(sliceEnd.Sub(cursor).Minutes() + 0.5)
+		if minutes > 0 {
+			slices = append(slices, daySlice{Day: cursor.Format("2006-01-02"), Minutes: minutes})
+		}
+		cursor = sliceEnd
+	}
+	return slices
+}
+
+// Aggregate reduces the filtered worklogs to (day, user, project, customer)
+// split-minute groups and (user, project, customer) duration/entry totals so
+// reports render without fetching every raw row.
+func (s *TimeWorklogService) Aggregate(filter repository.WorklogDetailFilter, timezone string) (*WorklogAggregate, error) {
+	_, location, err := ResolveTimezone(timezone)
+	if err != nil {
+		return nil, err
+	}
+	inputs, err := s.worklogs.ListAggregateInputs(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	dailyIndex := make(map[WorklogDailyAggregate]int)
+	daily := make([]WorklogDailyAggregate, 0)
+	totalIndex := make(map[WorklogTotalAggregate]int)
+	totals := make([]WorklogTotalAggregate, 0)
+
+	for i := range inputs {
+		input := &inputs[i]
+		for _, slice := range SplitWorklogMinutesByDay(input.StartTimeUnix, input.EndTimeUnix, location) {
+			key := WorklogDailyAggregate{
+				Day: slice.Day, UserID: input.UserID, UserName: input.UserName,
+				ProjectID: input.ProjectID, ProjectName: input.ProjectName,
+				CustomerID: input.CustomerID, CustomerName: input.CustomerName,
+			}
+			idx, ok := dailyIndex[key]
+			if !ok {
+				dailyIndex[key] = len(daily)
+				key.Minutes = slice.Minutes
+				daily = append(daily, key)
+			} else {
+				daily[idx].Minutes += slice.Minutes
+			}
+		}
+
+		key := WorklogTotalAggregate{
+			UserID: input.UserID, UserName: input.UserName,
+			ProjectID: input.ProjectID, ProjectName: input.ProjectName,
+			CustomerID: input.CustomerID, CustomerName: input.CustomerName,
+		}
+		idx, ok := totalIndex[key]
+		if !ok {
+			totalIndex[key] = len(totals)
+			key.DurationMinutes = int64(input.DurationMinutes)
+			key.Entries = 1
+			totals = append(totals, key)
+		} else {
+			totals[idx].DurationMinutes += int64(input.DurationMinutes)
+			totals[idx].Entries++
+		}
+	}
+
+	sort.Slice(daily, func(i, j int) bool {
+		if daily[i].Day != daily[j].Day {
+			return daily[i].Day < daily[j].Day
+		}
+		if daily[i].UserID != daily[j].UserID {
+			return daily[i].UserID < daily[j].UserID
+		}
+		if daily[i].ProjectID != daily[j].ProjectID {
+			return daily[i].ProjectID < daily[j].ProjectID
+		}
+		return daily[i].CustomerID < daily[j].CustomerID
+	})
+	sort.Slice(totals, func(i, j int) bool {
+		if totals[i].UserID != totals[j].UserID {
+			return totals[i].UserID < totals[j].UserID
+		}
+		if totals[i].ProjectID != totals[j].ProjectID {
+			return totals[i].ProjectID < totals[j].ProjectID
+		}
+		return totals[i].CustomerID < totals[j].CustomerID
+	})
+	return &WorklogAggregate{Daily: daily, Totals: totals}, nil
 }
 
 type preparedWorklog struct {
