@@ -294,6 +294,7 @@ func TestZammadOAuthSQLiteUpgradePreservesLegacyConnection(t *testing.T) {
 		SELECT provider_id, credential_id, base_url, default_group_id, default_group_name, allowed_groups, default_customer, correlation_field, closed_state_ids, completion_status_id, false, last_tested_at, last_test_error, created_by, created_at, updated_at FROM zammad_connections;
 		DROP TABLE zammad_connections;
 		ALTER TABLE zammad_connections_legacy RENAME TO zammad_connections;
+		DROP TABLE IF EXISTS zammad_connection_workspaces;
 		CREATE TABLE zammad_connection_workspaces (
 			provider_id TEXT NOT NULL, workspace_id INTEGER NOT NULL,
 			PRIMARY KEY (provider_id, workspace_id)

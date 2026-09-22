@@ -961,13 +961,18 @@ var Catalog = []Migration{
 	{
 		Version: "20260901_zammad_canonical_workspace_scope",
 		Name:    "Backfill managed-credential scope for existing Zammad connections",
+		// A database with no Zammad connections has nothing to backfill, so
+		// it counts as applied — including fresh installs whose schema files
+		// already carry the final shape.
 		CheckSQLite: `SELECT CASE WHEN
 			NOT EXISTS (SELECT 1 FROM pragma_table_info('zammad_connections') WHERE name='applies_to_all_workspaces')
 			OR NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='zammad_connection_workspaces')
+			OR NOT EXISTS (SELECT 1 FROM zammad_connections LIMIT 1)
 			THEN 1 ELSE 0 END`,
 		CheckPostgres: `SELECT CASE WHEN
 			NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='zammad_connections' AND column_name='applies_to_all_workspaces')
 			OR NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='zammad_connection_workspaces')
+			OR NOT EXISTS (SELECT 1 FROM zammad_connections)
 			THEN 1 ELSE 0 END`,
 		SQLite: `
 			UPDATE action_credentials
@@ -1335,7 +1340,15 @@ var Catalog = []Migration{
 				ON personal_labels(COALESCE(user_id, 0), name);
 		`,
 		// SQLite cannot drop the inline UNIQUE(name) without a table rebuild.
+		// The SQL field must stay non-empty: an empty body makes the runner
+		// stamp the row without reaching Check or ApplySQLite.
+		SQLite:      "applySQLitePersonalLabelsPerUserUnique:v1",
 		ApplySQLite: applySQLitePersonalLabelsPerUserUnique,
+		// Databases stamped while the SQLite field was empty carry the
+		// empty-body checksum (sha256 of ""); advance them to the marker
+		// checksum. Their rebuild still requires re-running the migration,
+		// which the runner does not do for stamped rows.
+		Superseded: []string{"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 	},
 	{
 		Version:       "20260918_kb_events",

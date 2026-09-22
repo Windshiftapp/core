@@ -148,11 +148,16 @@ CREATE TABLE IF NOT EXISTS zammad_connections (
 	base_url TEXT NOT NULL,
 	default_group_id INTEGER,
 	default_group_name TEXT DEFAULT '',
+	-- Legacy per-connection group-ID list; runtime reads allowed_groups.
+	-- migration: 20260829_zammad_integration
+	allowed_group_ids TEXT NOT NULL DEFAULT '[]',
 	allowed_groups TEXT NOT NULL DEFAULT '[]',
 	default_customer TEXT NOT NULL,
 	correlation_field TEXT NOT NULL DEFAULT 'windshift_item_key',
 	closed_state_ids TEXT NOT NULL DEFAULT '[]',
 	completion_status_id INTEGER,
+	-- migration: 20260829_zammad_integration
+	applies_to_all_workspaces BOOLEAN NOT NULL DEFAULT false,
 	last_tested_at DATETIME,
 	last_test_error TEXT DEFAULT '',
 	created_by INTEGER,
@@ -166,11 +171,24 @@ CREATE TABLE IF NOT EXISTS zammad_connections (
 
 CREATE INDEX IF NOT EXISTS idx_zammad_connections_credential ON zammad_connections(credential_id);
 
+-- Workspace membership scope for connection-scoped credentials.
+-- migration: 20260829_zammad_integration
+CREATE TABLE IF NOT EXISTS zammad_connection_workspaces (
+	provider_id TEXT NOT NULL,
+	workspace_id INTEGER NOT NULL,
+	PRIMARY KEY (provider_id, workspace_id),
+	FOREIGN KEY (provider_id) REFERENCES zammad_connections(provider_id) ON DELETE CASCADE,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_zammad_connection_workspaces_workspace ON zammad_connection_workspaces(workspace_id);
+
 -- Connection-scoped OAuth material. Zammad is a system/workspace integration,
 -- so these tokens intentionally never use user_integration_tokens.
 CREATE TABLE IF NOT EXISTS zammad_oauth_tokens (
 	provider_id TEXT PRIMARY KEY,
-	oauth_generation INTEGER NOT NULL,
+	-- migration: 20260830_zammad_oauth_generation
+	oauth_generation INTEGER NOT NULL DEFAULT 1,
 	expires_at DATETIME NOT NULL,
 	reauthorization_required BOOLEAN NOT NULL DEFAULT false,
 	refresh_lock_until DATETIME,
@@ -183,7 +201,8 @@ CREATE TABLE IF NOT EXISTS zammad_oauth_state (
 	state TEXT PRIMARY KEY,
 	provider_id TEXT NOT NULL,
 	initiated_by INTEGER NOT NULL,
-	oauth_generation INTEGER NOT NULL,
+	-- migration: 20260830_zammad_oauth_generation
+	oauth_generation INTEGER NOT NULL DEFAULT 1,
 	expires_at DATETIME NOT NULL,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (provider_id) REFERENCES zammad_connections(provider_id) ON DELETE CASCADE,
