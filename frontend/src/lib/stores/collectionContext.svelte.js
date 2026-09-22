@@ -340,48 +340,14 @@ class CollectionStore {
 
       if (loadId !== this.#loadId) return; // stale
 
-      if (itemsResult) {
-        this.items = deferredResult
-          ? [...itemsResult.items, ...deferredResult.items]
-          : itemsResult.items;
-        this.boardDeferred = deferredResult
-          ? {
-              ...boardPartition,
-              pagination: deferredResult.pagination,
-              total: deferredResult.pagination?.total_items ?? deferredResult.items.length,
-            }
-          : null;
-        this.rightmostCap = this.boardDeferred?.capped
-          ? {
-              statusIds: this.boardDeferred.statusIds,
-              total: this.boardDeferred.total,
-            }
-          : null;
-        this.collectionName = itemsResult.collectionName;
-        this.publicSlug = itemsResult.publicSlug ?? null;
-        this.itemsPagination = itemsResult.pagination;
-        this.itemsHasMore = this.#hasMoreItems();
-        if (itemsResult.sortableFields?.length) {
-          this.sortableFields = itemsResult.sortableFields;
-        }
-      }
-
-      if (backlogResult) {
-        this.backlogItems = backlogResult.items;
-        this.backlogPagination = backlogResult.pagination;
-        this.backlogHasMore = calcHasMore(backlogResult.pagination);
-        if (!itemsResult) {
-          this.collectionName = backlogResult.collectionName;
-          this.publicSlug =
-            collection?.is_public && collection?.public_slug ? collection.public_slug : null;
-        }
-      }
-      this.#changesWatermark = snapshotWatermark(
+      this.#applyResults({
         itemsResult,
         backlogResult,
         deferredResult,
-        countResult
-      );
+        countResult,
+        boardPartition,
+        collection,
+      });
       if (itemsResult && BOARD_VIEWS.has(view)) {
         void this.#loadRemainingBoardItems({
           first: itemsResult,
@@ -400,6 +366,62 @@ class CollectionStore {
         this.loading = false;
       }
     }
+  }
+
+  /**
+   * Apply one round of fetched results to store state. Load and refresh share
+   * this so their state shapes cannot drift apart.
+   */
+  #applyResults({
+    itemsResult,
+    backlogResult,
+    deferredResult,
+    countResult,
+    boardPartition,
+    collection,
+  }) {
+    if (itemsResult) {
+      this.items = deferredResult
+        ? [...itemsResult.items, ...deferredResult.items]
+        : itemsResult.items;
+      this.boardDeferred = deferredResult
+        ? {
+            ...boardPartition,
+            pagination: deferredResult.pagination,
+            total: deferredResult.pagination?.total_items ?? deferredResult.items.length,
+          }
+        : null;
+      this.rightmostCap = this.boardDeferred?.capped
+        ? {
+            statusIds: this.boardDeferred.statusIds,
+            total: this.boardDeferred.total,
+          }
+        : null;
+      this.collectionName = itemsResult.collectionName;
+      this.publicSlug = itemsResult.publicSlug ?? null;
+      this.itemsPagination = itemsResult.pagination;
+      this.itemsHasMore = this.#hasMoreItems();
+      if (itemsResult.sortableFields?.length) {
+        this.sortableFields = itemsResult.sortableFields;
+      }
+    }
+
+    if (backlogResult) {
+      this.backlogItems = backlogResult.items;
+      this.backlogPagination = backlogResult.pagination;
+      this.backlogHasMore = calcHasMore(backlogResult.pagination);
+      if (!itemsResult) {
+        this.collectionName = backlogResult.collectionName;
+        this.publicSlug =
+          collection?.is_public && collection?.public_slug ? collection.public_slug : null;
+      }
+    }
+    this.#changesWatermark = snapshotWatermark(
+      itemsResult,
+      backlogResult,
+      deferredResult,
+      countResult
+    );
   }
 
   async #refreshCollectionTotal() {
@@ -946,40 +968,14 @@ class CollectionStore {
       ]);
       if (loadId !== this.#loadId) return;
 
-      if (itemsResult) {
-        this.items = deferredResult
-          ? [...itemsResult.items, ...deferredResult.items]
-          : itemsResult.items;
-        this.boardDeferred = deferredResult
-          ? {
-              ...boardPartition,
-              pagination: deferredResult.pagination,
-              total: deferredResult.pagination?.total_items ?? deferredResult.items.length,
-            }
-          : null;
-        this.rightmostCap = this.boardDeferred?.capped
-          ? {
-              statusIds: this.boardDeferred.statusIds,
-              total: this.boardDeferred.total,
-            }
-          : null;
-        this.collectionName = itemsResult.collectionName;
-        this.publicSlug = itemsResult.publicSlug ?? null;
-        this.itemsPagination = itemsResult.pagination;
-        this.itemsHasMore = this.#hasMoreItems();
-      }
-
-      if (backlogResult) {
-        this.backlogItems = backlogResult.items;
-        this.backlogPagination = backlogResult.pagination;
-        this.backlogHasMore = calcHasMore(backlogResult.pagination);
-      }
-      this.#changesWatermark = snapshotWatermark(
+      this.#applyResults({
         itemsResult,
         backlogResult,
         deferredResult,
-        countResult
-      );
+        countResult,
+        boardPartition,
+        collection,
+      });
     } catch (error) {
       if (loadId !== this.#loadId) return;
       if (!isExpectedBackgroundSyncError(error)) {
