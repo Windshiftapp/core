@@ -1,5 +1,6 @@
 <script>
   import MobileSheet from './MobileSheet.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Confirmation bottom sheet for the phone surface — replaces the desktop
@@ -22,10 +23,10 @@
    */
   let {
     isOpen = $bindable(false),
-    title = 'Are you sure?',
+    title = undefined,
     message = '',
-    confirmLabel = 'Confirm',
-    cancelLabel = 'Cancel',
+    confirmLabel = undefined,
+    cancelLabel = undefined,
     destructive = false,
     busy = false,
     pushHistory = true,
@@ -35,7 +36,7 @@
   } = $props();
 </script>
 
-<MobileSheet bind:isOpen {title} {onclose} {dataTestid} {pushHistory}>
+<MobileSheet bind:isOpen title={title ?? t('common.areYouSure')} {onclose} {dataTestid} {pushHistory}>
   <div class="confirm">
     {#if message}
       <p class="message" data-testid="mobile-confirm-message">{message}</p>
@@ -48,7 +49,7 @@
         type="button"
         data-testid="mobile-confirm-cancel"
       >
-        {cancelLabel}
+        {cancelLabel ?? t('common.cancel')}
       </button>
       <button
         class="btn confirm-btn"
@@ -58,7 +59,7 @@
         type="button"
         data-testid="mobile-confirm-accept"
       >
-        {confirmLabel}
+        {confirmLabel ?? t('common.confirm')}
       </button>
     </div>
   </div>

@@ -7,6 +7,7 @@
   import MobileConfirmSheet from './MobileConfirmSheet.svelte';
   import { autoGrow, enterMovesFocus } from './autoGrowTextarea.js';
   import { Loader } from '@lucide/svelte';
+  import { t, translateError } from '../stores/i18n.svelte.js';
 
   /**
    * Full-page title/description editor for the phone surface
@@ -83,7 +84,7 @@
     }
   }
 
-  const pageTitle = $derived(formatItemKey(item) || 'Edit item');
+  const pageTitle = $derived(formatItemKey(item) || t('mobile.item.edit'));
   const canSave = $derived(title.trim() !== '' && !saving && isDirty);
 
   $effect(() => {
@@ -123,12 +124,12 @@
         description: description.trim(),
       });
       clearDraft();
-      successToast('Item updated.');
+      successToast(t('mobile.item.updated'));
       // Replace so back from the detail doesn't return to the editor.
       navigate(`/m/items/${itemId}`, { replace: true });
     } catch (err) {
       console.error('Failed to update item:', err);
-      error = err?.message || 'Could not save the item.';
+      error = (err?.code || err?.errorCode || err?.message) ? translateError(err) : t('mobile.item.saveFailed');
     } finally {
       saving = false;
     }
@@ -162,7 +163,7 @@
 
 <MobileEditorPage
   title={pageTitle}
-  saveLabel="Save"
+  saveLabel={t('common.save')}
   {canSave}
   {saving}
   {error}
@@ -174,7 +175,7 @@
     <div class="center" data-testid="item-edit-loading"><Loader class="spin" size={22} /></div>
   {:else if loadErrored || !item}
     <div class="center" data-testid="item-edit-error">
-      <p>Couldn't load this item.</p>
+      <p>{t('mobile.item.loadFailed')}</p>
     </div>
   {:else}
     <div class="edit-form" data-testid="item-edit-form">
@@ -183,7 +184,7 @@
       <textarea
         class="hero-title"
         bind:value={title}
-        placeholder="Issue title"
+        placeholder={t('createModal.issueTitle')}
         autocomplete="off"
         rows={1}
         enterkeyhint="next"
@@ -196,7 +197,7 @@
         bind:value={description}
         bind:this={descriptionField}
         rows={12}
-        placeholder="Description…"
+        placeholder={t('mobile.item.descriptionPlaceholder')}
         data-testid="item-edit-description"
       ></textarea>
     </div>
@@ -208,10 +209,10 @@
      interceptor owns the back gesture on this page. -->
 <MobileConfirmSheet
   bind:isOpen={confirmDiscardOpen}
-  title="Discard changes?"
-  message="Your edits haven't been saved."
-  confirmLabel="Discard"
-  cancelLabel="Keep editing"
+  title={t('mobile.item.discardChanges')}
+  message={t('mobile.item.unsavedChanges')}
+  confirmLabel={t('common.discard')}
+  cancelLabel={t('mobile.item.keepEditing')}
   destructive
   pushHistory={false}
   onconfirm={discardAndLeave}

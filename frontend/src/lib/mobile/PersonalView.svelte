@@ -7,6 +7,7 @@
   import MobileHeader from './MobileHeader.svelte';
   import MobileListState from './MobileListState.svelte';
   import { mobilePalette } from './mobilePalette.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Personal-workspace status ids: 1 = Open, 3 = Done (workspace default taxonomy).
   const STATUS_OPEN = 1;
@@ -75,7 +76,7 @@
       const rollback = [...tasks, snapshot];
       rollback.sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')));
       tasks = rollback;
-      errorToast('Could not update the task. Try again.');
+      errorToast(t('mobile.personal.updateFailed'));
     } finally {
       const next = new Set(toggling);
       next.delete(task.id);
@@ -103,9 +104,9 @@
   });
 </script>
 
-<MobileHeader title="Personal">
+<MobileHeader title={t('workspaces.personal')}>
   {#snippet right()}
-    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label={t('mobile.palette.title')} type="button">
       <CommandIcon size={20} />
     </button>
   {/snippet}
@@ -119,8 +120,8 @@
     skeletonRowHeight={52}
     errorTestId="personal-error"
     emptyTestId="personal-empty"
-    errorMessage="Couldn't load your personal tasks."
-    emptyMessage="Your personal todo list is empty."
+    errorMessage={t('mobile.personal.loadFailed')}
+    emptyMessage={t('mobile.personal.empty')}
     onretry={load}
   >
     {#each tasks as task (task.id)}
@@ -131,7 +132,7 @@
           onclick={(e) => toggleDone(task, e)}
           disabled={toggling.has(task.id)}
           data-testid="personal-toggle"
-          aria-label={done ? 'Mark not done' : 'Mark done'}
+          aria-label={done ? t('mobile.personal.markNotDone') : t('mobile.personal.markDone')}
           type="button"
         >
           <span class="check-circle" class:checked={done}>

@@ -23,6 +23,7 @@
   import ItemAgentLog from '../features/items/ItemAgentLog.svelte';
   import Avatar from '../components/Avatar.svelte';
   import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let { itemId } = $props();
 
@@ -67,7 +68,7 @@
       assigneeOptions = (await api.getAssignableUsers(item.workspace_id)) ?? [];
     } catch (err) {
       console.error('Failed to load assignable users:', err);
-      errorToast('Could not load assignees.');
+      errorToast(t('mobile.item.assigneesFailed'));
       assigneeOptions = [];
     } finally {
       assigneeLoading = false;
@@ -229,7 +230,7 @@
         workspace_id: item.workspace_id,
         item_id: item.id,
         project_id: projectId,
-        description: `Working on ${item.title}`,
+        description: t('mobile.timer.workingOn', { title: item.title }),
       });
       navigate('/m/timer');
     } catch (err) {
@@ -345,7 +346,7 @@
 
   // The viewed item was deleted elsewhere: toast and leave the now-stale detail.
   function handleDeleted() {
-    infoToast('This item was deleted.');
+    infoToast(t('mobile.item.deleted'));
     if (window.history.length > 1) window.history.back();
     else navigate('/m');
   }
@@ -375,8 +376,8 @@
   <div class="center" data-testid="detail-loading"><Loader class="spin" size={22} /></div>
 {:else if errored || !item}
   <div class="msg" data-testid="detail-error">
-    <p>Couldn't load this item.</p>
-    <button class="retry" onclick={retryLoadItem} disabled={loading} type="button">Retry</button>
+    <p>{t('mobile.item.loadFailed')}</p>
+    <button class="retry" onclick={retryLoadItem} disabled={loading} type="button">{t('common.retry')}</button>
   </div>
 {:else}
   <div
@@ -408,7 +409,7 @@
     </div>
 
     {#if ancestors.length > 0}
-      <nav class="breadcrumb" data-testid="detail-breadcrumb" aria-label="Parent items">
+      <nav class="breadcrumb" data-testid="detail-breadcrumb" aria-label={t('mobile.item.parents')}>
         {#each ancestors as anc, i (anc.id)}
           {#if i > 0}<ChevronRight size={13} class="bc-sep" />{/if}
           <button class="bc-link" onclick={() => navigate(`/m/items/${anc.id}`)} data-testid="breadcrumb-link" type="button">
@@ -428,11 +429,11 @@
         class="edit-btn"
         onclick={() => navigate(`/m/items/${item.id}/edit`)}
         data-testid="detail-edit"
-        aria-label="Edit title and description"
+        aria-label={t('mobile.item.editTitleDescription')}
         type="button"
       >
         <Pencil size={16} />
-        <span>Edit</span>
+        <span>{t('common.edit')}</span>
       </button>
     </div>
 
@@ -454,12 +455,12 @@
           aria-pressed={personalIsDone}
           type="button"
         >
-          <span class="field-label">Status</span>
+          <span class="field-label">{t('common.status')}</span>
           <span class="field-value" data-testid="detail-status">
             <span class="done-check" class:done={personalIsDone} aria-hidden="true">
               {#if personalIsDone}<Check size={12} strokeWidth={3} />{/if}
             </span>
-            {personalIsDone ? 'Done' : (item.status_name || 'Open')}
+            {personalIsDone ? t('common.done') : (item.status_name || t('statuses.defaults.open.name'))}
           </span>
         </button>
       {:else}
@@ -470,7 +471,7 @@
         data-testid="status-picker-trigger"
         type="button"
       >
-        <span class="field-label">Status</span>
+        <span class="field-label">{t('common.status')}</span>
         <span class="field-value" data-testid="detail-status">
           <StatusPill name={item.status_name} color={item.status_color} />
           <ChevronDown size={16} class="chev" />
@@ -484,13 +485,13 @@
         data-testid="assignee-picker-trigger"
         type="button"
       >
-        <span class="field-label">Assignee</span>
+        <span class="field-label">{t('common.assignee')}</span>
         <span class="field-value">
           {#if item.assignee_id && item.assignee_name}
             <Avatar src={item.assignee_avatar} name={item.assignee_name} size="xs" variant="teal" />
             <span class="assignee-name">{item.assignee_name}</span>
           {:else}
-            <span class="muted">Unassigned</span>
+            <span class="muted">{t('common.unassigned')}</span>
           {/if}
           <ChevronDown size={16} class="chev" />
         </span>
@@ -507,10 +508,10 @@
     {#if item.due_date || personalTaskCount > 0}
       <dl class="meta">
         {#if item.due_date}
-          <div><dt>Due</dt><dd>{formatDateOnly(item.due_date)}</dd></div>
+          <div><dt>{t('common.dueDate')}</dt><dd>{formatDateOnly(item.due_date)}</dd></div>
         {/if}
         {#if personalTaskCount > 0}
-          <div><dt>Personal tasks</dt><dd>{personalTaskCount} linked</dd></div>
+          <div><dt>{t('personal.personalTasks')}</dt><dd>{t('mobile.item.linkedCount', { count: personalTaskCount })}</dd></div>
         {/if}
       </dl>
     {/if}
@@ -519,11 +520,11 @@
     <div class="actions">
       <button class="act" class:on={isWatching} onclick={toggleWatch} disabled={watchBusy} data-testid="detail-watch" type="button">
         <Star size={16} fill={isWatching ? 'currentColor' : 'none'} />
-        {isWatching ? 'Watching' : 'Watch'}
+        {isWatching ? t('mobile.item.watching') : t('mobile.item.watch')}
       </button>
       {#if canStartTimer}
         <button class="act" onclick={startTimer} disabled={startingTimer} data-testid="detail-start-timer" type="button">
-          <Play size={16} /> Start timer
+          <Play size={16} /> {t('items.startTimer')}
         </button>
       {/if}
     </div>
@@ -534,15 +535,15 @@
     {#if canCreateChild}
       <section class="subitems" data-testid="detail-subitems">
         <h2 class="section-title">
-          Sub-items {#if children.length > 0}<span class="count">{children.length}</span>{/if}
+          {t('mobile.item.children')} {#if children.length > 0}<span class="count">{children.length}</span>{/if}
           <button
             class="add-child"
             onclick={openCreateChild}
             data-testid="detail-add-sub-item"
             type="button"
-            aria-label="Add sub-item"
+            aria-label={t('mobile.item.addChild')}
           >
-            <Plus size={16} /> Add
+            <Plus size={16} /> {t('common.add')}
           </button>
         </h2>
         {#if children.length > 0}
@@ -559,7 +560,7 @@
     {#if scmAvailable}
       <section class="panel" data-testid="scm-panel">
         <button class="panel-head" onclick={() => (scmOpen = !scmOpen)} aria-expanded={scmOpen} data-testid="scm-panel-toggle" type="button">
-          <span class="panel-title"><GitPullRequest size={16} /> Commits &amp; pull requests</span>
+          <span class="panel-title"><GitPullRequest size={16} /> {t('mobile.item.commitsPullRequests')}</span>
           <ChevronDown size={18} class={scmOpen ? 'chev open' : 'chev'} />
         </button>
         {#if scmOpen}
@@ -576,7 +577,7 @@
     {#if hasAgentRuns}
       <section class="panel" data-testid="agent-panel">
         <button class="panel-head" onclick={() => (agentOpen = !agentOpen)} aria-expanded={agentOpen} data-testid="agent-panel-toggle" type="button">
-          <span class="panel-title"><Bot size={16} /> Coding agent</span>
+          <span class="panel-title"><Bot size={16} /> {t('mobile.item.codingAgent')}</span>
           <ChevronDown size={18} class={agentOpen ? 'chev open' : 'chev'} />
         </button>
         {#if agentOpen}
@@ -599,13 +600,13 @@
 {#if item && transitions.length > 0}
   <MobileOptionSheet
     bind:isOpen={statusSheetOpen}
-    title="Status"
+    title={t('common.status')}
     options={transitions}
     getValue={(s) => s.id}
     getLabel={(s) => s.name}
     selectedValue={item.status_id ?? null}
     onSelect={(s) => s && changeStatus(s.id)}
-    emptyText="No status options"
+    emptyText={t('mobile.item.noStatuses')}
     dataTestid="status-sheet"
   >
     {#snippet row(s)}
@@ -620,17 +621,17 @@
 {#if item}
   <MobileOptionSheet
     bind:isOpen={assigneeSheetOpen}
-    title="Assignee"
+    title={t('common.assignee')}
     options={assigneeOptions ?? []}
     loading={assigneeLoading}
     getValue={(u) => u.id}
     getLabel={userLabel}
     selectedValue={item.assignee_id ?? null}
     allowClear={true}
-    clearLabel="Unassigned"
+    clearLabel={t('common.unassigned')}
     onSelect={updateAssignee}
     onClear={() => updateAssignee(null)}
-    emptyText="No assignable users"
+    emptyText={t('mobile.item.noAssignees')}
     dataTestid="assignee-sheet"
   >
     {#snippet row(user)}

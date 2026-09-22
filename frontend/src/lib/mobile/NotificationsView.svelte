@@ -7,6 +7,7 @@
   import { mobileActionUrl } from '../utils/actionUrl.js';
   import MobileHeader from './MobileHeader.svelte';
   import { mobilePalette } from './mobilePalette.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let push = $state({ supported: false, installed: false, permission: 'default', subscribed: false });
   let pushBusy = $state(false);
@@ -41,14 +42,14 @@
   }
 </script>
 
-<MobileHeader title="Notifications">
+<MobileHeader title={t('notifications.title')}>
   {#snippet right()}
-    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label={t('mobile.palette.title')} type="button">
       <CommandIcon size={20} />
     </button>
     {#if hasUnread}
       <button class="mark-all" onclick={() => notificationActions.markAllAsRead()} data-testid="notifications-mark-all" type="button">
-        <Check size={16} /> Mark all read
+        <Check size={16} /> {t('notifications.markAllRead')}
       </button>
     {/if}
   {/snippet}
@@ -59,20 +60,20 @@
     {#if !push.installed}
       <div class="pb-info">
         <BellOff size={18} />
-        <span>Add Windshift to your Home Screen to enable push notifications.</span>
+        <span>{t('mobile.notifications.installRequired')}</span>
       </div>
     {:else if push.permission === 'denied'}
       <div class="pb-info">
         <BellOff size={18} />
-        <span>Notifications are blocked. Enable them for Windshift in your device settings.</span>
+        <span>{t('mobile.notifications.blocked')}</span>
       </div>
     {:else if push.subscribed}
       <button class="pb-btn on" onclick={togglePush} disabled={pushBusy} data-testid="push-toggle" type="button">
-        <BellRing size={16} /> Notifications on
+        <BellRing size={16} /> {t('mobile.notifications.enabled')}
       </button>
     {:else}
       <button class="pb-btn" onclick={togglePush} disabled={pushBusy} data-testid="push-toggle" type="button">
-        <Bell size={16} /> Enable notifications
+        <Bell size={16} /> {t('mobile.notifications.enable')}
       </button>
     {/if}
   </div>
@@ -82,12 +83,12 @@
   {#if list.length === 0}
     <div class="empty" data-testid="notifications-empty">
       <Bell size={28} />
-      <p>You're all caught up</p>
+      <p>{t('mobile.notifications.caughtUp')}</p>
     </div>
   {:else}
     {#each list as n (n.id)}
       <button class="n-row" class:unread={!n.read} onclick={() => open(n)} data-testid="notification-row" type="button">
-        {#if !n.read}<span class="dot" aria-label="Unread"></span>{/if}
+        {#if !n.read}<span class="dot" aria-label={t('mobile.common.unread')}></span>{/if}
         <div class="n-body">
           <span class="n-title">{n.title}</span>
           {#if n.message}<span class="n-msg">{n.message}</span>{/if}

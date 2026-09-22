@@ -2,6 +2,7 @@
   import { navigate } from '../router.js';
   import DueMark from '../widgets/dashboard/DueMark.svelte';
   import StatusPill from '../components/StatusPill.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Touch-sized work-item row for the mobile lists. Derived from
@@ -44,11 +45,11 @@
 >
   <div class="main">
     {#if priorityColor}
-      <span class="prio" style={`background-color: ${priorityColor};`} title={priorityName} aria-label={priorityName ? `Priority: ${priorityName}` : undefined}></span>
+      <span class="prio" style={`background-color: ${priorityColor};`} title={priorityName} aria-label={priorityName ? t('mobile.item.priorityLabel', { name: priorityName }) : undefined}></span>
     {/if}
     <span class="title">{title}</span>
     {#if unread}
-      <span class="unread" data-testid="mobile-item-unread" aria-label="Unread"></span>
+      <span class="unread" data-testid="mobile-item-unread" aria-label={t('mobile.common.unread')}></span>
     {/if}
   </div>
   <div class="meta">

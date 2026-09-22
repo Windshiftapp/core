@@ -9,6 +9,7 @@
   import MobileHeader from './MobileHeader.svelte';
   import { autoGrow, enterMovesFocus } from './autoGrowTextarea.js';
   import { pageAncestors, pageChildren } from './mobilePagesData.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Phone page reader: rendered markdown, breadcrumb, and sub-page rows.
   // Editing is a borderless full-page form (same Linear-style hero fields as
@@ -68,13 +69,13 @@
       });
       page = { ...page, ...updated };
       editing = false;
-      infoToast('Page saved.');
+      infoToast(t('mobile.pages.saved'));
     } catch (err) {
       console.error('Failed to save page:', err);
       errorToast(
         err?.status === 409
-          ? 'This page changed elsewhere. Reload and try again.'
-          : 'Saving failed. Try again.',
+          ? t('mobile.pages.conflict')
+          : t('mobile.pages.saveFailed'),
       );
     } finally {
       saving = false;
@@ -124,11 +125,11 @@
 <MobileHeader title={page?.title ?? ''} onback={back}>
   {#snippet right()}
     {#if editing}
-      <button class="hdr-btn" onclick={cancelEditing} data-testid="mobile-page-cancel" aria-label="Cancel editing" type="button">
+      <button class="hdr-btn" onclick={cancelEditing} data-testid="mobile-page-cancel" aria-label={t('mobile.pages.cancelEditing')} type="button">
         <X size={20} />
       </button>
     {:else if canEdit && page}
-      <button class="hdr-btn" onclick={startEditing} data-testid="mobile-page-edit" aria-label="Edit page" type="button">
+      <button class="hdr-btn" onclick={startEditing} data-testid="mobile-page-edit" aria-label={t('pages.modeEdit')} type="button">
         <Pencil size={18} />
       </button>
     {/if}
@@ -139,8 +140,8 @@
   <div class="center" data-testid="page-loading"><Loader class="spin" size={22} /></div>
 {:else if errored || !page}
   <div class="msg" data-testid="page-error">
-    <p>Couldn't load this page.</p>
-    <button class="retry" onclick={() => load(++loadToken)} disabled={loading} type="button">Retry</button>
+    <p>{t('pages.errorLoadPage')}</p>
+    <button class="retry" onclick={() => load(++loadToken)} disabled={loading} type="button">{t('common.retry')}</button>
   </div>
 {:else if editing}
   <!-- Borderless Linear-style editor: hero title + content, actions pinned
@@ -151,33 +152,33 @@
       bind:value={draftTitle}
       rows={1}
       enterkeyhint="next"
-      placeholder="Page title"
+      placeholder={t('mobile.pages.pageTitle')}
       use:autoGrow={draftTitle}
       use:enterMovesFocus={{ next: draftContentField }}
       data-testid="mobile-page-title-input"
-      aria-label="Page title"
+      aria-label={t('mobile.pages.pageTitle')}
     ></textarea>
     <textarea
       class="hero-content"
       bind:value={draftContent}
       bind:this={draftContentField}
       data-testid="mobile-page-content-input"
-      aria-label="Page content (Markdown)"
+      aria-label={t('mobile.pages.contentLabel')}
       spellcheck="false"
-      placeholder="Write something…"
+      placeholder={t('pages.editorPlaceholder')}
     ></textarea>
     <div class="editor-actions">
-      <button class="btn secondary" onclick={cancelEditing} data-testid="mobile-page-editor-cancel" type="button">Cancel</button>
+      <button class="btn secondary" onclick={cancelEditing} data-testid="mobile-page-editor-cancel" type="button">{t('common.cancel')}</button>
       <button class="btn primary" onclick={save} disabled={saving} data-testid="mobile-page-save" type="button">
         {#if saving}<Loader class="spin" size={16} />{/if}
-        Save
+        {t('common.save')}
       </button>
     </div>
   </div>
 {:else}
   <div class="detail" data-testid="mobile-page-detail">
     {#if ancestors.length > 0}
-      <nav class="breadcrumb" data-testid="page-breadcrumb" aria-label="Ancestor pages">
+      <nav class="breadcrumb" data-testid="page-breadcrumb" aria-label={t('mobile.pages.ancestors')}>
         {#each ancestors as anc (anc.id)}
           <button class="crumb" onclick={() => openSubPage(anc.id)} data-testid="page-breadcrumb-crumb" type="button">
             {#if anc.is_home}<House size={12} />{/if}
@@ -196,7 +197,7 @@
 
     <p class="meta" data-testid="mobile-page-meta">
       {#if workspaceName}{workspaceName} · {/if}
-      Updated {page.updated_at ? formatRelativeCompact(new Date(page.updated_at)) : '—'}
+      {t('common.updated')} {page.updated_at ? formatRelativeCompact(new Date(page.updated_at)) : '—'}
     </p>
 
     {#if page.content}
@@ -209,12 +210,12 @@
         {workspaceId}
       />
     {:else}
-      <p class="empty" data-testid="mobile-page-empty">This page is empty.</p>
+      <p class="empty" data-testid="mobile-page-empty">{t('mobile.pages.empty')}</p>
     {/if}
 
     {#if children.length > 0}
       <section class="subpages" data-testid="mobile-page-subpages">
-        <h2 class="section-title">Sub-pages</h2>
+        <h2 class="section-title">{t('mobile.pages.children')}</h2>
         <div class="sub-rows">
           {#each children as child (child.id)}
             <button

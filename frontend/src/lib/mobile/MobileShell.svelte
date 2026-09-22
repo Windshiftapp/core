@@ -23,6 +23,7 @@
   import MobileCreatePage from './MobileCreatePage.svelte';
   import MobileItemEditPage from './MobileItemEditPage.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   const view = $derived($currentRoute.view);
   const TAB_VIEWS = ['mobile-my-work', 'mobile-personal', 'mobile-timer', 'mobile-notifications'];
@@ -101,7 +102,7 @@
   </main>
 
   {#if showFab}
-    <button class="fab" onclick={openCreate} data-testid="mobile-create-fab" aria-label="Create item" type="button">
+    <button class="fab" onclick={openCreate} data-testid="mobile-create-fab" aria-label={t('mobile.create.action')} type="button">
       <Plus size={26} />
     </button>
   {/if}

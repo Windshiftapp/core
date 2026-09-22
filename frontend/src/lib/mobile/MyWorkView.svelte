@@ -11,11 +11,12 @@
   import MobileListState from './MobileListState.svelte';
   import UserAvatar from '../components/UserAvatar.svelte';
   import { mobilePalette } from './mobilePalette.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const SEGMENTS = [
-    { id: 'assigned', label: 'Assigned' },
-    { id: 'watched', label: 'Watched' },
-    { id: 'recent', label: 'Recent' },
+    { id: 'assigned', labelKey: 'common.assigned' },
+    { id: 'watched', labelKey: 'mobile.myWork.watched' },
+    { id: 'recent', labelKey: 'mobile.myWork.recent' },
   ];
 
   let segment = $state('assigned');
@@ -127,17 +128,17 @@
   });
 </script>
 
-<MobileHeader title="My Work">
+<MobileHeader title={t('mobile.myWork.title')}>
   {#snippet right()}
-    <button class="hdr-search" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+    <button class="hdr-search" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label={t('mobile.palette.title')} type="button">
       <CommandIcon size={20} />
     </button>
     {#if aiStore.chatAvailable}
-      <button class="hdr-search" onclick={() => navigate('/m/chat')} data-testid="mobile-chat-open" aria-label="Assistant" type="button">
+      <button class="hdr-search" onclick={() => navigate('/m/chat')} data-testid="mobile-chat-open" aria-label={t('mobile.chat.title')} type="button">
         <Sparkles size={20} />
       </button>
     {/if}
-    <button class="hdr-search" onclick={() => navigate('/m/search')} data-testid="mobile-search-open" aria-label="Search" type="button">
+    <button class="hdr-search" onclick={() => navigate('/m/search')} data-testid="mobile-search-open" aria-label={t('common.search')} type="button">
       <Search size={20} />
     </button>
     <UserAvatar minimal />
@@ -153,7 +154,7 @@
           data-testid={`my-work-segment-${s.id}`}
           onclick={() => selectSegment(s.id)}
           type="button"
-        >{s.label}</button>
+        >{t(s.labelKey)}</button>
       {/each}
     </div>
   {/snippet}
@@ -166,8 +167,8 @@
     rowCount={rows.length}
     errorTestId="my-work-error"
     emptyTestId="my-work-empty"
-    errorMessage="Couldn't load your work."
-    emptyMessage={segment === 'assigned' ? 'Nothing assigned to you right now.' : segment === 'watched' ? "You aren't watching any items." : 'No recent activity.'}
+    errorMessage={t('mobile.myWork.loadFailed')}
+    emptyMessage={segment === 'assigned' ? t('mobile.myWork.noAssigned') : segment === 'watched' ? t('mobile.myWork.noWatched') : t('mobile.myWork.noRecent')}
     onretry={() => load(segment)}
   >
     {#each rows as row (row.itemId)}

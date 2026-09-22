@@ -20,6 +20,7 @@
   import { dateInputToISOString } from '../utils/dateFormatter.js';
   import { parseDuration } from '../utils/timeUtils.js';
   import { isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import { t, translateError } from '../stores/i18n.svelte.js';
 
   /**
    * Full-page create flow for the phone surface (replaces the old modal
@@ -219,7 +220,7 @@
   );
 
   const pageTitle = $derived(
-    isPersonal ? 'New personal task' : isChild ? 'New sub-item' : 'New item'
+    isPersonal ? t('mobile.create.personal') : isChild ? t('mobile.create.child') : t('mobile.create.item')
   );
 
   const canSubmit = $derived(
@@ -568,18 +569,18 @@
 
   function labelForSystemField(field) {
     switch (field.field_identifier) {
-      case 'priority': return 'Priority';
-      case 'assignee': return 'Assignee';
-      case 'milestone': return 'Milestone';
-      case 'iteration': return 'Iteration';
-      case 'project': return 'Project';
-      case 'labels': return 'Labels';
-      case 'due_date': return 'Due date';
-      case 'start_date': return 'Start date';
-      case 'end_date': return 'End date';
-      case 'story_points': return 'Story points';
+      case 'priority': return t('common.priority');
+      case 'assignee': return t('common.assignee');
+      case 'milestone': return t('common.milestone');
+      case 'iteration': return t('common.iteration');
+      case 'project': return t('common.project');
+      case 'labels': return t('common.labels');
+      case 'due_date': return t('common.dueDate');
+      case 'start_date': return t('common.startDate');
+      case 'end_date': return t('common.endDate');
+      case 'story_points': return t('items.storyPoints');
       case 'estimate':
-      case 'estimate_minutes': return 'Estimate';
+      case 'estimate_minutes': return t('items.estimate');
       default: return field.field_identifier;
     }
   }
@@ -639,18 +640,18 @@
         }
         const value = systemFieldValue(field);
         if (isEmptyValue(value)) {
-          error = `${labelForSystemField(field)} is required.`;
+          error = t('mobile.create.requiredField', { field: labelForSystemField(field) });
           return false;
         }
         if (field.field_identifier === 'story_points' && parsedStoryPoints() === null) {
-          error = 'Story points must be a valid number.';
+          error = t('mobile.create.invalidStoryPoints');
           return false;
         }
         if (
           systemFieldIdentifiers('estimate').includes(field.field_identifier) &&
           parsedEstimateMinutes() === null
         ) {
-          error = 'Estimate must be a valid duration.';
+          error = t('mobile.create.invalidEstimate');
           return false;
         }
       } else if (field.field_type === 'custom') {
@@ -659,7 +660,7 @@
         const fieldDef = customFieldsById.get(fieldId);
         if (isBooleanCustomFieldType(fieldDef?.field_type)) continue;
         if (isEmptyValue(value)) {
-          error = `${fieldDef?.name || 'Custom field'} is required.`;
+          error = t('mobile.create.requiredField', { field: fieldDef?.name || t('mobile.create.customField') });
           return false;
         }
       }
@@ -718,7 +719,7 @@
       }
     } catch (err) {
       console.error('Failed to create item:', err);
-      error = err?.message || 'Could not create the item.';
+      error = (err?.code || err?.errorCode || err?.message) ? translateError(err) : t('mobile.create.failed');
     } finally {
       saving = false;
     }
@@ -754,7 +755,7 @@
 
 <MobileEditorPage
   title={pageTitle}
-  saveLabel={isPersonal ? 'Add' : 'Create'}
+  saveLabel={isPersonal ? t('common.add') : t('common.create')}
   canSave={canSubmit}
   saving={saving}
   {error}
@@ -763,14 +764,14 @@
   dataTestid="mobile-create-page"
 >
   {#if parentLoading}
-    <p class="loading" data-testid="create-parent-loading">Loading parent…</p>
+    <p class="loading" data-testid="create-parent-loading">{t('mobile.create.loadingParent')}</p>
   {:else if parentErrored}
-    <p class="error" data-testid="create-parent-error">Couldn't load the parent item.</p>
+    <p class="error" data-testid="create-parent-error">{t('mobile.create.parentFailed')}</p>
   {:else}
     <div class="create" data-testid="create-form">
       {#if isChild}
         <p class="parent" data-testid="create-parent">
-          Under <strong>{parent?.title}</strong>
+          {t('mobile.create.under')} <strong>{parent?.title}</strong>
         </p>
       {/if}
 
@@ -780,7 +781,7 @@
       <textarea
         class="hero-title"
         bind:value={title}
-        placeholder={isPersonal ? 'Task title' : 'Issue title'}
+        placeholder={isPersonal ? t('mobile.create.taskTitle') : t('createModal.issueTitle')}
         autocomplete="off"
         rows={1}
         enterkeyhint="next"
@@ -793,7 +794,7 @@
         bind:value={description}
         bind:this={descriptionField}
         rows={4}
-        placeholder="Description…"
+        placeholder={t('mobile.item.descriptionPlaceholder')}
         data-testid="create-description"
         readonly={templateLocked}
       ></textarea>
@@ -806,15 +807,15 @@
         {#if templateLocked}
           <span
             class="template-chip template-locked"
-            title={`This item type enforces the "${mandatoryTemplate?.name}" template`}
+            title={t('mobile.create.enforcedTemplateHelp', { name: mandatoryTemplate?.name ?? '' })}
             data-testid="template-picker-locked"
           >
             <FileText size={14} style="flex-shrink: 0;" />
-            <span>{mandatoryTemplate?.name} (enforced)</span>
+            <span>{t('mobile.create.enforcedTemplate', { name: mandatoryTemplate?.name ?? '' })}</span>
           </span>
         {:else if templateOptions.length >= 1}
           <label class="inline-field">
-            <span>Template</span>
+            <span>{t('workspaces.template')}</span>
             <NativeSelect
               value={selectedTemplateId ?? ''}
               onchange={(value) => {
@@ -828,7 +829,7 @@
               disabled={templatesLoading}
               dataTestid="template-picker"
               options={[
-                { value: '', label: 'No template' },
+                { value: '', label: t('mobile.create.noTemplate') },
                 ...templateOptions.map((template) => ({ value: template.id, label: template.name })),
               ]}
             />
@@ -836,14 +837,14 @@
         {/if}
 
         {#if fieldsLoading}
-          <p class="loading">Loading configured fields…</p>
+          <p class="loading">{t('mobile.create.loadingFields')}</p>
         {/if}
 
         <!-- Screen-configured custom fields stay in the flow (arbitrary
              widget types); system properties are chips in the footer bar. -->
         {#if requiredCustomFields.length > 0}
           <section class="field-section" data-testid="configured-required-fields">
-            <h3>Required fields</h3>
+            <h3>{t('mobile.create.requiredFields')}</h3>
             {#each requiredCustomFields as entry (entry.screenField.field_identifier)}
               {@render customField(entry, true)}
             {/each}
@@ -858,7 +859,7 @@
               data-testid="create-optional-toggle"
               onclick={() => showOptionalFields = !showOptionalFields}
             >
-              <span>Optional fields ({optionalCustomFields.length})</span>
+              <span>{t('mobile.create.optionalFields', { count: optionalCustomFields.length })}</span>
               <span aria-hidden="true">{showOptionalFields ? '−' : '+'}</span>
             </button>
             {#if showOptionalFields}
@@ -885,7 +886,7 @@
               bind:value={workspaceId}
               disabled={isChild}
               dataTestid="create-workspace"
-              ariaLabel="Workspace"
+              ariaLabel={t('common.workspace')}
               options={workspaces.map((ws) => ({ value: ws.id, label: ws.name }))}
             />
           </div>
@@ -894,7 +895,7 @@
               bind:value={itemTypeId}
               disabled={typesLoading || itemTypes.length === 0}
               dataTestid="create-type"
-              ariaLabel="Type"
+              ariaLabel={t('common.type')}
               options={itemTypes.map((itemType) => ({ value: itemType.id, label: itemType.name }))}
             />
           </div>
@@ -912,10 +913,10 @@
      owns the back gesture on this page. -->
 <MobileConfirmSheet
   bind:isOpen={confirmDiscardOpen}
-  title="Discard this item?"
-  message="What you typed will be lost."
-  confirmLabel="Discard"
-  cancelLabel="Keep editing"
+  title={t('mobile.create.discardTitle')}
+  message={t('mobile.create.discardMessage')}
+  confirmLabel={t('common.discard')}
+  cancelLabel={t('mobile.item.keepEditing')}
   destructive
   pushHistory={false}
   onconfirm={discardAndLeave}
@@ -927,16 +928,16 @@
 {#if !isPersonal}
   <MobileOptionSheet
     bind:isOpen={prioritySheetOpen}
-    title="Priority"
+    title={t('common.priority')}
     options={priorities}
     getValue={(p) => p.id}
     getLabel={(p) => p.name}
     selectedValue={priorityId}
     allowClear={true}
-    clearLabel="No priority"
+    clearLabel={t('pickers.noPriority')}
     onSelect={(p) => (priorityId = p?.id ?? null)}
     onClear={() => (priorityId = null)}
-    emptyText="No priorities"
+    emptyText={t('mobile.create.noPriorities')}
     dataTestid="priority-sheet"
   >
     {#snippet row(p)}
@@ -949,17 +950,17 @@
 
   <MobileOptionSheet
     bind:isOpen={assigneeSheetOpen}
-    title="Assignee"
+    title={t('common.assignee')}
     options={assigneeOptions ?? []}
     loading={assigneeLoading}
     getValue={(u) => u.id}
     getLabel={userLabel}
     selectedValue={assigneeId}
     allowClear={true}
-    clearLabel="Unassigned"
+    clearLabel={t('common.unassigned')}
     onSelect={(u) => (assigneeId = u?.id ?? null)}
     onClear={() => (assigneeId = null)}
-    emptyText="No assignable users"
+    emptyText={t('mobile.item.noAssignees')}
     dataTestid="create-assignee-sheet"
   >
     {#snippet row(u)}
@@ -972,7 +973,7 @@
 
   <MobileOptionSheet
     bind:isOpen={milestoneSheetOpen}
-    title="Milestone"
+    title={t('common.milestone')}
     options={milestones}
     getValue={(m) => m.id}
     getLabel={(m) => m.name}
@@ -983,13 +984,13 @@
         ? milestoneIds.filter((id) => id !== m.id)
         : [...milestoneIds, m.id];
     }}
-    emptyText="No milestones"
+    emptyText={t('mobile.create.noMilestones')}
     dataTestid="milestone-sheet"
   />
 
   <MobileOptionSheet
     bind:isOpen={labelsSheetOpen}
-    title="Labels"
+    title={t('common.labels')}
     options={labelOptions}
     getValue={(l) => l.id}
     getLabel={(l) => l.name}
@@ -1000,7 +1001,7 @@
         ? selectedLabels.filter((l) => l.id !== label.id)
         : [...selectedLabels, label];
     }}
-    emptyText="No labels yet"
+    emptyText={t('pages.labelsEmpty')}
     dataTestid="labels-sheet"
   />
 {/if}
@@ -1010,27 +1011,27 @@
     {#if field.field_identifier === 'priority'}
       <button class="chip" class:filled={!!priorityName} onclick={() => (prioritySheetOpen = true)} data-testid="create-field-priority" type="button">
         {#if priorityName}<span class="chip-dot" style={`background-color: ${priorities.find((p) => p.id === priorityId)?.color || 'var(--ds-text-subtle)'};`}></span>{/if}
-        <span class="chip-value" class:unset={!priorityName}>{priorityName ?? 'Priority'}{#if required}<span class="req">*</span>{/if}</span>
+        <span class="chip-value" class:unset={!priorityName}>{priorityName ?? t('common.priority')}{#if required}<span class="req">*</span>{/if}</span>
       </button>
     {:else if field.field_identifier === 'assignee'}
       <button class="chip" class:filled={!!assigneeName} onclick={openAssigneeSheet} data-testid="create-field-assignee" type="button">
-        <span class="chip-value" class:unset={!assigneeName}>{assigneeName ?? 'Assignee'}{#if required}<span class="req">*</span>{/if}</span>
+        <span class="chip-value" class:unset={!assigneeName}>{assigneeName ?? t('common.assignee')}{#if required}<span class="req">*</span>{/if}</span>
       </button>
     {:else if field.field_identifier === 'milestone'}
       <button class="chip" class:filled={milestoneNames.length > 0} onclick={() => (milestoneSheetOpen = true)} data-testid="create-field-milestone" type="button">
-        <span class="chip-value" class:unset={milestoneNames.length === 0}>{milestoneNames.length > 0 ? milestoneNames.join(', ') : 'Milestone'}{#if required}<span class="req">*</span>{/if}</span>
+        <span class="chip-value" class:unset={milestoneNames.length === 0}>{milestoneNames.length > 0 ? milestoneNames.join(', ') : t('common.milestone')}{#if required}<span class="req">*</span>{/if}</span>
       </button>
     {:else if field.field_identifier === 'labels'}
       <button class="chip" class:filled={labelNames.length > 0} onclick={() => (labelsSheetOpen = true)} data-testid="create-field-labels" type="button">
-        <span class="chip-value" class:unset={labelNames.length === 0}>{labelNames.length > 0 ? labelNames.join(', ') : 'Labels'}{#if required}<span class="req">*</span>{/if}</span>
+        <span class="chip-value" class:unset={labelNames.length === 0}>{labelNames.length > 0 ? labelNames.join(', ') : t('common.labels')}{#if required}<span class="req">*</span>{/if}</span>
       </button>
     {:else if field.field_identifier === 'iteration'}
       <div class="chip chip-control">
         <NativeSelect
           bind:value={iterationId}
-          ariaLabel="Iteration"
+          ariaLabel={t('common.iteration')}
           options={[
-            { value: null, label: 'Iteration' },
+            { value: null, label: t('common.iteration') },
             ...iterations.map((iteration) => ({ value: iteration.id, label: iteration.name })),
           ]}
         />
@@ -1039,32 +1040,32 @@
       <div class="chip chip-control">
         <NativeSelect
           bind:value={projectId}
-          ariaLabel="Project"
+          ariaLabel={t('common.project')}
           options={[
-            { value: null, label: 'Project' },
+            { value: null, label: t('common.project') },
             ...timeProjects.map((project) => ({ value: project.id, label: project.name })),
           ]}
         />
       </div>
     {:else if field.field_identifier === 'due_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={dueDate} aria-label="Due date" />
+        <input class="chip-input" type="date" bind:value={dueDate} aria-label={t('common.dueDate')} />
       </label>
     {:else if field.field_identifier === 'start_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={startDate} aria-label="Start date" />
+        <input class="chip-input" type="date" bind:value={startDate} aria-label={t('common.startDate')} />
       </label>
     {:else if field.field_identifier === 'end_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={endDate} aria-label="End date" />
+        <input class="chip-input" type="date" bind:value={endDate} aria-label={t('common.endDate')} />
       </label>
     {:else if field.field_identifier === 'story_points'}
       <label class="chip chip-control">
-        <input class="chip-input" type="number" min="0" step="0.5" bind:value={storyPoints} placeholder="Points" aria-label="Story points" />
+        <input class="chip-input" type="number" min="0" step="0.5" bind:value={storyPoints} placeholder={t('items.storyPoints')} aria-label={t('items.storyPoints')} />
       </label>
     {:else if field.field_identifier === 'estimate' || field.field_identifier === 'estimate_minutes'}
       <label class="chip chip-control">
-        <input class="chip-input" type="text" bind:value={estimate} placeholder="Estimate" aria-label="Estimate" />
+        <input class="chip-input" type="text" bind:value={estimate} placeholder={t('items.estimate')} aria-label={t('items.estimate')} />
       </label>
     {/if}
   </div>

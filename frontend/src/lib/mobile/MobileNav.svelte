@@ -3,13 +3,14 @@
   import { currentRoute } from '../router.js';
   import { notifications } from '../stores/notifications.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   const tabs = [
-    { view: 'mobile-my-work', href: '/m', label: 'My Work', icon: ListChecks, testid: 'mobile-nav-my-work' },
-    { view: 'mobile-personal', href: '/m/personal', label: 'Personal', icon: SquareCheckBig, testid: 'mobile-nav-personal' },
-    { view: 'mobile-pages', href: '/m/pages', label: 'Pages', icon: BookOpen, testid: 'mobile-nav-pages' },
-    { view: 'mobile-timer', href: '/m/timer', label: 'Timer', icon: Timer, testid: 'mobile-nav-timer' },
-    { view: 'mobile-notifications', href: '/m/notifications', label: 'Alerts', icon: Bell, testid: 'mobile-nav-notifications' },
+    { view: 'mobile-my-work', href: '/m', labelKey: 'mobile.myWork.title', icon: ListChecks, testid: 'mobile-nav-my-work' },
+    { view: 'mobile-personal', href: '/m/personal', labelKey: 'workspaces.personal', icon: SquareCheckBig, testid: 'mobile-nav-personal' },
+    { view: 'mobile-pages', href: '/m/pages', labelKey: 'pages.treeHeading', icon: BookOpen, testid: 'mobile-nav-pages' },
+    { view: 'mobile-timer', href: '/m/timer', labelKey: 'time.pomodoro.timer', icon: Timer, testid: 'mobile-nav-timer' },
+    { view: 'mobile-notifications', href: '/m/notifications', labelKey: 'mobile.nav.alerts', icon: Bell, testid: 'mobile-nav-notifications' },
   ];
 
   const activeView = $derived($currentRoute.view);
@@ -35,7 +36,7 @@
           <span class="dot" data-testid="mobile-nav-timer-dot"></span>
         {/if}
       </span>
-      <span class="label">{tab.label}</span>
+      <span class="label">{t(tab.labelKey)}</span>
     </a>
   {/each}
 </nav>

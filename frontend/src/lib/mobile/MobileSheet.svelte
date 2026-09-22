@@ -1,5 +1,6 @@
 <script>
   import { portal } from '../actions/portal.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Bottom sheet primitive for the phone surface. Replaces desktop
@@ -133,7 +134,7 @@
     <!-- Scrim: tap to dismiss -->
     <button
       class="scrim"
-      aria-label="Close"
+      aria-label={t('common.close')}
       tabindex="-1"
       onclick={close}
       type="button"
@@ -145,7 +146,7 @@
       class:dragging
       role="dialog"
       aria-modal="true"
-      aria-label={title || 'Dialog'}
+      aria-label={title || t('mobile.common.dialog')}
       tabindex="-1"
       style:transform={dragY > 0 ? `translateY(${dragY}px)` : ''}
     >

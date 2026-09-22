@@ -7,6 +7,7 @@
   import MobileItemRow from './MobileItemRow.svelte';
   import Input from '../components/Input.svelte';
   import { searchPagesAcrossWorkspaces } from './mobilePagesData.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let query = $state('');
   let results = $state([]);
@@ -92,7 +93,7 @@
 </script>
 
 <header class="search-bar" data-testid="mobile-search-bar">
-  <button class="back" onclick={back} aria-label="Back" type="button">
+  <button class="back" onclick={back} aria-label={t('common.back')} type="button">
     <ChevronLeft size={24} />
   </button>
   <div class="field">
@@ -103,27 +104,27 @@
       oninput={onInput}
       type="search"
       enterkeyhint="search"
-      placeholder="Search items and pages…"
+      placeholder={t('mobile.search.placeholder')}
       dataTestid="mobile-search-input"
       autocomplete="off"
       class="mobile-search-input !p-0"
     />
     {#if query}
-      <button class="clear" onclick={clear} aria-label="Clear" type="button"><X size={16} /></button>
+      <button class="clear" onclick={clear} aria-label={t('common.clear')} type="button"><X size={16} /></button>
     {/if}
   </div>
 </header>
 
 <div class="results" data-testid="mobile-search-results">
   {#if loading && results.length === 0 && pageResults.length === 0}
-    <p class="msg">Searching…</p>
+    <p class="msg">{t('common.searching')}</p>
   {:else if !query.trim()}
-    <p class="msg" data-testid="search-prompt">Search by title, key, or text across items and pages you can see.</p>
+    <p class="msg" data-testid="search-prompt">{t('mobile.search.help')}</p>
   {:else if searched && results.length === 0 && pageResults.length === 0}
-    <p class="msg" data-testid="search-empty">No items or pages match “{query.trim()}”.</p>
+    <p class="msg" data-testid="search-empty">{t('mobile.search.empty', { query: query.trim() })}</p>
   {:else}
     {#if pageResults.length > 0}
-      <h2 class="section" data-testid="mobile-search-pages-header">Pages</h2>
+      <h2 class="section" data-testid="mobile-search-pages-header">{t('pages.treeHeading')}</h2>
       <div class="page-rows" data-testid="mobile-search-page-results">
         {#each pageResults as page (page.workspace_id + '-' + page.id)}
           <button
