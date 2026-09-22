@@ -3,7 +3,7 @@
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import StatusBadge from '../../../components/StatusBadge.svelte';
-  import GenericActionNode from '../shared/GenericActionNode.svelte';
+  import BaseActionNode from '../shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 
@@ -16,7 +16,7 @@
   let status = $derived(target.mode === 'explicit' ? getStatus(target.status_id) : null);
 </script>
 
-<GenericActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={ArrowRightCircle} title={t('actions.nodes.transitionItem', 'Transition item')} accentColor="teal">
+<BaseActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={ArrowRightCircle} title={t('actions.nodes.transitionItem', 'Transition item')} accentColor="teal">
   {#snippet body()}
     {#if target.mode === 'explicit'}
       {#if status}
@@ -36,7 +36,7 @@
       </div>
     {/if}
   {/snippet}
-</GenericActionNode>
+</BaseActionNode>
 
 <style>
   .target-summary {

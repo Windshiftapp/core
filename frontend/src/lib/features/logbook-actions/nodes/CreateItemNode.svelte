@@ -1,7 +1,7 @@
 <script>
   import { FileText } from '@lucide/svelte';
   import { logbookActionFlowStore } from '../../../stores/logbookActionFlowStore.svelte.js';
-  import GenericActionNode from '../../actions/shared/GenericActionNode.svelte';
+  import BaseActionNode from '../../actions/shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 
@@ -12,7 +12,7 @@
   };
 </script>
 
-<GenericActionNode {data} {selected} flowStore={data.flowStore || logbookActionFlowStore} icon={FileText} title="Create Item" {colorVars}>
+<BaseActionNode {data} {selected} flowStore={data.flowStore || logbookActionFlowStore} icon={FileText} title="Create Item" {colorVars}>
   {#snippet body()}
     {#if data.config?.title}
       <div class="config-line">{data.config.title}</div>
@@ -20,6 +20,6 @@
       <div class="placeholder">Configure item creation</div>
     {/if}
   {/snippet}
-</GenericActionNode>
+</BaseActionNode>
 
 

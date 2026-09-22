@@ -2,12 +2,12 @@
   import { Pencil } from '@lucide/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
-  import GenericActionNode from '../shared/GenericActionNode.svelte';
+  import BaseActionNode from '../shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 </script>
 
-<GenericActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={Pencil} title={t('actions.nodes.setField')} accentColor="purple">
+<BaseActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={Pencil} title={t('actions.nodes.setField')} accentColor="purple">
   {#snippet body()}
     {#if data.config?.field_name}
       <div class="field-info">
@@ -19,7 +19,7 @@
       <div class="placeholder">{t('actions.config.selectField')}</div>
     {/if}
   {/snippet}
-</GenericActionNode>
+</BaseActionNode>
 
 <style>
   .field-info {

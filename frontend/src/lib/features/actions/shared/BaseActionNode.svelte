@@ -23,6 +23,8 @@
     title,
     accentColor = 'teal',
     colorVars = null,
+    // Optional custom body snippet; falls back to the built-in body variants.
+    body = null,
     // i18n key for the label next to capability_id (e.g. AI agent shows "Model")
     capabilityLabelKey = 'actions.config.capability',
     // i18n key overriding the unconfigured-state placeholder
@@ -70,7 +72,7 @@
   // Common body rendering logic
 </script>
 
-{#snippet body()}
+{#snippet defaultBody()}
     {#if showCapabilityId && data.config?.capability_id}
       <div class="cap-info">
         <span class="cap-label">{t(capabilityLabelKey)}:</span>
@@ -153,7 +155,11 @@
     <span class="node-title">{title}</span>
   </div>
   <div class="node-body">
-    {@render body()}
+    {#if body}
+      {@render body()}
+    {:else}
+      {@render defaultBody()}
+    {/if}
   </div>
 
   <Handle type="source" position={positions.output} id="output" />
@@ -359,7 +365,8 @@
     font-weight: 500;
   }
 
-  .placeholder {
+  /* Covers the built-in placeholder and placeholders inside caller-supplied body snippets. */
+  .base-action-node :global(.placeholder) {
     color: var(--ds-text-subtle);
     font-size: 12px;
     font-style: italic;

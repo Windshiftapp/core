@@ -1,12 +1,12 @@
 <script>
   import { Users } from '@lucide/svelte';
   import { logbookActionFlowStore } from '../../../stores/logbookActionFlowStore.svelte.js';
-  import GenericActionNode from '../../actions/shared/GenericActionNode.svelte';
+  import BaseActionNode from '../../actions/shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 </script>
 
-<GenericActionNode {data} {selected} flowStore={data.flowStore || logbookActionFlowStore} icon={Users} title="Associate Customer" accentColor="purple">
+<BaseActionNode {data} {selected} flowStore={data.flowStore || logbookActionFlowStore} icon={Users} title="Associate Customer" accentColor="purple">
   {#snippet body()}
     {#if data.config?.customer_organisation_id || data.config?.portal_customer_id}
       <div class="config-line">
@@ -21,6 +21,6 @@
       <div class="placeholder">Configure customer</div>
     {/if}
   {/snippet}
-</GenericActionNode>
+</BaseActionNode>
 
 

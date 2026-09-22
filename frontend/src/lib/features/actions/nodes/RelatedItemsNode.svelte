@@ -2,7 +2,7 @@
   import { GitFork } from '@lucide/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
-  import GenericActionNode from '../shared/GenericActionNode.svelte';
+  import BaseActionNode from '../shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 
@@ -31,7 +31,7 @@
   }
 </script>
 
-<GenericActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={GitFork} title={t('actions.nodes.relatedItems', 'For each related item')} accentColor="indigo">
+<BaseActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={GitFork} title={t('actions.nodes.relatedItems', 'For each related item')} accentColor="indigo">
   {#snippet body()}
     <div class="related-summary">
       <div class="row"><span class="label">Relation:</span> {relationLabels[relation] || relation}</div>
@@ -46,7 +46,7 @@
       {/if}
     </div>
   {/snippet}
-</GenericActionNode>
+</BaseActionNode>
 
 <style>
   .related-summary {
