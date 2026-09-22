@@ -181,7 +181,8 @@ async function collectIssues() {
 
   for (const fullPath of files) {
     const source = await readFile(fullPath, 'utf8');
-    const file = path.relative(rootDir, fullPath);
+    // Baseline signatures use repository paths on every platform.
+    const file = path.relative(rootDir, fullPath).split(path.sep).join('/');
 
     checkModalSubmitShortcuts(source, file, issues);
     checkModalBackdropConfirmShortcuts(source, file, issues);
