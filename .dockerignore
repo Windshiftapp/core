@@ -36,3 +36,9 @@ cmd/stresstest-cf-index
 !frontend/scripts/**
 !frontend/src/
 !frontend/src/**
+!scripts/
+!scripts/demo/
+!scripts/demo/generate-demo.js
+!scripts/demo/demo-data.js
+!scripts/demo/challenge-data.js
+!scripts/demo/scale-data.js

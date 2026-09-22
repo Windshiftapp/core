@@ -10,6 +10,12 @@
  * - Hierarchical work items with realistic data
  * - Projects and priorities
  *
+ * All seeding goes through the current v2 API (`/api/v2/...`, `{data: ...}`
+ * envelopes). A few management endpoints are still session-auth legacy
+ * surface (`/api/users`, milestone categories, iteration types, customer
+ * organisations, personal workspace, item scheduling) and use the same
+ * session cookie.
+ *
  * Usage:
  *   node generate-demo.js [options]
  *
@@ -80,6 +86,12 @@ function getRelativeDate(daysFromMonday) {
   const result = new Date(weekStart);
   result.setDate(result.getDate() + daysFromMonday);
   return formatDate(result);
+}
+
+// Full ISO timestamp; the v2 item API decodes due_date/start_date as
+// time.Time and rejects date-only strings with a misleading decode error.
+function toISODate(dateStr) {
+  return dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00Z`;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -422,6 +434,7 @@ async function startServer(options) {
   const serverProcess = spawn(options.binary, [
     '-db', options.db,
     '-p', options.port.toString(),
+    '-no-csrf',
     '--allowed-hosts', 'localhost,127.0.0.1'
   ], {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -471,31 +484,60 @@ async function startServer(options) {
   return serverProcess;
 }
 
-// Note: CSRF protection uses Sec-Fetch-Site header, no token endpoint needed.
-
-// Make authenticated requests to the cookie-auth `/api/*` surface.
+// Authenticated session for both API surfaces.
 //
-// API tokens (`crw_*`) are intentionally only valid on `/rest/api/v1/*`; the
-// legacy/UI `/api/*` surface is session-cookie authenticated. Demo generation
-// still needs several endpoints that are not exposed in v1 yet (test mgmt,
-// assets, screens, admin custom fields), so we login once and send the session
-// cookie plus Sec-Fetch-Site for CSRF.
-async function makeAuthRequest(baseURL, method, endpoint, data, sessionCookie) {
+// The v2 surface (`/api/v2/*`) and the remaining legacy session-auth routes
+// (`/api/users`, `/api/milestone-categories`, ...) share the session cookie.
+// API tokens (`crw_*`) are only valid on `/rest/api/v1/*` and cannot be used
+// here. CSRF validation on both surfaces accepts the `Sec-Fetch-Site:
+// same-origin` header, which we send on every request; servers we spawn
+// additionally run with `-no-csrf`.
+async function makeAuthRequest(baseURL, method, endpoint, data, sessionCookie, extraHeaders = {}) {
   return makeRequest(method, `${baseURL}${endpoint}`, data, {
     'Cookie': sessionCookie,
-    'Sec-Fetch-Site': 'same-origin'
+    'Sec-Fetch-Site': 'same-origin',
+    ...extraHeaders
   });
 }
 
-// Complete initial setup
-async function completeSetup(baseURL) {
+// v2 request returning the unwrapped `data` payload. Throws on non-2xx with
+// the status and the server's error message so failures are diagnosable.
+async function v2(baseURL, sessionCookie, method, endpoint, data, extraHeaders = {}) {
+  const response = await makeAuthRequest(baseURL, method, endpoint, data, sessionCookie, extraHeaders);
+  if (response.status < 200 || response.status >= 300) {
+    // v2 errors use {error: {code, message, details?}}; older surfaces use flat strings.
+    const err = response.data?.error;
+    const detail = err?.message || response.data?.message || JSON.stringify(response.data)?.slice(0, 300);
+    throw new Error(`${method} ${endpoint} failed: ${response.status} - ${detail}`);
+  }
+  const body = response.data;
+  return body && typeof body === 'object' && 'data' in body ? body.data : body;
+}
+
+// Merge-patch JSON is the canonical partial-update content type on v2.
+async function v2Patch(baseURL, sessionCookie, endpoint, data) {
+  return v2(baseURL, sessionCookie, 'PATCH', endpoint, data, {
+    'Content-Type': 'application/merge-patch+json'
+  });
+}
+
+// Complete initial setup. Safe to call against an already-configured
+// instance; required for fresh databases even when the server was started
+// externally (the Docker seeder runs with --no-server).
+async function completeSetup(baseURL, options = {}) {
   logSection('Completing Initial Setup');
+
+  const statusResponse = await makeRequest('GET', `${baseURL}/api/setup/status`);
+  if (statusResponse.status === 200 && statusResponse.data?.setup_completed) {
+    logInfo('Setup already completed');
+    return true;
+  }
 
   const setupData = {
     admin_user: {
       email: 'admin@demo.com',
-      username: 'admin',
-      password: 'admin', // Plaintext; hashed server-side
+      username: options.adminUser || 'admin',
+      password: options.adminPassword || 'admin', // Plaintext; hashed server-side
       first_name: 'Admin',
       last_name: 'User'
     },
@@ -513,7 +555,7 @@ async function completeSetup(baseURL) {
     if (response.status === 200 || response.status === 201) {
       logSuccess('Initial setup completed');
       return true;
-    } else if (response.status === 400 && response.data.error?.includes('already completed')) {
+    } else if (response.status === 400 && JSON.stringify(response.data)?.includes('already been completed')) {
       logInfo('Setup already completed');
       return true;
     } else {
@@ -526,7 +568,7 @@ async function completeSetup(baseURL) {
   }
 }
 
-// Get a session cookie for the `/api/*` seeding surface.
+// Get a session cookie for both API surfaces.
 async function getSessionCookie(baseURL, options = {}) {
   logSection('Getting Session Cookie');
 
@@ -534,7 +576,6 @@ async function getSessionCookie(baseURL, options = {}) {
   const adminPassword = options.adminPassword || 'admin';
 
   try {
-    // Step 1: Login to get session cookie (CSRF uses Sec-Fetch-Site header)
     logInfo(`Logging in as ${adminUser}...`);
     const loginData = {
       email_or_username: adminUser,
@@ -550,14 +591,13 @@ async function getSessionCookie(baseURL, options = {}) {
       return null;
     }
 
-    // Step 2: Extract session cookie
+    // Extract session cookie
     const cookies = loginResponse.cookies;
     if (!cookies || cookies.length === 0) {
       logError('No session cookie received from login');
       return null;
     }
 
-    // Find session cookie
     let sessionCookie = null;
     for (const cookie of cookies) {
       if (cookie.includes('session') || cookie.includes('windshift_session')) {
@@ -587,7 +627,10 @@ async function getSessionCookie(baseURL, options = {}) {
 // before `/api/*` switched to session-only auth.
 const getBearerToken = getSessionCookie;
 
-// Create demo users
+// Create demo users.
+// POST /api/users is still legacy session-auth surface; accounts can be
+// created directly active. Re-runs against an existing instance resolve the
+// already-present accounts from GET /api/v2/users.
 async function createUsers(baseURL, token, usersData = demoUsers) {
   logSection('Creating Demo Users');
 
@@ -596,25 +639,26 @@ async function createUsers(baseURL, token, usersData = demoUsers) {
   // Fetch existing users so we can resolve IDs for already-created ones
   let existingUsers = [];
   try {
-    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/users', null, token);
-    if (listResp.status === 200 && Array.isArray(listResp.data)) {
-      existingUsers = listResp.data;
-    }
+    existingUsers = await v2(baseURL, token, 'GET', '/api/v2/users?page_size=1000');
+    if (!Array.isArray(existingUsers)) existingUsers = [];
   } catch (_) { /* ignore */ }
+
+  const findExisting = (username) => existingUsers.find(u => u.username === username);
 
   for (const user of usersData) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/users', user, token);
+      const response = await makeAuthRequest(baseURL, 'POST', '/api/users', { ...user, is_active: true }, token);
 
       if (response.status === 200 || response.status === 201) {
+        const created = response.data?.data ?? response.data;
         createdUsers[user.username] = {
-          id: response.data.id,
+          id: created.id,
           name: `${user.first_name} ${user.last_name}`.trim()
         };
         logSuccess(`Created user: ${user.first_name} ${user.last_name} (${user.role})`);
       } else if (response.status === 409) {
         // User already exists - find them in the existing list
-        const existing = existingUsers.find(u => u.username === user.username);
+        const existing = findExisting(user.username);
         if (existing) {
           createdUsers[user.username] = {
             id: existing.id,
@@ -625,10 +669,23 @@ async function createUsers(baseURL, token, usersData = demoUsers) {
           logError(`User ${user.username} exists but could not find in user list`);
         }
       } else {
-        logError(`Failed to create user ${user.username}: ${response.status}`);
+        logError(`Failed to create user ${user.username}: ${response.status} - ${JSON.stringify(response.data)?.slice(0, 200)}`);
       }
     } catch (error) {
       logError(`Error creating user ${user.username}: ${error.message}`);
+    }
+  }
+
+  // Accounts that already existed may be inactive (older seeds created them
+  // that way); activate them so they are assignable.
+  for (const user of usersData) {
+    const resolved = createdUsers[user.username];
+    const existing = findExisting(user.username);
+    if (resolved && existing && existing.is_active === false) {
+      try {
+        await makeAuthRequest(baseURL, 'POST', `/api/users/${resolved.id}/activate`, null, token);
+        logInfo(`Activated existing user: ${user.username}`);
+      } catch (_) { /* best effort */ }
     }
   }
 
@@ -644,10 +701,8 @@ async function createWorkspaces(baseURL, token, workspacesData = workspaces) {
   // Fetch existing workspaces so we can resolve IDs for already-created ones
   let existingWorkspaces = [];
   try {
-    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/workspaces', null, token);
-    if (listResp.status === 200 && Array.isArray(listResp.data)) {
-      existingWorkspaces = listResp.data;
-    }
+    existingWorkspaces = await v2(baseURL, token, 'GET', '/api/v2/workspaces?page_size=1000');
+    if (!Array.isArray(existingWorkspaces)) existingWorkspaces = [];
   } catch (_) { /* ignore */ }
 
   for (const workspace of workspacesData) {
@@ -660,14 +715,9 @@ async function createWorkspaces(baseURL, token, workspacesData = workspaces) {
     }
 
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/workspaces', workspace, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdWorkspaces[workspace.key] = response.data.id;
-        logSuccess(`Created workspace: ${workspace.name} (${workspace.key})`);
-      } else {
-        logError(`Failed to create workspace ${workspace.key}: ${response.status}`);
-      }
+      const created = await v2(baseURL, token, 'POST', '/api/v2/workspaces', workspace);
+      createdWorkspaces[workspace.key] = created.id;
+      logSuccess(`Created workspace: ${workspace.name} (${workspace.key})`);
     } catch (error) {
       logError(`Error creating workspace ${workspace.key}: ${error.message}`);
     }
@@ -676,9 +726,9 @@ async function createWorkspaces(baseURL, token, workspacesData = workspaces) {
   return createdWorkspaces;
 }
 
-// Create projects
+// Create time tracking projects (per workspace, tied to a customer)
 async function createProjects(baseURL, token, workspaceMap, customerMap, projectsData = projects) {
-  logSection('Creating Projects');
+  logSection('Creating Time Tracking Projects');
 
   const createdProjects = {};
 
@@ -693,19 +743,13 @@ async function createProjects(baseURL, token, workspaceMap, customerMap, project
       const projectData = {
         customer_id: customerId,
         name: project.name,
-        description: project.description,
-        active: project.active
+        description: project.description
       };
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/time/projects', projectData, token);
-
-      if (response.status === 200 || response.status === 201) {
-        const key = `${project.workspaceKey}:${project.name}`;
-        createdProjects[key] = response.data.id;
-        logSuccess(`Created project: ${project.name} for ${project.customerName}`);
-      } else {
-        logError(`Failed to create project ${project.name}: ${response.status}`);
-      }
+      const created = await v2(baseURL, token, 'POST', '/api/v2/time/projects', projectData);
+      const key = `${project.workspaceKey}:${project.name}`;
+      createdProjects[key] = created.id;
+      logSuccess(`Created project: ${project.name} for ${project.customerName}`);
     } catch (error) {
       logError(`Error creating project ${project.name}: ${error.message}`);
     }
@@ -714,28 +758,64 @@ async function createProjects(baseURL, token, workspaceMap, customerMap, project
   return createdProjects;
 }
 
-// Create custom fields
+// Parse a select field's options payload. The v2 catalog returns the parsed
+// object; the mutation DTO returns a JSON string in the normalized format.
+function parseSelectOptions(options) {
+  if (!options) return [];
+  const parsed = typeof options === 'string' ? JSON.parse(options) : options;
+  return Array.isArray(parsed?.items) ? parsed.items : [];
+}
+
+// Create custom fields.
+// Returns [fieldIdMap, selectOptionMap]: fieldIdMap maps field name → ID,
+// selectOptionMap maps select field name → { label → option id }. Select
+// values in item payloads must be numeric option IDs, not labels.
 async function createCustomFields(baseURL, token) {
   logSection('Creating Custom Fields');
 
   const createdFields = {};
+  const selectOptions = {};
+
+  const recordField = (field, payload) => {
+    createdFields[field.name] = payload.id;
+    if (field.field_type === 'select' || field.field_type === 'multiselect') {
+      const options = {};
+      for (const item of parseSelectOptions(payload.options)) {
+        options[item.label] = item.id;
+      }
+      selectOptions[field.name] = options;
+    }
+  };
 
   for (const field of customFields) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/admin/custom-fields', field, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdFields[field.name] = response.data.id;
-        logSuccess(`Created custom field: ${field.name} (${field.field_type})`);
-      } else {
-        logError(`Failed to create field ${field.name}: ${response.status}`);
-      }
+      const response = await v2(baseURL, token, 'POST', '/api/v2/custom-fields', {
+        name: field.name,
+        field_type: field.field_type,
+        description: field.description || '',
+        required: field.required || false,
+        options: field.options || ''
+      });
+      recordField(field, response.custom_field ?? response);
+      logSuccess(`Created custom field: ${field.name} (${field.field_type})`);
     } catch (error) {
       logError(`Error creating field ${field.name}: ${error.message}`);
     }
   }
 
-  return createdFields;
+  // Resolve fields that already existed (re-runs against a populated instance)
+  try {
+    const existing = await v2(baseURL, token, 'GET', '/api/v2/custom-fields?page_size=1000');
+    for (const field of Array.isArray(existing) ? existing : []) {
+      const definition = customFields.find(f => f.name === field.name);
+      if (definition && !createdFields[field.name]) {
+        recordField(definition, field);
+        logInfo(`Custom field already exists: ${field.name} (id: ${field.id})`);
+      }
+    }
+  } catch (_) { /* ignore */ }
+
+  return [createdFields, selectOptions];
 }
 
 // Create screens
@@ -746,45 +826,35 @@ async function createScreens(baseURL, token, fieldMap) {
 
   for (const screen of screens) {
     try {
-      const screenData = {
+      const created = await v2(baseURL, token, 'POST', '/api/v2/screens', {
         name: screen.name,
         description: screen.description
-      };
+      });
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/screens', screenData, token);
+      createdScreens[screen.name] = created.id;
+      logSuccess(`Created screen: ${screen.name}`);
 
-      if (response.status === 200 || response.status === 201) {
-        createdScreens[screen.name] = response.data.id;
-        logSuccess(`Created screen: ${screen.name}`);
+      // Add fields to screen. v2 screen fields identify custom fields with
+      // field_type "custom" and the field ID as a string identifier.
+      if (screen.fields && screen.fields.length > 0) {
+        const fieldsData = screen.fields
+          .map(fieldName => fieldMap[fieldName])
+          .filter(id => id !== undefined)
+          .map((fieldId, index) => ({
+            field_type: 'custom',
+            field_identifier: String(fieldId),
+            display_order: index + 1,
+            is_required: false
+          }));
 
-        // Add fields to screen
-        if (screen.fields && screen.fields.length > 0) {
-          const fieldIds = screen.fields
-            .map(fieldName => fieldMap[fieldName])
-            .filter(id => id !== undefined);
-
-          if (fieldIds.length > 0) {
-            const fieldsData = fieldIds.map((fieldId, index) => ({
-              custom_field_id: fieldId,
-              display_order: index + 1,
-              required: false
-            }));
-
-            const fieldsResponse = await makeAuthRequest(
-              baseURL,
-              'PUT',
-              `/api/screens/${response.data.id}/fields`,
-              { fields: fieldsData },
-              token
-            );
-
-            if (fieldsResponse.status === 200) {
-              logInfo(`  Added ${fieldIds.length} fields to screen`);
-            }
+        if (fieldsData.length > 0) {
+          try {
+            await v2(baseURL, token, 'PUT', `/api/v2/screens/${created.id}/fields`, { fields: fieldsData });
+            logInfo(`  Added ${fieldsData.length} fields to screen`);
+          } catch (error) {
+            logError(`  Failed to add fields to screen: ${error.message}`);
           }
         }
-      } else {
-        logError(`Failed to create screen ${screen.name}: ${response.status}`);
       }
     } catch (error) {
       logError(`Error creating screen ${screen.name}: ${error.message}`);
@@ -800,37 +870,34 @@ async function createPriorities(baseURL, token) {
 
   const createdPriorities = {};
 
-  for (const priority of priorities) {
-    try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/priorities', priority, token);
+  // Fetch existing priorities; a fresh database already has the builtin set.
+  let existing = [];
+  try {
+    existing = await v2(baseURL, token, 'GET', '/api/v2/priorities?page_size=1000');
+    if (!Array.isArray(existing)) existing = [];
+  } catch (_) { /* ignore */ }
 
-      if (response.status === 200 || response.status === 201) {
-        createdPriorities[priority.name] = response.data.id;
-        logSuccess(`Created priority: ${priority.name} ${priority.icon}`);
-      } else if (response.status === 409) {
-        // Priority already exists (from migrations) - fetch existing ID
-        try {
-          const allPriorities = await makeAuthRequest(baseURL, 'GET', '/api/priorities', null, token);
-          const existingPriority = allPriorities.data.find(p => p.name === priority.name);
-          if (existingPriority) {
-            createdPriorities[priority.name] = existingPriority.id;
-            logInfo(`Priority already exists: ${priority.name} ${priority.icon}`);
-          }
-        } catch (fetchError) {
-          logError(`Failed to fetch existing priority ${priority.name}: ${fetchError.message}`);
-        }
-      } else {
-        logError(`Failed to create priority ${priority.name}: ${response.status}`);
-      }
+  for (const priority of priorities) {
+    const match = existing.find(p => p.name === priority.name);
+    if (match) {
+      createdPriorities[priority.name] = match.id;
+      logInfo(`Priority already exists: ${priority.name} (id: ${match.id})`);
+      continue;
+    }
+
+    try {
+      const created = await v2(baseURL, token, 'POST', '/api/v2/priorities', priority);
+      createdPriorities[priority.name] = created.id;
+      logSuccess(`Created priority: ${priority.name} ${priority.icon}`);
     } catch (error) {
-      logError(`Error creating priority ${priority.name}: ${error.message}`);
+      logError(`Failed to create priority ${priority.name}: ${error.message}`);
     }
   }
 
   return createdPriorities;
 }
 
-// Create milestone categories (global)
+// Create milestone categories (global; still a session-auth legacy surface)
 async function createMilestoneCategories(baseURL, token) {
   logSection('Creating Milestone Categories');
 
@@ -840,8 +907,9 @@ async function createMilestoneCategories(baseURL, token) {
   let existingCategories = [];
   try {
     const listResp = await makeAuthRequest(baseURL, 'GET', '/api/milestone-categories', null, token);
-    if (listResp.status === 200 && Array.isArray(listResp.data)) {
-      existingCategories = listResp.data;
+    if (listResp.status === 200) {
+      const body = listResp.data?.data ?? listResp.data;
+      if (Array.isArray(body)) existingCategories = body;
     }
   } catch (_) { /* ignore */ }
 
@@ -862,7 +930,8 @@ async function createMilestoneCategories(baseURL, token) {
       }, token);
 
       if (response.status === 200 || response.status === 201) {
-        categoryMap[category.name] = response.data.id;
+        const created = response.data?.data ?? response.data;
+        categoryMap[category.name] = created.id;
         logSuccess(`Created milestone category: ${category.name}`);
       } else {
         logError(`Failed to create milestone category ${category.name}: ${response.status}`);
@@ -875,21 +944,21 @@ async function createMilestoneCategories(baseURL, token) {
   return categoryMap;
 }
 
-// Create milestones (supports both global and local)
+// Create milestones. Milestones are workspace-scoped on v2; global milestones
+// use the unscoped route, workspace milestones the nested route.
 async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}, milestonesData = milestones) {
   logSection('Creating Milestones');
 
   const createdMilestones = {};
 
   for (const milestone of milestonesData) {
-    // Handle global vs local milestones
-    let workspaceId = null;
-    if (!milestone.is_global) {
-      workspaceId = workspaceMap[milestone.workspaceKey];
-      if (!workspaceId) {
-        logError(`Workspace ${milestone.workspaceKey} not found for milestone ${milestone.name}`);
-        continue;
-      }
+    const endpoint = milestone.is_global
+      ? '/api/v2/milestones'
+      : `/api/v2/workspaces/${workspaceMap[milestone.workspaceKey]}/milestones`;
+
+    if (!milestone.is_global && !workspaceMap[milestone.workspaceKey]) {
+      logError(`Workspace ${milestone.workspaceKey} not found for milestone ${milestone.name}`);
+      continue;
     }
 
     try {
@@ -898,9 +967,7 @@ async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}, 
         name: milestone.name,
         description: milestone.description,
         target_date: targetDate,
-        status: milestone.status,
-        is_global: milestone.is_global || false,
-        workspace_id: workspaceId
+        status: milestone.status
       };
 
       // Add category_id if milestone has a categoryName and category exists
@@ -908,19 +975,15 @@ async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}, 
         milestoneData.category_id = categoryMap[milestone.categoryName];
       }
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/milestones', milestoneData, token);
+      const created = await v2(baseURL, token, 'POST', endpoint, milestoneData);
 
-      if (response.status === 200 || response.status === 201) {
-        // Key format: global milestones use just name, local use workspace:name
-        const key = milestone.is_global
-          ? milestone.name
-          : `${milestone.workspaceKey}:${milestone.name}`;
-        createdMilestones[key] = response.data.id;
-        const scope = milestone.is_global ? '(global)' : `(${milestone.workspaceKey})`;
-        logSuccess(`Created milestone: ${milestone.name} ${scope} (${targetDate})`);
-      } else {
-        logError(`Failed to create milestone ${milestone.name}: ${response.status}`);
-      }
+      // Key format: global milestones use just name, local use workspace:name
+      const key = milestone.is_global
+        ? milestone.name
+        : `${milestone.workspaceKey}:${milestone.name}`;
+      createdMilestones[key] = created.id;
+      const scope = milestone.is_global ? '(global)' : `(${milestone.workspaceKey})`;
+      logSuccess(`Created milestone: ${milestone.name} ${scope} (${targetDate})`);
     } catch (error) {
       logError(`Error creating milestone ${milestone.name}: ${error.message}`);
     }
@@ -929,17 +992,20 @@ async function createMilestones(baseURL, token, workspaceMap, categoryMap = {}, 
   return createdMilestones;
 }
 
-// Get iteration types from the API (returns name → id map)
+// Get iteration types from the legacy catalog surface (returns name → id map)
 async function getIterationTypes(baseURL, token) {
   try {
     const response = await makeAuthRequest(baseURL, 'GET', '/api/iteration-types', null, token);
 
-    if (response.status === 200 && Array.isArray(response.data)) {
-      const typeMap = {};
-      for (const type of response.data) {
-        typeMap[type.name] = type.id;
+    if (response.status === 200) {
+      const body = response.data?.data ?? response.data;
+      if (Array.isArray(body)) {
+        const typeMap = {};
+        for (const type of body) {
+          typeMap[type.name] = type.id;
+        }
+        return typeMap;
       }
-      return typeMap;
     }
 
     logError(`Failed to fetch iteration types: ${response.status}`);
@@ -950,7 +1016,7 @@ async function getIterationTypes(baseURL, token) {
   }
 }
 
-// Create iterations (supports both global and local, with different types)
+// Create iterations. Like milestones, iterations are workspace-scoped on v2.
 async function createIterations(baseURL, token, workspaceMap, iterationTypeMap = {}, iterationsData = iterations) {
   // Backwards compatibility for callers using the old signature:
   // createIterations(baseURL, token, workspaceMap, iterationsData)
@@ -968,14 +1034,13 @@ async function createIterations(baseURL, token, workspaceMap, iterationTypeMap =
   const createdIterations = {};
 
   for (const iteration of iterationsData) {
-    // Handle global vs local iterations
-    let workspaceId = null;
-    if (!iteration.is_global) {
-      workspaceId = workspaceMap[iteration.workspaceKey];
-      if (!workspaceId) {
-        logError(`Workspace ${iteration.workspaceKey} not found for iteration ${iteration.name}`);
-        continue;
-      }
+    const endpoint = iteration.is_global
+      ? '/api/v2/iterations'
+      : `/api/v2/workspaces/${workspaceMap[iteration.workspaceKey]}/iterations`;
+
+    if (!iteration.is_global && !workspaceMap[iteration.workspaceKey]) {
+      logError(`Workspace ${iteration.workspaceKey} not found for iteration ${iteration.name}`);
+      continue;
     }
 
     try {
@@ -988,24 +1053,18 @@ async function createIterations(baseURL, token, workspaceMap, iterationTypeMap =
         start_date: startDate,
         end_date: endDate,
         status: iteration.status,
-        type_id: iterationTypeMap[iteration.type] || iterationTypeMap['Sprint'] || null,
-        is_global: iteration.is_global || false,
-        workspace_id: workspaceId
+        type_id: iterationTypeMap[iteration.type] || iterationTypeMap['Sprint'] || null
       };
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/iterations', iterationData, token);
+      const created = await v2(baseURL, token, 'POST', endpoint, iterationData);
 
-      if (response.status === 200 || response.status === 201) {
-        // Key format: global iterations use just name, local use workspace:name
-        const key = iteration.is_global
-          ? iteration.name
-          : `${iteration.workspaceKey}:${iteration.name}`;
-        createdIterations[key] = response.data.id;
-        const scope = iteration.is_global ? '(global)' : `(${iteration.workspaceKey})`;
-        logSuccess(`Created iteration: ${iteration.name} [${iteration.type}] ${scope} (${startDate} - ${endDate})`);
-      } else {
-        logError(`Failed to create iteration ${iteration.name}: ${response.status}`);
-      }
+      // Key format: global iterations use just name, local use workspace:name
+      const key = iteration.is_global
+        ? iteration.name
+        : `${iteration.workspaceKey}:${iteration.name}`;
+      createdIterations[key] = created.id;
+      const scope = iteration.is_global ? '(global)' : `(${iteration.workspaceKey})`;
+      logSuccess(`Created iteration: ${iteration.name} [${iteration.type}] ${scope} (${startDate} - ${endDate})`);
     } catch (error) {
       logError(`Error creating iteration ${iteration.name}: ${error.message}`);
     }
@@ -1017,18 +1076,12 @@ async function createIterations(baseURL, token, workspaceMap, iterationTypeMap =
 // Get link types from the API (returns name → id map)
 async function getLinkTypes(baseURL, token) {
   try {
-    const response = await makeAuthRequest(baseURL, 'GET', '/api/link-types', null, token);
-
-    if (response.status === 200 && Array.isArray(response.data)) {
-      const linkTypes = {};
-      for (const linkType of response.data) {
-        linkTypes[linkType.name] = linkType.id;
-      }
-      return linkTypes;
+    const linkTypes = await v2(baseURL, token, 'GET', '/api/v2/link-types');
+    const result = {};
+    for (const linkType of Array.isArray(linkTypes) ? linkTypes : []) {
+      result[linkType.name] = linkType.id;
     }
-
-    logError(`Failed to fetch link types: ${response.status}`);
-    return {};
+    return result;
   } catch (error) {
     logError(`Error fetching link types: ${error.message}`);
     return {};
@@ -1038,18 +1091,12 @@ async function getLinkTypes(baseURL, token) {
 // Get item types from the API
 async function getItemTypes(baseURL, token) {
   try {
-    const response = await makeAuthRequest(baseURL, 'GET', '/api/item-types', null, token);
-
-    if (response.status === 200) {
-      const itemTypes = {};
-      for (const itemType of response.data) {
-        itemTypes[itemType.name] = itemType.id;
-      }
-      return itemTypes;
+    const itemTypes = await v2(baseURL, token, 'GET', '/api/v2/item-types?page_size=1000');
+    const result = {};
+    for (const itemType of Array.isArray(itemTypes) ? itemTypes : []) {
+      result[itemType.name] = itemType.id;
     }
-
-    logError('Failed to fetch item types');
-    return {};
+    return result;
   } catch (error) {
     logError(`Error fetching item types: ${error.message}`);
     return {};
@@ -1059,18 +1106,12 @@ async function getItemTypes(baseURL, token) {
 // Get statuses from the API (returns name → id map)
 async function getStatuses(baseURL, token) {
   try {
-    const response = await makeAuthRequest(baseURL, 'GET', '/api/statuses', null, token);
-
-    if (response.status === 200) {
-      const statusMap = {};
-      for (const status of response.data) {
-        statusMap[status.name] = status.id;
-      }
-      return statusMap;
+    const statuses = await v2(baseURL, token, 'GET', '/api/v2/statuses?page_size=1000');
+    const result = {};
+    for (const status of Array.isArray(statuses) ? statuses : []) {
+      result[status.name] = status.id;
     }
-
-    logError('Failed to fetch statuses');
-    return {};
+    return result;
   } catch (error) {
     logError(`Error fetching statuses: ${error.message}`);
     return {};
@@ -1105,7 +1146,7 @@ function determineItemType(item, depth, itemTypes) {
   }
 }
 
-// Create time tracking customers
+// Create time tracking customers (still a session-auth legacy surface)
 async function createTimeCustomers(baseURL, token, customersData = timeCustomers) {
   logSection('Creating Time Tracking Customers');
 
@@ -1123,8 +1164,11 @@ async function createTimeCustomers(baseURL, token, customersData = timeCustomers
       const response = await makeAuthRequest(baseURL, 'POST', '/api/customer-organisations', customerData, token);
 
       if (response.status === 200 || response.status === 201) {
-        createdCustomers[customer.name] = response.data.id;
+        const created = response.data?.data ?? response.data;
+        createdCustomers[customer.name] = created.id;
         logSuccess(`Created time customer: ${customer.name}`);
+      } else if (response.status === 409) {
+        logInfo(`Time customer already exists: ${customer.name}`);
       } else {
         logError(`Failed to create customer ${customer.name}: ${response.status}`);
       }
@@ -1132,6 +1176,19 @@ async function createTimeCustomers(baseURL, token, customersData = timeCustomers
       logError(`Error creating customer ${customer.name}: ${error.message}`);
     }
   }
+
+  // Resolve IDs for customers that already existed
+  try {
+    const listResp = await makeAuthRequest(baseURL, 'GET', '/api/customer-organisations', null, token);
+    if (listResp.status === 200) {
+      const body = listResp.data?.data ?? listResp.data;
+      for (const customer of Array.isArray(body) ? body : []) {
+        if (timeCustomers.some(c => c.name === customer.name) && !createdCustomers[customer.name]) {
+          createdCustomers[customer.name] = customer.id;
+        }
+      }
+    }
+  } catch (_) { /* ignore */ }
 
   return createdCustomers;
 }
@@ -1142,22 +1199,22 @@ async function createWorkLogs(baseURL, token, itemMap, projectMap) {
 
   let createdCount = 0;
 
-  for (const log of workLogs) {
+  for (const logEntry of workLogs) {
     // Find the item by title and workspace
-    const itemKey = `${log.workspaceKey}:${log.itemTitle}`;
+    const itemKey = `${logEntry.workspaceKey}:${logEntry.itemTitle}`;
     const itemId = itemMap[itemKey];
 
     if (!itemId) {
-      logError(`Item "${log.itemTitle}" not found in workspace ${log.workspaceKey}`);
+      logError(`Item "${logEntry.itemTitle}" not found in workspace ${logEntry.workspaceKey}`);
       continue;
     }
 
     // Find the project ID
-    const projectKey = `${log.workspaceKey}:${log.projectName}`;
+    const projectKey = `${logEntry.workspaceKey}:${logEntry.projectName}`;
     const projectId = projectMap[projectKey];
 
     if (!projectId) {
-      logError(`Project "${log.projectName}" not found in workspace ${log.workspaceKey}`);
+      logError(`Project "${logEntry.projectName}" not found in workspace ${logEntry.workspaceKey}`);
       continue;
     }
 
@@ -1165,31 +1222,38 @@ async function createWorkLogs(baseURL, token, itemMap, projectMap) {
       const logData = {
         project_id: projectId,
         item_id: itemId,
-        description: log.description,
-        date: log.date,
-        duration: log.duration,
-        start_time: '',  // Let API calculate from duration
-        end_time: ''
+        description: logEntry.description,
+        date: logEntry.date,
+        duration: logEntry.duration
       };
 
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/time/worklogs', logData, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdCount++;
-        logSuccess(`Created work log: ${log.duration} on "${log.itemTitle}" in ${log.projectName}`);
-      } else {
-        logError(`Failed to create work log for ${log.itemTitle}: ${response.status}`);
-      }
+      await v2(baseURL, token, 'POST', '/api/v2/time/worklogs', logData);
+      createdCount++;
+      logSuccess(`Created work log: ${logEntry.duration} on "${logEntry.itemTitle}" in ${logEntry.projectName}`);
     } catch (error) {
-      logError(`Error creating work log for ${log.itemTitle}: ${error.message}`);
+      logError(`Error creating work log for ${logEntry.itemTitle}: ${error.message}`);
     }
   }
 
   return createdCount;
 }
 
+// Map custom field names in the data module to custom field IDs; the v2 item
+// API keys custom_field_values by numeric field ID and silently drops other
+// keys. Select values are translated from labels to option IDs.
+function mapCustomFieldValues(customFieldsByName, fieldMap, selectOptionMap = {}) {
+  if (!customFieldsByName) return undefined;
+  const mapped = {};
+  for (const [name, value] of Object.entries(customFieldsByName)) {
+    const fieldId = fieldMap[name];
+    if (fieldId === undefined) continue;
+    mapped[String(fieldId)] = selectOptionMap[name]?.[value] ?? value;
+  }
+  return Object.keys(mapped).length > 0 ? mapped : undefined;
+}
+
 // Create work items recursively
-async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, parentId = null, projectMap = {}, priorityMap = {}, itemTypes = {}, milestoneMap = {}, iterationMap = {}, statusMap = {}, depth = 0) {
+async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, parentId = null, projectMap = {}, priorityMap = {}, itemTypes = {}, milestoneMap = {}, iterationMap = {}, statusMap = {}, fieldMap = {}, selectOptionMap = {}, depth = 0) {
   try {
     const indent = '  '.repeat(depth);
 
@@ -1205,18 +1269,20 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
       priorityId = priorityMap[item.priority];
     }
 
-    // Resolve milestone ID if specified (try workspace-specific first, then global)
-    let milestoneId = null;
+    // Resolve milestone IDs if specified (try workspace-specific first, then
+    // global). v2 items link to planning via the milestone_ids array.
+    let milestoneIds;
     if (item.milestoneName) {
       const localKey = `${workspaceKey}:${item.milestoneName}`;
-      milestoneId = milestoneMap[localKey] || milestoneMap[item.milestoneName];
+      const milestoneId = milestoneMap[localKey] || milestoneMap[item.milestoneName];
+      if (milestoneId) milestoneIds = [milestoneId];
     }
 
     // Resolve iteration ID if specified (try workspace-specific first, then global)
     let iterationId = null;
     if (item.iterationName) {
       const localKey = `${workspaceKey}:${item.iterationName}`;
-      iterationId = iterationMap[localKey] || iterationMap[item.iterationName];
+      iterationId = iterationMap[localKey] || iterationMap[item.iterationName] || null;
     }
 
     // Determine item type based on depth and characteristics
@@ -1232,51 +1298,48 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
       is_task: item.is_task || false,
       project_id: projectId,
       priority_id: priorityId,
-      milestone_id: milestoneId,
       iteration_id: iterationId,
-      custom_field_values: item.custom_fields || {}
+      custom_field_values: mapCustomFieldValues(item.custom_fields, fieldMap, selectOptionMap)
     };
+    if (milestoneIds) itemData.milestone_ids = milestoneIds;
 
-    // The Go API decodes due_date as time.Time; send RFC3339 rather than a
-    // bare YYYY-MM-DD so demo data remains valid across both legacy and v1 DTOs.
+    // The v2 API decodes due_date as time.Time; send RFC3339 rather than a
+    // bare YYYY-MM-DD (which fails decode with a misleading "invalid JSON").
     if (item.due_date) {
-      itemData.due_date = item.due_date.includes('T') ? item.due_date : `${item.due_date}T00:00:00Z`;
+      itemData.due_date = toISODate(item.due_date);
+    }
+    if (item.start_date) {
+      itemData.start_date = toISODate(item.start_date);
     }
 
-    const response = await makeAuthRequest(baseURL, 'POST', '/api/items', itemData, token);
+    const created = await v2(baseURL, token, 'POST', '/api/v2/items', itemData);
+    const itemId = created.id;
+    const icon = item.is_task ? '☐' : (item.children ? '📁' : '📄');
+    const milestoneInfo = milestoneIds ? ` [M:${item.milestoneName}]` : '';
+    const iterationInfo = iterationId ? ` [I:${item.iterationName}]` : '';
+    logSuccess(`${indent}${icon} Created: ${item.title}${milestoneInfo}${iterationInfo}`);
 
-    if (response.status === 200 || response.status === 201) {
-      const itemId = response.data.id;
-      const icon = item.is_task ? '☐' : (item.children ? '📁' : '📄');
-      const milestoneInfo = milestoneId ? ` [M:${item.milestoneName}]` : '';
-      const iterationInfo = iterationId ? ` [I:${item.iterationName}]` : '';
-      logSuccess(`${indent}${icon} Created: ${item.title}${milestoneInfo}${iterationInfo}`);
+    // Track this item in the map for work logs
+    const key = `${workspaceKey}:${item.title}`;
+    itemMap[key] = itemId;
 
-      // Track this item in the map for work logs
-      const key = `${workspaceKey}:${item.title}`;
-      itemMap[key] = itemId;
-
-      // Create children recursively
-      if (item.children && item.children.length > 0) {
-        for (const child of item.children) {
-          await createWorkItem(baseURL, token, child, workspaceId, workspaceKey, itemMap, itemId, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, depth + 1);
-        }
+    // Create children recursively
+    if (item.children && item.children.length > 0) {
+      for (const child of item.children) {
+        await createWorkItem(baseURL, token, child, workspaceId, workspaceKey, itemMap, itemId, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, fieldMap, selectOptionMap, depth + 1);
       }
-
-      return itemId;
-    } else {
-      const errMsg = response.data?.error || response.data?.message || JSON.stringify(response.data);
-      logError(`${indent}Failed to create item "${item.title}": ${response.status} - ${errMsg}`);
-      return null;
     }
+
+    return itemId;
   } catch (error) {
-    logError(`Error creating item "${item.title}": ${error.message}`);
+    const indent = '  '.repeat(depth);
+    logError(`${indent}Error creating item "${item.title}": ${error.message}`);
     return null;
   }
 }
 
 // Create all work items for all workspaces
-async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}, statusMap = {}, workItemsData = workItems) {
+async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap = {}, iterationMap = {}, statusMap = {}, fieldMap = {}, selectOptionMap = {}, workItemsData = workItems) {
   logSection('Creating Work Items');
 
   const itemMap = {};
@@ -1300,7 +1363,7 @@ async function createWorkItems(baseURL, token, workspaceMap, projectMap, priorit
     }
 
     for (const item of items) {
-      await createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, null, wsProjectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, 0);
+      await createWorkItem(baseURL, token, item, workspaceId, workspaceKey, itemMap, null, wsProjectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, fieldMap, selectOptionMap, 0);
     }
   }
 
@@ -1315,14 +1378,9 @@ async function createTestLabels(baseURL, token, workspaceId, labelsData = testLa
 
   for (const label of labelsData) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-labels`, label, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdLabels[label.name] = response.data.id;
-        logSuccess(`Created test label: ${label.name}`);
-      } else {
-        logError(`Failed to create label ${label.name}: ${response.status}`);
-      }
+      const created = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-labels`, label);
+      createdLabels[label.name] = created.id;
+      logSuccess(`Created test label: ${label.name}`);
     } catch (error) {
       logError(`Error creating label ${label.name}: ${error.message}`);
     }
@@ -1333,41 +1391,34 @@ async function createTestLabels(baseURL, token, workspaceId, labelsData = testLa
 
 // Create test folders recursively
 async function createTestFolder(baseURL, token, workspaceId, folder, parentId = null, folderMap = {}, depth = 0) {
+  const indent = '  '.repeat(depth);
+
   try {
-    const indent = '  '.repeat(depth);
-
-    const folderData = {
+    const created = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-folders`, {
       name: folder.name,
-      description: folder.description,
+      description: folder.description || '',
       parent_id: parentId
-    };
+    });
 
-    const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-folders`, folderData, token);
+    const folderId = created.id;
+    logSuccess(`${indent}Created folder: ${folder.name}`);
 
-    if (response.status === 200 || response.status === 201) {
-      const folderId = response.data.id;
-      logSuccess(`${indent}Created folder: ${folder.name}`);
+    // Store folder path in map
+    const folderPath = parentId
+      ? `${Object.keys(folderMap).find(key => folderMap[key] === parentId)}/${folder.name}`
+      : folder.name;
+    folderMap[folderPath] = folderId;
 
-      // Store folder path in map
-      const folderPath = parentId
-        ? `${Object.keys(folderMap).find(key => folderMap[key] === parentId)}/${folder.name}`
-        : folder.name;
-      folderMap[folderPath] = folderId;
-
-      // Create children recursively
-      if (folder.children && folder.children.length > 0) {
-        for (const child of folder.children) {
-          await createTestFolder(baseURL, token, workspaceId, child, folderId, folderMap, depth + 1);
-        }
+    // Create children recursively
+    if (folder.children && folder.children.length > 0) {
+      for (const child of folder.children) {
+        await createTestFolder(baseURL, token, workspaceId, child, folderId, folderMap, depth + 1);
       }
-
-      return folderId;
-    } else {
-      logError(`${indent}Failed to create folder "${folder.name}": ${response.status}`);
-      return null;
     }
+
+    return folderId;
   } catch (error) {
-    logError(`Error creating folder "${folder.name}": ${error.message}`);
+    logError(`${indent}Error creating folder "${folder.name}": ${error.message}`);
     return null;
   }
 }
@@ -1401,68 +1452,46 @@ async function createTestCases(baseURL, token, workspaceId, folderMap, labelMap,
       }
 
       // Create test case
-      const testCaseData = {
+      const created = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-cases`, {
         title: testCase.title,
-        preconditions: testCase.preconditions,
+        preconditions: testCase.preconditions || '',
         folder_id: folderId
-      };
+      });
+      const testCaseId = created.id;
+      const key = `${testCase.folderPath}:${testCase.title}`;
+      testCaseMap[key] = testCaseId;
+      logSuccess(`Created test case: ${testCase.title}`);
 
-      const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-cases`, testCaseData, token);
-
-      if (response.status === 200 || response.status === 201) {
-        const testCaseId = response.data.id;
-        const key = `${testCase.folderPath}:${testCase.title}`;
-        testCaseMap[key] = testCaseId;
-        logSuccess(`Created test case: ${testCase.title}`);
-
-        // Create test steps
-        if (testCase.steps && testCase.steps.length > 0) {
-          for (let i = 0; i < testCase.steps.length; i++) {
-            const step = testCase.steps[i];
-            const stepData = {
-              step_number: i + 1,
+      // Create test steps
+      if (testCase.steps && testCase.steps.length > 0) {
+        for (let i = 0; i < testCase.steps.length; i++) {
+          const step = testCase.steps[i];
+          try {
+            await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`, {
               action: step.action,
-              data: step.data,
-              expected: step.expected
-            };
+              data: step.data || '',
+              expected: step.expected || ''
+            });
+          } catch (error) {
+            logError(`  Failed to create step ${i + 1} for test case "${testCase.title}": ${error.message}`);
+          }
+        }
+        logInfo(`  Added ${testCase.steps.length} steps`);
+      }
 
-            const stepResponse = await makeAuthRequest(
-              baseURL,
-              'POST',
-              `/api/workspaces/${workspaceId}/test-cases/${testCaseId}/steps`,
-              stepData,
-              token
-            );
-
-            if (stepResponse.status !== 200 && stepResponse.status !== 201) {
-              logError(`  Failed to create step ${i + 1} for test case "${testCase.title}"`);
+      // Add labels to test case
+      if (testCase.labels && testCase.labels.length > 0) {
+        for (const labelName of testCase.labels) {
+          const labelId = labelMap[labelName];
+          if (labelId) {
+            try {
+              await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`, { label_id: labelId });
+            } catch (error) {
+              logError(`  Failed to add label "${labelName}" to test case "${testCase.title}": ${error.message}`);
             }
           }
-          logInfo(`  Added ${testCase.steps.length} steps`);
         }
-
-        // Add labels to test case
-        if (testCase.labels && testCase.labels.length > 0) {
-          for (const labelName of testCase.labels) {
-            const labelId = labelMap[labelName];
-            if (labelId) {
-              const labelResponse = await makeAuthRequest(
-                baseURL,
-                'POST',
-                `/api/workspaces/${workspaceId}/test-cases/${testCaseId}/labels`,
-                { label_id: labelId },
-                token
-              );
-
-              if (labelResponse.status !== 200 && labelResponse.status !== 201) {
-                logError(`  Failed to add label "${labelName}" to test case "${testCase.title}"`);
-              }
-            }
-          }
-          logInfo(`  Added ${testCase.labels.length} labels`);
-        }
-      } else {
-        logError(`Failed to create test case "${testCase.title}": ${response.status}`);
+        logInfo(`  Added ${testCase.labels.length} labels`);
       }
     } catch (error) {
       logError(`Error creating test case "${testCase.title}": ${error.message}`);
@@ -1472,9 +1501,9 @@ async function createTestCases(baseURL, token, workspaceId, folderMap, labelMap,
   return testCaseMap;
 }
 
-// Create test sets
+// Create test plans (formerly test sets; sets were renamed to plans)
 async function createTestSets(baseURL, token, workspaceId, milestoneMap, testCaseMap, labelMap) {
-  logSection('Creating Test Sets');
+  logSection('Creating Test Plans');
 
   const testSetMap = {};
 
@@ -1486,52 +1515,40 @@ async function createTestSets(baseURL, token, workspaceId, milestoneMap, testCas
         milestoneId = milestoneMap[testSet.milestone];
       }
 
-      const testSetData = {
+      const created = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-plans`, {
         name: testSet.name,
         description: testSet.description,
         milestone_id: milestoneId
-      };
+      });
 
-      const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-sets`, testSetData, token);
+      const testSetId = created.id;
+      testSetMap[testSet.name] = testSetId;
+      logSuccess(`Created test plan: ${testSet.name}`);
 
-      if (response.status === 200 || response.status === 201) {
-        const testSetId = response.data.id;
-        testSetMap[testSet.name] = testSetId;
-        logSuccess(`Created test set: ${testSet.name}`);
+      // Add test cases to plan based on label filter
+      let addedCount = 0;
+      if (testSet.labelFilter) {
+        // Find all test cases with this label
+        for (const [key, testCaseId] of Object.entries(testCaseMap)) {
+          // Find the original test case definition
+          const originalTestCase = testCases.find(tc => {
+            const tcKey = `${tc.folderPath}:${tc.title}`;
+            return tcKey === key;
+          });
 
-        // Add test cases to set based on label filter
-        let addedCount = 0;
-        if (testSet.labelFilter) {
-          // Find all test cases with this label
-          for (const [key, testCaseId] of Object.entries(testCaseMap)) {
-            // Find the original test case definition
-            const originalTestCase = testCases.find(tc => {
-              const tcKey = `${tc.folderPath}:${tc.title}`;
-              return tcKey === key;
-            });
-
-            if (originalTestCase && originalTestCase.labels && originalTestCase.labels.includes(testSet.labelFilter)) {
-              // Add this test case to the set
-              const addResponse = await makeAuthRequest(
-                baseURL,
-                'POST',
-                `/api/workspaces/${workspaceId}/test-sets/${testSetId}/test-cases`,
-                { test_case_id: testCaseId },
-                token
-              );
-
-              if (addResponse.status === 200 || addResponse.status === 201) {
-                addedCount++;
-              }
+          if (originalTestCase && originalTestCase.labels && originalTestCase.labels.includes(testSet.labelFilter)) {
+            try {
+              await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-plans/${testSetId}/test-cases`, { test_case_id: testCaseId });
+              addedCount++;
+            } catch (error) {
+              logError(`  Failed to add test case to plan: ${error.message}`);
             }
           }
-          logInfo(`  Added ${addedCount} test cases with label "${testSet.labelFilter}"`);
         }
-      } else {
-        logError(`Failed to create test set "${testSet.name}": ${response.status}`);
+        logInfo(`  Added ${addedCount} test cases with label "${testSet.labelFilter}"`);
       }
     } catch (error) {
-      logError(`Error creating test set "${testSet.name}": ${error.message}`);
+      logError(`Error creating test plan "${testSet.name}": ${error.message}`);
     }
   }
 
@@ -1546,27 +1563,21 @@ async function createTestRunTemplates(baseURL, token, workspaceId, testSetMap) {
 
   for (const template of testRunTemplates) {
     try {
-      // Find test set ID
+      // Find test plan ID (templates take plan_id since sets → plans)
       const testSetId = testSetMap[template.testSet];
       if (!testSetId) {
         logError(`Test set not found: ${template.testSet}`);
         continue;
       }
 
-      const templateData = {
-        set_id: testSetId,
+      const created = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-run-templates`, {
+        plan_id: testSetId,
         name: template.name,
         description: template.description
-      };
+      });
 
-      const response = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/test-run-templates`, templateData, token);
-
-      if (response.status === 200 || response.status === 201) {
-        templateMap[template.name] = response.data.id;
-        logSuccess(`Created test run template: ${template.name}`);
-      } else {
-        logError(`Failed to create template "${template.name}": ${response.status}`);
-      }
+      templateMap[template.name] = created.id;
+      logSuccess(`Created test run template: ${template.name}`);
     } catch (error) {
       logError(`Error creating template "${template.name}": ${error.message}`);
     }
@@ -1575,154 +1586,70 @@ async function createTestRunTemplates(baseURL, token, workspaceId, testSetMap) {
   return templateMap;
 }
 
+// Record test run results. Result updates are merge-patch on v2, and the run
+// only renders recorded results once it has been ended.
+async function recordRunResults(baseURL, token, workspaceId, testRunId, results, outcomes) {
+  let failedCount = 0;
+  for (let i = 0; i < results.length; i++) {
+    const status = outcomes(results[i], i, failedCount);
+    if (status === 'failed') failedCount++;
+    try {
+      await v2Patch(baseURL, token, `/api/v2/workspaces/${workspaceId}/test-runs/${testRunId}/results/${results[i].id}`, {
+        status,
+        actual_result: status === 'passed'
+          ? 'Test passed successfully'
+          : 'Test failed - unexpected behavior detected'
+      });
+    } catch (error) {
+      logError(`  Failed to record result for run: ${error.message}`);
+    }
+  }
+  try {
+    await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-runs/${testRunId}/end`, {});
+  } catch (error) {
+    logError(`  Failed to end run: ${error.message}`);
+  }
+  return failedCount;
+}
+
 // Execute test run templates and update results
 async function executeTestRuns(baseURL, token, workspaceId, templateMap, itemMap) {
   logSection('Executing Test Runs');
 
   const testRunMap = {};
 
+  const executeTemplate = async (templateName, runKey, outcomes) => {
+    try {
+      const run = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-run-templates/${templateMap[templateName]}/execute`, {});
+      const testRunId = run.id;
+      testRunMap[runKey] = testRunId;
+      logSuccess(`Executed template: ${templateName}`);
+
+      const results = await v2(baseURL, token, 'GET', `/api/v2/workspaces/${workspaceId}/test-runs/${testRunId}/results`);
+      const failedCount = await recordRunResults(baseURL, token, workspaceId, testRunId, Array.isArray(results) ? results : [], outcomes);
+      const passedCount = (Array.isArray(results) ? results.length : 0) - failedCount;
+      logSuccess(`  ${passedCount} passed, ${failedCount} failed, run completed`);
+    } catch (error) {
+      logError(`Error executing ${templateName}: ${error.message}`);
+    }
+  };
+
   // Execute "Daily Smoke Tests" template - all passing
   if (templateMap['Daily Smoke Tests']) {
-    try {
-      const executeResponse = await makeAuthRequest(
-        baseURL,
-        'POST',
-        `/api/workspaces/${workspaceId}/test-run-templates/${templateMap['Daily Smoke Tests']}/execute`,
-        {},
-        token
-      );
-
-      if (executeResponse.status === 200 || executeResponse.status === 201) {
-        const testRunId = executeResponse.data.id;
-        testRunMap['Daily Smoke Tests - 2025-01-15'] = testRunId;
-        logSuccess(`Executed template: Daily Smoke Tests`);
-
-        // Get all test results for this run
-        const resultsResponse = await makeAuthRequest(
-          baseURL,
-          'GET',
-          `/api/workspaces/${workspaceId}/test-runs/${testRunId}/results`,
-          null,
-          token
-        );
-
-        if (resultsResponse.status === 200) {
-          const results = resultsResponse.data;
-          logInfo(`  Updating ${results.length} test results to "passed"`);
-
-          // Mark all as passed
-          for (const result of results) {
-            await makeAuthRequest(
-              baseURL,
-              'PUT',
-              `/api/workspaces/${workspaceId}/test-runs/${testRunId}/results/${result.id}`,
-              {
-                status: 'passed',
-                actual_result: 'Test passed successfully',
-                executed_at: '2025-01-15T10:00:00Z'
-              },
-              token
-            );
-          }
-
-          // End the test run
-          await makeAuthRequest(
-            baseURL,
-            'POST',
-            `/api/workspaces/${workspaceId}/test-runs/${testRunId}/end`,
-            {},
-            token
-          );
-
-          logSuccess(`  All tests passed, run completed`);
-        }
-      }
-    } catch (error) {
-      logError(`Error executing Daily Smoke Tests: ${error.message}`);
-    }
+    await executeTemplate('Daily Smoke Tests', 'Daily Smoke Tests - 2025-01-15', () => 'passed');
   }
 
   // Execute "Weekly Regression" template - mostly passing with some failures
   if (templateMap['Weekly Regression']) {
-    try {
-      const executeResponse = await makeAuthRequest(
-        baseURL,
-        'POST',
-        `/api/workspaces/${workspaceId}/test-run-templates/${templateMap['Weekly Regression']}/execute`,
-        {},
-        token
-      );
-
-      if (executeResponse.status === 200 || executeResponse.status === 201) {
-        const testRunId = executeResponse.data.id;
-        testRunMap['Sprint Regression - 2025-01-18'] = testRunId;
-        logSuccess(`Executed template: Weekly Regression`);
-
-        // Get all test results for this run
-        const resultsResponse = await makeAuthRequest(
-          baseURL,
-          'GET',
-          `/api/workspaces/${workspaceId}/test-runs/${testRunId}/results`,
-          null,
-          token
-        );
-
-        if (resultsResponse.status === 200) {
-          const results = resultsResponse.data;
-          logInfo(`  Updating ${results.length} test results (mostly passed, 2 failed)`);
-
-          let failedCount = 0;
-          const maxFailures = 2;
-
-          // Mark most as passed, a few as failed
-          for (let i = 0; i < results.length; i++) {
-            const result = results[i];
-            const shouldFail = failedCount < maxFailures && Math.random() < 0.1;
-
-            if (shouldFail) {
-              failedCount++;
-              await makeAuthRequest(
-                baseURL,
-                'PUT',
-                `/api/workspaces/${workspaceId}/test-runs/${testRunId}/results/${result.id}`,
-                {
-                  status: 'failed',
-                  actual_result: 'Test failed - unexpected behavior detected',
-                  executed_at: '2025-01-18T14:30:00Z'
-                },
-                token
-              );
-            } else {
-              await makeAuthRequest(
-                baseURL,
-                'PUT',
-                `/api/workspaces/${workspaceId}/test-runs/${testRunId}/results/${result.id}`,
-                {
-                  status: 'passed',
-                  actual_result: 'Test passed successfully',
-                  executed_at: '2025-01-18T14:30:00Z'
-                },
-                token
-              );
-            }
-          }
-
-          // End the test run
-          await makeAuthRequest(
-            baseURL,
-            'POST',
-            `/api/workspaces/${workspaceId}/test-runs/${testRunId}/end`,
-            {},
-            token
-          );
-
-          const passedCount = results.length - failedCount;
-          logSuccess(`  ${passedCount} passed, ${failedCount} failed, run completed`);
-        }
+    const maxFailures = 2;
+    let failedCount = 0;
+    await executeTemplate('Weekly Regression', 'Sprint Regression - 2025-01-18', () => {
+      if (failedCount < maxFailures && Math.random() < 0.1) {
+        failedCount++;
+        return 'failed';
       }
-    } catch (error) {
-      logError(`Error executing Weekly Regression: ${error.message}`);
-    }
+      return 'passed';
+    });
   }
 
   return testRunMap;
@@ -1763,22 +1690,15 @@ async function createTestCaseLinks(baseURL, token, itemMap, testCaseMap, linkTyp
       // Create link: test_case (source) → item (target).
       // Resolve the system "Tests" link type via the catalog instead of
       // assuming a database ID; IDs can differ across existing/demo instances.
-      const linkData = {
+      await v2(baseURL, token, 'POST', '/api/v2/links', {
         link_type_id: testsLinkTypeId,
         source_type: "test_case",
         source_id: testCaseId,
         target_type: "item",
         target_id: requirementId
-      };
-
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/links', linkData, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdCount++;
-        logSuccess(`Linked: "${link.testCaseTitle}" tests "${link.requirementTitle}"`);
-      } else {
-        logError(`Failed to link: ${response.status}`);
-      }
+      });
+      createdCount++;
+      logSuccess(`Linked: "${link.testCaseTitle}" tests "${link.requirementTitle}"`);
     } catch (error) {
       logError(`Error creating link: ${error.message}`);
     }
@@ -1795,14 +1715,9 @@ async function createAssetSets(baseURL, token) {
 
   for (const set of assetSets) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/asset-sets', set, token);
-
-      if (response.status === 200 || response.status === 201) {
-        createdSets[set.name] = response.data.id;
-        logSuccess(`Created asset set: ${set.name}`);
-      } else {
-        logError(`Failed to create asset set ${set.name}: ${response.status}`);
-      }
+      const created = await v2(baseURL, token, 'POST', '/api/v2/asset-sets', set);
+      createdSets[set.name] = created.id;
+      logSuccess(`Created asset set: ${set.name}`);
     } catch (error) {
       logError(`Error creating asset set ${set.name}: ${error.message}`);
     }
@@ -1826,15 +1741,10 @@ async function createAssetTypes(baseURL, token, setMap) {
 
     for (const type of types) {
       try {
-        const response = await makeAuthRequest(baseURL, 'POST', `/api/asset-sets/${setId}/types`, type, token);
-
-        if (response.status === 200 || response.status === 201) {
-          const key = `${setName}:${type.name}`;
-          createdTypes[key] = response.data.id;
-          logSuccess(`Created asset type: ${type.name} (${setName})`);
-        } else {
-          logError(`Failed to create asset type ${type.name}: ${response.status}`);
-        }
+        const created = await v2(baseURL, token, 'POST', `/api/v2/asset-sets/${setId}/types`, type);
+        const key = `${setName}:${type.name}`;
+        createdTypes[key] = created.id;
+        logSuccess(`Created asset type: ${type.name} (${setName})`);
       } catch (error) {
         logError(`Error creating asset type ${type.name}: ${error.message}`);
       }
@@ -1846,38 +1756,31 @@ async function createAssetTypes(baseURL, token, setMap) {
 
 // Create asset categories recursively
 async function createAssetCategory(baseURL, token, setId, setName, category, parentId = null, categoryMap = {}, parentPath = '', depth = 0) {
-  try {
-    const indent = '  '.repeat(depth);
+  const indent = '  '.repeat(depth);
 
-    const categoryData = {
+  try {
+    const created = await v2(baseURL, token, 'POST', `/api/v2/asset-sets/${setId}/categories`, {
       name: category.name,
       description: category.description || '',
       parent_id: parentId
-    };
+    });
 
-    const response = await makeAuthRequest(baseURL, 'POST', `/api/asset-sets/${setId}/categories`, categoryData, token);
+    const categoryId = created.id;
+    const categoryPath = parentPath ? `${parentPath}/${category.name}` : category.name;
+    const key = `${setName}:${categoryPath}`;
+    categoryMap[key] = categoryId;
+    logSuccess(`${indent}Created category: ${category.name}`);
 
-    if (response.status === 200 || response.status === 201) {
-      const categoryId = response.data.id;
-      const categoryPath = parentPath ? `${parentPath}/${category.name}` : category.name;
-      const key = `${setName}:${categoryPath}`;
-      categoryMap[key] = categoryId;
-      logSuccess(`${indent}Created category: ${category.name}`);
-
-      // Create children recursively
-      if (category.children && category.children.length > 0) {
-        for (const child of category.children) {
-          await createAssetCategory(baseURL, token, setId, setName, child, categoryId, categoryMap, categoryPath, depth + 1);
-        }
+    // Create children recursively
+    if (category.children && category.children.length > 0) {
+      for (const child of category.children) {
+        await createAssetCategory(baseURL, token, setId, setName, child, categoryId, categoryMap, categoryPath, depth + 1);
       }
-
-      return categoryId;
-    } else {
-      logError(`${indent}Failed to create category "${category.name}": ${response.status}`);
-      return null;
     }
+
+    return categoryId;
   } catch (error) {
-    logError(`Error creating category "${category.name}": ${error.message}`);
+    logError(`${indent}Error creating category "${category.name}": ${error.message}`);
     return null;
   }
 }
@@ -1934,13 +1837,8 @@ async function createAssetTypeFields(baseURL, token, typeMap, fieldMap) {
       if (fieldData.length === 0) continue;
 
       try {
-        const response = await makeAuthRequest(baseURL, 'PUT', `/api/asset-types/${typeId}/fields`, { fields: fieldData }, token);
-
-        if (response.status === 200 || response.status === 201) {
-          logSuccess(`Assigned ${fields.join(', ')} to ${typeName}`);
-        } else {
-          logError(`Failed to assign fields to ${typeName}: ${response.status}`);
-        }
+        await v2(baseURL, token, 'PUT', `/api/v2/asset-types/${typeId}/fields`, { fields: fieldData });
+        logSuccess(`Assigned ${fields.join(', ')} to ${typeName}`);
       } catch (error) {
         logError(`Error assigning fields to ${typeName}: ${error.message}`);
       }
@@ -1995,19 +1893,14 @@ async function createAssets(baseURL, token, setMap, typeMap, categoryMap, userMa
           if (ownerFieldId) {
             const user = userMap[asset.ownerUsername];
             assetData.custom_field_values = {
-              [ownerFieldId]: user.id  // Just store the user ID, backend will enrich it
+              [String(ownerFieldId)]: user.id  // Just store the user ID, backend will enrich it
             };
           }
         }
 
-        const response = await makeAuthRequest(baseURL, 'POST', `/api/asset-sets/${setId}/assets`, assetData, token);
-
-        if (response.status === 200 || response.status === 201) {
-          createdCount++;
-          logSuccess(`Created asset: ${asset.title} (${asset.type})`);
-        } else {
-          logError(`Failed to create asset ${asset.title}: ${response.status}`);
-        }
+        await v2(baseURL, token, 'POST', `/api/v2/asset-sets/${setId}/assets`, assetData);
+        createdCount++;
+        logSuccess(`Created asset: ${asset.title} (${asset.type})`);
       } catch (error) {
         logError(`Error creating asset ${asset.title}: ${error.message}`);
       }
@@ -2070,47 +1963,35 @@ async function createPersonalTasks(baseURL, token, personalTasksData = personalT
         is_task: true
       };
 
-      // Add due date if specified. Item.DueDate is *time.Time on the Go
-      // side, which expects RFC3339 — a bare YYYY-MM-DD is rejected with 400.
+      // Add due date if specified. The v2 API decodes due_date as time.Time,
+      // which expects RFC3339 — a bare YYYY-MM-DD is rejected with 400.
       if (taskData.dueDaysFromMonday !== undefined) {
         itemData.due_date = getRelativeDate(taskData.dueDaysFromMonday) + 'T00:00:00Z';
       }
 
       // Create the task item
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/items', itemData, token);
+      const created = await v2(baseURL, token, 'POST', '/api/v2/items', itemData);
+      const itemId = created.id;
+      createdCount++;
+      logSuccess(`Created task: ${taskData.title}`);
 
-      if (response.status === 200 || response.status === 201) {
-        const itemId = response.data.id;
-        createdCount++;
-        logSuccess(`Created task: ${taskData.title}`);
+      // Schedule on calendar if has scheduled time
+      if (taskData.scheduledTime && taskData.daysFromMonday !== undefined) {
+        const scheduleData = {
+          user_id: userId,
+          workspace_id: personalWorkspaceId,
+          scheduled_date: getRelativeDate(taskData.daysFromMonday),
+          scheduled_time: taskData.scheduledTime,
+          duration_minutes: taskData.durationMinutes || 30
+        };
 
-        // Schedule on calendar if has scheduled time
-        if (taskData.scheduledTime && taskData.daysFromMonday !== undefined) {
-          const scheduleData = {
-            user_id: userId,
-            workspace_id: personalWorkspaceId,
-            scheduled_date: getRelativeDate(taskData.daysFromMonday),
-            scheduled_time: taskData.scheduledTime,
-            duration_minutes: taskData.durationMinutes || 30
-          };
-
-          const scheduleResponse = await makeAuthRequest(
-            baseURL,
-            'POST',
-            `/api/items/${itemId}/schedule`,
-            scheduleData,
-            token
-          );
-
-          if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
-            scheduledCount++;
-            logInfo(`  Scheduled for ${scheduleData.scheduled_date} at ${scheduleData.scheduled_time}`);
-          } else {
-            logError(`  Failed to schedule: ${scheduleResponse.status}`);
-          }
+        try {
+          await makeAuthRequest(baseURL, 'POST', `/api/items/${itemId}/schedule`, scheduleData, token);
+          scheduledCount++;
+          logInfo(`  Scheduled for ${scheduleData.scheduled_date} at ${scheduleData.scheduled_time}`);
+        } catch (error) {
+          logError(`  Failed to schedule: ${error.message}`);
         }
-      } else {
-        logError(`Failed to create task "${taskData.title}": ${response.status}`);
       }
     } catch (error) {
       logError(`Error creating task "${taskData.title}": ${error.message}`);
@@ -2136,21 +2017,13 @@ async function createComments(baseURL, token, itemMap, userMap, scaleModule) {
     if (!itemId) continue;
 
     for (const comment of comments) {
-      const user = userMap[comment.username];
-      if (!user) continue;
-
       try {
-        const response = await makeAuthRequest(baseURL, 'POST', `/api/items/${itemId}/comments`, {
+        // Comments are attributed to the authenticated principal on v2.
+        await v2(baseURL, token, 'POST', `/api/v2/items/${itemId}/comments`, {
           content: comment.content,
-          author_id: user.id,
           is_private: comment.is_private
-        }, token);
-
-        if (response.status >= 200 && response.status < 300) {
-          createdCount++;
-        } else {
-          errorCount++;
-        }
+        });
+        createdCount++;
       } catch (err) {
         errorCount++;
       }
@@ -2250,16 +2123,21 @@ ${colors.reset}`);
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Complete setup only for fresh local instances
-      const setupSuccess = await completeSetup(options.baseURL);
+      const setupSuccess = await completeSetup(options.baseURL, options);
       if (!setupSuccess) {
         throw new Error('Setup failed');
       }
     } else {
       logInfo(`Using existing server at ${options.baseURL}`);
-      logInfo('Skipping setup (assuming instance is already configured)');
+      // A fresh database started externally (the Docker seeder does this)
+      // still needs the admin user before anything can be seeded.
+      const setupSuccess = await completeSetup(options.baseURL, options);
+      if (!setupSuccess) {
+        throw new Error('Setup failed');
+      }
     }
 
-    // Login once and use the session cookie for the cookie-auth `/api/*` routes.
+    // Login once and use the session cookie for both API surfaces.
     const token = await getSessionCookie(options.baseURL, options);
     if (!token) {
       throw new Error('Failed to get session cookie');
@@ -2270,7 +2148,7 @@ ${colors.reset}`);
     const workspaceMap = await createWorkspaces(options.baseURL, token, getMergedData(workspaces, 'challengeWorkspaces', 'scaleWorkspaces'));
     const customerMap = await createTimeCustomers(options.baseURL, token, getMergedData(timeCustomers, 'challengeTimeCustomers', 'scaleTimeCustomers'));
     const projectMap = await createProjects(options.baseURL, token, workspaceMap, customerMap, getMergedData(projects, 'challengeProjects', 'scaleProjects'));
-    const fieldMap = await createCustomFields(options.baseURL, token);
+    const [fieldMap, selectOptionMap] = await createCustomFields(options.baseURL, token);
     const screenMap = await createScreens(options.baseURL, token, fieldMap);
     const priorityMap = await createPriorities(options.baseURL, token);
     const categoryMap = await createMilestoneCategories(options.baseURL, token);
@@ -2280,7 +2158,7 @@ ${colors.reset}`);
     const itemTypes = await getItemTypes(options.baseURL, token);
     const statusMap = await getStatuses(options.baseURL, token);
     const linkTypeMap = await getLinkTypes(options.baseURL, token);
-    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems'));
+    const itemMap = await createWorkItems(options.baseURL, token, workspaceMap, projectMap, priorityMap, itemTypes, milestoneMap, iterationMap, statusMap, fieldMap, selectOptionMap, getMergedData(workItems, 'challengeWorkItems', 'scaleWorkItems'));
     const worklogCount = await createWorkLogs(options.baseURL, token, itemMap, projectMap);
 
     // Create comments (scale mode only)
@@ -2357,7 +2235,7 @@ ${colors.reset}`);
     logSuccess(`Created ${Object.keys(labelMap).length} test labels`);
     logSuccess(`Created ${Object.keys(folderMap).length} test folders`);
     logSuccess(`Created ${Object.keys(testCaseMap).length} test cases`);
-    logSuccess(`Created ${Object.keys(testSetMap).length} test sets`);
+    logSuccess(`Created ${Object.keys(testSetMap).length} test plans`);
     logSuccess(`Created ${Object.keys(templateMap).length} test run templates`);
     logSuccess(`Created ${Object.keys(testRunMap).length} test run executions`);
     logSuccess(`Created ${linkCount} test case to requirement links`);

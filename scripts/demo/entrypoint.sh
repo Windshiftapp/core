@@ -16,6 +16,18 @@ envsubst '${HOSTNAME}' < /etc/caddy/Caddyfile.template > /etc/caddy/Caddyfile
 # Ensure data directory permissions
 chown -R windshift:windshift /data 2>/dev/null || true
 
+# Session signing requires a secret; generate one on first boot and persist it
+# so logins survive container restarts.
+if [ -z "$SESSION_SECRET" ]; then
+    if [ ! -f /data/session-secret ]; then
+        head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > /data/session-secret
+        chown windshift:windshift /data/session-secret
+        chmod 600 /data/session-secret
+    fi
+    SESSION_SECRET="$(cat /data/session-secret)"
+    export SESSION_SECRET
+fi
+
 # Start windshift in background as non-root user
 echo "Starting Windshift server..."
 su-exec windshift /usr/local/bin/windshift \

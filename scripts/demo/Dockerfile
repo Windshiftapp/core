@@ -8,12 +8,28 @@
 #   With compose:       docker compose -f scripts/demo/docker-compose.yml up --build
 
 # ============================================================
-# Stage 1: Build windshift server binary
+# Stage 1a: Build frontend (pinned node image; the frontend enforces
+# engine-strict on an exact node version, so apk's drifting node is not usable)
 # ============================================================
-FROM golang:1.26.0-alpine AS builder
+FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS frontend-builder
+
+WORKDIR /build
+
+# Copy package files first for better layer caching
+COPY frontend/package*.json frontend/.npmrc ./
+RUN npm ci
+
+# Copy frontend source and build
+COPY frontend/ ./
+RUN npm run build
+
+# ============================================================
+# Stage 1b: Build windshift server binary
+# ============================================================
+FROM golang:1.27.0-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS builder
 
 # Install build dependencies
-RUN apk add --no-cache nodejs npm git
+RUN apk add --no-cache git
 
 WORKDIR /build
 
@@ -24,18 +40,16 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build frontend
-WORKDIR /build/frontend
-RUN rm -rf node_modules && npm install --force && npm run build
+# Copy pre-built frontend from the frontend-builder stage
+COPY --from=frontend-builder /build/dist ./frontend/dist
 
 # Build backend with static linking
-WORKDIR /build
 RUN CGO_ENABLED=0 go build -ldflags '-s -w' -o windshift main.go
 
 # ============================================================
 # Stage 2: Generate demo data (seeder)
 # ============================================================
-FROM node:20-alpine AS seeder
+FROM node:24.18.0-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS seeder
 
 RUN apk add --no-cache ca-certificates
 
@@ -47,16 +61,19 @@ COPY --from=builder /build/windshift /usr/local/bin/
 # Copy demo generation scripts from builder
 COPY --from=builder /build/scripts/demo/generate-demo.js ./
 COPY --from=builder /build/scripts/demo/demo-data.js ./
+COPY --from=builder /build/scripts/demo/challenge-data.js ./
+COPY --from=builder /build/scripts/demo/scale-data.js ./
 
 # Create data directory
 RUN mkdir -p /data
 
 # Generate demo database:
-# 1. Start windshift server in background
+# 1. Start windshift server in background (session signing requires a secret;
+#    a fixed value is fine here because seeded sessions do not outlive this stage)
 # 2. Wait for it to be ready
 # 3. Run demo generator
 # 4. Stop server
-RUN /usr/local/bin/windshift -db /data/demo.db -p 8080 --allowed-hosts localhost & \
+RUN SESSION_SECRET=demo-seeder-not-a-real-credential /usr/local/bin/windshift -db /data/demo.db -p 8080 --allowed-hosts localhost & \
     SERVER_PID=$! && \
     echo "Waiting for server to start..." && \
     sleep 5 && \

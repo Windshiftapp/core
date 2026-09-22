@@ -29,7 +29,7 @@ The demo comes pre-loaded with:
 - **Multiple Projects** across workspaces
 - **Hierarchical Work Items**: Epics, Stories, Tasks with realistic data
 - **Custom Fields and Screens**
-- **Test Management**: Test cases, test sets, and test runs
+- **Test Management**: Test cases, test plans, and test runs
 - **Time Tracking**: Projects, customers, and work logs
 
 ## Login Credentials
