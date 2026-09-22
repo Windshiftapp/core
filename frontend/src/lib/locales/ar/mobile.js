@@ -31,11 +31,7 @@ export default {
       noRecent: 'لا توجد نشاطات حديثة.',
     },
     personal: {
-      updateFailed: 'تعذّر تحديث المهمة. حاول مجدداً.',
       loadFailed: 'تعذّر تحميل مهامك الشخصية.',
-      empty: 'قائمتك الشخصية فارغة.',
-      markNotDone: 'وضع علامة غير منجز',
-      markDone: 'وضع علامة منجز',
     },
     search: {
       placeholder: 'ابحث في العناصر والصفحات…',

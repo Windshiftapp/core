@@ -143,6 +143,9 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    /* The phone surface never scrolls sideways: rows must clamp to the
+       viewport instead of widening the page. */
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     /* Clear the fixed bottom nav + iPhone home indicator. */
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4rem);

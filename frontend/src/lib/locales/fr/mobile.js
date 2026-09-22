@@ -31,11 +31,7 @@ export default {
       noRecent: 'Aucune activité récente.',
     },
     personal: {
-      updateFailed: 'Impossible de mettre à jour la tâche. Réessayez.',
       loadFailed: 'Impossible de charger vos tâches personnelles.',
-      empty: 'Votre liste personnelle est vide.',
-      markNotDone: 'Marquer comme non terminé',
-      markDone: 'Marquer comme terminé',
     },
     search: {
       placeholder: 'Rechercher des éléments et des pages…',

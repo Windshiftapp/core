@@ -31,11 +31,7 @@ export default {
       noRecent: 'Keine letzten Aktivitäten.',
     },
     personal: {
-      updateFailed: 'Die Aufgabe konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
       loadFailed: 'Ihre persönlichen Aufgaben konnten nicht geladen werden.',
-      empty: 'Ihre persönliche To-do-Liste ist leer.',
-      markNotDone: 'Als nicht erledigt markieren',
-      markDone: 'Als erledigt markieren',
     },
     search: {
       placeholder: 'Elemente und Seiten durchsuchen…',

@@ -31,11 +31,7 @@ export default {
       noRecent: 'Sin actividad reciente.',
     },
     personal: {
-      updateFailed: 'No se pudo actualizar la tarea. Inténtalo de nuevo.',
       loadFailed: 'No se pudieron cargar tus tareas personales.',
-      empty: 'Tu lista personal de pendientes está vacía.',
-      markNotDone: 'Marcar como no hecho',
-      markDone: 'Marcar como hecho',
     },
     search: {
       placeholder: 'Buscar elementos y páginas…',

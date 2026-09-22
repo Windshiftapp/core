@@ -1,5 +1,5 @@
 <script>
-  let { href = null, onclick = null, compact = false, children } = $props();
+  let { href = null, onclick = null, compact = false, dataTestid = undefined, children } = $props();
 
   const bgStyle = 'backdrop-filter: var(--ctx-backdrop, none); background-color: var(--ctx-surface-raised, var(--ds-surface-card));';
   const borderStyle = 'border-color: var(--ctx-border, transparent);';
@@ -11,6 +11,7 @@
     class="item-card block p-3 rounded-lg border no-underline text-inherit group"
     style="{bgStyle} {borderStyle}"
     {onclick}
+    data-testid={dataTestid}
   >
     <div class="item-card-content relative">
       {@render children()}
@@ -24,6 +25,7 @@
     role={onclick ? 'button' : undefined}
     tabindex={onclick ? 0 : undefined}
     {onclick}
+    data-testid={dataTestid}
     onkeydown={(e) => { if (onclick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onclick(e); } }}
   >
     <div class="item-card-content relative">

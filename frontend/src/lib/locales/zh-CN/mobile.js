@@ -31,11 +31,7 @@ export default {
       noRecent: '暂无最近动态。',
     },
     personal: {
-      updateFailed: '无法更新任务，请重试。',
       loadFailed: '无法加载你的个人任务。',
-      empty: '你的个人待办清单是空的。',
-      markNotDone: '标记为未完成',
-      markDone: '标记为完成',
     },
     search: {
       placeholder: '搜索工作项和页面…',

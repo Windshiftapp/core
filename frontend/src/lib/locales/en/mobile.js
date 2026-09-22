@@ -31,11 +31,7 @@ export default {
       noRecent: 'No recent activity.',
     },
     personal: {
-      updateFailed: 'Could not update the task. Try again.',
       loadFailed: "Couldn't load your personal tasks.",
-      empty: 'Your personal todo list is empty.',
-      markNotDone: 'Mark not done',
-      markDone: 'Mark done',
     },
     search: {
       placeholder: 'Search items and pages…',

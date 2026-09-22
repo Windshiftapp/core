@@ -31,11 +31,7 @@ export default {
       noRecent: 'Nenhuma atividade recente.',
     },
     personal: {
-      updateFailed: 'Não foi possível atualizar a tarefa. Tente novamente.',
       loadFailed: 'Não foi possível carregar suas tarefas pessoais.',
-      empty: 'Sua lista pessoal de pendências está vazia.',
-      markNotDone: 'Marcar como não concluído',
-      markDone: 'Marcar como concluído',
     },
     search: {
       placeholder: 'Pesquisar itens e páginas…',

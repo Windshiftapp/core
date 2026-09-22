@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BUCKET_LABEL_KEYS } from '../commands/buckets.js';
 import { mobileNavigationProvider } from '../commands/providers/mobileNavigationProvider.js';
 import { rankCommands } from '../commands/rank.js';
-import { i18n, t, translateError } from '../stores/i18n.svelte.js';
+import { i18n, SUPPORTED_LOCALES, t, translateError } from '../stores/i18n.svelte.js';
 import MobileCommandPalette from './MobileCommandPalette.svelte';
 import MobileConfirmSheet from './MobileConfirmSheet.svelte';
 import MobileEditorPage from './MobileEditorPage.svelte';
@@ -221,8 +221,10 @@ describe('mobile localization with real catalogs', () => {
     );
     expect(t('mobile.create.optionalFields', { count: 3 })).toBe('선택 필드 (3)');
     expect(translateError({ message: 'External server detail' })).toBe('External server detail');
-    for (const locale of ['en', 'ko', 'ru']) {
-      await switchLocale(locale);
+    // Every shipped locale must resolve the full mobile surface — no English
+    // fallback for missing mobile keys.
+    for (const { code } of SUPPORTED_LOCALES) {
+      await switchLocale(code);
       expect(t('mobile.create.item')).not.toBe('mobile.create.item');
       for (const key of Object.values(BUCKET_LABEL_KEYS)) expect(t(key)).not.toBe(key);
     }

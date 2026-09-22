@@ -31,11 +31,7 @@ export default {
       noRecent: '최근 활동이 없습니다.',
     },
     personal: {
-      updateFailed: '작업을 변경하지 못했습니다. 다시 시도해 주세요.',
       loadFailed: '개인 작업을 불러오지 못했습니다.',
-      empty: '개인 할 일 목록이 비어 있습니다.',
-      markNotDone: '미완료로 표시',
-      markDone: '완료로 표시',
     },
     search: {
       placeholder: '항목과 페이지 검색…',

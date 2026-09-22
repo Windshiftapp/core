@@ -28,6 +28,7 @@
     timestamp = null,
     formatTimestamp = null,
     compact = false,
+    dataTestid = undefined,
     showStoryPoints = false,
     storyPointsSaving = false,
     onStoryPointsChange = null,
@@ -145,7 +146,7 @@
   }
 </script>
 
-<ItemCard href={itemHref} {onclick} {compact}>
+<ItemCard href={itemHref} {onclick} {compact} {dataTestid}>
   {#snippet children()}
     <div class="flex items-center gap-3">
       {#if leading}{@render leading()}{/if}
@@ -175,7 +176,7 @@
 
       <!-- Optional Workspace Name -->
       {#if showWorkspace && item.workspace_name}
-        <span class="text-xs flex-shrink-0" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
+        <span class="text-xs min-w-0 truncate" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
       {/if}
 
       <!-- Optional Timestamp -->
