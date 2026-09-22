@@ -455,6 +455,39 @@ func (r *PermissionRepository) ListUserWorkspaceRoleGrants(userID int) ([]models
 	return grants, nil
 }
 
+// ListUserWorkspacePermissionKeys returns the permission keys granted to a
+// user per workspace through explicit permission-enabled role assignments,
+// deduplicated into map[workspaceID]set-of-keys. It carries no display
+// fields — the compact shape the permission profile serves.
+func (r *PermissionRepository) ListUserWorkspacePermissionKeys(userID int) (map[int]map[string]bool, error) {
+	rows, err := r.db.Query(`
+		SELECT uwr.workspace_id, p.permission_key
+		FROM user_workspace_roles uwr
+		JOIN workspace_roles wr ON wr.id = uwr.role_id AND wr.permissions_enabled = true
+		JOIN role_permissions rp ON uwr.role_id = rp.role_id
+		JOIN permissions p ON rp.permission_id = p.id
+		WHERE uwr.user_id = ?
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace permission keys: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[int]map[string]bool)
+	for rows.Next() {
+		var workspaceID int
+		var key string
+		if scanErr := rows.Scan(&workspaceID, &key); scanErr != nil {
+			continue
+		}
+		if result[workspaceID] == nil {
+			result[workspaceID] = make(map[string]bool)
+		}
+		result[workspaceID][key] = true
+	}
+	return result, rows.Err()
+}
+
 // PermissionsByKey returns the full permission catalog keyed by
 // permission_key. Rows that fail to scan are skipped and iteration errors
 // are ignored — callers use this as a best-effort lookup table.

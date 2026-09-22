@@ -113,13 +113,16 @@ const (
 	RoleBuiltinTester        = "tester"
 )
 
-// UserPermissionSummary provides a complete overview of a user's permissions
+// UserPermissionSummary is the compact permission profile served to the SPA
+// boot path: permission keys only, grouped by workspace, with no joined
+// display objects. At a 10k-workspace tenant the Everyone fallback produces
+// one entry per workspace; verbose per-grant objects there multi-MB payload.
 type UserPermissionSummary struct {
-	UserID               int                       `json:"user_id"`
-	User                 *User                     `json:"user,omitempty"`
-	GlobalPermissions    []UserGlobalPermission    `json:"global_permissions"`
-	WorkspacePermissions []UserWorkspacePermission `json:"workspace_permissions"`
-	HasSystemAdmin       bool                      `json:"has_system_admin"`
+	UserID            int      `json:"user_id"`
+	HasSystemAdmin    bool     `json:"has_system_admin"`
+	GlobalPermissions []string `json:"global_permissions"`
+	// Map encoded as JSON object keyed by stringified workspace ID.
+	WorkspacePermissions map[int][]string `json:"workspace_permissions"`
 }
 
 // PermissionRequest for granting/revoking permissions

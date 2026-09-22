@@ -19,7 +19,7 @@ export function beginPermissionProfileGeneration() {
 
 export function loadPermissionProfile(userId) {
   if (!userId) {
-    return Promise.resolve({ global_permissions: [], workspace_permissions: [] });
+    return Promise.resolve({ global_permissions: [], workspace_permissions: {} });
   }
 
   const key = cacheKey(userId);

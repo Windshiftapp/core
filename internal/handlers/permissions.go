@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -409,151 +410,88 @@ func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWrite
 	respondJSONOKWithWarnings(w, map[string]string{"message": "Permission revoked from group successfully"}, warnings)
 }
 
-// getUserPermissionSummary gets a complete permission summary for a user
+// getUserPermissionSummary builds the compact permission profile: permission
+// keys only, workspace permissions grouped by workspace ID. Explicit grants,
+// group grants, and the "Everyone" fallback all collapse into the same maps,
+// so the payload stays flat regardless of how many workspaces the user can
+// reach.
 func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPermissionSummary, error) {
 	summary := &models.UserPermissionSummary{
 		UserID:               userID,
-		GlobalPermissions:    []models.UserGlobalPermission{},    // Initialize as empty slice, not nil
-		WorkspacePermissions: []models.UserWorkspacePermission{}, // Initialize as empty slice, not nil
+		GlobalPermissions:    []string{},
+		WorkspacePermissions: map[int][]string{},
 	}
 
-	// Get user info
-	user, err := h.repo.GetUserBasic(userID)
+	// Global permissions: direct grants plus active-group grants.
+	globalKeys := make(map[string]bool)
+	globalSources := [][]models.UserGlobalPermission{}
+	directGlobal, err := h.repo.ListUserGlobalGrants(userID)
 	if err != nil {
 		return nil, err
 	}
-	summary.User = user
-
-	// Get global permissions
-	globalGrants, err := h.repo.ListUserGlobalGrants(userID)
+	globalSources = append(globalSources, directGlobal)
+	groupGlobal, err := h.repo.ListUserGroupGlobalGrants(userID)
 	if err != nil {
 		return nil, err
 	}
-	for _, ugp := range globalGrants {
-		summary.GlobalPermissions = append(summary.GlobalPermissions, ugp)
-		if ugp.Permission != nil && ugp.Permission.PermissionKey == models.PermissionSystemAdmin {
-			summary.HasSystemAdmin = true
+	globalSources = append(globalSources, groupGlobal)
+
+	for _, source := range globalSources {
+		for _, grant := range source {
+			if grant.Permission == nil {
+				continue
+			}
+			globalKeys[grant.Permission.PermissionKey] = true
+			if grant.Permission.PermissionKey == models.PermissionSystemAdmin {
+				summary.HasSystemAdmin = true
+			}
 		}
 	}
+	for key := range globalKeys {
+		summary.GlobalPermissions = append(summary.GlobalPermissions, key)
+	}
+	sort.Strings(summary.GlobalPermissions)
 
-	// Get permissions inherited from groups
-	groupGrants, err := h.repo.ListUserGroupGlobalGrants(userID)
+	// Workspace permissions: explicit role assignments first, then the
+	// effective cache supplies group-based and "Everyone" keys. The cache
+	// already resolves all three sources, so it only fills gaps.
+	wsKeys := make(map[int]map[string]bool)
+
+	explicit, err := h.repo.ListUserWorkspacePermissionKeys(userID)
 	if err != nil {
 		return nil, err
 	}
-	for _, ugp := range groupGrants {
-		summary.GlobalPermissions = append(summary.GlobalPermissions, ugp)
-		if ugp.Permission != nil && ugp.Permission.PermissionKey == models.PermissionSystemAdmin {
-			summary.HasSystemAdmin = true
-		}
+	for workspaceID, keys := range explicit {
+		wsKeys[workspaceID] = keys
 	}
 
-	// Get workspace permissions from explicit role assignments
-	// Track already-added workspace permissions to avoid duplicates
-	addedPerms := make(map[int]map[string]bool) // workspace_id -> permission_key -> true
-
-	workspaceGrants, err := h.repo.ListUserWorkspaceRoleGrants(userID)
-	if err != nil {
-		return nil, err
-	}
-	for _, uwp := range workspaceGrants {
-		summary.WorkspacePermissions = append(summary.WorkspacePermissions, uwp)
-
-		if addedPerms[uwp.WorkspaceID] == nil {
-			addedPerms[uwp.WorkspaceID] = make(map[string]bool)
-		}
-		addedPerms[uwp.WorkspaceID][uwp.Permission.PermissionKey] = true
-	}
-
-	// Supplement with group-based and "Everyone" implicit permissions from the
-	// permission cache.  The cache already resolves all three sources (explicit,
-	// group, everyone) so we only need to add entries not already covered above.
 	if h.permissionService != nil {
 		effectiveCache, cacheErr := h.permissionService.GetUserEffectivePermissions(userID)
+		// A failed cache build must not widen access: skip the supplement
+		// (fail closed) rather than erroring the whole profile.
 		if cacheErr == nil && !effectiveCache.IsSystemAdmin {
-			// Build a permission-key → Permission lookup so we can populate the
-			// Permission field on synthetic UserWorkspacePermission entries.
-			permLookup, lookupErr := h.repo.PermissionsByKey()
-			if lookupErr != nil {
-				permLookup = make(map[string]*models.Permission)
-			}
-
-			// Build a workspace ID → Workspace lookup for workspaces we haven't seen yet.
-			wsLookup := make(map[int]*models.Workspace)
-
-			// Collect workspace IDs we may need from cache sources.
-			needWSIDs := make(map[int]bool)
-			for wsID, perms := range effectiveCache.WorkspacePermissions {
-				for key := range perms {
-					if addedPerms[wsID] == nil || !addedPerms[wsID][key] {
-						needWSIDs[wsID] = true
+			mergeKeys := func(perms map[int]map[string]bool) {
+				for workspaceID, keys := range perms {
+					if wsKeys[workspaceID] == nil {
+						wsKeys[workspaceID] = make(map[string]bool)
+					}
+					for key := range keys {
+						wsKeys[workspaceID][key] = true
 					}
 				}
 			}
-			for wsID, perms := range effectiveCache.WorkspaceEveryone {
-				for key := range perms {
-					if addedPerms[wsID] == nil || !addedPerms[wsID][key] {
-						needWSIDs[wsID] = true
-					}
-				}
-			}
-
-			if len(needWSIDs) > 0 {
-				workspaces, wsErr := h.repo.ListWorkspacesBasic()
-				if wsErr == nil {
-					for _, w := range workspaces {
-						if needWSIDs[w.ID] {
-							cp := w
-							wsLookup[w.ID] = &cp
-						}
-					}
-				}
-			}
-
-			// Helper to add a permission entry if not already present.
-			addIfMissing := func(wsID int, permKey string) {
-				if addedPerms[wsID] != nil && addedPerms[wsID][permKey] {
-					return
-				}
-				p := permLookup[permKey]
-				if p == nil {
-					return
-				}
-				w := wsLookup[wsID]
-				if w == nil {
-					return
-				}
-
-				uwp := models.UserWorkspacePermission{
-					UserID:       userID,
-					WorkspaceID:  wsID,
-					PermissionID: p.ID,
-					Permission:   p,
-					Workspace:    w,
-					GrantedAt:    effectiveCache.CachedAt,
-				}
-				summary.WorkspacePermissions = append(summary.WorkspacePermissions, uwp)
-
-				if addedPerms[wsID] == nil {
-					addedPerms[wsID] = make(map[string]bool)
-				}
-				addedPerms[wsID][permKey] = true
-			}
-
-			// Add group-based workspace permissions
-			for wsID, perms := range effectiveCache.WorkspacePermissions {
-				for key := range perms {
-					addIfMissing(wsID, key)
-				}
-			}
-
-			// Add "Everyone" implicit workspace permissions
-			for wsID, perms := range effectiveCache.WorkspaceEveryone {
-				for key := range perms {
-					addIfMissing(wsID, key)
-				}
-			}
+			mergeKeys(effectiveCache.WorkspacePermissions)
+			mergeKeys(effectiveCache.WorkspaceEveryone)
 		}
+	}
+
+	for workspaceID, keys := range wsKeys {
+		keyList := make([]string, 0, len(keys))
+		for key := range keys {
+			keyList = append(keyList, key)
+		}
+		sort.Strings(keyList)
+		summary.WorkspacePermissions[workspaceID] = keyList
 	}
 
 	return summary, nil

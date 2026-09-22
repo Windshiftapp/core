@@ -217,16 +217,11 @@ function createPermissionStore() {
 
       try {
         const response = await loadPermissionProfile(userId);
-        const globalPerms = response.global_permissions || [];
-        const globalPermissionIds = new Set(globalPerms.map((p) => p.permission_id));
-        const globalPermKeys = new Set(
-          globalPerms
-            .filter((p) => p.permission?.permission_key)
-            .map((p) => p.permission.permission_key)
-        );
-
-        userPermissions.set(globalPermissionIds);
-        userPermissionKeys.set(globalPermKeys);
+        // Compact profile: global permission keys only. The ID-keyed set is
+        // kept for the PermissionGuard contract but no permission is ever
+        // passed by ID.
+        userPermissions.set(new Set());
+        userPermissionKeys.set(new Set(response.global_permissions || []));
         loading.set(false);
         error.set(null);
       } catch (err) {

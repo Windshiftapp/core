@@ -106,9 +106,9 @@
       const profile = await loadPermissionProfile(userId);
       kbIsSystemAdmin = profile.has_system_admin === true;
       const adminIds = new Set();
-      for (const wp of profile.workspace_permissions || []) {
-        if (wp.permission?.permission_key === 'workspace.admin') {
-          adminIds.add(Number(wp.workspace_id));
+      for (const [wsId, keys] of Object.entries(profile.workspace_permissions || {})) {
+        if (keys.includes('workspace.admin')) {
+          adminIds.add(Number(wsId));
         }
       }
       kbAdminWorkspaceIds = adminIds;

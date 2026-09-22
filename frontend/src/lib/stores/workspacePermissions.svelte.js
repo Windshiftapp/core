@@ -33,16 +33,11 @@ class WorkspacePermissionStore {
     try {
       const response = await loadPermissionProfile(userId);
 
-      // Parse workspace permissions into Map<workspaceId, Set<permissionKey>>
+      // The profile groups permission keys by workspace ID (compact WI-1444
+      // encoding); fold it in one pass into Map<workspaceId, Set<key>>.
       const wsPerms = new Map();
-      for (const wp of response.workspace_permissions || []) {
-        const wsId = normalizeWorkspaceId(wp.workspace_id);
-        if (!wsPerms.has(wsId)) {
-          wsPerms.set(wsId, new Set());
-        }
-        if (wp.permission?.permission_key) {
-          wsPerms.get(wsId).add(wp.permission.permission_key);
-        }
+      for (const [wsId, keys] of Object.entries(response.workspace_permissions || {})) {
+        wsPerms.set(normalizeWorkspaceId(wsId), new Set(keys));
       }
       this.permissions = wsPerms;
     } catch (err) {
