@@ -51,6 +51,19 @@ func (im *jiraImportContext) mentionResolver() jira.MentionResolver {
 	})
 }
 
+// jiraGlobalModel holds the job-wide reference data resolved once before any
+// project is imported: status/item-type/custom-field maps and the per-project
+// preflight results.
+type jiraGlobalModel struct {
+	statusMap                 map[string]int
+	itemTypeMap               map[string]int
+	customFieldIDMap          map[string]int
+	choiceOptionIDs           map[string]map[string]int
+	affectsVersionField       *jiraAffectsVersionCustomField
+	issueKeysByProject        map[string][]string
+	applicableFieldsByProject map[string]map[string]bool
+}
+
 // jiraIssueReferences holds the Windshift identities resolved from one Jira
 // issue's direct fields, ready to be spread into item creation parameters.
 type jiraIssueReferences struct {

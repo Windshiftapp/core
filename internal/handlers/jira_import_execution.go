@@ -17,6 +17,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/xray"
 )
 
 const (
@@ -221,50 +222,8 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 		}
 	}
 
-	// Create statuses and item types once (global model - shared across all workspaces)
-	statusMap, err := h.ensureStatuses(ctx, jobID, req.Mappings.Statuses)
-	if err != nil {
-		slog.Error("Failed to ensure statuses", slog.String("component", "jira"), slog.Any("error", err))
-	}
-
-	itemTypeMap, err := h.ensureItemTypes(ctx, jobID, req.Mappings.IssueTypes)
-	if err != nil {
-		slog.Error("Failed to ensure item types", slog.String("component", "jira"), slog.Any("error", err))
-	}
-
-	h.importJiraAssets(ctx, jobID, client, createdByUserID)
-	if h.failOnMappingFailure(jobID, progress) {
-		return
-	}
-
-	fieldConfigurations := loadJiraCustomFieldConfigurations(ctx, client, req.Mappings.CustomFields)
-	issueKeysByProject, assetFieldSetIDs, applicableFieldsByProject, choiceLabelsByField := h.preflightJiraCustomFields(
-		ctx, jobID, client, req.ProjectKeys, req.OpenIssuesOnly, req.Mappings.CustomFields,
-	)
-	mergeJiraConfiguredChoiceLabels(choiceLabelsByField, fieldConfigurations)
-	customFieldIDMap, choiceOptionIDs, err := h.ensureCustomFields(
-		ctx,
-		jobID,
-		req.Mappings.CustomFields,
-		assetFieldSetIDs,
-		choiceLabelsByField,
-		fieldConfigurations,
-	)
-	if err != nil {
-		slog.Error("Failed to ensure custom fields", slog.String("component", "jira"), slog.Any("error", err))
-		customFieldIDMap = make(map[string]int)
-	}
-	jiraKeyFieldID, err := h.ensureJiraIssueKeyCustomField(jobID)
-	if err != nil {
-		slog.Error("Failed to ensure searchable Jira Key field", slog.String("component", "jira"), slog.Any("error", err))
-	} else {
-		customFieldIDMap[jiraIssueKeyFieldSourceID] = jiraKeyFieldID
-	}
-	affectsVersionField, err := h.ensureAffectsVersionCustomField(ctx, jobID, req.Mappings.Versions)
-	if err != nil {
-		slog.Error("Failed to ensure Affects Version custom field", slog.String("component", "jira"), slog.Any("error", err))
-	}
-	if h.failOnMappingFailure(jobID, progress) {
+	global, aborted := h.prepareJiraGlobalModel(ctx, jobID, req, client, createdByUserID, progress)
+	if aborted {
 		return
 	}
 
@@ -276,354 +235,22 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 		progress.Phase = "importing_project"
 		h.updateJobProgress(jobID, progress)
 
-		// Find the workspace mapping for this project
-		var wsMapping *WorkspaceMapping
-		for j := range req.Mappings.Workspaces {
-			if req.Mappings.Workspaces[j].JiraKey == projectKey {
-				wsMapping = &req.Mappings.Workspaces[j]
-				break
+		im, ok := h.setupJiraProject(ctx, jobID, req, projectKey, global, client, createdByUserID, progress)
+		if !ok {
+			if h.failOnMappingFailure(jobID, progress) {
+				return
 			}
-		}
-		if wsMapping == nil {
-			slog.Warn("No workspace mapping found for project", slog.String("component", "jira"), slog.String("project", projectKey))
-			progress.FailedProjects++
 			continue
 		}
 
-		// Create or use existing workspace
-		workspaceID, err := h.ensureWorkspace(ctx, jobID, wsMapping, createdByUserID)
-		if err != nil {
-			slog.Error("Failed to ensure workspace", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-			progress.FailedProjects++
+		skip, aborted := h.importJiraIssueBatches(ctx, im, projectKey, global, req.OpenIssuesOnly, xrayPlan)
+		if aborted {
+			return
+		}
+		if skip {
 			continue
 		}
-		if h.failOnMappingFailure(jobID, progress) {
-			return
-		}
-
-		jsmImport, err := h.prepareJiraServiceManagementImport(
-			ctx, jobID, projectKey, workspaceID, itemTypeMap, client, createdByUserID,
-			req.Mappings.ServiceManagement.ImportOrganizations,
-		)
-		if err != nil {
-			slog.Error("Failed to prepare Jira Service Management portal",
-				slog.String("component", "jira"),
-				slog.String("project", projectKey),
-				slog.Any("error", err))
-			progress.FailedProjects++
-			continue
-		}
-		if h.failOnMappingFailure(jobID, progress) {
-			return
-		}
-
-		// Create workflows and configuration set for this project
-		if err = h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, statusMap, itemTypeMap, client); err != nil {
-			slog.Error("Failed to create workflows/config set", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-			// Non-fatal: continue importing
-		}
-		if err = h.ensureJiraProjectScreens(
-			ctx, jobID, projectKey, workspaceID, itemTypeMap, customFieldIDMap,
-			req.Mappings.CustomFields, client,
-		); err != nil {
-			slog.Warn("Jira screen configuration was not imported",
-				slog.String("component", "jira"),
-				slog.String("project", projectKey),
-				slog.Any("error", err))
-		}
-		if err = h.bindJiraImportFieldsToWorkspace(
-			workspaceID, projectKey, customFieldIDMap, req.Mappings.CustomFields, applicableFieldsByProject[projectKey],
-		); err != nil {
-			slog.Error("Failed to bind Jira import fields to workspace screens",
-				slog.String("component", "jira"),
-				slog.String("project", projectKey),
-				slog.Any("error", err))
-		}
-		if h.failOnMappingFailure(jobID, progress) {
-			return
-		}
-
-		// Create milestones from version mappings for this project
-		var projectVersionMappings []VersionMapping
-		for _, vm := range req.Mappings.Versions {
-			if vm.ProjectKey == projectKey {
-				projectVersionMappings = append(projectVersionMappings, vm)
-			}
-		}
-		versionMap, err := h.ensureMilestones(ctx, jobID, workspaceID, projectVersionMappings)
-		if err != nil {
-			slog.Error("Failed to ensure milestones", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-		}
-
-		iterationMap, err := h.ensureJiraIterations(ctx, jobID, workspaceID, projectKey, client)
-		if err != nil {
-			slog.Error("Failed to ensure Jira iterations", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-			iterationMap = make(map[string]int)
-		}
-
-		h.importJiraBoardsAndFilters(ctx, jobID, projectKey, workspaceID, statusMap, client, createdByUserID)
-
-		timeProjectID, err := h.ensureJiraTimeProject(jobID, workspaceID, projectKey, wsMapping.NewWorkspaceName)
-		if err != nil {
-			slog.Error("Failed to ensure Jira time project", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-			timeProjectID = nil
-		}
-		if h.failOnMappingFailure(jobID, progress) {
-			return
-		}
-
-		issueKeys, prefetched := issueKeysByProject[projectKey]
-		if !prefetched {
-			issueKeys, err = getJiraIssueKeysInImportOrder(ctx, client, projectKey, req.OpenIssuesOnly)
-			if err != nil {
-				slog.Error("Failed to get issue keys", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-				progress.FailedProjects++
-				continue
-			}
-		}
-
-		// Fetch and import issues in batches
-		// Track user map across all batches for this project. usernameMap holds
-		// the same accountID keys mapped to Windshift usernames so the ADF
-		// converter can render @mentions as `@<username>` rather than display
-		// text — letting MentionService pick them up via its standard regex.
-		userMap := make(map[string]int)
-		usernameMap := make(map[string]string)
-		portalCustomerMap := make(map[string]int)
-		if jsmImport != nil && len(jsmImport.OrganizationCustomers) > 0 {
-			organizationMappings, organizationErr := h.ensurePortalCustomers(
-				jobID, jsmImport.ChannelID, jsmImport.OrganizationCustomers, jsmImport.CustomerOrganizations,
-			)
-			if organizationErr != nil {
-				slog.Error("Failed to ensure Jira organization customers", slog.String("component", "jira"), slog.Any("error", organizationErr))
-			}
-			for accountID, customerID := range organizationMappings {
-				portalCustomerMap[accountID] = customerID
-			}
-		}
-
-		batchSize := 100
-		for j := 0; j < len(issueKeys); j += batchSize {
-			end := j + batchSize
-			if end > len(issueKeys) {
-				end = len(issueKeys)
-			}
-			batch := issueKeys[j:end]
-
-			// Bulk fetch issues
-			fetchResult, err := client.BulkFetchIssues(ctx, jira.BulkFetchRequest{
-				IssueIdsOrKeys: batch,
-				Fields:         []string{"*all"},
-				Expand:         []string{"renderedFields"},
-			})
-			if err != nil {
-				slog.Error("Failed to fetch issues batch", slog.String("component", "jira"), slog.Any("error", err))
-				for _, issueKey := range batch {
-					if xrayPlan.isTest(projectKey, issueKey) {
-						progress.FailedTests++
-					} else {
-						progress.FailedIssues++
-					}
-				}
-				continue
-			}
-			recordJiraBulkFetchErrors(projectKey, fetchResult.Errors, xrayPlan, progress)
-			// Bulk fetch is a set-oriented API and does not guarantee request
-			// ordering. Restore the Rank-ordered key sequence so CreateItem's
-			// append-only fractional index generation preserves Jira order.
-			sortJiraIssuesByRequestedKeyOrder(fetchResult.Issues, batch)
-
-			xrayDefinitions, xrayDefinitionErrors := xrayPlan.definitions(ctx, projectKey, fetchResult.Issues)
-
-			// Complete paginated issue subresources before collecting users/importing
-			// rows. Jira embeds only the first comment/worklog page in issue payloads;
-			// fetching the rest here lets author mapping include every referenced user.
-			for idx := range fetchResult.Issues {
-				if xrayPlan.isTest(projectKey, fetchResult.Issues[idx].Key) {
-					continue
-				}
-				if err := h.completePagedIssueContainers(ctx, &fetchResult.Issues[idx], client); err != nil {
-					slog.Warn("Failed to complete paged Jira issue containers",
-						slog.String("component", "jira"),
-						slog.String("issue", fetchResult.Issues[idx].Key),
-						slog.Any("error", err))
-				}
-				h.completeIssueWatchers(ctx, &fetchResult.Issues[idx], client)
-				if jsmImport != nil {
-					if err := h.annotateJiraServiceDeskCommentVisibility(ctx, &fetchResult.Issues[idx], client); err != nil {
-						slog.Warn("Failed to load Jira Service Management comment visibility",
-							slog.String("component", "jira"),
-							slog.String("issue", fetchResult.Issues[idx].Key),
-							slog.Any("error", err))
-					}
-				}
-			}
-
-			// Collect users from this batch
-			var usersToProcess []JiraUserSummary
-			usersSeen := make(map[string]bool)
-			knownIdentityMap := make(map[string]int, len(userMap)+len(portalCustomerMap))
-			for accountID, userID := range userMap {
-				knownIdentityMap[accountID] = userID
-			}
-			for accountID := range portalCustomerMap {
-				knownIdentityMap[accountID] = 0
-			}
-			for _, issue := range fetchResult.Issues {
-				if xrayPlan.isTest(projectKey, issue.Key) {
-					continue
-				}
-				// Collect every first-class user reference that can be written during
-				// issue import. If we only pre-collect assignee/reporter, creator,
-				// comment author, update author, and attachment uploader references
-				// degrade to nil or the shared fallback user even though Jira supplied
-				// enough identity data in the issue payload.
-				addJiraUserSummaryFromUser(issue.Fields.Assignee, knownIdentityMap, &usersToProcess, usersSeen)
-				addJiraUserSummaryFromUser(issue.Fields.Reporter, knownIdentityMap, &usersToProcess, usersSeen)
-				addJiraUserSummaryFromUser(issue.Fields.Creator, knownIdentityMap, &usersToProcess, usersSeen)
-				for watcherIdx := range issue.Fields.Watchers {
-					addJiraUserSummaryFromUser(&issue.Fields.Watchers[watcherIdx], knownIdentityMap, &usersToProcess, usersSeen)
-				}
-				if issue.Fields.Votes != nil {
-					for voterIdx := range issue.Fields.Votes.Voters {
-						addJiraUserSummaryFromUser(&issue.Fields.Votes.Voters[voterIdx], knownIdentityMap, &usersToProcess, usersSeen)
-					}
-				}
-				collectUsersFromADF(issue.Fields.Description, knownIdentityMap, &usersToProcess, usersSeen)
-				if issue.Fields.Comment != nil {
-					for _, comment := range issue.Fields.Comment.Comments {
-						addJiraUserSummaryFromUser(comment.Author, knownIdentityMap, &usersToProcess, usersSeen)
-						addJiraUserSummaryFromUser(comment.UpdateAuthor, knownIdentityMap, &usersToProcess, usersSeen)
-						collectUsersFromADF(comment.Body, knownIdentityMap, &usersToProcess, usersSeen)
-					}
-				}
-				for _, attachment := range issue.Fields.Attachment {
-					addJiraUserSummaryFromUser(attachment.Author, knownIdentityMap, &usersToProcess, usersSeen)
-				}
-				if issue.Fields.Worklog != nil {
-					for _, worklog := range issue.Fields.Worklog.Worklogs {
-						addJiraUserSummaryFromUser(worklog.Author, knownIdentityMap, &usersToProcess, usersSeen)
-						collectUsersFromADF(worklog.Comment, knownIdentityMap, &usersToProcess, usersSeen)
-					}
-				}
-				for _, value := range issue.Fields.CustomFields {
-					collectUsersFromADF(value, knownIdentityMap, &usersToProcess, usersSeen)
-				}
-
-				// Collect users from custom user fields (single and multi-user pickers)
-				for _, mapping := range req.Mappings.CustomFields {
-					if mapping.WindshiftType != "user" && mapping.WindshiftType != "multi_user" {
-						continue
-					}
-					if mapping.Action == "skip" {
-						continue
-					}
-
-					value, exists := issue.Fields.CustomFields[mapping.JiraID]
-					if !exists || value == nil {
-						continue
-					}
-
-					collectUsersFromCustomField(value, mapping.WindshiftType, knownIdentityMap, &usersToProcess, usersSeen)
-				}
-			}
-
-			// Ensure users are created/matched
-			if len(usersToProcess) > 0 {
-				internalUsers := usersToProcess
-				var portalCustomers []JiraUserSummary
-				if jsmImport != nil {
-					internalUsers, portalCustomers = splitJiraImportUsers(usersToProcess)
-				}
-				newUserMappings, newUsernameMappings, err := h.ensureUsers(ctx, jobID, internalUsers, client)
-				if err != nil {
-					slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
-				}
-				// Merge new mappings into userMap and usernameMap
-				for k, v := range newUserMappings {
-					userMap[k] = v
-				}
-				for k, v := range newUsernameMappings {
-					usernameMap[k] = v
-				}
-				if len(portalCustomers) > 0 {
-					newPortalMappings, portalErr := h.ensurePortalCustomers(
-						jobID, jsmImport.ChannelID, portalCustomers, jsmImport.CustomerOrganizations,
-					)
-					if portalErr != nil {
-						slog.Error("Failed to ensure Jira portal customers", slog.String("component", "jira"), slog.Any("error", portalErr))
-					}
-					for k, v := range newPortalMappings {
-						portalCustomerMap[k] = v
-					}
-				}
-			}
-
-			// Import each issue
-			im := &jiraImportContext{
-				jobID:               jobID,
-				forceReimport:       req.ForceReimport,
-				progress:            progress,
-				client:              client,
-				workspaceID:         workspaceID,
-				timeProjectID:       timeProjectID,
-				statusMap:           statusMap,
-				itemTypeMap:         itemTypeMap,
-				customFieldIDMap:    customFieldIDMap,
-				choiceOptionIDs:     choiceOptionIDs,
-				customFieldMappings: req.Mappings.CustomFields,
-				affectsVersionField: affectsVersionField,
-				userMap:             userMap,
-				usernameMap:         usernameMap,
-				portalCustomerMap:   portalCustomerMap,
-				versionMap:          versionMap,
-				iterationMap:        iterationMap,
-				jsmImport:           jsmImport,
-			}
-			for _, issue := range fetchResult.Issues {
-				if xrayPlan.isTest(projectKey, issue.Key) {
-					if definitionErr, failed := xrayDefinitionErrors[issue.Key]; failed {
-						slog.Error("Failed to load Xray Test definition",
-							slog.String("component", "jira"),
-							slog.String("issue", issue.Key),
-							slog.Any("error", definitionErr))
-						progress.FailedTests++
-						continue
-					}
-					definition, exists := xrayDefinitions[issue.ID]
-					if !exists {
-						slog.Error("Missing Xray Test definition",
-							slog.String("component", "jira"),
-							slog.String("issue", issue.Key))
-						progress.FailedTests++
-						continue
-					}
-					if _, err := h.importXrayTestCase(jobID, workspaceID, &issue, definition); err != nil {
-						slog.Error("Failed to import Xray Test",
-							slog.String("component", "jira"),
-							slog.String("issue", issue.Key),
-							slog.Any("error", err))
-						progress.FailedTests++
-					} else {
-						progress.ImportedTests++
-					}
-					continue
-				}
-				err := h.importIssue(ctx, im, &issue)
-				if h.failOnMappingFailure(jobID, progress) {
-					return
-				}
-				if err != nil {
-					slog.Error("Failed to import issue", slog.String("component", "jira"), slog.String("issue", issue.Key), slog.Any("error", err))
-					progress.FailedIssues++
-				} else {
-					progress.ImportedIssues++
-				}
-			}
-
-			h.updateJobProgress(jobID, progress)
-		}
-
+		// After all issues imported for this project, link parents
 		// After all issues imported for this project, link parents
 		h.linkParents(jobID)
 
@@ -654,6 +281,490 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 	progress.Phase = phase
 	h.persistJiraImportResult(jobID, progress)
 	h.updateJobStatus(jobID, status, phase, progress, errorMessage)
+}
+
+// prepareJiraGlobalModel creates the job-wide reference data once: statuses,
+// item types, assets, and custom fields. Individual failures are logged and
+// leave empty maps; only mapping failures abort the import.
+func (h *JiraImportHandler) prepareJiraGlobalModel(
+	ctx context.Context,
+	jobID string,
+	req StartImportRequest,
+	client jira.Client,
+	createdByUserID int,
+	progress *ImportProgress,
+) (model *jiraGlobalModel, aborted bool) {
+	model = &jiraGlobalModel{
+		issueKeysByProject:        make(map[string][]string),
+		applicableFieldsByProject: make(map[string]map[string]bool),
+	}
+
+	// Create statuses and item types once (global model - shared across all workspaces)
+	statusMap, err := h.ensureStatuses(ctx, jobID, req.Mappings.Statuses)
+	if err != nil {
+		slog.Error("Failed to ensure statuses", slog.String("component", "jira"), slog.Any("error", err))
+	}
+	model.statusMap = statusMap
+
+	itemTypeMap, err := h.ensureItemTypes(ctx, jobID, req.Mappings.IssueTypes)
+	if err != nil {
+		slog.Error("Failed to ensure item types", slog.String("component", "jira"), slog.Any("error", err))
+	}
+	model.itemTypeMap = itemTypeMap
+
+	h.importJiraAssets(ctx, jobID, client, createdByUserID)
+	if h.failOnMappingFailure(jobID, progress) {
+		return model, true
+	}
+
+	fieldConfigurations := loadJiraCustomFieldConfigurations(ctx, client, req.Mappings.CustomFields)
+	issueKeysByProject, assetFieldSetIDs, applicableFieldsByProject, choiceLabelsByField := h.preflightJiraCustomFields(
+		ctx, jobID, client, req.ProjectKeys, req.OpenIssuesOnly, req.Mappings.CustomFields,
+	)
+	model.issueKeysByProject = issueKeysByProject
+	model.applicableFieldsByProject = applicableFieldsByProject
+	mergeJiraConfiguredChoiceLabels(choiceLabelsByField, fieldConfigurations)
+	customFieldIDMap, choiceOptionIDs, err := h.ensureCustomFields(
+		ctx,
+		jobID,
+		req.Mappings.CustomFields,
+		assetFieldSetIDs,
+		choiceLabelsByField,
+		fieldConfigurations,
+	)
+	if err != nil {
+		slog.Error("Failed to ensure custom fields", slog.String("component", "jira"), slog.Any("error", err))
+		customFieldIDMap = make(map[string]int)
+	}
+	model.customFieldIDMap = customFieldIDMap
+	model.choiceOptionIDs = choiceOptionIDs
+	jiraKeyFieldID, err := h.ensureJiraIssueKeyCustomField(jobID)
+	if err != nil {
+		slog.Error("Failed to ensure searchable Jira Key field", slog.String("component", "jira"), slog.Any("error", err))
+	} else {
+		model.customFieldIDMap[jiraIssueKeyFieldSourceID] = jiraKeyFieldID
+	}
+	affectsVersionField, err := h.ensureAffectsVersionCustomField(ctx, jobID, req.Mappings.Versions)
+	if err != nil {
+		slog.Error("Failed to ensure Affects Version custom field", slog.String("component", "jira"), slog.Any("error", err))
+	}
+	model.affectsVersionField = affectsVersionField
+	if h.failOnMappingFailure(jobID, progress) {
+		return model, true
+	}
+	return model, false
+}
+
+// setupJiraProject prepares one project's workspace and Windshift model:
+// workspace, JSM portal, workflows and screens, milestones, iterations,
+// boards, and the time project. It returns ok=false when the project must be
+// skipped (no workspace mapping, workspace/JSM failure, or a mapping failure).
+func (h *JiraImportHandler) setupJiraProject(
+	ctx context.Context,
+	jobID string,
+	req StartImportRequest,
+	projectKey string,
+	global *jiraGlobalModel,
+	client jira.Client,
+	createdByUserID int,
+	progress *ImportProgress,
+) (im *jiraImportContext, ok bool) {
+	// Find the workspace mapping for this project
+	var wsMapping *WorkspaceMapping
+	for j := range req.Mappings.Workspaces {
+		if req.Mappings.Workspaces[j].JiraKey == projectKey {
+			wsMapping = &req.Mappings.Workspaces[j]
+			break
+		}
+	}
+	if wsMapping == nil {
+		slog.Warn("No workspace mapping found for project", slog.String("component", "jira"), slog.String("project", projectKey))
+		progress.FailedProjects++
+		return nil, false
+	}
+
+	// Create or use existing workspace
+	workspaceID, err := h.ensureWorkspace(ctx, jobID, wsMapping, createdByUserID)
+	if err != nil {
+		slog.Error("Failed to ensure workspace", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+		progress.FailedProjects++
+		return nil, false
+	}
+	if h.failOnMappingFailure(jobID, progress) {
+		return nil, false
+	}
+
+	im = &jiraImportContext{
+		jobID:               jobID,
+		forceReimport:       req.ForceReimport,
+		progress:            progress,
+		client:              client,
+		workspaceID:         workspaceID,
+		statusMap:           global.statusMap,
+		itemTypeMap:         global.itemTypeMap,
+		customFieldIDMap:    global.customFieldIDMap,
+		choiceOptionIDs:     global.choiceOptionIDs,
+		customFieldMappings: req.Mappings.CustomFields,
+		affectsVersionField: global.affectsVersionField,
+		userMap:             make(map[string]int),
+		usernameMap:         make(map[string]string),
+		portalCustomerMap:   make(map[string]int),
+	}
+
+	jsmImport, err := h.prepareJiraServiceManagementImport(
+		ctx, jobID, projectKey, workspaceID, global.itemTypeMap, client, createdByUserID,
+		req.Mappings.ServiceManagement.ImportOrganizations,
+	)
+	if err != nil {
+		slog.Error("Failed to prepare Jira Service Management portal",
+			slog.String("component", "jira"),
+			slog.String("project", projectKey),
+			slog.Any("error", err))
+		progress.FailedProjects++
+		return nil, false
+	}
+	im.jsmImport = jsmImport
+	if h.failOnMappingFailure(jobID, progress) {
+		return nil, false
+	}
+
+	// Create workflows and configuration set for this project
+	if err := h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, global.statusMap, global.itemTypeMap, client); err != nil {
+		slog.Error("Failed to create workflows/config set", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+		// Non-fatal: continue importing
+	}
+	if err := h.ensureJiraProjectScreens(
+		ctx, jobID, projectKey, workspaceID, global.itemTypeMap, global.customFieldIDMap,
+		req.Mappings.CustomFields, client,
+	); err != nil {
+		slog.Warn("Jira screen configuration was not imported",
+			slog.String("component", "jira"),
+			slog.String("project", projectKey),
+			slog.Any("error", err))
+	}
+	if err := h.bindJiraImportFieldsToWorkspace(
+		workspaceID, projectKey, global.customFieldIDMap, req.Mappings.CustomFields, global.applicableFieldsByProject[projectKey],
+	); err != nil {
+		slog.Error("Failed to bind Jira import fields to workspace screens",
+			slog.String("component", "jira"),
+			slog.String("project", projectKey),
+			slog.Any("error", err))
+	}
+	if h.failOnMappingFailure(jobID, progress) {
+		return nil, false
+	}
+
+	// Create milestones from version mappings for this project
+	var projectVersionMappings []VersionMapping
+	for _, vm := range req.Mappings.Versions {
+		if vm.ProjectKey == projectKey {
+			projectVersionMappings = append(projectVersionMappings, vm)
+		}
+	}
+	versionMap, err := h.ensureMilestones(ctx, jobID, workspaceID, projectVersionMappings)
+	if err != nil {
+		slog.Error("Failed to ensure milestones", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+	}
+	im.versionMap = versionMap
+
+	iterationMap, err := h.ensureJiraIterations(ctx, jobID, workspaceID, projectKey, client)
+	if err != nil {
+		slog.Error("Failed to ensure Jira iterations", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+		iterationMap = make(map[string]int)
+	}
+	im.iterationMap = iterationMap
+
+	h.importJiraBoardsAndFilters(ctx, jobID, projectKey, workspaceID, global.statusMap, client, createdByUserID)
+
+	timeProjectID, err := h.ensureJiraTimeProject(jobID, workspaceID, projectKey, wsMapping.NewWorkspaceName)
+	if err != nil {
+		slog.Error("Failed to ensure Jira time project", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+		timeProjectID = nil
+	}
+	im.timeProjectID = timeProjectID
+	if h.failOnMappingFailure(jobID, progress) {
+		return nil, false
+	}
+
+	return im, true
+}
+
+// importJiraIssueBatches fetches the project's issues in Rank order and
+// imports them batch by batch: subresource completion, user collection and
+// matching, then per-issue import. skip=true means the project's issue keys
+// could not be listed; abort=true means a mapping failure ended the import.
+func (h *JiraImportHandler) importJiraIssueBatches(
+	ctx context.Context,
+	im *jiraImportContext,
+	projectKey string,
+	global *jiraGlobalModel,
+	openIssuesOnly bool,
+	xrayPlan *xrayImportPlan,
+) (skip, abort bool) {
+	issueKeys, prefetched := global.issueKeysByProject[projectKey]
+	if !prefetched {
+		var err error
+		issueKeys, err = getJiraIssueKeysInImportOrder(ctx, im.client, projectKey, openIssuesOnly)
+		if err != nil {
+			slog.Error("Failed to get issue keys", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
+			im.progress.FailedProjects++
+			return true, false
+		}
+	}
+
+	// Track user maps across all batches for this project. usernameMap holds
+	// the same accountID keys mapped to Windshift usernames so the ADF
+	// converter can render @mentions as `@<username>` rather than display
+	// text — letting MentionService pick them up via its standard regex.
+	im.userMap = make(map[string]int)
+	im.usernameMap = make(map[string]string)
+	im.portalCustomerMap = make(map[string]int)
+	if im.jsmImport != nil && len(im.jsmImport.OrganizationCustomers) > 0 {
+		organizationMappings, organizationErr := h.ensurePortalCustomers(
+			im.jobID, im.jsmImport.ChannelID, im.jsmImport.OrganizationCustomers, im.jsmImport.CustomerOrganizations,
+		)
+		if organizationErr != nil {
+			slog.Error("Failed to ensure Jira organization customers", slog.String("component", "jira"), slog.Any("error", organizationErr))
+		}
+		for accountID, customerID := range organizationMappings {
+			im.portalCustomerMap[accountID] = customerID
+		}
+	}
+
+	batchSize := 100
+	for j := 0; j < len(issueKeys); j += batchSize {
+		end := j + batchSize
+		if end > len(issueKeys) {
+			end = len(issueKeys)
+		}
+		batch := issueKeys[j:end]
+
+		// Bulk fetch issues
+		fetchResult, err := im.client.BulkFetchIssues(ctx, jira.BulkFetchRequest{
+			IssueIdsOrKeys: batch,
+			Fields:         []string{"*all"},
+			Expand:         []string{"renderedFields"},
+		})
+		if err != nil {
+			slog.Error("Failed to fetch issues batch", slog.String("component", "jira"), slog.Any("error", err))
+			for _, issueKey := range batch {
+				if xrayPlan.isTest(projectKey, issueKey) {
+					im.progress.FailedTests++
+				} else {
+					im.progress.FailedIssues++
+				}
+			}
+			continue
+		}
+		recordJiraBulkFetchErrors(projectKey, fetchResult.Errors, xrayPlan, im.progress)
+		// Bulk fetch is a set-oriented API and does not guarantee request
+		// ordering. Restore the Rank-ordered key sequence so CreateItem's
+		// append-only fractional index generation preserves Jira order.
+		sortJiraIssuesByRequestedKeyOrder(fetchResult.Issues, batch)
+
+		xrayDefinitions, xrayDefinitionErrors := xrayPlan.definitions(ctx, projectKey, fetchResult.Issues)
+
+		h.completeJiraBatchSubresources(ctx, im, projectKey, fetchResult.Issues, xrayPlan)
+		usersToProcess := h.collectJiraBatchUsers(im, projectKey, fetchResult.Issues, xrayPlan)
+		h.ensureJiraBatchUsers(ctx, im, usersToProcess)
+
+		if h.importJiraBatchIssues(ctx, im, projectKey, fetchResult.Issues, xrayPlan, xrayDefinitions, xrayDefinitionErrors) {
+			return false, true
+		}
+
+		h.updateJobProgress(im.jobID, im.progress)
+	}
+	return false, false
+}
+
+// completeJiraBatchSubresources finishes the paginated issue subresources
+// before user collection/importing. Jira embeds only the first
+// comment/worklog page in issue payloads; fetching the rest here lets author
+// mapping include every referenced user.
+func (h *JiraImportHandler) completeJiraBatchSubresources(ctx context.Context, im *jiraImportContext, projectKey string, issues []jira.JiraIssue, xrayPlan *xrayImportPlan) {
+	for idx := range issues {
+		if xrayPlan.isTest(projectKey, issues[idx].Key) {
+			continue
+		}
+		if err := h.completePagedIssueContainers(ctx, &issues[idx], im.client); err != nil {
+			slog.Warn("Failed to complete paged Jira issue containers",
+				slog.String("component", "jira"),
+				slog.String("issue", issues[idx].Key),
+				slog.Any("error", err))
+		}
+		h.completeIssueWatchers(ctx, &issues[idx], im.client)
+		if im.jsmImport != nil {
+			if err := h.annotateJiraServiceDeskCommentVisibility(ctx, &issues[idx], im.client); err != nil {
+				slog.Warn("Failed to load Jira Service Management comment visibility",
+					slog.String("component", "jira"),
+					slog.String("issue", issues[idx].Key),
+					slog.Any("error", err))
+			}
+		}
+	}
+}
+
+// collectJiraBatchUsers gathers every Jira user referenced by the batch's
+// issues so they can be created or matched before any issue row is written.
+func (h *JiraImportHandler) collectJiraBatchUsers(im *jiraImportContext, projectKey string, issues []jira.JiraIssue, xrayPlan *xrayImportPlan) []JiraUserSummary {
+	var usersToProcess []JiraUserSummary
+	usersSeen := make(map[string]bool)
+	knownIdentityMap := make(map[string]int, len(im.userMap)+len(im.portalCustomerMap))
+	for accountID, userID := range im.userMap {
+		knownIdentityMap[accountID] = userID
+	}
+	for accountID := range im.portalCustomerMap {
+		knownIdentityMap[accountID] = 0
+	}
+	for _, issue := range issues {
+		if xrayPlan.isTest(projectKey, issue.Key) {
+			continue
+		}
+		// Collect every first-class user reference that can be written during
+		// issue import. If we only pre-collect assignee/reporter, creator,
+		// comment author, update author, and attachment uploader references
+		// degrade to nil or the shared fallback user even though Jira supplied
+		// enough identity data in the issue payload.
+		addJiraUserSummaryFromUser(issue.Fields.Assignee, knownIdentityMap, &usersToProcess, usersSeen)
+		addJiraUserSummaryFromUser(issue.Fields.Reporter, knownIdentityMap, &usersToProcess, usersSeen)
+		addJiraUserSummaryFromUser(issue.Fields.Creator, knownIdentityMap, &usersToProcess, usersSeen)
+		for watcherIdx := range issue.Fields.Watchers {
+			addJiraUserSummaryFromUser(&issue.Fields.Watchers[watcherIdx], knownIdentityMap, &usersToProcess, usersSeen)
+		}
+		if issue.Fields.Votes != nil {
+			for voterIdx := range issue.Fields.Votes.Voters {
+				addJiraUserSummaryFromUser(&issue.Fields.Votes.Voters[voterIdx], knownIdentityMap, &usersToProcess, usersSeen)
+			}
+		}
+		collectUsersFromADF(issue.Fields.Description, knownIdentityMap, &usersToProcess, usersSeen)
+		if issue.Fields.Comment != nil {
+			for _, comment := range issue.Fields.Comment.Comments {
+				addJiraUserSummaryFromUser(comment.Author, knownIdentityMap, &usersToProcess, usersSeen)
+				addJiraUserSummaryFromUser(comment.UpdateAuthor, knownIdentityMap, &usersToProcess, usersSeen)
+				collectUsersFromADF(comment.Body, knownIdentityMap, &usersToProcess, usersSeen)
+			}
+		}
+		for _, attachment := range issue.Fields.Attachment {
+			addJiraUserSummaryFromUser(attachment.Author, knownIdentityMap, &usersToProcess, usersSeen)
+		}
+		if issue.Fields.Worklog != nil {
+			for _, worklog := range issue.Fields.Worklog.Worklogs {
+				addJiraUserSummaryFromUser(worklog.Author, knownIdentityMap, &usersToProcess, usersSeen)
+				collectUsersFromADF(worklog.Comment, knownIdentityMap, &usersToProcess, usersSeen)
+			}
+		}
+		for _, value := range issue.Fields.CustomFields {
+			collectUsersFromADF(value, knownIdentityMap, &usersToProcess, usersSeen)
+		}
+
+		// Collect users from custom user fields (single and multi-user pickers)
+		for _, mapping := range im.customFieldMappings {
+			if mapping.WindshiftType != "user" && mapping.WindshiftType != "multi_user" {
+				continue
+			}
+			if mapping.Action == "skip" {
+				continue
+			}
+
+			value, exists := issue.Fields.CustomFields[mapping.JiraID]
+			if !exists || value == nil {
+				continue
+			}
+
+			collectUsersFromCustomField(value, mapping.WindshiftType, knownIdentityMap, &usersToProcess, usersSeen)
+		}
+	}
+	return usersToProcess
+}
+
+// ensureJiraBatchUsers creates or matches the collected users, splitting
+// portal customers into the JSM customer flow when the project has one.
+func (h *JiraImportHandler) ensureJiraBatchUsers(ctx context.Context, im *jiraImportContext, usersToProcess []JiraUserSummary) {
+	if len(usersToProcess) == 0 {
+		return
+	}
+	internalUsers := usersToProcess
+	var portalCustomers []JiraUserSummary
+	if im.jsmImport != nil {
+		internalUsers, portalCustomers = splitJiraImportUsers(usersToProcess)
+	}
+	newUserMappings, newUsernameMappings, err := h.ensureUsers(ctx, im.jobID, internalUsers, im.client)
+	if err != nil {
+		slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
+	}
+	// Merge new mappings into userMap and usernameMap
+	for k, v := range newUserMappings {
+		im.userMap[k] = v
+	}
+	for k, v := range newUsernameMappings {
+		im.usernameMap[k] = v
+	}
+	if len(portalCustomers) > 0 {
+		newPortalMappings, portalErr := h.ensurePortalCustomers(
+			im.jobID, im.jsmImport.ChannelID, portalCustomers, im.jsmImport.CustomerOrganizations,
+		)
+		if portalErr != nil {
+			slog.Error("Failed to ensure Jira portal customers", slog.String("component", "jira"), slog.Any("error", portalErr))
+		}
+		for k, v := range newPortalMappings {
+			im.portalCustomerMap[k] = v
+		}
+	}
+}
+
+// importJiraBatchIssues imports each issue in the batch, routing Xray tests
+// to the test-case importer. Returns true when a mapping failure aborts the
+// whole import.
+func (h *JiraImportHandler) importJiraBatchIssues(
+	ctx context.Context,
+	im *jiraImportContext,
+	projectKey string,
+	issues []jira.JiraIssue,
+	xrayPlan *xrayImportPlan,
+	xrayDefinitions map[string]xray.Test,
+	xrayDefinitionErrors map[string]error,
+) (abort bool) {
+	for _, issue := range issues {
+		if xrayPlan.isTest(projectKey, issue.Key) {
+			if definitionErr, failed := xrayDefinitionErrors[issue.Key]; failed {
+				slog.Error("Failed to load Xray Test definition",
+					slog.String("component", "jira"),
+					slog.String("issue", issue.Key),
+					slog.Any("error", definitionErr))
+				im.progress.FailedTests++
+				continue
+			}
+			definition, exists := xrayDefinitions[issue.ID]
+			if !exists {
+				slog.Error("Missing Xray Test definition",
+					slog.String("component", "jira"),
+					slog.String("issue", issue.Key))
+				im.progress.FailedTests++
+				continue
+			}
+			if _, err := h.importXrayTestCase(im.jobID, im.workspaceID, &issue, definition); err != nil {
+				slog.Error("Failed to import Xray Test",
+					slog.String("component", "jira"),
+					slog.String("issue", issue.Key),
+					slog.Any("error", err))
+				im.progress.FailedTests++
+			} else {
+				im.progress.ImportedTests++
+			}
+			continue
+		}
+		err := h.importIssue(ctx, im, &issue)
+		if h.failOnMappingFailure(im.jobID, im.progress) {
+			return true
+		}
+		if err != nil {
+			slog.Error("Failed to import issue", slog.String("component", "jira"), slog.String("issue", issue.Key), slog.Any("error", err))
+			im.progress.FailedIssues++
+		} else {
+			im.progress.ImportedIssues++
+		}
+	}
+	return false
 }
 
 type jiraImportFidelityFinding struct {
