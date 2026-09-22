@@ -4,6 +4,7 @@
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { navigate } from '../router.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import {
@@ -82,7 +83,7 @@
 
       const [configSetsResponse, workspacesData, workflowsData, screensData, notificationSettingsData] = await Promise.all([
         api.get(`/configuration-sets?${params.toString()}`),
-        api.workspaces.getAll(),
+        workspacesStore.load(),
         api.workflows.getAll(),
         api.get('/screens'),
         api.notificationSettings.getAll()

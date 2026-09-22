@@ -4,6 +4,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { api } from '../../api.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { isSelfOrDescendant } from './pageHierarchy.js';
 
@@ -44,7 +45,7 @@
 
   async function loadDialogData() {
     loadingWorkspaces = true;
-    const workspaceRequest = api.workspaces.getAll();
+    const workspaceRequest = workspacesStore.load();
     await Promise.all([loadCandidates(workspaceId, true), workspaceRequest.then((items) => {
       workspaces = (items || []).filter((item) => item.active !== false);
     }).catch((err) => {

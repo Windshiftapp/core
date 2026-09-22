@@ -5,6 +5,7 @@ import { QLBuilder } from '../utils/ql.js';
 import { completionFieldToFilterField } from '../utils/qlCompletion.js';
 import { t } from './i18n.svelte.js';
 import { warningToast } from './toasts.svelte.js';
+import { workspacesStore } from './workspaces.svelte.js';
 
 /**
  * Factory that creates a fresh work-item search/filter store.
@@ -150,7 +151,7 @@ export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
   async function loadReferenceData() {
     try {
       const [wsData, stData, prData, catData] = await Promise.all([
-        api.workspaces.getAll(),
+        workspacesStore.load(),
         api.statuses.getAll(),
         api.priorities.getAll(),
         api.statusCategories.getAll(),

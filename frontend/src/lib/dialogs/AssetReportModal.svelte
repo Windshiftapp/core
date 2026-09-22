@@ -1,5 +1,6 @@
 <script>
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import BasePicker from '../pickers/BasePicker.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import Input from '../components/Input.svelte';
@@ -49,11 +50,11 @@
 
   async function loadPickers() {
     try {
-      const [sets, itemTypes, workspaces] = await Promise.all([
+      const [sets, itemTypes] = await Promise.all([
         api.assetSets.getAll(),
-        api.itemTypes.getAll(),
-        api.workspaces.getAll()
+        api.itemTypes.getAll()
       ]);
+      const workspaces = await workspacesStore.load();
       availableAssetSets = sets || [];
       availableItemTypes = itemTypes || [];
       if (channelWorkspaceIds && channelWorkspaceIds.length > 0) {

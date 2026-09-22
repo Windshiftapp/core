@@ -3,11 +3,13 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { workspacesStore } from '../stores/workspaces.svelte.js';
 import ZammadConnectionManager from './ZammadConnectionManager.svelte';
 
 const mocks = vi.hoisted(() => ({
   getConnections: vi.fn(),
   getWorkspaces: vi.fn(),
+  getWorkspacesPage: vi.fn(),
   getStatuses: vi.fn(),
   testConnection: vi.fn(),
   updateConnection: vi.fn(),
@@ -20,7 +22,7 @@ vi.mock('../api.js', () => ({
       test: mocks.testConnection,
       update: mocks.updateConnection,
     },
-    workspaces: { getAll: mocks.getWorkspaces },
+    workspaces: { getAll: mocks.getWorkspaces, getPage: mocks.getWorkspacesPage },
     statuses: { getAll: mocks.getStatuses },
   },
 }));
@@ -78,6 +80,10 @@ describe('ZammadConnectionManager', () => {
     vi.clearAllMocks();
     mocks.getConnections.mockResolvedValue([connection]);
     mocks.getWorkspaces.mockResolvedValue([]);
+    // The component reads workspaces through the shared store (WI-1443);
+    // reset its cache so each test re-rigs this mock.
+    workspacesStore.clear();
+    mocks.getWorkspacesPage.mockResolvedValue({ data: [], pagination: { total: 0 } });
     mocks.getStatuses.mockResolvedValue([]);
     mocks.testConnection.mockResolvedValue({
       metadata: {

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { Plus, Edit2, Trash2, PlugZap, RefreshCw } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -81,7 +82,7 @@
     try {
       [connections, workspaces, statuses] = await Promise.all([
         api.zammadConnections.getAll(),
-        api.workspaces.getAll(),
+        workspacesStore.load(),
         api.statuses.getAll(),
       ]);
     } catch (err) {

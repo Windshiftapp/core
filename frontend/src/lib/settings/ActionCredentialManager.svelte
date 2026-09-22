@@ -16,6 +16,7 @@
   import StateDisplay from '../components/StateDisplay.svelte';
   import { Plus, Edit, Trash2, KeyRound } from '@lucide/svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Radio from '../components/Radio.svelte';
@@ -98,7 +99,7 @@
 
   async function loadWorkspaces() {
     try {
-      workspaces = (await api.workspaces.getAll()) || [];
+      workspaces = (await workspacesStore.load()) || [];
     } catch (err) {
       console.error('Failed to load workspaces:', err);
     }

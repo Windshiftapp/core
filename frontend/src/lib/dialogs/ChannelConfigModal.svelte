@@ -2,6 +2,7 @@
   import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send, ClipboardList } from '@lucide/svelte';
   import TabStrip from '../components/TabStrip.svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
   import { t } from '../stores/i18n.svelte.js';
   import { isSystemAdmin } from '../stores/permissions.svelte.js';
@@ -276,7 +277,7 @@
 
   async function loadWorkspacesAndItemTypes() {
     try {
-      workspaces = (await api.workspaces.getAll()).filter(w => !w.is_personal);
+      workspaces = ((await workspacesStore.load()) || []).filter(w => !w.is_personal);
       if (emailFormData.workspace_id) {
         await loadItemTypesForWorkspace(emailFormData.workspace_id);
       }

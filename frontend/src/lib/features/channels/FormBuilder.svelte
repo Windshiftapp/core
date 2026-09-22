@@ -9,6 +9,7 @@
   } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { formBuilderStore } from '../../stores/formBuilderStore.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -68,11 +69,11 @@
   onMount(async () => {
     await formBuilderStore.loadForms(channelId);
     try {
-      const [allWorkspaces, allConfigSets, customFields] = await Promise.all([
-        api.workspaces.getAll(),
+      const [allConfigSets, customFields] = await Promise.all([
         api.configurationSets.getAll(),
         api.customFields.getAll(),
       ]);
+      const allWorkspaces = await workspacesStore.load();
       configSets = allConfigSets?.configuration_sets || [];
       previewCustomFieldDefinitions = customFields || [];
       availableWorkspaces = (channelWorkspaceIds && channelWorkspaceIds.length > 0)

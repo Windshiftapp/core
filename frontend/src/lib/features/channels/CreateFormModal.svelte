@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
@@ -35,12 +36,12 @@
 
   onMount(async () => {
     try {
-      const [allWorkspaces, allConfigSets] = await Promise.all([
-        api.workspaces.getAll(),
+      const [allConfigSets] = await Promise.all([
         api.configurationSets.getAll(),
       ]);
+      const allWorkspaces = await workspacesStore.load();
       configSets = allConfigSets?.configuration_sets || [];
-      availableWorkspaces = allWorkspaces;
+      availableWorkspaces = allWorkspaces || [];
     } catch (err) {
       console.error('Failed to load workspaces:', err);
     }

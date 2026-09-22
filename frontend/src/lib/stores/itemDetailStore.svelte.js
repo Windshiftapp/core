@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { childItemTypesForParent } from '../utils/hierarchy.js';
 import { buildDetailScreenFieldConfig } from '../utils/screenFields.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
+import { workspacesStore } from './workspaces.svelte.js';
 
 const FIELD_MAP = {
   title: 'title',
@@ -537,7 +538,7 @@ class ItemDetailStore {
     const promise = Promise.all([
       fallback(api.customerOrganisations.getAll({}, requestOptions), 'customers'),
       fallback(api.items.getAll({ limit: 100 }, requestOptions), 'work items'),
-      fallback(api.workspaces.getAll({}, requestOptions), 'workspaces'),
+      fallback(workspacesStore.load(), 'workspaces'),
     ])
       .then(([customers, workItems, workspaces]) => {
         this.customers = customers || [];

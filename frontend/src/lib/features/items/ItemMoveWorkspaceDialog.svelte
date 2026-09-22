@@ -5,7 +5,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import NativeSelect from '../../components/NativeSelect.svelte';
   import { api } from '../../api.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions, workspacesStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
@@ -45,7 +45,7 @@
     loadingWorkspaces = true;
     error = '';
     try {
-      const all = await api.workspaces.getAll();
+      const all = await workspacesStore.load();
       workspaces = (all || []).filter((workspace) =>
         workspace.active !== false &&
         Number(workspace.id) !== Number(item.workspace_id) &&

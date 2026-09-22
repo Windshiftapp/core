@@ -1,5 +1,6 @@
 <script>
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -45,7 +46,7 @@
   // Load workspaces filtered to channel's configured IDs
   async function loadWorkspaces() {
     try {
-      const allWorkspaces = await api.workspaces.getAll();
+      const allWorkspaces = (await workspacesStore.load()) || [];
       if (channelWorkspaceIds && channelWorkspaceIds.length > 0) {
         availableWorkspaces = allWorkspaces.filter(ws => channelWorkspaceIds.includes(ws.id));
       } else {

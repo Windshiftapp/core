@@ -4,6 +4,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { ArrowLeft } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Tabs from '../components/Tabs.svelte';
@@ -147,7 +148,7 @@
         api.workflows.getAll(),
         api.screens.getAll(),
         api.notificationSettings.getAll(),
-        api.workspaces.getAll(),
+        workspacesStore.load(),
         api.itemTypes.getAll(),
         api.priorities.getAll(),
         api.conditionSets.getAll(),

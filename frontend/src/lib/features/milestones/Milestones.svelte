@@ -23,6 +23,7 @@
   import { currentRoute } from '../../router.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { api } from '../../api.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import ColorDot from '../../components/ColorDot.svelte';
@@ -121,14 +122,13 @@
     try {
       // In workspace view, filter milestones by workspace_id and include global
       const filters = isGlobalView ? { is_global: true } : { workspace_id: workspaceId, include_global: true };
-      const [_, milestones, ws] = await Promise.all([
+      const [_, milestones] = await Promise.all([
         categoriesStore.init(),
-        api.milestones.getAll(filters),
-        api.workspaces.getAll()
+        api.milestones.getAll(filters)
       ]);
       // Update the store with filtered milestones
       milestonesStore.set(milestones || []);
-      workspaces = ws || [];
+      workspaces = await workspacesStore.load();
     } catch (error) {
       console.error('Failed to load data:', error);
     }

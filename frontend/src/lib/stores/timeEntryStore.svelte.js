@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { getUserTimezone } from '../utils/dateFormatter.js';
 import { formatClockInZone, monthBoundsInZone } from '../utils/worklogTimezone.js';
 import { authStore } from './auth.svelte.js';
+import { workspacesStore } from './workspaces.svelte.js';
 
 class TimeEntryStore {
   // === Data ===
@@ -130,7 +131,7 @@ class TimeEntryStore {
 
   async loadWorkspaces() {
     try {
-      this.workspaces = (await api.workspaces.getAll()) || [];
+      this.workspaces = (await workspacesStore.load()) || [];
     } catch (err) {
       console.error('Failed to load workspaces:', err);
       this.workspaces = [];

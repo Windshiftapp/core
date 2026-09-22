@@ -1,6 +1,7 @@
 <script>
   import { Plus, RefreshCw, Search } from '@lucide/svelte';
   import { api } from '../../api.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { navigate } from '../../router.js';
@@ -84,7 +85,7 @@
       collections = Array.isArray(collectionResponse) ? collectionResponse : [];
       if (!workspaceId) {
         try {
-          const workspaceResponse = await api.workspaces.getAll();
+          const workspaceResponse = await workspacesStore.load();
           if (version === collectionLoadVersion) {
             workspaces = Array.isArray(workspaceResponse) ? workspaceResponse : [];
           }

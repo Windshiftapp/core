@@ -23,6 +23,7 @@
   import { gradients, iconMap } from '../stores/portalPresentation.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';
   import { loadPermissionProfile } from '../stores/permissionProfile.js';
@@ -90,7 +91,7 @@
 
   async function loadKbWorkspaces() {
     try {
-      kbWorkspaces = (await api.workspaces.getAll()) ?? [];
+      kbWorkspaces = (await workspacesStore.load()) ?? [];
     } catch (err) {
       console.error('Failed to load workspaces for knowledge base wiring:', err);
       kbWorkspaces = [];

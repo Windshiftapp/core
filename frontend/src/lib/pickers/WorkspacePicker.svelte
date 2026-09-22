@@ -2,6 +2,7 @@
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { Briefcase, Package } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -39,7 +40,7 @@
     try {
       loading = true;
       error = null;
-      const allWorkspaces = await api.workspaces.getAll() || [];
+      const allWorkspaces = (await workspacesStore.load()) || [];
       // Filter out personal workspaces for dropdown
       loadedWorkspaces = allWorkspaces.filter(w => !w.is_personal);
     } catch (err) {

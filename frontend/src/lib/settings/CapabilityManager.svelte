@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { api } from '../api.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { Plus, Edit, Trash2 } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
@@ -244,7 +245,7 @@
 
   async function loadWorkspaces() {
     try {
-      workspaces = await api.workspaces.getAll();
+      workspaces = await workspacesStore.load();
     } catch (err) {
       console.error('Failed to load workspaces:', err);
     }
