@@ -2,9 +2,9 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -39,7 +39,7 @@ func (as *ActionService) runIterator(
 	stepResult *models.StepResult,
 	allNodes []models.ActionNode,
 	allEdges []models.ActionEdge,
-	executedNodes map[int]bool,
+	markExecuted func(int),
 ) error {
 	// Run the iterator-specific executor, which populates stepResult.Output.
 	// Currently only related_items is an iterator; future iterators get added
@@ -96,7 +96,7 @@ func (as *ActionService) runIterator(
 
 	// Mark every body node as executed so the outer loop doesn't re-run them.
 	for nodeID := range body {
-		executedNodes[nodeID] = true
+		markExecuted(nodeID)
 	}
 
 	// Replace the items slice with a JSON-friendly summary in the step output
@@ -131,76 +131,48 @@ func (as *ActionService) runBodyOnce(
 		}
 	}
 
-	sorted, err := as.topologicalSort(bodyNodes, bodyEdges)
-	if err != nil {
-		return nil, fmt.Errorf("iterator body subgraph: %w", err)
-	}
-
-	executed := map[int]bool{}
-	var results []models.StepResult
-
-	for _, n := range sorted {
-		// Reuse the outer canExecuteNode logic with this body's local step
-		// results. Entry nodes have no incoming edge after the iterator->body
-		// edge is stripped, so allow roots within the body subgraph.
-		if !as.canExecuteNodeWithResults(n.ID, bodyEdges, executed, results, true) {
-			continue
-		}
-
-		ctx.TotalSteps++
-		if ctx.TotalSteps > maxStepsPerFlow {
-			return results, errStepBudgetExceeded
-		}
-
-		nodeCopy := n
-		step := models.StepResult{
-			NodeID:    n.ID,
-			NodeType:  n.NodeType,
-			Status:    models.ActionStatusRunning,
-			StartedAt: time.Now(),
-		}
-
+	run, err := actionutil.RunFlow(ctx.Context, bodyNodes, bodyEdges, actionutil.FlowOptions{
+		// Entry nodes have no incoming edge after the iterator->body edge is
+		// stripped, so allow roots within the body subgraph.
+		AllowRoots:        true,
+		MaxSteps:          maxStepsPerFlow,
+		BudgetExceededErr: errStepBudgetExceeded,
+		TotalSteps:        &ctx.TotalSteps,
+	}, func(node *models.ActionNode, step *models.StepResult, markExecuted func(int)) error {
 		// Iterators inside iterator bodies are valid — recurse.
-		if n.NodeType.IsIterator() {
-			err := as.runIterator(&nodeCopy, ctx, &step, allNodes, allEdges, executed)
-			completedAt := time.Now()
-			step.CompletedAt = &completedAt
-			if err != nil {
-				step.Status = models.ActionStatusFailed
-				step.ErrorMessage = err.Error()
+		if node.NodeType.IsIterator() {
+			if err := as.runIterator(node, ctx, step, allNodes, allEdges, markExecuted); err != nil {
 				slog.Warn("nested iterator failed",
 					slog.String("component", "actions"),
-					slog.Int("node_id", n.ID),
+					slog.Int("node_id", node.ID),
 					slog.Any("error", err),
 				)
-			} else {
-				step.Status = models.ActionStatusCompleted
-				executed[n.ID] = true
+				return err
 			}
-			results = append(results, step)
-			continue
+			return nil
 		}
-
-		err := as.executeNode(&nodeCopy, ctx, &step)
-		completedAt := time.Now()
-		step.CompletedAt = &completedAt
-		if err != nil {
-			step.Status = models.ActionStatusFailed
-			step.ErrorMessage = err.Error()
+		if err := as.executeNode(node, ctx, step); err != nil {
 			slog.Warn("iterator body node failed",
 				slog.String("component", "actions"),
-				slog.Int("node_id", n.ID),
-				slog.String("node_type", string(n.NodeType)),
+				slog.Int("node_id", node.ID),
+				slog.String("node_type", string(node.NodeType)),
 				slog.Any("error", err),
 			)
-		} else {
-			step.Status = models.ActionStatusCompleted
-			executed[n.ID] = true
+			return err
 		}
-		results = append(results, step)
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, actionutil.ErrCycleDetected) {
+			return run.Steps, fmt.Errorf("iterator body subgraph: %w", err)
+		}
+		// The body loop only fails on a canceled context; abort the iterator.
+		return run.Steps, err
 	}
-
-	return results, nil
+	if run.BudgetExceeded {
+		return run.Steps, errStepBudgetExceeded
+	}
+	return run.Steps, nil
 }
 
 // executeRelatedItems is the iterator's per-execution producer: it fetches

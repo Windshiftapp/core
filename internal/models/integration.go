@@ -913,6 +913,12 @@ type ActionNode struct {
 // FlowNodeID returns the node's ID for generic action-flow helpers.
 func (n ActionNode) FlowNodeID() int { return n.ID }
 
+// GetID returns the node's ID for the shared action-flow runner.
+func (n ActionNode) GetID() int { return n.ID }
+
+// GetNodeType returns the node type for the shared action-flow runner.
+func (n ActionNode) GetNodeType() string { return string(n.NodeType) }
+
 // SetFlowActionID sets the node's action ID for generic action-flow helpers.
 func (n *ActionNode) SetFlowActionID(id int) { n.ActionID = id }
 
@@ -935,6 +941,15 @@ type ActionEdge struct {
 
 // SetFlowActionID sets the edge's action ID for generic action-flow helpers.
 func (e *ActionEdge) SetFlowActionID(id int) { e.ActionID = id }
+
+// GetSourceNodeID returns the edge's source node ID for the shared runner.
+func (e ActionEdge) GetSourceNodeID() int { return e.SourceNodeID }
+
+// GetTargetNodeID returns the edge's target node ID for the shared runner.
+func (e ActionEdge) GetTargetNodeID() int { return e.TargetNodeID }
+
+// GetEdgeType returns the edge's routing type for the shared runner.
+func (e ActionEdge) GetEdgeType() string { return e.EdgeType }
 
 // FlowSourceNodeID returns the edge's source node ID for generic action-flow helpers.
 func (e ActionEdge) FlowSourceNodeID() int { return e.SourceNodeID }

@@ -256,6 +256,9 @@ type LogbookActionNode struct {
 
 func (n LogbookActionNode) GetID() int { return n.ID }
 
+// GetNodeType returns the node type for the shared action-flow runner.
+func (n LogbookActionNode) GetNodeType() string { return string(n.NodeType) }
+
 // FlowNodeID returns the node's ID for generic action-flow helpers.
 func (n LogbookActionNode) FlowNodeID() int { return n.ID }
 

@@ -471,72 +471,43 @@ func (as *AssetActionService) executeActionWithResultForEvent(executionCtx conte
 		ctx.Variables["new_"+k] = v
 	}
 
-	// Topological sort
-	sortedNodes, err := as.topologicalSort(action.Nodes, action.Edges)
-	if err != nil {
-		log.Status = models.ActionStatusFailed
-		log.ErrorMessage = fmt.Sprintf("failed to sort nodes: %v", err)
-		completedAt := time.Now()
-		log.CompletedAt = &completedAt
-		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
-			slog.Error("failed to update asset execution log", slog.Any("error", logErr))
-		}
-		return &AssetActionExecutionResult{
-			LogID:        log.ID,
-			Status:       log.Status,
-			ErrorMessage: log.ErrorMessage,
-		}, fmt.Errorf("failed to topologically sort nodes: %w", err)
-	}
-
 	// Execute nodes
-	executedNodes := make(map[int]bool)
-	for _, node := range sortedNodes {
-		if node.NodeType == models.AssetNodeTrigger {
-			executedNodes[node.ID] = true
-			continue
-		}
-
-		canExecute := as.canExecuteNode(node.ID, action.Edges, executedNodes, ctx)
-		if !canExecute {
-			continue
-		}
-
-		stepResult := models.StepResult{
-			NodeID:    node.ID,
-			NodeType:  models.ActionNodeType(node.NodeType),
-			Status:    models.ActionStatusRunning,
-			StartedAt: time.Now(),
-		}
-
-		err := as.executeNode(&node, ctx, &stepResult)
-		completedAt := time.Now()
-		stepResult.CompletedAt = &completedAt
-		if contextErr := executionCtx.Err(); contextErr != nil {
-			stepResult.Status = models.ActionStatusFailed
-			stepResult.ErrorMessage = contextErr.Error()
-			ctx.StepResults = append(ctx.StepResults, stepResult)
-			log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(ctx.StepResults)
-			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
-				return nil, fmt.Errorf("cancel asset action execution log: %w", logErr)
-			}
-			return &AssetActionExecutionResult{LogID: log.ID, Status: log.Status, ErrorMessage: log.ErrorMessage}, contextErr
-		}
-
-		if err != nil {
-			stepResult.Status = models.ActionStatusFailed
-			stepResult.ErrorMessage = err.Error()
-			ctx.StepResults = append(ctx.StepResults, stepResult)
+	_, err := actionutil.RunFlow(executionCtx, action.Nodes, action.Edges, actionutil.FlowOptions{
+		TriggerNodeType: string(models.AssetNodeTrigger),
+		OnStep:          func(step *models.StepResult) { ctx.StepResults = append(ctx.StepResults, *step) },
+	}, func(node *models.AssetActionNode, step *models.StepResult, _ func(int)) error {
+		if err := as.executeNode(node, ctx, step); err != nil {
 			slog.Warn("asset action node execution failed",
 				slog.String("component", "asset-actions"),
 				slog.Int("node_id", node.ID),
 				slog.String("node_type", string(node.NodeType)),
 				slog.Any("error", err),
 			)
-		} else {
-			stepResult.Status = models.ActionStatusCompleted
-			ctx.StepResults = append(ctx.StepResults, stepResult)
-			executedNodes[node.ID] = true
+			return err
 		}
+		return nil
+	})
+	if err != nil {
+		completedAt := time.Now()
+		if errors.Is(err, actionutil.ErrCycleDetected) {
+			log.Status = models.ActionStatusFailed
+			log.ErrorMessage = fmt.Sprintf("failed to sort nodes: %v", err)
+			log.CompletedAt = &completedAt
+			if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+				slog.Error("failed to update asset execution log", slog.Any("error", logErr))
+			}
+			return &AssetActionExecutionResult{
+				LogID:        log.ID,
+				Status:       log.Status,
+				ErrorMessage: log.ErrorMessage,
+			}, fmt.Errorf("failed to topologically sort nodes: %w", err)
+		}
+		// Canceled mid-step; the runner already recorded the in-flight step.
+		log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(ctx.StepResults)
+		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
+			return nil, fmt.Errorf("cancel asset action execution log: %w", logErr)
+		}
+		return &AssetActionExecutionResult{LogID: log.ID, Status: log.Status, ErrorMessage: log.ErrorMessage}, err
 	}
 
 	// Update execution log
@@ -973,16 +944,6 @@ func (as *AssetActionService) substituteVariables(template string, ctx *models.A
 
 		return match
 	})
-}
-
-// Shared topology and execution helpers
-
-func (as *AssetActionService) topologicalSort(nodes []models.AssetActionNode, edges []models.AssetActionEdge) ([]models.AssetActionNode, error) {
-	return actionutil.TopologicalSort(nodes, edges)
-}
-
-func (as *AssetActionService) canExecuteNode(nodeID int, edges []models.AssetActionEdge, executedNodes map[int]bool, ctx *models.AssetActionExecutionContext) bool {
-	return actionutil.CanExecuteNodeTyped(nodeID, edges, executedNodes, ctx.StepResults)
 }
 
 func evaluateAssetActionCondition(value any, operator, compareValue string) bool {

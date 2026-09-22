@@ -288,6 +288,9 @@ type AssetActionNode struct {
 
 func (n AssetActionNode) GetID() int { return n.ID }
 
+// GetNodeType returns the node type for the shared action-flow runner.
+func (n AssetActionNode) GetNodeType() string { return string(n.NodeType) }
+
 // FlowNodeID returns the node's ID for generic action-flow helpers.
 func (n AssetActionNode) FlowNodeID() int { return n.ID }
 

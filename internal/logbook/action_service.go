@@ -386,8 +386,21 @@ func (s *LogbookActionService) executeAction(action *models.LogbookAction, event
 		"actor.id":         event.ActorUserID,
 	}
 
-	// Get topologically sorted nodes
-	sortedNodes, err := s.topologicalSort(action.Nodes, action.Edges)
+	// Execute nodes in order
+	run, err := actionutil.RunFlow(context.Background(), action.Nodes, action.Edges, actionutil.FlowOptions{
+		TriggerNodeType: string(models.LogbookNodeTrigger),
+	}, func(node *models.LogbookActionNode, step *models.StepResult, _ func(int)) error {
+		if err := s.executeNode(node, event, vars, step); err != nil {
+			slog.Warn("logbook action node execution failed",
+				slog.String("component", "logbook-actions"),
+				slog.Int("node_id", node.ID),
+				slog.String("node_type", string(node.NodeType)),
+				slog.Any("error", err),
+			)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		log.Status = models.ActionStatusFailed
 		log.ErrorMessage = fmt.Sprintf("failed to sort nodes: %v", err)
@@ -396,48 +409,7 @@ func (s *LogbookActionService) executeAction(action *models.LogbookAction, event
 		_ = s.repo.UpdateExecutionLog(log)
 		return fmt.Errorf("failed to topologically sort nodes: %w", err)
 	}
-
-	// Execute nodes in order
-	var stepResults []models.StepResult
-	executedNodes := make(map[int]bool)
-	for _, node := range sortedNodes {
-		if node.NodeType == models.LogbookNodeTrigger {
-			executedNodes[node.ID] = true
-			continue
-		}
-
-		canExecute := s.canExecuteNode(node.ID, action.Edges, executedNodes, stepResults)
-		if !canExecute {
-			continue
-		}
-
-		stepResult := models.StepResult{
-			NodeID:    node.ID,
-			NodeType:  models.ActionNodeType(node.NodeType),
-			Status:    models.ActionStatusRunning,
-			StartedAt: time.Now(),
-		}
-
-		err := s.executeNode(&node, event, vars, &stepResult)
-		completedAt := time.Now()
-		stepResult.CompletedAt = &completedAt
-
-		if err != nil {
-			stepResult.Status = models.ActionStatusFailed
-			stepResult.ErrorMessage = err.Error()
-			stepResults = append(stepResults, stepResult)
-			slog.Warn("logbook action node execution failed",
-				slog.String("component", "logbook-actions"),
-				slog.Int("node_id", node.ID),
-				slog.String("node_type", string(node.NodeType)),
-				slog.Any("error", err),
-			)
-		} else {
-			stepResult.Status = models.ActionStatusCompleted
-			stepResults = append(stepResults, stepResult)
-			executedNodes[node.ID] = true
-		}
-	}
+	stepResults := run.Steps
 
 	// Update execution log
 	log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(stepResults)
@@ -468,14 +440,6 @@ func (s *LogbookActionService) executeActionForEvent(action *models.LogbookActio
 		return nil, fmt.Errorf("load completed durable logbook execution: %w", err)
 	}
 	return log, nil
-}
-
-func (s *LogbookActionService) topologicalSort(nodes []models.LogbookActionNode, edges []models.LogbookActionEdge) ([]models.LogbookActionNode, error) {
-	return actionutil.TopologicalSort(nodes, edges)
-}
-
-func (s *LogbookActionService) canExecuteNode(nodeID int, edges []models.LogbookActionEdge, executedNodes map[int]bool, stepResults []models.StepResult) bool {
-	return actionutil.CanExecuteNodeTyped(nodeID, edges, executedNodes, stepResults)
 }
 
 func (s *LogbookActionService) executeNode(node *models.LogbookActionNode, event *models.LogbookActionEvent, vars map[string]any, stepResult *models.StepResult) error {

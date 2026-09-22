@@ -21,54 +21,6 @@ type ActionEdge interface {
 	GetEdgeType() string
 }
 
-// TopologicalSort performs a topological sort on concrete node/edge slices,
-// returning sorted nodes and an error if a cycle is detected.
-func TopologicalSort[N ActionNode, E ActionEdge](nodes []N, edges []E) ([]N, error) {
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-
-	nodeIDs := make([]int, len(nodes))
-	nodeMap := make(map[int]N, len(nodes))
-	for i, n := range nodes {
-		nodeIDs[i] = n.GetID()
-		nodeMap[n.GetID()] = n
-	}
-
-	flowEdges := make([]FlowEdge, len(edges))
-	for i, e := range edges {
-		flowEdges[i] = FlowEdge{
-			SourceNodeID: e.GetSourceNodeID(),
-			TargetNodeID: e.GetTargetNodeID(),
-			EdgeType:     e.GetEdgeType(),
-		}
-	}
-
-	sortedIDs, err := TopologicalSortByID(nodeIDs, flowEdges)
-	if err != nil {
-		return nil, err
-	}
-
-	sorted := make([]N, len(sortedIDs))
-	for i, id := range sortedIDs {
-		sorted[i] = nodeMap[id]
-	}
-	return sorted, nil
-}
-
-// CanExecuteNodeTyped converts typed edges to FlowEdge and delegates to CanExecuteNode.
-func CanExecuteNodeTyped[E ActionEdge](nodeID int, edges []E, executedNodes map[int]bool, stepResults []models.StepResult) bool {
-	flowEdges := make([]FlowEdge, len(edges))
-	for i, e := range edges {
-		flowEdges[i] = FlowEdge{
-			SourceNodeID: e.GetSourceNodeID(),
-			TargetNodeID: e.GetTargetNodeID(),
-			EdgeType:     e.GetEdgeType(),
-		}
-	}
-	return CanExecuteNode(nodeID, flowEdges, executedNodes, stepResults)
-}
-
 // TopologicalSortByID performs a topological sort on a set of node IDs connected
 // by edges. It returns the IDs in execution order and an error if a cycle is
 // detected.
@@ -116,45 +68,6 @@ func TopologicalSortByID(nodeIDs []int, edges []FlowEdge) ([]int, error) {
 	}
 
 	return sorted, nil
-}
-
-// CanExecuteNode determines whether a node can be executed based on the
-// current set of already-executed nodes and edge conditions. It checks that
-// all incoming edges have their source nodes executed and that conditional
-// edge types ("true"/"false") match the condition results from step results.
-//
-// This deduplicates the identical logic in AssetActionService.canExecuteNode
-// and LogbookActionService.canExecuteNode.
-func CanExecuteNode(nodeID int, edges []FlowEdge, executedNodes map[int]bool, stepResults []models.StepResult) bool {
-	hasIncomingEdge := false
-	for _, edge := range edges {
-		if edge.TargetNodeID == nodeID {
-			hasIncomingEdge = true
-
-			if !executedNodes[edge.SourceNodeID] {
-				return false
-			}
-
-			if edge.EdgeType == "true" || edge.EdgeType == "false" {
-				for _, result := range stepResults {
-					if result.NodeID == edge.SourceNodeID {
-						condResult, ok := result.Output["condition_result"].(bool)
-						if !ok {
-							return false
-						}
-						if edge.EdgeType == "true" && !condResult {
-							return false
-						}
-						if edge.EdgeType == "false" && condResult {
-							return false
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return hasIncomingEdge || len(edges) == 0
 }
 
 // FinalizeExecutionLog updates an execution log's completion status and trace
