@@ -9,6 +9,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
+  import WorkspaceCheckboxList from '../components/WorkspaceCheckboxList.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import FormField from '../components/FormField.svelte';
   import AlertBox from '../components/AlertBox.svelte';
@@ -527,17 +528,12 @@
     <Checkbox id="zammad-global" bind:checked={form.applies_to_all_workspaces} label={t('zammad.allWorkspaces')} size="small" />
     {#if !form.applies_to_all_workspaces}
       <FormField label={t('zammad.allowedWorkspaces')} required>
-        <div class="space-y-2 max-h-40 overflow-y-auto border rounded p-3" style="border-color: var(--ds-border);">
-          {#each workspaces as workspace}
-            <Checkbox
-              id={`zammad-workspace-${workspace.id}`}
-              checked={form.workspace_ids.includes(workspace.id)}
-              onchange={(checked) => toggleWorkspace(workspace.id, checked)}
-              label={`${workspace.key} - ${workspace.name}`}
-              size="small"
-            />
-          {/each}
-        </div>
+        <WorkspaceCheckboxList
+          workspaces={workspaces}
+          selected={form.workspace_ids}
+          onToggle={toggleWorkspace}
+          idPrefix="zammad-workspace"
+        />
       </FormField>
     {/if}
     <Checkbox id="zammad-enabled" bind:checked={form.enabled} label={t('common.enabled')} size="small" />

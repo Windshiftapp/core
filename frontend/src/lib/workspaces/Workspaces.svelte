@@ -151,6 +151,8 @@
         columns={workspaceColumns}
         data={workspaceRows}
         keyField="id"
+        pagination={true}
+        pageSize={50}
         emptyMessage={t('workspaces.empty')}
         emptyIcon={Circle}
         actionItems={buildWorkspaceDropdownItems}

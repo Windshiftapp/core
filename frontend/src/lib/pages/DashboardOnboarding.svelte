@@ -225,7 +225,7 @@
           {t('onboarding.selectWorkspace')}
         </p>
         <div class="space-y-2">
-          {#each accessibleWorkspaces as workspace}
+          {#each accessibleWorkspaces.slice(0, 12) as workspace}
             <ItemCard href="/workspaces/{workspace.id}" compact={true}>
               {#snippet children()}
                 {@const WsIcon = workspaceIconMap[workspace.icon] || Grip}
@@ -247,6 +247,13 @@
               {/snippet}
             </ItemCard>
           {/each}
+          {#if accessibleWorkspaces.length > 12}
+            <!-- First-login surface: bound the card list and hand off to the
+                 workspace directory instead of mounting every workspace. -->
+            <a href="/workspaces" class="block text-center text-sm py-2 hover:underline" style="color: var(--ds-interactive);">
+              {t('onboarding.browseAllWorkspaces', { count: accessibleWorkspaces.length })}
+            </a>
+          {/if}
         </div>
       {:else}
         <!-- Member path without workspaces: contact admin message -->

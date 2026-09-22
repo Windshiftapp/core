@@ -6,6 +6,7 @@
   import { Plus, Edit, Trash2 } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
+  import WorkspaceCheckboxList from '../components/WorkspaceCheckboxList.svelte';
   import Radio from '../components/Radio.svelte';
   import Input from '../components/Input.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -524,19 +525,13 @@
     </label>
 
     {#if !form.applies_to_all_workspaces}
-      <div class="ml-6 mt-1 max-h-40 overflow-auto rounded-md border p-2" style="border-color: var(--ds-border); background: var(--ds-surface);">
-        {#if workspaces.length === 0}
-          <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.actionCapabilities.noWorkspaces')}</p>
-        {:else}
-          {#each workspaces as ws}
-            <Checkbox
-              checked={form.workspace_ids.includes(ws.id)}
-              onchange={() => toggleWorkspaceScope(ws.id)}
-              label={ws.name}
-              class="py-1"
-            />
-          {/each}
-        {/if}
+      <div class="ml-6 mt-1">
+        <WorkspaceCheckboxList
+          workspaces={workspaces}
+          selected={form.workspace_ids}
+          onToggle={toggleWorkspaceScope}
+          emptyMessage={t('settings.adminOperations.actionCapabilities.noWorkspaces')}
+        />
       </div>
     {/if}
   </div>

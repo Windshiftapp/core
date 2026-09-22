@@ -408,6 +408,7 @@ export default {
     dismissOnboarding: 'Закрыть вводный экран',
     getStartedMember: 'Доступные вам рабочие пространства',
     selectWorkspace: 'Выберите рабочее пространство, чтобы начать',
+    browseAllWorkspaces: 'Показать все рабочие пространства ({count})',
     noWorkspacesAvailable:
       'Доступных рабочих пространств пока нет. Обратитесь к администратору, чтобы получить доступ.',
   },

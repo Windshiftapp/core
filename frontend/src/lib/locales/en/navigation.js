@@ -418,6 +418,7 @@ export default {
     dismissOnboarding: 'Dismiss onboarding',
     getStartedMember: 'Here are the workspaces available to you',
     selectWorkspace: 'Select a workspace to get started',
+    browseAllWorkspaces: 'Browse all {count} workspaces',
     noWorkspacesAvailable:
       'No workspaces are available yet. Please contact your administrator to get access to a workspace.',
   },
