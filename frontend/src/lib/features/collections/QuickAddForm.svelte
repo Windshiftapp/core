@@ -40,6 +40,19 @@
   let workspaceMenuStyle = $state('');
   let itemTypeMenuStyle = $state('');
 
+  // Search-to-narrow plus a render cap (WI-1445): at large workspace counts
+  // the dropdown mounts a bounded list instead of every workspace.
+  const MAX_VISIBLE_WORKSPACES = 50;
+  let workspaceFilter = $state('');
+  let filteredWorkspaces = $derived.by(() => {
+    const term = workspaceFilter.trim().toLowerCase();
+    if (!term) return workspaces;
+    return workspaces.filter(ws =>
+      ws.name?.toLowerCase().includes(term) || ws.key?.toLowerCase().includes(term)
+    );
+  });
+  let visibleWorkspaces = $derived(filteredWorkspaces.slice(0, MAX_VISIBLE_WORKSPACES));
+
   const MENU_WIDTH = 192; // w-48
   const MENU_MAX_HEIGHT = 240;
   const VIEWPORT_MARGIN = 8;
@@ -68,7 +81,10 @@
   function toggleWorkspaceDropdown() {
     showItemTypeDropdown = false;
     showWorkspaceDropdown = !showWorkspaceDropdown;
-    if (showWorkspaceDropdown) workspaceMenuStyle = menuPositionStyle(workspaceAnchor);
+    if (showWorkspaceDropdown) {
+      workspaceMenuStyle = menuPositionStyle(workspaceAnchor);
+      workspaceFilter = '';
+    }
   }
 
   function toggleItemTypeDropdown() {
@@ -186,7 +202,20 @@
           class="fixed z-[1000] overflow-y-auto rounded-md shadow-lg border py-1"
           style="{workspaceMenuStyle} background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
         >
-          {#each workspaces as ws}
+          <div class="px-2 pt-1 pb-1.5 sticky top-0" style="background-color: var(--ds-surface-raised);">
+            <input
+              bind:value={workspaceFilter}
+              type="text"
+              data-testid="quick-add-workspace-search"
+              placeholder={t('nav.searchWorkspaces')}
+              class="w-full px-2 py-1.5 rounded text-sm outline-none"
+              style="background-color: var(--ds-background-input); border: 1px solid var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
+          {#if filteredWorkspaces.length === 0}
+            <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">{t('nav.noWorkspacesMatch')}</div>
+          {/if}
+          {#each visibleWorkspaces as ws}
             <button
               type="button"
               onclick={() => selectWorkspace(ws.id)}
@@ -207,6 +236,11 @@
               <span class="truncate">{ws.name}</span>
             </button>
           {/each}
+          {#if visibleWorkspaces.length < filteredWorkspaces.length}
+            <div data-testid="quick-add-workspace-more-hint" class="px-3 py-1.5 text-xs text-center" style="color: var(--ds-text-subtle);">
+              {t('pickers.showingOfTotal', { shown: visibleWorkspaces.length, total: filteredWorkspaces.length })}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>

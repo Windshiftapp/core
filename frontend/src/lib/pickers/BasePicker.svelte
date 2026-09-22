@@ -65,6 +65,10 @@
     onSearchChange = null,
     searchDebounce = 300,
 
+    // Render cap: mount at most this many options and hint to narrow the
+    // search instead (WI-1445). ArrowDown past the cap reveals more.
+    maxVisibleOptions = 100,
+
     // Popover mode: open on mount
     autoOpen = false,
 
@@ -122,10 +126,12 @@
   // In popover mode we maintain our own search term inside the dropdown.
   let popoverSearchTerm = $state('');
 
-  // Debounced server-side search
+  // Debounced server-side search notifications. Providing onSearchChange
+  // alone activates them; the caller decides when to switch from local
+  // filtering to server results via the serverSearch prop.
   let debounceTimer;
   $effect(() => {
-    if (!serverSearch || !onSearchChange) return;
+    if (!onSearchChange) return;
     const query = popoverMode ? popoverSearchTerm : $inputValue;
     clearTimeout(debounceTimer);
     if (!popoverMode && !$touchedInput) return;
@@ -177,6 +183,19 @@
     }
 
     return opts;
+  });
+
+  // Rendered slice of options: the DOM mounts at most maxVisibleOptions rows.
+  // Narrowing the search resets the reveal window; ArrowDown past the end of
+  // the slice grows it, so keyboard users can still reach every option.
+  let revealedCount = $state(maxVisibleOptions);
+  const visibleOptions = $derived(options.slice(0, revealedCount));
+  const hiddenOptionCount = $derived(options.length - visibleOptions.length);
+
+  $effect(() => {
+    // New filter results collapse the reveal window back to the first page.
+    void filteredItems;
+    revealedCount = maxVisibleOptions;
   });
 
   function labelFor(item) {
@@ -339,14 +358,18 @@
     // intercepting Tab.
     if (!$open) return;
 
-    const totalItems = options.length;
+    const totalItems = visibleOptions.length;
 
     if (event.key === 'ArrowDown') {
       if (totalItems === 0) return;
       event.preventDefault();
       event.stopPropagation();
       highlightViaKeyboard = true;
-      highlightedIndex = (highlightedIndex + 1) % totalItems;
+      if (highlightedIndex === totalItems - 1 && hiddenOptionCount > 0) {
+        // Reveal the next page instead of wrapping; the highlight follows.
+        revealedCount += maxVisibleOptions;
+      }
+      highlightedIndex = (highlightedIndex + 1) % visibleOptions.length;
     } else if (event.key === 'ArrowUp') {
       if (totalItems === 0) return;
       event.preventDefault();
@@ -363,7 +386,7 @@
       }
 
       if (highlightedIndex >= 0 && highlightedIndex < totalItems) {
-        selectOption(options[highlightedIndex]);
+        selectOption(visibleOptions[highlightedIndex]);
       }
     }
   }
@@ -407,9 +430,9 @@
     }
   }
 
-  // Reset highlighted index when options change
+  // Reset highlighted index when the visible options change
   $effect(() => {
-    const len = options.length;
+    const len = visibleOptions.length;
     if (highlightedIndex >= len) {
       highlightedIndex = Math.max(0, len - 1);
     }
@@ -600,7 +623,7 @@
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
       {:else if options.length > 0}
         <div role="listbox" data-testid="picker-option-list" class="min-h-0 max-h-60 overflow-y-auto overscroll-contain">
-          {#each options as opt, index (opt.value ?? 'unassigned')}
+          {#each visibleOptions as opt, index (opt.value ?? 'unassigned')}
             {@const itemSelected = multiple ? isItemSelected(opt.value) : $isSelected(opt)}
             {@const isHighlighted = highlightedIndex === index}
             {@const disabledByMax = atMaxSelections && !itemSelected}
@@ -628,6 +651,11 @@
               </div>
             </div>
           {/each}
+          {#if hiddenOptionCount > 0}
+            <div data-testid="picker-more-hint" class="px-4 py-2.5 text-xs text-center border-t" style="border-color: var(--ds-border); color: var(--ds-text-subtle);">
+              {t('pickers.showingOfTotal', { shown: visibleOptions.length, total: options.length })}
+            </div>
+          {/if}
           {#if canCreateCurrentInput()}
             <div role="button" tabindex="0"
                  data-testid="picker-create-option"

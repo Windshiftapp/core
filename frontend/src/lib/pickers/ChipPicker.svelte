@@ -45,6 +45,11 @@
   let inputElement = $state(null);
   let listRef = $state(null);
 
+  // Render cap (WI-1445): mount at most maxVisibleOptions rows and hint to
+  // narrow the search. ArrowDown past the end of the slice reveals more.
+  let maxVisibleOptions = 100;
+  let revealedCount = $state(maxVisibleOptions);
+
   // Derive display value from current value
   let selectedItem = $derived(
     items.find(item => getValue(item) === value) || null
@@ -65,6 +70,15 @@
     );
   });
 
+  const visibleItems = $derived(filteredItems.slice(0, revealedCount));
+  const hiddenItemCount = $derived(filteredItems.length - visibleItems.length);
+
+  // New filter results collapse the reveal window back to the first page.
+  $effect(() => {
+    void filteredItems;
+    revealedCount = maxVisibleOptions;
+  });
+
   // Focus input when popover opens, reset state
   $effect(() => {
     if ($open) {
@@ -78,9 +92,9 @@
     }
   });
 
-  // Reset highlighted index when filtered items change
+  // Reset highlighted index when visible items change
   $effect(() => {
-    const len = filteredItems.length;
+    const len = visibleItems.length;
     if (highlightedIndex >= len) {
       highlightedIndex = Math.max(0, len - 1);
     }
@@ -88,7 +102,7 @@
 
   // Scroll highlighted item into view
   $effect(() => {
-    if ($open && listRef && filteredItems.length > 0) {
+    if ($open && listRef && visibleItems.length > 0) {
       const highlightedEl = listRef.children[highlightedIndex];
       if (highlightedEl) {
         highlightedEl.scrollIntoView({ block: 'nearest' });
@@ -110,7 +124,7 @@
   }
 
   function handleKeyDown(e) {
-    const total = filteredItems.length;
+    const total = visibleItems.length;
 
     // Tab is intentionally left to native handling: when closed it moves to the
     // next field (no trap, WI-445); when open the user selects with Enter rather
@@ -128,7 +142,10 @@
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       e.stopPropagation();
-      highlightedIndex = (highlightedIndex + 1) % total;
+      if (highlightedIndex === total - 1 && hiddenItemCount > 0) {
+        revealedCount += maxVisibleOptions;
+      }
+      highlightedIndex = (highlightedIndex + 1) % visibleItems.length;
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
@@ -137,7 +154,7 @@
       e.preventDefault();
       e.stopPropagation();
       if (highlightedIndex >= 0 && highlightedIndex < total) {
-        handleSelect(filteredItems[highlightedIndex]);
+        handleSelect(visibleItems[highlightedIndex]);
       }
     }
   }
@@ -219,12 +236,12 @@
       onkeydown={handleKeyDown}
       style="outline: none;"
     >
-      {#if filteredItems.length === 0}
+      {#if visibleItems.length === 0}
         <div class="p-4 text-center text-sm" style="color: var(--ds-text-subtle);">
           {t('pickers.noItemsFound')}
         </div>
       {:else}
-        {#each filteredItems as item, index (getValue(item))}
+        {#each visibleItems as item, index (getValue(item))}
           {@const itemValue = getValue(item)}
           {@const isSelected = itemValue === value}
           {@const isHighlighted = highlightedIndex === index}
@@ -253,6 +270,11 @@
             {/if}
           </button>
         {/each}
+        {#if hiddenItemCount > 0}
+          <div data-testid="picker-more-hint" class="px-3 py-2 text-xs text-center" style="color: var(--ds-text-subtle);">
+            {t('pickers.showingOfTotal', { shown: visibleItems.length, total: filteredItems.length })}
+          </div>
+        {/if}
       {/if}
     </div>
   </div>

@@ -1,7 +1,6 @@
 <script>
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { Briefcase, Package } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
@@ -24,7 +23,11 @@
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkspaces'));
 
   let loadedWorkspaces = $state([]);
-  let workspaces = $derived(items ?? loadedWorkspaces);
+  let searchedWorkspaces = $state(null);
+  // Server results replace the cached page while a search is active; before
+  // the first response (and once the query clears) the cached page applies
+  // with instant local filtering.
+  let workspaces = $derived(items ?? (searchedWorkspaces ?? loadedWorkspaces));
   let loading = $state(false);
   let error = $state(null);
 
@@ -58,6 +61,20 @@
     }
     return Briefcase;
   }
+
+  let workspaceSearchToken = 0;
+
+  async function handleSearchChange(query) {
+    const trimmed = query.trim();
+    const token = ++workspaceSearchToken;
+    if (!trimmed) {
+      searchedWorkspaces = null;
+      return;
+    }
+    const result = await workspacesStore.searchWorkspaces(trimmed, { limit: 100 });
+    if (token !== workspaceSearchToken) return;
+    searchedWorkspaces = (result.workspaces || []).filter(w => !w.is_personal);
+  }
 </script>
 
 <BasePicker
@@ -71,6 +88,8 @@
   class={className}
   multiple={multiple}
   {allowClear}
+  serverSearch={searchedWorkspaces !== null}
+  onSearchChange={handleSearchChange}
   searchFields={['name', 'key', 'description']}
   getValue={(workspace) => workspace?.id}
   getLabel={(workspace) => workspace?.name ?? ''}
