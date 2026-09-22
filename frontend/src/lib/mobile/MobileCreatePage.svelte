@@ -795,6 +795,7 @@
         bind:this={descriptionField}
         rows={4}
         placeholder={t('mobile.item.descriptionPlaceholder')}
+        use:autoGrow={description}
         data-testid="create-description"
         readonly={templateLocked}
       ></textarea>

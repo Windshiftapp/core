@@ -198,6 +198,7 @@
         bind:this={descriptionField}
         rows={12}
         placeholder={t('mobile.item.descriptionPlaceholder')}
+        use:autoGrow={description}
         data-testid="item-edit-description"
       ></textarea>
     </div>

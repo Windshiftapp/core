@@ -166,6 +166,7 @@
       aria-label={t('mobile.pages.contentLabel')}
       spellcheck="false"
       placeholder={t('pages.editorPlaceholder')}
+      use:autoGrow={draftContent}
     ></textarea>
     <div class="editor-actions">
       <button class="btn secondary" onclick={cancelEditing} data-testid="mobile-page-editor-cancel" type="button">{t('common.cancel')}</button>
