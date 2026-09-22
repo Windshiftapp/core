@@ -77,8 +77,17 @@
 		});
 	});
 
+	// DOM cap (WI-1451): each mounted comment carries a SafeMarkdown subtree,
+	// so long threads render a bounded window. "Load more" reveals already-
+	// fetched comments first, then fetches older pages from the server.
+	const RENDER_WINDOW_STEP = 100;
+	let renderedCommentLimit = $state(RENDER_WINDOW_STEP);
+	const visibleComments = $derived(sortedComments.slice(0, renderedCommentLimit));
+	const hiddenCommentCount = $derived(sortedComments.length - visibleComments.length);
+
 	function toggleSortOrder() {
 		sortOrder = sortOrder === 'oldest' ? 'newest' : 'oldest';
+		renderedCommentLimit = RENDER_WINDOW_STEP;
 	}
 
 	function dismissNewBadge() {
@@ -148,6 +157,7 @@
 				comments = [];
 				hasMore = false;
 				totalCount = 0;
+				renderedCommentLimit = RENDER_WINDOW_STEP;
 				onCommentsLoaded?.({ count: 0 });
 			} else {
 				console.warn('Comments poll failed:', err);
@@ -260,6 +270,16 @@
 		onCommentsLoaded?.({ count: totalCount });
 	}
 
+	// Reveal already-fetched comments from the render window first, then
+	// fetch older pages from the server.
+	function showOlderComments() {
+		if (hiddenCommentCount > 0) {
+			renderedCommentLimit += RENDER_WINDOW_STEP;
+			return;
+		}
+		loadMoreComments();
+	}
+
 	async function loadMoreComments() {
 		if (isLoadingMore || !hasMore) return;
 		if (!olderCursor) return;
@@ -319,6 +339,9 @@
 
 			const alreadyLoaded = comments.some((comment) => comment.id === newComment.id);
 			comments = mergeCommentRows(comments, [newComment]);
+			// In oldest-first order a new comment lands beyond the render
+			// window; grow it so the freshly posted comment is visible.
+			if (sortOrder === 'oldest') renderedCommentLimit += 1;
 			if (!alreadyLoaded) totalCount++;
 			newCommentContent = '';
 			editorRef?.clear();
@@ -464,13 +487,13 @@
 		</div>
 	{/if}
 
-	{#if hasMore}
+	{#if hasMore || hiddenCommentCount > 0}
 		<div class="flex justify-center mb-4">
 			<Button
 				variant="secondary"
 				size="small"
 				dataTestid="comments-load-more"
-				onclick={loadMoreComments}
+				onclick={showOlderComments}
 				disabled={isLoadingMore}
 			>
 				{isLoadingMore ? t('common.loading') : t('common.loadMore')}
@@ -480,7 +503,7 @@
 
 	<!-- Comments List -->
 	<div class="space-y-4">
-		{#each sortedComments as comment (comment.id)}
+		{#each visibleComments as comment (comment.id)}
 			<div class="flex items-start space-x-3 group" data-testid="comment-item" data-comment-id={comment.id}>
 				<div class="flex-shrink-0">
 					<Avatar
