@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findHardcodedCopy } from './hardcoded-i18n-ast.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -99,10 +100,28 @@ for (const relativeFile of guardedFiles) {
   }
 }
 
+// All mobile components are migrated. Include new components automatically,
+// and inspect script labels/defaults plus expression/attribute fallback copy.
+const mobileFiles = readdirSync(path.join(root, 'src/lib/mobile'))
+  .filter((file) => file.endsWith('.svelte'))
+  .sort()
+  .map((file) => `src/lib/mobile/${file}`);
+const mobileProvider = 'src/lib/commands/providers/mobileNavigationProvider.js';
+for (const relativeFile of [...mobileFiles, mobileProvider]) {
+  const source = readFileSync(path.join(root, relativeFile), 'utf8');
+  for (const finding of findHardcodedCopy(source, { scriptOnly: relativeFile.endsWith('.js') })) {
+    violations.push(
+      `${relativeFile}:${finding.line} localizable copy: ${JSON.stringify(finding.text)}`
+    );
+  }
+}
+
 if (violations.length > 0) {
   console.error('Hardcoded i18n guard failed. Move this copy into the locale catalog:');
   for (const violation of violations) console.error(`  ${violation}`);
   process.exit(1);
 }
 
-console.log(`Hardcoded i18n guard passed (${guardedFiles.length} migrated screens).`);
+console.log(
+  `Hardcoded i18n guard passed (${guardedFiles.length} desktop screens, ${mobileFiles.length} mobile components, mobile navigation provider).`
+);
