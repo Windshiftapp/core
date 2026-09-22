@@ -560,6 +560,26 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 			}
 
 			// Import each issue
+			im := &jiraImportContext{
+				jobID:               jobID,
+				forceReimport:       req.ForceReimport,
+				progress:            progress,
+				client:              client,
+				workspaceID:         workspaceID,
+				timeProjectID:       timeProjectID,
+				statusMap:           statusMap,
+				itemTypeMap:         itemTypeMap,
+				customFieldIDMap:    customFieldIDMap,
+				choiceOptionIDs:     choiceOptionIDs,
+				customFieldMappings: req.Mappings.CustomFields,
+				affectsVersionField: affectsVersionField,
+				userMap:             userMap,
+				usernameMap:         usernameMap,
+				portalCustomerMap:   portalCustomerMap,
+				versionMap:          versionMap,
+				iterationMap:        iterationMap,
+				jsmImport:           jsmImport,
+			}
 			for _, issue := range fetchResult.Issues {
 				if xrayPlan.isTest(projectKey, issue.Key) {
 					if definitionErr, failed := xrayDefinitionErrors[issue.Key]; failed {
@@ -589,7 +609,7 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 					}
 					continue
 				}
-				err := h.importIssue(ctx, jobID, workspaceID, &issue, statusMap, itemTypeMap, userMap, usernameMap, portalCustomerMap, versionMap, iterationMap, customFieldIDMap, choiceOptionIDs, timeProjectID, affectsVersionField, req.Mappings.CustomFields, jsmImport, client, progress, req.ForceReimport)
+				err := h.importIssue(ctx, im, &issue)
 				if h.failOnMappingFailure(jobID, progress) {
 					return
 				}
