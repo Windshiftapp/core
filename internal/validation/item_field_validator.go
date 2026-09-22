@@ -168,14 +168,47 @@ func applyDateField(updateData map[string]any, field string, dst **time.Time) er
 	return nil
 }
 
-// ValidateAndApplyUpdates applies all update data to an item with validation
-// Returns a list of validation errors if any occur
+// ValidateAndApplyUpdates applies all update data to an item with validation.
+// Returns a list of validation errors if any occur.
+//
+// Each field group lives in its own policy function; the step order below is
+// the validation contract. It decides which error surfaces first, and it
+// keeps dependent checks after the fields they read — workspace before the
+// priority/assignee/parent cross-checks, status and is_task before the final
+// task-state check.
 func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	item *models.Item,
 	updateData map[string]any,
 	userID int, // for permission checks on personal tasks
 ) error {
-	// Titles use the same normalization as the create and update services.
+	for _, step := range []func(*models.Item, map[string]any, int) error{
+		applyScalarFields,
+		v.applyStatusAndPriority,
+		applyDateFields,
+		v.applyMilestones,
+		v.applyIteration,
+		v.applyProjectAndInheritance,
+		v.applyTimeProject,
+		v.applyWorkspace,
+		v.checkPriorityAllowedInWorkspace,
+		v.applyAssignee,
+		v.applyCreator,
+		v.applyParent,
+		v.applyRelatedWorkItemUpdate,
+		applyEstimates,
+		v.applyCustomFieldValues,
+	} {
+		if err := step(item, updateData, userID); err != nil {
+			return err
+		}
+	}
+	return ValidateTaskState(v.db, item.WorkspaceID, userID, item.IsTask, item.StatusID)
+}
+
+// applyScalarFields normalizes and applies the independent scalar fields:
+// title, description, and is_task. Titles use the same normalization as the
+// create and update services.
+func applyScalarFields(item *models.Item, updateData map[string]any, _ int) error {
 	if title, ok := updateData["title"].(string); ok {
 		title, err := NormalizeTitle(title)
 		if err != nil {
@@ -197,61 +230,70 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 			item.IsTask = isTaskBool
 		}
 	}
+	return nil
+}
 
-	// Status ID validation
+// applyStatusAndPriority validates the status and priority foreign keys.
+func (v *ItemFieldValidator) applyStatusAndPriority(item *models.Item, updateData map[string]any, _ int) error {
 	if err := v.ValidateNullableIDField(updateData, "status_id", &item.StatusID, "statuses", "Status"); err != nil {
 		return err
 	}
+	return v.ValidateNullableIDField(updateData, "priority_id", &item.PriorityID, "priorities", "Priority")
+}
 
-	// Priority ID validation
-	if err := v.ValidateNullableIDField(updateData, "priority_id", &item.PriorityID, "priorities", "Priority"); err != nil {
-		return err
-	}
-
-	// Date validation and parsing (due/start/end)
+// applyDateFields validates and parses the due/start/end dates.
+func applyDateFields(item *models.Item, updateData map[string]any, _ int) error {
 	if err := applyDateField(updateData, "due_date", &item.DueDate); err != nil {
 		return err
 	}
 	if err := applyDateField(updateData, "start_date", &item.StartDate); err != nil {
 		return err
 	}
-	if err := applyDateField(updateData, "end_date", &item.EndDate); err != nil {
-		return err
-	}
+	return applyDateField(updateData, "end_date", &item.EndDate)
+}
 
-	// Milestone IDs validation (multi-milestone). Accepts []int / []float64 /
-	// []any. nil/missing = no change. Empty slice = clear all. Each
-	// referenced milestone must exist.
-	if msVal, ok := updateData["milestone_ids"]; ok {
-		ids, err := coerceIntSlice(msVal)
+// applyMilestones validates the multi-milestone selection. Accepts []int /
+// []float64 / []any. nil/missing = no change. Empty slice = clear all. Each
+// referenced milestone must exist.
+func (v *ItemFieldValidator) applyMilestones(item *models.Item, updateData map[string]any, _ int) error {
+	msVal, ok := updateData["milestone_ids"]
+	if !ok {
+		return nil
+	}
+	ids, err := coerceIntSlice(msVal)
+	if err != nil {
+		return &ValidationError{Field: "milestone_ids", Message: "milestone_ids must be an array of integers"}
+	}
+	for _, mID := range ids {
+		exists, err := v.EntityExists("milestones", mID)
 		if err != nil {
-			return &ValidationError{Field: "milestone_ids", Message: "milestone_ids must be an array of integers"}
+			return fmt.Errorf("failed to check milestone existence: %w", err)
 		}
-		for _, mID := range ids {
-			exists, err := v.EntityExists("milestones", mID)
-			if err != nil {
-				return fmt.Errorf("failed to check milestone existence: %w", err)
-			}
-			if !exists {
-				return &ValidationError{Field: "milestone_ids", Message: fmt.Sprintf("Milestone %d not found", mID)}
-			}
+		if !exists {
+			return &ValidationError{Field: "milestone_ids", Message: fmt.Sprintf("Milestone %d not found", mID)}
 		}
-		// Stash validated IDs on the item so the calling service can persist
-		// them into item_milestones. Hydrated as ID-only Milestone stubs; the
-		// handler/loader will refill the full rows on read.
-		stubs := make([]models.Milestone, 0, len(ids))
-		for _, mID := range ids {
-			stubs = append(stubs, models.Milestone{ID: mID})
-		}
-		item.Milestones = stubs
 	}
-
-	// Iteration ID validation
-	if err := v.ValidateNullableIDField(updateData, "iteration_id", &item.IterationID, "iterations", "Iteration"); err != nil {
-		return err
+	// Stash validated IDs on the item so the calling service can persist
+	// them into item_milestones. Hydrated as ID-only Milestone stubs; the
+	// handler/loader will refill the full rows on read.
+	stubs := make([]models.Milestone, 0, len(ids))
+	for _, mID := range ids {
+		stubs = append(stubs, models.Milestone{ID: mID})
 	}
+	item.Milestones = stubs
+	return nil
+}
 
-	// Project inheritance logic
+// applyIteration validates the iteration foreign key.
+func (v *ItemFieldValidator) applyIteration(item *models.Item, updateData map[string]any, _ int) error {
+	return v.ValidateNullableIDField(updateData, "iteration_id", &item.IterationID, "iterations", "Iteration")
+}
+
+// applyProjectAndInheritance applies project_id and inherit_project, which
+// must be resolved together: inheriting clears the direct project, a direct
+// project clears the inherit flag, and clearing project_id keeps the inherit
+// flag when inherit_project was explicitly set to true in the same payload.
+func (v *ItemFieldValidator) applyProjectAndInheritance(item *models.Item, updateData map[string]any, userID int) error {
 	if inheritProjectValue, ok := updateData["inherit_project"]; ok {
 		if inheritProjectBool, ok := inheritProjectValue.(bool); ok {
 			item.InheritProject = inheritProjectBool
@@ -262,82 +304,105 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		}
 	}
 
-	// Project ID validation with inheritance logic
-	if projectIDValue, ok := updateData["project_id"]; ok {
-		if projectIDValue == nil {
-			item.ProjectID = nil
-			// When clearing project_id, only clear inherit flag if inherit_project wasn't explicitly set to true
-			if inheritProjectValue, hasInheritProject := updateData["inherit_project"]; !hasInheritProject || inheritProjectValue != true {
-				item.InheritProject = false
-			}
-		} else {
-			newProjectID, ok := utils.CoerceInt(projectIDValue)
-			if !ok {
-				return &ValidationError{Field: "project_id", Message: "Invalid project_id type"}
-			}
-			if newProjectID > 0 {
-				// Validate the project exists AND the caller may assign it.
-				if err := v.checkProjectAssignable("project_id", userID, newProjectID); err != nil {
-					return err
-				}
-				item.ProjectID = &newProjectID
-				// When setting a direct project, clear inherit flag
-				item.InheritProject = false
-			}
-		}
+	projectIDValue, ok := updateData["project_id"]
+	if !ok {
+		return nil
 	}
+	if projectIDValue == nil {
+		item.ProjectID = nil
+		// When clearing project_id, only clear inherit flag if inherit_project wasn't explicitly set to true
+		if inheritProjectValue, hasInheritProject := updateData["inherit_project"]; !hasInheritProject || inheritProjectValue != true {
+			item.InheritProject = false
+		}
+		return nil
+	}
+	newProjectID, ok := utils.CoerceInt(projectIDValue)
+	if !ok {
+		return &ValidationError{Field: "project_id", Message: "Invalid project_id type"}
+	}
+	if newProjectID > 0 {
+		// Validate the project exists AND the caller may assign it.
+		if err := v.checkProjectAssignable("project_id", userID, newProjectID); err != nil {
+			return err
+		}
+		item.ProjectID = &newProjectID
+		// When setting a direct project, clear inherit flag
+		item.InheritProject = false
+	}
+	return nil
+}
 
-	// Time-project override validation. time_project_id overrides the project
-	// used when logging time on the item; it is independent of inherit_project.
-	if timeProjectIDValue, ok := updateData["time_project_id"]; ok {
-		if timeProjectIDValue == nil {
-			item.TimeProjectID = nil
-		} else {
-			newTimeProjectID, ok := utils.CoerceInt(timeProjectIDValue)
-			if !ok {
-				return &ValidationError{Field: "time_project_id", Message: "Invalid time_project_id type"}
-			}
-			if newTimeProjectID > 0 {
-				if err := v.checkProjectAssignable("time_project_id", userID, newTimeProjectID); err != nil {
-					return err
-				}
-				item.TimeProjectID = &newTimeProjectID
-			} else {
-				// 0 means clear, consistent with the aitools convention.
-				item.TimeProjectID = nil
-			}
-		}
+// applyTimeProject validates the time-project override used when logging
+// time on the item; it is independent of inherit_project. 0 means clear,
+// consistent with the aitools convention.
+func (v *ItemFieldValidator) applyTimeProject(item *models.Item, updateData map[string]any, userID int) error {
+	timeProjectIDValue, ok := updateData["time_project_id"]
+	if !ok {
+		return nil
 	}
+	if timeProjectIDValue == nil {
+		item.TimeProjectID = nil
+		return nil
+	}
+	newTimeProjectID, ok := utils.CoerceInt(timeProjectIDValue)
+	if !ok {
+		return &ValidationError{Field: "time_project_id", Message: "Invalid time_project_id type"}
+	}
+	if newTimeProjectID > 0 {
+		if err := v.checkProjectAssignable("time_project_id", userID, newTimeProjectID); err != nil {
+			return err
+		}
+		item.TimeProjectID = &newTimeProjectID
+	} else {
+		item.TimeProjectID = nil
+	}
+	return nil
+}
 
-	// Workspace ID validation (if being changed)
-	if workspaceIDValue, ok := updateData["workspace_id"]; ok && workspaceIDValue != nil {
-		newWorkspaceID, ok := utils.CoerceInt(workspaceIDValue)
-		if !ok {
-			return &ValidationError{Field: "workspace_id", Message: "Invalid workspace_id type"}
-		}
-		exists, err := v.EntityExists("workspaces", newWorkspaceID)
-		if err != nil {
-			return fmt.Errorf("failed to validate workspace: %w", err)
-		}
-		if !exists {
-			return &ValidationError{Field: "workspace_id", Message: "Workspace not found"}
-		}
-		item.WorkspaceID = newWorkspaceID
+// applyWorkspace validates and applies a workspace move.
+func (v *ItemFieldValidator) applyWorkspace(item *models.Item, updateData map[string]any, _ int) error {
+	workspaceIDValue, ok := updateData["workspace_id"]
+	if !ok || workspaceIDValue == nil {
+		return nil
 	}
+	newWorkspaceID, ok := utils.CoerceInt(workspaceIDValue)
+	if !ok {
+		return &ValidationError{Field: "workspace_id", Message: "Invalid workspace_id type"}
+	}
+	exists, err := v.EntityExists("workspaces", newWorkspaceID)
+	if err != nil {
+		return fmt.Errorf("failed to validate workspace: %w", err)
+	}
+	if !exists {
+		return &ValidationError{Field: "workspace_id", Message: "Workspace not found"}
+	}
+	item.WorkspaceID = newWorkspaceID
+	return nil
+}
+
+// checkPriorityAllowedInWorkspace rejects priorities the target workspace
+// does not offer. Runs after both priority_id and workspace_id are applied,
+// and fires only when either field is part of the update.
+func (v *ItemFieldValidator) checkPriorityAllowedInWorkspace(item *models.Item, updateData map[string]any, _ int) error {
 	_, priorityChanged := updateData["priority_id"]
 	_, workspaceChanged := updateData["workspace_id"]
-	if (priorityChanged || workspaceChanged) && item.PriorityID != nil {
-		allowed, err := IsPriorityAllowedInWorkspace(v.db, item.WorkspaceID, *item.PriorityID)
-		if err != nil {
-			return fmt.Errorf("failed to validate workspace priority: %w", err)
-		}
-		if !allowed {
-			return &ValidationError{Field: "priority_id", Message: "Priority is not allowed in this workspace"}
-		}
+	if !(priorityChanged || workspaceChanged) || item.PriorityID == nil {
+		return nil
 	}
+	allowed, err := IsPriorityAllowedInWorkspace(v.db, item.WorkspaceID, *item.PriorityID)
+	if err != nil {
+		return fmt.Errorf("failed to validate workspace priority: %w", err)
+	}
+	if !allowed {
+		return &ValidationError{Field: "priority_id", Message: "Priority is not allowed in this workspace"}
+	}
+	return nil
+}
 
-	// Reject inactive and unknown users first, then apply the shared workspace
-	// access and ready-binding rules without exposing which check failed.
+// applyAssignee validates the assignee: reject inactive and unknown users
+// first, then apply the shared workspace access and ready-binding rules
+// without exposing which check failed.
+func (v *ItemFieldValidator) applyAssignee(item *models.Item, updateData map[string]any, _ int) error {
 	if err := v.ValidateNullableActiveUserID(updateData, "assignee_id", &item.AssigneeID, "Assignee user"); err != nil {
 		return err
 	}
@@ -350,120 +415,134 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 			return &ValidationError{Field: "assignee_id", Message: "Assignee user not found"}
 		}
 	}
+	return nil
+}
 
-	// Creator ID validation
-	if err := v.ValidateNullableUserID(updateData, "creator_id", &item.CreatorID, "Creator user"); err != nil {
-		return err
+// applyCreator validates the creator foreign key.
+func (v *ItemFieldValidator) applyCreator(item *models.Item, updateData map[string]any, _ int) error {
+	return v.ValidateNullableUserID(updateData, "creator_id", &item.CreatorID, "Creator user")
+}
+
+// applyParent validates a parent change: self-parent rejection, existence,
+// cross-workspace view permission, hierarchy cycles, and item-type
+// hierarchy levels.
+func (v *ItemFieldValidator) applyParent(item *models.Item, updateData map[string]any, userID int) error {
+	parentIDValue, ok := updateData["parent_id"]
+	if !ok {
+		return nil
 	}
-
-	// Parent ID validation (with hierarchy level checking)
-	if parentIDValue, ok := updateData["parent_id"]; ok {
-		if parentIDValue == nil {
-			if item.ItemTypeID != nil {
-				if err := ValidateParentForItemType(v.db, *item.ItemTypeID, nil); err != nil {
-					return err
-				}
-			}
-			item.ParentID = nil
-		} else {
-			newParentID, ok := utils.CoerceInt(parentIDValue)
-			if !ok {
-				return &ValidationError{Field: "parent_id", Message: "Invalid parent_id type"}
-			}
-
-			// Reject self-parent outright. Catches the common typo/malicious
-			// case before we bother the DB with a cycle walk, and ensures
-			// items without an item_type_id (which skip hierarchy-level
-			// validation below) still can't point at themselves.
-			if item.ID != 0 && newParentID == item.ID {
-				return &ValidationError{Field: "parent_id", Message: "Item cannot be its own parent"}
-			}
-
-			// Validate parent item exists and capture its workspace for the
-			// cross-workspace view-permission check below.
-			parentWorkspaceID, err := repository.NewItemRepository(v.db).GetWorkspaceID(newParentID)
-			if errors.Is(err, repository.ErrNotFound) {
-				return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
-			}
-			if err != nil {
-				return fmt.Errorf("failed to validate parent: %w", err)
-			}
-
-			// Cross-workspace parents are allowed by design, but only if the
-			// caller has view permission on the parent's workspace — otherwise
-			// they could link their item to an item whose existence they
-			// shouldn't know about.
-			if parentWorkspaceID != item.WorkspaceID {
-				if v.permChecker == nil {
-					// Fail closed: no way to verify the caller's permission.
-					return &ValidationError{Field: "parent_id", Message: "Cross-workspace parent requires a permission-checked caller"}
-				}
-				hasView, permErr := v.permChecker.HasWorkspacePermission(userID, parentWorkspaceID, models.PermissionItemView)
-				if permErr != nil {
-					return fmt.Errorf("failed to check parent workspace permission: %w", permErr)
-				}
-				if !hasView {
-					// Mimic a 404-style "not found" to avoid leaking existence.
-					return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
-				}
-			}
-
-			// Existing items need a wired cycle checker before parent changes can be validated.
-			if item.ID != 0 {
-				if v.cycleChecker == nil {
-					return &ValidationError{Field: "parent_id", Message: "parent_id changes require a cycle-checked caller"}
-				}
-				wouldCycle, cycleErr := v.cycleChecker.WouldCreateCycle(item.ID, newParentID)
-				if cycleErr != nil {
-					return fmt.Errorf("failed to check hierarchy cycle: %w", cycleErr)
-				}
-				if wouldCycle {
-					return &ValidationError{Field: "parent_id", Message: "Parent change would create a hierarchy cycle"}
-				}
-			}
-
-			// Validate hierarchy levels if item has an item type
-			if item.ItemTypeID != nil {
-				if err := ValidateParentForItemType(v.db, *item.ItemTypeID, &newParentID); err != nil {
-					return err
-				}
-			}
-
-			item.ParentID = &newParentID
-		}
-	}
-
-	// Related work item ID validation (for personal tasks)
-	if relatedWorkItemIDValue, ok := updateData["related_work_item_id"]; ok {
-		if relatedWorkItemIDValue == nil {
-			item.RelatedWorkItemID = nil
-		} else {
-			newRelatedWorkItemID, ok := utils.CoerceInt(relatedWorkItemIDValue)
-			if !ok {
-				return &ValidationError{Field: "related_work_item_id", Message: "Invalid related_work_item_id type"}
-			}
-
-			if err := v.ValidateRelatedWorkItem(item.WorkspaceID, userID, newRelatedWorkItemID); err != nil {
+	if parentIDValue == nil {
+		if item.ItemTypeID != nil {
+			if err := ValidateParentForItemType(v.db, *item.ItemTypeID, nil); err != nil {
 				return err
 			}
+		}
+		item.ParentID = nil
+		return nil
+	}
+	newParentID, ok := utils.CoerceInt(parentIDValue)
+	if !ok {
+		return &ValidationError{Field: "parent_id", Message: "Invalid parent_id type"}
+	}
 
-			item.RelatedWorkItemID = &newRelatedWorkItemID
+	// Reject self-parent outright. Catches the common typo/malicious
+	// case before we bother the DB with a cycle walk, and ensures
+	// items without an item_type_id (which skip hierarchy-level
+	// validation below) still can't point at themselves.
+	if item.ID != 0 && newParentID == item.ID {
+		return &ValidationError{Field: "parent_id", Message: "Item cannot be its own parent"}
+	}
+
+	// Validate parent item exists and capture its workspace for the
+	// cross-workspace view-permission check below.
+	parentWorkspaceID, err := repository.NewItemRepository(v.db).GetWorkspaceID(newParentID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
+	}
+	if err != nil {
+		return fmt.Errorf("failed to validate parent: %w", err)
+	}
+
+	// Cross-workspace parents are allowed by design, but only if the
+	// caller has view permission on the parent's workspace — otherwise
+	// they could link their item to an item whose existence they
+	// shouldn't know about.
+	if parentWorkspaceID != item.WorkspaceID {
+		if v.permChecker == nil {
+			// Fail closed: no way to verify the caller's permission.
+			return &ValidationError{Field: "parent_id", Message: "Cross-workspace parent requires a permission-checked caller"}
+		}
+		hasView, permErr := v.permChecker.HasWorkspacePermission(userID, parentWorkspaceID, models.PermissionItemView)
+		if permErr != nil {
+			return fmt.Errorf("failed to check parent workspace permission: %w", permErr)
+		}
+		if !hasView {
+			// Mimic a 404-style "not found" to avoid leaking existence.
+			return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
 		}
 	}
 
-	// Story points validation
+	// Existing items need a wired cycle checker before parent changes can be validated.
+	if item.ID != 0 {
+		if v.cycleChecker == nil {
+			return &ValidationError{Field: "parent_id", Message: "parent_id changes require a cycle-checked caller"}
+		}
+		wouldCycle, cycleErr := v.cycleChecker.WouldCreateCycle(item.ID, newParentID)
+		if cycleErr != nil {
+			return fmt.Errorf("failed to check hierarchy cycle: %w", cycleErr)
+		}
+		if wouldCycle {
+			return &ValidationError{Field: "parent_id", Message: "Parent change would create a hierarchy cycle"}
+		}
+	}
+
+	// Validate hierarchy levels if item has an item type
+	if item.ItemTypeID != nil {
+		if err := ValidateParentForItemType(v.db, *item.ItemTypeID, &newParentID); err != nil {
+			return err
+		}
+	}
+
+	item.ParentID = &newParentID
+	return nil
+}
+
+// applyRelatedWorkItemUpdate validates the personal-task link to another
+// work item.
+func (v *ItemFieldValidator) applyRelatedWorkItemUpdate(item *models.Item, updateData map[string]any, userID int) error {
+	relatedWorkItemIDValue, ok := updateData["related_work_item_id"]
+	if !ok {
+		return nil
+	}
+	if relatedWorkItemIDValue == nil {
+		item.RelatedWorkItemID = nil
+		return nil
+	}
+	newRelatedWorkItemID, ok := utils.CoerceInt(relatedWorkItemIDValue)
+	if !ok {
+		return &ValidationError{Field: "related_work_item_id", Message: "Invalid related_work_item_id type"}
+	}
+	if err := v.ValidateRelatedWorkItem(item.WorkspaceID, userID, newRelatedWorkItemID); err != nil {
+		return err
+	}
+	item.RelatedWorkItemID = &newRelatedWorkItemID
+	return nil
+}
+
+// applyEstimates validates the story-points and estimate-minutes numbers.
+func applyEstimates(item *models.Item, updateData map[string]any, _ int) error {
 	if spValue, ok := updateData["story_points"]; ok {
 		if spValue == nil {
 			item.StoryPoints = nil
 		} else {
-			switch v := spValue.(type) {
+			switch sp := spValue.(type) {
 			case float64:
-				if v < 0 {
+				if sp < 0 {
 					return &ValidationError{Field: "story_points", Message: "Story points cannot be negative"}
 				}
-				item.StoryPoints = &v
+				item.StoryPoints = &sp
 			case int:
-				f := float64(v)
+				f := float64(sp)
 				if f < 0 {
 					return &ValidationError{Field: "story_points", Message: "Story points cannot be negative"}
 				}
@@ -474,61 +553,60 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		}
 	}
 
-	// Estimate minutes validation
 	if emValue, ok := updateData["estimate_minutes"]; ok {
 		if emValue == nil {
 			item.EstimateMinutes = nil
 		} else {
-			switch v := emValue.(type) {
+			switch em := emValue.(type) {
 			case float64:
-				if v < 0 {
+				if em < 0 {
 					return &ValidationError{Field: "estimate_minutes", Message: "Estimate cannot be negative"}
 				}
-				n := int(v)
+				n := int(em)
 				item.EstimateMinutes = &n
 			case int:
-				if v < 0 {
+				if em < 0 {
 					return &ValidationError{Field: "estimate_minutes", Message: "Estimate cannot be negative"}
 				}
-				item.EstimateMinutes = &v
+				item.EstimateMinutes = &em
 			default:
 				return &ValidationError{Field: "estimate_minutes", Message: "Invalid estimate_minutes type"}
 			}
 		}
 	}
+	return nil
+}
 
-	// Custom field values are a per-field patch: each key sets that field, a
-	// null value clears it, and keys left out of the payload are preserved.
-	// A null payload is ignored — clearing is per-key, never whole-blob.
-	// Validation and normalization run on the merged result.
-	if rawCustomFields, ok := updateData["custom_field_values"]; ok && rawCustomFields != nil {
-		cfv, ok := rawCustomFields.(map[string]any)
-		if !ok {
-			return &ValidationError{Field: "custom_field_values", Message: "must be a JSON object"}
-		}
-		merged := make(map[string]any, len(item.CustomFieldValues)+len(cfv))
-		for key, value := range item.CustomFieldValues {
-			merged[key] = value
-		}
-		for key, value := range cfv {
-			if value == nil {
-				delete(merged, key)
-				continue
-			}
-			merged[key] = value
-		}
-		// Validate option ids (select/multiselect) + dedupe multiselect
-		// arrays. Unknown field ids are accepted here; the async cfv
-		// cleanup scheduler is responsible for removing them.
-		if err := ValidateAndNormalizeCustomFieldValues(v.db, merged); err != nil {
-			return err
-		}
-		item.CustomFieldValues = merged
+// applyCustomFieldValues merges the per-field custom-field patch onto the
+// item: each key sets that field, a null value clears it, and keys left out
+// of the payload are preserved. A null payload is ignored — clearing is
+// per-key, never whole-blob. Validation and normalization run on the merged
+// result. Unknown field ids are accepted here; the async cfv cleanup
+// scheduler is responsible for removing them.
+func (v *ItemFieldValidator) applyCustomFieldValues(item *models.Item, updateData map[string]any, _ int) error {
+	rawCustomFields, ok := updateData["custom_field_values"]
+	if !ok || rawCustomFields == nil {
+		return nil
 	}
-	if err := ValidateTaskState(v.db, item.WorkspaceID, userID, item.IsTask, item.StatusID); err != nil {
+	cfv, ok := rawCustomFields.(map[string]any)
+	if !ok {
+		return &ValidationError{Field: "custom_field_values", Message: "must be a JSON object"}
+	}
+	merged := make(map[string]any, len(item.CustomFieldValues)+len(cfv))
+	for key, value := range item.CustomFieldValues {
+		merged[key] = value
+	}
+	for key, value := range cfv {
+		if value == nil {
+			delete(merged, key)
+			continue
+		}
+		merged[key] = value
+	}
+	if err := ValidateAndNormalizeCustomFieldValues(v.db, merged); err != nil {
 		return err
 	}
-
+	item.CustomFieldValues = merged
 	return nil
 }
 
