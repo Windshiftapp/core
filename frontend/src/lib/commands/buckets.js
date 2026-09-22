@@ -59,6 +59,21 @@ export const BUCKET_LABELS = Object.freeze({
   [BUCKET.SYSTEM]: 'System',
 });
 
+// Localized consumers resolve these keys at render time so an open palette
+// follows locale changes. Keep BUCKET_LABELS for existing consumers.
+export const BUCKET_LABEL_KEYS = Object.freeze({
+  [BUCKET.RECENT]: 'mobile.myWork.recent',
+  [BUCKET.ITEM_ACTIONS]: 'mobile.palette.item',
+  [BUCKET.WORKSPACE_ACTIONS]: 'common.workspace',
+  [BUCKET.WORKSPACE_NAVIGATION]: 'common.workspace',
+  [BUCKET.MODULE_ACTIONS]: 'mobile.palette.tools',
+  [BUCKET.CREATE]: 'common.create',
+  [BUCKET.ADMIN]: 'mobile.palette.admin',
+  [BUCKET.SEARCH_RESULTS]: 'common.search',
+  [BUCKET.GLOBAL_NAVIGATION]: 'mobile.palette.navigation',
+  [BUCKET.SYSTEM]: 'mobile.palette.system',
+});
+
 // Per-bucket cap is set so empty-query palette renders all workspace views
 // (up to ~12) and global nav items (up to ~10). Total cap keeps the list
 // scannable without burying admin / system commands.

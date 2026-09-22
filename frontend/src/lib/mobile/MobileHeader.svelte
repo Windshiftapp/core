@@ -1,5 +1,6 @@
 <script>
   import { ChevronLeft } from '@lucide/svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * @type {{
@@ -15,7 +16,7 @@
 <header class="mobile-header" data-testid="mobile-header">
   <div class="left">
     {#if onback}
-      <button class="back" onclick={onback} data-testid="mobile-header-back" aria-label="Back" type="button">
+      <button class="back" onclick={onback} data-testid="mobile-header-back" aria-label={t('common.back')} type="button">
         <ChevronLeft size={24} />
       </button>
     {/if}

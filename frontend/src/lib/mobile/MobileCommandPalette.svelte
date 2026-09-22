@@ -3,7 +3,7 @@
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { workspacesStore } from '../stores';
-  import { BUCKET_LABELS } from '../commands/buckets.js';
+  import { BUCKET_LABEL_KEYS } from '../commands/buckets.js';
   import { buildContext } from '../commands/context.js';
   import { buildCommands } from '../commands/buildCommands.js';
   import { rankCommands } from '../commands/rank.js';
@@ -137,10 +137,10 @@
     <button
       class="backdrop"
       onclick={() => mobilePalette.close()}
-      aria-label="Close command palette"
+      aria-label={t('mobile.palette.close')}
       type="button"
     ></button>
-    <div class="sheet" role="dialog" aria-label="Command palette">
+    <div class="sheet" role="dialog" aria-label={t('mobile.palette.title')}>
       <div class="grabber" aria-hidden="true"></div>
       <div class="input-row">
         <Search size={18} class="search-icon" />
@@ -152,7 +152,7 @@
           type="text"
           enterkeyhint="go"
           autocomplete="off"
-          placeholder="Search commands, items, pages…"
+          placeholder={t('mobile.palette.placeholder')}
         />
         {#if searching}
           <Loader size={16} class="spin" />
@@ -162,13 +162,13 @@
       <div class="list" data-testid="mobile-command-palette-list">
         {#if filtered.length === 0}
           <p class="empty" data-testid="mobile-command-palette-empty">
-            {query.trim() ? 'Nothing matches.' : 'Type to search, or pick a destination.'}
+            {query.trim() ? t('mobile.common.noMatches') : t('mobile.palette.help')}
           </p>
         {:else}
           {#each filtered as cmd, i (cmd.id)}
             {#if i === 0 || filtered[i - 1].bucket !== cmd.bucket}
               <div class="bucket" data-testid={`mobile-command-palette-bucket-${cmd.bucket}`}>
-                {BUCKET_LABELS[cmd.bucket] || ''}
+                {BUCKET_LABEL_KEYS[cmd.bucket] ? t(BUCKET_LABEL_KEYS[cmd.bucket]) : ''}
               </div>
             {/if}
             <button

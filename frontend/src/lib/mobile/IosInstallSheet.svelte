@@ -2,6 +2,7 @@
   import { Share, SquarePlus } from '@lucide/svelte';
   import Modal from '../dialogs/Modal.svelte';
   import { iosInstallOpen } from './installClient.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   function close() {
     iosInstallOpen.set(false);
@@ -10,15 +11,15 @@
 
 <Modal bind:isOpen={$iosInstallOpen} maxWidth="max-w-sm" zIndexClass="z-[600]" onclose={close}>
   <div class="sheet" data-testid="ios-install-sheet">
-    <h2>Add to Home Screen</h2>
-    <p class="lead">Install Windshift as an app to launch it full-screen and receive push notifications.</p>
+    <h2>{t('mobile.install.title')}</h2>
+    <p class="lead">{t('mobile.install.description')}</p>
     <ol class="steps">
-      <li><span class="n">1</span> Open this page in <strong>Safari</strong> (not inside another app).</li>
-      <li><span class="n">2</span> Tap the <strong>Share</strong> button <Share size={15} /> in the toolbar.</li>
-      <li><span class="n">3</span> Choose <strong>Add to Home Screen</strong> <SquarePlus size={15} />.</li>
-      <li><span class="n">4</span> Tap <strong>Add</strong>, then open Windshift from the new icon.</li>
+      <li><span class="n">1</span> {t('mobile.install.openSafari')}</li>
+      <li><span class="n">2</span> {t('mobile.install.share')} <Share size={15} aria-hidden="true" /></li>
+      <li><span class="n">3</span> {t('mobile.install.addToHome')} <SquarePlus size={15} aria-hidden="true" /></li>
+      <li><span class="n">4</span> {t('mobile.install.launch')}</li>
     </ol>
-    <button class="ok" onclick={close} data-testid="ios-install-dismiss" type="button">Got it</button>
+    <button class="ok" onclick={close} data-testid="ios-install-dismiss" type="button">{t('mobile.install.dismiss')}</button>
   </div>
 </Modal>
 

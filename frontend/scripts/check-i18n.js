@@ -15,7 +15,7 @@
 
 import { glob, readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ENGLISH_FALLBACK_KEYS } from '../src/lib/locales/adminOperationsFallback.js';
 import { mergeInto } from '../src/lib/locales/createLocale.js';
 
@@ -184,7 +184,7 @@ async function loadLocaleFiles(localeCode) {
   const explicitKeys = new Set();
 
   for (const file of files) {
-    const mod = await import(join(localeDir, file));
+    const mod = await import(pathToFileURL(join(localeDir, file)).href);
     const data = mod.default || mod;
     const keys = new Set(flattenKeys(data));
     const fileFallbackKeys = data[ENGLISH_FALLBACK_KEYS] ?? new Set();

@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../stores/i18n.svelte.js';
   // Shared loading/error/empty/skeleton state for mobile list views.
   // Renders the caller's rows snippet once content is available.
   let {
@@ -9,8 +10,8 @@
     skeletonRowHeight = 56,
     errorTestId = 'mobile-list-error',
     emptyTestId = 'mobile-list-empty',
-    errorMessage = "Couldn't load.",
-    emptyMessage = 'Nothing here yet.',
+    errorMessage = undefined,
+    emptyMessage = undefined,
     onretry = null,
     children,
   } = $props();
@@ -24,13 +25,13 @@
   </div>
 {:else if errored}
   <div class="msg" data-testid={errorTestId}>
-    <p>{errorMessage}</p>
+    <p>{errorMessage ?? t('mobile.common.loadFailed')}</p>
     {#if onretry}
-      <button class="retry" onclick={onretry} disabled={loading} type="button">Retry</button>
+      <button class="retry" onclick={onretry} disabled={loading} type="button">{t('common.retry')}</button>
     {/if}
   </div>
 {:else if rowCount === 0}
-  <p class="msg" data-testid={emptyTestId}>{emptyMessage}</p>
+  <p class="msg" data-testid={emptyTestId}>{emptyMessage ?? t('mobile.common.empty')}</p>
 {:else}
   {@render children()}
 {/if}

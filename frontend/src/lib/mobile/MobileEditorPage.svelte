@@ -1,5 +1,6 @@
 <script>
   import { Loader } from '@lucide/svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Full-screen editor layout for /m composition flows (create item, edit
@@ -25,8 +26,8 @@
    */
   let {
     title = '',
-    saveLabel = 'Save',
-    cancelLabel = 'Cancel',
+    saveLabel = undefined,
+    cancelLabel = undefined,
     canSave = true,
     saving = false,
     error = '',
@@ -47,7 +48,7 @@
       type="button"
       data-testid="editor-cancel"
     >
-      {cancelLabel}
+      {cancelLabel ?? t('common.cancel')}
     </button>
     <h1 class="bar-title" data-testid="editor-title">{title}</h1>
     <button
@@ -58,9 +59,9 @@
       data-testid="editor-save"
     >
       {#if saving}
-        <Loader size={16} class="spin" aria-label="Saving" />
+        <Loader size={16} class="spin" aria-label={t('mobile.common.saving')} />
       {:else}
-        {saveLabel}
+        {saveLabel ?? t('common.save')}
       {/if}
     </button>
   </header>

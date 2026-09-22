@@ -1,6 +1,7 @@
 <script>
   import { Search, Check, Loader } from '@lucide/svelte';
   import MobileSheet from './MobileSheet.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   /**
    * Generic "pick one of N" bottom sheet — the mobile replacement for desktop
@@ -41,10 +42,10 @@
     selectedValues = [],
     multiple = false,
     allowClear = false,
-    clearLabel = 'None',
+    clearLabel = undefined,
     searchable = null,
     loading = false,
-    emptyText = 'No options',
+    emptyText = undefined,
     dataTestid = undefined,
     row = null,
     onSelect = () => {},
@@ -97,7 +98,7 @@
       <input
         type="text"
         bind:value={query}
-        placeholder="Search…"
+        placeholder={t('placeholders.search')}
         autocomplete="off"
         data-testid="mobile-sheet-search"
       />
@@ -109,13 +110,13 @@
       <Loader size={18} class="spin" />
     </div>
   {:else if filtered.length === 0}
-    <p class="state" data-testid="mobile-sheet-empty">{query ? 'No matches' : emptyText}</p>
+    <p class="state" data-testid="mobile-sheet-empty">{query ? t('mobile.common.noMatches') : (emptyText ?? t('mobile.common.noOptions'))}</p>
   {:else}
     <ul class="options" role="listbox" aria-label={title}>
       {#if allowClear}
         <li>
           <button class="option clear" onclick={clear} type="button" data-testid="mobile-sheet-clear">
-            <span>{clearLabel}</span>
+            <span>{clearLabel ?? t('common.none')}</span>
             {#if selectedValue == null && (!multiple || selectedValues.length === 0)}<span class="check-wrap"><Check size={18} aria-hidden="true" /></span>{/if}
           </button>
         </li>
@@ -147,7 +148,7 @@
 
   {#if multiple}
     <div class="done-row">
-      <button class="done-btn" onclick={() => (isOpen = false)} type="button" data-testid="mobile-sheet-done">Done</button>
+      <button class="done-btn" onclick={() => (isOpen = false)} type="button" data-testid="mobile-sheet-done">{t('common.done')}</button>
     </div>
   {/if}
 </MobileSheet>

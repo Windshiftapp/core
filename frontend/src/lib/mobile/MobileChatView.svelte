@@ -6,6 +6,7 @@
   import { currentRoute, navigate } from '../router.js';
   import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import Textarea from '../components/Textarea.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   let text = $state('');
   let scrollEl = $state(null);
@@ -53,10 +54,10 @@
 
 <div class="chat">
 <header class="chat-header" data-testid="mobile-chat-header">
-  <button class="back" onclick={back} aria-label="Back" type="button"><ChevronLeft size={24} /></button>
-  <span class="title"><Sparkles size={17} /> Assistant</span>
+  <button class="back" onclick={back} aria-label={t('common.back')} type="button"><ChevronLeft size={24} /></button>
+  <span class="title"><Sparkles size={17} /> {t('mobile.chat.title')}</span>
   {#if messages.length > 0}
-    <button class="clear" onclick={() => chatStore.clearHistory()} aria-label="Clear conversation" type="button"><Trash2 size={18} /></button>
+    <button class="clear" onclick={() => chatStore.clearHistory()} aria-label={t('mobile.chat.clear')} type="button"><Trash2 size={18} /></button>
   {:else}
     <span class="spacer"></span>
   {/if}
@@ -66,8 +67,8 @@
   {#if messages.length === 0}
     <div class="empty" data-testid="chat-empty">
       <Sparkles size={28} />
-      <p>Ask about your work</p>
-      <span>The assistant can search items, summarize, and help you plan.</span>
+      <p>{t('mobile.chat.intro')}</p>
+      <span>{t('mobile.chat.help')}</span>
     </div>
   {:else}
     {#each messages as msg, i (i)}
@@ -87,7 +88,7 @@
               />
             </div>
             {#if msg.needsReview}
-              <p class="review">⚠ This answer may need review.</p>
+              <p class="review">⚠ {t('mobile.chat.review')}</p>
             {/if}
           {/if}
         </div>
@@ -95,7 +96,7 @@
     {/each}
   {/if}
   {#if loading}
-    <div class="msg assistant thinking" data-testid="chat-thinking"><Loader class="spin" size={16} /> Thinking…</div>
+    <div class="msg assistant thinking" data-testid="chat-thinking"><Loader class="spin" size={16} /> {t('mobile.chat.thinking')}</div>
   {/if}
 </div>
 
@@ -103,12 +104,12 @@
   <Textarea
     bind:value={text}
     onkeydown={onKeydown}
-    placeholder="Message the assistant…"
+    placeholder={t('mobile.chat.placeholder')}
     rows={1}
     data-testid="chat-input"
     class="mobile-chat-input"
   />
-  <button class="send" disabled={!text.trim() || loading || conversationLoading} data-testid="chat-send" aria-label="Send" type="submit">
+  <button class="send" disabled={!text.trim() || loading || conversationLoading} data-testid="chat-send" aria-label={t('mobile.chat.send')} type="submit">
     <Send size={18} />
   </button>
 </form>

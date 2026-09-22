@@ -49,9 +49,9 @@
   });
 </script>
 
-<MobileHeader title="Timer">
+<MobileHeader title={t('time.pomodoro.timer')}>
   {#snippet right()}
-    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label="Command palette" type="button">
+    <button class="hdr-palette" onclick={() => mobilePalette.open()} data-testid="mobile-palette-open" aria-label={t('mobile.palette.title')} type="button">
       <CommandIcon size={20} />
     </button>
   {/snippet}
@@ -68,7 +68,7 @@
             {formatItemKey(activeTimer)} <ExternalLink size={12} />
           </a>
         {:else}
-          <span class="t-key">{activeTimer.project_name ?? 'Running'}</span>
+          <span class="t-key">{activeTimer.project_name ?? t('mobile.timer.running')}</span>
         {/if}
       </div>
       <div class="t-duration" data-testid="timer-duration">{timerStore.durationFormatted}</div>
@@ -76,13 +76,13 @@
         <div class="t-title">{activeTimer.item_title}</div>
       {/if}
       <button class="btn-stop" onclick={stopTimer} disabled={timerStore.syncing} data-testid="timer-stop" type="button">
-        <Square size={16} /> Stop
+        <Square size={16} /> {t('mobile.timer.stop')}
       </button>
     {:else}
       <div class="t-idle" data-testid="timer-idle">
         <Clock size={20} />
-        <p>No timer running</p>
-        <span>Start one from a work item's detail screen.</span>
+        <p>{t('mobile.timer.idle')}</p>
+        <span>{t('mobile.timer.startHelp')}</span>
       </div>
     {/if}
   </section>
@@ -90,29 +90,29 @@
   <!-- Recent worklogs + manual log -->
   <section class="block">
     <div class="block-head">
-      <h2>Recent worklogs</h2>
+      <h2>{t('mobile.timer.recentWorklogs')}</h2>
       <button class="btn-log" onclick={() => timeEntryStore.openTimeLogModal()} data-testid="quick-log-open" type="button">
-        <Plus size={16} /> Log time
+        <Plus size={16} /> {t('items.logTime')}
       </button>
     </div>
 
     {#if timeEntryStore.worklogsLoading && worklogs.length === 0}
-      <p class="msg">Loading…</p>
+      <p class="msg">{t('common.loading')}</p>
     {:else if worklogs.length === 0}
-      <p class="msg" data-testid="worklogs-empty">No worklogs yet.</p>
+      <p class="msg" data-testid="worklogs-empty">{t('mobile.timer.empty')}</p>
     {:else}
       <ul class="worklogs" data-testid="worklogs-list">
         {#each worklogs as w (w.id)}
           <li class="wl">
             <button class="wl-main" onclick={() => timeEntryStore.editWorklog(w)} data-testid="worklog-edit" type="button">
-              <span class="wl-desc">{w.description || w.project_name || 'Worklog'}</span>
+              <span class="wl-desc">{w.description || w.project_name || t('mobile.timer.worklog')}</span>
               <span class="wl-sub">
                 {#if formatItemKey(w)}<span class="wl-key">{formatItemKey(w)}</span>{/if}
                 <span class="wl-dur">{timeEntryStore.formatDuration(w.duration_minutes)}</span>
                 <span class="wl-day">{fmtDay(w.start_time || w.date)}</span>
               </span>
             </button>
-            <button class="wl-del" onclick={(e) => removeWorklog(w, e)} data-testid="worklog-delete" aria-label="Delete worklog" type="button">
+            <button class="wl-del" onclick={(e) => removeWorklog(w, e)} data-testid="worklog-delete" aria-label={t('mobile.timer.deleteWorklog')} type="button">
               <Trash2 size={16} />
             </button>
           </li>

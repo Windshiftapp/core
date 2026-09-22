@@ -8,6 +8,7 @@
   import MobileListState from './MobileListState.svelte';
   import { fetchWorkspacePageSections } from './mobilePagesData.js';
   import { mobilePalette } from './mobilePalette.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   // Knowledge-pages list across every workspace the user belongs to. The
   // desktop page tree is workspace-scoped; on the phone one flat, grouped
@@ -63,13 +64,13 @@
   onMount(load);
 </script>
 
-<MobileHeader title="Pages">
+<MobileHeader title={t('pages.treeHeading')}>
   {#snippet right()}
     <button
       class="hdr-btn"
       onclick={() => mobilePalette.open()}
       data-testid="mobile-palette-open"
-      aria-label="Command palette"
+      aria-label={t('mobile.palette.title')}
       type="button"
     >
       <CommandIcon size={20} />
@@ -84,7 +85,7 @@
         type="search"
         enterkeyhint="search"
         autocomplete="off"
-        placeholder="Filter pages…"
+        placeholder={t('mobile.pages.filter')}
       />
     </div>
   {/snippet}
@@ -95,8 +96,8 @@
     loading={loading}
     errored={errored}
     rowCount={visibleSections.reduce((n, s) => n + s.pages.length, 0)}
-    errorMessage="Couldn't load pages."
-    emptyMessage={trimmedFilter ? 'No pages match your filter.' : 'No pages yet.'}
+    errorMessage={t('pages.errorLoadTree')}
+    emptyMessage={trimmedFilter ? t('mobile.pages.noMatches') : t('pages.treeEmptyTitle')}
     onretry={load}
   >
     {#each visibleSections as section (section.workspace.id)}
