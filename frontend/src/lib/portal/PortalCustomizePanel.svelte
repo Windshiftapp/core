@@ -120,19 +120,19 @@
 
   async function loadKbPageTitles() {
     const sources = portalStore.knowledgeBasePageSources || [];
-    const workspaceIds = [...new Set(sources.map((s) => s.workspace_id))];
-    for (const workspaceId of workspaceIds) {
-      if (kbPageTitles[workspaceId]) continue;
-      try {
-        const pages = await api.pages.getAll(workspaceId);
-        const rows = Array.isArray(pages) ? pages : (pages?.items ?? []);
-        const titles = { ...kbPageTitles };
-        for (const page of rows) titles[page.id] = page.title;
-        titles[`ws:${workspaceId}`] = true;
-        kbPageTitles = titles;
-      } catch (err) {
-        console.error('Failed to load page titles for knowledge base wiring:', err);
+    const workspaceIds = [...new Set(sources.map((s) => s.workspace_id))]
+      .filter((id) => kbPageTitles[`ws:${id}`] !== true);
+    if (workspaceIds.length === 0) return;
+    try {
+      const rows = await api.pages.getTitles(workspaceIds);
+      const titles = { ...kbPageTitles };
+      for (const row of Array.isArray(rows) ? rows : []) {
+        titles[row.page_id] = row.title;
       }
+      for (const workspaceId of workspaceIds) titles[`ws:${workspaceId}`] = true;
+      kbPageTitles = titles;
+    } catch (err) {
+      console.error('Failed to load page titles for knowledge base wiring:', err);
     }
   }
 

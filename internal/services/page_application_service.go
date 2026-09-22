@@ -49,6 +49,46 @@ type PagePermissionsResult struct {
 	ACL                []models.PagePermission `json:"acl"`
 }
 
+// PageTitleRow is a lightweight cross-workspace page reference for pickers
+// and label lookups — no content, no labels.
+type PageTitleRow struct {
+	WorkspaceID int    `json:"workspace_id"`
+	PageID      int    `json:"page_id"`
+	Title       string `json:"title"`
+}
+
+// ListTitlesAcrossWorkspaces returns id+title pairs for the pages the user
+// can see in each requested workspace. Page-level visibility applies exactly
+// as List does; workspaces the user cannot access contribute no rows.
+func (s *PageApplicationService) ListTitlesAcrossWorkspaces(userID int, workspaceIDs []int) ([]PageTitleRow, error) {
+	rows := make([]PageTitleRow, 0)
+	seen := make(map[int]bool, len(workspaceIDs))
+	for _, workspaceID := range workspaceIDs {
+		if seen[workspaceID] {
+			continue
+		}
+		seen[workspaceID] = true
+		pages, err := s.pages.ListTreeMeta(workspaceID, false)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]int, len(pages))
+		for i := range pages {
+			ids[i] = pages[i].ID
+		}
+		visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range pages {
+			if visible[pages[i].ID] {
+				rows = append(rows, PageTitleRow{WorkspaceID: workspaceID, PageID: pages[i].ID, Title: pages[i].Title})
+			}
+		}
+	}
+	return rows, nil
+}
+
 func (s *PageApplicationService) List(userID, workspaceID int) ([]models.Page, error) {
 	pages, err := s.pages.ListTreeMeta(workspaceID, false)
 	if err != nil {

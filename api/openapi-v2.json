@@ -24981,6 +24981,41 @@
         ],
         "type": "object"
       },
+      "GetPagesTitlesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "The title value.",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "page_id",
+                "title",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetPrioritiesPriorityIdResult": {
         "additionalProperties": false,
         "properties": {
@@ -93598,6 +93633,59 @@
         "summary": "Get the API v2 OpenAPI document",
         "tags": [
           "API"
+        ]
+      }
+    },
+    "/pages/titles": {
+      "get": {
+        "description": "List page titles across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getPagesTitles",
+        "parameters": [
+          {
+            "description": "Comma-separated workspace IDs to include.",
+            "in": "query",
+            "name": "workspace_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPagesTitlesResult"
+                }
+              }
+            },
+            "description": "List page titles across workspaces response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List page titles across workspaces",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
         ]
       }
     },

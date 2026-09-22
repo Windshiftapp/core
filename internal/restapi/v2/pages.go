@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/models"
@@ -15,6 +16,7 @@ import (
 func registerPageRoutes(builder *routeBuilder, deps Deps) {
 	pages := deps.PageApplication
 	builder.Read("/workspaces/{workspace_id}/pages", AuthAuthenticated, []string{"pages:read"}, listPages(pages))
+	builder.Read("/pages/titles", AuthAuthenticated, []string{"pages:read"}, listPageTitlesAcrossWorkspaces(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/effective-levels", AuthAuthenticated, []string{"pages:read"}, listPageEffectiveLevels(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/archived", AuthAuthenticated, []string{"pages:read"}, listArchivedPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/search", AuthAuthenticated, []string{"pages:read"}, searchPages(pages))
@@ -86,6 +88,49 @@ func listPages(pages pageApplication) readOperation[[]models.Page] {
 		result, err := pages.List(user.ID, workspaceID)
 		return result, pageError(err)
 	}
+}
+
+// maxTitleWorkspaces bounds one titles request; consumers needing more
+// workspace sources must batch their lookups.
+const maxTitleWorkspaces = 50
+
+// listPageTitlesAcrossWorkspaces serves the portal customize panel's
+// id+title lookups for several KB source workspaces in one request (WI-1447)
+// instead of one full-page-list fetch per workspace.
+func listPageTitlesAcrossWorkspaces(pages pageApplication) readOperation[[]services.PageTitleRow] {
+	return func(r *http.Request) ([]services.PageTitleRow, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		workspaceIDs := parseWorkspaceIDList(r.URL.Query().Get("workspace_ids"), maxTitleWorkspaces)
+		if len(workspaceIDs) == 0 {
+			return []services.PageTitleRow{}, nil
+		}
+		return pages.ListTitlesAcrossWorkspaces(user.ID, workspaceIDs)
+	}
+}
+
+// parseWorkspaceIDList parses a comma-separated id list, deduplicates, and
+// caps the result. Malformed entries are skipped.
+func parseWorkspaceIDList(raw string, limit int) []int {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	seen := make(map[int]bool)
+	ids := make([]int, 0, limit)
+	for _, part := range strings.Split(raw, ",") {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || value < 1 || seen[value] {
+			continue
+		}
+		seen[value] = true
+		ids = append(ids, value)
+		if len(ids) >= limit {
+			break
+		}
+	}
+	return ids
 }
 
 func listArchivedPages(pages pageApplication) readOperation[[]archivedPageDTO] {

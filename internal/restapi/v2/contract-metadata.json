@@ -7730,6 +7730,32 @@
         ]
       }
     },
+    "/pages/titles": {
+      "get": {
+        "description": "List page titles across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_ids",
+            "In": "query",
+            "Description": "Comma-separated workspace IDs to include.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List page titles across workspaces",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/pages/{page_id}/links": {
       "get": {
         "description": "List page links. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

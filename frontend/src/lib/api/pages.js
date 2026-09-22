@@ -10,6 +10,10 @@ export const pages = {
   /** Fetch every visible page as an ordered, flat metadata list. */
   getAll: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/pages`),
 
+  /** id+title for the visible pages of several workspaces in one request. */
+  getTitles: (workspaceIds) =>
+    fetchV2Data(`/pages/titles${buildQueryString({ workspace_ids: workspaceIds.join(',') })}`),
+
   /** Caller's effective page permission level per visible page, keyed by page ID. */
   getEffectiveLevels: (workspaceId) =>
     fetchV2Data(`/workspaces/${workspaceId}/pages/effective-levels`),
