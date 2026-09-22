@@ -20,6 +20,7 @@ import quality from './quality.js';
 import adminOperations from './adminOperations.js';
 import dashboard from './dashboard.js';
 import zammad from './zammad.js';
+import mobile from './mobile.js';
 
 export default createLocale({
   common,
@@ -43,4 +44,5 @@ export default createLocale({
   adminOperations,
   dashboard,
   zammad,
+  mobile,
 });
