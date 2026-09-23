@@ -1774,6 +1774,7 @@ func (s *Server) initialize() error {
 		WorkspaceRoles:               services.NewWorkspaceRoleProvisioningService(s.db, repository.NewWorkspaceRoleRepository(s.db), permService, approvalService),
 		ConfigurationSetProvisioning: services.NewConfigurationSetProvisioningService(s.db, repository.NewConfigurationSetRepository(s.db), permService, s.notificationService),
 		ConfigurationSetExport:       services.NewConfigSetExportService(s.db, repository.NewConfigurationSetRepository(s.db)),
+		ConfigSetConformance:         services.NewConfigSetConformanceService(s.db, repository.NewConfigurationSetRepository(s.db)),
 		StoryPointRollup:             repository.NewItemRepository(s.db),
 		HierarchyLevels:              hierarchyLevelEnumService,
 		Workspaces:                   services.NewWorkspaceApplicationService(s.db, v2Access, authorizationCacheInvalidator),

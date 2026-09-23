@@ -534,6 +534,7 @@ type Deps struct {
 	Screens                      *services.ScreenProvisioningService
 	WorkspaceRoles               *services.WorkspaceRoleProvisioningService
 	ConfigurationSetProvisioning *services.ConfigurationSetProvisioningService
+	ConfigSetConformance         *services.ConfigSetConformanceService
 	ConfigurationSetExport       *services.ConfigSetExportService
 	StoryPointRollup             storyPointRollupReader
 	HierarchyLevels              *services.EnumService

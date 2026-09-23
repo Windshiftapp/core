@@ -350,6 +350,8 @@ const (
 	ActionConfigSetDelete               = "config_set.delete"
 	ActionConfigSetExport               = "config_set.export"
 	ActionConfigSetImport               = "config_set.import"
+	ActionConfigSetConformanceCheck     = "config_set.conformance_check"
+	ActionConfigSetConformanceRepair    = "config_set.conformance_repair"
 	ActionConfigSetNotificationAssign   = "config_set.notification_assign"
 	ActionConfigSetNotificationUnassign = "config_set.notification_unassign"
 

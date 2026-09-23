@@ -39,6 +39,10 @@ func configurationSetMutationError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, services.ErrCannotExportDefault) {
+		return newError(http.StatusForbidden, "default_not_exportable",
+			"The default configuration set cannot be exported or compared against a template; clone it first.")
+	}
 	var serviceErr *services.ServiceError
 	if errors.As(err, &serviceErr) {
 		return newError(serviceErr.StatusCode, catalogErrorCode(serviceErr.StatusCode), serviceErr.Message)
@@ -145,6 +149,51 @@ func registerConfigurationSetRoutes(b *routeBuilder, deps Deps) {
 			return configurationSetMutationResponse{}, configurationSetImportError(err)
 		}
 		return configurationSetMutationResponse{ConfigurationSet: result.Set, Warnings: result.Warnings}, nil
+	})
+
+	// Conformance check: does this configuration set still match the
+	// canonical template? The template document is the request body — the
+	// same payload Import consumes. Read-only; drift rows carry stable IDs
+	// used to select rows for repair.
+	b.JSON(http.MethodPost, "/configuration-sets/{configuration_set_id}/conformance/check", http.StatusOK, false, AuthAuthenticated, read, func(r *http.Request, tpl services.ConfigSetTemplate) (*services.ConfigSetConformanceReport, error) {
+		id, err := pathID(r, "configuration_set_id")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := requireSystemAdmin(r, deps); err != nil {
+			return nil, err
+		}
+		if err := services.SanitizeConfigSetTemplate(&tpl); err != nil {
+			return nil, newError(http.StatusBadRequest, "invalid_request", err.Error())
+		}
+		report, err := deps.ConfigSetConformance.Check(r.Context(), id, &tpl)
+		if err != nil {
+			return nil, configurationSetMutationError(err)
+		}
+		deps.ConfigSetConformance.AuditCheck(auditActorFromRequest(r), id, report.DriftCount)
+		return report, nil
+	})
+
+	// Conformance repair restores drifted configuration to the template in
+	// one transaction. Drift row IDs select rows; an empty list repairs all
+	// repairable rows. Item data is never written.
+	b.JSON(http.MethodPost, "/configuration-sets/{configuration_set_id}/conformance/repair", http.StatusOK, false, AuthAuthenticated, write, func(r *http.Request, req services.ConfigSetConformanceRepairRequest) (*services.ConfigSetConformanceRepairResult, error) {
+		id, err := pathID(r, "configuration_set_id")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := requireSystemAdmin(r, deps); err != nil {
+			return nil, err
+		}
+		if err := services.SanitizeConfigSetTemplate(&req.Template); err != nil {
+			return nil, newError(http.StatusBadRequest, "invalid_request", err.Error())
+		}
+		result, err := deps.ConfigSetConformance.Repair(r.Context(), id, &req.Template, req.IDs)
+		if err != nil {
+			return nil, configurationSetMutationError(err)
+		}
+		deps.ConfigSetConformance.AuditRepair(auditActorFromRequest(r), id, result.Repaired, result.Failed, result.Skipped)
+		return result, nil
 	})
 
 	// Export writes the portable template document directly — no v2 data
