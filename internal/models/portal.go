@@ -87,6 +87,10 @@ type ChannelConfig struct {
 	EmailDeleteAfterProcess    bool       `json:"email_delete_after_process,omitempty"`    // Delete emails after processing
 	EmailConnectedPortalID     *int       `json:"email_connected_portal_id,omitempty"`     // Portal for "My Requests" visibility
 	EmailTrackingRetentionDays int        `json:"email_tracking_retention_days,omitempty"` // Days to keep processed-email tracking rows; 0 = default (365). Anchor rows (referenced by in_reply_to) are kept regardless.
+	// Per-sender cap on NEW tickets per rolling hour. nil = default
+	// (DefaultEmailRateLimitPerHour), 0 = unlimited, n = n. Replies to
+	// existing threads are never rate-limited.
+	EmailRateLimitPerHour *int `json:"email_rate_limit_per_hour,omitempty"`
 
 	// Portal Configuration
 	PortalSlug         string `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")

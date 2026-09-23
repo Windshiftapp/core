@@ -36,6 +36,9 @@ func ValidateConfigForEnable(channel *models.Channel, config *models.ChannelConf
 	if strings.TrimSpace(config.EmailMailbox) == "" {
 		return fmt.Errorf("%w: email_mailbox is required (default \"INBOX\")", ErrConfigNotReady)
 	}
+	if config.EmailRateLimitPerHour != nil && *config.EmailRateLimitPerHour < 0 {
+		return fmt.Errorf("%w: email_rate_limit_per_hour must be 0 (unlimited) or a positive number", ErrConfigNotReady)
+	}
 
 	switch strings.ToLower(config.EmailAuthMethod) {
 	case "oauth":

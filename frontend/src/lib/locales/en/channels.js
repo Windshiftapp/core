@@ -223,6 +223,10 @@ export default {
     processingOptions: 'Processing Options',
     mailbox: 'Mailbox',
     mailboxHelp: 'The folder to poll for new emails',
+    rateLimitPerHour: 'Ticket rate limit per sender (per hour)',
+    rateLimitHelp:
+      'Maximum new tickets one sender can create per rolling hour. Empty = default (100), 0 = unlimited. Replies to existing tickets are never limited.',
+    rateLimitInvalid: 'Rate limit must be 0 (unlimited) or a positive number',
     markAsRead: 'Mark as read after processing',
     markAsReadHelp: "Mark emails as read once they've been converted to items",
     deleteAfterProcess: 'Delete after processing',
@@ -316,6 +320,10 @@ export default {
       previous: 'Previous',
       next: 'Next',
       page: 'Page {page} of {total}',
+      rateLimited: 'Rate limited',
+      rateLimitedCount: '{count} message(s) held back by the per-sender rate limit and waiting for requeue.',
+      requeue: 'Requeue and retry',
+      requeueing: 'Requeueing...',
     },
   },
 

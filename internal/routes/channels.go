@@ -34,6 +34,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("POST /channels/{id}/test-config", channelMgmt(http.HandlerFunc(deps.Channels.Channel.TestChannelConfig)))
 	api.HandleH("POST /channels/{id}/process-emails", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Channels.Channel.ProcessEmailsNow))))
 	api.HandleH("GET /channels/{id}/email-log", channelMgmt(http.HandlerFunc(deps.Channels.Channel.GetEmailLog)))
+	api.HandleH("POST /channels/{id}/email/requeue-rate-limited", channelMgmt(http.HandlerFunc(deps.Channels.Channel.RequeueRateLimitedEmails)))
 
 	// Channel email OAuth endpoints
 	api.HandleH("POST /channels/{id}/inline-oauth/start", admin(http.HandlerFunc(deps.Channels.Channel.StartChannelEmailOAuth)))

@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- attachments_status: see email.sql for the column contract.
 	attachments_status TEXT CHECK(attachments_status IN ('ok','partial','failed') OR attachments_status IS NULL),
 	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
+	-- uid/uid_validity/rate_limited_at: see email.sql for the column contract.
+	uid BIGINT NOT NULL DEFAULT 0,
+	uid_validity BIGINT NOT NULL DEFAULT 0,
+	rate_limited_at TIMESTAMPTZ,
 	processed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

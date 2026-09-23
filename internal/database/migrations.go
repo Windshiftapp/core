@@ -1396,6 +1396,22 @@ var Catalog = []Migration{
 			CREATE INDEX idx_kb_events_customer_created ON kb_events(portal_customer_id, created_at);
 		`,
 	},
+	{
+		Version:       "20260923_email_intake_rate_limit",
+		Name:          "Track rate-limited inbound email for flood recovery",
+		CheckSQLite:   sqliteColumnCheck("email_message_tracking", "rate_limited_at"),
+		CheckPostgres: pgColumnCheck("email_message_tracking", "rate_limited_at"),
+		SQLite: `
+			ALTER TABLE email_message_tracking ADD COLUMN uid INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN uid_validity INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN rate_limited_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS uid BIGINT NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS uid_validity BIGINT NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS rate_limited_at TIMESTAMPTZ;
+		`,
+	},
 }
 
 func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {

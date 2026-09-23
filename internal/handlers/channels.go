@@ -1305,6 +1305,79 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// RequeueRateLimitedEmails rewinds the channel's IMAP watermark to the
+// earliest flood-declined message so the next poll retries it. Rate-limited
+// mail was left in the mailbox, so nothing is re-downloaded from the sender:
+// recovery only re-reads what is already there. After the tracking row's
+// claim goes stale the message is re-evaluated against the current cap.
+// POST /channels/{id}/email/requeue-rate-limited
+func (h *ChannelHandler) RequeueRateLimitedEmails(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+
+	channel, err := h.service.GetByID(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	if channel.Type != "email" || channel.Direction != "inbound" {
+		respondValidationError(w, r, "Channel is not an inbound email channel")
+		return
+	}
+
+	state, err := h.channelRepo.GetEmailChannelState(ctx, id)
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		respondInternalError(w, r, err)
+		return
+	}
+	var uidValidity uint32
+	if state != nil {
+		uidValidity = state.UIDValidity
+	}
+
+	earliestUID, found, err := h.channelRepo.GetEarliestRateLimitedUID(ctx, id, uidValidity)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !found {
+		respondJSONOK(w, map[string]any{
+			"requeued":   false,
+			"channel_id": id,
+			"message":    "No rate-limited messages to requeue",
+		})
+		return
+	}
+
+	if err := h.channelRepo.ResetEmailWatermarkToUID(ctx, id, earliestUID-1); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	slog.Info("requeued rate-limited email messages",
+		"channel_id", id,
+		"from_uid", earliestUID,
+	)
+	respondJSONOK(w, map[string]any{
+		"requeued":   true,
+		"channel_id": id,
+		"from_uid":   earliestUID,
+		"message":    "Rate-limited messages requeued for reprocessing",
+	})
+}
+
 // GetEmailLog returns the email processing log for a channel
 // GET /channels/{id}/email-log?page=1&page_size=50
 func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
@@ -1374,6 +1447,9 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		// Healthy is derived: a non-empty last_error means the last poll either
 		// failed or dropped a poison message, so the channel needs attention.
 		Healthy bool `json:"healthy"`
+		// RateLimitedCount is how many messages flood protection declined and
+		// are waiting for operator requeue.
+		RateLimitedCount int `json:"rate_limited_count"`
 	}
 	state := emailChannelState{Healthy: true}
 	if got, err := h.channelRepo.GetEmailChannelState(ctx, id); err == nil {
@@ -1386,6 +1462,12 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	rateLimitedCount, err := h.channelRepo.CountRateLimitedEmails(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	state.RateLimitedCount = rateLimitedCount
 
 	total, err := h.channelRepo.CountEmailMessages(ctx, id, search)
 	if err != nil {
@@ -1400,16 +1482,17 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type emailMessage struct {
-		ID                  int       `json:"id"`
-		FromEmail           string    `json:"from_email"`
-		FromName            string    `json:"from_name"`
-		Subject             string    `json:"subject"`
-		ItemID              *int      `json:"item_id"`
-		CommentID           *int      `json:"comment_id"`
-		ProcessedAt         time.Time `json:"processed_at"`
-		WorkspaceKey        string    `json:"workspace_key,omitempty"`
-		WorkspaceItemNumber int       `json:"workspace_item_number,omitempty"`
-		Redacted            bool      `json:"redacted,omitempty"`
+		ID                  int        `json:"id"`
+		FromEmail           string     `json:"from_email"`
+		FromName            string     `json:"from_name"`
+		Subject             string     `json:"subject"`
+		ItemID              *int       `json:"item_id"`
+		CommentID           *int       `json:"comment_id"`
+		ProcessedAt         time.Time  `json:"processed_at"`
+		RateLimitedAt       *time.Time `json:"rate_limited_at,omitempty"`
+		WorkspaceKey        string     `json:"workspace_key,omitempty"`
+		WorkspaceItemNumber int        `json:"workspace_item_number,omitempty"`
+		Redacted            bool       `json:"redacted,omitempty"`
 	}
 
 	// Collect distinct workspace IDs so we batch the permission checks.
@@ -1439,6 +1522,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 			ItemID:              m.ItemID,
 			CommentID:           m.CommentID,
 			ProcessedAt:         m.ProcessedAt,
+			RateLimitedAt:       m.RateLimitedAt,
 			WorkspaceKey:        m.WorkspaceKey,
 			WorkspaceItemNumber: m.WorkspaceItemNumber,
 		}

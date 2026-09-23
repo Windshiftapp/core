@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- 'failed' = the email had attachments but none were stored.
 	attachments_status TEXT CHECK(attachments_status IN ('ok','partial','failed') OR attachments_status IS NULL),
 	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
+	-- uid/uid_validity record the IMAP coordinates observed at fetch time so
+	-- rate-limited mail can be requeued surgically within the right epoch.
+	uid INTEGER NOT NULL DEFAULT 0,
+	uid_validity INTEGER NOT NULL DEFAULT 0,
+	-- rate_limited_at is set when per-sender flood protection declined to
+	-- create a ticket. The mail stays in the mailbox for operator requeue.
+	rate_limited_at DATETIME,
 	processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

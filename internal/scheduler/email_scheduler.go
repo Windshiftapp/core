@@ -364,6 +364,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	// maxUID from sinceUID so UIDVALIDITY resets persist.
 	maxUID := sinceUID
 	processedCount := 0
+	rateLimitedCount := 0
 	errorCount := 0
 	var lastBatchError string
 	var offenderUID uint32
@@ -414,9 +415,11 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 			"comment_id", result.CommentID,
 		)
 
-		// Post-processing failures do not block UID advancement. Do not alter
-		// re-fetched ActionAlreadyExists mail after resets or restores.
-		if result.Action != email.ActionAlreadyExists {
+		// Rate-limited mail is left untouched in the mailbox (unread, not
+		// deleted) so an operator can requeue it; the watermark still advances
+		// past it so one flooding sender cannot wedge the channel.
+		rateLimited := result.Action == email.ActionRateLimited
+		if !rateLimited && result.Action != email.ActionAlreadyExists {
 			if decryptedConfig.EmailMarkAsRead {
 				if err := client.MarkAsRead(msg.UID); err != nil {
 					slog.Warn("failed to mark email as read", "uid", msg.UID, "error", err)
@@ -432,7 +435,11 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 		if msg.UID > maxUID {
 			maxUID = msg.UID
 		}
-		processedCount++
+		if rateLimited {
+			rateLimitedCount++
+		} else {
+			processedCount++
+		}
 	}
 
 	// Expunge if we deleted messages
@@ -489,6 +496,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	slog.Info("finished processing email channel",
 		"channel_id", ch.ID,
 		"processed", processedCount,
+		"rate_limited", rateLimitedCount,
 		"errors", errorCount,
 	)
 

@@ -80,6 +80,10 @@ const (
 	ActionError         ProcessingAction = "error"
 	ActionAlreadyExists ProcessingAction = "already_exists"
 	ActionDeferred      ProcessingAction = "deferred"
+	// ActionRateLimited means per-sender flood protection declined to create
+	// a new ticket. The tracking row is marked rate_limited_at and the
+	// original mail is left in the mailbox for operator requeue.
+	ActionRateLimited ProcessingAction = "rate_limited"
 )
 
 // Provider defines the interface for email providers (Microsoft, Google, Generic)

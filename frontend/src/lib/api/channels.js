@@ -44,6 +44,12 @@ export const channels = {
     if (search) url += `&search=${encodeURIComponent(search)}`;
     return fetchAPI(url);
   },
+  // Rewind the IMAP watermark to the earliest flood-declined message so the
+  // next poll retries rate-limited mail that was left in the mailbox.
+  requeueRateLimitedEmail: (id) =>
+    fetchAPI(`/channels/${id}/email/requeue-rate-limited`, {
+      method: 'POST',
+    }),
   // Email OAuth (inline per-channel OAuth credentials)
   startEmailOAuth: (channelId, restoreChannelEnabled = false) =>
     fetchAPI(`/channels/${channelId}/inline-oauth/start`, {

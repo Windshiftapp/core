@@ -36,6 +36,7 @@
       mailbox: 'INBOX',
       mark_as_read: true,
       delete_after_process: false,
+      rate_limit_per_hour: null,
       enabled: false
     }),
     workspaces = [],
@@ -111,6 +112,9 @@
     if (!formData.item_type_id) {
       return { valid: false, message: t('channel.itemTypeRequired') };
     }
+    if (formData.rate_limit_per_hour !== null && formData.rate_limit_per_hour !== '' && Number(formData.rate_limit_per_hour) < 0) {
+      return { valid: false, message: t('channel.rateLimitInvalid') };
+    }
 
     return { valid: true };
   }
@@ -122,7 +126,12 @@
       email_item_type_id: formData.item_type_id,
       email_mailbox: formData.mailbox,
       email_mark_as_read: formData.mark_as_read,
-      email_delete_after_process: formData.delete_after_process
+      email_delete_after_process: formData.delete_after_process,
+      // null = default cap, 0 = unlimited, n = n per sender per hour
+      email_rate_limit_per_hour:
+        formData.rate_limit_per_hour === null || formData.rate_limit_per_hour === ''
+          ? null
+          : Number(formData.rate_limit_per_hour)
     };
 
     if (formData.auth_method === 'oauth') {
@@ -405,6 +414,18 @@
           bind:value={formData.mailbox}
         />
         <DescriptionText>{t('channel.mailboxHelp')}</DescriptionText>
+      </div>
+
+      <div>
+        <TextField
+          label={t('channel.rateLimitPerHour')}
+          labelColor="default"
+          type="number"
+          min="0"
+          placeholder="100"
+          bind:value={formData.rate_limit_per_hour}
+        />
+        <DescriptionText>{t('channel.rateLimitHelp')}</DescriptionText>
       </div>
 
       <div class="space-y-3">

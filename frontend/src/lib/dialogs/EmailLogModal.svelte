@@ -20,6 +20,7 @@
   let data = $state(null);
   let page = $state(1);
   let search = $state('');
+  let requeueing = $state(false);
   const pageSize = 50;
 
   const debouncedSearch = useDebounce(() => {
@@ -116,6 +117,20 @@
     return '-';
   }
 
+  async function requeueRateLimited() {
+    if (requeueing || !channel) return;
+    try {
+      requeueing = true;
+      await api.channels.requeueRateLimitedEmail(channel.id);
+      await loadLog();
+    } catch (err) {
+      console.error('Failed to requeue rate-limited emails:', err);
+      error = err.message || 'Failed to requeue rate-limited emails';
+    } finally {
+      requeueing = false;
+    }
+  }
+
   const messageColumns = [
     { key: 'from', label: t('channel.emailLog.from', 'From'), slot: 'from' },
     { key: 'subject', label: t('channel.emailLog.subject', 'Subject'), slot: 'subject' },
@@ -177,6 +192,22 @@
             {data.state.last_error}
           </div>
         {/if}
+        {#if data.state.rate_limited_count > 0}
+          <div class="mt-2 flex items-center justify-between gap-3 rounded p-2" style="background: var(--ds-surface-warning, rgba(234, 88, 12, 0.1));" data-testid="email-log-rate-limited-banner">
+            <div class="text-xs" style="color: var(--ds-text-warning, var(--ds-text));">
+              {t('channel.emailLog.rateLimitedCount', { count: data.state.rate_limited_count })}
+            </div>
+            <Button
+              onclick={requeueRateLimited}
+              variant="default"
+              size="small"
+              disabled={requeueing}
+              dataTestid="email-log-requeue-button"
+            >
+              {requeueing ? t('channel.emailLog.requeueing') : t('channel.emailLog.requeue')}
+            </Button>
+          </div>
+        {/if}
       </div>
 
       <!-- Search -->
@@ -202,7 +233,12 @@
             <span class="truncate max-w-56 inline-block" style="color: var(--ds-text);">{msg.subject}</span>
           {/snippet}
           {#snippet result(msg)}
-            {#if msg.item_id}
+            {#if msg.rate_limited_at}
+              <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full" style="background: var(--ds-surface-warning, rgba(234, 88, 12, 0.12)); color: var(--ds-text-warning, var(--ds-text));" data-testid="email-log-rate-limited-badge">
+                <AlertTriangle class="w-3 h-3" />
+                {t('channel.emailLog.rateLimited')}
+              </span>
+            {:else if msg.item_id}
               {@const href = getItemHref(msg)}
               <svelte:element this={href ? 'a' : 'span'} href={href} class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full {href ? 'hover:opacity-80' : ''}" style="background: var(--ds-surface-selected, rgba(59, 130, 246, 0.1)); color: var(--ds-text-accent, var(--ds-text)); {href ? 'text-decoration: none;' : ''}">
                 {#if msg.comment_id}

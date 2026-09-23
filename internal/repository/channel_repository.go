@@ -1021,6 +1021,7 @@ func (r *ChannelRepository) GroupExists(ctx context.Context, groupID int) (bool,
 // LastCheckedAt is nullable; nil means "never polled".
 type EmailChannelState struct {
 	LastUID       int
+	UIDValidity   uint32
 	LastCheckedAt *time.Time
 	ErrorCount    int
 	LastError     string
@@ -1034,9 +1035,9 @@ func (r *ChannelRepository) GetEmailChannelState(ctx context.Context, channelID 
 	var lastCheckedAt sql.NullTime
 	var lastError sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		"SELECT last_uid, last_checked_at, error_count, last_error FROM email_channel_state WHERE channel_id = ?",
+		"SELECT last_uid, COALESCE(uid_validity, 0), last_checked_at, error_count, last_error FROM email_channel_state WHERE channel_id = ?",
 		channelID,
-	).Scan(&state.LastUID, &lastCheckedAt, &state.ErrorCount, &lastError)
+	).Scan(&state.LastUID, &state.UIDValidity, &lastCheckedAt, &state.ErrorCount, &lastError)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get email_channel_state for channel %d", channelID))
 	}
@@ -1059,6 +1060,7 @@ type EmailMessageRow struct {
 	ItemID              *int
 	CommentID           *int
 	ProcessedAt         time.Time
+	RateLimitedAt       *time.Time
 	WorkspaceID         *int
 	WorkspaceItemNumber int
 	WorkspaceKey        string
@@ -1095,7 +1097,7 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 	queryArgs = append(queryArgs, pageSize, offset)
 
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
+		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, emt.rate_limited_at, i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
 			"FROM email_message_tracking emt "+
 			"LEFT JOIN items i ON emt.item_id = i.id "+
 			"LEFT JOIN workspaces w ON i.workspace_id = w.id "+
@@ -1113,11 +1115,16 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 		var msg EmailMessageRow
 		var itemID, commentID, workspaceID, workspaceItemNumber sql.NullInt64
 		var fromName, workspaceKey sql.NullString
-		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
+		var rateLimitedAt sql.NullTime
+		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &rateLimitedAt, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
 			return nil, fmt.Errorf("scan email_message_tracking row: %w", err)
 		}
 		if fromName.Valid {
 			msg.FromName = fromName.String
+		}
+		if rateLimitedAt.Valid {
+			t := rateLimitedAt.Time
+			msg.RateLimitedAt = &t
 		}
 		if itemID.Valid {
 			v := int(itemID.Int64)
@@ -1154,6 +1161,57 @@ func emailMessageWhere(channelID int, search string) (whereClause string, args [
 		args = append(args, searchPattern, searchPattern, searchPattern)
 	}
 	return whereClause, args
+}
+
+// CountRateLimitedEmails returns how many tracking rows for a channel were
+// declined by per-sender flood protection and are awaiting operator requeue.
+func (r *ChannelRepository) CountRateLimitedEmails(ctx context.Context, channelID int) (int, error) {
+	var total int
+	if err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM email_message_tracking WHERE channel_id = ? AND rate_limited_at IS NOT NULL",
+		channelID,
+	).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count rate-limited email_message_tracking for channel %d: %w", channelID, err)
+	}
+	return total, nil
+}
+
+// GetEarliestRateLimitedUID returns the lowest IMAP UID among rate-limited
+// messages recorded in the given UIDVALIDITY epoch. ok is false when there is
+// nothing to requeue. UIDs from older epochs are ignored: they are meaningless
+// in the current one, and an epoch change already resets the watermark to 0.
+func (r *ChannelRepository) GetEarliestRateLimitedUID(ctx context.Context, channelID int, uidValidity uint32) (uid int, ok bool, err error) {
+	var minUID sql.NullInt64
+	err = r.db.QueryRowContext(ctx, `
+		SELECT MIN(uid) FROM email_message_tracking
+		WHERE channel_id = ? AND rate_limited_at IS NOT NULL AND uid_validity = ? AND uid > 0
+	`, channelID, int64(uidValidity)).Scan(&minUID)
+	if err != nil {
+		return 0, false, fmt.Errorf("find earliest rate-limited email for channel %d: %w", channelID, err)
+	}
+	if !minUID.Valid {
+		return 0, false, nil
+	}
+	return int(minUID.Int64), true, nil
+}
+
+// ResetEmailWatermarkToUID rewinds the channel's poll watermark so the next
+// IMAP poll re-fetches from lastUID onward, and clears the poison-message
+// tracker so a fresh retry starts unblocked. A channel that has never polled
+// has no state row and nothing to rewind.
+func (r *ChannelRepository) ResetEmailWatermarkToUID(ctx context.Context, channelID, lastUID int) error {
+	if lastUID < 0 {
+		lastUID = 0
+	}
+	if _, err := r.db.ExecWriteContext(ctx, `
+		UPDATE email_channel_state
+		SET last_uid = ?, failed_message_uid = 0, failed_message_uid_validity = 0,
+		    failed_message_count = 0, updated_at = CURRENT_TIMESTAMP
+		WHERE channel_id = ?
+	`, lastUID, channelID); err != nil {
+		return fmt.Errorf("rewind email watermark for channel %d: %w", channelID, err)
+	}
+	return nil
 }
 
 // CreateOAuthState records an in-flight OAuth state for a channel-level
