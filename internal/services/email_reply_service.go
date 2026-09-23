@@ -252,7 +252,7 @@ func (s *EmailReplyService) ProcessPendingReplies(limit int) (int, error) {
 	rows, err := s.db.Query(`
 		SELECT comment_id
 		FROM email_reply_outbox
-		WHERE delivered_at IS NULL AND next_attempt_at <= CURRENT_TIMESTAMP
+		WHERE delivered_at IS NULL AND discarded_at IS NULL AND next_attempt_at <= CURRENT_TIMESTAMP
 		ORDER BY created_at ASC
 		LIMIT ?
 	`, limit)
@@ -306,7 +306,7 @@ func (s *EmailReplyService) deliverPendingReply(commentID int) (bool, error) {
 	err := s.db.QueryRow(`
 		UPDATE email_reply_outbox
 		SET next_attempt_at = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE comment_id = ? AND delivered_at IS NULL
+		WHERE comment_id = ? AND delivered_at IS NULL AND discarded_at IS NULL
 		  AND next_attempt_at <= CURRENT_TIMESTAMP
 		RETURNING comment_id, channel_id, item_id, to_email, to_name, subject,
 		       html_body, text_body, message_id, in_reply_to, references_json,
@@ -419,4 +419,55 @@ func (s *EmailReplyService) getSMTPFromEmail() string {
 		return fallbackSMTPFromEmail
 	}
 	return cfg.SMTPFromEmail
+}
+
+// ErrEmailReplyNotRetryable marks an outbox row an operator cannot re-send:
+// it is already delivered, explicitly discarded, or belongs to another
+// channel. Handlers surface it as a conflict; repository.ErrNotFound stays
+// the missing-row signal.
+var ErrEmailReplyNotRetryable = errors.New("email reply is not retryable")
+
+// RetryPendingReply attempts immediate delivery of one pending outbound
+// reply on behalf of an operator. The row's backoff lease is cleared first so
+// a stuck schedule (or an earlier failure's next_attempt_at) cannot block the
+// explicit retry. A failed send is recorded like any scheduler attempt:
+// attempt_count increments, last_error is stored, and the row returns to the
+// backoff schedule.
+func (s *EmailReplyService) RetryPendingReply(channelID, commentID int) (delivered bool, err error) {
+	s.outboxMu.Lock()
+	defer s.outboxMu.Unlock()
+
+	var state struct {
+		delivered sql.NullTime
+		discarded sql.NullTime
+	}
+	err = s.db.QueryRow(`
+		SELECT delivered_at, discarded_at FROM email_reply_outbox
+		WHERE channel_id = ? AND comment_id = ?
+	`, channelID, commentID).Scan(&state.delivered, &state.discarded)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, repository.ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("load email reply for retry: %w", err)
+	}
+	if state.delivered.Valid || state.discarded.Valid {
+		return false, ErrEmailReplyNotRetryable
+	}
+
+	if !s.smtpSender.IsSMTPConfigured() {
+		return false, ErrSMTPNotConfigured
+	}
+
+	// Clear the backoff lease so deliverPendingReply's next_attempt_at guard
+	// lets this explicit retry through right now.
+	if _, err := s.db.ExecWrite(`
+		UPDATE email_reply_outbox
+		SET next_attempt_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE channel_id = ? AND comment_id = ?
+	`, channelID, commentID); err != nil {
+		return false, fmt.Errorf("reset email reply backoff for retry: %w", err)
+	}
+
+	return s.deliverPendingReply(commentID)
 }

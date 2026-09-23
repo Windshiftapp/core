@@ -1412,6 +1412,18 @@ var Catalog = []Migration{
 			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS rate_limited_at TIMESTAMPTZ;
 		`,
 	},
+	{
+		Version:       "20260923_email_reply_outbox_discarded_at",
+		Name:          "Let operators discard stuck outbound email replies",
+		CheckSQLite:   sqliteColumnCheck("email_reply_outbox", "discarded_at"),
+		CheckPostgres: pgColumnCheck("email_reply_outbox", "discarded_at"),
+		SQLite: `
+			ALTER TABLE email_reply_outbox ADD COLUMN discarded_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE email_reply_outbox ADD COLUMN IF NOT EXISTS discarded_at TIMESTAMPTZ;
+		`,
+	},
 }
 
 func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {

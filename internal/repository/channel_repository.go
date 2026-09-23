@@ -1214,6 +1214,131 @@ func (r *ChannelRepository) ResetEmailWatermarkToUID(ctx context.Context, channe
 	return nil
 }
 
+// EmailReplyOutboxStatus narrows the reply-outbox listing. The zero value
+// lists everything the operator can still act on.
+type EmailReplyOutboxStatus string
+
+const (
+	EmailReplyOutboxPending   EmailReplyOutboxStatus = "pending"
+	EmailReplyOutboxDelivered EmailReplyOutboxStatus = "delivered"
+	EmailReplyOutboxDiscarded EmailReplyOutboxStatus = "discarded"
+	EmailReplyOutboxAll       EmailReplyOutboxStatus = "all"
+)
+
+// EmailReplyOutboxRow is one row of the outbound customer-reply queue as the
+// channel UI renders it. Bodies are deliberately excluded — the queue shows
+// envelope metadata and delivery state, never message content.
+type EmailReplyOutboxRow struct {
+	CommentID     int
+	ItemID        int
+	ToEmail       string
+	ToName        string
+	Subject       string
+	AttemptCount  int
+	NextAttemptAt sql.NullTime
+	LastError     sql.NullString
+	DeliveredAt   sql.NullTime
+	DiscardedAt   sql.NullTime
+	CreatedAt     time.Time
+	WorkspaceID   *int
+	WorkspaceKey  string
+}
+
+func emailReplyOutboxStatusWhere(status EmailReplyOutboxStatus) string {
+	switch status {
+	case EmailReplyOutboxPending:
+		return " AND eo.delivered_at IS NULL AND eo.discarded_at IS NULL"
+	case EmailReplyOutboxDelivered:
+		return " AND eo.delivered_at IS NOT NULL"
+	case EmailReplyOutboxDiscarded:
+		return " AND eo.discarded_at IS NOT NULL"
+	default: // EmailReplyOutboxAll
+		return ""
+	}
+}
+
+// CountEmailReplies returns how many email_reply_outbox rows a channel has
+// for the given status filter.
+func (r *ChannelRepository) CountEmailReplies(ctx context.Context, channelID int, status EmailReplyOutboxStatus) (int, error) {
+	var total int
+	if err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM email_reply_outbox eo WHERE eo.channel_id = ?"+emailReplyOutboxStatusWhere(status),
+		channelID,
+	).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count email_reply_outbox for channel %d: %w", channelID, err)
+	}
+	return total, nil
+}
+
+// ListEmailReplies returns a page of the channel's outbound reply queue,
+// pending rows first (oldest attempt first), then delivered/discarded.
+func (r *ChannelRepository) ListEmailReplies(ctx context.Context, channelID int, status EmailReplyOutboxStatus, page, pageSize int) ([]EmailReplyOutboxRow, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 50
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT eo.comment_id, eo.item_id, eo.to_email, eo.to_name, eo.subject, eo.attempt_count, eo.next_attempt_at, eo.last_error, eo.delivered_at, eo.discarded_at, eo.created_at, i.workspace_id, w.key "+
+			"FROM email_reply_outbox eo "+
+			"LEFT JOIN items i ON eo.item_id = i.id "+
+			"LEFT JOIN workspaces w ON i.workspace_id = w.id "+
+			"WHERE eo.channel_id = ?"+emailReplyOutboxStatusWhere(status)+
+			" ORDER BY (eo.delivered_at IS NULL) DESC, eo.created_at DESC LIMIT ? OFFSET ?",
+		channelID, pageSize, (page-1)*pageSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email_reply_outbox for channel %d: %w", channelID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []EmailReplyOutboxRow
+	for rows.Next() {
+		var row EmailReplyOutboxRow
+		var workspaceID sql.NullInt64
+		var workspaceKey sql.NullString
+		if err := rows.Scan(&row.CommentID, &row.ItemID, &row.ToEmail, &row.ToName, &row.Subject, &row.AttemptCount,
+			&row.NextAttemptAt, &row.LastError, &row.DeliveredAt, &row.DiscardedAt, &row.CreatedAt, &workspaceID, &workspaceKey); err != nil {
+			return nil, fmt.Errorf("scan email_reply_outbox row: %w", err)
+		}
+		if workspaceID.Valid {
+			v := int(workspaceID.Int64)
+			row.WorkspaceID = &v
+		}
+		if workspaceKey.Valid {
+			row.WorkspaceKey = workspaceKey.String
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate email_reply_outbox rows: %w", err)
+	}
+	return out, nil
+}
+
+// DiscardEmailReply marks a pending outbound reply as never-send. It reports
+// whether a pending row was discarded; delivered, already-discarded, and
+// missing rows report false so callers can distinguish idempotent success
+// from a conflict.
+func (r *ChannelRepository) DiscardEmailReply(ctx context.Context, channelID, commentID int) (bool, error) {
+	res, err := r.db.ExecWriteContext(ctx, `
+		UPDATE email_reply_outbox
+		SET discarded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE channel_id = ? AND comment_id = ?
+		  AND delivered_at IS NULL AND discarded_at IS NULL
+	`, channelID, commentID)
+	if err != nil {
+		return false, fmt.Errorf("discard email_reply_outbox row %d: %w", commentID, err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("count discarded email_reply_outbox rows: %w", err)
+	}
+	return rows > 0, nil
+}
+
 // CreateOAuthState records an in-flight OAuth state for a channel-level
 // OAuth flow. provider_id is NULL (the provider-flow uses non-zero).
 // expiresAt is a hard cutoff the consume call enforces.

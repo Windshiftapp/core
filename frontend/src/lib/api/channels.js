@@ -50,6 +50,19 @@ export const channels = {
     fetchAPI(`/channels/${id}/email/requeue-rate-limited`, {
       method: 'POST',
     }),
+  // Outbound customer-reply queue: envelope metadata and delivery state.
+  getEmailReplies: (id, status = 'pending', page = 1, pageSize = 50) =>
+    fetchAPI(
+      `/channels/${id}/email/replies?status=${encodeURIComponent(status)}&page=${page}&page_size=${pageSize}`
+    ),
+  retryEmailReply: (id, commentId) =>
+    fetchAPI(`/channels/${id}/email/replies/${commentId}/retry`, {
+      method: 'POST',
+    }),
+  discardEmailReply: (id, commentId) =>
+    fetchAPI(`/channels/${id}/email/replies/${commentId}/discard`, {
+      method: 'POST',
+    }),
   // Email OAuth (inline per-channel OAuth credentials)
   startEmailOAuth: (channelId, restoreChannelEnabled = false) =>
     fetchAPI(`/channels/${channelId}/inline-oauth/start`, {

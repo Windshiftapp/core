@@ -130,6 +130,9 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	last_error TEXT,
 	delivered_at DATETIME,
+	-- discarded_at marks an operator's explicit "never send" decision. A
+	-- discarded row stops retrying and stays visible for audit.
+	discarded_at DATETIME,
 	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,

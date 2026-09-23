@@ -1172,6 +1172,7 @@ func (s *Server) initialize() error {
 		logger.NewAuditor(s.db),
 	)
 	channelHandler.SetEmailScheduler(s.emailScheduler)
+	channelHandler.SetEmailReplyService(emailReplyService)
 	channelHandler.SetEncryption(scmProviderHandler.GetEncryption())
 	channelHandler.SetBaseURL(baseURL)
 	channelHandler.SetKnowledgeBasePageValidator(repository.NewPageRepository(s.db).ValidateLivePageInWorkspace)

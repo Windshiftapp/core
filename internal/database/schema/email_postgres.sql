@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	last_error TEXT,
 	delivered_at TIMESTAMPTZ,
+	-- discarded_at: see email.sql for the column contract.
+	discarded_at TIMESTAMPTZ,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
