@@ -6,9 +6,9 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
-  import { workspaceDataStore, workspacesStore } from '../../stores/index.js';
+  import { workspaceDataStore, workspacesStore, capabilitiesStore } from '../../stores/index.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { Plus, ChevronDown, ChevronRight, Home, MapPin } from '@lucide/svelte';
+  import { Plus, ChevronDown, ChevronRight, Home, MapPin, Settings } from '@lucide/svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Textarea from '../../components/Textarea.svelte';
@@ -16,6 +16,7 @@
   import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
   import Tooltip from '../../components/Tooltip.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import Select from '../../components/Select.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
@@ -28,6 +29,13 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { childItemTypesForParent } from '../../utils/hierarchy.js';
   import { indexCollectionHierarchy } from './collectionHierarchy.js';
+  import {
+    buildSwimlanes,
+    childrenForLane,
+    laneDropUpdate,
+    mapSwimlaneStorageKey,
+    SWIMLANE_DIMENSIONS,
+  } from './mapSwimlanes.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -55,6 +63,87 @@
   let selectedItemId = $state(null);
   let showItemModal = $state(false);
   let mapScrollElement = $state(null);
+
+  // Swimlane mode (Pro capability: map.swimlanes)
+  let swimlaneSettingsOpen = $state(false);
+  let swimlaneSettingsButton = $state(null);
+  let swimlaneSettingsPanel = $state(null);
+  let swimlaneDimension = $state(null);
+  let swimlaneCollapsed = $state({});
+
+  const swimlanesAvailable = $derived(capabilitiesStore.has('map.swimlanes'));
+
+  function mapPreferenceScope() {
+    return collectionId ? `collection-${collectionId}` : `workspace-${workspaceId || 'global'}`;
+  }
+
+  function loadSwimlanePreference() {
+    const saved = localStorage.getItem(mapSwimlaneStorageKey(mapPreferenceScope()));
+    if (saved && SWIMLANE_DIMENSIONS.includes(saved)) {
+      swimlaneDimension = saved;
+    }
+  }
+
+  function setSwimlaneDimension(value) {
+    swimlaneDimension = SWIMLANE_DIMENSIONS.includes(value) ? value : null;
+    swimlaneCollapsed = {};
+    const storageKey = mapSwimlaneStorageKey(mapPreferenceScope());
+    if (swimlaneDimension) {
+      localStorage.setItem(storageKey, swimlaneDimension);
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+  }
+
+  function toggleSwimlaneCollapsed(laneKey) {
+    swimlaneCollapsed = { ...swimlaneCollapsed, [laneKey]: swimlaneCollapsed[laneKey] !== true };
+  }
+
+  function onSwimlaneSettingsClickOutside(e) {
+    if (!swimlaneSettingsOpen) return;
+    if (
+      swimlaneSettingsPanel &&
+      !swimlaneSettingsPanel.contains(e.target) &&
+      swimlaneSettingsButton &&
+      !swimlaneSettingsButton.contains(e.target)
+    ) {
+      swimlaneSettingsOpen = false;
+    }
+  }
+
+  useEventListener(() => (swimlaneSettingsOpen ? document : null), 'click', onSwimlaneSettingsClickOutside);
+
+  const swimlaneDimensionOptions = $derived([
+    { value: '', label: t('collections.mapSwimlaneOff') },
+    { value: 'status', label: t('collections.mapSwimlaneStatus') },
+    { value: 'status_category', label: t('collections.mapSwimlaneStatusCategory') },
+    { value: 'assignee', label: t('collections.mapSwimlaneAssignee') },
+    { value: 'priority', label: t('collections.mapSwimlanePriority') },
+    { value: 'iteration', label: t('collections.mapSwimlaneIteration') },
+    { value: 'milestone', label: t('collections.mapSwimlaneMilestone') },
+  ]);
+
+  const swimlaneNoneTitles = $derived({
+    assignee: t('collections.mapSwimlaneNoAssignee'),
+    priority: t('collections.mapSwimlaneNoPriority'),
+    iteration: t('collections.mapSwimlaneNoIteration'),
+    milestone: t('collections.mapSwimlaneNoMilestone'),
+  });
+
+  const swimlanes = $derived.by(() => {
+    if (!swimlanesAvailable || !swimlaneDimension) return null;
+    return buildSwimlanes({
+      dimension: swimlaneDimension,
+      items: Object.values(childItemsByParent).flat(),
+      statuses,
+      statusCategories,
+      users: workspaceDataStore.users,
+      priorities: workspaceDataStore.priorities,
+      iterations: workspaceDataStore.iterations,
+      milestones: workspaceDataStore.milestones,
+      noneTitle: swimlaneNoneTitles[swimlaneDimension] || t('collections.roadmapNone'),
+    });
+  });
 
 
   // Centralized gradient styling
@@ -100,6 +189,7 @@
       workspacesStore.load(),
     ]);
     loadStoryMapDataFromURL();
+    loadSwimlanePreference();
     loading = false;
   }
 
@@ -241,11 +331,14 @@
     return monitorForElements({
       onDrop({ source, location }) {
         const draggedItemId = parseInt(String(source.data.itemId));
-        const targetParentId = location.current.dropTargets.length > 0
-          ? parseInt(String(location.current.dropTargets[0].data.parentId))
+        const target = location.current.dropTargets.length > 0
+          ? location.current.dropTargets[0].data
+          : {};
+        const targetParentId = target.parentId != null
+          ? parseInt(String(target.parentId))
           : null;
         if (targetParentId && draggedItemId) {
-          moveItemToParent(draggedItemId, targetParentId);
+          moveItemToParent(draggedItemId, targetParentId, target.laneKey ?? null);
         }
       }
     });
@@ -259,14 +352,17 @@
     return { destroy: cleanup };
   }
 
-  function registerMapDropZone(element, parentId) {
+  function registerMapDropZone(element, target) {
+    const options = typeof target === 'object' && target !== null
+      ? target
+      : { parentId: target, laneKey: null };
     const reset = () => {
       element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
       element.style.boxShadow = '';
     };
     const cleanup = dropTargetForElements({
       element,
-      getData: () => ({ parentId }),
+      getData: () => ({ parentId: options.parentId, laneKey: options.laneKey ?? null }),
       onDragEnter: () => {
         element.style.borderColor = 'var(--ds-border-focused)';
         element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
@@ -282,11 +378,40 @@
     };
   }
 
-  async function moveItemToParent(itemId, newParentId) {
+  // Apply the attribute a swimlane drop implies (e.g. iteration, milestone set).
+  // Status moves go through the transition endpoint so workflow rules hold.
+  async function applySwimlaneDrop(itemId, laneKey) {
+    const lane = swimlanes?.find((l) => l.key === laneKey);
+    if (!lane) return;
+
+    const update = laneDropUpdate(lane, swimlaneDimension, statuses);
+    if (update.transitionToStatusId != null) {
+      const item = collectionStore.items.find((i) => i.id === itemId);
+      const currentStatusId = item?.status_id ?? null;
+      if (currentStatusId !== update.transitionToStatusId) {
+        await api.items.transition(itemId, update.transitionToStatusId);
+      }
+      return;
+    }
+    if (Object.keys(update).length > 0) {
+      await api.items.update(itemId, update);
+    }
+  }
+
+  async function moveItemToParent(itemId, newParentId, laneKey = null) {
     try {
 
       // Update the item's parent_id
       const result = await api.items.update(itemId, { parent_id: newParentId });
+
+      if (laneKey) {
+        try {
+          await applySwimlaneDrop(itemId, laneKey);
+        } catch (laneError) {
+          console.error('Failed to apply swimlane move:', laneError);
+          errorToast(laneError.message || 'Failed to move the item to that lane', 'Cannot move item');
+        }
+      }
 
       // Reload data from central store
       reloadCollection();
@@ -339,7 +464,12 @@
     return childTypes.length > 0;
   }
 
-  function initQuickAdd(parentId) {
+  function quickAddKey(parentId, laneKey) {
+    return laneKey ? `${parentId}::${laneKey}` : `${parentId}`;
+  }
+
+  function initQuickAdd(parentId, laneKey = null) {
+    const stateKey = quickAddKey(parentId, laneKey);
     // Check if this parent can have children
     if (!canAddChildren(parentId)) {
       return; // Don't initialize quick-add for items at lowest hierarchy level
@@ -373,8 +503,10 @@
       preselectedWorkspaceId = workspaces[0].id;
     }
 
-    quickAddState[parentId] = {
+    quickAddState[stateKey] = {
       show: true,
+      parentId,
+      laneKey,
       workspaceId: preselectedWorkspaceId,
       itemTypeId: availableTypes.length > 0 ? availableTypes[0].id : null,
       availableTypes: availableTypes,
@@ -384,32 +516,33 @@
 
     // Focus the textarea after it's rendered
     setTimeout(() => {
-      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-quick-add-parent="${parentId}"]`));
+      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-quick-add-parent="${stateKey}"]`));
       if (textarea) {
         textarea.focus();
       }
     }, 0);
   }
 
-  function cancelQuickAdd(parentId) {
-    delete quickAddState[parentId];
+  function cancelQuickAdd(stateKey) {
+    delete quickAddState[stateKey];
   }
 
-  async function createChildItem(parentId) {
-    const state = quickAddState[parentId];
+  async function createChildItem(stateKey) {
+    const state = quickAddState[stateKey];
     if (!state) return;
+    const parentId = state.parentId;
 
     // Validate
     if (!state.workspaceId) {
-      quickAddState[parentId].error = 'Please select a workspace';
+      quickAddState[stateKey].error = 'Please select a workspace';
       return;
     }
     if (!state.itemTypeId) {
-      quickAddState[parentId].error = 'Please select an item type';
+      quickAddState[stateKey].error = 'Please select an item type';
       return;
     }
     if (!state.title?.trim()) {
-      quickAddState[parentId].error = 'Please enter a title';
+      quickAddState[stateKey].error = 'Please enter a title';
       return;
     }
 
@@ -421,6 +554,20 @@
         description: '',
         parent_id: parentId
       });
+
+      // Place the new card into the lane it was created from
+      const lane = swimlanes?.find((l) => l.key === state.laneKey);
+      if (lane) {
+        const laneUpdate = laneDropUpdate(lane, swimlaneDimension, statuses);
+        if (laneUpdate.transitionToStatusId != null) {
+          await api.items.transition(newItem.id, laneUpdate.transitionToStatusId);
+        }
+        const fields = { ...laneUpdate };
+        delete fields.transitionToStatusId;
+        if (Object.keys(fields).length > 0) {
+          await api.items.update(newItem.id, fields);
+        }
+      }
 
       // Check if the created item will be visible in the current collection view
       const filters = { workspace_id: workspaceId };
@@ -442,18 +589,18 @@
       }
 
       // Reset state and reload
-      cancelQuickAdd(parentId);
+      cancelQuickAdd(stateKey);
       reloadCollection();
     } catch (error) {
       console.error('Failed to create child item:', error);
-      quickAddState[parentId].error = 'Failed to create item: ' + (error.message || error);
+      quickAddState[stateKey].error = 'Failed to create item: ' + (error.message || error);
     }
   }
 
-  function updateQuickAddField(parentId, field, value) {
-    if (quickAddState[parentId]) {
-      quickAddState[parentId][field] = value;
-      quickAddState[parentId].error = null;
+  function updateQuickAddField(stateKey, field, value) {
+    if (quickAddState[stateKey]) {
+      quickAddState[stateKey][field] = value;
+      quickAddState[stateKey].error = null;
     }
   }
 
@@ -553,7 +700,42 @@
         viewName="Map"
         itemCount={collectionStore.collectionTotal}
           shownCount={collectionStore.loading ? null : backboneItems.length + Object.values(childItemsByParent).flat().length}
-      />
+      >
+        {#snippet actions()}
+          {#if swimlanesAvailable}
+            <div class="relative">
+              <button
+                bind:this={swimlaneSettingsButton}
+                data-testid="map-swimlanes-button"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+                style="background-color: var(--ctx-surface, var(--ds-background-neutral)); color: var(--ctx-text, var(--ds-text)); border: 1px solid var(--ctx-border, var(--ds-border));"
+                onclick={() => (swimlaneSettingsOpen = !swimlaneSettingsOpen)}
+              >
+                <Settings class="w-4 h-4" />
+                {t('collections.mapSwimlanes')}
+              </button>
+              {#if swimlaneSettingsOpen}
+                <div
+                  bind:this={swimlaneSettingsPanel}
+                  class="absolute right-0 top-full mt-1 rounded-lg shadow-xl z-[60] p-4"
+                  style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); min-width: 240px;"
+                  data-testid="map-swimlanes-panel"
+                >
+                  <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.mapSwimlaneDimension')}</div>
+                  <Select
+                    id="map-swimlane-dimension"
+                    value={swimlaneDimension || ''}
+                    options={swimlaneDimensionOptions}
+                    size="small"
+                    portalOwner="map-swimlanes"
+                    onchange={(value) => setSwimlaneDimension(value)}
+                  />
+                </div>
+              {/if}
+            </div>
+          {/if}
+        {/snippet}
+      </ViewHeader>
 
       <!-- Controls Bar -->
       <div class="flex items-center mt-4">
@@ -623,199 +805,252 @@
       data-testid="map-scroll-container"
     >
       <div class="min-w-max">
+        {#snippet backboneCard(backboneItem)}
+          {@const itemType = getItemTypeInfo(backboneItem.item_type_id)}
+          <ItemCard compact>
+            <!-- Title -->
+            <button
+              data-testid="map-backbone-item-{backboneItem.id}"
+              onclick={() => navigateToItem(backboneItem)}
+              class="text-sm mb-2 leading-snug text-left w-full line-clamp-2 transition-colors"
+              style="{styles.glassTextStyle}"
+            >
+              {backboneItem.title}
+            </button>
+
+            <!-- Bottom row: Key, Icon, Status, Drill Down -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                {#if itemType}
+                  <ItemTypeIcon {itemType} />
+                {/if}
+                <ItemKey item={backboneItem} {workspace}
+                  onClick={(e) => handleKeyClick(backboneItem, e)}
+                  style={styles.glassSubtleTextStyle}
+                />
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <Tooltip class="flex items-center" content={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}>
+                  {#snippet children()}
+                    <Lozenge
+                      square
+                      customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                    />
+                  {/snippet}
+                </Tooltip>
+                <!-- Drill Down Arrow (only show if item has children) -->
+                {#if childItemsByParent[backboneItem.id]?.length > 0}
+                  <Tooltip content={t('collections.drillDown')}>
+                    {#snippet children()}
+                      <button
+                        data-testid="map-drill-down-{backboneItem.id}"
+                        onclick={() => drillDown(backboneItem.id)}
+                        class="hover-bg p-1.5 rounded-full transition-colors group"
+                        style="color: var(--ds-interactive);"
+                      >
+                        <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                      </button>
+                    {/snippet}
+                  </Tooltip>
+                {/if}
+              </div>
+            </div>
+          </ItemCard>
+        {/snippet}
+
+        {#snippet childCard(childItem)}
+          {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            use:registerMapItem={childItem.id}
+            class="item-card rounded border p-3 cursor-move"
+            style="box-shadow: var(--ds-shadow-raised); {styles.cardStyle(4)}"
+            data-item-id={childItem.id}
+            data-testid="draggable-item-{childItem.id}"
+            ondblclick={(e) => startEditingItem(childItem, e)}
+          >
+            <!-- Title -->
+            {#if editingItemId === childItem.id}
+              <Textarea
+                bind:value={editingTitle}
+                data-item-id={childItem.id}
+                class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
+                style="color: var(--ds-text); caret-color: var(--ds-text);"
+                rows={2}
+                onblur={() => saveEditingItem(childItem)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEditingItem(childItem);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEditingItem();
+                  }
+                }}
+                onclick={(e) => e.stopPropagation()}
+              />
+            {:else}
+              <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
+                {childItem.title}
+              </h4>
+            {/if}
+
+            <!-- Bottom row: Key, Icon, Status -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                {#if childItemType}
+                  <ItemTypeIcon itemType={childItemType} />
+                {/if}
+                <ItemKey item={childItem} {workspace}
+                  onClick={(e) => handleKeyClick(childItem, e)}
+                  style={styles.glassSubtleTextStyle}
+                />
+              </div>
+              <Tooltip class="flex items-center" content={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}>
+                {#snippet children()}
+                  <Lozenge
+                    square
+                    customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
+                  />
+                {/snippet}
+              </Tooltip>
+            </div>
+          </div>
+        {/snippet}
+
+        {#snippet columnContent(parentId, laneKey, childItems, showChildCountHeader)}
+          <div
+            use:registerMapDropZone={laneKey ? { parentId, laneKey } : parentId}
+            class="{laneKey ? 'min-h-24' : 'min-h-96'} p-3 rounded border-2 border-dashed transition-all"
+            style="border-color: var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-overlay, var(--ds-surface-overlay)); backdrop-filter: var(--ctx-backdrop, none);"
+            data-parent-id={parentId}
+            data-testid={laneKey ? `map-lane-cell-${parentId}-${laneKey}` : `drop-zone-${parentId}`}
+          >
+            {#if showChildCountHeader}
+              <h3 class="text-sm font-medium mb-3 text-center" style={styles.glassTextStyle}>
+                {t('collections.childWorkItems', { count: childItems.length })}
+              </h3>
+            {/if}
+
+            <div class="space-y-2">
+              {#each childItems as childItem}
+                {@render childCard(childItem)}
+              {/each}
+
+              <!-- Add Card button when there are existing items -->
+              {#if !quickAddState[quickAddKey(parentId, laneKey)]?.show && childItems.length > 0 && canAddChildren(parentId)}
+                <button
+                  data-testid={`map-add-card-${parentId}`}
+                  onclick={() => initQuickAdd(parentId, laneKey)}
+                  class="map-add-card w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors "
+                  style="background-color: transparent; color: var(--ds-text-subtle);"
+                >
+                  <Plus class="w-4 h-4" />
+                  {t('collections.addCard')}
+                </button>
+              {/if}
+
+              <!-- Quick Add / Empty State -->
+              {#if !laneKey && !quickAddState[quickAddKey(parentId, laneKey)]?.show && childItems.length === 0}
+                {#if canAddChildren(parentId)}
+                  <button
+                    data-testid={`map-add-card-${parentId}`}
+                    onclick={() => initQuickAdd(parentId, laneKey)}
+                    class="map-add-card w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors"
+                    style="background-color: transparent; color: var(--ds-text-subtle);"
+                  >
+                    <Plus class="w-4 h-4" />
+                    {t('collections.addCard')}
+                  </button>
+                {/if}
+              {/if}
+
+              <!-- Quick Add Form -->
+              {#if quickAddState[quickAddKey(parentId, laneKey)]?.show}
+                <QuickAddForm
+                  parentId={quickAddKey(parentId, laneKey)}
+                  formState={quickAddState[quickAddKey(parentId, laneKey)]}
+                  {workspaces}
+                  compact={true}
+                  cardBgStyle={styles.cardStyle(8)}
+                  onUpdateField={updateQuickAddField}
+                  onCreate={createChildItem}
+                  onCancel={cancelQuickAdd}
+                />
+              {/if}
+            </div>
+          </div>
+        {/snippet}
+
         <!-- Backbone (Horizontal) -->
         <div
-          class="grid gap-x-6 gap-y-10 mb-8"
-          style="grid-template-columns: repeat({backboneItems.length}, 16rem); grid-template-rows: auto 1fr;"
+          class="grid gap-x-6"
+          class:mb-8={Boolean(swimlanes)}
+          style="grid-template-columns: repeat({backboneItems.length}, 16rem);"
         >
-          {#each backboneItems as backboneItem}
-            {@const itemType = getItemTypeInfo(backboneItem.item_type_id)}
-            <div class="row-span-2 grid grid-rows-subgrid">
-              <!-- Backbone Item -->
-              <div class="self-start">
-                <ItemCard compact>
-                  <!-- Title -->
-                  <button
-                    data-testid="map-backbone-item-{backboneItem.id}"
-                    onclick={() => navigateToItem(backboneItem)}
-                    class="text-sm mb-2 leading-snug text-left w-full line-clamp-2 transition-colors"
-                    style="{styles.glassTextStyle}"
-                  >
-                    {backboneItem.title}
-                  </button>
-
-                  <!-- Bottom row: Key, Icon, Status, Drill Down -->
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      {#if itemType}
-                        <ItemTypeIcon {itemType} />
-                      {/if}
-                      <ItemKey item={backboneItem} {workspace}
-                        onClick={(e) => handleKeyClick(backboneItem, e)}
-                        style={styles.glassSubtleTextStyle}
-                      />
-                    </div>
-
-                    <div class="flex items-center gap-1.5">
-                      <Tooltip class="flex items-center" content={(backboneItem.status_name || backboneItem.status)?.replace('_', ' ') || 'Status'}>
-                        {#snippet children()}
-                          <Lozenge
-                            square
-                            customBg={getStatusCategory(backboneItem.status_name || backboneItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
-                          />
-                        {/snippet}
-                      </Tooltip>
-                      <!-- Drill Down Arrow (only show if item has children) -->
-                      {#if childItemsByParent[backboneItem.id]?.length > 0}
-                        <Tooltip content={t('collections.drillDown')}>
-                          {#snippet children()}
-                            <button
-                              data-testid="map-drill-down-{backboneItem.id}"
-                              onclick={() => drillDown(backboneItem.id)}
-                              class="hover-bg p-1.5 rounded-full transition-colors group"
-                              style="color: var(--ds-interactive);"
-                            >
-                              <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                            </button>
-                          {/snippet}
-                        </Tooltip>
-                      {/if}
-                    </div>
-                  </div>
-                </ItemCard>
-              </div>
-
-              <!-- Drop Zone for this parent -->
-              <div
-                use:registerMapDropZone={backboneItem.id}
-                class="min-h-96 p-3 rounded border-2 border-dashed transition-all"
-                style="border-color: var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-overlay, var(--ds-surface-overlay)); backdrop-filter: var(--ctx-backdrop, none);"
-                data-parent-id={backboneItem.id}
-                data-testid="drop-zone-{backboneItem.id}"
-              >
-                <h3 class="text-sm font-medium mb-3 text-center" style={styles.glassTextStyle}>
-                  {t('collections.childWorkItems', { count: childItemsByParent[backboneItem.id]?.length || 0 })}
-                </h3>
-
-                <!-- Child Items Column -->
-                <div class="space-y-2">
-                  {#each childItemsByParent[backboneItem.id] || [] as childItem}
-                    {@const childItemType = getItemTypeInfo(childItem.item_type_id)}
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <div
-                      use:registerMapItem={childItem.id}
-                      class="item-card rounded border p-3 cursor-move"
-                      style="box-shadow: var(--ds-shadow-raised); {styles.cardStyle(4)}"
-                      data-item-id={childItem.id}
-                      data-testid="draggable-item-{childItem.id}"
-                      ondblclick={(e) => startEditingItem(childItem, e)}
-                    >
-                      <!-- Title -->
-                      {#if editingItemId === childItem.id}
-                        <Textarea
-                          bind:value={editingTitle}
-                          data-item-id={childItem.id}
-                          class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
-                          style="color: var(--ds-text); caret-color: var(--ds-text);"
-                          rows={2}
-                          onblur={() => saveEditingItem(childItem)}
-                          onkeydown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              saveEditingItem(childItem);
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              cancelEditingItem();
-                            }
-                          }}
-                          onclick={(e) => e.stopPropagation()}
-                        />
-                      {:else}
-                        <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
-                          {childItem.title}
-                        </h4>
-                      {/if}
-
-                      <!-- Bottom row: Key, Icon, Status -->
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                          {#if childItemType}
-                            <ItemTypeIcon itemType={childItemType} />
-                          {/if}
-                          <ItemKey item={childItem} {workspace}
-                            onClick={(e) => handleKeyClick(childItem, e)}
-                            style={styles.glassSubtleTextStyle}
-                          />
-                        </div>
-                        <Tooltip class="flex items-center" content={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}>
-                          {#snippet children()}
-                            <Lozenge
-                              square
-                              customBg={getStatusCategory(childItem.status_name || childItem.status, statuses, statusCategories)?.color || 'var(--ds-text-subtle)'}
-                            />
-                          {/snippet}
-                        </Tooltip>
-                      </div>
-                    </div>
-                  {/each}
-
-                  <!-- Add Card button when there are existing items -->
-                  {#if !quickAddState[backboneItem.id]?.show && childItemsByParent[backboneItem.id]?.length > 0 && canAddChildren(backboneItem.id)}
-                    <button
-                      data-testid="map-add-card-{backboneItem.id}"
-                      onclick={() => initQuickAdd(backboneItem.id)}
-                      class="map-add-card w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors "
-                      style="background-color: transparent; color: var(--ds-text-subtle);"
-                    >
-                      <Plus class="w-4 h-4" />
-                      {t('collections.addCard')}
-                    </button>
-                  {/if}
-
-                  <!-- Quick Add / Empty State -->
-                  {#if !quickAddState[backboneItem.id]?.show && (!childItemsByParent[backboneItem.id] || childItemsByParent[backboneItem.id].length === 0)}
-                    {#if canAddChildren(backboneItem.id)}
-                      <button
-                        data-testid="map-add-card-{backboneItem.id}"
-                        onclick={() => initQuickAdd(backboneItem.id)}
-                        class="map-add-card w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors"
-                        style="background-color: transparent; color: var(--ds-text-subtle);"
-                      >
-                        <Plus class="w-4 h-4" />
-                        {t('collections.addCard')}
-                      </button>
-                    {/if}
-                  {/if}
-
-                  <!-- Quick Add Form -->
-                  {#if quickAddState[backboneItem.id]?.show}
-                    <QuickAddForm
-                      parentId={backboneItem.id}
-                      formState={quickAddState[backboneItem.id]}
-                      {workspaces}
-                      compact={true}
-                      cardBgStyle={styles.cardStyle(8)}
-                      onUpdateField={updateQuickAddField}
-                      onCreate={createChildItem}
-                      onCancel={cancelQuickAdd}
-                    />
-                  {/if}
-                </div>
-              </div>
+          {#each backboneItems as backboneItem (backboneItem.id)}
+            <div class="self-start">
+              {@render backboneCard(backboneItem)}
             </div>
           {/each}
-
-          <!-- Empty State for when there are no backbone items -->
-          {#if backboneItems.length === 0}
-            <div class="flex items-center justify-center w-full min-h-[400px]">
-              <EmptyState
-                icon={MapPin}
-                title={t('collections.noTopLevelItems')}
-                description={t('collections.noTopLevelItemsDesc')}
-              />
-            </div>
-          {/if}
         </div>
+
+        {#if swimlanes}
+          <!-- Swimlane bands slicing every column -->
+          {#each swimlanes as lane (lane.key)}
+            {@const laneExpanded = swimlaneCollapsed[lane.key] !== true}
+            <section class="mb-6" data-testid={`map-lane-${lane.key}`}>
+              <div class="mb-3 flex items-center">
+                <button
+                  data-testid={`map-lane-header-${lane.key}`}
+                  class="flex items-center gap-2 rounded px-2 py-1 transition-colors"
+                  style="background-color: var(--ctx-surface-overlay, var(--ds-surface-overlay)); border: 1px solid var(--ctx-border, var(--ds-border)); backdrop-filter: var(--ctx-backdrop, none);"
+                  onclick={() => toggleSwimlaneCollapsed(lane.key)}
+                  aria-expanded={laneExpanded}
+                >
+                  <ChevronDown
+                    class="w-3.5 h-3.5 transition-transform"
+                    style="color: var(--ctx-text-subtle, var(--ds-text-subtle)); transform: rotate({laneExpanded ? 0 : -90}deg);"
+                  />
+                  {#if lane.color}
+                    <span class="h-2 w-2 rounded-full shrink-0" style="background-color: {lane.color};"></span>
+                  {/if}
+                  <span class="text-sm font-medium" style={styles.glassTextStyle}>{lane.title}</span>
+                  {#if lane.sublabel}
+                    <span class="text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">{lane.sublabel}</span>
+                  {/if}
+                  <span class="text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">{lane.count}</span>
+                </button>
+              </div>
+              {#if laneExpanded}
+                <div class="grid gap-x-6" style="grid-template-columns: repeat({backboneItems.length}, 16rem);">
+                  {#each backboneItems as backboneItem (backboneItem.id)}
+                    {@const laneChildren = childrenForLane(childItemsByParent[backboneItem.id], lane, swimlaneDimension, statuses, statusCategories)}
+                    {@render columnContent(backboneItem.id, lane.key, laneChildren, false)}
+                  {/each}
+                </div>
+              {/if}
+            </section>
+          {/each}
+        {:else}
+          <div class="mt-10 grid gap-x-6" style="grid-template-columns: repeat({backboneItems.length}, 16rem);">
+            {#each backboneItems as backboneItem (backboneItem.id)}
+              {@render columnContent(backboneItem.id, null, childItemsByParent[backboneItem.id] || [], true)}
+            {/each}
+          </div>
+        {/if}
+
+        <!-- Empty State for when there are no backbone items -->
+        {#if backboneItems.length === 0}
+          <div class="flex items-center justify-center w-full min-h-[400px]">
+            <EmptyState
+              icon={MapPin}
+              title={t('collections.noTopLevelItems')}
+              description={t('collections.noTopLevelItemsDesc')}
+            />
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -839,11 +1074,13 @@
     background-color: var(--ds-surface-raised-hovered) !important;
   }
 
-  [data-testid^="drop-zone"] {
+  [data-testid^="drop-zone"],
+  [data-testid^="map-lane-cell"] {
     transition: border-color 0.2s ease, background-color 0.2s ease;
   }
 
-  [data-testid^="drop-zone"]:hover {
+  [data-testid^="drop-zone"]:hover,
+  [data-testid^="map-lane-cell"]:hover {
     border-color: var(--ds-border-focused);
     background-color: var(--ds-background-selected);
   }

@@ -519,6 +519,22 @@ export default {
     blockingCount_one: '{count} blockiert',
     blockingCount_other: '{count} blockiert',
     roadmap: 'Roadmap',
+
+    // Map swimlanes (Pro)
+    mapSwimlanes: 'Swimlanes',
+    mapSwimlaneDimension: 'Karten gruppieren nach',
+    mapSwimlaneOff: 'Aus',
+    mapSwimlaneStatus: 'Status',
+    mapSwimlaneStatusCategory: 'Statuskategorie',
+    mapSwimlaneAssignee: 'Zugewiesene Person',
+    mapSwimlanePriority: 'Priorität',
+    mapSwimlaneIteration: 'Iteration',
+    mapSwimlaneMilestone: 'Meilenstein',
+    mapSwimlaneNoAssignee: 'Nicht zugewiesen',
+    mapSwimlaneNoPriority: 'Keine Priorität',
+    mapSwimlaneNoIteration: 'Keine Iteration',
+    mapSwimlaneNoMilestone: 'Kein Meilenstein',
+
     roadmapSettings: 'Roadmap-Einstellungen',
     roadmapStartField: 'Startdatum-Feld',
     roadmapEndField: 'Enddatum-Feld',

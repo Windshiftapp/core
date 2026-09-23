@@ -584,6 +584,21 @@ export default {
     roadmap: 'Roadmap',
     publicBoard: 'Public Board',
 
+    // Map swimlanes (Pro)
+    mapSwimlanes: 'Swimlanes',
+    mapSwimlaneDimension: 'Group cards by',
+    mapSwimlaneOff: 'Off',
+    mapSwimlaneStatus: 'Status',
+    mapSwimlaneStatusCategory: 'Status Category',
+    mapSwimlaneAssignee: 'Assignee',
+    mapSwimlanePriority: 'Priority',
+    mapSwimlaneIteration: 'Iteration',
+    mapSwimlaneMilestone: 'Milestone',
+    mapSwimlaneNoAssignee: 'Unassigned',
+    mapSwimlaneNoPriority: 'No priority',
+    mapSwimlaneNoIteration: 'No iteration',
+    mapSwimlaneNoMilestone: 'No milestone',
+
     // Roadmap view
     roadmapSettings: 'Roadmap Settings',
     roadmapStartField: 'Start Date Field',
