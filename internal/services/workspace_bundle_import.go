@@ -50,6 +50,7 @@ type workspaceBundleImporter struct {
 	actor         AuditActor
 	workspaceID   int
 	bundle        *WorkspaceBundle
+	idempotent    bool
 	outcomes      []WorkspaceBundleImportOutcome
 	pageIDs       map[string]int
 	failedPages   map[string]bool
@@ -101,8 +102,20 @@ func (s *WorkspaceBundleImportService) AuditImport(actor AuditActor, workspaceID
 	})
 }
 
+// WorkspaceBundleImportOptions tunes an import run. Idempotent mode skips
+// entities that already exist in the target workspace under the same stable
+// name (page/item titles), which is what pack applies converge on.
+type WorkspaceBundleImportOptions struct {
+	Idempotent bool
+}
+
 // Import applies the bundle to the target workspace.
 func (s *WorkspaceBundleImportService) Import(ctx context.Context, actor AuditActor, workspaceID int, bundle *WorkspaceBundle) (*WorkspaceBundleImportResult, error) {
+	return s.ImportWithOptions(ctx, actor, workspaceID, bundle, nil)
+}
+
+// ImportWithOptions applies the bundle with optional idempotent resolution.
+func (s *WorkspaceBundleImportService) ImportWithOptions(ctx context.Context, actor AuditActor, workspaceID int, bundle *WorkspaceBundle, opts *WorkspaceBundleImportOptions) (*WorkspaceBundleImportResult, error) {
 	if bundle == nil || bundle.Payload.Pages == nil && bundle.Payload.Items == nil &&
 		bundle.Payload.PageLabels == nil && bundle.Payload.Labels == nil && bundle.Payload.ItemLinks == nil &&
 		bundle.ConfigurationSet == nil {
@@ -120,7 +133,8 @@ func (s *WorkspaceBundleImportService) Import(ctx context.Context, actor AuditAc
 	result := &WorkspaceBundleImportResult{WorkspaceID: workspaceID}
 	imp := &workspaceBundleImporter{
 		db: s.db, ctx: ctx, actor: actor, workspaceID: workspaceID, bundle: bundle,
-		pageIDs: map[string]int{}, failedPages: map[string]bool{},
+		idempotent: opts != nil && opts.Idempotent,
+		pageIDs:    map[string]int{}, failedPages: map[string]bool{},
 		itemIDs: map[string]int{}, failedItems: map[string]bool{},
 	}
 
@@ -426,6 +440,24 @@ func (s *WorkspaceBundleImportService) importPages(imp *workspaceBundleImporter,
 			}
 			parentID = &id
 		}
+		if imp.idempotent {
+			var existingID int
+			err := s.db.QueryRowContext(imp.ctx, `
+				SELECT id FROM pages
+				WHERE workspace_id = ? AND title = ? AND archived_at IS NULL
+				ORDER BY id LIMIT 1
+			`, imp.workspaceID, page.Title).Scan(&existingID)
+			if err == nil {
+				imp.pageIDs[page.Ref] = existingID
+				imp.outcome("page", page.Ref, page.Title, "skipped", "page already exists")
+				continue
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				imp.failedPages[page.Ref] = true
+				imp.outcome("page", page.Ref, page.Title, "failed", err.Error())
+				continue
+			}
+		}
 		created, err := s.pages.Create(imp.actor, CreatePageInput{
 			WorkspaceID: imp.workspaceID,
 			ParentID:    parentID,
@@ -472,6 +504,25 @@ func (s *WorkspaceBundleImportService) importItems(ctx context.Context, imp *wor
 			imp.failedItems[item.Ref] = true
 			imp.outcome("item", item.Ref, item.Title, "failed", fmt.Sprintf("item type %q is not available in the target workspace", item.ItemTypeName))
 			continue
+		}
+		if imp.idempotent {
+			var existingID int
+			err := s.db.QueryRowContext(imp.ctx, `
+				SELECT i.id FROM items i
+				JOIN item_types it ON it.id = i.item_type_id
+				WHERE i.workspace_id = ? AND i.title = ? AND it.name = ?
+				ORDER BY i.id LIMIT 1
+			`, imp.workspaceID, item.Title, item.ItemTypeName).Scan(&existingID)
+			if err == nil {
+				imp.itemIDs[item.Ref] = existingID
+				imp.outcome("item", item.Ref, item.Title, "skipped", "item already exists")
+				continue
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				imp.failedItems[item.Ref] = true
+				imp.outcome("item", item.Ref, item.Title, "failed", err.Error())
+				continue
+			}
 		}
 		input := ItemCreateInput{
 			WorkspaceID: imp.workspaceID,

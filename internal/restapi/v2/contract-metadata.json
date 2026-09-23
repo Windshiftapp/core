@@ -7813,6 +7813,44 @@
         ]
       }
     },
+    "/packs/apply": {
+      "post": {
+        "description": "Apply a framework pack. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Apply a framework pack",
+        "tags": [
+          "Workspace configuration"
+        ]
+      }
+    },
+    "/packs/verify": {
+      "post": {
+        "description": "Verify a framework pack. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Verify a framework pack",
+        "tags": [
+          "Workspace configuration"
+        ]
+      }
+    },
     "/pages/titles": {
       "get": {
         "description": "List page titles across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

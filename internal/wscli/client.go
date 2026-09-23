@@ -1813,3 +1813,54 @@ func (c *Client) StopTimer() (map[string]any, error) {
 	}
 	return out, nil
 }
+
+// Upload posts a multipart/form-data request with one file field plus
+// optional text fields, decoding the JSON response into result.
+func (c *Client) Upload(method, path, field, filename string, data []byte, fields map[string]string, result any) error {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for name, value := range fields {
+		if err := writer.WriteField(name, value); err != nil {
+			return fmt.Errorf("write multipart field %q: %w", name, err)
+		}
+	}
+	part, err := writer.CreateFormFile(field, filename)
+	if err != nil {
+		return fmt.Errorf("create multipart file: %w", err)
+	}
+	if _, err := part.Write(data); err != nil {
+		return fmt.Errorf("write multipart file: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	reqURL := c.baseURL + path
+	req, err := http.NewRequest(method, reqURL, &body)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: URL from server config, not user input
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return decodeAPIError(resp.StatusCode, respBody)
+	}
+	if result != nil && len(respBody) > 0 {
+		if err := decodeResponse(respBody, result); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+	}
+	return nil
+}

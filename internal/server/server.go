@@ -1754,6 +1754,7 @@ func (s *Server) initialize() error {
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
 	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
 	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
+	workspaceAppService := services.NewWorkspaceApplicationService(s.db, v2Access, authorizationCacheInvalidator)
 	if err := v2.RegisterRoutes(v2.Deps{
 		Mux:                mux,
 		Tokens:             tokenManager,
@@ -1776,6 +1777,23 @@ func (s *Server) initialize() error {
 		ConfigurationSetExport:       services.NewConfigSetExportService(s.db, repository.NewConfigurationSetRepository(s.db)),
 		ConfigSetConformance:         services.NewConfigSetConformanceService(s.db, repository.NewConfigurationSetRepository(s.db)),
 		WorkspaceBundleExport:        services.NewWorkspaceBundleExportService(s.db, services.NewConfigSetExportService(s.db, repository.NewConfigurationSetRepository(s.db))),
+		PackApply: services.NewPackApplyService(
+			s.db,
+			workspaceAppService,
+			repository.NewConfigurationSetRepository(s.db),
+			services.NewConfigSetConformanceService(s.db, repository.NewConfigurationSetRepository(s.db)),
+			services.NewWorkspaceBundleImportService(
+				s.db,
+				repository.NewConfigurationSetRepository(s.db),
+				repository.NewItemTypeRepository(s.db),
+				repository.NewLabelRepository(s.db),
+				pageApplication,
+				pageLabelService,
+				itemHandler.ItemCreationService(),
+				itemLinkService,
+				permService,
+			),
+		),
 		WorkspaceBundleImport: services.NewWorkspaceBundleImportService(
 			s.db,
 			repository.NewConfigurationSetRepository(s.db),
@@ -1789,7 +1807,7 @@ func (s *Server) initialize() error {
 		),
 		StoryPointRollup:  repository.NewItemRepository(s.db),
 		HierarchyLevels:   hierarchyLevelEnumService,
-		Workspaces:        services.NewWorkspaceApplicationService(s.db, v2Access, authorizationCacheInvalidator),
+		Workspaces:        workspaceAppService,
 		ItemTemplates:     services.NewItemTemplateApplicationService(s.db, v2Access),
 		Labels:            services.NewLabelApplicationService(s.db),
 		Items:             repository.NewItemRepository(s.db),

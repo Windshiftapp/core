@@ -75573,6 +75573,404 @@
         ],
         "type": "object"
       },
+      "PostPacksApplyPayload": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "PostPacksApplyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "configuration_set_id": {
+                "description": "The configuration set id value.",
+                "type": "integer"
+              },
+              "conformance": {
+                "additionalProperties": false,
+                "description": "The conformance value.",
+                "nullable": true,
+                "properties": {
+                  "checked_at": {
+                    "description": "The checked at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "configuration_set_id": {
+                    "description": "The configuration set id value.",
+                    "type": "integer"
+                  },
+                  "conformant": {
+                    "description": "The conformant value.",
+                    "type": "boolean"
+                  },
+                  "drift_count": {
+                    "description": "The drift count value.",
+                    "type": "integer"
+                  },
+                  "drifts": {
+                    "description": "The drifts value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "detail": {
+                          "description": "The detail value.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "The kind value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "repairable": {
+                          "description": "The repairable value.",
+                          "type": "boolean"
+                        },
+                        "section": {
+                          "description": "The section value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "detail",
+                        "id",
+                        "kind",
+                        "name",
+                        "repairable",
+                        "section"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "repairable_count": {
+                    "description": "The repairable count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "checked_at",
+                  "configuration_set_id",
+                  "conformant",
+                  "drift_count",
+                  "drifts",
+                  "repairable_count"
+                ],
+                "type": "object"
+              },
+              "pack": {
+                "description": "The pack value.",
+                "type": "string"
+              },
+              "pack_version": {
+                "description": "The pack version value.",
+                "type": "string"
+              },
+              "plugins": {
+                "description": "The plugins value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "found_version": {
+                      "description": "The found version value.",
+                      "type": "string"
+                    },
+                    "installed": {
+                      "description": "The installed value.",
+                      "type": "boolean"
+                    },
+                    "min_version": {
+                      "description": "The min version value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "ok": {
+                      "description": "The ok value.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "installed",
+                    "min_version",
+                    "name",
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "stages": {
+                "description": "The stages value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "detail": {
+                      "description": "The detail value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "workspace_created": {
+                "description": "The workspace created value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "pack",
+              "pack_version",
+              "stages",
+              "status",
+              "workspace_created",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostPacksVerifyPayload": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "PostPacksVerifyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "configuration_set_id": {
+                "description": "The configuration set id value.",
+                "type": "integer"
+              },
+              "conformance": {
+                "additionalProperties": false,
+                "description": "The conformance value.",
+                "nullable": true,
+                "properties": {
+                  "checked_at": {
+                    "description": "The checked at value.",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "configuration_set_id": {
+                    "description": "The configuration set id value.",
+                    "type": "integer"
+                  },
+                  "conformant": {
+                    "description": "The conformant value.",
+                    "type": "boolean"
+                  },
+                  "drift_count": {
+                    "description": "The drift count value.",
+                    "type": "integer"
+                  },
+                  "drifts": {
+                    "description": "The drifts value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "detail": {
+                          "description": "The detail value.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "The kind value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "repairable": {
+                          "description": "The repairable value.",
+                          "type": "boolean"
+                        },
+                        "section": {
+                          "description": "The section value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "detail",
+                        "id",
+                        "kind",
+                        "name",
+                        "repairable",
+                        "section"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "repairable_count": {
+                    "description": "The repairable count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "checked_at",
+                  "configuration_set_id",
+                  "conformant",
+                  "drift_count",
+                  "drifts",
+                  "repairable_count"
+                ],
+                "type": "object"
+              },
+              "pack": {
+                "description": "The pack value.",
+                "type": "string"
+              },
+              "pack_version": {
+                "description": "The pack version value.",
+                "type": "string"
+              },
+              "plugins": {
+                "description": "The plugins value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "found_version": {
+                      "description": "The found version value.",
+                      "type": "string"
+                    },
+                    "installed": {
+                      "description": "The installed value.",
+                      "type": "boolean"
+                    },
+                    "min_version": {
+                      "description": "The min version value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "ok": {
+                      "description": "The ok value.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "installed",
+                    "min_version",
+                    "name",
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "stages": {
+                "description": "The stages value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "detail": {
+                      "description": "The detail value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "description": "The status value.",
+                "type": "string"
+              },
+              "workspace_created": {
+                "description": "The workspace created value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "pack",
+              "pack_version",
+              "stages",
+              "status",
+              "workspace_created",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostPrioritiesPayload": {
         "additionalProperties": false,
         "properties": {
@@ -99197,6 +99595,130 @@
         "summary": "Get the API v2 OpenAPI document",
         "tags": [
           "API"
+        ]
+      }
+    },
+    "/packs/apply": {
+      "post": {
+        "description": "Apply a framework pack. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postPacksApply",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PostPacksApplyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPacksApplyResult"
+                }
+              }
+            },
+            "description": "Apply a framework pack response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Apply a framework pack",
+        "tags": [
+          "Workspace configuration"
+        ],
+        "x-required-scopes": [
+          "workspaces:write"
+        ]
+      }
+    },
+    "/packs/verify": {
+      "post": {
+        "description": "Verify a framework pack. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postPacksVerify",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PostPacksVerifyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPacksVerifyResult"
+                }
+              }
+            },
+            "description": "Verify a framework pack response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Verify a framework pack",
+        "tags": [
+          "Workspace configuration"
+        ],
+        "x-required-scopes": [
+          "workspaces:read"
         ]
       }
     },

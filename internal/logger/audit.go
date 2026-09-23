@@ -354,6 +354,7 @@ const (
 	ActionConfigSetConformanceRepair    = "config_set.conformance_repair"
 	ActionWorkspaceBundleExport         = "workspace.bundle_export"
 	ActionWorkspaceBundleImport         = "workspace.bundle_import"
+	ActionPackApply                     = "pack.apply"
 	ActionConfigSetNotificationAssign   = "config_set.notification_assign"
 	ActionConfigSetNotificationUnassign = "config_set.notification_unassign"
 
