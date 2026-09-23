@@ -101,7 +101,7 @@ export default {
     "clickToViewDetails": "Klicken, um Arbeitselementdetails anzuzeigen"
   },
   "collectionTree": {
-    "itemKey": "Arbeitselementschlüssel"
+    "itemKey": "Schlüssel"
   },
   "collections": {
     "selectItemType": "Arbeitselementtyp auswählen",

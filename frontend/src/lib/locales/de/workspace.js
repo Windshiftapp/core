@@ -385,7 +385,7 @@ export default {
   },
   collectionTree: {
     loading: 'Wird geladen...',
-    tree: 'Baum',
+    tree: 'Hierarchie',
     noWorkItemsYet: 'Noch keine Vorgänge',
     createFirstWorkItem: 'Erstellen Sie Ihren ersten Vorgang, um den Hierarchiebaum zu sehen.',
     expandAll: 'Alle ausklappen',
@@ -612,7 +612,7 @@ export default {
       board: 'Board',
       backlog: 'Backlog',
       list: 'Liste',
-      tree: 'Baum',
+      tree: 'Hierarchie',
       map: 'Karte',
       overview: 'Übersicht',
     },
