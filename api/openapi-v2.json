@@ -31099,6 +31099,1025 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdExportResult": {
+        "additionalProperties": false,
+        "nullable": true,
+        "properties": {
+          "configuration_set_template": {
+            "additionalProperties": false,
+            "description": "The configuration set template value.",
+            "nullable": true,
+            "properties": {
+              "exported_at": {
+                "description": "The exported at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "exported_by": {
+                "additionalProperties": false,
+                "description": "The exported by value.",
+                "nullable": true,
+                "properties": {
+                  "instance": {
+                    "description": "The instance value.",
+                    "type": "string"
+                  },
+                  "username": {
+                    "description": "The username value.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "kind": {
+                "description": "The kind value.",
+                "type": "string"
+              },
+              "payload": {
+                "additionalProperties": false,
+                "description": "The payload value.",
+                "properties": {
+                  "approval_sets": {
+                    "description": "The approval sets value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "set_statuses": {
+                          "description": "The set statuses value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "approve_transition": {
+                                "additionalProperties": false,
+                                "description": "The approve transition value.",
+                                "properties": {
+                                  "from_all_statuses": {
+                                    "description": "The from all statuses value.",
+                                    "type": "boolean"
+                                  },
+                                  "from_status_name": {
+                                    "description": "The from status name value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "to_status_name": {
+                                    "description": "The to status name value.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to_status_name"
+                                ],
+                                "type": "object"
+                              },
+                              "deny_transition": {
+                                "additionalProperties": false,
+                                "description": "The deny transition value.",
+                                "properties": {
+                                  "from_all_statuses": {
+                                    "description": "The from all statuses value.",
+                                    "type": "boolean"
+                                  },
+                                  "from_status_name": {
+                                    "description": "The from status name value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "to_status_name": {
+                                    "description": "The to status name value.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to_status_name"
+                                ],
+                                "type": "object"
+                              },
+                              "status_name": {
+                                "description": "The status name value.",
+                                "type": "string"
+                              },
+                              "step_mode": {
+                                "description": "The step mode value.",
+                                "type": "string"
+                              },
+                              "steps": {
+                                "description": "The steps value.",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "allow_self_approval": {
+                                      "description": "The allow self approval value.",
+                                      "type": "boolean"
+                                    },
+                                    "approver_custom_field_name": {
+                                      "description": "The approver custom field name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_field_identifier": {
+                                      "description": "The approver field identifier value.",
+                                      "type": "string"
+                                    },
+                                    "approver_group_name": {
+                                      "description": "The approver group name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_role_name": {
+                                      "description": "The approver role name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_source": {
+                                      "description": "The approver source value.",
+                                      "type": "string"
+                                    },
+                                    "approver_user_email": {
+                                      "description": "The approver user email value.",
+                                      "type": "string"
+                                    },
+                                    "display_order": {
+                                      "description": "The display order value.",
+                                      "type": "integer"
+                                    },
+                                    "escalation_action": {
+                                      "description": "The escalation action value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_after_hours": {
+                                      "description": "The escalation after hours value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "escalation_target_custom_field_name": {
+                                      "description": "The escalation target custom field name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_field_identifier": {
+                                      "description": "The escalation target field identifier value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_group_name": {
+                                      "description": "The escalation target group name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_role_name": {
+                                      "description": "The escalation target role name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_source": {
+                                      "description": "The escalation target source value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_user_email": {
+                                      "description": "The escalation target user email value.",
+                                      "type": "string"
+                                    },
+                                    "max_escalations": {
+                                      "description": "The max escalations value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "description": "The name value.",
+                                      "type": "string"
+                                    },
+                                    "on_leave_strategy": {
+                                      "description": "The on leave strategy value.",
+                                      "type": "string"
+                                    },
+                                    "quorum_count": {
+                                      "description": "The quorum count value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "quorum_mode": {
+                                      "description": "The quorum mode value.",
+                                      "type": "string"
+                                    },
+                                    "quorum_percent": {
+                                      "description": "The quorum percent value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "rejection_policy": {
+                                      "description": "The rejection policy value.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "approver_source",
+                                    "display_order",
+                                    "on_leave_strategy",
+                                    "quorum_mode",
+                                    "rejection_policy"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "approve_transition",
+                              "deny_transition",
+                              "status_name",
+                              "step_mode"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "workflow_name": {
+                          "description": "The workflow name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "workflow_name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "condition_sets": {
+                    "description": "The condition sets value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "transition_conditions": {
+                          "description": "The transition conditions value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "conditions": {
+                                "description": "The conditions value.",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "config": {
+                                      "additionalProperties": {
+                                        "description": "Arbitrary JSON extension value."
+                                      },
+                                      "description": "The config value.",
+                                      "type": "object"
+                                    },
+                                    "display_order": {
+                                      "description": "The display order value.",
+                                      "type": "integer"
+                                    },
+                                    "error_message": {
+                                      "description": "The error message value.",
+                                      "type": "string"
+                                    },
+                                    "mode": {
+                                      "description": "The mode value.",
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "description": "The type value.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "config",
+                                    "mode",
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "from_all_statuses": {
+                                "description": "The from all statuses value.",
+                                "type": "boolean"
+                              },
+                              "from_status_name": {
+                                "description": "The from status name value.",
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "logic_mode": {
+                                "description": "The logic mode value.",
+                                "type": "string"
+                              },
+                              "to_status_name": {
+                                "description": "The to status name value.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "logic_mode",
+                              "to_status_name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "workflow_name": {
+                          "description": "The workflow name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "workflow_name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "configuration_set": {
+                    "additionalProperties": false,
+                    "description": "The configuration set value.",
+                    "properties": {
+                      "default_item_type_name": {
+                        "description": "The default item type name value.",
+                        "type": "string"
+                      },
+                      "description": {
+                        "description": "The description value.",
+                        "type": "string"
+                      },
+                      "differentiate_by_item_type": {
+                        "description": "The differentiate by item type value.",
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "configuration_set_links": {
+                    "additionalProperties": false,
+                    "description": "The configuration set links value.",
+                    "properties": {
+                      "approval_set_name": {
+                        "description": "The approval set name value.",
+                        "type": "string"
+                      },
+                      "condition_set_name": {
+                        "description": "The condition set name value.",
+                        "type": "string"
+                      },
+                      "create_screen_name": {
+                        "description": "The create screen name value.",
+                        "type": "string"
+                      },
+                      "edit_screen_name": {
+                        "description": "The edit screen name value.",
+                        "type": "string"
+                      },
+                      "item_type_configs": {
+                        "description": "The item type configs value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "approval_set_name": {
+                              "description": "The approval set name value.",
+                              "type": "string"
+                            },
+                            "condition_set_name": {
+                              "description": "The condition set name value.",
+                              "type": "string"
+                            },
+                            "create_screen_name": {
+                              "description": "The create screen name value.",
+                              "type": "string"
+                            },
+                            "edit_screen_name": {
+                              "description": "The edit screen name value.",
+                              "type": "string"
+                            },
+                            "item_type_name": {
+                              "description": "The item type name value.",
+                              "type": "string"
+                            },
+                            "view_screen_name": {
+                              "description": "The view screen name value.",
+                              "type": "string"
+                            },
+                            "workflow_name": {
+                              "description": "The workflow name value.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "item_type_name"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "priority_names": {
+                        "description": "The priority names value.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "view_screen_name": {
+                        "description": "The view screen name value.",
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "description": "The workflow name value.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "custom_fields": {
+                    "description": "The custom fields value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "applies_to_customer_organisations": {
+                          "description": "The applies to customer organisations value.",
+                          "type": "boolean"
+                        },
+                        "applies_to_portal_customers": {
+                          "description": "The applies to portal customers value.",
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "display_order": {
+                          "description": "The display order value.",
+                          "type": "integer"
+                        },
+                        "field_type": {
+                          "description": "The field type value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "options": {
+                          "description": "The options value.",
+                          "type": "string"
+                        },
+                        "required": {
+                          "description": "The required value.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "display_order",
+                        "field_type",
+                        "name",
+                        "required"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "item_types": {
+                    "description": "The item types value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "hierarchy_level": {
+                          "description": "The hierarchy level value.",
+                          "type": "integer"
+                        },
+                        "icon": {
+                          "description": "The icon value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "sort_order": {
+                          "description": "The sort order value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "hierarchy_level",
+                        "name",
+                        "sort_order"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "link_types": {
+                    "description": "The link types value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "allowed_entity_types": {
+                          "description": "The allowed entity types value.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "forward_label": {
+                          "description": "The forward label value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "reverse_label": {
+                          "description": "The reverse label value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "forward_label",
+                        "name",
+                        "reverse_label"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "priorities": {
+                    "description": "The priorities value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "icon": {
+                          "description": "The icon value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "sort_order": {
+                          "description": "The sort order value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "sort_order"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "screens": {
+                    "description": "The screens value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "fields": {
+                          "description": "The fields value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "custom_field_name": {
+                                "description": "The custom field name value.",
+                                "type": "string"
+                              },
+                              "display_order": {
+                                "description": "The display order value.",
+                                "type": "integer"
+                              },
+                              "field_identifier": {
+                                "description": "The field identifier value.",
+                                "type": "string"
+                              },
+                              "field_kind": {
+                                "description": "The field kind value.",
+                                "type": "string"
+                              },
+                              "field_width": {
+                                "description": "The field width value.",
+                                "type": "string"
+                              },
+                              "is_required": {
+                                "description": "The is required value.",
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "display_order",
+                              "field_kind"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "system_fields": {
+                          "description": "The system fields value.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "fields",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "status_categories": {
+                    "description": "The status categories value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "statuses": {
+                    "description": "The statuses value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "category_name": {
+                          "description": "The category name value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category_name",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "workflows": {
+                    "description": "The workflows value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "transitions": {
+                          "description": "The transitions value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "display_order": {
+                                "description": "The display order value.",
+                                "type": "integer"
+                              },
+                              "from_all_statuses": {
+                                "description": "The from all statuses value.",
+                                "type": "boolean"
+                              },
+                              "from_status_name": {
+                                "description": "The from status name value.",
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "source_handle": {
+                                "description": "The source handle value.",
+                                "type": "string"
+                              },
+                              "target_handle": {
+                                "description": "The target handle value.",
+                                "type": "string"
+                              },
+                              "to_status_name": {
+                                "description": "The to status name value.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "to_status_name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "configuration_set",
+                  "configuration_set_links"
+                ],
+                "type": "object"
+              },
+              "schema_version": {
+                "description": "The schema version value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "exported_at",
+              "kind",
+              "payload",
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "exported_at": {
+            "description": "The exported at value.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "exported_by": {
+            "additionalProperties": false,
+            "description": "The exported by value.",
+            "nullable": true,
+            "properties": {
+              "instance": {
+                "description": "The instance value.",
+                "type": "string"
+              },
+              "username": {
+                "description": "The username value.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "kind": {
+            "description": "The kind value.",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": false,
+            "description": "The payload value.",
+            "properties": {
+              "item_links": {
+                "description": "The item links value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "link_type_name": {
+                      "description": "The link type name value.",
+                      "type": "string"
+                    },
+                    "source_ref": {
+                      "description": "The source ref value.",
+                      "type": "string"
+                    },
+                    "target_ref": {
+                      "description": "The target ref value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "link_type_name",
+                    "source_ref",
+                    "target_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "items": {
+                "description": "The items value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignee_email": {
+                      "description": "The assignee email value.",
+                      "type": "string"
+                    },
+                    "description": {
+                      "description": "The description value.",
+                      "type": "string"
+                    },
+                    "field_values": {
+                      "additionalProperties": {
+                        "description": "Arbitrary JSON extension value."
+                      },
+                      "description": "The field values value.",
+                      "type": "object"
+                    },
+                    "item_type_name": {
+                      "description": "The item type name value.",
+                      "type": "string"
+                    },
+                    "labels": {
+                      "description": "The labels value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "parent_ref": {
+                      "description": "The parent ref value.",
+                      "type": "string"
+                    },
+                    "priority_name": {
+                      "description": "The priority name value.",
+                      "type": "string"
+                    },
+                    "ref": {
+                      "description": "The ref value.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "item_type_name",
+                    "ref",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "labels": {
+                "description": "The labels value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "page_labels": {
+                "description": "The page labels value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "pages": {
+                "description": "The pages value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "content": {
+                      "description": "The content value.",
+                      "type": "string"
+                    },
+                    "labels": {
+                      "description": "The labels value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "parent_ref": {
+                      "description": "The parent ref value.",
+                      "type": "string"
+                    },
+                    "ref": {
+                      "description": "The ref value.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "schema_version": {
+            "description": "The schema version value.",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "The source value.",
+            "properties": {
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "exported_at",
+          "kind",
+          "payload",
+          "schema_version",
+          "source"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdItemTemplatesResult": {
         "additionalProperties": false,
         "properties": {
@@ -77224,6 +78243,1102 @@
         ],
         "type": "object"
       },
+      "PostWorkspacesWorkspaceIdImportPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration_set_template": {
+            "additionalProperties": false,
+            "description": "The configuration set template value.",
+            "nullable": true,
+            "properties": {
+              "exported_at": {
+                "description": "The exported at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "exported_by": {
+                "additionalProperties": false,
+                "description": "The exported by value.",
+                "nullable": true,
+                "properties": {
+                  "instance": {
+                    "description": "The instance value.",
+                    "type": "string"
+                  },
+                  "username": {
+                    "description": "The username value.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "kind": {
+                "description": "The kind value.",
+                "type": "string"
+              },
+              "payload": {
+                "additionalProperties": false,
+                "description": "The payload value.",
+                "properties": {
+                  "approval_sets": {
+                    "description": "The approval sets value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "set_statuses": {
+                          "description": "The set statuses value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "approve_transition": {
+                                "additionalProperties": false,
+                                "description": "The approve transition value.",
+                                "properties": {
+                                  "from_all_statuses": {
+                                    "description": "The from all statuses value.",
+                                    "type": "boolean"
+                                  },
+                                  "from_status_name": {
+                                    "description": "The from status name value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "to_status_name": {
+                                    "description": "The to status name value.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to_status_name"
+                                ],
+                                "type": "object"
+                              },
+                              "deny_transition": {
+                                "additionalProperties": false,
+                                "description": "The deny transition value.",
+                                "properties": {
+                                  "from_all_statuses": {
+                                    "description": "The from all statuses value.",
+                                    "type": "boolean"
+                                  },
+                                  "from_status_name": {
+                                    "description": "The from status name value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "to_status_name": {
+                                    "description": "The to status name value.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "to_status_name"
+                                ],
+                                "type": "object"
+                              },
+                              "status_name": {
+                                "description": "The status name value.",
+                                "type": "string"
+                              },
+                              "step_mode": {
+                                "description": "The step mode value.",
+                                "type": "string"
+                              },
+                              "steps": {
+                                "description": "The steps value.",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "allow_self_approval": {
+                                      "description": "The allow self approval value.",
+                                      "type": "boolean"
+                                    },
+                                    "approver_custom_field_name": {
+                                      "description": "The approver custom field name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_field_identifier": {
+                                      "description": "The approver field identifier value.",
+                                      "type": "string"
+                                    },
+                                    "approver_group_name": {
+                                      "description": "The approver group name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_role_name": {
+                                      "description": "The approver role name value.",
+                                      "type": "string"
+                                    },
+                                    "approver_source": {
+                                      "description": "The approver source value.",
+                                      "type": "string"
+                                    },
+                                    "approver_user_email": {
+                                      "description": "The approver user email value.",
+                                      "type": "string"
+                                    },
+                                    "display_order": {
+                                      "description": "The display order value.",
+                                      "type": "integer"
+                                    },
+                                    "escalation_action": {
+                                      "description": "The escalation action value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_after_hours": {
+                                      "description": "The escalation after hours value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "escalation_target_custom_field_name": {
+                                      "description": "The escalation target custom field name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_field_identifier": {
+                                      "description": "The escalation target field identifier value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_group_name": {
+                                      "description": "The escalation target group name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_role_name": {
+                                      "description": "The escalation target role name value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_source": {
+                                      "description": "The escalation target source value.",
+                                      "type": "string"
+                                    },
+                                    "escalation_target_user_email": {
+                                      "description": "The escalation target user email value.",
+                                      "type": "string"
+                                    },
+                                    "max_escalations": {
+                                      "description": "The max escalations value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "description": "The name value.",
+                                      "type": "string"
+                                    },
+                                    "on_leave_strategy": {
+                                      "description": "The on leave strategy value.",
+                                      "type": "string"
+                                    },
+                                    "quorum_count": {
+                                      "description": "The quorum count value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "quorum_mode": {
+                                      "description": "The quorum mode value.",
+                                      "type": "string"
+                                    },
+                                    "quorum_percent": {
+                                      "description": "The quorum percent value.",
+                                      "nullable": true,
+                                      "type": "integer"
+                                    },
+                                    "rejection_policy": {
+                                      "description": "The rejection policy value.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "approver_source",
+                                    "display_order",
+                                    "on_leave_strategy",
+                                    "quorum_mode",
+                                    "rejection_policy"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "approve_transition",
+                              "deny_transition",
+                              "status_name",
+                              "step_mode"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "workflow_name": {
+                          "description": "The workflow name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "workflow_name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "condition_sets": {
+                    "description": "The condition sets value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "transition_conditions": {
+                          "description": "The transition conditions value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "conditions": {
+                                "description": "The conditions value.",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "config": {
+                                      "additionalProperties": {
+                                        "description": "Arbitrary JSON extension value."
+                                      },
+                                      "description": "The config value.",
+                                      "type": "object"
+                                    },
+                                    "display_order": {
+                                      "description": "The display order value.",
+                                      "type": "integer"
+                                    },
+                                    "error_message": {
+                                      "description": "The error message value.",
+                                      "type": "string"
+                                    },
+                                    "mode": {
+                                      "description": "The mode value.",
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "description": "The type value.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "config",
+                                    "mode",
+                                    "type"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "from_all_statuses": {
+                                "description": "The from all statuses value.",
+                                "type": "boolean"
+                              },
+                              "from_status_name": {
+                                "description": "The from status name value.",
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "logic_mode": {
+                                "description": "The logic mode value.",
+                                "type": "string"
+                              },
+                              "to_status_name": {
+                                "description": "The to status name value.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "logic_mode",
+                              "to_status_name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "workflow_name": {
+                          "description": "The workflow name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "workflow_name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "configuration_set": {
+                    "additionalProperties": false,
+                    "description": "The configuration set value.",
+                    "properties": {
+                      "default_item_type_name": {
+                        "description": "The default item type name value.",
+                        "type": "string"
+                      },
+                      "description": {
+                        "description": "The description value.",
+                        "type": "string"
+                      },
+                      "differentiate_by_item_type": {
+                        "description": "The differentiate by item type value.",
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "configuration_set_links": {
+                    "additionalProperties": false,
+                    "description": "The configuration set links value.",
+                    "properties": {
+                      "approval_set_name": {
+                        "description": "The approval set name value.",
+                        "type": "string"
+                      },
+                      "condition_set_name": {
+                        "description": "The condition set name value.",
+                        "type": "string"
+                      },
+                      "create_screen_name": {
+                        "description": "The create screen name value.",
+                        "type": "string"
+                      },
+                      "edit_screen_name": {
+                        "description": "The edit screen name value.",
+                        "type": "string"
+                      },
+                      "item_type_configs": {
+                        "description": "The item type configs value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "approval_set_name": {
+                              "description": "The approval set name value.",
+                              "type": "string"
+                            },
+                            "condition_set_name": {
+                              "description": "The condition set name value.",
+                              "type": "string"
+                            },
+                            "create_screen_name": {
+                              "description": "The create screen name value.",
+                              "type": "string"
+                            },
+                            "edit_screen_name": {
+                              "description": "The edit screen name value.",
+                              "type": "string"
+                            },
+                            "item_type_name": {
+                              "description": "The item type name value.",
+                              "type": "string"
+                            },
+                            "view_screen_name": {
+                              "description": "The view screen name value.",
+                              "type": "string"
+                            },
+                            "workflow_name": {
+                              "description": "The workflow name value.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "item_type_name"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "priority_names": {
+                        "description": "The priority names value.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "view_screen_name": {
+                        "description": "The view screen name value.",
+                        "type": "string"
+                      },
+                      "workflow_name": {
+                        "description": "The workflow name value.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "custom_fields": {
+                    "description": "The custom fields value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "applies_to_customer_organisations": {
+                          "description": "The applies to customer organisations value.",
+                          "type": "boolean"
+                        },
+                        "applies_to_portal_customers": {
+                          "description": "The applies to portal customers value.",
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "display_order": {
+                          "description": "The display order value.",
+                          "type": "integer"
+                        },
+                        "field_type": {
+                          "description": "The field type value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "options": {
+                          "description": "The options value.",
+                          "type": "string"
+                        },
+                        "required": {
+                          "description": "The required value.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "display_order",
+                        "field_type",
+                        "name",
+                        "required"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "item_types": {
+                    "description": "The item types value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "hierarchy_level": {
+                          "description": "The hierarchy level value.",
+                          "type": "integer"
+                        },
+                        "icon": {
+                          "description": "The icon value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "sort_order": {
+                          "description": "The sort order value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "hierarchy_level",
+                        "name",
+                        "sort_order"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "link_types": {
+                    "description": "The link types value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "allowed_entity_types": {
+                          "description": "The allowed entity types value.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "forward_label": {
+                          "description": "The forward label value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "reverse_label": {
+                          "description": "The reverse label value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "forward_label",
+                        "name",
+                        "reverse_label"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "priorities": {
+                    "description": "The priorities value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "color": {
+                          "description": "The color value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "icon": {
+                          "description": "The icon value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "sort_order": {
+                          "description": "The sort order value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "sort_order"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "screens": {
+                    "description": "The screens value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "fields": {
+                          "description": "The fields value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "custom_field_name": {
+                                "description": "The custom field name value.",
+                                "type": "string"
+                              },
+                              "display_order": {
+                                "description": "The display order value.",
+                                "type": "integer"
+                              },
+                              "field_identifier": {
+                                "description": "The field identifier value.",
+                                "type": "string"
+                              },
+                              "field_kind": {
+                                "description": "The field kind value.",
+                                "type": "string"
+                              },
+                              "field_width": {
+                                "description": "The field width value.",
+                                "type": "string"
+                              },
+                              "is_required": {
+                                "description": "The is required value.",
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "display_order",
+                              "field_kind"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "system_fields": {
+                          "description": "The system fields value.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "fields",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "status_categories": {
+                    "description": "The status categories value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "statuses": {
+                    "description": "The statuses value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "category_name": {
+                          "description": "The category name value.",
+                          "type": "string"
+                        },
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category_name",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "workflows": {
+                    "description": "The workflows value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "description": "The description value.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "transitions": {
+                          "description": "The transitions value.",
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "display_order": {
+                                "description": "The display order value.",
+                                "type": "integer"
+                              },
+                              "from_all_statuses": {
+                                "description": "The from all statuses value.",
+                                "type": "boolean"
+                              },
+                              "from_status_name": {
+                                "description": "The from status name value.",
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "source_handle": {
+                                "description": "The source handle value.",
+                                "type": "string"
+                              },
+                              "target_handle": {
+                                "description": "The target handle value.",
+                                "type": "string"
+                              },
+                              "to_status_name": {
+                                "description": "The to status name value.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "to_status_name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "configuration_set",
+                  "configuration_set_links"
+                ],
+                "type": "object"
+              },
+              "schema_version": {
+                "description": "The schema version value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "exported_at",
+              "kind",
+              "payload",
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "exported_at": {
+            "description": "The exported at value.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "exported_by": {
+            "additionalProperties": false,
+            "description": "The exported by value.",
+            "nullable": true,
+            "properties": {
+              "instance": {
+                "description": "The instance value.",
+                "type": "string"
+              },
+              "username": {
+                "description": "The username value.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "kind": {
+            "description": "The kind value.",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": false,
+            "description": "The payload value.",
+            "properties": {
+              "item_links": {
+                "description": "The item links value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "link_type_name": {
+                      "description": "The link type name value.",
+                      "type": "string"
+                    },
+                    "source_ref": {
+                      "description": "The source ref value.",
+                      "type": "string"
+                    },
+                    "target_ref": {
+                      "description": "The target ref value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "link_type_name",
+                    "source_ref",
+                    "target_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "items": {
+                "description": "The items value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignee_email": {
+                      "description": "The assignee email value.",
+                      "type": "string"
+                    },
+                    "description": {
+                      "description": "The description value.",
+                      "type": "string"
+                    },
+                    "field_values": {
+                      "additionalProperties": {
+                        "description": "Arbitrary JSON extension value."
+                      },
+                      "description": "The field values value.",
+                      "type": "object"
+                    },
+                    "item_type_name": {
+                      "description": "The item type name value.",
+                      "type": "string"
+                    },
+                    "labels": {
+                      "description": "The labels value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "parent_ref": {
+                      "description": "The parent ref value.",
+                      "type": "string"
+                    },
+                    "priority_name": {
+                      "description": "The priority name value.",
+                      "type": "string"
+                    },
+                    "ref": {
+                      "description": "The ref value.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "item_type_name",
+                    "ref",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "labels": {
+                "description": "The labels value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "page_labels": {
+                "description": "The page labels value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "pages": {
+                "description": "The pages value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "content": {
+                      "description": "The content value.",
+                      "type": "string"
+                    },
+                    "labels": {
+                      "description": "The labels value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "parent_ref": {
+                      "description": "The parent ref value.",
+                      "type": "string"
+                    },
+                    "ref": {
+                      "description": "The ref value.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "schema_version": {
+            "description": "The schema version value.",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "The source value.",
+            "properties": {
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "exported_at",
+          "kind",
+          "payload",
+          "schema_version",
+          "source"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdImportResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "item_links_imported": {
+                "description": "The item links imported value.",
+                "type": "integer"
+              },
+              "items_imported": {
+                "description": "The items imported value.",
+                "type": "integer"
+              },
+              "labels_created": {
+                "description": "The labels created value.",
+                "type": "integer"
+              },
+              "outcomes": {
+                "description": "The outcomes value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "detail": {
+                      "description": "The detail value.",
+                      "type": "string"
+                    },
+                    "entity": {
+                      "description": "The entity value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "ref": {
+                      "description": "The ref value.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "entity",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "pages_imported": {
+                "description": "The pages imported value.",
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "item_links_imported",
+              "items_imported",
+              "labels_created",
+              "outcomes",
+              "pages_imported",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostWorkspacesWorkspaceIdItemTemplatesPayload": {
         "additionalProperties": false,
         "properties": {
@@ -103557,6 +105672,139 @@
         ],
         "x-required-scopes": [
           "workspaces:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/export": {
+      "get": {
+        "description": "Export a workspace bundle. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdExport",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdExportResult"
+                }
+              }
+            },
+            "description": "Export a workspace bundle response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Export a workspace bundle",
+        "tags": [
+          "Workspace configuration"
+        ],
+        "x-required-scopes": [
+          "workspaces:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/import": {
+      "post": {
+        "description": "Import a workspace bundle. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postWorkspacesWorkspaceIdImport",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdImportPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdImportResult"
+                }
+              }
+            },
+            "description": "Import a workspace bundle response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Import a workspace bundle",
+        "tags": [
+          "Workspace configuration"
+        ],
+        "x-required-scopes": [
+          "workspaces:write"
         ]
       }
     },

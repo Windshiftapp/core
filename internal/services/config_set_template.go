@@ -259,6 +259,10 @@ const (
 	UnresolvedKindRole           UnresolvedRefKind = "role"
 	UnresolvedKindGroup          UnresolvedRefKind = "group"
 	UnresolvedKindUser           UnresolvedRefKind = "user"
+	// Workspace-bundle identity references (WI-1335).
+	UnresolvedKindItemType    UnresolvedRefKind = "item_type"
+	UnresolvedKindCustomField UnresolvedRefKind = "custom_field"
+	UnresolvedKindLinkType    UnresolvedRefKind = "link_type"
 )
 
 // UnresolvedRef is a single missing reference. Path is a coarse human-readable

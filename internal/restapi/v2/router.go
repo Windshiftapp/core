@@ -535,6 +535,8 @@ type Deps struct {
 	WorkspaceRoles               *services.WorkspaceRoleProvisioningService
 	ConfigurationSetProvisioning *services.ConfigurationSetProvisioningService
 	ConfigSetConformance         *services.ConfigSetConformanceService
+	WorkspaceBundleExport        *services.WorkspaceBundleExportService
+	WorkspaceBundleImport        *services.WorkspaceBundleImportService
 	ConfigurationSetExport       *services.ConfigSetExportService
 	StoryPointRollup             storyPointRollupReader
 	HierarchyLevels              *services.EnumService
@@ -788,6 +790,7 @@ func buildRoutes(deps Deps) []route {
 	registerScreenRoutes(&builder, deps)
 	registerWorkspaceRoleRoutes(&builder, deps)
 	registerConfigurationSetRoutes(&builder, deps)
+	registerWorkspaceBundleRoutes(&builder, deps)
 	registerHierarchyLevelRoutes(&builder, deps)
 	registerScopedCatalogRoutes(&builder, deps.Catalog, deps.Workspaces, deps.ItemTemplates)
 	registerLabelRoutes(&builder, deps)

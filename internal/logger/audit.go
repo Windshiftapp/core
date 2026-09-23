@@ -352,6 +352,8 @@ const (
 	ActionConfigSetImport               = "config_set.import"
 	ActionConfigSetConformanceCheck     = "config_set.conformance_check"
 	ActionConfigSetConformanceRepair    = "config_set.conformance_repair"
+	ActionWorkspaceBundleExport         = "workspace.bundle_export"
+	ActionWorkspaceBundleImport         = "workspace.bundle_import"
 	ActionConfigSetNotificationAssign   = "config_set.notification_assign"
 	ActionConfigSetNotificationUnassign = "config_set.notification_unassign"
 
