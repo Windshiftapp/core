@@ -138,6 +138,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	resolvedAdditionalProxies := firstNonEmpty(os.Getenv("ADDITIONAL_PROXIES"), *additionalProxies)
 
 	resolvedPluginDir := firstNonEmpty(os.Getenv("PLUGIN_DIR"), "")
+	licensePubKey := os.Getenv("PLUGIN_LICENSE_PUBKEY")
 	var extraPluginDirs []string
 	if envDirs := os.Getenv("PLUGIN_DIRS"); envDirs != "" {
 		for _, dir := range strings.Split(envDirs, ",") {
@@ -250,9 +251,10 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			Format: resolvedLogFormat,
 		},
 		Plugins: PluginsConfig{
-			Disabled:  pluginsDisabled,
-			Dir:       resolvedPluginDir,
-			ExtraDirs: extraPluginDirs,
+			Disabled:      pluginsDisabled,
+			Dir:           resolvedPluginDir,
+			ExtraDirs:     extraPluginDirs,
+			LicensePubKey: licensePubKey,
 		},
 		LLM: LLMConfig{
 			Endpoint:      os.Getenv("LLM_ENDPOINT"),

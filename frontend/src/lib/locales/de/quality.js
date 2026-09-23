@@ -321,7 +321,7 @@ export default {
     }
   },
   "statusCategory": {
-    "marksWorkCompletedHelp": "Arbeitselemente, die in Status dieser Kategorie verschoben werden, werden in Berichten und Überprüfungen als abgeschlossen behandelt."
+    "marksWorkCompletedHelp": "Arbeitselemente, die in Status dieser Kategorie verschoben werden, werden in Berichten und Rückblicken als abgeschlossen behandelt."
   },
   "items": {
     "title": "Arbeitselemente",

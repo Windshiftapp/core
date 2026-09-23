@@ -14,6 +14,7 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import FileInput from '../components/FileInput.svelte';
+  import CopyButton from '../components/CopyButton.svelte';
 
   let saving = $state(false);
   let error = $state('');
@@ -28,6 +29,9 @@
   let dragActive = $state(false);
   let fileInput = $state(null);
   let manifestInput = $state(null);
+  let licenseInput = $state(null);
+  let selectedLicense = $state(null);
+  let instanceId = $state('');
 
   // Local toggle state
   let testManagementEnabled = $state(false);
@@ -52,7 +56,24 @@
     });
     loadPlugins();
     loadSecuritySettings();
+    loadInstanceID();
   });
+
+  async function loadInstanceID() {
+    try {
+      const data = await fetchAPI('/plugins/instance-id');
+      instanceId = data?.instance_id || '';
+    } catch (err) {
+      console.error('Failed to load instance ID:', err);
+    }
+  }
+
+  function handleLicenseSelect(event) {
+    const files = event.target.files;
+    if (files.length > 0) {
+      selectedLicense = files[0];
+    }
+  }
 
   async function loadSecuritySettings() {
     try {
@@ -127,6 +148,9 @@
     if (selectedManifest) {
       formData.append('manifest', selectedManifest);
     }
+    if (selectedLicense) {
+      formData.append('license', selectedLicense);
+    }
 
     try {
       const response = await fetch('/api/plugins/upload', {
@@ -143,6 +167,7 @@
       successMessage = t('settings.modules.pluginUploadedSuccess');
       selectedFile = null;
       selectedManifest = null;
+      selectedLicense = null;
       await loadPlugins();
 
       setTimeout(() => {
@@ -333,6 +358,35 @@
           <AlertBox variant="info" message={t('settings.modules.pluginsDisabledMessage')} />
         </div>
       {:else}
+        <!-- Instance ID (plugin licensing) -->
+        <div
+          class="mb-4 rounded-lg border p-4"
+          style="border-color: var(--ds-border); background: var(--ds-background-neutral);"
+          data-testid="plugins-instance-id"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-medium" style="color: var(--ds-text);">
+                {t('settings.modules.instanceId')}
+              </p>
+              <p class="mt-0.5 text-xs" style="color: var(--ds-text-subtle);">
+                {t('settings.modules.instanceIdDescription')}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <code
+                class="rounded px-2 py-1 text-sm font-mono"
+                style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); color: var(--ds-text);"
+              >
+                {instanceId || '…'}
+              </code>
+              {#if instanceId}
+                <CopyButton text={instanceId} />
+              {/if}
+            </div>
+          </div>
+        </div>
+
         <!-- Plugin Upload -->
         <div class="mb-4">
           <Panel padding="spacious">
@@ -368,6 +422,29 @@
               <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">
                 Selected: {selectedFile.name}
               </p>
+            {/if}
+
+            {#if selectedFile && selectedFile.name.endsWith('.zip')}
+              <div class="mt-4">
+                <FileInput
+                  accept=".license,.txt,.token"
+                  onchange={handleLicenseSelect}
+                  class="hidden"
+                  bind:inputRef={licenseInput}
+                />
+                <Button variant="primary" size="sm" onclick={() => licenseInput?.click()}>
+                  {selectedLicense ? t('settings.modules.changeLicense') : t('settings.modules.chooseLicense')}
+                </Button>
+                {#if selectedLicense}
+                  <p class="mt-2 text-xs" style="color: var(--ds-text-success);">
+                    ✓ {t('settings.modules.licenseSelected', { name: selectedLicense.name })}
+                  </p>
+                {:else}
+                  <p class="mt-2 text-xs" style="color: var(--ds-text-subtle);">
+                    {t('settings.modules.licenseOptional')}
+                  </p>
+                {/if}
+              </div>
             {/if}
 
             {#if selectedFile && selectedFile.name.endsWith('.wasm')}

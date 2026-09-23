@@ -35,7 +35,15 @@ type ManagerOptions struct {
 	Logger               *slog.Logger
 	Database             database.Database
 	AdditionalPluginDirs []string
+	// LicenseVerifier, when set, enables license enforcement: a plugin only
+	// contributes capabilities when its stored license verifies. Nil keeps the
+	// legacy behavior where every loaded plugin's capabilities count.
+	LicenseVerifier LicenseVerifier
 }
+
+// LicenseVerifier validates a plugin's license token. It returns nil when the
+// license grants the named plugin its capabilities on this installation.
+type LicenseVerifier func(pluginName string, license []byte) error
 
 // Option configures the ManagerOptions.
 type Option func(*ManagerOptions)
@@ -86,5 +94,14 @@ func WithCommentService(cs *services.CommentService) Option {
 func WithAdditionalPluginDirs(dirs ...string) Option {
 	return func(o *ManagerOptions) {
 		o.AdditionalPluginDirs = append(o.AdditionalPluginDirs, dirs...)
+	}
+}
+
+// WithLicenseVerifier enables license enforcement. A nil verifier (the zero
+// case) keeps the legacy behavior where every loaded plugin's capabilities
+// count regardless of licensing.
+func WithLicenseVerifier(verifier LicenseVerifier) Option {
+	return func(o *ManagerOptions) {
+		o.LicenseVerifier = verifier
 	}
 }

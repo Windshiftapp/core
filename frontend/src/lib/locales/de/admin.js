@@ -798,6 +798,13 @@ export default {
       subtitle: 'Systemmodule aktivieren oder deaktivieren und Plugins verwalten',
       plugins: 'Plugins',
       pluginsDisabledMessage: 'Das Plugin-System wurde über die Server-Startkonfiguration deaktiviert.',
+      instanceId: 'Instanz-ID',
+      instanceIdDescription:
+        'Geben Sie diese ID im Windshift-Portal ein, um Plugin-Lizenzen für diese Installation zu erhalten.',
+      chooseLicense: 'Lizenzdatei auswählen',
+      changeLicense: 'Lizenzdatei ändern',
+      licenseSelected: 'Lizenz ausgewählt: {name}',
+      licenseOptional: 'Optional: Lizenzdatei anhängen, die für diese Installation ausgestellt wurde.',
       uploadPlugin: 'Plugin hochladen',
       dropOrSelect: 'Plugin-Dateien hierher ziehen oder klicken zum Auswählen',
       supportedFormats: 'Unterstützte Formate: .zip oder .wasm',

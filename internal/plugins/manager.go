@@ -28,6 +28,10 @@ import (
 	extism "github.com/extism/go-sdk"
 )
 
+// licenseTokenFileName stores the plugin's license token alongside the
+// manifest and entry point so verification survives restarts.
+const licenseTokenFileName = "license.token"
+
 // LoadedPlugin represents a loaded plugin instance backed by a compiled Extism module.
 type LoadedPlugin struct {
 	Manifest   PluginManifest
@@ -36,23 +40,27 @@ type LoadedPlugin struct {
 	Extensions []Extension
 	Path       string
 	Enabled    bool
-	compiled   *extism.CompiledPlugin
+	// Licensed reports whether the plugin's license verified. It only gates
+	// capabilities when a LicenseVerifier is configured.
+	Licensed bool
+	compiled *extism.CompiledPlugin
 }
 
 // Manager handles plugin loading and lifecycle.
 type Manager struct {
-	mu             sync.RWMutex
-	plugins        map[string]*LoadedPlugin
-	pluginDirs     []string
-	httpClient     *http.Client
-	smtpSender     SMTPSender
-	scmService     SCMService
-	commentService *services.CommentService
-	logger         *slog.Logger
-	pluginTimeout  time.Duration
-	memoryLimit    uint64
-	hostFuncs      []extism.HostFunction
-	db             database.Database
+	mu              sync.RWMutex
+	plugins         map[string]*LoadedPlugin
+	pluginDirs      []string
+	httpClient      *http.Client
+	smtpSender      SMTPSender
+	scmService      SCMService
+	commentService  *services.CommentService
+	logger          *slog.Logger
+	pluginTimeout   time.Duration
+	memoryLimit     uint64
+	licenseVerifier LicenseVerifier
+	hostFuncs       []extism.HostFunction
+	db              database.Database
 
 	// Plugin-declared periodic invocations, keyed by plugin name. Guarded by
 	// its own mutex so DueSchedules from the scheduler tick doesn't contend
@@ -103,17 +111,18 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
 
 	m := &Manager{
-		plugins:        make(map[string]*LoadedPlugin),
-		schedules:      make(map[string][]*scheduledPlugin),
-		pluginDirs:     pluginDirs,
-		httpClient:     options.HTTPClient,
-		smtpSender:     options.SMTPSender,
-		scmService:     options.SCMService,
-		commentService: options.CommentService,
-		logger:         options.Logger,
-		pluginTimeout:  options.PluginTimeout,
-		memoryLimit:    options.MemoryLimit,
-		db:             options.Database,
+		plugins:         make(map[string]*LoadedPlugin),
+		schedules:       make(map[string][]*scheduledPlugin),
+		pluginDirs:      pluginDirs,
+		httpClient:      options.HTTPClient,
+		smtpSender:      options.SMTPSender,
+		scmService:      options.SCMService,
+		commentService:  options.CommentService,
+		logger:          options.Logger,
+		pluginTimeout:   options.PluginTimeout,
+		memoryLimit:     options.MemoryLimit,
+		licenseVerifier: options.LicenseVerifier,
+		db:              options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
 	return m
@@ -222,6 +231,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		Routes:   manifest.Routes,
 		Path:     pluginPath,
 		Enabled:  true,
+		Licensed: m.verifyStoredLicense(pluginPath, manifest.Name),
 		compiled: compiled,
 	}
 
@@ -498,6 +508,14 @@ func (m *Manager) validateAndPreparePlugin(name string, manifestData []byte) (ma
 
 // UploadPlugin handles plugin upload from a zip file.
 func (m *Manager) UploadPlugin(name string, zipData []byte) error {
+	return m.UploadPluginWithLicense(name, zipData, nil)
+}
+
+// UploadPluginWithLicense handles plugin upload with an optional license
+// token. When a verifier is configured the license is verified immediately so
+// the admin gets feedback; it is stored with the plugin either way and
+// re-checked on every load.
+func (m *Manager) UploadPluginWithLicense(name string, zipData, license []byte) error {
 	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return fmt.Errorf("invalid zip file: %w", err)
@@ -527,6 +545,22 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 	_, pluginPath, err := m.validateAndPreparePlugin(name, manifestData)
 	if err != nil {
 		return err
+	}
+
+	// Immediate feedback at upload time; the token is stored either way and
+	// re-verified on every load.
+	if len(license) > 0 && m.licenseVerifier != nil {
+		var uploadedManifest PluginManifest
+		if err := json.Unmarshal(manifestData, &uploadedManifest); err != nil {
+			return fmt.Errorf("invalid manifest.json: %w", err)
+		}
+		if err := m.licenseVerifier(uploadedManifest.Name, license); err != nil {
+			_ = os.RemoveAll(pluginPath)
+			return fmt.Errorf("license rejected: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(pluginPath, licenseTokenFileName), license, 0o600); err != nil {
+			return fmt.Errorf("failed to store license: %w", err)
+		}
 	}
 
 	assetsPath := filepath.Join(pluginPath, "assets")
@@ -665,13 +699,35 @@ func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentTy
 	return data, mimeTypeForExt(assetPath), nil
 }
 
+// verifyStoredLicense reports whether the plugin's stored license (if any)
+// satisfies the configured verifier. enforcement := verifier != nil.
+func (m *Manager) verifyStoredLicense(pluginPath, pluginName string) bool {
+	if m.licenseVerifier == nil {
+		return true // enforcement off: every plugin counts
+	}
+	licenseBytes, err := os.ReadFile(filepath.Join(pluginPath, licenseTokenFileName)) //nolint:gosec // G304 — pluginPath from securejoin, fixed name
+	if err != nil || len(licenseBytes) == 0 {
+		m.logger.Warn("plugin has no license; capabilities are disabled for it", "name", pluginName)
+		return false
+	}
+	if err := m.licenseVerifier(pluginName, licenseBytes); err != nil {
+		m.logger.Warn("plugin license verification failed; capabilities are disabled for it", "name", pluginName, "error", err)
+		return false
+	}
+	return true
+}
+
 // HasCapability checks if any enabled plugin provides the given capability.
+// With license enforcement on, only plugins whose license verified count.
 func (m *Manager) HasCapability(name string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	for _, p := range m.plugins {
 		if !p.Enabled {
+			continue
+		}
+		if m.licenseVerifier != nil && !p.Licensed {
 			continue
 		}
 		for _, cap := range p.Manifest.Capabilities {
@@ -693,6 +749,9 @@ func (m *Manager) GetCapabilities() []string {
 
 	for _, p := range m.plugins {
 		if !p.Enabled {
+			continue
+		}
+		if m.licenseVerifier != nil && !p.Licensed {
 			continue
 		}
 		for _, cap := range p.Manifest.Capabilities {

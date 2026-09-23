@@ -189,7 +189,7 @@ export default {
     setAsDefault: 'Als Standardkategorie festlegen',
     marksWorkCompleted: 'Markiert Arbeit als abgeschlossen',
     marksWorkCompletedHelp:
-      'Vorgänge, die in Status dieser Kategorie verschoben werden, werden in Berichten und Überprüfungen als abgeschlossen behandelt.',
+      'Vorgänge, die in Status dieser Kategorie verschoben werden, werden in Berichten und Rückblicken als abgeschlossen behandelt.',
     updateCategory: 'Kategorie aktualisieren',
     createCategory: 'Kategorie erstellen',
   },

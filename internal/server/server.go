@@ -6,7 +6,9 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +34,7 @@ import (
 	"windshift/internal/handlers"
 	"windshift/internal/health"
 	"windshift/internal/ldap"
+	"windshift/internal/licensing"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	mcpserver "windshift/internal/mcp"
@@ -1234,9 +1237,32 @@ func (s *Server) initialize() error {
 	itemDiagramService := services.NewItemDiagramService(repository.NewDiagramRepository(s.db))
 
 	var pluginRouter *plugins.Router
+	var pluginLicenseVerifier plugins.LicenseVerifier
+	var instanceService *services.InstanceService
 	if !cfg.Plugins.Disabled {
 		var pluginOpts []plugins.Option
 		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService))
+
+		// License enforcement: when a license public key is configured, a
+		// plugin only contributes capabilities if its license verifies against
+		// this install's instance ID.
+		if cfg.Plugins.LicensePubKey != "" {
+			licensePubKey, err := base64.StdEncoding.DecodeString(cfg.Plugins.LicensePubKey)
+			if err != nil || len(licensePubKey) != ed25519.PublicKeySize {
+				slog.Error("invalid PLUGIN_LICENSE_PUBKEY; license enforcement disabled", "error", err)
+			} else {
+				instanceService = services.NewInstanceService(repository.NewSystemSettingRepository(s.db))
+				instanceID, err := instanceService.GetOrCreate()
+				if err != nil {
+					slog.Error("failed to load instance id; license enforcement disabled", "error", err)
+					instanceService = nil
+				} else {
+					pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
+					pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
+					slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
+				}
+			}
+		}
 
 		pluginDir := cfg.Plugins.Dir
 		if pluginDir == "" {
@@ -1287,6 +1313,7 @@ func (s *Server) initialize() error {
 	ssoHandler.SetPluginManager(s.pluginManager)
 
 	pluginHandler := handlers.NewPluginHandler(s.pluginManager, repository.NewPluginRegistryRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
+	pluginHandler.SetLicensing(pluginLicenseVerifier, instanceService)
 
 	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db))
 

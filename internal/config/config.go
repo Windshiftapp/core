@@ -164,6 +164,9 @@ type PluginsConfig struct {
 	Disabled  bool
 	Dir       string
 	ExtraDirs []string // from PLUGIN_DIRS (comma-separated)
+	// LicensePubKey is the base64 Ed25519 public key that plugin license
+	// tokens must verify against. Empty disables license enforcement.
+	LicensePubKey string
 }
 
 // LLMConfig holds LLM-related configuration.

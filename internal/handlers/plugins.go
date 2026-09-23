@@ -2,15 +2,18 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"windshift/internal/licensing"
 	"windshift/internal/logger"
 	"windshift/internal/plugins"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
@@ -20,6 +23,8 @@ type PluginHandler struct {
 	registry        *repository.PluginRegistryRepository
 	auditor         *logger.Auditor
 	pluginsDisabled bool
+	licenseVerifier plugins.LicenseVerifier
+	instanceService *services.InstanceService
 }
 
 // NewPluginHandler creates a new plugin handler
@@ -32,14 +37,24 @@ func NewPluginHandler(manager *plugins.Manager, registry *repository.PluginRegis
 	}
 }
 
+// SetLicensing wires license enforcement and instance identity into the
+// handler. Both may be nil when licensing is not configured.
+func (h *PluginHandler) SetLicensing(verifier plugins.LicenseVerifier, instanceService *services.InstanceService) {
+	h.licenseVerifier = verifier
+	h.instanceService = instanceService
+}
+
 // PluginInfo represents plugin information for API responses
 type PluginInfo struct {
-	ID          int                 `json:"id"`
-	Name        string              `json:"name"`
-	Version     string              `json:"version"`
-	Description string              `json:"description"`
-	Author      string              `json:"author"`
-	Enabled     bool                `json:"enabled"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+	Author      string `json:"author"`
+	Enabled     bool   `json:"enabled"`
+	// Licensed reports whether the plugin's license verified for this install.
+	// Always true when license enforcement is not configured.
+	Licensed    bool                `json:"licensed"`
 	Routes      []map[string]string `json:"routes"`
 	Extensions  []plugins.Extension `json:"extensions,omitempty"`
 	InstalledAt string              `json:"installed_at"`
@@ -80,8 +95,11 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 	if h.manager != nil {
 		for _, loadedPlugin := range h.manager.ListPlugins() {
 			found := false
-			for _, dbPlugin := range pluginList {
+			for i := range pluginList {
+				dbPlugin := &pluginList[i]
 				if dbPlugin.Name == loadedPlugin.Manifest.Name {
+					// The loaded state is the source of truth for licensing.
+					dbPlugin.Licensed = loadedPlugin.Licensed
 					found = true
 					break
 				}
@@ -104,6 +122,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 					Description: loadedPlugin.Manifest.Description,
 					Author:      loadedPlugin.Manifest.Author,
 					Enabled:     loadedPlugin.Enabled,
+					Licensed:    loadedPlugin.Licensed,
 					Routes:      routes,
 				})
 			}
@@ -146,11 +165,23 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optional license token. When licensing is configured an invalid license
+	// is rejected here so the admin gets immediate feedback.
+	var license []byte
+	if licenseFile, _, err := r.FormFile("license"); err == nil {
+		license, err = io.ReadAll(licenseFile)
+		_ = licenseFile.Close()
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
 	// Check if it's a zip file or direct wasm
 	switch {
 	case strings.HasSuffix(header.Filename, ".zip"):
 		// Handle zip file - new unified approach
-		err = h.manager.UploadPlugin("", fileData)
+		err = h.manager.UploadPluginWithLicense("", fileData, license)
 	case strings.HasSuffix(header.Filename, ".wasm"):
 		// Handle direct WASM file - need manifest (legacy)
 		manifestFile, _, formErr := r.FormFile("manifest")
@@ -175,6 +206,16 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
+		// License rejections are client errors: surface the reason so the admin
+		// can fix the license instead of retrying blindly.
+		if errors.Is(err, licensing.ErrLicenseMalformed) ||
+			errors.Is(err, licensing.ErrLicenseBadSignature) ||
+			errors.Is(err, licensing.ErrLicenseWrongPlugin) ||
+			errors.Is(err, licensing.ErrLicenseWrongHost) ||
+			errors.Is(err, licensing.ErrLicenseExpired) {
+			respondBadRequest(w, r, err.Error())
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -401,4 +442,23 @@ func (h *PluginHandler) syncPluginToDatabase() {
 			slog.Error("failed to sync plugin to database", slog.String("plugin", p.Manifest.Name), slog.Any("error", err))
 		}
 	}
+}
+
+// GetInstanceID returns this installation's stable identity. Admins paste it
+// into the Windshift portal to issue a plugin license bound to this install.
+func (h *PluginHandler) GetInstanceID(w http.ResponseWriter, r *http.Request) {
+	if h.pluginsDisabled {
+		respondError(w, r, restapi.ErrPluginsDisabled)
+		return
+	}
+	if h.instanceService == nil {
+		respondInternalError(w, r, errors.New("instance identity not configured"))
+		return
+	}
+	instanceID, err := h.instanceService.GetOrCreate()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, map[string]string{"instance_id": instanceID})
 }

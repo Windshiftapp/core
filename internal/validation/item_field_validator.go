@@ -386,7 +386,7 @@ func (v *ItemFieldValidator) applyWorkspace(item *models.Item, updateData map[st
 func (v *ItemFieldValidator) checkPriorityAllowedInWorkspace(item *models.Item, updateData map[string]any, _ int) error {
 	_, priorityChanged := updateData["priority_id"]
 	_, workspaceChanged := updateData["workspace_id"]
-	if !(priorityChanged || workspaceChanged) || item.PriorityID == nil {
+	if (!priorityChanged && !workspaceChanged) || item.PriorityID == nil {
 		return nil
 	}
 	allowed, err := IsPriorityAllowedInWorkspace(v.db, item.WorkspaceID, *item.PriorityID)

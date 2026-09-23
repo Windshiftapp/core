@@ -820,6 +820,13 @@ export default {
       plugins: 'Plugins',
       pluginsDisabledMessage:
         'The plugin system has been disabled via server startup configuration.',
+      instanceId: 'Instance ID',
+      instanceIdDescription:
+        'Paste this ID in the Windshift portal to issue plugin licenses bound to this installation.',
+      chooseLicense: 'Choose License File',
+      changeLicense: 'Change License File',
+      licenseSelected: 'License selected: {name}',
+      licenseOptional: 'Optional: attach the license file issued for this installation.',
       uploadPlugin: 'Upload Plugin',
       dropOrSelect: 'Drag and drop plugin files here or click to select',
       supportedFormats: 'Supported formats: .zip or .wasm',

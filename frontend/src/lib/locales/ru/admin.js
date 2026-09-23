@@ -865,7 +865,7 @@ export default {
       plugins: 'Плагины',
       pluginsDisabledMessage:
         'Система плагинов отключена в конфигурации запуска сервера.',
-      uploadPlugin: 'Загрузить плагин',
+      instanceId: 'ID инстанса', instanceIdDescription: 'Укажите этот ID в портале Windshift, чтобы получить лицензии на плагины для этой установки.', chooseLicense: 'Выбрать файл лицензии', changeLicense: 'Изменить файл лицензии', licenseSelected: 'Выбрана лицензия: {name}', licenseOptional: 'Необязательно: приложите файл лицензии, выданный для этой установки.', uploadPlugin: 'Загрузить плагин',
       dropOrSelect: 'Перетащите сюда файлы плагина или нажмите, чтобы выбрать их',
       supportedFormats: 'Поддерживаемые форматы: .zip и .wasm',
       installedPlugins: 'Установленные плагины',

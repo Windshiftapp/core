@@ -87,6 +87,7 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /plugins/{name}/assets/{asset...}", http.HandlerFunc(deps.Admin.Plugin.GetAsset))
 	api.HandleH("PUT /plugins/{name}/toggle", admin(http.HandlerFunc(deps.Admin.Plugin.TogglePlugin)))
 	api.HandleH("DELETE /plugins/{name}", admin(http.HandlerFunc(deps.Admin.Plugin.DeletePlugin)))
+	api.HandleH("GET /plugins/instance-id", admin(http.HandlerFunc(deps.Admin.Plugin.GetInstanceID)))
 	api.HandleH("POST /plugins/{name}/reload", admin(http.HandlerFunc(deps.Admin.Plugin.ReloadPlugin)))
 
 	// Admin API token management

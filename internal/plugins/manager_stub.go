@@ -93,6 +93,10 @@ func (m *Manager) UploadPlugin(_ string, _ []byte) error {
 	return errors.New("plugins disabled (built without -tags=plugins)")
 }
 
+func (m *Manager) UploadPluginWithLicense(_ string, _, _ []byte) error {
+	return errors.New("plugins disabled (built without -tags=plugins)")
+}
+
 func (m *Manager) UploadPluginLegacy(_ string, _ []byte, _ []byte) error {
 	return errors.New("plugins disabled (built without -tags=plugins)")
 }
