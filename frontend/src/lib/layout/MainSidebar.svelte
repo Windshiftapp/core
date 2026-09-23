@@ -275,6 +275,7 @@
   as="nav"
   class="main-sidebar {$uiStore.navExpanded ? 'w-[200px]' : 'w-16'} shadow-lg border-r py-4 fixed inset-y-0 left-0 z-40 themed-nav transition-[width] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none"
   style="border-color: var(--ds-border);"
+  data-testid="main-sidebar"
   aria-label={t('aria.mainNavigation')}
   header={sidebarHeader}
   footer={sidebarFooter}

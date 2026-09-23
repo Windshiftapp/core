@@ -109,6 +109,8 @@
     {
       key: 'created_at',
       label: t('common.created'),
+      sortable: true,
+      sortValue: (workspace) => workspace.created_at,
       render: (workspace) => formatDateSimple(workspace.created_at),
       textColor: 'var(--ds-text-subtle)'
     },

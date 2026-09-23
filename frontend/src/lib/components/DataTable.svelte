@@ -172,6 +172,7 @@
             {#each columns as column, colIndex}
               <th
                 data-testid={`table-column-${column.key}`}
+                aria-sort={column.sortable ? (sortKey === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
                 class="{thClass} {getColumnAlign(column)} {getColumnWidth(column)} {column.sortable ? 'group cursor-pointer select-none' : ''}"
                 style="color: var(--ds-text); {getColumnWidthStyle(column)} {column.headerStyle || ''}"
                 onclick={() => toggleSort(column)}
@@ -248,17 +249,19 @@
           <button
             onclick={prevPage}
             disabled={currentPage === 1}
+            data-testid="table-pagination-prev"
             class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style="background: var(--ds-background-neutral); color: var(--ds-text);"
           >
             <ChevronLeft class="w-4 h-4" />
           </button>
-          <span class="text-sm px-2" style="color: var(--ds-text-subtle);">
+          <span class="text-sm px-2" style="color: var(--ds-text-subtle);" data-testid="table-pagination-status">
             {t('components.pagination.pageOf', { current: currentPage, total: totalPages })}
           </span>
           <button
             onclick={nextPage}
             disabled={currentPage >= totalPages}
+            data-testid="table-pagination-next"
             class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style="background: var(--ds-background-neutral); color: var(--ds-text);"
           >
