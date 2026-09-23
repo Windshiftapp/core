@@ -49,6 +49,36 @@ func configurationSetMutationError(err error) error {
 	return internalError(err)
 }
 
+// configurationSetImportError maps template-import failures onto v2 error
+// semantics, echoing the same structured reports the browser import surfaces.
+func configurationSetImportError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var unresolvedErr *services.ErrUnresolvedReferences
+	if errors.As(err, &unresolvedErr) {
+		e := newError(http.StatusUnprocessableEntity, "unresolved_references",
+			"Import requires identity references that don't exist on this instance")
+		e.Details = unresolvedErr.Items
+		return e
+	}
+	var defaultConflictErr *services.ErrDefaultEntityConflict
+	if errors.As(err, &defaultConflictErr) {
+		e := newError(http.StatusConflict, "default_entity_conflict",
+			"Import would shadow a default-flagged entity on this instance; rename the bundle or import elsewhere.")
+		e.Details = defaultConflictErr.Conflicts
+		return e
+	}
+	var linkTypeConflictErr *services.ErrLinkTypeDefinitionConflict
+	if errors.As(err, &linkTypeConflictErr) {
+		e := newError(http.StatusConflict, "link_type_definition_conflict",
+			"Import contains link types whose names collide with existing link types defined differently on this instance; rename one side or align the definitions.")
+		e.Details = linkTypeConflictErr.Conflicts
+		return e
+	}
+	return configurationSetMutationError(err)
+}
+
 func registerConfigurationSetRoutes(b *routeBuilder, deps Deps) {
 	read := []string{"configuration-sets:read"}
 	write := []string{"configuration-sets:write"}
@@ -100,6 +130,21 @@ func registerConfigurationSetRoutes(b *routeBuilder, deps Deps) {
 			return err
 		}
 		return configurationSetMutationError(deps.ConfigurationSetProvisioning.Delete(auditActorFromRequest(r), id))
+	})
+
+	// Import applies a portable template document — the exact payload Export
+	// produces — and creates a fresh configuration set. The request body is
+	// the document itself; structured rejection reports (unresolved identity
+	// refs, default/name-definition conflicts) ride in error.details.
+	b.JSON(http.MethodPost, "/configuration-sets/import", http.StatusCreated, false, AuthAuthenticated, write, func(r *http.Request, tpl services.ConfigSetTemplate) (configurationSetMutationResponse, error) {
+		if _, err := requireSystemAdmin(r, deps); err != nil {
+			return configurationSetMutationResponse{}, err
+		}
+		result, err := deps.ConfigurationSetProvisioning.ImportTemplate(r.Context(), auditActorFromRequest(r), &tpl)
+		if err != nil {
+			return configurationSetMutationResponse{}, configurationSetImportError(err)
+		}
+		return configurationSetMutationResponse{ConfigurationSet: result.Set, Warnings: result.Warnings}, nil
 	})
 
 	// Export writes the portable template document directly — no v2 data

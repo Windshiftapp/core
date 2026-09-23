@@ -3844,6 +3844,27 @@
         ]
       }
     },
+    "/configuration-sets/import": {
+      "post": {
+        "description": "Import a configuration set template. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "422": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Import a configuration set template",
+        "tags": [
+          "Workspace configuration"
+        ]
+      }
+    },
     "/configuration-sets/{configuration_set_id}": {
       "delete": {
         "description": "Delete configuration set. The server verifies resource ownership and deletion preconditions before removing the resource.",

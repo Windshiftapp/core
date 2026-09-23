@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -20,7 +21,10 @@ import (
 //
 // Resolution policy:
 //   - Statuses, item types, priorities, custom fields, status categories,
-//     screens: match by name (case-insensitive) and create if missing.
+//     screens, link types: match by name (case-insensitive) and create if
+//     missing. Link types additionally refuse same-named rows whose
+//     definition differs (ErrLinkTypeDefinitionConflict) — the registry is
+//     global and import never overwrites it.
 //   - Workflow, condition set, approval set, configuration set: always
 //     created fresh with the bundle's names (DB does not enforce uniqueness
 //     on these except screens, where reuse-by-name is intentional).
@@ -53,6 +57,13 @@ func (s *ConfigSetImportService) Import(ctx context.Context, tpl *ConfigSetTempl
 	}
 
 	if err := s.validateReferences(ctx, tpl); err != nil {
+		return 0, nil, err
+	}
+
+	// Link type definition conflicts are also a pre-write structural
+	// rejection: the registry stays untouched and the admin gets both
+	// definitions back to decide which side to rename.
+	if err := s.validateLinkTypeDefinitions(ctx, tpl); err != nil {
 		return 0, nil, err
 	}
 
@@ -324,6 +335,19 @@ func (s *ConfigSetImportService) apply(ctx context.Context, tx database.Tx, tpl 
 			return 0, nil, fmt.Errorf("priority %q: %w", p.Name, err)
 		}
 		priorityNameToID[lowerStr(p.Name)] = id
+	}
+
+	// 5b. Link types — matched by name (case-insensitive); the global registry
+	//     stays global. Identical definitions were verified pre-transaction,
+	//     so reuse is safe; missing types are created active and non-system.
+	for _, lt := range tpl.Payload.LinkTypes {
+		created, err := s.findOrCreateLinkType(ctx, tx, lt, now)
+		if err != nil {
+			return 0, nil, fmt.Errorf("link_type %q: %w", lt.Name, err)
+		}
+		if !created {
+			warnings = append(warnings, fmt.Sprintf("link type %q already exists; reusing existing definition", lt.Name))
+		}
 	}
 
 	// 6. Screens — match by name (DB has UNIQUE(name)). Reuse if found;
@@ -612,6 +636,135 @@ func (s *ConfigSetImportService) findOrCreatePriority(ctx context.Context, tx da
 // findOrCreateScreen reuses a screen by name if one exists (DB enforces
 // UNIQUE(name)); otherwise creates the screen, screen_fields, and
 // screen_system_fields rows.
+// findOrCreateLinkType reuses a link type by name (its definition was
+// verified identical before the transaction); otherwise inserts a new
+// active, non-system row. Returns whether a row was created.
+func (s *ConfigSetImportService) findOrCreateLinkType(ctx context.Context, tx database.Tx, lt ConfigSetTplLinkType, now time.Time) (created bool, err error) {
+	var id int
+	err = tx.QueryRowContext(ctx, `SELECT id FROM link_types WHERE LOWER(name) = LOWER(?)`, lt.Name).Scan(&id)
+	if err == nil {
+		return false, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+	normalized := normalizeTplLinkType(lt)
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system, active, allowed_entity_types, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, false, true, ?, ?, ?)
+	`, lt.Name, lt.Description, lt.ForwardLabel, lt.ReverseLabel, normalized.Color,
+		encodeTplEntityTypes(normalized.AllowedEntityTypes), now, now)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// validateLinkTypeDefinitions compares every template link type against the
+// target registry and returns ErrLinkTypeDefinitionConflict when a same-named
+// row carries a different definition. No writes.
+func (s *ConfigSetImportService) validateLinkTypeDefinitions(ctx context.Context, tpl *ConfigSetTemplate) error {
+	var conflicts []LinkTypeConflict
+	for i := range tpl.Payload.LinkTypes {
+		tplLt := normalizeTplLinkType(tpl.Payload.LinkTypes[i])
+		existing, err := s.findLinkTypeDefinition(ctx, tplLt.Name)
+		if err != nil {
+			return err
+		}
+		if existing == nil || linkTypeDefinitionsEqual(tplLt, *existing) {
+			continue
+		}
+		conflicts = append(conflicts, LinkTypeConflict{
+			Name:     tplLt.Name,
+			Template: tplLt,
+			Existing: *existing,
+		})
+	}
+	if len(conflicts) == 0 {
+		return nil
+	}
+	return &ErrLinkTypeDefinitionConflict{Conflicts: conflicts}
+}
+
+// findLinkTypeDefinition loads one registry row by case-insensitive name as
+// a portable definition. Returns nil when no row matches.
+func (s *ConfigSetImportService) findLinkTypeDefinition(ctx context.Context, name string) (*ConfigSetTplLinkType, error) {
+	var lt ConfigSetTplLinkType
+	var aetRaw sql.NullString
+	err := s.db.QueryRowContext(ctx, `
+		SELECT name, COALESCE(description, ''), forward_label, reverse_label, COALESCE(color, ''), allowed_entity_types
+		FROM link_types WHERE LOWER(name) = LOWER(?)
+	`, name).Scan(&lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel, &lt.Color, &aetRaw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Invalid JSON decodes as "all entity types allowed", matching the live
+	// registry reader.
+	if aetRaw.Valid && aetRaw.String != "" {
+		_ = json.Unmarshal([]byte(aetRaw.String), &lt.AllowedEntityTypes)
+	}
+	return &lt, nil
+}
+
+// normalizeTplLinkType applies the import-time normal forms so that a
+// template and an existing row compare semantically: empty color falls back
+// to the registry default, and a nil/empty entity-type list means "all".
+func normalizeTplLinkType(lt ConfigSetTplLinkType) ConfigSetTplLinkType {
+	if lt.Color == "" {
+		lt.Color = "#6b7280"
+	}
+	if len(lt.AllowedEntityTypes) == 0 {
+		lt.AllowedEntityTypes = nil
+	} else {
+		seen := map[string]struct{}{}
+		deduped := make([]string, 0, len(lt.AllowedEntityTypes))
+		for _, t := range lt.AllowedEntityTypes {
+			if _, dup := seen[t]; dup {
+				continue
+			}
+			seen[t] = struct{}{}
+			deduped = append(deduped, t)
+		}
+		sort.Strings(deduped)
+		lt.AllowedEntityTypes = deduped
+	}
+	return lt
+}
+
+// linkTypeDefinitionsEqual compares two already-normalized definitions.
+// Entity types compare as sets: nil and empty both mean "all allowed".
+func linkTypeDefinitionsEqual(a, b ConfigSetTplLinkType) bool {
+	if a.Description != b.Description || a.ForwardLabel != b.ForwardLabel ||
+		a.ReverseLabel != b.ReverseLabel || a.Color != b.Color {
+		return false
+	}
+	if len(a.AllowedEntityTypes) != len(b.AllowedEntityTypes) {
+		return false
+	}
+	for i := range a.AllowedEntityTypes {
+		if a.AllowedEntityTypes[i] != b.AllowedEntityTypes[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// encodeTplEntityTypes returns the JSON-encoded form for the nullable
+// allowed_entity_types column, or nil when empty ("all allowed").
+func encodeTplEntityTypes(types []string) any {
+	if len(types) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(types)
+	if err != nil {
+		return nil
+	}
+	return string(b)
+}
+
 func (s *ConfigSetImportService) findOrCreateScreen(ctx context.Context, tx database.Tx, sc ConfigSetTplScreen, customFieldNameToID map[string]int, now time.Time) (id int, reused bool, err error) {
 	err = tx.QueryRowContext(ctx, `SELECT id FROM screens WHERE LOWER(name) = LOWER(?)`, sc.Name).Scan(&id)
 	if err == nil {

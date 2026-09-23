@@ -193,6 +193,16 @@ func (s *ConfigSetExportService) Export(ctx context.Context, configSetID int, ex
 	tpl.Payload.Links.EditScreenName = cs.EditScreenName
 	tpl.Payload.Links.ViewScreenName = cs.ViewScreenName
 
+	// Link types: the mutable part of the instance-global registry. Nothing
+	// on the configuration set references link types, so export carries every
+	// active non-system definition to keep the bundle self-contained; system
+	// rows exist on every instance by seed and are never carried.
+	linkTypes, err := s.exportLinkTypes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("export link types: %w", err)
+	}
+	tpl.Payload.LinkTypes = linkTypes
+
 	// Custom fields collected through workflow/condition/approval/screen
 	// traversal — emit their full definitions.
 	if len(customFieldNames) > 0 {
@@ -857,6 +867,36 @@ func (s *ConfigSetExportService) exportCustomFields(ctx context.Context, names [
 			return nil, err
 		}
 		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// exportLinkTypes emits every active non-system link type's portable
+// definition, ordered by name for stable bundles.
+func (s *ConfigSetExportService) exportLinkTypes(ctx context.Context) ([]ConfigSetTplLinkType, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT name, COALESCE(description, ''), forward_label, reverse_label, COALESCE(color, ''), allowed_entity_types
+		FROM link_types
+		WHERE is_system = false AND active = true
+		ORDER BY name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []ConfigSetTplLinkType
+	for rows.Next() {
+		var lt ConfigSetTplLinkType
+		var aetRaw sql.NullString
+		if err := rows.Scan(&lt.Name, &lt.Description, &lt.ForwardLabel, &lt.ReverseLabel, &lt.Color, &aetRaw); err != nil {
+			return nil, err
+		}
+		// A nil/invalid JSON column means "all entity types allowed", matching
+		// the live registry reader.
+		if aetRaw.Valid && aetRaw.String != "" {
+			_ = json.Unmarshal([]byte(aetRaw.String), &lt.AllowedEntityTypes)
+		}
+		out = append(out, lt)
 	}
 	return out, rows.Err()
 }

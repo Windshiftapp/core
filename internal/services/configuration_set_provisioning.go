@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -99,6 +100,45 @@ func (s *ConfigurationSetProvisioningService) Create(actor AuditActor, cs *model
 	})
 
 	return &ConfigurationSetMutationResult{Set: created, Warnings: warnings}, nil
+}
+
+// ImportTemplate sanitizes and applies a portable configuration-set template
+// document — the programmatic (API v2) counterpart of the browser multipart
+// import. Import creates a fresh set under one transaction; warnings carry
+// the non-fatal reuse notes (same-named entities reused rather than created).
+func (s *ConfigurationSetProvisioningService) ImportTemplate(ctx context.Context, actor AuditActor, tpl *ConfigSetTemplate) (*ConfigurationSetMutationResult, error) {
+	if err := SanitizeConfigSetTemplate(tpl); err != nil {
+		return nil, NewServiceError(400, err.Error())
+	}
+
+	importSvc := NewConfigSetImportService(s.db, s.repo)
+	newID, warnings, err := importSvc.Import(ctx, tpl)
+	if err != nil {
+		return nil, err
+	}
+	created, err := s.repo.FindByID(newID)
+	if err != nil {
+		return nil, fmt.Errorf("load imported configuration set: %w", err)
+	}
+
+	if s.permissions != nil {
+		_ = s.permissions.OnConfigurationSetChanged(newID)
+	}
+
+	apiWarnings := make([]models.APIWarning, 0, len(warnings))
+	for _, w := range warnings {
+		apiWarnings = append(apiWarnings, models.APIWarning{
+			Code:    "import_reuse",
+			Message: w,
+			Context: "configuration_set_import",
+		})
+	}
+
+	emitServiceAudit(s.db, actor, logger.ActionConfigSetImport, logger.ResourceConfigurationSet, &newID, created.Name, map[string]any{
+		"warning_count": len(warnings),
+	})
+
+	return &ConfigurationSetMutationResult{Set: created, Warnings: apiWarnings}, nil
 }
 
 // Delete removes a configuration set and its associations, invalidating
