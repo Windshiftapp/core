@@ -9,6 +9,7 @@
 
   let workflow = $state(null);
   let statuses = $state([]);
+  let statusCategories = $state([]);
   let loading = $state(true);
   let loadingFlow = $state(false);
   let SvelteFlowDesigner = $state(null);
@@ -26,14 +27,16 @@
     try {
       loading = true;
       
-      // Load workflow and statuses in parallel
-      const [workflowData, statusesData] = await Promise.all([
+      // Load workflow, statuses, and status categories in parallel
+      const [workflowData, statusesData, categoriesData] = await Promise.all([
         api.workflows.get(workflowId),
-        api.statuses.getAll()
+        api.statuses.getAll(),
+        api.statusCategories.getAll()
       ]);
       
       workflow = workflowData;
       statuses = statusesData || [];
+      statusCategories = categoriesData || [];
       
     } catch (error) {
       console.error('Failed to load workflow data:', error);
@@ -111,6 +114,7 @@
       <SvelteFlowDesigner
         {workflow}
         {statuses}
+        {statusCategories}
         onSave={handleSave}
         onCancel={handleCancel}
       />

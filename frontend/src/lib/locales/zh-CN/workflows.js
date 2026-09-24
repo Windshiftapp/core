@@ -112,6 +112,9 @@ export default {
     allStatuses: '全部',
     fromAllStatuses: '允许从其他所有状态转入',
     transitionHint4: '勾选状态上的“全部”，即可允许从其他所有状态转入',
+    filterStatuses: '筛选状态',
+    transitionHelp: '流转帮助',
+    noStatusesMatchFilter: '没有符合筛选条件的状态',
   },
 
   screens: {

@@ -29,8 +29,12 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
+  import { api } from '../../api.js';
+  import { HelpCircle, Plus } from '@lucide/svelte';
+  import SearchInput from '../../components/SearchInput.svelte';
+  import StatusModal from '../../dialogs/StatusModal.svelte';
 
-  let { workflow, statuses = [], onSave, onCancel } = $props();
+  let { workflow, statuses = [], statusCategories = [], onSave, onCancel } = $props();
 
   // Local state
   let nodes = $state([]);
@@ -403,10 +407,67 @@
     }
   }
 
-  // Filter statuses not already in workflow
-  let availableStatuses = $derived(statuses.filter(status =>
-    !nodes.some(node => node.data.statusId === status.id)
-  ));
+  // Filter statuses not already in workflow. Statuses created inline are kept
+  // in their own list rather than appended to the `statuses` prop, which
+  // would re-run the workflow load effect and reset the canvas.
+  let createdStatuses = $state([]);
+  let lastCreatedStatusId = $state(null);
+  let availableStatuses = $derived.by(() => {
+    const available = [...statuses, ...createdStatuses].filter(status =>
+      !nodes.some(node => node.data.statusId === status.id)
+    );
+    // A freshly created status pins to the top so it cannot get buried in a
+    // long list; once added to the workflow it leaves the palette anyway.
+    if (lastCreatedStatusId == null) return available;
+    const created = available.filter(status => status.id === lastCreatedStatusId);
+    const rest = available.filter(status => status.id !== lastCreatedStatusId);
+    return [...created, ...rest];
+  });
+
+  // Palette filtering — large catalogs need a quick way to find a status.
+  let statusFilter = $state('');
+  let filteredAvailableStatuses = $derived.by(() => {
+    const query = statusFilter.trim().toLowerCase();
+    if (!query) return availableStatuses;
+    return availableStatuses.filter(status =>
+      status.name?.toLowerCase().includes(query) ||
+      status.display_name?.toLowerCase().includes(query)
+    );
+  });
+
+  // Inline status creation reuses the shared status dialog.
+  let showStatusModal = $state(false);
+  let creatingStatus = $state(false);
+  let statusFormData = $state({ name: '', description: '', category_id: null, is_default: false });
+  let showTransitionHints = $state(false);
+
+  function openStatusModal() {
+    statusFormData = {
+      name: '',
+      description: '',
+      category_id: statusCategories[0]?.id ?? null,
+      is_default: false
+    };
+    showStatusModal = true;
+  }
+
+  async function createStatusFromDesigner() {
+    if (creatingStatus || !statusFormData.name.trim() || statusFormData.category_id == null) return;
+    creatingStatus = true;
+    try {
+      const created = await api.statuses.create(statusFormData);
+      createdStatuses = [...createdStatuses, created];
+      lastCreatedStatusId = created.id;
+      showStatusModal = false;
+      statusFilter = '';
+      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
+    } catch (error) {
+      console.error('Failed to create status:', error);
+      errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
+    } finally {
+      creatingStatus = false;
+    }
+  }
 
   // Watch for node count changes and save positions to localStorage
   $effect(() => {
@@ -461,18 +522,57 @@
 <div class="flex h-full">
   <!-- Status Palette -->
   <div class="w-80 workflow-sidebar border-r p-6 overflow-y-auto flex-shrink-0">
-    <h3 class="text-lg font-medium sidebar-title mb-2">{t('workflows.availableStatuses')}</h3>
-    <div class="mb-4 p-3 sidebar-hint border rounded-md">
-      <div class="text-xs font-medium hint-heading">{t('workflows.transitionHintTitle')}</div>
-      <div class="text-xs hint-body">
-        {t('workflows.transitionHint1')}<br/>
-        {t('workflows.transitionHint2')}<br/>
-        {t('workflows.transitionHint3')}<br/>
-        {t('workflows.transitionHint4')}
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <h3 class="text-lg font-medium sidebar-title">{t('workflows.availableStatuses')}</h3>
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          data-testid="workflow-status-help"
+          class="p-1.5 rounded border workflow-icon-button cursor-pointer transition-colors"
+          aria-expanded={showTransitionHints}
+          title={t('workflows.transitionHelp')}
+          aria-label={t('workflows.transitionHelp')}
+          onclick={() => (showTransitionHints = !showTransitionHints)}
+        >
+          <HelpCircle class="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          data-testid="workflow-status-add"
+          class="p-1.5 rounded border workflow-icon-button cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={statusCategories.length === 0}
+          title={statusCategories.length === 0 ? t('categories.noCategories') : t('statuses.createStatus')}
+          aria-label={t('statuses.createStatus')}
+          onclick={openStatusModal}
+        >
+          <Plus class="w-4 h-4" />
+        </button>
       </div>
     </div>
+
+    {#if showTransitionHints}
+      <div class="mb-4 p-3 sidebar-hint border rounded-md" data-testid="workflow-transition-hints">
+        <div class="text-xs font-medium hint-heading">{t('workflows.transitionHintTitle')}</div>
+        <div class="text-xs hint-body">
+          {t('workflows.transitionHint1')}<br/>
+          {t('workflows.transitionHint2')}<br/>
+          {t('workflows.transitionHint3')}<br/>
+          {t('workflows.transitionHint4')}
+        </div>
+      </div>
+    {/if}
+
+    <div class="mb-3">
+      <SearchInput
+        bind:value={statusFilter}
+        placeholder={t('workflows.filterStatuses')}
+        size="small"
+        dataTestid="workflow-status-filter"
+      />
+    </div>
+
     <div class="space-y-3">
-      {#each availableStatuses as status}
+      {#each filteredAvailableStatuses as status (status.id)}
         <button
           type="button"
           data-testid={`workflow-status-option-${status.id}`}
@@ -492,9 +592,11 @@
         </button>
       {/each}
       
-      {#if availableStatuses.length === 0}
-        <div class="text-center py-8 status-empty">
-          <p class="text-sm">{t('workflows.allStatusesAdded')}</p>
+      {#if filteredAvailableStatuses.length === 0}
+        <div class="text-center py-8 status-empty" data-testid="workflow-status-empty">
+          <p class="text-sm">
+            {availableStatuses.length === 0 ? t('workflows.allStatusesAdded') : t('workflows.noStatusesMatchFilter')}
+          </p>
         </div>
       {/if}
     </div>
@@ -593,6 +695,16 @@
       </button>
     </div>
   </div>
+
+  <!-- Shared create-status dialog -->
+  <StatusModal
+    isOpen={showStatusModal}
+    bind:formData={statusFormData}
+    categories={statusCategories}
+    saving={creatingStatus}
+    onsave={createStatusFromDesigner}
+    oncancel={() => (showStatusModal = false)}
+  />
 </div>
 
 <style>
@@ -666,6 +778,18 @@
 
   .sidebar-counts {
     color: var(--workflow-text-subtle);
+  }
+
+  .workflow-icon-button {
+    color: var(--workflow-text-subtle);
+    background-color: var(--workflow-panel);
+    border-color: var(--workflow-border);
+  }
+
+  .workflow-icon-button:hover:enabled {
+    color: var(--workflow-text);
+    background-color: var(--workflow-panel-hover);
+    border-color: var(--workflow-accent);
   }
 
   .workflow-hint {

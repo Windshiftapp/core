@@ -121,6 +121,9 @@ export default {
     allStatuses: 'All',
     fromAllStatuses: 'Allow transitions from every other status',
     transitionHint4: 'Tick "All" on a status to allow transitions from every other status',
+    filterStatuses: 'Filter statuses',
+    transitionHelp: 'Transition help',
+    noStatusesMatchFilter: 'No statuses match your filter',
   },
 
   screens: {

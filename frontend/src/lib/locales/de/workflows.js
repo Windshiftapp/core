@@ -120,6 +120,9 @@ export default {
     allStatuses: 'Alle',
     fromAllStatuses: 'Übergänge von jedem anderen Status erlauben',
     transitionHint4: 'Aktivieren Sie „Alle" an einem Status, um Übergänge von jedem anderen Status zu erlauben',
+    filterStatuses: 'Status filtern',
+    transitionHelp: 'Hilfe zu Übergängen',
+    noStatusesMatchFilter: 'Keine Status entsprechen dem Filter',
   },
 
   screens: {

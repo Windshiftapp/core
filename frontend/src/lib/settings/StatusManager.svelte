@@ -8,14 +8,7 @@
   import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { getHexFromColorName } from '../utils/colors.js';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
-  import Textarea from '../components/Textarea.svelte';
-  import Input from '../components/Input.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import Toggle from '../components/Toggle.svelte';
-  import BasePicker from '../pickers/BasePicker.svelte';
-  import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -23,7 +16,7 @@
   import { loadStatusManagerData } from './statusManagerData.js';
   import './settings-form.css';
   import { objectDisplayName, objectDisplayValue } from '../utils/systemLabels.js';
-  import LocalizedObjectFields from './LocalizedObjectFields.svelte';
+  import StatusModal from '../dialogs/StatusModal.svelte';
 
   let statuses = $state([]);
   let statusCategories = $state([]);
@@ -322,83 +315,17 @@
     </DataTable>
   {/if}
 
-  <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus} submitDisabled={saving}>
-    {#snippet children(submitHint)}
-    <!-- Modal header -->
-    <ModalHeader title={editingId ? t('statuses.editStatus') : t('statuses.createStatus')} showCloseButton={false} />
-
-    <!-- Modal content -->
-    <div class="px-6 py-4">
-      <form onsubmit={(e) => { e.preventDefault(); saveStatus(); }}>
-        {#if editingId}
-          {#key editingId}
-            <LocalizedObjectFields
-              bind:this={translationEditor}
-              objectType="status"
-              objectId={editingId}
-              bind:canonicalName={formData.name}
-              bind:canonicalDescription={formData.description}
-              displayName={editingObject?.display_name || editingObject?.name}
-              displayDescription={editingObject?.display_description || editingObject?.description}
-            />
-          {/key}
-        {:else}
-          <div class="form-group">
-            <label for="name">{t('common.name')} *</label>
-            <Input
-              type="text"
-              id="name"
-              placeholder={t('statuses.namePlaceholder')}
-              bind:value={formData.name}
-              required
-              size="small"
-            />
-          </div>
-        {/if}
-
-        <div class="form-group">
-          <label for="category">{t('common.category')} *</label>
-          <BasePicker
-            bind:value={formData.category_id}
-            items={statusCategories}
-            placeholder={t('categories.selectCategory')}
-            getValue={(item) => item.id}
-            getLabel={getStatusCategoryDisplayName}
-          />
-        </div>
-
-        {#if !editingId}
-          <div class="form-group">
-            <label for="description">{t('common.description')}</label>
-            <Textarea
-              id="description"
-              placeholder={t('placeholders.optionalDescription')}
-              bind:value={formData.description}
-              rows={2}
-            />
-          </div>
-        {/if}
-
-        <div class="mb-6">
-          <Toggle
-            bind:checked={formData.is_default}
-            label={t('common.default')}
-            size="small"
-          />
-        </div>
-
-        <!-- Modal footer -->
-        <DialogFooter
-          onCancel={cancelForm}
-          onConfirm={saveStatus}
-          confirmLabel={editingId ? t('common.update') : t('common.create')}
-          loading={saving}
-          showKeyboardHint={true}
-          confirmKeyboardHint={submitHint}
-          class="mx-[-1.5rem] mb-[-1rem] mt-0"
-        />
-      </form>
-    </div>
-    {/snippet}
-  </Modal>
+  <StatusModal
+    isOpen={showCreateForm}
+    bind:formData
+    categories={statusCategories}
+    isEditing={editingId !== null}
+    objectId={editingId}
+    displayName={editingObject?.display_name || editingObject?.name}
+    displayDescription={editingObject?.display_description || editingObject?.description}
+    bind:translationEditor
+    saving={saving}
+    onsave={saveStatus}
+    oncancel={cancelForm}
+  />
 </div>

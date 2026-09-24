@@ -119,6 +119,9 @@ export default {
     allStatuses: 'الكل',
     fromAllStatuses: 'السماح بالانتقالات من كل حالة أخرى',
     transitionHint4: 'حدد "الكل" على حالة للسماح بالانتقالات من كل حالة أخرى',
+    filterStatuses: 'تصفية الحالات',
+    transitionHelp: 'مساعدة في الانتقالات',
+    noStatusesMatchFilter: 'لا توجد حالات تطابق عامل التصفية',
   },
 
   screens: {

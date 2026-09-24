@@ -122,6 +122,9 @@ export default {
     allStatuses: 'Todos',
     fromAllStatuses: 'Permitir transiciones desde todos los demás estados',
     transitionHint4: 'Marque «Todos» en un estado para permitir transiciones desde todos los demás estados',
+    filterStatuses: 'Filtrar estados',
+    transitionHelp: 'Ayuda de transiciones',
+    noStatusesMatchFilter: 'Ningún estado coincide con el filtro',
   },
 
   screens: {

@@ -125,6 +125,9 @@ export default {
     allStatuses: 'Все',
     fromAllStatuses: 'Разрешить переход из любого другого статуса',
     transitionHint4: 'Отметьте «Все» у статуса, чтобы разрешить переход в него из любого другого статуса',
+    filterStatuses: 'Фильтровать статусы',
+    transitionHelp: 'Справка по переходам',
+    noStatusesMatchFilter: 'Нет статусов, соответствующих фильтру',
   },
 
   screens: {

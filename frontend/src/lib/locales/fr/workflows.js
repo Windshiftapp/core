@@ -121,6 +121,9 @@ export default {
     allStatuses: 'Tous',
     fromAllStatuses: 'Autoriser les transitions depuis tous les autres statuts',
     transitionHint4: 'Cochez « Tous » sur un statut pour autoriser les transitions depuis n’importe quel autre statut',
+    filterStatuses: 'Filtrer les statuts',
+    transitionHelp: 'Aide sur les transitions',
+    noStatusesMatchFilter: 'Aucun statut ne correspond au filtre',
   },
 
   screens: {

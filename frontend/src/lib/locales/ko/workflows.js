@@ -124,7 +124,10 @@ export default {
     "swapDirection": "방향 반전",
     "allStatuses": "전체",
     "fromAllStatuses": "다른 모든 상태에서 전환 허용",
-    "transitionHint4": "다른 모든 상태에서의 전환을 허용하려면 상태의 \"전체\"를 선택하세요"
+    "transitionHint4": "다른 모든 상태에서의 전환을 허용하려면 상태의 \"전체\"를 선택하세요",    "filterStatuses": "상태 필터",
+    "transitionHelp": "전환 도움말",
+    "noStatusesMatchFilter": "필터와 일치하는 상태가 없습니다",
+
   },
   "screens": {
     "title": "화면",
