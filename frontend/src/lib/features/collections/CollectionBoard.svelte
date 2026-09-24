@@ -1450,29 +1450,33 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace || !workspaceId}
-  <div
-    bind:this={boardScrollElement}
-    class="w-full min-w-0 max-w-full overflow-x-auto"
-    data-testid="board-scroll-container"
+  <!-- The board chrome (view header and filters) is fixed to the viewport
+       width; only the lane canvas scrolls, so wide boards pan underneath a
+       toolbar that never has to be scrolled to be reached. -->
+  <StaticViewBackground
+    backgroundStyle={styles.backgroundStyle}
+    contextVars={styles.contextVars}
+    fullWidth
+    rootClass="h-full"
+    contentClass="flex h-full flex-col"
+    testid="collection-board-background"
   >
-    <StaticViewBackground
-      backgroundStyle={styles.backgroundStyle}
-      contextVars={styles.contextVars}
-      contentClass="p-6 min-w-fit"
-      testid="collection-board-background"
-    >
-    <!-- Content Container -->
       <!-- Header with view tabs -->
-      <div class="mb-8">
+      <div
+        class="flex-shrink-0 border-b px-6 pb-3 pt-3"
+        style="border-color: var(--ctx-border, var(--ds-border));"
+        data-testid="board-header"
+      >
         <ViewHeader
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
           viewName={t('workspaceSettings.views.board')}
           itemCount={collectionStore.collectionTotal}
           shownCount={collectionStore.loading ? null : totalVisibleItems}
+          marginClass="mb-0"
         >
           {#snippet actions()}
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-3">
               {#if allIterations.length > 0}
                 <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
                      style="background-color: var(--ctx-surface, transparent); backdrop-filter: var(--ctx-backdrop, none); border-color: var(--ctx-border, var(--ds-border));">
@@ -1564,7 +1568,10 @@
       </div>
 
       <!-- Controls Bar -->
-      <div class="flex items-center gap-4 mb-6">
+      <div
+        class="flex flex-shrink-0 flex-wrap items-center gap-4 border-b px-6 pb-3 pt-1"
+        style="border-color: var(--ctx-border, var(--ds-border));"
+      >
         <SearchInput
           bind:value={searchQuery}
           placeholder={t('common.search')}
@@ -1573,12 +1580,21 @@
         <SubFilterBar {workspaceId} showCompletionToggle={false} />
       </div>
 
+      <!-- Scrolling canvas: everything below the fixed chrome pans in both
+           axes; the horizontal scrollbar sits at the bottom of the area. -->
+      <div
+        bind:this={boardScrollElement}
+        class="min-h-0 min-w-0 max-w-full flex-1 w-full overflow-auto overscroll-contain"
+        data-testid="board-scroll-container"
+      >
+      <div class="px-6 py-6 min-w-fit">
+
       {#if searchActive && (searchDebouncing || collectionStore.boardSearchLoading)}
-        <p class="-mt-4 mb-4 text-sm" style="color: var(--ds-text-subtle);" data-testid="board-search-status">
+        <p class="-mt-2 mb-4 text-sm" style="color: var(--ds-text-subtle);" data-testid="board-search-status">
           {t('common.searching')}
         </p>
       {:else if searchActive && collectionStore.boardSearchError}
-        <p class="-mt-4 mb-4 text-sm" style="color: var(--ds-text-danger);" data-testid="board-search-error">
+        <p class="-mt-2 mb-4 text-sm" style="color: var(--ds-text-danger);" data-testid="board-search-error">
           {t('common.error')}
         </p>
       {/if}
@@ -1806,14 +1822,15 @@
         {/if}
 
         <!-- Summary -->
-        <div class="mt-8 text-center">
+        <div class="mt-8 text-center" data-testid="board-summary">
           <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
             {t('collections.boardSummary', { itemCount: totalVisibleItems, columnCount: displayColumns.length })}
           </p>
         </div>
       {/if}
+      </div>
+      </div>
     </StaticViewBackground>
-  </div>
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">

@@ -43,7 +43,7 @@
   }
 </script>
 
-<div class="flex rounded p-1" style={containerStyle}>
+<div class="flex rounded p-1" style={containerStyle} data-testid="board-view-switcher">
   <!-- Board Button -->
   <button
     class="view-btn px-3 py-1.5 text-sm font-medium rounded transition-colors"

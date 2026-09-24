@@ -14,6 +14,7 @@
     textStyle = '',
     subtleTextStyle = '',
     actions = null,
+    marginClass = 'mb-4'
   } = $props();
 
   let countText = $derived(formatItemCount(itemCount, shownCount, t));
@@ -30,5 +31,5 @@
   icon={null}
   count={null}
   children={null}
-  marginClass="mb-4"
+  {marginClass}
 />
