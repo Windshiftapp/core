@@ -1,5 +1,5 @@
 <script>
-  import { BaseEdge, getBezierPath, Position } from '@xyflow/svelte';
+  import { BaseEdge } from '@xyflow/svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
@@ -16,22 +16,41 @@
   } = $props();
 
   // The all-statuses arrow loops out of the top of the status and re-enters
-  // on its left side, so it reads as one special incoming transition instead
-  // of one arrow per source status.
-  const LOOP_GAP = 22;
+  // on its left side as a squared bracket, so it reads as one special
+  // incoming transition instead of one arrow per source status.
+  const RISE = 26; // stand-off above the top handle
+  const STANDOFF = 24; // horizontal distance from the left handle
+  const CORNER = 10; // corner rounding — square with softened joints
 
-  let pathResult = $derived(getBezierPath({
-    sourceX,
-    sourceY: sourceY - LOOP_GAP,
-    sourcePosition: sourcePosition || Position.Top,
-    targetX: targetX - LOOP_GAP,
-    targetY,
-    targetPosition: targetPosition || Position.Left,
-    curvature: 0.8,
-  }));
-  let edgePath = $derived(pathResult[0]);
-  let labelX = $derived(pathResult[1]);
-  let labelY = $derived(pathResult[2]);
+  // The loop always leaves the top handle and enters the left handle, which
+  // is how createAllIncomingEdge wires it; the bracket below is that shape.
+  let loop = $derived.by(() => {
+    const topY = sourceY - RISE;
+    const leftX = targetX - STANDOFF;
+    const r = Math.max(
+      2,
+      Math.min(CORNER, RISE, STANDOFF, Math.abs(sourceX - leftX) / 2, Math.abs(targetY - topY) / 2)
+    );
+
+    // Up from the top handle, left along the top, down past the node's left
+    // edge, then right into the left handle. Corners are quadratic curves so
+    // the bracket reads square but not sharp.
+    const path = [
+      `M ${sourceX} ${sourceY}`,
+      `L ${sourceX} ${topY + r}`,
+      `Q ${sourceX} ${topY} ${sourceX - r} ${topY}`,
+      `L ${leftX + r} ${topY}`,
+      `Q ${leftX} ${topY} ${leftX} ${topY + r}`,
+      `L ${leftX} ${targetY - r}`,
+      `Q ${leftX} ${targetY} ${leftX + r} ${targetY}`,
+      `L ${targetX} ${targetY}`,
+    ].join(' ');
+
+    return { path, labelX: (sourceX + leftX) / 2, labelY: topY };
+  });
+  let edgePath = $derived(loop.path);
+  let labelX = $derived(loop.labelX);
+  let labelY = $derived(loop.labelY);
 </script>
 
 <BaseEdge
