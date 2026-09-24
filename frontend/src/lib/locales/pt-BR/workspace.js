@@ -669,6 +669,9 @@ export default {
     noLogoSet: 'Nenhum logo definido',
     uploadLogo: 'Enviar Logo',
     logoRecommendation: 'Recomendado: PNG ou SVG com fundo transparente. Altura máxima no cabeçalho: 40-50px.',
+    lightLogo: 'Logo do modo claro',
+    darkLogo: 'Logo do modo escuro',
+    darkLogoFallback: 'Exibido no modo escuro. Usa o logo do modo claro quando vazio.',
   },
   issueSync: {
     title: 'Sincronização de Issues do GitHub',

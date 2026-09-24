@@ -1424,6 +1424,18 @@ var Catalog = []Migration{
 			ALTER TABLE email_reply_outbox ADD COLUMN IF NOT EXISTS discarded_at TIMESTAMPTZ;
 		`,
 	},
+	{
+		Version:       "20260924_theme_dark_logo_url",
+		Name:          "Add an optional dark-mode company logo URL to themes",
+		CheckSQLite:   sqliteColumnCheck("themes", "logo_url_dark"),
+		CheckPostgres: pgColumnCheck("themes", "logo_url_dark"),
+		SQLite: `
+			ALTER TABLE themes ADD COLUMN logo_url_dark TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_url_dark TEXT;
+		`,
+	},
 }
 
 func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {

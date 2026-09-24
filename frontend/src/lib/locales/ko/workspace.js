@@ -792,7 +792,10 @@ export default {
     "currentLogo": "현재 로고",
     "noLogoSet": "로고 미설정",
     "uploadLogo": "로고 업로드",
-    "logoRecommendation": "권장: 투명 배경 PNG 또는 SVG. 헤더의 최대 높이: 40~50px."
+    "logoRecommendation": "권장: 투명 배경 PNG 또는 SVG. 헤더의 최대 높이: 40~50px.",
+    "lightLogo": "라이트 모드 로고",
+    "darkLogo": "다크 모드 로고",
+    "darkLogoFallback": "다크 모드에서 표시됩니다. 비워 두면 라이트 모드 로고를 사용합니다."
   },
   "issueSync": {
     "title": "GitHub 이슈 동기화",

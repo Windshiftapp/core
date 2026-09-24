@@ -911,6 +911,10 @@ export default {
     uploadLogo: 'Upload Logo',
     logoRecommendation:
       'Recommended: PNG or SVG with transparent background. Max height in header: 40-50px.',
+    lightLogo: 'Light Mode Logo',
+    darkLogo: 'Dark Mode Logo',
+    darkLogoFallback:
+      'Shown in dark mode. Falls back to the light mode logo when left empty.',
   },
 
   issueSync: {

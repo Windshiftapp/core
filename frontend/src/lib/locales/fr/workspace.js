@@ -878,6 +878,10 @@ export default {
     uploadLogo: 'Téléverser le logo',
     logoRecommendation:
       'Recommandé : PNG ou SVG avec fond transparent. Hauteur maximale dans l’en-tête : 40-50px.',
+    lightLogo: 'Logo du mode clair',
+    darkLogo: 'Logo du mode sombre',
+    darkLogoFallback:
+      "Affiché en mode sombre. Utilise le logo du mode clair s'il est vide.",
   },
 
   issueSync: {

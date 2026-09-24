@@ -112,10 +112,18 @@
         ? 'justify-start px-4'
         : 'justify-center'} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
     >
-      {#if themeStore.activeTheme?.logo_url}
+      {#if themeStore.isDarkMode && themeStore.activeTheme?.logo_url_dark}
+        <img
+          src={themeStore.activeTheme.logo_url_dark}
+          alt={themeStore.activeTheme.name || 'Windshift'}
+          data-testid="nav-logo"
+          class="max-w-8 max-h-8 object-contain flex-shrink-0"
+        />
+      {:else if themeStore.activeTheme?.logo_url}
         <img
           src={themeStore.activeTheme.logo_url}
           alt={themeStore.activeTheme.name || 'Windshift'}
+          data-testid="nav-logo"
           class="max-w-8 max-h-8 object-contain flex-shrink-0"
         />
       {:else}

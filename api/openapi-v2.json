@@ -27572,6 +27572,10 @@
                     "description": "The logo url value.",
                     "type": "string"
                   },
+                  "logo_url_dark": {
+                    "description": "The logo url dark value.",
+                    "type": "string"
+                  },
                   "name": {
                     "description": "The name value.",
                     "type": "string"
@@ -51830,6 +51834,10 @@
                   },
                   "logo_url": {
                     "description": "The logo url value.",
+                    "type": "string"
+                  },
+                  "logo_url_dark": {
+                    "description": "The logo url dark value.",
                     "type": "string"
                   },
                   "name": {

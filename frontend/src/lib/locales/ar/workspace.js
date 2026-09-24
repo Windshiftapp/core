@@ -669,6 +669,9 @@ export default {
     noLogoSet: 'لم يتم تعيين شعار',
     uploadLogo: 'رفع شعار',
     logoRecommendation: 'يُنصح: صورة PNG أو SVG بخلفية شفافة. أقصى ارتفاع في الرأس: 40-50 بكسل.',
+    lightLogo: 'شعار الوضع الفاتح',
+    darkLogo: 'شعار الوضع الداكن',
+    darkLogoFallback: 'يظهر في الوضع الداكن. يعود إلى شعار الوضع الفاتح عند تركه فارغًا.',
   },
   issueSync: {
     title: 'مزامنة مشكلات GitHub',

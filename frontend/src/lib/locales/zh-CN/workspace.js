@@ -677,6 +677,9 @@ export default {
     noLogoSet: '未设置标志',
     uploadLogo: '上传标志',
     logoRecommendation: '建议：透明背景的 PNG 或 SVG。页眉中最大高度：40-50px。',
+    lightLogo: '浅色模式标志',
+    darkLogo: '深色模式标志',
+    darkLogoFallback: '在深色模式下显示。留空时使用浅色模式标志。',
   },
 
   issueSync: {
