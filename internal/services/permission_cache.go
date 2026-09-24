@@ -747,11 +747,21 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	}
 
 	builder := newPermissionCacheBuilder(ps, userID)
-	complete, err := builder.loadSystemAdmin()
+	isAdmin, err := builder.loadSystemAdmin()
 	if err != nil {
 		return nil, err
 	}
-	if complete {
+	// Memberships and role assignments are still loaded for system admins so
+	// user_in_group and user_in_role conditions resolve against real data.
+	// Admins bypass permission checks, so the remaining permission grants are
+	// only loaded for non-admins.
+	if err := builder.loadGroupMemberships(); err != nil {
+		return nil, err
+	}
+	if err := builder.loadUserRoleAssignments(); err != nil {
+		return nil, err
+	}
+	if isAdmin {
 		return builder.cached, nil
 	}
 	if err := builder.loadEveryonePermissions(); err != nil {
