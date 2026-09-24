@@ -259,6 +259,7 @@
             style="{isDraggingItem && isDropTarget ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-solid)' : 'var(--ds-border)'}; background-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-bg)' : 'transparent'}; padding: 0.5rem;` : ''}"
             data-section-drop-zone
             data-section-id={section.id}
+            data-testid="portal-section-drop-zone"
           >
             {#if gridItems.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

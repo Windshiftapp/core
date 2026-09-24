@@ -356,7 +356,8 @@
   });
 </script>
 
-<!-- Customization Panel Overlay (hide when editing request types so sections are visible) -->
+<!-- Customization Panel Overlay (hidden while the request-types or
+     asset-reports section is active so section drop zones stay reachable) -->
 
 <!-- Shared card fragments for the request-type and asset-report lists. -->
 {#snippet cardIconBadge(color, Icon)}
@@ -367,8 +368,8 @@
   </div>
 {/snippet}
 
-{#snippet dragHandle()}
-  <div class="cursor-grab active:cursor-grabbing pt-1" style="color: {portalStore.isDarkMode ? '#64748b' : '#9ca3af'};" data-drag-handle>
+{#snippet dragHandle(testId)}
+  <div class="cursor-grab active:cursor-grabbing pt-1" style="color: {portalStore.isDarkMode ? '#64748b' : '#9ca3af'};" data-drag-handle data-testid={testId}>
     <GripVertical class="w-4 h-4" />
   </div>
 {/snippet}
@@ -393,7 +394,7 @@
 {/snippet}
 
 <ModalBackdrop
-  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types'}
+  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types' && portalStore.activeSection !== 'asset-reports'}
   opacity={0.3}
   blur={0}
   align="none"
@@ -480,6 +481,7 @@
         {#snippet children()}
           <button
             onclick={() => portalStore.activeSection = 'asset-reports'}
+            data-testid="portal-customize-asset-reports-section"
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all mb-1"
             style="background-color: {portalStore.activeSection === 'asset-reports' ? 'var(--ds-background-neutral)' : 'transparent'};"
           >
@@ -627,7 +629,7 @@
                   {@render cardIconBadge(requestType.color, RequestTypeIcon)}
 
                   <!-- Drag Handle -->
-                  {@render dragHandle()}
+                  {@render dragHandle('portal-request-type-drag-handle')}
 
                   <!-- Content -->
                   <div class="flex-1 min-w-0">
@@ -732,13 +734,14 @@
                 style="background-color: {portalStore.isDarkMode ? '#334155' : '#f9fafb'}; border-color: {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};"
                 data-asset-report-card
                 data-asset-report-id={report.id}
+                data-testid="portal-customize-asset-report-card"
               >
                 <div class="flex items-start gap-3">
                   <!-- Icon Preview -->
                   {@render cardIconBadge(report.color, ReportIcon)}
 
                   <!-- Drag Handle -->
-                  {@render dragHandle()}
+                  {@render dragHandle('portal-asset-report-drag-handle')}
 
                   <!-- Content -->
                   <div class="flex-1 min-w-0">
