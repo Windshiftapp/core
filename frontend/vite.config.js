@@ -57,9 +57,6 @@ export default defineConfig({
     // The startup cost is bounded since both are only loaded behind a dynamic
     // import — the optimizer just makes sure the pre-bundle is well-formed.
     include: [
-      '@milkdown/core',
-      '@milkdown/kit',
-      '@milkdown/theme-nord',
       'react',
       'react-dom',
       'react/jsx-runtime',
@@ -75,6 +72,13 @@ export default defineConfig({
     // ~30 s in our codebase. Excluded deps are loaded on demand from
     // their original location.
     exclude: [
+      // Milkdown is pure ESM and only loads behind the knowledge-page editor.
+      // It never changes, so pre-bundling it only adds cold-start cost and
+      // re-bundle cost on every optimizer invalidation — serve it from source
+      // and let the browser cache the individual modules instead.
+      '@milkdown/kit',
+      '@milkdown/utils',
+      '@milkdown/theme-nord',
       '@tauri-apps/api',
       '@tauri-apps/api/path',
       '@tauri-apps/plugin-dialog',
