@@ -1436,6 +1436,18 @@ var Catalog = []Migration{
 			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_url_dark TEXT;
 		`,
 	},
+	{
+		Version:       "20260924_items_merged_into",
+		Name:          "Point merged duplicate tickets at their canonical item",
+		CheckSQLite:   sqliteColumnCheck("items", "merged_into_item_id"),
+		CheckPostgres: pgColumnCheck("items", "merged_into_item_id"),
+		SQLite: `
+			ALTER TABLE items ADD COLUMN merged_into_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL;
+		`,
+		Postgres: `
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS merged_into_item_id BIGINT REFERENCES items(id) ON DELETE SET NULL;
+		`,
+	},
 }
 
 func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {

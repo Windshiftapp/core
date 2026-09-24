@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -42,6 +44,7 @@ type ItemDetailSummary struct {
 	RequestTypeFields      []models.RequestTypeField     `json:"request_type_fields"`
 	Transitions            ItemTransitionSummary         `json:"transitions"`
 	Watching               bool                          `json:"watching"`
+	MergedIntoItemID       *int                          `json:"merged_into_item_id,omitempty"`
 	Children               []models.Item                 `json:"children"`
 	StoryPointsRollup      *repository.StoryPointsRollup `json:"story_points_rollup,omitempty"`
 	Ancestors              []models.Item                 `json:"ancestors"`
@@ -146,6 +149,16 @@ func (s *ItemDetailApplicationService) load(ctx context.Context, userID int, ite
 			result.Watching = value.Watching
 		}
 		return err
+	})
+	run("merge-redirect", func() error {
+		var mergedInto *int
+		if err := s.db.QueryRowContext(ctx,
+			`SELECT merged_into_item_id FROM items WHERE id = ?`, item.ID,
+		).Scan(&mergedInto); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		result.MergedIntoItemID = mergedInto
+		return nil
 	})
 	run("children", func() error {
 		value, err := s.items.Children(ctx, userID, item.ID)

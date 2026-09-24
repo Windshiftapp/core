@@ -258,6 +258,24 @@ export const items = {
       }),
     'update'
   ),
+  // Ticket lifecycle (WI-1135): fold duplicates into this ticket.
+  mergeInto: withCrossTabNotice(
+    (id, sourceItemIds) =>
+      fetchV2Data(`/items/${id}/merge`, {
+        method: 'POST',
+        body: JSON.stringify({ source_item_ids: sourceItemIds }),
+      }),
+    'update'
+  ),
+  // Carve a subticket out of this ticket with selected content.
+  split: withCrossTabNotice(
+    (id, data) =>
+      fetchV2Data(`/items/${id}/split`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    'create'
+  ),
   updateFracIndex: withCrossTabNotice(
     (id, data) =>
       fetchV2Data(`/items/${id}/rank`, {

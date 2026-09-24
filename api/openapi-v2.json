@@ -17063,6 +17063,11 @@
                 },
                 "type": "array"
               },
+              "merged_into_item_id": {
+                "description": "The merged into item id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "personal_task_count": {
                 "description": "The personal task count value.",
                 "type": "integer"
@@ -18429,6 +18434,29 @@
             "required": [
               "incoming",
               "outgoing"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetItemsItemIdMergeRedirectResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "target_item_id": {
+                "description": "The target item id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "target_item_id"
             ],
             "type": "object"
           }
@@ -42577,6 +42605,11 @@
                   "type": "object"
                 },
                 "type": "array"
+              },
+              "merged_into_item_id": {
+                "description": "The merged into item id value.",
+                "nullable": true,
+                "type": "integer"
               },
               "personal_task_count": {
                 "description": "The personal task count value.",
@@ -69212,6 +69245,88 @@
         ],
         "type": "object"
       },
+      "PostItemsItemIdMergePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "source_item_ids": {
+            "description": "The source item ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_item_ids"
+        ],
+        "type": "object"
+      },
+      "PostItemsItemIdMergeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "sources": {
+                "description": "The sources value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "comments_private": {
+                      "description": "The comments private value.",
+                      "type": "boolean"
+                    },
+                    "merged": {
+                      "description": "The merged value.",
+                      "type": "boolean"
+                    },
+                    "moved_attachments": {
+                      "description": "The moved attachments value.",
+                      "type": "integer"
+                    },
+                    "moved_comments": {
+                      "description": "The moved comments value.",
+                      "type": "integer"
+                    },
+                    "moved_links": {
+                      "description": "The moved links value.",
+                      "type": "integer"
+                    },
+                    "source_item_id": {
+                      "description": "The source item id value.",
+                      "type": "integer"
+                    },
+                    "target_item_id": {
+                      "description": "The target item id value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "comments_private",
+                    "merged",
+                    "moved_attachments",
+                    "moved_comments",
+                    "moved_links",
+                    "source_item_id",
+                    "target_item_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "sources"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostItemsItemIdMoveWorkspacePayload": {
         "additionalProperties": false,
         "properties": {
@@ -70866,6 +70981,83 @@
             },
             "required": [
               "count"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostItemsItemIdSplitPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee_id": {
+            "description": "The assignee id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "attachment_ids": {
+            "description": "The attachment ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "comment_ids": {
+            "description": "The comment ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "The description value.",
+            "type": "string"
+          },
+          "portal_customer_id": {
+            "description": "The portal customer id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "title": {
+            "description": "The title value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachment_ids",
+          "comment_ids",
+          "description",
+          "title"
+        ],
+        "type": "object"
+      },
+      "PostItemsItemIdSplitResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "moved_attachments": {
+                "description": "The moved attachments value.",
+                "type": "integer"
+              },
+              "moved_comments": {
+                "description": "The moved comments value.",
+                "type": "integer"
+              },
+              "split_item_id": {
+                "description": "The split item id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "moved_attachments",
+              "moved_comments",
+              "split_item_id"
             ],
             "type": "object"
           }
@@ -96291,6 +96483,142 @@
         ]
       }
     },
+    "/items/{item_id}/merge": {
+      "post": {
+        "description": "Merge duplicate items into canonical item. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postItemsItemIdMerge",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostItemsItemIdMergePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostItemsItemIdMergeResult"
+                }
+              }
+            },
+            "description": "Merge duplicate items into canonical item response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Merge duplicate items into canonical item",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/items/{item_id}/merge-redirect": {
+      "get": {
+        "description": "Read the merge redirect target. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getItemsItemIdMergeRedirect",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetItemsItemIdMergeRedirectResult"
+                }
+              }
+            },
+            "description": "Read the merge redirect target response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read the merge redirect target",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
     "/items/{item_id}/move-workspace": {
       "post": {
         "description": "Move item workspace. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -97090,6 +97418,85 @@
           }
         ],
         "summary": "Reparent item children",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/items/{item_id}/split": {
+      "post": {
+        "description": "Split item into subticket. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postItemsItemIdSplit",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostItemsItemIdSplitPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostItemsItemIdSplitResult"
+                }
+              }
+            },
+            "description": "Split item into subticket response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Split item into subticket",
         "tags": [
           "Work items"
         ],

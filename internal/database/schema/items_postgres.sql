@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS items (
 	-- Hierarchy fields
 	parent_id INTEGER,
 	path TEXT DEFAULT '/',
+	-- Merge lifecycle: see items.sql for the column contract.
+	merged_into_item_id BIGINT REFERENCES items(id) ON DELETE SET NULL,
 	-- Personal task relationship (for linking personal workspace tasks to work items)
 	related_work_item_id INTEGER,
 	-- Estimation

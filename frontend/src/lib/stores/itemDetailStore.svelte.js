@@ -162,6 +162,8 @@ class ItemDetailStore {
 
   // Watch
   isWatching = $state(false);
+  // Set when the open ticket is a merged duplicate pointing at its canonical.
+  mergedIntoItemId = $state(null);
   loadingWatchStatus = $state(false);
 
   // Time tracking
@@ -348,6 +350,7 @@ class ItemDetailStore {
       this.availableStatusTransitions = summary.transitions?.available_transitions || [];
       this.pendingApproval = summary.transitions?.pending_approval || null;
       this.isWatching = summary.watching || false;
+      this.mergedIntoItemId = summary.merged_into_item_id || null;
       this.childItems = summary.children || [];
       this.currentItemType = summary.current_item_type || null;
       this.currentHierarchyLevel = summary.current_hierarchy_level || null;

@@ -8,7 +8,7 @@
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
-  import { Trash2, X, Copy, BookOpen, Search, GitBranch, Repeat, FolderInput } from '@lucide/svelte';
+  import { Trash2, X, Copy, BookOpen, Search, GitBranch, GitMerge, Repeat, FolderInput } from '@lucide/svelte';
   import { Bookmark, BookmarkCheck, ExternalLink } from '@lucide/svelte';
   import { addToast, successToast, errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import { timerStore } from '../../stores/timerStore.svelte.js';
@@ -33,6 +33,8 @@ import AIConfirmModal from '../../dialogs/AIConfirmModal.svelte';
 import CatchMeUpBriefing from './CatchMeUpBriefing.svelte';
 import FindSimilarResults from './FindSimilarResults.svelte';
 import ItemMoveWorkspaceDialog from './ItemMoveWorkspaceDialog.svelte';
+import ItemMergeDialog from './ItemMergeDialog.svelte';
+import ItemSplitDialog from './ItemSplitDialog.svelte';
 
   // Import the shared content component
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
@@ -124,6 +126,25 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     }
   });
 
+  // Whether the open ticket is a merged duplicate comes straight from the
+  // detail summary via the store; no extra request.
+  let mergedInto = $derived(itemDetailStore.mergedIntoItemId);
+
+  function handleMerged() {
+    successToast(t('items.mergeSuccess'));
+    // The moved comments land on this ticket; the comments tab listens for
+    // this event and refreshes without waiting for its poll cadence.
+    window.dispatchEvent(new CustomEvent('reload-item-detail', { detail: { itemId: item?.id } }));
+  }
+
+  function handleSplit(result) {
+    successToast(t('items.splitSuccess'));
+    window.dispatchEvent(new CustomEvent('reload-item-detail', { detail: { itemId: item?.id } }));
+    if (result?.split_item_id && workspaceId) {
+      navigate(`/workspaces/${workspaceId}/items/${result.split_item_id}`);
+    }
+  }
+
   // Instant refresh after the AI chat agent completes a run — don't make
   // the user wait up to 30s for the next poll tick to see the agent's effects.
   $effect(() => agentRuns.subscribe(() => {
@@ -143,6 +164,10 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 
   // Cross-workspace move state
   let showWorkspaceMoveDialog = $state(false);
+
+  // Ticket lifecycle (merge/split) state
+  let showMergeDialog = $state(false);
+  let showSplitDialog = $state(false);
 
   // Item type change state
   let showTypeChangeModal = $state(false);
@@ -837,6 +862,24 @@ import NativeSelect from '../../components/NativeSelect.svelte';
         title: t('items.moveWorkspaceMenu'),
         onClick: () => { showWorkspaceMoveDialog = true; }
       });
+      items.push(
+        {
+          id: 'merge-duplicate',
+          type: 'regular',
+          icon: GitMerge,
+          testid: 'item-merge-open',
+          title: t('items.mergeMenu'),
+          onClick: () => { showMergeDialog = true; }
+        },
+        {
+          id: 'split-subticket',
+          type: 'regular',
+          icon: GitBranch,
+          testid: 'item-split-open',
+          title: t('items.splitMenu'),
+          onClick: () => { showSplitDialog = true; }
+        }
+      );
     }
 
     // Only show delete option if user has permission
@@ -1203,6 +1246,29 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 </script>
 
 {#snippet contentSnippet()}
+  {#if mergedInto != null && mergedInto !== item?.id}
+    <div
+      class="flex items-center gap-2 px-4 py-2.5 rounded-lg border mx-4 mt-4 text-sm"
+      style="border-color: var(--ds-border); background: var(--ds-surface-warning, rgba(234, 88, 12, 0.08));"
+      data-testid="item-merged-banner"
+    >
+      <GitMerge class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-warning, var(--ds-text));" />
+      <span style="color: var(--ds-text);">
+        {t('items.mergedBanner')}
+      </span>
+      {#if workspaceId}
+        <button
+          type="button"
+          class="font-medium underline"
+          style="color: var(--ds-interactive);"
+          onclick={() => navigate(`/workspaces/${workspaceId}/items/${mergedInto}`)}
+          data-testid="item-merged-banner-link"
+        >
+          {t('items.mergedBannerOpen')}
+        </button>
+      {/if}
+    </div>
+  {/if}
   <ItemDetailContent
     loading={itemDetailStore.loading}
     error={itemDetailStore.error}
@@ -1427,6 +1493,18 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   bind:isOpen={showWorkspaceMoveDialog}
   item={itemDetailStore.item}
   onMoved={handleWorkspaceMoved}
+/>
+
+<ItemMergeDialog
+  bind:isOpen={showMergeDialog}
+  item={itemDetailStore.item}
+  onMerged={handleMerged}
+/>
+
+<ItemSplitDialog
+  bind:isOpen={showSplitDialog}
+  item={itemDetailStore.item}
+  onSplit={handleSplit}
 />
 
 {#if showTypeChangeModal && typeChangeAnalysis}

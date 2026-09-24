@@ -26,6 +26,8 @@ const (
 	CommentCreated = "item.comment_created"
 	Linked         = "item.linked"
 	Unlinked       = "item.unlinked"
+	Merged         = "item.merged"
+	Split          = "item.split"
 
 	PayloadVersion = 1
 )
@@ -279,6 +281,29 @@ type LinkChangedV1 struct {
 	Automation *AutomationContext `json:"automation,omitempty"`
 }
 
+// MergedV1 records one duplicate folded into a canonical ticket. Counts are
+// informational; the durable redirect is items.merged_into_item_id.
+type MergedV1 struct {
+	SourceItemID     int                `json:"source_item_id"`
+	TargetItemID     int                `json:"target_item_id"`
+	MovedComments    int                `json:"moved_comments"`
+	MovedAttachments int                `json:"moved_attachments"`
+	MovedLinks       int                `json:"moved_links"`
+	CommentsPrivate  bool               `json:"comments_private"`
+	Automation       *AutomationContext `json:"automation,omitempty"`
+}
+
+// SplitV1 records a subticket carved out of a source ticket.
+type SplitV1 struct {
+	SourceItemID     int                `json:"source_item_id"`
+	SplitItemID      int                `json:"split_item_id"`
+	MovedComments    int                `json:"moved_comments"`
+	MovedAttachments int                `json:"moved_attachments"`
+	AssigneeID       *int               `json:"assignee_id,omitempty"`
+	PortalCustomerID *int               `json:"portal_customer_id,omitempty"`
+	Automation       *AutomationContext `json:"automation,omitempty"`
+}
+
 // UpdateRecord describes one item update in a set-based source transaction.
 type UpdateRecord struct {
 	Item          *models.Item
@@ -374,6 +399,36 @@ func (r *Recorder) Deleted(ctx context.Context, tx database.Tx, item *models.Ite
 	return r.append(ctx, tx, Deleted, item.WorkspaceID, item.ID, metadata, DeletedV1{
 		Item: Snapshot(item), DescendantCount: descendantCount, Automation: metadata.Automation,
 	})
+}
+
+// Merged appends the merge fact to both aggregates so each item's stream
+// records its side of the fold.
+func (r *Recorder) Merged(ctx context.Context, tx database.Tx, workspaceID int, payload MergedV1, metadata Metadata) ([]*events.Event, error) {
+	payload.Automation = metadata.Automation
+	source, err := r.append(ctx, tx, Merged, workspaceID, payload.SourceItemID, metadata, payload)
+	if err != nil {
+		return nil, err
+	}
+	target, err := r.append(ctx, tx, Merged, workspaceID, payload.TargetItemID, metadata, payload)
+	if err != nil {
+		return nil, err
+	}
+	return []*events.Event{source, target}, nil
+}
+
+// Split appends the split fact to both aggregates: the source records what
+// was carved out, the new subticket records where it came from.
+func (r *Recorder) Split(ctx context.Context, tx database.Tx, workspaceID int, payload SplitV1, metadata Metadata) ([]*events.Event, error) {
+	payload.Automation = metadata.Automation
+	source, err := r.append(ctx, tx, Split, workspaceID, payload.SourceItemID, metadata, payload)
+	if err != nil {
+		return nil, err
+	}
+	split, err := r.append(ctx, tx, Split, workspaceID, payload.SplitItemID, metadata, payload)
+	if err != nil {
+		return nil, err
+	}
+	return []*events.Event{source, split}, nil
 }
 
 func (r *Recorder) CommentCreated(ctx context.Context, tx database.Tx, workspaceID int, payload CommentCreatedV1, metadata Metadata) (*events.Event, error) {

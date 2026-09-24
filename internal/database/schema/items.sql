@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS items (
 	-- Hierarchy fields
 	parent_id INTEGER,
 	path TEXT DEFAULT '/',
+	-- Merge lifecycle: set on a duplicate after its content moved to the
+	-- canonical ticket. The item stays in place (searchable, visible to its
+	-- requester) and the pointer drives the merged banner, merge idempotency,
+	-- and conflict detection.
+	merged_into_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
 	-- Personal task relationship (for linking personal workspace tasks to work items)
 	related_work_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
 	-- Estimation

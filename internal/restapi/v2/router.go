@@ -583,6 +583,7 @@ type Deps struct {
 	Assets                       *services.AssetApplicationService
 	ItemApplication              *services.ItemApplicationService
 	ItemDetail                   *services.ItemDetailApplicationService
+	ItemLifecycle                *services.ItemLifecycleService
 	SessionMiddleware            func(http.Handler) http.Handler
 	SearchAllowed                func(*http.Request) bool
 	DBRequestTimeout             time.Duration
@@ -817,7 +818,7 @@ func buildRoutes(deps Deps) []route {
 	registerActionRoutes(&builder, deps.Actions)
 	registerTestManagementRoutes(&builder, deps.TestManagement)
 	registerAssetRoutes(&builder, deps.Assets)
-	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.Access, deps.StoryPointRollup, deps.DBRequestTimeout)
+	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.ItemLifecycle, deps.Access, deps.StoryPointRollup, deps.DBRequestTimeout)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	return builder.routes
 }

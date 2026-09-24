@@ -116,7 +116,7 @@ type roadmapHierarchyDatesRequest struct {
 	RootIDs []int `json:"root_ids"`
 }
 
-func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, rollupAccess resourceAccess, rollup storyPointRollupReader, requestTimeout time.Duration) {
+func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, lifecycle *services.ItemLifecycleService, rollupAccess resourceAccess, rollup storyPointRollupReader, requestTimeout time.Duration) {
 	collection := "/items"
 	builder.Page("/items/search", AuthAuthenticated, []string{"items:read"}, searchItems(app, requestTimeout))
 	builder.PageMetadata(collection, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, Pagination, int, itemListMeta, error) {
@@ -277,8 +277,71 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		}
 		return itemError(app.Delete(auditActor(r, user), id))
 	})
+	registerItemLifecycleRoutes(builder, lifecycle)
 	registerItemReadRoutes(builder, app)
 	registerItemSetRoutes(builder, app)
+}
+
+// itemMergeRequest names the duplicates to fold into the canonical item.
+type itemMergeRequest struct {
+	SourceItemIDs []int `json:"source_item_ids"`
+}
+
+// itemSplitRequest carves a subticket out of an item with explicit ownership.
+type itemSplitRequest struct {
+	Title            string `json:"title"`
+	Description      string `json:"description"`
+	CommentIDs       []int  `json:"comment_ids"`
+	AttachmentIDs    []int  `json:"attachment_ids"`
+	AssigneeID       *int   `json:"assignee_id"`
+	PortalCustomerID *int   `json:"portal_customer_id"`
+}
+
+func registerItemLifecycleRoutes(builder *routeBuilder, lifecycle *services.ItemLifecycleService) {
+	builder.JSON(http.MethodPost, "/items/{item_id}/merge", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemMergeRequest) (*services.ItemMergeResult, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		id, err := pathID(r, "item_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := lifecycle.Merge(r.Context(), services.ItemMergeInput{
+			ActorUserID: user.ID, ActorUsername: user.Username,
+			TargetItemID: id, SourceItemIDs: input.SourceItemIDs,
+		})
+		return result, itemError(err)
+	})
+	builder.JSON(http.MethodPost, "/items/{item_id}/split", http.StatusCreated, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemSplitRequest) (*services.ItemSplitResult, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		id, err := pathID(r, "item_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := lifecycle.Split(r.Context(), services.ItemSplitInput{
+			ActorUserID: user.ID, ActorUsername: user.Username,
+			SourceItemID: id, Title: input.Title, Description: input.Description,
+			CommentIDs: input.CommentIDs, AttachmentIDs: input.AttachmentIDs,
+			AssigneeID: input.AssigneeID, PortalCustomerID: input.PortalCustomerID,
+		})
+		return result, itemError(err)
+	})
+	builder.Read("/items/{item_id}/merge-redirect", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*services.ItemMergeRedirect, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		id, err := pathID(r, "item_id")
+		if err != nil {
+			return nil, err
+		}
+		redirect, err := lifecycle.GetMergeRedirect(r.Context(), user.ID, id)
+		return redirect, itemError(err)
+	})
 }
 
 func registerItemSetRoutes(builder *routeBuilder, app *services.ItemApplicationService) {
@@ -941,6 +1004,9 @@ func itemError(err error) error {
 	}
 	if errors.Is(err, services.ErrItemHasProtectedIntegrationLinks) {
 		return newError(http.StatusConflict, "conflict", "Remove all protected integration links from the affected items before deleting them.")
+	}
+	if errors.Is(err, services.ErrItemMergeConflict) {
+		return newError(http.StatusConflict, "merge_conflict", err.Error())
 	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")

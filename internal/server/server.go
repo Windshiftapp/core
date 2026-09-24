@@ -1850,6 +1850,7 @@ func (s *Server) initialize() error {
 		Assets:            assetApplication,
 		ItemApplication:   itemApplication,
 		ItemDetail:        itemDetailApplication,
+		ItemLifecycle:     services.NewItemLifecycleService(s.db, permService),
 		SessionMiddleware: authMiddleware.OptionalAuth,
 		SearchAllowed:     s.searchLimiter.AllowRequest,
 		DBRequestTimeout:  s.config.DB.RequestTimeout,
