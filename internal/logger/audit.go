@@ -708,6 +708,10 @@ const (
 	ActionAssetSetRoleAssign = "asset_set_role.assign"
 	ActionAssetSetRoleRevoke = "asset_set_role.revoke"
 
+	// Asset set portal exposure
+	ActionAssetSetPortalAccessGrant  = "asset_set_portal_access.grant"
+	ActionAssetSetPortalAccessRevoke = "asset_set_portal_access.revoke"
+
 	// Notification setting management
 	ActionNotificationSettingCreate = "notification_setting.create"
 	ActionNotificationSettingUpdate = "notification_setting.update"
@@ -870,6 +874,7 @@ const (
 	ResourceAssetCategory        = "asset_category"
 	ResourceAssetSet             = "asset_set"
 	ResourceAssetSetRole         = "asset_set_role"
+	ResourceAssetSetPortalAccess = "asset_set_portal_access"
 	ResourceNotificationSetting  = "notification_setting"
 	ResourceIterationType        = "iteration_type"
 	ResourceChannelCategory      = "channel_category"

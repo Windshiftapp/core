@@ -1,13 +1,10 @@
 package services
 
 import (
-	"bufio"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +16,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"windshift/internal/csvimport"
+	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -131,50 +130,13 @@ func (s *AssetApplicationService) UploadCSV(userID, setID int, filename string, 
 	if s.attachmentPath == "" {
 		return AssetCSVUpload{}, ErrAssetImportStorageDisabled
 	}
-	ext := strings.ToLower(filepath.Ext(filename))
-	if ext != ".csv" && ext != ".tsv" {
-		return AssetCSVUpload{}, &AssetValidationError{Msg: "only CSV and TSV files are accepted"}
-	}
-
-	uploadID := uuid.NewString()
-	dir := filepath.Join(s.attachmentPath, "imports", uploadID)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return AssetCSVUpload{}, fmt.Errorf("create import directory: %w", err)
-	}
-	path := filepath.Join(dir, "upload.csv")
-	// path is derived from the configured storage root and a server-generated UUID.
-	//nolint:gosec // G304 cannot infer that the path has no user-controlled segment.
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	staged, _, err := csvimport.StageUpload(s.imports, s.attachmentPath, csvimport.KindAsset, setID, userID, filename, hasHeader, delimiterName, source, assetImportMaxBytes)
 	if err != nil {
-		_ = os.RemoveAll(dir)
-		return AssetCSVUpload{}, fmt.Errorf("create import upload: %w", err)
-	}
-	written, copyErr := io.Copy(file, io.LimitReader(source, assetImportMaxBytes+1))
-	closeErr := file.Close()
-	if copyErr != nil || closeErr != nil || written > assetImportMaxBytes {
-		_ = os.RemoveAll(dir)
-		if written > assetImportMaxBytes {
-			return AssetCSVUpload{}, &AssetValidationError{Msg: "CSV upload exceeds 50 MiB"}
-		}
-		return AssetCSVUpload{}, errors.Join(copyErr, closeErr)
-	}
-
-	delimiter := parseAssetImportDelimiter(delimiterName)
-	if delimiterName == "" {
-		delimiter = detectAssetImportDelimiter(path)
-	}
-	headers, rows, total, err := parseAssetCSVPreview(path, delimiter, hasHeader, 5)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-		return AssetCSVUpload{}, &AssetValidationError{Msg: fmt.Sprintf("parse CSV: %v", err)}
-	}
-	if err := s.repo.CreateImportUpload(uploadID, setID, userID, time.Now().UTC()); err != nil {
-		_ = os.RemoveAll(dir)
-		return AssetCSVUpload{}, err
+		return AssetCSVUpload{}, &AssetValidationError{Msg: err.Error()}
 	}
 	return AssetCSVUpload{
-		UploadID: uploadID, Headers: headers, PreviewRows: rows, TotalRows: total,
-		Delimiter: assetImportDelimiterName(delimiter), HeaderWarning: detectAssetHeaderMismatch(headers, rows, hasHeader),
+		UploadID: staged.UploadID, Headers: staged.Headers, PreviewRows: staged.PreviewRows,
+		TotalRows: staged.TotalRows, Delimiter: staged.Delimiter, HeaderWarning: staged.HeaderWarning,
 	}, nil
 }
 
@@ -228,7 +190,7 @@ func (s *AssetApplicationService) StartImport(userID, setID int, actor AuditActo
 		return AssetImportJob{}, err
 	}
 	jobID := input.UploadID
-	claimed, err := s.repo.ClaimImportUpload(jobID, setID, userID, path, string(config), time.Now().UTC())
+	claimed, err := s.imports.ClaimUpload(csvimport.KindAsset, setID, userID, jobID, path, string(config), time.Now().UTC())
 	if err != nil {
 		return AssetImportJob{}, err
 	}
@@ -248,7 +210,10 @@ func (s *AssetApplicationService) GetImportJob(userID, setID int, jobID string) 
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
 		return AssetImportJob{}, err
 	}
-	row, err := s.repo.GetImportJob(jobID, setID)
+	row, err := s.imports.GetJob(csvimport.KindAsset, setID, jobID)
+	if errors.Is(err, csvimport.ErrUploadNotFound) {
+		row, err = nil, repository.ErrNotFound
+	}
 	if err != nil {
 		return AssetImportJob{}, err
 	}
@@ -259,7 +224,7 @@ func (s *AssetApplicationService) ListImportJobs(userID, setID int) ([]AssetImpo
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.ListImportJobs(setID, 20)
+	rows, err := s.imports.ListJobs(csvimport.KindAsset, setID, 20)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +245,7 @@ func (s *AssetApplicationService) SuggestImportFields(userID, setID int, uploadI
 	if err := s.requireImportUpload(userID, setID, uploadID); err != nil {
 		return AssetImportFieldSuggestions{}, err
 	}
-	headers, rows, _, err := parseAssetCSVPreview(s.assetImportUploadPath(uploadID), parseAssetImportDelimiter(delimiterName), hasHeader, 20)
+	headers, rows, _, err := csvimport.ParsePreview(csvimport.UploadPath(s.attachmentPath, uploadID), csvimport.ParseDelimiter(delimiterName), hasHeader, 20)
 	if os.IsNotExist(err) {
 		return AssetImportFieldSuggestions{}, ErrAssetImportUploadNotFound
 	}
@@ -362,7 +327,9 @@ func (s *AssetApplicationService) CreateTypeFromImport(userID, setID int, actor 
 }
 
 func (s *AssetApplicationService) ReconcileInterruptedImports() (int, error) {
-	return s.repo.ReconcileExpiredAssetImports(time.Now().UTC())
+	return s.imports.ReconcileExpired(csvimport.KindAsset, time.Now().UTC(), func(tx database.Tx, jobID string) error {
+		return s.repo.DeleteAssetsFromImportJobInTx(tx, jobID)
+	})
 }
 
 func (s *AssetApplicationService) assetImportUploadPath(uploadID string) string {
@@ -370,76 +337,25 @@ func (s *AssetApplicationService) assetImportUploadPath(uploadID string) string 
 }
 
 func (s *AssetApplicationService) executeAssetCSVImport(jobID string, setID int, input StartAssetImport, path string, userID int) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			_ = s.updateAssetImportStatus(jobID, "failed", "", nil, fmt.Sprintf("Import crashed: %v", recovered))
-		}
-	}()
-	if err := s.updateAssetImportStatus(jobID, "running", "initializing", nil, ""); err != nil {
-		return
-	}
-	// path was built from the configured storage root and a validated UUID.
-	//nolint:gosec // G304 cannot follow validation across the asynchronous boundary.
-	file, err := os.Open(path)
-	if err != nil {
-		_ = s.updateAssetImportStatus(jobID, "failed", "", nil, "Failed to open CSV file")
-		return
-	}
-	defer func() { _ = file.Close() }()
-	reader := newAssetCSVReader(file, parseAssetImportDelimiter(input.Delimiter))
-	if input.HasHeader {
-		if _, err := reader.Read(); err != nil {
-			_ = s.updateAssetImportStatus(jobID, "failed", "", nil, "Failed to read CSV header")
-			return
+	// Resolve the set's default status up front so rows without a mapping land
+	// somewhere sensible; the old per-run resolution moved into this wrapper.
+	if input.DefaultStatusID == nil {
+		if defaultStatusID, err := s.repo.GetDefaultStatus(setID); err == nil {
+			input.DefaultStatusID = defaultStatusID
 		}
 	}
-	defaultStatusID := input.DefaultStatusID
-	if defaultStatusID == nil {
-		defaultStatusID, _ = s.repo.GetDefaultStatus(setID)
-	}
-	progress := &AssetImportProgress{Phase: "importing"}
-	errorsTruncated := false
-	appendError := func(message string) {
-		if len(progress.Errors) < assetImportErrorCap {
-			progress.Errors = append(progress.Errors, message)
-		} else {
-			errorsTruncated = true
+	csvimport.RunRows(s.imports, jobID, path, csvimport.ParseDelimiter(input.Delimiter), input.HasHeader, func(rowNumber int, record []string) error {
+		err := s.importAssetCSVRow(record, setID, input, userID, input.DefaultStatusID, jobID)
+		if err == nil {
+			return nil
 		}
-	}
-	for row := 1; ; row++ {
-		record, readErr := reader.Read()
-		if readErr == io.EOF {
-			break
+		// A lost lease must stop the runner silently; reconciliation owns the
+		// job. Everything else is a per-row failure.
+		if errors.Is(err, repository.ErrAssetImportLeaseLost) {
+			return csvimport.ErrLeaseLost
 		}
-		progress.TotalRows = row
-		if readErr != nil {
-			progress.FailedCount++
-			appendError(fmt.Sprintf("Row %d: %v", row, readErr))
-		} else if err := s.importAssetCSVRow(record, setID, input, userID, defaultStatusID, jobID); err != nil {
-			if errors.Is(err, repository.ErrAssetImportLeaseLost) {
-				return
-			}
-			progress.FailedCount++
-			appendError(fmt.Sprintf("Row %d: %v", row, err))
-		} else {
-			progress.ImportedCount++
-		}
-		if row%100 == 0 {
-			if err := s.updateAssetImportProgress(jobID, progress); err != nil {
-				return
-			}
-		}
-	}
-	if errorsTruncated {
-		progress.Errors = append(progress.Errors, fmt.Sprintf("additional errors omitted; only the first %d are shown", assetImportErrorCap))
-	}
-	progress.Phase = "completed"
-	if err := s.updateAssetImportStatus(jobID, "completed", "completed", progress, ""); err != nil {
-		return
-	}
-	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
-		slog.Warn("failed to clean asset import upload", "path", path, "error", err)
-	}
+		return err
+	})
 }
 
 func (s *AssetApplicationService) importAssetCSVRow(record []string, setID int, input StartAssetImport, userID int, defaultStatusID *int, jobID string) error {
@@ -532,40 +448,7 @@ func (s *AssetApplicationService) resolveAssetImportFieldValue(fieldKey, text st
 	return text
 }
 
-func (s *AssetApplicationService) updateAssetImportStatus(jobID, status, phase string, progress *AssetImportProgress, message string) error {
-	encoded := "{}"
-	if progress != nil {
-		if data, err := json.Marshal(progress); err == nil {
-			encoded = string(data)
-		}
-	}
-	var err error
-	switch status {
-	case "running":
-		err = s.repo.StartImportJobRunning(jobID, phase, encoded)
-	case "completed", "failed":
-		err = s.repo.FinishImportJob(jobID, status, phase, encoded, message)
-	default:
-		err = s.repo.UpdateImportJobStatus(jobID, status, phase, encoded)
-	}
-	if err != nil {
-		slog.Error("failed to update asset import job", "job_id", jobID, "error", err)
-	}
-	return err
-}
-
-func (s *AssetApplicationService) updateAssetImportProgress(jobID string, progress *AssetImportProgress) error {
-	data, err := json.Marshal(progress)
-	if err == nil {
-		err = s.repo.UpdateImportJobProgress(jobID, progress.Phase, string(data))
-	}
-	if err != nil {
-		slog.Error("failed to update asset import progress", "job_id", jobID, "error", err)
-	}
-	return err
-}
-
-func assetImportJobFromRow(jobID string, row *repository.ImportJobRow) AssetImportJob {
+func assetImportJobFromRow(jobID string, row *csvimport.JobRow) AssetImportJob {
 	job := AssetImportJob{JobID: jobID, Status: row.Status.String, Phase: row.Phase.String}
 	if row.ProgressJSON.Valid && row.ProgressJSON.String != "" {
 		var progress AssetImportProgress
@@ -589,116 +472,6 @@ func assetImportJobFromRow(jobID string, row *repository.ImportJobRow) AssetImpo
 		job.CompletedAt = &value
 	}
 	return job
-}
-
-func newAssetCSVReader(source io.Reader, delimiter rune) *csv.Reader {
-	buffer := bufio.NewReader(source)
-	if bytes, err := buffer.Peek(3); err == nil && len(bytes) == 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf {
-		_, _ = buffer.Discard(3)
-	}
-	reader := csv.NewReader(buffer)
-	reader.Comma = delimiter
-	reader.LazyQuotes = true
-	reader.TrimLeadingSpace = true
-	return reader
-}
-
-func parseAssetImportDelimiter(value string) rune {
-	switch value {
-	case "tab", "\\t":
-		return '\t'
-	case "semicolon", ";":
-		return ';'
-	case "pipe", "|":
-		return '|'
-	default:
-		if len(value) == 1 {
-			return rune(value[0])
-		}
-		return ','
-	}
-}
-
-func assetImportDelimiterName(delimiter rune) string {
-	if delimiter == '\t' {
-		return "tab"
-	}
-	return string(delimiter)
-}
-
-func detectAssetImportDelimiter(path string) rune {
-	// Callers pass the server-owned upload path built from a validated UUID.
-	//nolint:gosec // G304 cannot infer the caller's path validation.
-	file, err := os.Open(path)
-	if err != nil {
-		return ','
-	}
-	defer func() { _ = file.Close() }()
-	data := make([]byte, 8192)
-	read, _ := file.Read(data)
-	lines := strings.SplitN(string(data[:read]), "\n", 5)
-	best, bestScore := ',', 0
-	for _, delimiter := range []rune{',', '\t', ';', '|'} {
-		counts := make([]int, 0, len(lines))
-		for _, line := range lines {
-			if strings.TrimSpace(line) != "" {
-				counts = append(counts, strings.Count(line, string(delimiter)))
-			}
-		}
-		if len(counts) < 2 || counts[0] == 0 {
-			continue
-		}
-		score := counts[0]
-		consistent := true
-		for _, count := range counts[1:] {
-			consistent = consistent && count == counts[0]
-		}
-		if consistent {
-			score *= 2
-		}
-		if score > bestScore {
-			best, bestScore = delimiter, score
-		}
-	}
-	return best
-}
-
-func parseAssetCSVPreview(path string, delimiter rune, hasHeader bool, limit int) (headers []string, rows [][]string, total int, err error) {
-	// Callers pass the server-owned upload path built from a validated UUID.
-	//nolint:gosec // G304 cannot infer the caller's path validation.
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	defer func() { _ = file.Close() }()
-	reader := newAssetCSVReader(file, delimiter)
-	if hasHeader {
-		headers, err = reader.Read()
-		if err != nil {
-			return nil, nil, 0, fmt.Errorf("read header: %w", err)
-		}
-	}
-	rows = make([][]string, 0, limit)
-	for {
-		record, readErr := reader.Read()
-		if readErr == io.EOF {
-			break
-		}
-		total++
-		if readErr != nil {
-			continue
-		}
-		if len(rows) < limit {
-			rows = append(rows, record)
-		}
-		if !hasHeader && headers == nil {
-			headers = make([]string, len(record))
-			for i := range headers {
-				headers[i] = fmt.Sprintf("Column %d", i+1)
-			}
-		}
-	}
-	return headers, rows, total, nil
 }
 
 func InferAssetImportFieldType(values []string) (fieldType string, options []string) {
@@ -762,42 +535,11 @@ func cleanAssetImportHeader(header string) string {
 	return strings.Join(words, " ")
 }
 
-func detectAssetHeaderMismatch(headers []string, rows [][]string, hasHeader bool) string {
-	if len(headers) == 0 || len(rows) == 0 {
-		return ""
-	}
-	looksLikeData := func(values []string) bool {
-		matches := 0
-		for _, value := range values {
-			value = strings.TrimSpace(value)
-			if _, err := strconv.ParseFloat(value, 64); err == nil || strings.Contains(value, "@") {
-				matches++
-			}
-		}
-		return matches > len(values)/2
-	}
-	if hasHeader && looksLikeData(headers) {
-		return "The first row looks like data rather than column headers."
-	}
-	if !hasHeader && !looksLikeData(rows[0]) {
-		keywords := 0
-		for _, value := range rows[0] {
-			if isStandardAssetImportField(value) {
-				keywords++
-			}
-		}
-		if keywords > 0 {
-			return "The first row looks like column headers."
-		}
-	}
-	return ""
-}
-
 func (s *AssetApplicationService) requireImportUpload(userID, setID int, uploadID string) error {
 	if s.attachmentPath == "" {
 		return ErrAssetImportStorageDisabled
 	}
-	owned, err := s.repo.ImportUploadOwnedBy(uploadID, setID, userID)
+	owned, err := s.imports.UploadOwnedBy(csvimport.KindAsset, setID, userID, uploadID)
 	if err != nil {
 		return err
 	}

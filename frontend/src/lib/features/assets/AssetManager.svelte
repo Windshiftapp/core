@@ -69,7 +69,7 @@
   // Set form state
   let showSetForm = $state(false);
   let editingSet = $state(null);
-  let setFormData = $state({ name: '', description: '', is_default: false });
+  let setFormData = $state({ name: '', description: '', is_default: false, portal_access: false });
 
   // Field assignment state
   let showFieldsModal = $state(false);
@@ -147,13 +147,19 @@
   function showAddSetForm() {
     showSetForm = true;
     editingSet = null;
-    setFormData = { name: '', description: '', is_default: false };
+    setFormData = { name: '', description: '', is_default: false, portal_access: false };
   }
 
-  function showEditSetForm(set) {
+  async function showEditSetForm(set) {
     showSetForm = true;
     editingSet = set;
-    setFormData = { name: set.name, description: set.description || '', is_default: set.is_default };
+    setFormData = { name: set.name, description: set.description || '', is_default: !!set.is_default, portal_access: !!set.portal_access };
+    try {
+      const access = await api.assetSets.getPortalAccess(set.id);
+      if (editingSet?.id === set.id) setFormData.portal_access = !!access;
+    } catch (error) {
+      console.error('Failed to load portal access:', error);
+    }
   }
 
   async function saveConfiguration(save, refresh, complete, failureAction, failureMessage) {
@@ -189,9 +195,24 @@
 
   async function handleSetSubmit() {
     await saveConfiguration(
-      () => editingSet
-        ? api.assetSets.update(editingSet.id, setFormData)
-        : api.assetSets.create(setFormData),
+      async () => {
+        if (editingSet) {
+          await api.assetSets.update(editingSet.id, {
+            name: setFormData.name,
+            description: setFormData.description,
+            is_default: setFormData.is_default,
+          });
+          if (isSetAdmin) {
+            await api.assetSets.setPortalAccess(editingSet.id, setFormData.portal_access);
+          }
+        } else {
+          await api.assetSets.create({
+            name: setFormData.name,
+            description: setFormData.description,
+            is_default: setFormData.is_default,
+          });
+        }
+      },
       loadAssetSets,
       () => showSetForm = false,
       'save asset set',
@@ -625,8 +646,9 @@
           iconOnly={true}
           showChevron={false}
           triggerClass="p-2 rounded hover-bg"
+          triggerTestid="asset-manager-set-actions"
           items={[
-            { id: 'edit', title: t('assets.editSet'), icon: IconEdit, onClick: () => showEditSetForm(selectedSet) },
+            { id: 'edit', title: t('assets.editSet'), icon: IconEdit, testid: 'asset-manager-edit-set', onClick: () => showEditSetForm(selectedSet) },
             { id: 'delete', title: t('assets.deleteSet'), icon: IconTrash, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
           ]}
         />
@@ -898,6 +920,14 @@
         />
       </div>
       <Checkbox bind:checked={setFormData.is_default} label={t('assets.default')} />
+      {#if editingSet && isSetAdmin}
+        <Checkbox
+          bind:checked={setFormData.portal_access}
+          label={t('assets.availableOnPortals')}
+          hint={t('assets.availableOnPortalsDesc')}
+          dataTestid="asset-set-portal-access"
+        />
+      {/if}
     </div>
     <DialogFooter
       onCancel={closeSetForm}

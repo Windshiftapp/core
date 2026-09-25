@@ -329,12 +329,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	// per-field portal-visibility flag), so derive the set of permitted custom
 	// field keys from the cf_<id> columns and project the stored JSON down to
 	// them — never serialize fields the report did not opt into.
-	allowedCustomFieldKeys := make(map[string]struct{})
-	for _, col := range columns {
-		if strings.HasPrefix(col, "cf_") {
-			allowedCustomFieldKeys[strings.TrimPrefix(col, "cf_")] = struct{}{}
-		}
-	}
+	allowedCustomFieldKeys := allowedPortalCustomFieldKeys(columns)
 
 	assetRepo := repository.NewAssetRepository(h.db)
 	assets, err := assetRepo.ListPortalReportAssets(ctx, report.AssetSetID, cqlSQL, cqlArgs, perPage, offset, allowedCustomFieldKeys)
@@ -357,6 +352,303 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	}
 
 	respondJSONOK(w, response)
+}
+
+// allowedPortalCustomFieldKeys derives the custom-field keys a report opts
+// into from its cf_<id> columns. Asset custom fields have no per-field portal
+// visibility flag, so a column_config entry is the only thing that authorizes
+// serializing a custom field to a portal visitor.
+func allowedPortalCustomFieldKeys(columns []string) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	for _, col := range columns {
+		if strings.HasPrefix(col, "cf_") {
+			allowed[strings.TrimPrefix(col, "cf_")] = struct{}{}
+		}
+	}
+	return allowed
+}
+
+// portalExposedSetReports groups the active, visible asset reports this visitor
+// can reach on the portal by asset set, dropping any set without a
+// portal-access grant. A grant alone never exposes a set: the set must also be
+// referenced by a report this visitor can actually see.
+func (h *PortalHandler) portalExposedSetReports(
+	channel models.Channel,
+	config models.ChannelConfig,
+	vc portalVisibilityContext,
+) (map[int][]models.AssetReport, error) {
+	reports, err := repository.NewAssetReportRepository(h.db).ListByChannel(channel.ID)
+	if err != nil {
+		return nil, err
+	}
+	assetRepo := repository.NewAssetRepository(h.db)
+	bySet := make(map[int][]models.AssetReport)
+	for _, ar := range reports {
+		if !ar.IsActive {
+			continue
+		}
+		bindingAvailable, err := h.assetReportBindingAvailable(&config, ar.RunMode, ar.ItemTypeID, ar.WorkspaceID)
+		if err != nil {
+			return nil, err
+		}
+		if !bindingAvailable {
+			continue
+		}
+		if !vc.isAdmin && !ar.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+			continue
+		}
+		enabled, err := assetRepo.IsSetPortalEnabled(ar.AssetSetID)
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			continue
+		}
+		bySet[ar.AssetSetID] = append(bySet[ar.AssetSetID], ar)
+	}
+	return bySet, nil
+}
+
+// portalReportCQLSQL evaluates a report's CQL with the current portal context
+// functions substituted and returns the SQL fragment plus args. An empty CQL
+// yields an empty fragment that matches every asset in the set.
+func (h *PortalHandler) portalReportCQLSQL(
+	ctx context.Context,
+	report *models.AssetReport,
+	portalCustomerID, customerOrgID *int,
+) (cqlSQL string, arguments []any, err error) {
+	query := report.CQLQuery
+	if strings.TrimSpace(query) == "" {
+		return "", nil, nil
+	}
+
+	fnCtx := cql.FunctionContext{CustomerID: portalCustomerID, OrganisationID: customerOrgID}
+	if portalCustomerID != nil {
+		userID, err := repository.NewPortalCustomerRepository(h.db).UserID(ctx, *portalCustomerID)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return "", nil, err
+		}
+		if userID != nil {
+			fnCtx.UserID = userID
+		} else if strings.Contains(query, "currentUser()") {
+			query = strings.ReplaceAll(query, "currentUser()", fmt.Sprintf("portal:%d", *portalCustomerID))
+		}
+	}
+	query = cql.SubstituteFunctions(query, fnCtx)
+
+	assetRepo := repository.NewAssetRepository(h.db)
+	setMap, err := assetRepo.GetCQLSetMap()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load set mapping: %w", err)
+	}
+	workspaceMap, err := repository.NewWorkspaceRepository(h.db).ListNameKeyToIDMap()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load workspace mapping: %w", err)
+	}
+	customFieldMap, err := assetRepo.GetCQLCustomFieldMap(report.AssetSetID)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load custom field mapping: %w", err)
+	}
+	itemCustomFieldMap, err := repository.NewItemRepository(h.db).GetCQLCustomFieldMap()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load item custom field mapping: %w", err)
+	}
+	evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, itemCustomFieldMap, h.db.GetDriverName())
+	return evaluator.EvaluateToSQL(query)
+}
+
+// resolvePortalAsset authorizes and projects a single asset. It returns nil
+// when the asset is missing, its set has no portal grant, or no visible report
+// on this portal includes it — the caller must not distinguish those cases.
+func (h *PortalHandler) resolvePortalAsset(
+	ctx context.Context,
+	reportsBySet map[int][]models.AssetReport,
+	assetID int,
+	portalCustomerID, customerOrgID *int,
+) (*repository.PortalReportAsset, error) {
+	assetSetID, err := repository.NewAssetRepository(h.db).GetAssetSetID(assetID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	reports := reportsBySet[assetSetID]
+	for i := range reports {
+		report := &reports[i]
+		cqlSQL, cqlArgs, err := h.portalReportCQLSQL(ctx, report, portalCustomerID, customerOrgID)
+		if err != nil {
+			return nil, err
+		}
+		query := cqlSQL
+		args := append([]any{}, cqlArgs...)
+		if query != "" {
+			query += " AND a.id = ?"
+		} else {
+			query = "a.id = ?"
+		}
+		args = append(args, assetID)
+		assets, err := repository.NewAssetRepository(h.db).ListPortalReportAssets(ctx, report.AssetSetID, query, args, 1, 0, allowedPortalCustomFieldKeys(report.ColumnConfig))
+		if err != nil {
+			return nil, err
+		}
+		if len(assets) > 0 {
+			return &assets[0], nil
+		}
+	}
+	return nil, nil
+}
+
+// portalAssetAccess carries the resolved portal context shared by the asset
+// read endpoints: the visible reports grouped by set, and the current
+// customer identity used by CQL context functions.
+type portalAssetAccess struct {
+	ctx              context.Context
+	reportsBySet     map[int][]models.AssetReport
+	portalCustomerID *int
+	customerOrgID    *int
+}
+
+// portalAssetRequestContext resolves the portal, its visibility context, and
+// the current customer identity shared by the portal asset read endpoints.
+// It writes the response and returns ok=false on failure.
+func (h *PortalHandler) portalAssetRequestContext(w http.ResponseWriter, r *http.Request) (portalAssetAccess, context.CancelFunc, bool) {
+	ctx, cancel, channel, config, ok := h.resolvePortalBySlug(w, r)
+	if !ok {
+		return portalAssetAccess{}, cancel, false
+	}
+	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
+	reportsBySet, err := h.portalExposedSetReports(channel, config, vc)
+	if err != nil {
+		cancel()
+		respondInternalError(w, r, err)
+		return portalAssetAccess{}, cancel, false
+	}
+	portalCustomerID, _ := h.getPortalCustomerID(ctx, r, channel.ID)
+	var customerOrgID *int
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	return portalAssetAccess{
+		ctx:              ctx,
+		reportsBySet:     reportsBySet,
+		portalCustomerID: portalCustomerID,
+		customerOrgID:    customerOrgID,
+	}, cancel, true
+}
+
+// GetPortalAsset returns one asset for a portal visitor through the
+// portal-access + visible-report gate. Missing and unauthorized ids both
+// return 404 so the endpoint is not an existence oracle.
+func (h *PortalHandler) GetPortalAsset(w http.ResponseWriter, r *http.Request) {
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	access, cancel, ok := h.portalAssetRequestContext(w, r)
+	if !ok {
+		return
+	}
+	defer cancel()
+
+	asset, err := h.resolvePortalAsset(access.ctx, access.reportsBySet, assetID, access.portalCustomerID, access.customerOrgID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if asset == nil {
+		respondNotFound(w, r, "asset")
+		return
+	}
+	respondJSONOK(w, asset)
+}
+
+// PortalAssetSummaries resolves a batch of asset ids, silently omitting ids
+// that are missing or not authorized for this portal. Used to prefill asset
+// fields without turning a bare id into a name probe.
+func (h *PortalHandler) PortalAssetSummaries(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	var body struct {
+		IDs []int `json:"ids"`
+	}
+	dec := newJSONDecoder(w, r)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		respondValidationError(w, r, "Invalid request body: "+err.Error())
+		return
+	}
+	if len(body.IDs) > 100 {
+		respondValidationError(w, r, "Too many asset ids")
+		return
+	}
+
+	access, cancel, ok := h.portalAssetRequestContext(w, r)
+	if !ok {
+		return
+	}
+	defer cancel()
+
+	assets := make([]repository.PortalReportAsset, 0, len(body.IDs))
+	for _, id := range body.IDs {
+		if id <= 0 {
+			continue
+		}
+		asset, err := h.resolvePortalAsset(access.ctx, access.reportsBySet, id, access.portalCustomerID, access.customerOrgID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if asset != nil {
+			assets = append(assets, *asset)
+		}
+	}
+	respondJSONOK(w, map[string]any{"assets": assets})
+}
+
+// SearchPortalAssets searches assets limited to portal-enabled sets this
+// visitor can reach through a visible report, then re-checks each hit against
+// those reports' CQL so the search cannot reveal assets a report hides.
+func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+	limit := 20
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 50 {
+			limit = parsed
+		}
+	}
+
+	access, cancel, ok := h.portalAssetRequestContext(w, r)
+	if !ok {
+		return
+	}
+	defer cancel()
+
+	setIDs := make([]int, 0, len(access.reportsBySet))
+	for setID := range access.reportsBySet {
+		setIDs = append(setIDs, setID)
+	}
+	matches, err := repository.NewAssetRepository(h.db).Search(query, setIDs, limit)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	assets := make([]repository.PortalReportAsset, 0, len(matches))
+	for _, match := range matches {
+		asset, err := h.resolvePortalAsset(access.ctx, access.reportsBySet, match.ID, access.portalCustomerID, access.customerOrgID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if asset != nil {
+			assets = append(assets, *asset)
+		}
+	}
+	respondJSONOK(w, map[string]any{"assets": assets})
 }
 
 // GetAssetReports returns asset reports for a portal, filtered by visibility

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/cql"
+	"windshift/internal/csvimport"
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -69,6 +70,7 @@ type AssetRoleAssignment struct {
 type AssetApplicationService struct {
 	db               database.Database
 	repo             *repository.AssetRepository
+	imports          *csvimport.Store
 	permissions      *PermissionService
 	assetPermissions *AssetPermissionService
 	assets           *AssetService
@@ -84,7 +86,7 @@ func NewAssetApplicationService(db database.Database, permissions *PermissionSer
 	if assetPermissions == nil {
 		assetPermissions = NewAssetPermissionService(repo, permissions)
 	}
-	return &AssetApplicationService{db: db, repo: repo, permissions: permissions, assetPermissions: assetPermissions, assets: assets}
+	return &AssetApplicationService{db: db, repo: repo, imports: csvimport.NewStore(db), permissions: permissions, assetPermissions: assetPermissions, assets: assets}
 }
 
 func (s *AssetApplicationService) WithLinks(links *ItemLinkService) *AssetApplicationService {
@@ -142,6 +144,11 @@ func (s *AssetApplicationService) GetSet(userID, id int) (*models.AssetManagemen
 	if roleErr == nil && role != nil {
 		set.UserPermission = role.Name
 	}
+	access, accessErr := s.repo.GetSetPortalAccess(id)
+	if accessErr != nil {
+		return nil, accessErr
+	}
+	set.PortalAccess = access
 	return set, nil
 }
 
@@ -205,9 +212,47 @@ func (s *AssetApplicationService) UpdateSet(userID, id int, actor AuditActor, pa
 	if err != nil {
 		return nil, err
 	}
+	access, err := s.repo.GetSetPortalAccess(id)
+	if err != nil {
+		return nil, err
+	}
+	result.PortalAccess = access
 	result.UserPermission = "Administrator"
 	emitServiceAudit(s.db, actor, logger.ActionAssetSetUpdate, logger.ResourceAssetSet, &id, result.Name, nil)
 	return result, nil
+}
+
+// PortalAccess returns the set's portal-exposure grant, or nil when the set is
+// not available on portals.
+func (s *AssetApplicationService) PortalAccess(userID, setID int) (*models.AssetSetPortalAccess, error) {
+	if err := s.require(userID, setID, AssetPermissionKeyView); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSetPortalAccess(setID)
+}
+
+// SetPortalAccess enables or disables portal exposure for a set. Requires
+// asset.admin on the set, so a global asset.manage-only user without a role on
+// the set cannot publish an asset set they cannot view.
+func (s *AssetApplicationService) SetPortalAccess(userID, setID int, enabled bool, actor AuditActor) (*models.AssetSetPortalAccess, error) {
+	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetSetByID(setID); err != nil {
+		return nil, err
+	}
+	if enabled {
+		if err := s.repo.GrantSetPortalAccess(setID, userID); err != nil {
+			return nil, err
+		}
+		emitServiceAudit(s.db, actor, logger.ActionAssetSetPortalAccessGrant, logger.ResourceAssetSetPortalAccess, &setID, "", nil)
+	} else {
+		if err := s.repo.RevokeSetPortalAccess(setID); err != nil {
+			return nil, err
+		}
+		emitServiceAudit(s.db, actor, logger.ActionAssetSetPortalAccessRevoke, logger.ResourceAssetSetPortalAccess, &setID, "", nil)
+	}
+	return s.repo.GetSetPortalAccess(setID)
 }
 
 func (s *AssetApplicationService) DeleteSet(userID, id int, actor AuditActor) error {

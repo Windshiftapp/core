@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"windshift/internal/csvimport"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -94,6 +95,9 @@ type assetRoleInput struct {
 }
 type everyoneRoleInput struct {
 	RoleID *int `json:"role_id"`
+}
+type assetSetPortalAccessInput struct {
+	Enabled bool `json:"enabled"`
 }
 type assetRoleAssignmentResponse struct {
 	Assigned bool `json:"assigned"`
@@ -295,6 +299,23 @@ func registerAssetSetRoutes(builder *routeBuilder, app *services.AssetApplicatio
 			return nil, err
 		}
 		result, err := app.SetEveryoneRole(user.ID, setID, input.RoleID, auditActor(r, user))
+		return result, assetError(err)
+	})
+	portalAccessPath := path + "/{asset_set_id}/portal-access"
+	builder.Read(portalAccessPath, AuthAuthenticated, []string{"assets:read"}, func(r *http.Request) (*models.AssetSetPortalAccess, error) {
+		user, setID, err := assetTarget(r, "asset_set_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.PortalAccess(user.ID, setID)
+		return result, assetError(err)
+	})
+	builder.SessionJSON(http.MethodPut, portalAccessPath, http.StatusOK, false, func(r *http.Request, input assetSetPortalAccessInput) (*models.AssetSetPortalAccess, error) {
+		user, setID, err := assetTarget(r, "asset_set_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.SetPortalAccess(user.ID, setID, input.Enabled, auditActor(r, user))
 		return result, assetError(err)
 	})
 }
@@ -646,8 +667,8 @@ func assetError(err error) error {
 		return newError(http.StatusServiceUnavailable, "service_unavailable", "Asset import storage is not configured")
 	case errors.Is(err, services.ErrAssetImportUploadNotFound):
 		return newError(http.StatusNotFound, "not_found", "Asset import upload was not found")
-	case errors.Is(err, repository.ErrAssetImportConfigConflict):
-		return newError(http.StatusConflict, "conflict", repository.ErrAssetImportConfigConflict.Error())
+	case errors.Is(err, csvimport.ErrConfigConflict):
+		return newError(http.StatusConflict, "conflict", csvimport.ErrConfigConflict.Error())
 	case errors.Is(err, repository.ErrDuplicateEntry):
 		return newError(http.StatusConflict, "conflict", "Asset resource already exists")
 	case errors.Is(err, services.ErrAssetConflict):

@@ -223,4 +223,18 @@ BEGIN
 	INSERT INTO item_change_log(item_id, workspace_id, change_type) VALUES (OLD.id, OLD.workspace_id, 'delete');
 END;
 
+-- Ticket CSV import idempotency: one row per imported ticket keyed by the
+-- source system's external reference within its workspace. Re-importing a
+-- CSV resolves through this table, so retries never duplicate tickets.
+CREATE TABLE IF NOT EXISTS item_import_rows (
+	workspace_id INTEGER NOT NULL,
+	external_ref TEXT NOT NULL,
+	item_id INTEGER NOT NULL,
+	job_id TEXT NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (workspace_id, external_ref),
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);
+
 -- migration: 0000_baseline

@@ -408,6 +408,66 @@ func (r *AssetRepository) GetSetByID(setID int) (*models.AssetManagementSet, err
 	return &set, nil
 }
 
+// GetSetPortalAccess returns the portal-access grant for a set, or nil when
+// the set is not exposed to portals.
+func (r *AssetRepository) GetSetPortalAccess(setID int) (*models.AssetSetPortalAccess, error) {
+	var access models.AssetSetPortalAccess
+	var grantedBy sql.NullInt64
+	var grantedByName sql.NullString
+	err := r.db.QueryRow(`
+		SELECT aspa.set_id, aspa.granted_by, aspa.granted_at,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') AS granted_by_name
+		FROM asset_set_portal_access aspa
+		LEFT JOIN users u ON aspa.granted_by = u.id
+		WHERE aspa.set_id = ?
+	`, setID).Scan(&access.SetID, &grantedBy, &access.GrantedAt, &grantedByName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get asset set portal access: %w", err)
+	}
+	if grantedBy.Valid {
+		v := int(grantedBy.Int64)
+		access.GrantedBy = &v
+	}
+	access.GrantedByName = grantedByName.String
+	return &access, nil
+}
+
+// IsSetPortalEnabled reports whether the set carries a portal-access grant.
+func (r *AssetRepository) IsSetPortalEnabled(setID int) (bool, error) {
+	var exists int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM asset_set_portal_access WHERE set_id = ?`, setID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check asset set portal access: %w", err)
+	}
+	return exists > 0, nil
+}
+
+// GrantSetPortalAccess upserts the portal-access grant for a set.
+func (r *AssetRepository) GrantSetPortalAccess(setID, grantedBy int) error {
+	now := time.Now()
+	_, err := r.db.ExecWrite(`
+		INSERT INTO asset_set_portal_access (set_id, granted_by, granted_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT (set_id) DO UPDATE SET granted_by = ?, granted_at = ?
+	`, setID, grantedBy, now, grantedBy, now)
+	if err != nil {
+		return fmt.Errorf("grant asset set portal access: %w", err)
+	}
+	return nil
+}
+
+// RevokeSetPortalAccess removes the grant. It is a no-op when none exists.
+func (r *AssetRepository) RevokeSetPortalAccess(setID int) error {
+	_, err := r.db.ExecWrite(`DELETE FROM asset_set_portal_access WHERE set_id = ?`, setID)
+	if err != nil {
+		return fmt.Errorf("revoke asset set portal access: %w", err)
+	}
+	return nil
+}
+
 // FindSetIDByName returns the ID of the asset set with the exact name.
 func (r *AssetRepository) FindSetIDByName(name string) (int, error) {
 	var setID int
@@ -2478,68 +2538,9 @@ func buildAssetListWhere(f AssetListFilter) (ctePrefix, whereClause string, args
 
 // Asset-import operations.
 
-type ImportJobRow struct {
-	JobID        string
-	Status       sql.NullString
-	Phase        sql.NullString
-	ProgressJSON sql.NullString
-	ErrorMessage sql.NullString
-	CreatedAt    sql.NullTime
-	StartedAt    sql.NullTime
-	CompletedAt  sql.NullTime
-}
-
-func (r *AssetRepository) CreateImportJob(jobID string, setID int, filePath, configJSON string, createdBy int, createdAt time.Time) error {
-	_, err := r.db.ExecWrite(`
-		INSERT INTO asset_import_jobs (id, set_id, status, phase, file_path, config_json, created_by, created_at, lease_expires_at)
-		VALUES (?, ?, 'queued', 'initializing', ?, ?, ?, ?, ?)
-	`, jobID, setID, filePath, configJSON, createdBy, createdAt, createdAt.Add(assetImportLeaseDuration).Unix())
-	if err != nil {
-		return fmt.Errorf("failed to create import job: %w", err)
-	}
-	return nil
-}
-
-func (r *AssetRepository) GetImportJob(jobID string, setID int) (*ImportJobRow, error) {
-	row := ImportJobRow{JobID: jobID}
-	err := r.db.QueryRow(`
-		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
-		FROM asset_import_jobs WHERE id = ? AND set_id = ?
-	`, jobID, setID).Scan(&row.Status, &row.Phase, &row.ProgressJSON, &row.ErrorMessage, &row.CreatedAt, &row.StartedAt, &row.CompletedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get import job: %w", err)
-	}
-	return &row, nil
-}
-
-func (r *AssetRepository) ListImportJobs(setID, limit int) ([]ImportJobRow, error) {
-	rows, err := r.db.Query(`
-		SELECT id, status, phase, progress_json, error_message, created_at, started_at, completed_at
-		FROM asset_import_jobs WHERE set_id = ? ORDER BY created_at DESC LIMIT ?
-	`, setID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list import jobs: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	jobs := make([]ImportJobRow, 0)
-	for rows.Next() {
-		var job ImportJobRow
-		if err := rows.Scan(&job.JobID, &job.Status, &job.Phase, &job.ProgressJSON, &job.ErrorMessage, &job.CreatedAt, &job.StartedAt, &job.CompletedAt); err != nil {
-			continue
-		}
-		jobs = append(jobs, job)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate import jobs: %w", err)
-	}
-	return jobs, nil
-}
-
-func (r *AssetRepository) deleteAssetsFromImportJobInTx(tx database.Tx, jobID string) error {
+// DeleteAssetsFromImportJobInTx rolls back the partial rows of an
+// interrupted asset CSV import inside the recovery transaction.
+func (r *AssetRepository) DeleteAssetsFromImportJobInTx(tx database.Tx, jobID string) error {
 	rows, err := tx.Query("SELECT id FROM assets WHERE import_job_id = ? ORDER BY id", jobID)
 	if err != nil {
 		return fmt.Errorf("load asset import links: %w", err)
@@ -2668,38 +2669,6 @@ func (r *AssetRepository) GetCustomFieldTypeAndOptions(fieldID int) (fieldType s
 		err = fmt.Errorf("failed to query custom field definition: %w", err)
 	}
 	return
-}
-
-func (r *AssetRepository) StartImportJobRunning(jobID, phase, progressJSON string) error {
-	now := time.Now().UTC()
-	return assetImportWriteResult(r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = 'running', phase = ?, progress_json = ?, started_at = ?, lease_expires_at = ?
-         WHERE id = ? AND status = 'queued' AND lease_expires_at > ?`,
-		phase, progressJSON, now, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
-}
-
-func (r *AssetRepository) FinishImportJob(jobID, status, phase, progressJSON, errorMessage string) error {
-	now := time.Now().UTC()
-	return assetImportWriteResult(r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = ?
-         WHERE id = ? AND status IN ('queued', 'running') AND lease_expires_at > ?`,
-		status, phase, progressJSON, errorMessage, now, jobID, now.Unix()))
-}
-
-func (r *AssetRepository) UpdateImportJobStatus(jobID, status, phase, progressJSON string) error {
-	now := time.Now().UTC()
-	return assetImportWriteResult(r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, lease_expires_at = ?
-         WHERE id = ? AND status IN ('queued', 'running') AND lease_expires_at > ?`,
-		status, phase, progressJSON, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
-}
-
-func (r *AssetRepository) UpdateImportJobProgress(jobID, phase, progressJSON string) error {
-	now := time.Now().UTC()
-	return assetImportWriteResult(r.db.ExecWrite(
-		`UPDATE asset_import_jobs SET phase = ?, progress_json = ?, lease_expires_at = ?
-         WHERE id = ? AND status = 'running' AND lease_expires_at > ?`,
-		phase, progressJSON, now.Add(assetImportLeaseDuration).Unix(), jobID, now.Unix()))
 }
 
 type ImportTypeFieldInput struct {

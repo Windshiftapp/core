@@ -1995,6 +1995,63 @@
         ]
       }
     },
+    "/asset-sets/{asset_set_id}/portal-access": {
+      "get": {
+        "description": "Get asset set portal access. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "asset_set_id",
+            "In": "path",
+            "Description": "The asset set identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get asset set portal access",
+        "tags": [
+          "Asset management"
+        ]
+      },
+      "put": {
+        "description": "Set asset set portal access. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "asset_set_id",
+            "In": "path",
+            "Description": "The asset set identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Set asset set portal access",
+        "tags": [
+          "Asset management"
+        ]
+      }
+    },
     "/asset-sets/{asset_set_id}/roles": {
       "get": {
         "description": "List asset set roles. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -16180,6 +16237,133 @@
         "summary": "Update test run example step",
         "tags": [
           "Test management"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/tickets/export": {
+      "get": {
+        "description": "Export tickets as CSV. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Export tickets as CSV",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/tickets/import/jobs/{job_id}": {
+      "get": {
+        "description": "Read ticket import progress. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "job_id",
+            "In": "path",
+            "Description": "The import job identifier.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read ticket import progress",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/tickets/import/start": {
+      "post": {
+        "description": "Start a ticket CSV import. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Start a ticket CSV import",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/tickets/import/upload": {
+      "post": {
+        "description": "Stage a ticket CSV import upload. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Stage a ticket CSV import upload",
+        "tags": [
+          "Work items"
         ]
       }
     },

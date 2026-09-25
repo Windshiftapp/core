@@ -190,6 +190,40 @@ var Catalog = []Migration{
 		Name:    "fresh-install baseline marker",
 	},
 	{
+		Version:       "20260924_generic_import_jobs",
+		Name:          "Generalize asset import jobs into a shared CSV import pipeline",
+		CheckSQLite:   sqliteTableCheck("import_jobs"),
+		CheckPostgres: pgTableCheck("import_jobs"),
+		SQLite: `
+			ALTER TABLE asset_import_jobs RENAME TO import_jobs;
+			ALTER TABLE asset_import_uploads RENAME TO import_uploads;
+			ALTER TABLE import_jobs RENAME COLUMN set_id TO scope_id;
+			ALTER TABLE import_uploads RENAME COLUMN set_id TO scope_id;
+			ALTER TABLE import_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'asset';
+			ALTER TABLE import_uploads ADD COLUMN kind TEXT NOT NULL DEFAULT 'asset';
+			DROP INDEX IF EXISTS idx_asset_import_jobs_set_id;
+			DROP INDEX IF EXISTS idx_asset_import_jobs_status;
+			DROP INDEX IF EXISTS idx_asset_import_jobs_created_by;
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_scope ON import_jobs(scope_id);
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_created_by ON import_jobs(created_by);
+		`,
+		Postgres: `
+			ALTER TABLE asset_import_jobs RENAME TO import_jobs;
+			ALTER TABLE asset_import_uploads RENAME TO import_uploads;
+			ALTER TABLE import_jobs RENAME COLUMN set_id TO scope_id;
+			ALTER TABLE import_uploads RENAME COLUMN set_id TO scope_id;
+			ALTER TABLE import_jobs ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'asset';
+			ALTER TABLE import_uploads ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'asset';
+			DROP INDEX IF EXISTS idx_asset_import_jobs_set_id;
+			DROP INDEX IF EXISTS idx_asset_import_jobs_status;
+			DROP INDEX IF EXISTS idx_asset_import_jobs_created_by;
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_scope ON import_jobs(scope_id);
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
+			CREATE INDEX IF NOT EXISTS idx_import_jobs_created_by ON import_jobs(created_by);
+		`,
+	},
+	{
 		Version:       "20260814_workflow_transitions_from_all",
 		Name:          "Allow workflow transitions from every other status",
 		CheckSQLite:   "SELECT COUNT(*) FROM pragma_table_info('workflow_transitions') WHERE name='from_all_statuses'",
@@ -1453,6 +1487,36 @@ var Catalog = []Migration{
 		`,
 	},
 	{
+		Version:       "20260924_item_import_rows",
+		Name:          "Track ticket CSV import rows for retry idempotency",
+		CheckSQLite:   sqliteTableCheck("item_import_rows"),
+		CheckPostgres: pgTableCheck("item_import_rows"),
+		SQLite: `
+			CREATE TABLE item_import_rows (
+				workspace_id INTEGER NOT NULL,
+				external_ref TEXT NOT NULL,
+				item_id INTEGER NOT NULL,
+				job_id TEXT NOT NULL,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (workspace_id, external_ref),
+				FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+			);
+		`,
+		Postgres: `
+			CREATE TABLE item_import_rows (
+				workspace_id INTEGER NOT NULL,
+				external_ref TEXT NOT NULL,
+				item_id INTEGER NOT NULL,
+				job_id TEXT NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (workspace_id, external_ref),
+				FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+			);
+		`,
+	},
+	{
 		Version:       "20260925_items_team",
 		Name:          "Assign a team to work items",
 		CheckSQLite:   sqliteColumnCheck("items", "team_id"),
@@ -1574,6 +1638,27 @@ var Catalog = []Migration{
 			);
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_incident_notification_state ON incident_notification_state(incident_id, notification_rule_id, repeat_index);
 			CREATE INDEX IF NOT EXISTS idx_incident_notification_state_due ON incident_notification_state(next_notification_at);
+		`,
+	},
+	{
+		Version:       "20260927_asset_set_portal_access",
+		Name:          "Add per-set portal access grants for asset sets",
+		CheckSQLite:   sqliteTableCheck("asset_set_portal_access"),
+		CheckPostgres: pgTableCheck("asset_set_portal_access"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS asset_set_portal_access (
+				set_id INTEGER PRIMARY KEY,
+				granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (set_id) REFERENCES asset_management_sets(id) ON DELETE CASCADE
+			);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS asset_set_portal_access (
+				set_id INTEGER PRIMARY KEY REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+				granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+			);
 		`,
 	},
 }

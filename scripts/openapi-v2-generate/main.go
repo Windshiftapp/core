@@ -107,10 +107,23 @@ func generate(data []byte) ([]byte, error) {
 		}
 
 		operationResponses := object(operation, "responses")
-		if route.ResponseShape == v2.ResponseEmpty {
+		switch {
+		case route.ResponseShape == v2.ResponseEmpty:
 			removeSuccessResponses(operationResponses)
 			operationResponses[strconv.Itoa(route.SuccessStatus)] = map[string]any{"description": "Request completed successfully with no response body."}
-		} else if route.ResponseShape != v2.ResponseRaw && route.ResponseType != nil {
+		case route.ResponseShape == v2.ResponseRaw:
+			// Raw handlers write their own body (e.g. CSV streams); the schema
+			// is a plain string under the operation-specific result name.
+			name := exportedName(operationID) + "Result"
+			schemas[name] = map[string]any{"type": "string"}
+			removeSuccessResponses(operationResponses)
+			operationResponses[strconv.Itoa(route.SuccessStatus)] = map[string]any{
+				"description": successDescription(operation),
+				"content": map[string]any{
+					route.ResponseMediaType: map[string]any{"schema": ref(name)},
+				},
+			}
+		case route.ResponseType != nil:
 			name := exportedName(operationID) + "Result"
 			schemas[name] = responseSchema(route)
 			removeSuccessResponses(operationResponses)

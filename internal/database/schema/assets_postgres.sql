@@ -248,10 +248,12 @@ CREATE INDEX IF NOT EXISTS idx_assets_frac_index ON assets(frac_index) WHERE fra
 CREATE INDEX IF NOT EXISTS idx_assets_created_by ON assets(created_by);
 CREATE INDEX IF NOT EXISTS idx_assets_import_job_id ON assets(import_job_id) WHERE import_job_id IS NOT NULL;
 
--- Asset Import Jobs (CSV import tracking)
-CREATE TABLE IF NOT EXISTS asset_import_jobs (
+-- Import Jobs (generic CSV import tracking; kind = 'asset' | 'ticket').
+-- Named scope_id: the owning container id (asset set or workspace).
+CREATE TABLE IF NOT EXISTS import_jobs (
 	id TEXT PRIMARY KEY,
-	set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+	kind TEXT NOT NULL DEFAULT 'asset',
+	scope_id INTEGER NOT NULL,
 	status TEXT NOT NULL DEFAULT 'queued',
 	phase TEXT DEFAULT 'initializing',
 	file_path TEXT NOT NULL,
@@ -265,14 +267,27 @@ CREATE TABLE IF NOT EXISTS asset_import_jobs (
 	lease_expires_at BIGINT -- Unix seconds; migration: 20260905_asset_import_leases
 );
 
-CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_set_id ON asset_import_jobs(set_id);
-CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_status ON asset_import_jobs(status);
-CREATE INDEX IF NOT EXISTS idx_asset_import_jobs_created_by ON asset_import_jobs(created_by);
+CREATE INDEX IF NOT EXISTS idx_import_jobs_scope ON import_jobs(scope_id);
+CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_import_jobs_created_by ON import_jobs(created_by);
 
 -- migration: 20260905_asset_import_upload_ownership
-CREATE TABLE IF NOT EXISTS asset_import_uploads (
+CREATE TABLE IF NOT EXISTS import_uploads (
  id TEXT PRIMARY KEY,
- set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL DEFAULT 'asset',
+ scope_id INTEGER NOT NULL,
  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  created_at BIGINT NOT NULL
+);
+
+-- migration: 20260924_generic_import_jobs
+
+-- migration: 20260927_asset_set_portal_access
+-- Presence of a row marks an asset set as "available on portals". The row
+-- alone does not authorize reads: a portal visitor still needs a portal that
+-- exposes the set through an active, visible asset report.
+CREATE TABLE IF NOT EXISTS asset_set_portal_access (
+	set_id INTEGER PRIMARY KEY REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+	granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	granted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

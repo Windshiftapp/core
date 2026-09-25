@@ -250,3 +250,15 @@ DO $$ BEGIN
 			FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE;
 	END IF;
 END $$;
+
+-- Ticket CSV import idempotency: see items.sql for the table contract.
+CREATE TABLE IF NOT EXISTS item_import_rows (
+	workspace_id INTEGER NOT NULL,
+	external_ref TEXT NOT NULL,
+	item_id INTEGER NOT NULL,
+	job_id TEXT NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (workspace_id, external_ref),
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);

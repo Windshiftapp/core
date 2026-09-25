@@ -21,6 +21,13 @@ export const assetSets = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  // Portal exposure (set administrators only)
+  getPortalAccess: (id) => fetchV2Data(`/asset-sets/${id}/portal-access`),
+  setPortalAccess: (id, enabled) =>
+    fetchV2Data(`/asset-sets/${id}/portal-access`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
 };
 
 export const assetRoles = {

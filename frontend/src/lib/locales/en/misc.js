@@ -428,6 +428,8 @@ export default {
     selectAnAssetSet: 'Select an Asset Set',
     selectAnAssetSetDesc: 'Choose an asset set from the dropdown above to view and manage assets.',
     default: 'Default',
+    availableOnPortals: 'Available on portals',
+    availableOnPortalsDesc: 'Let portal visitors read assets in this set through a portal report that references it.',
     assetTag: 'Asset Tag',
     preview: 'Preview',
     serialNumber: 'Serial Number',

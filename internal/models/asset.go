@@ -20,6 +20,19 @@ type AssetManagementSet struct {
 	AssetCount     int    `json:"asset_count,omitempty"`
 	// User's permission on this set (populated per-request)
 	UserPermission string `json:"user_permission,omitempty"` // view, edit, admin, or empty
+	// PortalAccess is populated when the set is exposed to portals.
+	PortalAccess *AssetSetPortalAccess `json:"portal_access,omitempty"`
+}
+
+// AssetSetPortalAccess marks an asset set as available on portals. The row's
+// presence enables the set; a portal visitor still needs a portal that exposes
+// the set through an active, visible asset report before reading its assets.
+// Internal asset roles are unaffected by this grant.
+type AssetSetPortalAccess struct {
+	SetID         int       `json:"set_id"`
+	GrantedBy     *int      `json:"granted_by,omitempty"`
+	GrantedAt     time.Time `json:"granted_at"`
+	GrantedByName string    `json:"granted_by_name,omitempty"`
 }
 
 // AssetManagementSetPermission represents user-level permission for an asset set
