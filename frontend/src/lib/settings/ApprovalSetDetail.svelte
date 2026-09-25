@@ -387,7 +387,8 @@
   }
 </script>
 
-<div class="p-6 max-w-5xl mx-auto">
+<div class="flex-1 min-h-0 overflow-y-auto p-6" style="background-color: var(--ds-surface);" data-testid="approval-set-detail-scroll">
+  <div class="max-w-5xl mx-auto">
   <div class="mb-4">
     <Button variant="ghost" icon={ArrowLeft} onclick={back}>
       {t('approvalSets.backToList')}
@@ -856,4 +857,5 @@
       </Button>
     </div>
   {/if}
+  </div>
 </div>
