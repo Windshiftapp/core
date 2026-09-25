@@ -957,7 +957,6 @@ func (s *Server) initialize() error {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
 	go s.runAssetImportRecovery(assetApplication)
-	go s.runTicketImportRecovery(s.ticketImport)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -981,6 +980,7 @@ func (s *Server) initialize() error {
 	emailProviderHandler.SetCredentialManager(emailCredManager)
 
 	s.ticketImport = services.NewTicketImportService(s.db, permService, cfg.AttachmentPath)
+	go s.runTicketImportRecovery(s.ticketImport)
 	s.emailScheduler = scheduler.NewEmailScheduler(s.db, emailCredManager, cfg.AttachmentPath)
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
@@ -2539,6 +2539,10 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 // runTicketImportRecovery rolls back abandoned ticket CSV imports so a
 // retried upload starts from a clean slate.
 func (s *Server) runTicketImportRecovery(tickets *services.TicketImportService) {
+	if tickets == nil {
+		return
+	}
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
