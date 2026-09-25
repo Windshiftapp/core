@@ -708,7 +708,7 @@
                 bind:this={swimlaneSettingsButton}
                 data-testid="map-swimlanes-button"
                 class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors"
-                style="background-color: var(--ctx-surface, var(--ds-background-neutral)); color: var(--ctx-text, var(--ds-text)); border: 1px solid var(--ctx-border, var(--ds-border));"
+                style="background-color: var(--ctx-surface, var(--ds-background-neutral)); color: var(--ds-text); border: 1px solid var(--ctx-border, var(--ds-border));"
                 onclick={() => (swimlaneSettingsOpen = !swimlaneSettingsOpen)}
               >
                 <Settings class="w-4 h-4" />
@@ -1011,16 +1011,16 @@
                 >
                   <ChevronDown
                     class="w-3.5 h-3.5 transition-transform"
-                    style="color: var(--ctx-text-subtle, var(--ds-text-subtle)); transform: rotate({laneExpanded ? 0 : -90}deg);"
+                    style="color: var(--ds-text-subtle); transform: rotate({laneExpanded ? 0 : -90}deg);"
                   />
                   {#if lane.color}
                     <span class="h-2 w-2 rounded-full shrink-0" style="background-color: {lane.color};"></span>
                   {/if}
                   <span class="text-sm font-medium" style={styles.glassTextStyle}>{lane.title}</span>
                   {#if lane.sublabel}
-                    <span class="text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">{lane.sublabel}</span>
+                    <span class="text-xs" style="color: var(--ds-text-subtle);">{lane.sublabel}</span>
                   {/if}
-                  <span class="text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">{lane.count}</span>
+                  <span class="text-xs" data-testid={`map-lane-count-${lane.key}`} style="color: var(--ds-text-subtle);">{lane.count}</span>
                 </button>
               </div>
               {#if laneExpanded}
