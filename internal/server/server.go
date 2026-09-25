@@ -161,6 +161,8 @@ type Server struct {
 	tokenTracker                 *services.TokenTracker
 	webhookSender                *webhook.WebhookSender
 	scmSyncStopChan              chan struct{}
+	issueSyncLoopMu              sync.Mutex
+	issueSyncLoopStop            chan struct{}
 	// secretEncryption is the at-rest secret cipher shared by the SCM and
 	// integration OAuth surfaces; set during wiring, used to revoke provider
 	// grants when a user is offboarded.
@@ -956,7 +958,6 @@ func (s *Server) initialize() error {
 	} else if n > 0 {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
-	go s.runAssetImportRecovery(assetApplication)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -980,7 +981,11 @@ func (s *Server) initialize() error {
 	emailProviderHandler.SetCredentialManager(emailCredManager)
 
 	s.ticketImport = services.NewTicketImportService(s.db, permService, cfg.AttachmentPath)
-	go s.runTicketImportRecovery(s.ticketImport)
+	if n, err := s.ticketImport.ReconcileInterrupted(); err != nil {
+		slog.Warn("failed to reconcile interrupted ticket imports", slog.Any("error", err))
+	} else if n > 0 {
+		slog.Info("reconciled interrupted ticket imports", slog.Int("count", n))
+	}
 	s.emailScheduler = scheduler.NewEmailScheduler(s.db, emailCredManager, cfg.AttachmentPath)
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
@@ -1002,8 +1007,9 @@ func (s *Server) initialize() error {
 
 	issueSyncService := scm.NewIssueSyncService(s.db, scmProviderHandler.GetEncryption())
 	issueSyncService.SetUserService(services.NewUserReadService(s.db))
-
-	go s.runIssueSync(issueSyncService)
+	issueSyncHandler := handlers.NewIssueSyncHandler(issueSyncService, permService, logger.NewAuditor(s.db))
+	issueSyncHandler.SetSyncConfigChanged(func() { s.refreshIssueSyncLoop(issueSyncService) })
+	s.refreshIssueSyncLoop(issueSyncService)
 
 	go s.runMagicLinkCleanup(magicLinkService)
 
@@ -1531,7 +1537,7 @@ func (s *Server) initialize() error {
 			ItemLinks:     scmItemLinksHandler,
 			UserToken:     userSCMTokenHandler,
 			EmailProvider: emailProviderHandler,
-			IssueSync:     handlers.NewIssueSyncHandler(issueSyncService, permService, logger.NewAuditor(s.db)),
+			IssueSync:     issueSyncHandler,
 		},
 		Items: routes.ItemHandlers{
 			Item:               itemHandler,
@@ -2431,6 +2437,12 @@ func (s *Server) cleanup() {
 
 func (s *Server) stopBackgroundLoops() {
 	s.backgroundStopOnce.Do(func() {
+		s.issueSyncLoopMu.Lock()
+		defer s.issueSyncLoopMu.Unlock()
+		if s.issueSyncLoopStop != nil {
+			close(s.issueSyncLoopStop)
+			s.issueSyncLoopStop = nil
+		}
 		// Do not nil these fields: workers read them concurrently.
 		if s.cleanupTicker != nil {
 			s.cleanupTicker.Stop()
@@ -2532,42 +2544,6 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 		case <-s.magicLinkStopChan:
 			slog.Info("magic link cleanup scheduler stopped")
 			return
-		}
-	}
-}
-
-// runTicketImportRecovery rolls back abandoned ticket CSV imports so a
-// retried upload starts from a clean slate.
-func (s *Server) runTicketImportRecovery(tickets *services.TicketImportService) {
-	if tickets == nil {
-		return
-	}
-
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-s.cleanupStopChan:
-			return
-		case <-ticker.C:
-			if _, err := tickets.ReconcileInterrupted(); err != nil {
-				slog.Error("ticket import recovery failed", "error", err)
-			}
-		}
-	}
-}
-
-func (s *Server) runAssetImportRecovery(assets *services.AssetApplicationService) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-s.cleanupStopChan:
-			return
-		case <-ticker.C:
-			if _, err := assets.ReconcileInterruptedImports(); err != nil {
-				slog.Error("asset import recovery failed", "error", err)
-			}
 		}
 	}
 }
@@ -2713,8 +2689,37 @@ func (s *Server) restoreExpiredEmailOAuthChannels(ctx context.Context) error {
 	return nil
 }
 
-// runIssueSync runs periodic GitHub Issue synchronization.
-func (s *Server) runIssueSync(issueSyncService *scm.IssueSyncService) {
+func (s *Server) refreshIssueSyncLoop(issueSyncService *scm.IssueSyncService) {
+	s.issueSyncLoopMu.Lock()
+	defer s.issueSyncLoopMu.Unlock()
+	select {
+	case <-s.issueSyncStopChan:
+		return
+	default:
+	}
+
+	enabled, err := issueSyncService.HasEnabledSyncConfig(context.Background())
+	if err != nil {
+		slog.Error("failed to check issue sync configuration", "error", err)
+		return
+	}
+	if !enabled {
+		if s.issueSyncLoopStop != nil {
+			close(s.issueSyncLoopStop)
+			s.issueSyncLoopStop = nil
+		}
+		return
+	}
+	if s.issueSyncLoopStop != nil {
+		return
+	}
+
+	s.issueSyncLoopStop = make(chan struct{})
+	go s.runIssueSync(issueSyncService, s.issueSyncLoopStop)
+}
+
+// runIssueSync runs periodic GitHub Issue synchronization while enabled.
+func (s *Server) runIssueSync(issueSyncService *scm.IssueSyncService, stop <-chan struct{}) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	slog.Info("Issue sync scheduler started (5-minute interval)")
@@ -2729,6 +2734,9 @@ func (s *Server) runIssueSync(issueSyncService *scm.IssueSyncService) {
 				slog.Error("Issue sync error", "error", err)
 			}
 			cancel()
+		case <-stop:
+			slog.Info("Issue sync scheduler stopped because no sync configs are enabled")
+			return
 		case <-s.issueSyncStopChan:
 			slog.Info("Issue sync scheduler stopped")
 			return

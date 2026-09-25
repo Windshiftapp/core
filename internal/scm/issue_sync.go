@@ -42,6 +42,23 @@ func NewIssueSyncService(db database.Database, encryption *sso.SecretEncryption)
 	return &IssueSyncService{db: db, encryption: encryption}
 }
 
+func (s *IssueSyncService) HasEnabledSyncConfig(ctx context.Context) (bool, error) {
+	var enabled bool
+	err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM issue_sync_configs isc
+			JOIN workspace_repositories wr ON wr.id = isc.workspace_repository_id
+			JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+			WHERE isc.sync_enabled = ? AND wr.is_active = ? AND wsc.enabled = ?
+		)
+	`, true, true, true).Scan(&enabled)
+	if err != nil {
+		return false, fmt.Errorf("check enabled issue sync configs: %w", err)
+	}
+	return enabled, nil
+}
+
 // SyncAll finds all enabled issue sync configs and syncs each one.
 func (s *IssueSyncService) SyncAll(ctx context.Context) error {
 	if !s.syncMu.TryLock() {

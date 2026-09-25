@@ -15,16 +15,17 @@ const LeaseDuration = time.Minute
 
 // JobRow is the persisted state of one import job.
 type JobRow struct {
-	JobID        string
-	Kind         string
-	ScopeID      int
-	Status       sql.NullString
-	Phase        sql.NullString
-	ProgressJSON sql.NullString
-	ErrorMessage sql.NullString
-	CreatedAt    sql.NullTime
-	StartedAt    sql.NullTime
-	CompletedAt  sql.NullTime
+	JobID          string
+	Kind           string
+	ScopeID        int
+	Status         sql.NullString
+	Phase          sql.NullString
+	ProgressJSON   sql.NullString
+	ErrorMessage   sql.NullString
+	CreatedAt      sql.NullTime
+	StartedAt      sql.NullTime
+	CompletedAt    sql.NullTime
+	LeaseExpiresAt sql.NullInt64
 }
 
 // Store persists import uploads and jobs in the shared generic tables.
@@ -96,10 +97,10 @@ func (s *Store) ClaimUpload(kind string, scopeID, userID int, uploadID, filePath
 func (s *Store) GetJob(kind string, scopeID int, jobID string) (*JobRow, error) {
 	row := &JobRow{JobID: jobID, Kind: kind, ScopeID: scopeID}
 	err := s.db.QueryRow(`
-		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
+		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at, lease_expires_at
 		FROM import_jobs WHERE id = ? AND kind = ? AND scope_id = ?
 	`, jobID, kind, scopeID).Scan(&row.Status, &row.Phase, &row.ProgressJSON, &row.ErrorMessage,
-		&row.CreatedAt, &row.StartedAt, &row.CompletedAt)
+		&row.CreatedAt, &row.StartedAt, &row.CompletedAt, &row.LeaseExpiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUploadNotFound
 	}
@@ -112,7 +113,7 @@ func (s *Store) GetJob(kind string, scopeID int, jobID string) (*JobRow, error) 
 // ListJobs returns the scope's most recent jobs, newest first.
 func (s *Store) ListJobs(kind string, scopeID, limit int) ([]JobRow, error) {
 	rows, err := s.db.Query(`
-		SELECT id, status, phase, progress_json, error_message, created_at, started_at, completed_at
+		SELECT id, status, phase, progress_json, error_message, created_at, started_at, completed_at, lease_expires_at
 		FROM import_jobs WHERE kind = ? AND scope_id = ? ORDER BY created_at DESC LIMIT ?
 	`, kind, scopeID, limit)
 	if err != nil {
@@ -124,7 +125,7 @@ func (s *Store) ListJobs(kind string, scopeID, limit int) ([]JobRow, error) {
 	for rows.Next() {
 		var job JobRow
 		if err := rows.Scan(&job.JobID, &job.Status, &job.Phase, &job.ProgressJSON, &job.ErrorMessage,
-			&job.CreatedAt, &job.StartedAt, &job.CompletedAt); err != nil {
+			&job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.LeaseExpiresAt); err != nil {
 			continue
 		}
 		jobs = append(jobs, job)

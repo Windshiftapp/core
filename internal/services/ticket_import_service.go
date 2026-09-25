@@ -135,6 +135,16 @@ func (s *TicketImportService) getJob(workspaceID int, jobID string) (*TicketImpo
 	if err != nil {
 		return nil, err
 	}
+	if (row.Status.String == "queued" || row.Status.String == "running") &&
+		(!row.LeaseExpiresAt.Valid || row.LeaseExpiresAt.Int64 <= time.Now().UTC().Unix()) {
+		if _, err := s.ReconcileInterrupted(); err != nil {
+			return nil, err
+		}
+		row, err = s.imports.GetJob(csvimport.KindTicket, workspaceID, jobID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	job := &TicketImportJob{
 		JobID: jobID, Status: row.Status.String, Phase: row.Phase.String,
 		CreatedAt: nullableTime(row.CreatedAt), CompletedAt: nullableTime(row.CompletedAt),

@@ -18,6 +18,7 @@ type IssueSyncHandler struct {
 	issueSyncService  *scm.IssueSyncService
 	permissionService *services.PermissionService
 	auditor           *logger.Auditor
+	syncConfigChanged func()
 }
 
 // NewIssueSyncHandler creates a new IssueSyncHandler.
@@ -27,6 +28,10 @@ func NewIssueSyncHandler(issueSyncService *scm.IssueSyncService, permService *se
 		permissionService: permService,
 		auditor:           auditor,
 	}
+}
+
+func (h *IssueSyncHandler) SetSyncConfigChanged(callback func()) {
+	h.syncConfigChanged = callback
 }
 
 // validateSyncConfigRequest gates the user-supplied fields on a sync-config
@@ -180,6 +185,9 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if h.syncConfigChanged != nil {
+		h.syncConfigChanged()
+	}
 	h.audit(r, user, logger.ActionIssueSyncConfigCreate, config)
 	respondJSONCreated(w, config)
 }
@@ -246,6 +254,9 @@ func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if h.syncConfigChanged != nil {
+		h.syncConfigChanged()
+	}
 	h.audit(r, user, logger.ActionIssueSyncConfigUpdate, updated)
 	respondJSONOK(w, updated)
 }
@@ -262,6 +273,9 @@ func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if h.syncConfigChanged != nil {
+		h.syncConfigChanged()
+	}
 	h.audit(r, user, logger.ActionIssueSyncConfigDelete, config)
 	w.WriteHeader(http.StatusNoContent)
 }

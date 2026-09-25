@@ -210,12 +210,29 @@ func (s *AssetApplicationService) GetImportJob(userID, setID int, jobID string) 
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
 		return AssetImportJob{}, err
 	}
+	return s.getImportJob(setID, jobID)
+}
+
+func (s *AssetApplicationService) getImportJob(setID int, jobID string) (AssetImportJob, error) {
 	row, err := s.imports.GetJob(csvimport.KindAsset, setID, jobID)
 	if errors.Is(err, csvimport.ErrUploadNotFound) {
 		row, err = nil, repository.ErrNotFound
 	}
 	if err != nil {
 		return AssetImportJob{}, err
+	}
+	if (row.Status.String == "queued" || row.Status.String == "running") &&
+		(!row.LeaseExpiresAt.Valid || row.LeaseExpiresAt.Int64 <= time.Now().UTC().Unix()) {
+		if _, err := s.ReconcileInterruptedImports(); err != nil {
+			return AssetImportJob{}, err
+		}
+		row, err = s.imports.GetJob(csvimport.KindAsset, setID, jobID)
+		if errors.Is(err, csvimport.ErrUploadNotFound) {
+			row, err = nil, repository.ErrNotFound
+		}
+		if err != nil {
+			return AssetImportJob{}, err
+		}
 	}
 	return assetImportJobFromRow(jobID, row), nil
 }
@@ -227,6 +244,20 @@ func (s *AssetApplicationService) ListImportJobs(userID, setID int) ([]AssetImpo
 	rows, err := s.imports.ListJobs(csvimport.KindAsset, setID, 20)
 	if err != nil {
 		return nil, err
+	}
+	now := time.Now().UTC().Unix()
+	for i := range rows {
+		if (rows[i].Status.String == "queued" || rows[i].Status.String == "running") &&
+			(!rows[i].LeaseExpiresAt.Valid || rows[i].LeaseExpiresAt.Int64 <= now) {
+			if _, err := s.ReconcileInterruptedImports(); err != nil {
+				return nil, err
+			}
+			rows, err = s.imports.ListJobs(csvimport.KindAsset, setID, 20)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
 	}
 	jobs := make([]AssetImportJob, len(rows))
 	for i := range rows {
