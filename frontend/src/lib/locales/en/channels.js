@@ -456,6 +456,7 @@ export default {
     rowActionSourceAssetId: 'Asset ID',
     rowActionSourceAssetTag: 'Asset tag',
     rowActionSourceTitle: 'Asset title',
+    rowActionIncomplete: 'Row action {index} is incomplete: {field} is required',
     runReport: 'Run Report',
     failedToRunReport: 'Failed to run report',
     fieldRequired: '{field} is required',

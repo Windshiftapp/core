@@ -118,9 +118,32 @@
   }
 
   // Changing the target request type invalidates the previously chosen field.
-  function onRowActionRequestTypeChange(action) {
+  // BasePicker single-select reports the choice through onSelect, not onChange.
+  function onRowActionRequestTypeSelect(action, item) {
     action.target_field = '';
-    loadRequestTypeFields(action.request_type_id);
+    loadRequestTypeFields(item?.id);
+  }
+
+  // Block submit on incomplete row actions so partially filled ones are never
+  // silently dropped from the saved config. A fully empty row is still a draft
+  // and is simply ignored.
+  function incompleteRowActionError() {
+    for (let i = 0; i < formData.row_actions.length; i++) {
+      const action = formData.row_actions[i];
+      const started = Boolean(action.label?.trim() || action.request_type_id || action.target_field);
+      if (!started) continue;
+      const missing = !action.label?.trim()
+        ? t('portal.rowActionLabel')
+        : !action.request_type_id
+          ? t('portal.rowActionRequestType')
+          : !action.target_field
+            ? t('portal.rowActionTargetField')
+            : null;
+      if (missing) {
+        return t('portal.rowActionIncomplete', { index: i + 1, field: missing });
+      }
+    }
+    return null;
   }
 
   function parseConfig(cfg) {
@@ -207,6 +230,11 @@
     }
     if (formData.run_mode === 'form' && !/\$\{[a-zA-Z0-9_-]+\}/.test(formData.cql_query)) {
       error = t('portal.qlQueryTokenRequired');
+      return;
+    }
+    const rowActionError = incompleteRowActionError();
+    if (rowActionError) {
+      error = rowActionError;
       return;
     }
 
@@ -546,7 +574,7 @@
                         getValue={(item) => item.id}
                         getLabel={(item) => item.name}
                         inputTestid={`asset-report-row-action-request-type-${index}`}
-                        onChange={() => onRowActionRequestTypeChange(action)}
+                        onSelect={(item) => onRowActionRequestTypeSelect(action, item)}
                       />
                     </div>
                     <div>

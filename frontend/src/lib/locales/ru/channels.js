@@ -429,6 +429,7 @@ export default {
     rowActionSourceAssetId: 'ID актива',
     rowActionSourceAssetTag: 'Тег актива',
     rowActionSourceTitle: 'Название актива',
+    rowActionIncomplete: 'Действие строки {index} не заполнено: требуется «{field}»',
     runReport: 'Создать отчёт',
     failedToRunReport: 'Не удалось создать отчёт',
     fieldRequired: 'Заполните поле «{field}»',
