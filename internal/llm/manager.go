@@ -200,6 +200,49 @@ func (m *ConnectionManager) resolve(connectionID int) (*resolvedConnection, erro
 	}, nil
 }
 
+// ConnectionDescriptor is the non-secret identity of a resolved LLM connection:
+// enough for a caller to report which model answered a request and to price the
+// usage it produced, without holding a client or touching the API key.
+type ConnectionDescriptor struct {
+	ConnectionID int
+	ProviderType ProviderType
+	Model        string
+	// UsedFallback marks the env-var client, which has no database row — its
+	// provider and model are genuinely unknown, so callers must not guess them.
+	UsedFallback bool
+	// Pricing is the catalog's USD rates for Model, or nil when the catalog
+	// carries none. A nil Pricing means cost stays unknown, never estimated.
+	Pricing *Pricing
+}
+
+// ResolveWithIdentity returns a Client for the given connection ID together
+// with the descriptor for the same resolution. Callers that need to report or
+// price a call use this rather than resolving a second time: a second resolve
+// could land on a different connection if the admin changed the default
+// mid-request, which would attribute one model's cost to another.
+func (m *ConnectionManager) ResolveWithIdentity(connectionID int) (Client, ConnectionDescriptor, error) {
+	rc, err := m.resolve(connectionID)
+	if err != nil {
+		return nil, ConnectionDescriptor{}, err
+	}
+	return rc.client, m.descriptorFor(rc), nil
+}
+
+// descriptorFor projects a resolved connection onto its public identity,
+// attaching catalog pricing when one exists for the model.
+func (m *ConnectionManager) descriptorFor(rc *resolvedConnection) ConnectionDescriptor {
+	desc := ConnectionDescriptor{
+		ConnectionID: rc.connectionID,
+		ProviderType: rc.providerType,
+		Model:        rc.model,
+		UsedFallback: rc.usedFallback,
+	}
+	if desc.Model != "" {
+		desc.Pricing = m.ModelPricing(rc.providerType, rc.model)
+	}
+	return desc
+}
+
 // ConnectionRuntimeConfig contains the decrypted runtime fields needed to
 // resolve the admin-selected provider for a coding-agent run (the model id for
 // the agent container; the key + base URL stay server-side in the llm-proxy).
@@ -782,6 +825,23 @@ func (m *ConnectionManager) ResolveForFeatureWithOverride(featureKey string, use
 		return nil, ErrFeatureDisabled
 	}
 	return m.Resolve(decision.connectionID)
+}
+
+// ResolveForFeatureWithIdentity applies the same per-feature policy as
+// ResolveForFeatureWithOverride and returns the descriptor for the connection
+// that policy selected. Both must stay on decideFeatureResolution: a chat that
+// reports the wrong model because it re-derived the policy is worse than one
+// that reports nothing.
+func (m *ConnectionManager) ResolveForFeatureWithIdentity(featureKey string, userOverrideConnectionID int) (Client, ConnectionDescriptor, error) {
+	cfg, err := LoadAIFeaturesConfig(m.db)
+	if err != nil {
+		return nil, ConnectionDescriptor{}, err
+	}
+	decision := decideFeatureResolution(cfg[featureKey], userOverrideConnectionID)
+	if decision.disabled {
+		return nil, ConnectionDescriptor{}, ErrFeatureDisabled
+	}
+	return m.ResolveWithIdentity(decision.connectionID)
 }
 
 // featureResolution is the outcome of applying the feature policy: either the

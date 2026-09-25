@@ -1,6 +1,9 @@
 package llm
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // unmarshalExtras parses data into a raw map and removes the specified known keys,
 // returning only the unknown fields.
@@ -141,6 +144,21 @@ type CompletionRequest struct {
 // Windshift's OpenAI-compatible proxy endpoint. New internal code should use
 // CompletionRequest.
 type ChatCompletionRequest = CompletionRequest
+
+// CompletionRequestImageCount reports how many image parts a request sends.
+// Images carry their own per-part rate, so metering needs this alongside the
+// normalized token usage to price a call correctly.
+func CompletionRequestImageCount(request CompletionRequest) int {
+	count := 0
+	for _, message := range request.Messages {
+		for _, attachment := range message.Attachments {
+			if strings.HasPrefix(strings.ToLower(attachment.MimeType), "image/") {
+				count++
+			}
+		}
+	}
+	return count
+}
 
 // CompletionResponse is Windshift's normalized generation result.
 type CompletionResponse struct {

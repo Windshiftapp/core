@@ -307,6 +307,7 @@ func (r *AgentConversationRepository) listMessages(ctx context.Context, sessionI
 		}
 		message.ContextJSON = contextJSON.String
 		message.MetadataJSON = metadataJSON.String
+		applyAgentMessageTelemetry(&message)
 		reversed = append(reversed, message)
 	}
 	if err := rows.Err(); err != nil {
@@ -317,6 +318,32 @@ func (r *AgentConversationRepository) listMessages(ctx context.Context, sessionI
 		out[len(reversed)-1-i] = reversed[i]
 	}
 	return out, nil
+}
+
+// agentMessageTelemetry is the allow-listed projection of a stored message's
+// metadata_json that is safe to serve. agent_messages.metadata_json is json:"-"
+// on purpose: it is an internal scratchpad whose other keys (stop reason, tool
+// summaries, review reasons) are an implementation detail of the run loop.
+// Telemetry is different — a user asking "what did that cost, and which model
+// answered?" needs it after a reload, and it carries no prompt or response text.
+type agentMessageTelemetry struct {
+	Model string                 `json:"model"`
+	Usage *models.RunUsageTotals `json:"usage"`
+}
+
+// applyAgentMessageTelemetry lifts the model and usage out of a message's stored
+// metadata. A malformed or absent blob leaves both fields zero: telemetry is
+// supplementary, so a corrupt value must not cost the caller the message.
+func applyAgentMessageTelemetry(message *models.AgentMessage) {
+	if message.MetadataJSON == "" {
+		return
+	}
+	var telemetry agentMessageTelemetry
+	if err := json.Unmarshal([]byte(message.MetadataJSON), &telemetry); err != nil {
+		return
+	}
+	message.Model = telemetry.Model
+	message.Usage = telemetry.Usage
 }
 
 type BeginAgentTurnInput struct {

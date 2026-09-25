@@ -1744,7 +1744,8 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 			COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
 			COALESCE(u.email, '') as user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
-			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name
+			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
+			COALESCE(ih.source, '') AS source
 		FROM item_history ih
 		LEFT JOIN users u ON ih.user_id = u.id
 		LEFT JOIN users owner ON owner.id = u.agent_owner_user_id
@@ -1761,7 +1762,8 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 			COALESCE(u.first_name || ' ' || u.last_name, u.username, 'System') AS user_name,
 			COALESCE(u.email, '') AS user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
-			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name
+			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
+			'' AS source
 		FROM approval_decisions d
 		JOIN approval_requests ar ON ar.id = d.approval_request_id
 		LEFT JOIN users u ON u.id = d.actor_user_id
@@ -1779,7 +1781,7 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 	history := []models.ItemHistory{}
 	for rows.Next() {
 		var entry models.ItemHistory
-		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName); err != nil {
+		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName, &entry.Source); err != nil {
 			return nil, err
 		}
 		if !includeAgentOwner {

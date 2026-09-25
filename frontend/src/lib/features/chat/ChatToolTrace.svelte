@@ -7,9 +7,12 @@
    *   2. The agent hitting the iteration ceiling (stopReason === 'max_iterations').
    *   3. Empty tool_calls when the agent went straight to a text reply.
    */
-  import { IconChevronRight, IconAlertTriangle, IconCircleCheck, IconCircleX } from '@tabler/icons-svelte-runes';
+  import { IconChevronRight, IconAlertTriangle, IconCircleCheck, IconCircleX, IconReceipt } from '@tabler/icons-svelte-runes';
+  import { formatCostUSD, hasMeteredUsage } from '../../utils/llmUsage.js';
 
-  /** @type {{ toolCalls?: any[], iterations?: number, maxIterations?: number, stopReason?: string, needsReview?: boolean, reviewReasons?: string[] }} */
+  /**
+   * @type {{ toolCalls?: any[], iterations?: number, maxIterations?: number, stopReason?: string, needsReview?: boolean, reviewReasons?: string[], model?: string, usage?: { prompt_tokens: number, completion_tokens: number, total_tokens: number, cost_usd: number|null, calls: number }|null }}
+   */
   let {
     toolCalls = [],
     iterations = 0,
@@ -17,12 +20,33 @@
     stopReason = '',
     needsReview = false,
     reviewReasons = [],
+    model = '',
+    usage = null,
   } = $props();
 
   let expanded = $state(false);
   let expandedIdx = $state(/** @type {number | null} */ (null));
+  // The token/cost reading is behind a click rather than inline: it is
+  // reference detail most turns never need, and keeping it collapsed stops the
+  // footer from competing with the answer for attention.
+  let showMeter = $state(false);
 
   const hitLimit = $derived(stopReason === 'max_iterations');
+  // Nothing to report when metering never ran for the turn, or when the
+  // fallback client served it and there is no model to name.
+  const hasMeter = $derived(hasMeteredUsage(usage));
+  const meterLabel = $derived.by(() => {
+    if (!hasMeter) return '';
+    const parts = [];
+    if (model) parts.push(model);
+    parts.push(`${usage.total_tokens.toLocaleString()} tokens`);
+    parts.push(
+      `(${usage.prompt_tokens.toLocaleString()} in · ${usage.completion_tokens.toLocaleString()} out)`
+    );
+    const cost = formatCostUSD(usage.cost_usd);
+    parts.push(cost || 'cost unknown');
+    return parts.join(' · ');
+  });
 
   function toolStatus(tc) {
     // Soft-error convention: tool returned a JSON body with an "error"
@@ -71,27 +95,52 @@
   </div>
 {/if}
 
-{#if toolCalls.length > 0 || hitLimit}
+{#if toolCalls.length > 0 || hitLimit || hasMeter}
   <div class="trace">
-    <button
-      class="summary"
-      class:warn={hitLimit}
-      onclick={() => (expanded = !expanded)}
-      aria-expanded={expanded}
-      type="button"
-    >
-      <IconChevronRight
-        size={12}
-        stroke={1.5}
-        class={expanded ? 'chev open' : 'chev'}
-      />
-      {#if hitLimit}
-        <IconAlertTriangle size={12} stroke={1.5} class="icon-warn" />
-        <span>Ran out of steps after {iterations}/{maxIterations} — {toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'}</span>
-      {:else}
-        <span>{toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'} · {iterations}/{maxIterations} steps</span>
-      {/if}
-    </button>
+    {#if toolCalls.length > 0 || hitLimit}
+      <button
+        class="summary"
+        class:warn={hitLimit}
+        onclick={() => (expanded = !expanded)}
+        aria-expanded={expanded}
+        type="button"
+      >
+        <IconChevronRight
+          size={12}
+          stroke={1.5}
+          class={expanded ? 'chev open' : 'chev'}
+        />
+        {#if hitLimit}
+          <IconAlertTriangle size={12} stroke={1.5} class="icon-warn" />
+          <span>Ran out of steps after {iterations}/{maxIterations} — {toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'}</span>
+        {:else}
+          <span>{toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'} · {iterations}/{maxIterations} steps</span>
+        {/if}
+      </button>
+    {/if}
+
+    {#if hasMeter}
+      <!-- No aria-label: the accessible name comes from the content, so the
+           expanded reading is announced rather than overridden by a label
+           that says only "usage". The collapsed icon gets its name from the
+           visually-hidden span instead. -->
+      <button
+        class="meter"
+        class:on={showMeter}
+        onclick={() => (showMeter = !showMeter)}
+        aria-expanded={showMeter}
+        title="Model and token usage"
+        data-testid="chat-usage-toggle"
+        type="button"
+      >
+        <IconReceipt size={12} stroke={1.5} />
+        {#if showMeter}
+          <span class="meter-detail" data-testid="chat-usage-detail">{meterLabel}</span>
+        {:else}
+          <span class="sr-only">Model and token usage</span>
+        {/if}
+      </button>
+    {/if}
 
     {#if expanded}
       <ol class="calls">
@@ -156,6 +205,44 @@
     margin-top: 6px;
     font-size: 11px;
     color: var(--ds-text-subtle);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-border);
+    color: var(--ds-text-subtle);
+    cursor: pointer;
+    font: inherit;
+  }
+  .meter:hover {
+    background: var(--ds-background-neutral-hovered);
+  }
+  .meter.on {
+    /* Expanded: the reading is the button's content, so it reads as one
+       control rather than a label paired with loose text. */
+    align-items: baseline;
+  }
+  .meter-detail {
+    color: var(--ds-text);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
   .summary {
     display: inline-flex;

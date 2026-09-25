@@ -628,6 +628,7 @@ func (s *WorkflowService) CommitTransition(
 		OldValue:  fmt.Sprintf("%d", oldStatusID),
 		NewValue:  fmt.Sprintf("%d", newStatusID),
 		ChangedAt: changedAt,
+		Source:    historySourceForAgent(metadata),
 	}); err != nil {
 		return fmt.Errorf("record transition history: %w", err)
 	}

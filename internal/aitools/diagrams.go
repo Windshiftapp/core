@@ -223,7 +223,7 @@ func init() {
 				return nil, err
 			}
 			if herr := repo.RecordHistory(itemID, env.UserID, "diagram_created", nil,
-				fmt.Sprintf("diagram:%d:%s", id, name)); herr != nil {
+				fmt.Sprintf("diagram:%d:%s", id, name), env.Source); herr != nil {
 				// History is best-effort, mirroring the handler.
 				_ = herr
 			}
@@ -310,7 +310,7 @@ func init() {
 				oldName = &old
 			}
 			_ = repo.RecordHistory(existing.ItemID, env.UserID, "diagram_updated", oldName,
-				fmt.Sprintf("diagram:%d:%s", args.ID, newName))
+				fmt.Sprintf("diagram:%d:%s", args.ID, newName), env.Source)
 			env.AuditWrite(resourceDiagram, args.ID, "update_diagram", newName)
 
 			return diagramSummaryDTO{
@@ -358,7 +358,7 @@ func init() {
 			if !canEdit {
 				return map[string]string{"error": "permission denied"}, nil
 			}
-			_ = repo.RecordHistory(itemID, env.UserID, "diagram_deleted", &name, name)
+			_ = repo.RecordHistory(itemID, env.UserID, "diagram_deleted", &name, name, env.Source)
 			if err := repo.Delete(args.ID); err != nil {
 				if errors.Is(err, repository.ErrNotFound) {
 					return map[string]string{"error": "diagram not found"}, nil

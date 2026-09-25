@@ -51,7 +51,7 @@ func (s *ItemDiagramService) Create(itemID int, name, data string, actorID int) 
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.RecordHistory(itemID, actorID, "diagram_created", nil, fmt.Sprintf("diagram:%d:%s", id, name))
+	_ = s.repo.RecordHistory(itemID, actorID, "diagram_created", nil, fmt.Sprintf("diagram:%d:%s", id, name), "")
 	return s.repo.GetByID(int(id))
 }
 
@@ -71,7 +71,7 @@ func (s *ItemDiagramService) Update(id int, name, data string, actorID int) (*mo
 	if current.Name != name {
 		oldName = &current.Name
 	}
-	_ = s.repo.RecordHistory(current.ItemID, actorID, "diagram_updated", oldName, fmt.Sprintf("diagram:%d:%s", id, name))
+	_ = s.repo.RecordHistory(current.ItemID, actorID, "diagram_updated", oldName, fmt.Sprintf("diagram:%d:%s", id, name), "")
 	return s.repo.GetByID(id)
 }
 
@@ -95,7 +95,7 @@ func (s *ItemDiagramService) Delete(id, actorID int) (*models.ItemDiagram, error
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.RecordHistory(diagram.ItemID, actorID, "diagram_deleted", &diagram.Name, diagram.Name)
+	_ = s.repo.RecordHistory(diagram.ItemID, actorID, "diagram_deleted", &diagram.Name, diagram.Name, "")
 	if err := s.repo.Delete(id); err != nil {
 		return nil, err
 	}

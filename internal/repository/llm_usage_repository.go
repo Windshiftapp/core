@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // LLMUsageRepository persists per-call LLM token usage + cost, metered at the
@@ -55,17 +56,11 @@ func (r *LLMUsageRepository) Insert(ctx context.Context, rec LLMUsageRecord) err
 	return nil
 }
 
-// RunUsageTotals is the aggregated token + cost spend for a single run.
-type RunUsageTotals struct {
-	PromptTokens     int      `json:"prompt_tokens"`
-	CompletionTokens int      `json:"completion_tokens"`
-	TotalTokens      int      `json:"total_tokens"`
-	CacheReadTokens  int      `json:"cache_read_tokens"`
-	CacheWriteTokens int      `json:"cache_write_tokens"`
-	ReasoningTokens  int      `json:"reasoning_tokens"`
-	CostUSD          *float64 `json:"cost_usd"` // nil when no call carried a known cost
-	Calls            int      `json:"calls"`
-}
+// RunUsageTotals is the aggregated token + cost spend for a single run. It
+// aliases the model because the same numbers are read here, written by the
+// metering services, and served on agent-message and agent-run responses — one
+// definition, so a field added for one surface cannot be missing on another.
+type RunUsageTotals = models.RunUsageTotals
 
 // TotalsForRun aggregates all metered calls for a run. CostUSD is the sum of
 // the calls whose cost was known; it is nil when none were.

@@ -464,6 +464,13 @@ export default {
     selectOrCreateLabels: 'Select or create labels',
   },
 
+  history: {
+    // Tooltip on the bot marker shown when an agent changed the item on this
+    // user's behalf through the AI Chat, as opposed to the connected-agent
+    // markers under comments.agentAuthored / comments.agentOwnedBy.
+    viaAIChat: 'Changed via AI chat',
+  },
+
   comments: {
     failedToLoad: 'Failed to load comments',
     failedToCreate: 'Failed to post comment',

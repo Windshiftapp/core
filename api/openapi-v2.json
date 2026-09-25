@@ -19100,6 +19100,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
                 "user_email": {
                   "description": "The user email value.",
                   "type": "string"

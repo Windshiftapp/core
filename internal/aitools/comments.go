@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"windshift/internal/auth"
-	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -121,7 +120,7 @@ func init() {
 				AuthorID:      env.UserID,
 				Content:       args.Content,
 				ActorUserID:   env.UserID,
-				EventMetadata: itemevents.Agent(fmt.Sprintf("user:%d", env.UserID), "agent"),
+				EventMetadata: env.eventMetadata(),
 			})
 			if err != nil {
 				return nil, err

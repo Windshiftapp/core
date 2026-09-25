@@ -3,9 +3,11 @@
 package aitools
 
 import (
+	"fmt"
 	"log/slog"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/services"
 )
@@ -125,4 +127,21 @@ func (e *Env) HasWorkspaceAccess(workspaceID int) bool {
 		}
 	}
 	return false
+}
+
+// eventMetadata describes this adapter's writes as agent-actor provenance, so
+// the durable event store and the item-history feed can both answer "an agent
+// did this on the user's behalf, through which surface?". ActorRef carries the
+// human the agent acts as — the identity every tool's permission check already
+// used, so the audit trail attributes the change to the same principal.
+//
+// Source falls back to "agent" when an embedder left it unset: writing
+// "application" would be a lie (this is not a direct UI click) and would make
+// the history feed's source column non-empty but unmatchable.
+func (e *Env) eventMetadata() itemevents.Metadata {
+	source := e.Source
+	if source == "" {
+		source = "agent"
+	}
+	return itemevents.Agent(fmt.Sprintf("user:%d", e.UserID), source)
 }

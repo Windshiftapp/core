@@ -39,6 +39,10 @@ export default {
     setStatus: 'Задать статус', unassigned: 'Не назначено', milestone: 'Этап', iteration: 'Итерация', labels: 'Метки', addLabel: '+ Добавить метку', storyPoints: 'Сторипойнты', storyPointsChildRollup: '{points} пт. из {count} дочерних элементов', project: 'Проект', clickToViewDetails: 'Нажмите, чтобы открыть сведения', itemLinkCopied: 'Ссылка на элемент скопирована', failedToCopyToClipboard: 'Не удалось скопировать в буфер обмена', copyError: 'Ошибка копирования', setField: 'Задать поле «{field}»', selectField: 'Выберите поле «{field}»', enterField: 'Введите «{field}»', notSet: 'Не задано', selectIteration: 'Выберите итерацию', noIteration: 'Без итерации', selectOrCreateLabels: 'Выберите или создайте метки',
   },
 
+  history: {
+    viaAIChat: 'Изменено через ИИ-чат',
+  },
+
   comments: {
     failedToLoad: 'Не удалось загрузить комментарии', failedToCreate: 'Не удалось отправить комментарий', confirmDelete: 'Удалить этот комментарий?', failedToDelete: 'Не удалось удалить комментарий', failedToUpdate: 'Не удалось обновить комментарий', edited: 'изменено', newCommentsAvailable: 'Новых: {count}', editComment: 'Изменить комментарий', deleteComment: 'Удалить комментарий', editPlaceholder: 'Измените комментарий…', writePlaceholder: 'Добавить комментарий…', markdownSupported: 'Поддерживается Markdown', posting: 'Отправка…', comment: 'Комментарий', noComments: 'Комментариев пока нет', beFirstToComment: 'Оставьте первый комментарий к этому элементу.', internalNote: 'Внутренняя заметка', internalNoteHint: 'Не видна на портале', internalNoteHintGeneral: 'Видна только участникам команды', internal: 'Внутренний', oldestFirst: 'Сначала старые', newestFirst: 'Сначала новые', agentAuthored: 'Автор — ИИ-агент', agentOwnedBy: 'Владелец ИИ-агента: {owner}',
   },

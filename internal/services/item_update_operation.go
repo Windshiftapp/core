@@ -157,6 +157,17 @@ func readItemMilestoneIDsForHistory(tx database.Tx, itemID int) ([]int, error) {
 	return ids, nil
 }
 
+// eventMetadata resolves the merged provenance for this update. Hoisted into a
+// method so the history rows and the domain event are stamped from one value —
+// item_history.source must never disagree with the event's actor_kind/source_kind.
+func (u *itemUpdateOperation) eventMetadata() itemevents.Metadata {
+	metadata := mergeItemEventMetadata(u.req.EventMetadata, itemEventMetadata(u.req.UserID, "application", nil))
+	if metadata.OccurredAt.IsZero() {
+		metadata.OccurredAt = u.now
+	}
+	return metadata
+}
+
 func (u *itemUpdateOperation) recordHistoryAndEvent() error {
 	eventHistory := u.service.compareAndGenerateHistory(u.original, &u.updated, u.req.UserID)
 	if u.opts.recordHistory {
@@ -174,6 +185,7 @@ func (u *itemUpdateOperation) recordHistoryAndEvent() error {
 		}
 	}
 	if u.opts.recordHistory {
+		stampHistorySource(u.history, u.eventMetadata())
 		if err := u.service.recordItemHistory(u.tx, u.history); err != nil {
 			return fmt.Errorf("failed to record history: %w", err)
 		}
@@ -185,10 +197,7 @@ func (u *itemUpdateOperation) recordHistoryAndEvent() error {
 }
 
 func (u *itemUpdateOperation) recordEvent() error {
-	metadata := mergeItemEventMetadata(u.req.EventMetadata, itemEventMetadata(u.req.UserID, "application", nil))
-	if metadata.OccurredAt.IsZero() {
-		metadata.OccurredAt = u.now
-	}
+	metadata := u.eventMetadata()
 	changes := itemevents.Changes(u.original, &u.updated)
 	if u.hasMilestoneIDs && u.milestonesChanged {
 		changes = append(changes, itemevents.FieldChange{

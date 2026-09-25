@@ -651,6 +651,14 @@ type ChatResponse struct {
 	// not a claim that the answer is wrong. ReviewReasons explains why.
 	NeedsReview   bool     `json:"needs_review,omitempty"`
 	ReviewReasons []string `json:"review_reasons,omitempty"`
+	// Model is the model id that actually answered, which is not always the one
+	// the connection currently points at. Empty for the env-var fallback client,
+	// which has no configured model to name.
+	Model string `json:"model,omitempty"`
+	// Usage is the metered token/cost total for this turn. Nil when metering
+	// failed or nothing was recorded, so the UI omits the meter rather than
+	// showing a confident zero.
+	Usage *repository.RunUsageTotals `json:"usage,omitempty"`
 }
 
 // reviewVerdictForToolCalls computes the recovery-aware review flag for a chat
@@ -807,7 +815,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		history = append(history, llm.Message{Role: message.Role, Content: content})
 	}
 
-	llmClient, err := mode.resolveLLM(h.chatLLMs, req.ConnectionID)
+	llmClient, llmDescriptor, err := mode.resolveLLM(h.chatLLMs, req.ConnectionID)
 	if err != nil {
 		_ = runRepo.Finalize(r.Context(), begun.RunID, models.AgentRunStatusFailed,
 			"Configured LLM is unavailable", time.Now().UTC())
@@ -914,12 +922,30 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		_ = runRepo.AppendEvent(context.Background(), begun.RunID, "tool",
 			marshalChatMetadata(map[string]any{"name": call.Name, "status": status}))
 	}
+	// Meter the turn against its own agent_runs row so the model's identity and
+	// spend survive a reload. Best-effort: the answer is already produced, and a
+	// bookkeeping miss must not fail a turn the user is waiting on.
+	usage, meterErr := services.RecordLLMCall(r.Context(), h.llmUsage, begun.RunID, llmDescriptor, services.MeteredCall{
+		Usage:  result.Usage,
+		Images: result.Images,
+		Calls:  result.Calls,
+	})
+	if meterErr != nil {
+		slog.WarnContext(context.Background(), "meter ai chat turn",
+			slog.Int("run_id", begun.RunID),
+			slog.String("model", llmDescriptor.Model),
+			slog.Any("error", meterErr),
+		)
+	}
+
 	metadata := marshalChatMetadata(map[string]any{
 		"stop_reason":    result.StopReason,
 		"iterations":     result.Iterations,
 		"tool_summaries": toolSummaries,
 		"needs_review":   verdict.Flagged,
 		"review_reasons": verdict.Reasons,
+		"model":          llmDescriptor.Model,
+		"usage":          usage,
 	})
 	assistantMessageID, err := h.conversations.CompleteTurn(
 		context.Background(), session.ID, begun.RunID, mode.actingUserID,
@@ -945,7 +971,19 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		StopReason:    string(result.StopReason),
 		NeedsReview:   verdict.Flagged,
 		ReviewReasons: verdict.Reasons,
+		Model:         llmDescriptor.Model,
+		Usage:         chatUsageOrNil(usage, meterErr),
 	})
+}
+
+// chatUsageOrNil reports the metered totals, or nil when metering failed or
+// nothing was recorded. A nil Usage tells the UI to omit the meter rather than
+// render a confident zero.
+func chatUsageOrNil(usage repository.RunUsageTotals, err error) *repository.RunUsageTotals {
+	if err != nil || usage.Calls == 0 {
+		return nil
+	}
+	return &usage
 }
 
 var errChatPermissionDenied = errors.New("agent chat permission denied")
@@ -971,13 +1009,21 @@ type chatExecutionMode struct {
 type chatLLMResolver interface {
 	Resolve(connectionID int) (llm.Client, error)
 	ResolveForFeatureWithOverride(featureKey string, userOverrideConnectionID int) (llm.Client, error)
+	// ResolveWithIdentity / ResolveForFeatureWithIdentity return the descriptor
+	// for the connection the matching Resolve would have picked. The chat needs
+	// the model name and catalog pricing to report and meter the turn, and it
+	// must come from the same resolution the client did — resolving twice could
+	// straddle an admin changing the default connection and attribute one
+	// model's cost to another.
+	ResolveWithIdentity(connectionID int) (llm.Client, llm.ConnectionDescriptor, error)
+	ResolveForFeatureWithIdentity(featureKey string, userOverrideConnectionID int) (llm.Client, llm.ConnectionDescriptor, error)
 }
 
-func (m chatExecutionMode) resolveLLM(manager chatLLMResolver, overrideID int) (llm.Client, error) {
+func (m chatExecutionMode) resolveLLM(manager chatLLMResolver, overrideID int) (llm.Client, llm.ConnectionDescriptor, error) {
 	if m.standard {
-		return manager.Resolve(m.llmConnectionID)
+		return manager.ResolveWithIdentity(m.llmConnectionID)
 	}
-	return manager.ResolveForFeatureWithOverride("ai_chat", overrideID)
+	return manager.ResolveForFeatureWithIdentity("ai_chat", overrideID)
 }
 
 func (h *AIHandler) resolveChatSession(ctx context.Context, userID, requestedSessionID int) (*models.AgentSession, error) {

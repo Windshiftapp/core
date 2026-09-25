@@ -35,6 +35,9 @@ type AIHandler struct {
 	commentService         *services.CommentService
 	approvalService        *services.ApprovalService
 	chatLLMs               chatLLMResolver
+	// llmUsage meters each chat turn's token/cost against its own agent_runs
+	// row, so the model's identity and the turn's spend outlive the response.
+	llmUsage *repository.LLMUsageRepository
 }
 
 // NewAIHandler creates a new AI handler.
@@ -62,6 +65,7 @@ func NewAIHandler(
 		conversations:          repository.NewAgentConversationRepository(db),
 		agentBindings:          repository.NewWorkspaceAgentBindingRepository(db),
 		chatLLMs:               llmManager,
+		llmUsage:               repository.NewLLMUsageRepository(db),
 	}
 }
 

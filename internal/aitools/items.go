@@ -11,7 +11,6 @@ import (
 	"windshift/internal/auth"
 	"windshift/internal/cql"
 	"windshift/internal/database"
-	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -357,7 +356,7 @@ func init() {
 				CreatorID:        &env.UserID,
 				ValidatingUserID: env.UserID,
 				PermService:      env.PermService,
-				EventMetadata:    itemevents.Agent(fmt.Sprintf("user:%d", env.UserID), "agent"),
+				EventMetadata:    env.eventMetadata(),
 			})
 			if err != nil {
 				return map[string]string{"error": fmt.Sprintf("create failed: %s", err.Error())}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
@@ -411,9 +410,10 @@ func init() {
 			result, err := services.NewItemUpdateService(env.DB).
 				WithPermissionService(env.PermService).
 				UpdateItem(services.UpdateItemRequest{
-					ItemID:     itemID,
-					UpdateData: updateData,
-					UserID:     env.UserID,
+					ItemID:        itemID,
+					UpdateData:    updateData,
+					UserID:        env.UserID,
+					EventMetadata: env.eventMetadata(),
 				})
 			if err != nil {
 				return map[string]string{"error": fmt.Sprintf("update failed: %s", err.Error())}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
@@ -554,10 +554,11 @@ func init() {
 			conditionSvc := services.NewConditionService(env.DB, env.PermService, services.NewScriptEngine())
 			approvalSvc := services.NewApprovalService(env.DB, repository.NewLeaveRepository(env.DB), workflowSvc)
 			result, err := workflowSvc.PerformTransition(ctx, services.PerformTransitionRequest{
-				ItemID:      itemID,
-				ToStatusID:  toStatusID,
-				ActorUserID: env.UserID,
-				Modes:       []string{"validator", "condition"},
+				ItemID:        itemID,
+				ToStatusID:    toStatusID,
+				ActorUserID:   env.UserID,
+				EventMetadata: env.eventMetadata(),
+				Modes:         []string{"validator", "condition"},
 			}, repository.NewItemRepository(env.DB), conditionSvc, approvalSvc)
 			if err != nil {
 				if rej := services.IsTransitionRejection(err); rej != nil {

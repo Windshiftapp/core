@@ -158,6 +158,11 @@ type ItemHistory struct {
 	IsAgent   bool   `json:"is_agent"`             // Whether the user is an AI agent
 	// AgentOwnerName is permission-filtered by the item-history handler.
 	AgentOwnerName string `json:"agent_owner_name,omitempty"`
+	// Source names the acting surface when an agent made the change on the
+	// user's behalf ("ai_chat", "mcp", "standard_agent"). Empty for a direct
+	// write. The UI marks these rows so a viewer can tell a change the user
+	// typed from one the AI made for them under their name.
+	Source string `json:"source,omitempty"`
 	// Resolved values for display (when value is an ID)
 	ResolvedOldValue *string `json:"resolved_old_value,omitempty"` // Human-readable version of old_value
 	ResolvedNewValue *string `json:"resolved_new_value,omitempty"` // Human-readable version of new_value

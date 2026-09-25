@@ -27,6 +27,12 @@ type HistoryEntry struct {
 	OldValueNull bool
 	NewValue     string
 	ChangedAt    time.Time
+	// Source names the surface that produced the change when an agent acted on
+	// a human's behalf (aitools.SourceAIChat, SourceMCP, SourceStandardAgent).
+	// Empty for a direct cookie-auth write, which needs no explanation. The
+	// column answers "did the AI do this?", so it is deliberately sparse
+	// rather than re-encoding provenance every UI click already implies.
+	Source string
 }
 
 // RecordHistory records a history entry for an item change
@@ -36,9 +42,10 @@ func (r *ItemRepository) RecordHistory(w HistoryWriter, entry HistoryEntry) erro
 		oldValue = nil
 	}
 	_, err := w.ExecWrite(`
-		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, entry.ItemID, entry.UserID, entry.FieldName, oldValue, entry.NewValue, entry.ChangedAt)
+		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, entry.ItemID, entry.UserID, entry.FieldName, oldValue, entry.NewValue, entry.ChangedAt,
+		nullStringArg(entry.Source))
 	if err != nil {
 		return fmt.Errorf("failed to record history: %w", err)
 	}

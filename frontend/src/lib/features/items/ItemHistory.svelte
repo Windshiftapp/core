@@ -9,7 +9,7 @@
 	import EmptyState from '../../components/EmptyState.svelte';
 	import Tooltip from '../../components/Tooltip.svelte';
 	import { t } from '../../stores/i18n.svelte.js';
-	import { agentOwnerName, loadAttributedItemHistory } from './activityAttributionData.js';
+	import { agentOwnerName, isAIChatAttributed, loadAttributedItemHistory } from './activityAttributionData.js';
 
 	let { itemId } = $props();
 
@@ -38,6 +38,12 @@
 	}
 
 	function agentTooltipContent(entry) {
+		// AI-chat attribution is checked first: a chat-driven change is the
+		// more specific fact, and its owner is simply the human whose name is
+		// already on the row, so the connected-agent copy would be misleading.
+		if (isAIChatAttributed(entry)) {
+			return t('history.viaAIChat');
+		}
 		const owner = agentOwnerName(entry);
 		if (owner) {
 			return t('comments.agentOwnedBy', { owner });
@@ -65,11 +71,24 @@
 					user_id: entry.user_id,
 					user_name: entry.user_name,
 					user_email: entry.user_email,
-					is_agent: entry.is_agent,
-					agent_owner_name: entry.agent_owner_name,
+					is_agent: false,
+					agent_owner_name: '',
+					source: '',
 					changes: []
 				};
 				groups.push(currentGroup);
+			}
+
+			// Attribution is OR-ed across the whole group rather than taken from
+			// the first row: one agentic write emits many field rows sharing a
+			// single timestamp, and trusting the first would drop the marker
+			// whenever that row happened to carry no stamp.
+			currentGroup.is_agent = currentGroup.is_agent || !!entry.is_agent;
+			if (isAIChatAttributed(entry)) {
+				currentGroup.source = entry.source;
+			}
+			if (!currentGroup.agent_owner_name && entry.agent_owner_name) {
+				currentGroup.agent_owner_name = entry.agent_owner_name;
 			}
 
 			currentGroup.changes.push({
@@ -214,9 +233,9 @@
 					</div>
 					<div class="body">
 						<div class="header">
-							{#if group.is_agent}
+							{#if group.is_agent || isAIChatAttributed(group)}
 								<Tooltip content={agentTooltipContent(group)} placement="top">
-									<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+									<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
 								</Tooltip>
 							{/if}
 							<span class="user">{group.user_name || 'Unknown'}</span>
