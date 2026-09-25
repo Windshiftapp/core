@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
+	"windshift/internal/sanitize"
 	"windshift/internal/services"
 )
 
@@ -660,7 +662,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 
 	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
-	assetReports, err := h.loadPortalAssetReports(channel, config, vc)
+	assetReports, err := h.loadPortalAssetReports(ctx, channel, config, vc)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -668,11 +670,85 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	respondJSONOK(w, assetReports)
 }
 
-func (h *PortalHandler) loadPortalAssetReports(channel models.Channel, config models.ChannelConfig, vc portalVisibilityContext) ([]models.PublicAssetReport, error) {
+// allowedRowActionSources are the scalar asset fields a row action may pass
+// through its link. Anything else is dropped before the config is exposed.
+var allowedRowActionSources = map[string]bool{
+	"asset_id":  true,
+	"asset_tag": true,
+	"title":     true,
+}
+
+// visibleRequestTypeIDs returns the active request types on a channel that the
+// current portal visitor may open. Row actions targeting anything outside this
+// set are dropped so a link never exposes a hidden form or its id.
+func (h *PortalHandler) visibleRequestTypeIDs(ctx context.Context, channelID int, vc portalVisibilityContext) (map[int]bool, error) {
+	rows, err := h.db.QueryContext(ctx, `
+		SELECT id, visibility_group_ids, visibility_org_ids
+		FROM request_types
+		WHERE channel_id = ? AND is_active = true
+	`, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	visible := make(map[int]bool)
+	for rows.Next() {
+		var id int
+		var groupIDs, orgIDs sql.NullString
+		if err := rows.Scan(&id, &groupIDs, &orgIDs); err != nil {
+			return nil, err
+		}
+		groups, err := unmarshalIntIDs(groupIDs)
+		if err != nil {
+			return nil, fmt.Errorf("parse request type %d visibility groups: %w", id, err)
+		}
+		orgs, err := unmarshalIntIDs(orgIDs)
+		if err != nil {
+			return nil, fmt.Errorf("parse request type %d visibility organizations: %w", id, err)
+		}
+		rt := models.RequestType{VisibilityGroupIDs: groups, VisibilityOrgIDs: orgs}
+		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+			visible[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return visible, nil
+}
+
+// filterVisibleRowActions copies the row actions whose target request type is
+// visible to the visitor, scrubbing the display fields and dropping malformed
+// or unsupported entries.
+func filterVisibleRowActions(actions []models.AssetReportRowAction, visibleTypes map[int]bool) []models.AssetReportRowAction {
+	filtered := []models.AssetReportRowAction{}
+	for _, action := range actions {
+		if action.RequestTypeID <= 0 || !visibleTypes[action.RequestTypeID] {
+			continue
+		}
+		if !allowedRowActionSources[action.Source] {
+			continue
+		}
+		action.Label = strings.TrimSpace(action.Label)
+		sanitize.Apply(&action.Label, sanitize.PlainTextField)
+		sanitize.Apply(&action.TargetField, sanitize.ShortIdentifier)
+		if action.Label == "" || action.TargetField == "" {
+			continue
+		}
+		filtered = append(filtered, action)
+	}
+	return filtered
+}
+
+func (h *PortalHandler) loadPortalAssetReports(ctx context.Context, channel models.Channel, config models.ChannelConfig, vc portalVisibilityContext) ([]models.PublicAssetReport, error) {
 	reports, err := repository.NewAssetReportRepository(h.db).ListByChannel(channel.ID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Computed once, lazily, only when a report actually carries row actions.
+	var visibleTypes map[int]bool
 
 	assetReports := []models.PublicAssetReport{}
 	for _, ar := range reports {
@@ -706,10 +782,22 @@ func (h *PortalHandler) loadPortalAssetReports(channel models.Channel, config mo
 				if err := json.Unmarshal([]byte(*ar.Config), &config); err != nil {
 					slog.Warn("ignoring invalid public asset report config",
 						slog.String("component", "portal_assets"), slog.Int("asset_report_id", ar.ID), slog.Any("error", err))
-				} else if config.SuccessMessage != "" || config.SubmitButtonText != "" {
-					publicReport.Config = &models.PublicAssetReportConfig{
+				} else {
+					publicConfig := models.PublicAssetReportConfig{
 						SuccessMessage:   config.SuccessMessage,
 						SubmitButtonText: config.SubmitButtonText,
+					}
+					if len(config.RowActions) > 0 {
+						if visibleTypes == nil {
+							visibleTypes, err = h.visibleRequestTypeIDs(ctx, channel.ID, vc)
+							if err != nil {
+								return nil, err
+							}
+						}
+						publicConfig.RowActions = filterVisibleRowActions(config.RowActions, visibleTypes)
+					}
+					if publicConfig.SuccessMessage != "" || publicConfig.SubmitButtonText != "" || len(publicConfig.RowActions) > 0 {
+						publicReport.Config = &publicConfig
 					}
 				}
 			}

@@ -23,6 +23,10 @@
     requestType = null,
     portalSlug = '',
     isDarkMode = false,
+    // Field values to seed on open, keyed by field_identifier (e.g. the
+    // clicked asset id for an asset field). Applied after any draft resume so
+    // the prefill wins for its target field while other draft values remain.
+    prefill = {},
     onsubmitted = () => {},
     onclose = () => {}
   } = $props();
@@ -61,8 +65,10 @@
 
   // Load fields when modal opens
   $effect(() => {
+    // Read prefill here so a URL-driven change re-seeds the form.
+    const prefillValues = prefill;
     if (isOpen && requestType) {
-      loadFields();
+      loadFields(prefillValues);
     }
   });
 
@@ -84,7 +90,7 @@
     };
   });
 
-  async function loadFields() {
+  async function loadFields(prefillValues = {}) {
     try {
       loading = true;
       error = null;
@@ -120,6 +126,11 @@
       if (portalSlug) {
         await applyDraftIfPresent();
       }
+
+      // Apply prefill last so it wins over a resumed draft for its target
+      // field. Fields the form does not configure are ignored here and would
+      // be dropped by the submit API anyway.
+      applyPrefill(prefillValues);
     } catch (err) {
       console.error('Failed to load request type fields:', err);
       error = err.message || t('requestForm.failedToLoadFields');
@@ -150,6 +161,22 @@
       // resume is far better than blocking submission.
       console.warn('Failed to load draft for resume:', err);
       resumedDraft = null;
+    }
+  }
+
+  // Seed fields configured in the request type whose field_identifier is
+  // present in the prefill map. Unknown keys are ignored.
+  function applyPrefill(prefillValues) {
+    if (!prefillValues || typeof prefillValues !== 'object') return;
+    for (const field of fields) {
+      const identifier = field.field_identifier;
+      if (!identifier || prefillValues[identifier] === undefined) continue;
+      const value = prefillValues[identifier];
+      if (field.field_type === 'default') {
+        formData = { ...formData, [identifier]: value };
+      } else if (field.field_type === 'custom' || field.field_type === 'virtual') {
+        customFieldValues = { ...customFieldValues, [identifier]: value };
+      }
     }
   }
 

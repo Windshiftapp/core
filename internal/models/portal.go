@@ -249,6 +249,21 @@ type RequestTypeConfig struct {
 	SuccessMessage   string `json:"success_message,omitempty"`
 	SubmitButtonText string `json:"submit_button_text,omitempty"`
 	RedirectURL      string `json:"redirect_url,omitempty"`
+	// RowActions is only meaningful on asset reports: each action renders a
+	// per-row link that opens a request type with one field prefilled.
+	RowActions []AssetReportRowAction `json:"row_actions,omitempty"`
+}
+
+// AssetReportRowAction configures a portal asset report row link that opens a
+// request type with one form field prefilled from that row's asset. Source is
+// one of asset_id, asset_tag, or title; the row action only passes a scalar
+// through the URL, so a whole-object source is intentionally not supported.
+type AssetReportRowAction struct {
+	ID            string `json:"id"`
+	Label         string `json:"label"`
+	RequestTypeID int    `json:"request_type_id"`
+	TargetField   string `json:"target_field"`
+	Source        string `json:"source"`
 }
 
 // RequestType represents a portal request type that maps to an item type
@@ -359,8 +374,9 @@ type PublicAssetReport struct {
 // PublicAssetReportConfig contains only copy used by the current portal form
 // UI. Internal auth and redirect controls are not part of the guest contract.
 type PublicAssetReportConfig struct {
-	SuccessMessage   string `json:"success_message,omitempty"`
-	SubmitButtonText string `json:"submit_button_text,omitempty"`
+	SuccessMessage   string                 `json:"success_message,omitempty"`
+	SubmitButtonText string                 `json:"submit_button_text,omitempty"`
+	RowActions       []AssetReportRowAction `json:"row_actions,omitempty"`
 }
 
 // AssetReportField represents a field configuration for a form-mode asset report.

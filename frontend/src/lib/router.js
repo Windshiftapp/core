@@ -155,6 +155,7 @@ const routes = {
   '/portal/:slug/profile': 'portal',
   '/portal/:slug/kb': 'portal',
   '/portal/:slug/kb/:pageId': 'portal',
+  '/portal/:slug/request/:requestTypeId': 'portal',
   '/forms/:slug/:formId': 'public-form',
   '/forms/:slug': 'public-form',
   '/set-password/:token': 'set-password',

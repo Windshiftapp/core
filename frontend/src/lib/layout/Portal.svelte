@@ -115,6 +115,22 @@
   let approvalIdParam = $derived($currentRoute.query?.id);
   let requestTypeParam = $derived($currentRoute.query?.['request-type']);
 
+  // Prefill values for a route-bound request form, keyed by field_identifier.
+  let requestPrefill = $state({});
+
+  // Parse ?prefill.<field_identifier>=<value> from the current URL. The
+  // optional .label suffix carries display text only and is never a value.
+  function parsePrefill(query) {
+    const prefill = {};
+    for (const [key, value] of Object.entries(query || {})) {
+      if (!key.startsWith('prefill.')) continue;
+      const field = key.slice('prefill.'.length);
+      if (!field || field.endsWith('.label')) continue;
+      prefill[field] = value;
+    }
+    return prefill;
+  }
+
   // Track auth check completion to prevent flash of unauthenticated content
   let authCheckComplete = $state(false);
 
@@ -140,6 +156,13 @@
   // same way as /profile; the article id comes from the route params.
   let isKBBrowseRoute = $derived(/\/kb\/?$/.test($currentRoute?.path ?? ''));
   let isKBArticleRoute = $derived(/\/kb\/\d+$/.test($currentRoute?.path ?? ''));
+
+  // Request-type routes mirror the KB routes: /request/{requestTypeId} opens
+  // that form, optionally with prefill.* query params.
+  let isRequestRoute = $derived(/\/request\/\d+$/.test($currentRoute?.path ?? ''));
+  let requestTypeIdFromRoute = $derived(
+    isRequestRoute ? Number($currentRoute.params?.requestTypeId) : null
+  );
   let kbPageId = $derived(
     isKBArticleRoute ? Number($currentRoute.params?.pageId) : null
   );
@@ -192,37 +215,37 @@
       portalRequestsStore.setVisible(false);
       portalApprovalsStore.setVisible(false);
 
-      // Check for request-type param to auto-open form
+      // The legacy ?request-type= deep link is now an alias for the real
+      // request route.
       if (requestTypeParam) {
         const requestTypeId = parseInt(requestTypeParam, 10);
         if (!isNaN(requestTypeId)) {
-          // Wait for request types to load, then open the form
-          const checkAndOpenForm = () => {
-            const rt = portalCatalogStore.requestTypes.find(t => t.id === requestTypeId);
-            if (rt) {
-              openRequestForm(rt);
-              // Clear the query param from URL without reload
-              const slug = $currentRoute.params?.slug;
-              window.history.replaceState({}, '', `/portal/${slug}`);
-            }
-          };
-          // If request types already loaded, open immediately; otherwise wait
-          if (portalCatalogStore.requestTypes.length > 0) {
-            checkAndOpenForm();
-          } else {
-            // Poll briefly for request types to load
-            const interval = setInterval(() => {
-              if (portalCatalogStore.requestTypes.length > 0) {
-                clearInterval(interval);
-                checkAndOpenForm();
-              }
-            }, 100);
-            // Clear interval after 5 seconds to prevent infinite polling
-            setTimeout(() => clearInterval(interval), 5000);
-          }
+          navigate(`/portal/${$currentRoute.params?.slug}/request/${requestTypeId}`, {
+            replace: true,
+          });
         }
       }
     }
+  });
+
+  // Open the request form for a /request/{id} route once request types are
+  // loaded, applying any prefill.* values. The URL stays authoritative so
+  // refresh/back/forward reopen the same form. Signed-out visitors get the
+  // login dialog and the URL is preserved for after login.
+  $effect(() => {
+    if (!authCheckComplete || !isRequestRoute || !requestTypeIdFromRoute) return;
+    if (!isUserAuthenticated) {
+      portalStore.showLoginDialog = true;
+      return;
+    }
+    // Already showing this form (e.g. from a card click) — don't reopen.
+    if (showRequestFormModal && selectedRequestTypeForForm?.id === requestTypeIdFromRoute) return;
+
+    const rt = portalCatalogStore.requestTypes.find((t) => t.id === requestTypeIdFromRoute);
+    if (!rt) return;
+    selectedRequestTypeForForm = rt;
+    requestPrefill = parsePrefill($currentRoute.query);
+    showRequestFormModal = true;
   });
 
   // Replace the anonymous sign-in shell with the protected portal after login,
@@ -334,8 +357,19 @@
       return;
     }
 
+    requestPrefill = {};
     selectedRequestTypeForForm = requestType;
     showRequestFormModal = true;
+  }
+
+  // Closing a route-bound form returns to the portal home so the URL does not
+  // keep pointing at a form that is no longer open.
+  function handleRequestFormClose() {
+    showRequestFormModal = false;
+    requestPrefill = {};
+    if (isRequestRoute) {
+      navigate(`/portal/${$currentRoute.params?.slug}`, { replace: true });
+    }
   }
 
   function handleRequestSubmitted(itemId) {
@@ -547,8 +581,9 @@
           requestType={selectedRequestTypeForForm}
           portalSlug={portalStore.portalData.slug}
           isDarkMode={portalStore.isDarkMode}
+          prefill={requestPrefill}
           onsubmitted={handleRequestSubmitted}
-          onclose={() => showRequestFormModal = false}
+          onclose={handleRequestFormClose}
         />
       {/if}
 

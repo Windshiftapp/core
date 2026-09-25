@@ -8,6 +8,8 @@ import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Input from '../components/Input.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
+  import { buildRowActionHref } from './rowActions.js';
+  import { toExternal } from '../runtime/contextPath.js';
 
   let {
     report,
@@ -46,6 +48,10 @@ import EmptyState from '../components/EmptyState.svelte';
   let displayColumns = $derived(
     report?.column_config?.length ? report.column_config : ['title', 'asset_tag', 'status']
   );
+
+  // Per-row action links configured on the report. The backend already drops
+  // actions whose target request type is not visible to this visitor.
+  let rowActions = $derived(report?.config?.row_actions ?? []);
 
   // Load assets from execute endpoint
   async function loadAssets() {
@@ -365,6 +371,15 @@ import EmptyState from '../components/EmptyState.svelte';
                 {getColumnLabel(col)}
               </th>
             {/each}
+            {#each rowActions as action (action.id)}
+              <th
+                class="text-left px-4 py-3 text-sm font-medium"
+                style="color: var(--ds-text-subtle);"
+                data-testid={`asset-report-action-column-${action.id}`}
+              >
+                {action.label}
+              </th>
+            {/each}
           </tr>
         </thead>
         <tbody>
@@ -392,6 +407,21 @@ import EmptyState from '../components/EmptyState.svelte';
                   {:else}
                     {getCellValue(asset, col)}
                   {/if}
+                </td>
+              {/each}
+              {#each rowActions as action (action.id)}
+                <td
+                  class="px-4 py-3 text-sm"
+                  data-testid={`asset-report-action-cell-${asset.id}-${action.id}`}
+                >
+                  <a
+                    href={toExternal(buildRowActionHref(slug, action, asset))}
+                    class="font-medium hover:underline"
+                    style="color: var(--ds-text-link);"
+                    data-testid={`asset-report-action-${asset.id}-${action.id}`}
+                  >
+                    {action.label}
+                  </a>
                 </td>
               {/each}
             </tr>
