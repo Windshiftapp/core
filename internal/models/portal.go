@@ -685,12 +685,18 @@ type PortalHubConfig struct {
 	FooterColumns     []FooterColumn `json:"footer_columns"`
 }
 
-// HubSection represents a customizable section in the Portal Hub
+// HubSection represents a customizable section in the Portal Hub. The shape
+// mirrors the frontend editor, which persists subtitle, ordering, and the
+// portals assigned to each section; dropping any of these on save would lose
+// section assignments on the next load.
 type HubSection struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	Visible bool   `json:"visible"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Subtitle     string `json:"subtitle"`
+	Content      string `json:"content"`
+	Visible      bool   `json:"visible"`
+	DisplayOrder int    `json:"display_order"`
+	PortalIDs    []int  `json:"portal_ids"`
 }
 
 // FooterColumn represents a column in the Portal Hub footer

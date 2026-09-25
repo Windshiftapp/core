@@ -56,7 +56,7 @@ func (h *PortalHandler) GetBootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	portal, err := h.loadPortalData(ctx, channel, config)
+	portal, err := h.loadPortalData(ctx, r, channel, config)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "workspace")
 		return

@@ -180,6 +180,10 @@ async function loadPortal(slug) {
  * Toggle editing mode
  */
 function toggleEditing() {
+  // Entering edit mode is a management action; only channel managers and
+  // system admins can persist the changes it schedules.
+  if (!isEditing && portalData?.can_manage !== true) return;
+
   const wasUsingManagementData = isEditing || showCustomizePanel;
   const wasEditing = isEditing;
   isEditing = !isEditing;
@@ -668,6 +672,12 @@ function closeAllMenus() {
 
 // Reset store (for cleanup)
 function reset() {
+  // Cancel a pending debounced customization save so it cannot fire after
+  // navigation and write stale state to a newly loaded portal.
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
   assetReportsLoadId++;
   requestTypesLoadId++;
   portalData = null;
@@ -716,6 +726,11 @@ export const portalCustomizationStore = {
   get portalData() {
     return portalData;
   },
+  // Whether the current internal viewer may edit this portal. Portal customers
+  // and internal non-managers never can, so the customize UI stays hidden.
+  get canManage() {
+    return portalData?.can_manage === true;
+  },
   get loading() {
     return loading;
   },
@@ -739,7 +754,7 @@ export const portalCustomizationStore = {
   },
   set showCustomizePanel(value) {
     const wasUsingManagementData = isEditing || showCustomizePanel;
-    const shouldShowCustomizePanel = Boolean(value);
+    const shouldShowCustomizePanel = Boolean(value) && portalData?.can_manage === true;
 
     if (shouldShowCustomizePanel) {
       showCustomizePanel = true;

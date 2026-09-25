@@ -37,8 +37,14 @@ func sanitizeHubConfig(config *models.PortalHubConfig) {
 		sanitize.ApplyAll(
 			sanitize.Pair{Target: &config.Sections[i].ID, Policy: sanitize.ShortIdentifier},
 			sanitize.Pair{Target: &config.Sections[i].Title, Policy: sanitize.PlainTextField},
+			sanitize.Pair{Target: &config.Sections[i].Subtitle, Policy: sanitize.PlainTextField},
 			sanitize.Pair{Target: &config.Sections[i].Content, Policy: sanitize.RichText},
 		)
+		// Serialize an absent assignment list as [] rather than null so the
+		// frontend never has to distinguish the two.
+		if config.Sections[i].PortalIDs == nil {
+			config.Sections[i].PortalIDs = []int{}
+		}
 	}
 	for i := range config.FooterColumns {
 		sanitize.Apply(&config.FooterColumns[i].Title, sanitize.PlainTextField)
@@ -348,10 +354,12 @@ func (h *HubHandler) getUserGroupIDs(ctx context.Context, userID int) []int {
 // isAdmin: if true, shows all request types regardless of visibility
 // userGroupIDs: internal user group IDs for visibility filtering
 func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGroupIDs []int) ([]models.HubPortalInfo, error) {
+	// The request-type count is derived from the visibility-filtered list
+	// below, not a raw table count: the two must agree so a portal card never
+	// reveals that hidden request types exist.
 	query := `
 		SELECT
-			c.id, c.name, COALESCE(c.description, ''), c.status, COALESCE(c.config, '{}'),
-			(SELECT COUNT(*) FROM request_types rt WHERE rt.channel_id = c.id AND rt.is_active = true) as request_type_count
+			c.id, c.name, COALESCE(c.description, ''), c.status, COALESCE(c.config, '{}')
 		FROM channels c
 		WHERE c.type = 'portal' AND c.status = 'enabled'
 		ORDER BY c.name ASC
@@ -372,7 +380,6 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 
 		err = rows.Scan(
 			&portal.ID, &portal.Name, &description, &portal.Status, &configJSON,
-			&portal.RequestTypeCount,
 		)
 		if err != nil {
 			return nil, err
@@ -411,11 +418,11 @@ func (h *HubHandler) getEnabledPortals(ctx context.Context, isAdmin bool, userGr
 			return nil, err
 		}
 
-		// Map request types to their portals
+		// Map request types to their portals and derive the displayed count
+		// from the same visibility-filtered set.
 		for i := range portals {
-			if rts, ok := requestTypes[portals[i].ID]; ok {
-				portals[i].RequestTypes = rts
-			}
+			portals[i].RequestTypes = requestTypes[portals[i].ID]
+			portals[i].RequestTypeCount = len(portals[i].RequestTypes)
 		}
 	}
 

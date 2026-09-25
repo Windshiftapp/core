@@ -271,34 +271,37 @@
                 <ArrowLeft class="w-4 h-4" />
                 <span>{t('portal.backToApp')}</span>
               </button>
-              <button
-                type="button"
-                onclick={() => {
-                  portalStore.showCustomizePanel = true;
-                  portalStore.showMainMenu = false;
-                }}
-                class="portal-menu-item"
-                data-testid="portal-customize-button"
-              >
-                <Palette class="w-4 h-4" />
-                <span>{t('portal.customizeButton')}</span>
-              </button>
-              <button
-                type="button"
-                onclick={() => {
-                  portalStore.toggleTheme();
-                  portalStore.showMainMenu = false;
-                }}
-                class="portal-menu-item"
-              >
-                {#if portalStore.isDarkMode}
-                  <Sun class="w-4 h-4" />
-                  <span>{t('portal.lightMode')}</span>
-                {:else}
-                  <Moon class="w-4 h-4" />
-                  <span>{t('portal.darkMode')}</span>
-                {/if}
-              </button>
+              {#if portalStore.canManage}
+                <button
+                  type="button"
+                  onclick={() => {
+                    portalStore.showCustomizePanel = true;
+                    portalStore.showMainMenu = false;
+                  }}
+                  class="portal-menu-item"
+                  data-testid="portal-customize-button"
+                >
+                  <Palette class="w-4 h-4" />
+                  <span>{t('portal.customizeButton')}</span>
+                </button>
+                <button
+                  type="button"
+                  onclick={() => {
+                    portalStore.toggleTheme();
+                    portalStore.showMainMenu = false;
+                  }}
+                  class="portal-menu-item"
+                  data-testid="portal-theme-toggle"
+                >
+                  {#if portalStore.isDarkMode}
+                    <Sun class="w-4 h-4" />
+                    <span>{t('portal.lightMode')}</span>
+                  {:else}
+                    <Moon class="w-4 h-4" />
+                    <span>{t('portal.darkMode')}</span>
+                  {/if}
+                </button>
+              {/if}
             </div>
           {/if}
         </div>
