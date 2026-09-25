@@ -269,45 +269,16 @@ func (h *PluginHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// This route is unauthenticated and the Content-Type is derived from the
-	// asset's file extension, so an HTML/JS/SVG asset would otherwise render
-	// inline in the app's same-origin context. Mirror the attachment download
-	// hardening: always forbid MIME sniffing + framing, and for non-passive
-	// (script-capable) types force a sandboxed download instead of inline
-	// rendering. Plugins are admin-installed, so this is defense-in-depth.
+	// Plugin frontends are loaded by the admin app in a same-origin iframe, so
+	// the entry document must render inline; forcing a download here makes the
+	// browser save the HTML instead of loading the plugin. Keep sniffing off and
+	// restrict framing to same-origin. The global security middleware is the CSP
+	// source of truth, so do not overwrite it with a sandbox that would block the
+	// plugin's own scripts and styles.
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Frame-Options", "DENY")
-	if !isPassivePluginAssetType(mimeType) {
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
-		w.Header().Set("Content-Disposition", "attachment")
-	}
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	_, _ = w.Write(data) //nolint:gosec // G705: static plugin assets served with hardened headers
-}
-
-// isPassivePluginAssetType reports whether a plugin asset MIME type is inert
-// when served inline (images, fonts, stylesheets, plain media). Anything else —
-// notably text/html, SVG, and any */*script* type — is treated as
-// script-capable and forced to a sandboxed download.
-func isPassivePluginAssetType(mimeType string) bool {
-	mt := strings.ToLower(strings.TrimSpace(mimeType))
-	if i := strings.IndexByte(mt, ';'); i >= 0 {
-		mt = strings.TrimSpace(mt[:i])
-	}
-	if strings.Contains(mt, "script") || mt == "image/svg+xml" {
-		return false
-	}
-	switch {
-	case strings.HasPrefix(mt, "image/"),
-		strings.HasPrefix(mt, "font/"),
-		strings.HasPrefix(mt, "audio/"),
-		strings.HasPrefix(mt, "video/"),
-		mt == "text/css",
-		mt == "application/font-woff",
-		mt == "application/font-woff2":
-		return true
-	}
-	return false
 }
 
 // TogglePlugin enables or disables a plugin
