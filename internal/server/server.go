@@ -957,7 +957,6 @@ func (s *Server) initialize() error {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
 	go s.runAssetImportRecovery(assetApplication)
-	go s.runTicketImportRecovery(s.ticketImport)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -981,6 +980,11 @@ func (s *Server) initialize() error {
 	emailProviderHandler.SetCredentialManager(emailCredManager)
 
 	s.ticketImport = services.NewTicketImportService(s.db, permService, cfg.AttachmentPath)
+	// Started only after s.ticketImport is assigned above: a `go` statement
+	// evaluates its arguments at the call site, so launching this recovery loop
+	// before the assignment handed the goroutine a nil service and the first
+	// tick, 30s later, panicked the whole process on every startup.
+	go s.runTicketImportRecovery(s.ticketImport)
 	s.emailScheduler = scheduler.NewEmailScheduler(s.db, emailCredManager, cfg.AttachmentPath)
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
