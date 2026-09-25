@@ -41,6 +41,10 @@ export default {
 
   history: {
     viaAIChat: 'Изменено через ИИ-чат',
+    model: 'Модель',
+    tokens: 'Токены',
+    cost: 'Стоимость',
+    costUnknown: 'стоимость неизвестна',
   },
 
   comments: {

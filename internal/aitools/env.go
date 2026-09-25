@@ -24,11 +24,16 @@ const (
 // Env provides tools their caller, services, and readable workspaces. Tools
 // must gate workspace data through AccessibleWorkspaceIDs regardless of adapter.
 type Env struct {
-	DB                     database.Database
-	UserID                 int
-	Username               string // Cached at Env-construction time for audit logs
-	Timezone               string // Validated IANA timezone for the acting user
-	Source                 string // SourceAIChat | SourceMCP — for audit trail
+	DB       database.Database
+	UserID   int
+	Username string // Cached at Env-construction time for audit logs
+	Timezone string // Validated IANA timezone for the acting user
+	Source   string // SourceAIChat | SourceMCP — for audit trail
+	// RunID is the agent_runs row this invocation belongs to, when the caller
+	// has one (the chat, the coding agent). It is what lets a resulting change
+	// name the turn that caused it — the model and cost behind the edit. Zero
+	// for surfaces with no run to point at, such as MCP.
+	RunID                  int
 	AccessibleWorkspaceIDs []int
 	// AuditDetails contains adapter-supplied correlation identifiers only.
 	// Raw tool arguments and results must never be placed here.
@@ -143,5 +148,18 @@ func (e *Env) eventMetadata() itemevents.Metadata {
 	if source == "" {
 		source = "agent"
 	}
-	return itemevents.Agent(fmt.Sprintf("user:%d", e.UserID), source)
+	metadata := itemevents.Agent(fmt.Sprintf("user:%d", e.UserID), source)
+	metadata.AgentRunID = e.RunID
+	return metadata
+}
+
+// historyRunID is the agent run to attribute a history row to, or nil when this
+// surface has no run to point at (MCP) — a row must not claim a turn that does
+// not exist.
+func (e *Env) historyRunID() *int {
+	if e.RunID <= 0 {
+		return nil
+	}
+	runID := e.RunID
+	return &runID
 }

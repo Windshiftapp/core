@@ -1738,6 +1738,20 @@ func (r *ItemRepository) ClearRelatedWorkItem(itemID int) error {
 
 // GetHistoryWithApprovals returns item history plus approval decision events as a single chronological feed.
 func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner bool) ([]models.ItemHistory, error) {
+	// A run can be metered by more than one row (the coding agent bills per
+	// provider call), so the telemetry is pre-aggregated in a derived table
+	// rather than joined row-for-row — joining directly would multiply the
+	// history rows and duplicate every change in the feed. Cost is reported
+	// only when every call in the run could be priced: summing the known ones
+	// and calling it the total would understate the spend as a confident
+	// number.
+	runTelemetry := `
+		SELECT run_id,
+		       MIN(model) AS model,
+		       SUM(total_tokens) AS total_tokens,
+		       CASE WHEN COUNT(cost_usd) = COUNT(*) THEN SUM(cost_usd) ELSE NULL END AS cost_usd
+		FROM llm_usage GROUP BY run_id
+	`
 	query := `
 		SELECT
 			ih.id, ih.item_id, ih.user_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value,
@@ -1745,10 +1759,15 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 			COALESCE(u.email, '') as user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
 			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
-			COALESCE(ih.source, '') AS source
+			COALESCE(ih.source, '') AS source,
+			ih.agent_run_id,
+			COALESCE(rt.model, '') AS model,
+			rt.cost_usd,
+			COALESCE(rt.total_tokens, 0) AS total_tokens
 		FROM item_history ih
 		LEFT JOIN users u ON ih.user_id = u.id
 		LEFT JOIN users owner ON owner.id = u.agent_owner_user_id
+		LEFT JOIN (` + runTelemetry + `) rt ON rt.run_id = ih.agent_run_id
 		WHERE ih.item_id = ?
 		UNION ALL
 		SELECT
@@ -1763,7 +1782,11 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 			COALESCE(u.email, '') AS user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
 			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
-			'' AS source
+			'' AS source,
+			NULL AS agent_run_id,
+			'' AS model,
+			NULL AS cost_usd,
+			0 AS total_tokens
 		FROM approval_decisions d
 		JOIN approval_requests ar ON ar.id = d.approval_request_id
 		LEFT JOIN users u ON u.id = d.actor_user_id
@@ -1781,8 +1804,18 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 	history := []models.ItemHistory{}
 	for rows.Next() {
 		var entry models.ItemHistory
-		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName, &entry.Source); err != nil {
+		var runID sql.NullInt64
+		var cost sql.NullFloat64
+		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName, &entry.Source, &runID, &entry.Model, &cost, &entry.TotalTokens); err != nil {
 			return nil, err
+		}
+		if runID.Valid {
+			v := int(runID.Int64)
+			entry.AgentRunID = &v
+		}
+		if cost.Valid {
+			c := cost.Float64
+			entry.CostUSD = &c
 		}
 		if !includeAgentOwner {
 			entry.AgentOwnerName = ""

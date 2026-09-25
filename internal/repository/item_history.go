@@ -33,6 +33,11 @@ type HistoryEntry struct {
 	// column answers "did the AI do this?", so it is deliberately sparse
 	// rather than re-encoding provenance every UI click already implies.
 	Source string
+	// AgentRunID is the agent_runs row that produced this change, when an agent
+	// made it. It is what lets the history feed report that turn's model and
+	// cost instead of leaving the change unattributable. Always nil for a
+	// direct write.
+	AgentRunID *int
 }
 
 // RecordHistory records a history entry for an item change
@@ -42,10 +47,10 @@ func (r *ItemRepository) RecordHistory(w HistoryWriter, entry HistoryEntry) erro
 		oldValue = nil
 	}
 	_, err := w.ExecWrite(`
-		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at, source)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at, source, agent_run_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`, entry.ItemID, entry.UserID, entry.FieldName, oldValue, entry.NewValue, entry.ChangedAt,
-		nullStringArg(entry.Source))
+		nullStringArg(entry.Source), nullIntArg(entry.AgentRunID))
 	if err != nil {
 		return fmt.Errorf("failed to record history: %w", err)
 	}

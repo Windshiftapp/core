@@ -42,6 +42,14 @@ type Metadata struct {
 	CorrelationID     string
 	CausationEventKey string
 	Automation        *AutomationContext
+	// AgentRunID is the agent_runs row that produced this write, when an agent
+	// made it. It is the only precise link from an agent's effect back to the
+	// turn that caused it — a history row stamped with just "an agent did this"
+	// cannot say which turn, and therefore cannot report that turn's model or
+	// cost without guessing from timestamps. Adapters set it; the item-history
+	// feed persists it. newEvent surfaces it as SourceRef so the durable event
+	// store carries the same link.
+	AgentRunID int
 }
 
 // AutomationContext preserves action cascade information across restarts.
@@ -553,6 +561,14 @@ func newEvent(eventType string, workspaceID, itemID int, metadata Metadata, payl
 	if metadata.SourceKind == "" {
 		metadata.SourceKind = "application"
 	}
+	// Surface the agent run as the event's source reference so the durable
+	// stream carries the same turn-level link the history feed persists. An
+	// automation's own SourceRef (the triggering application) wins: it
+	// describes *why* the write happened, which is the more specific fact.
+	sourceRef := metadata.SourceRef
+	if sourceRef == "" && metadata.AgentRunID > 0 {
+		sourceRef = "agent_run:" + strconv.Itoa(metadata.AgentRunID)
+	}
 	workspace := workspaceID
 	return events.NewEvent{
 		WorkspaceID:       &workspace,
@@ -564,7 +580,7 @@ func newEvent(eventType string, workspaceID, itemID int, metadata Metadata, payl
 		ActorKind:         metadata.ActorKind,
 		ActorRef:          metadata.ActorRef,
 		SourceKind:        metadata.SourceKind,
-		SourceRef:         metadata.SourceRef,
+		SourceRef:         sourceRef,
 		CorrelationID:     metadata.CorrelationID,
 		CausationEventKey: metadata.CausationEventKey,
 		Payload:           encoded,

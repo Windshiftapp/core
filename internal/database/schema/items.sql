@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS item_history (
 	old_value TEXT,
 	new_value TEXT,
 	source TEXT,
+	agent_run_id INTEGER,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 );

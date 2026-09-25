@@ -9,6 +9,7 @@
 	import EmptyState from '../../components/EmptyState.svelte';
 	import Tooltip from '../../components/Tooltip.svelte';
 	import { t } from '../../stores/i18n.svelte.js';
+	import { formatCostUSD } from '../../utils/llmUsage.js';
 	import { agentOwnerName, isAIChatAttributed, loadAttributedItemHistory } from './activityAttributionData.js';
 
 	let { itemId } = $props();
@@ -51,6 +52,18 @@
 		return t('comments.agentAuthored');
 	}
 
+	// The turn that made this change, when the change came from an agent run
+	// that was metered. Null for a direct edit, for a surface with no run to
+	// point at (MCP), and for a run with no usage recorded.
+	function agentRunDetail(entry) {
+		if (!entry?.agent_run_id) return null;
+		const model = entry.model || '';
+		const tokens = Number(entry.total_tokens) || 0;
+		const cost = formatCostUSD(entry.cost_usd);
+		if (!model && !tokens && !cost) return null;
+		return { model, tokens, cost };
+	}
+
 	// Group history entries by timestamp (changes made at the same time)
 	let groupedHistory = $derived(groupByTimestamp(history));
 
@@ -74,6 +87,10 @@
 					is_agent: false,
 					agent_owner_name: '',
 					source: '',
+					agent_run_id: null,
+					model: '',
+					cost_usd: null,
+					total_tokens: 0,
 					changes: []
 				};
 				groups.push(currentGroup);
@@ -86,6 +103,15 @@
 			currentGroup.is_agent = currentGroup.is_agent || !!entry.is_agent;
 			if (isAIChatAttributed(entry)) {
 				currentGroup.source = entry.source;
+			}
+			// Keep the telemetry of whichever row carries it. The run link is on
+			// every row a turn wrote, but a group can also hold rows from a
+			// direct edit made in the same second, and those have none.
+			if (!currentGroup.agent_run_id && entry.agent_run_id) {
+				currentGroup.agent_run_id = entry.agent_run_id;
+				currentGroup.model = entry.model || '';
+				currentGroup.cost_usd = entry.cost_usd ?? null;
+				currentGroup.total_tokens = entry.total_tokens || 0;
 			}
 			if (!currentGroup.agent_owner_name && entry.agent_owner_name) {
 				currentGroup.agent_owner_name = entry.agent_owner_name;
@@ -234,9 +260,37 @@
 					<div class="body">
 						<div class="header">
 							{#if group.is_agent || isAIChatAttributed(group)}
-								<Tooltip content={agentTooltipContent(group)} placement="top">
-									<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
-								</Tooltip>
+								{@const runDetail = agentRunDetail(group)}
+								{#if runDetail}
+									<Tooltip placement="top" contentClass="px-2 py-1.5 text-xs max-w-xs">
+										{#snippet tip()}
+											<div class="agent-detail">
+												<div class="agent-detail-title">{t('history.viaAIChat')}</div>
+												{#if runDetail.model}
+													<div class="agent-detail-row">
+														<span>{t('history.model')}</span>
+														<span class="agent-detail-value">{runDetail.model}</span>
+													</div>
+												{/if}
+												{#if runDetail.tokens}
+													<div class="agent-detail-row">
+														<span>{t('history.tokens')}</span>
+														<span class="agent-detail-value">{runDetail.tokens.toLocaleString()}</span>
+													</div>
+												{/if}
+												<div class="agent-detail-row">
+													<span>{t('history.cost')}</span>
+													<span class="agent-detail-value">{runDetail.cost || t('history.costUnknown')}</span>
+												</div>
+											</div>
+										{/snippet}
+										<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
+									</Tooltip>
+								{:else}
+									<Tooltip content={agentTooltipContent(group)} placement="top">
+										<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
+									</Tooltip>
+								{/if}
 							{/if}
 							<span class="user">{group.user_name || 'Unknown'}</span>
 							<span data-testid="item-history-time" class="time" title={formatHistoryTimestamp(group.changed_at, timezone)}>
@@ -375,5 +429,27 @@
 	.quote {
 		font-style: italic;
 		color: var(--ds-text);
+	}
+
+	/* Hover detail for an agent-authored change: which turn wrote it, and what
+	   it cost. Laid out as label/value rows so a long model id cannot push the
+	   numbers out of the popover. */
+	:global(.agent-detail) {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 11rem;
+	}
+	:global(.agent-detail-title) {
+		font-weight: 600;
+		margin-bottom: 2px;
+	}
+	:global(.agent-detail-row) {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	:global(.agent-detail-value) {
+		font-weight: 500;
 	}
 </style>

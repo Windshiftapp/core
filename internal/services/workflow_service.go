@@ -622,13 +622,14 @@ func (s *WorkflowService) CommitTransition(
 	}
 
 	if err := itemRepo.RecordHistory(tx, repository.HistoryEntry{
-		ItemID:    itemID,
-		UserID:    actorUserID,
-		FieldName: "status_id",
-		OldValue:  fmt.Sprintf("%d", oldStatusID),
-		NewValue:  fmt.Sprintf("%d", newStatusID),
-		ChangedAt: changedAt,
-		Source:    historySourceForAgent(metadata),
+		ItemID:     itemID,
+		UserID:     actorUserID,
+		FieldName:  "status_id",
+		OldValue:   fmt.Sprintf("%d", oldStatusID),
+		NewValue:   fmt.Sprintf("%d", newStatusID),
+		ChangedAt:  changedAt,
+		Source:     historySourceForAgent(metadata),
+		AgentRunID: historyRunForAgent(metadata),
 	}); err != nil {
 		return fmt.Errorf("record transition history: %w", err)
 	}

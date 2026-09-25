@@ -469,6 +469,11 @@ export default {
     // user's behalf through the AI Chat, as opposed to the connected-agent
     // markers under comments.agentAuthored / comments.agentOwnedBy.
     viaAIChat: 'Changed via AI chat',
+    // The agent turn behind that change, revealed by hovering the marker.
+    model: 'Model',
+    tokens: 'Tokens',
+    cost: 'Cost',
+    costUnknown: 'cost unknown',
   },
 
   comments: {

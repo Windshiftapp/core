@@ -19059,10 +19059,20 @@
                   "description": "The agent owner name value.",
                   "type": "string"
                 },
+                "agent_run_id": {
+                  "description": "The agent run id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "changed_at": {
                   "description": "The changed at value.",
                   "format": "date-time",
                   "type": "string"
+                },
+                "cost_usd": {
+                  "description": "The cost usd value.",
+                  "nullable": true,
+                  "type": "number"
                 },
                 "field_name": {
                   "description": "The field name value.",
@@ -19079,6 +19089,10 @@
                 "item_id": {
                   "description": "The item id value.",
                   "type": "integer"
+                },
+                "model": {
+                  "description": "The model value.",
+                  "type": "string"
                 },
                 "new_value": {
                   "description": "The new value value.",
@@ -19103,6 +19117,10 @@
                 "source": {
                   "description": "The source value.",
                   "type": "string"
+                },
+                "total_tokens": {
+                  "description": "The total tokens value.",
+                  "type": "integer"
                 },
                 "user_email": {
                   "description": "The user email value.",

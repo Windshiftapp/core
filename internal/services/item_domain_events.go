@@ -112,16 +112,30 @@ func historySourceForAgent(metadata itemevents.Metadata) string {
 	return metadata.SourceKind
 }
 
-// stampHistorySource applies historySourceForAgent to every entry in a batch.
+// historyRunForAgent reports the agent run behind an agent-authored history row,
+// or nil when the surface has no run to point at (MCP) or the write was direct.
+// Without it a history row can say an agent acted but not which turn, and the
+// feed could not report that turn's model or cost.
+func historyRunForAgent(metadata itemevents.Metadata) *int {
+	if metadata.ActorKind != "agent" || metadata.AgentRunID <= 0 {
+		return nil
+	}
+	runID := metadata.AgentRunID
+	return &runID
+}
+
+// stampHistorySource applies the agent provenance to every entry in a batch.
 // History rows are written in one transaction by one actor, so the whole batch
-// shares one source.
+// shares one source and one originating run.
 func stampHistorySource(history []repository.HistoryEntry, metadata itemevents.Metadata) []repository.HistoryEntry {
 	source := historySourceForAgent(metadata)
 	if source == "" {
 		return history
 	}
+	runID := historyRunForAgent(metadata)
 	for i := range history {
 		history[i].Source = source
+		history[i].AgentRunID = runID
 	}
 	return history
 }

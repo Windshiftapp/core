@@ -160,12 +160,13 @@ func (r *DiagramRepository) GetNameAndItemID(id int) (name string, itemID int, e
 // RecordHistory appends an item_history row for a diagram-related action.
 // userID is required (the handler skips the call entirely when nil). source
 // names the acting surface when an agent did this on a user's behalf, and is
-// empty for a direct write.
-func (r *DiagramRepository) RecordHistory(itemID, userID int, action string, oldValue *string, newValue, source string) error {
+// empty for a direct write. agentRunID links the row to the agent run that made
+// it, or nil.
+func (r *DiagramRepository) RecordHistory(itemID, userID int, action string, oldValue *string, newValue, source string, agentRunID *int) error {
 	if _, err := r.db.ExecWrite(
-		`INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at, source)
-		 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
-		itemID, userID, action, oldValue, newValue, nullStringArg(source),
+		`INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at, source, agent_run_id)
+		 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+		itemID, userID, action, oldValue, newValue, nullStringArg(source), nullIntArg(agentRunID),
 	); err != nil {
 		return fmt.Errorf("record diagram history for item %d: %w", itemID, err)
 	}
