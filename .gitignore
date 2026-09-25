@@ -11,6 +11,8 @@ windshift
 cx
 /ws
 /logbook
+# Local build of scripts/openapi-v2-generate.
+/openapi-v2-generate
 
 # Test binary, built with `go test -c`
 *.test
