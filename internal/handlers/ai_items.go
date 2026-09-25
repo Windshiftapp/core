@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"windshift/internal/llm"
 	"windshift/internal/models"
@@ -86,6 +87,76 @@ func (h *AIHandler) loadItemWithPermission(w http.ResponseWriter, r *http.Reques
 	return item, llmClient, true
 }
 
+const (
+	// catchMeUpMaxChildren caps direct sub-items in a briefing. Grandchildren are
+	// never included.
+	catchMeUpMaxChildren = 20
+	// catchMeUpMaxComments bounds comments quoted from any item.
+	catchMeUpMaxComments = 20
+	// catchMeUpMaxDescriptionBytes caps any item description in the context.
+	catchMeUpMaxDescriptionBytes = 6 * 1024
+	// catchMeUpMaxCommentBytes caps a single quoted comment.
+	catchMeUpMaxCommentBytes = 300
+)
+
+// truncateBriefingText caps s at maxBytes without splitting a UTF-8 rune.
+func truncateBriefingText(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	cut := s[:maxBytes]
+	for !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	return cut + "..."
+}
+
+// appendHierarchyContext formats already-loaded parent and direct-sub-item
+// context. It performs no lookups and never recurses. moreChildren marks that
+// the child list was capped so the model knows the list is partial.
+func appendHierarchyContext(lines []string, parent *models.Item, parentComments []services.ItemCommentSummary, children []repository.ChildItemSummary, moreChildren bool) []string {
+	if parent != nil {
+		parentKey := fmt.Sprintf("%s-%d", parent.WorkspaceKey, parent.WorkspaceItemNumber)
+		lines = append(lines, fmt.Sprintf("\nParent item: %s - %s", parentKey, parent.Title))
+		if parent.StatusName != "" {
+			lines = append(lines, fmt.Sprintf("Parent status: %s", parent.StatusName))
+		}
+		if parent.Description != "" {
+			lines = append(lines, fmt.Sprintf("\nParent description:\n%s", truncateBriefingText(parent.Description, catchMeUpMaxDescriptionBytes)))
+		}
+		if len(parentComments) > 0 {
+			lines = append(lines, "\nParent recent comments:")
+			for _, comment := range parentComments {
+				lines = append(lines, fmt.Sprintf("- %s (%s): %s", comment.Author, comment.CreatedAt.Format("Jan 2"), truncateBriefingText(comment.Content, catchMeUpMaxCommentBytes)))
+			}
+		}
+	}
+
+	if len(children) > 0 {
+		lines = append(lines, fmt.Sprintf("\nSub-items (%d):", len(children)))
+		for _, child := range children {
+			line := fmt.Sprintf("- %s: %s", child.ItemKey, child.Title)
+			if child.ItemTypeName != "" {
+				line += fmt.Sprintf(" [%s]", child.ItemTypeName)
+			}
+			if child.StatusName != "" {
+				line += fmt.Sprintf(" status=%s", child.StatusName)
+			}
+			if child.AssigneeName != "" {
+				line += fmt.Sprintf(" assignee=%s", child.AssigneeName)
+			}
+			lines = append(lines, line)
+			if child.Description != "" {
+				lines = append(lines, fmt.Sprintf("  Description: %s", truncateBriefingText(child.Description, catchMeUpMaxDescriptionBytes)))
+			}
+		}
+		if moreChildren {
+			lines = append(lines, fmt.Sprintf("(showing the first %d sub-items; more exist)", len(children)))
+		}
+	}
+	return lines
+}
+
 // CatchMeUp generates a summary briefing for an item.
 func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	item, llmClient, ok := h.loadItemWithPermission(w, r, "catch_me_up")
@@ -117,26 +188,54 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 		contextLines = append(contextLines, fmt.Sprintf("Due date: %s", item.DueDate.Format("2006-01-02")))
 	}
 	if item.Description != "" {
-		desc := item.Description
-		if len(desc) > 2000 {
-			desc = desc[:2000] + "..."
-		}
-		contextLines = append(contextLines, fmt.Sprintf("\nDescription:\n%s", desc))
+		contextLines = append(contextLines, fmt.Sprintf("\nDescription:\n%s", truncateBriefingText(item.Description, catchMeUpMaxDescriptionBytes)))
 	}
 
+	crudService := services.NewItemCRUDService(h.db)
+	itemRepo := repository.NewItemRepository(h.db)
 	commentService := h.commentService
 	if commentService == nil {
 		commentService = services.NewCommentService(h.db)
 	}
-	commentRows, err := commentService.ListRecentSummaries(itemID, 20)
+
+	var parent *models.Item
+	if item.ParentID != nil {
+		loadedParent, err := crudService.GetByID(*item.ParentID)
+		if err != nil {
+			slog.Warn("failed to load parent item", slog.String("component", "ai"), slog.Any("error", err))
+		} else {
+			parent = loadedParent
+		}
+	}
+
+	var parentComments []services.ItemCommentSummary
+	if parent != nil {
+		loadedComments, err := commentService.ListRecentSummaries(parent.ID, catchMeUpMaxComments)
+		if err != nil {
+			slog.Warn("failed to load parent comments", slog.String("component", "ai"), slog.Any("error", err))
+		} else {
+			parentComments = loadedComments
+		}
+	}
+
+	// Direct children only, capped: key, title, type, status, and assignee.
+	// Fetch one extra to detect a truncated list without a second query.
+	children, err := itemRepo.ListChildBriefings(item.WorkspaceID, itemID, catchMeUpMaxChildren+1)
+	moreChildren := false
+	if err != nil {
+		slog.Warn("failed to load child items", slog.String("component", "ai"), slog.Any("error", err))
+	} else if len(children) > catchMeUpMaxChildren {
+		children = children[:catchMeUpMaxChildren]
+		moreChildren = true
+	}
+
+	contextLines = appendHierarchyContext(contextLines, parent, parentComments, children, moreChildren)
+
+	commentRows, err := commentService.ListRecentSummaries(itemID, catchMeUpMaxComments)
 	if err == nil {
 		comments := make([]string, 0, len(commentRows))
 		for _, comment := range commentRows {
-			content := comment.Content
-			if len(content) > 300 {
-				content = content[:300] + "..."
-			}
-			comments = append(comments, fmt.Sprintf("- %s (%s): %s", comment.Author, comment.CreatedAt.Format("Jan 2"), content))
+			comments = append(comments, fmt.Sprintf("- %s (%s): %s", comment.Author, comment.CreatedAt.Format("Jan 2"), truncateBriefingText(comment.Content, catchMeUpMaxCommentBytes)))
 		}
 		if len(comments) > 0 {
 			contextLines = append(contextLines, "\nRecent comments:")
@@ -147,7 +246,6 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load history (last 30 changes)
-	crudService := services.NewItemCRUDService(h.db)
 	history, err := crudService.GetHistory(itemID)
 	if err == nil && len(history) > 0 {
 		limit := 30

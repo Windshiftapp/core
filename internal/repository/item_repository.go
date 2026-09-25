@@ -463,6 +463,61 @@ func (r *ItemRepository) GetWorkspaceIDCtx(ctx context.Context, itemID int) (int
 	return workspaceID, nil
 }
 
+// ChildItemSummary is the projection used by item briefings. It carries
+// descriptions but not attachments, so a parent briefing can include children
+// without pulling in attachment data.
+type ChildItemSummary struct {
+	ID           int
+	ItemKey      string
+	Title        string
+	StatusName   string
+	AssigneeName string
+	ItemTypeName string
+	Description  string
+}
+
+// ListChildBriefings returns the direct children of parentID in the same
+// workspace, ordered by board position, capped at limit. It does not recurse.
+func (r *ItemRepository) ListChildBriefings(workspaceID, parentID, limit int) ([]ChildItemSummary, error) {
+	if limit <= 0 {
+		return []ChildItemSummary{}, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT i.id,
+		       w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key,
+		       i.title,
+		       COALESCE(s.name, '') as status_name,
+		       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), '') as assignee_name,
+		       COALESCE(it.name, '') as item_type_name,
+		       COALESCE(i.description, '') as description
+		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN users u ON i.assignee_id = u.id
+		LEFT JOIN item_types it ON i.item_type_id = it.id
+		WHERE i.workspace_id = ? AND i.parent_id = ?
+		ORDER BY i.frac_index, i.workspace_item_number
+		LIMIT ?
+	`, workspaceID, parentID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list child briefings: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]ChildItemSummary, 0)
+	for rows.Next() {
+		var child ChildItemSummary
+		if err := rows.Scan(&child.ID, &child.ItemKey, &child.Title, &child.StatusName, &child.AssigneeName, &child.ItemTypeName, &child.Description); err != nil {
+			return nil, fmt.Errorf("scan child briefing: %w", err)
+		}
+		out = append(out, child)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate child briefings: %w", err)
+	}
+	return out, nil
+}
+
 func (r *ItemRepository) ListChildTitles(parentID int) ([]string, error) {
 	rows, err := r.db.Query(`SELECT title FROM items WHERE parent_id = ?`, parentID)
 	if err != nil {
