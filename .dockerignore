@@ -36,6 +36,14 @@ cmd/stresstest-cf-index
 !frontend/scripts/**
 !frontend/src/
 !frontend/src/**
+# `!frontend/` above re-includes the whole directory, which otherwise drags the
+# developer's node_modules (and their locally built dist) into the context:
+# ~900MB on every build, and — worse than slow — `COPY frontend/ ./` lands on
+# top of the `npm ci` the frontend-builder stage just ran, so the image would
+# build against whatever the host happened to have installed. The stage's own
+# node_modules and dist are the only ones that should exist in the image.
+frontend/node_modules
+frontend/dist
 !scripts/
 !scripts/demo/
 !scripts/demo/generate-demo.js
