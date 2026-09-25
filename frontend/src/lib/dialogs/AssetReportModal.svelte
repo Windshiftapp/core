@@ -5,6 +5,7 @@
   import IconSelector from '../pickers/IconSelector.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import PortalModal from './PortalModal.svelte';
   import DialogFooter from './DialogFooter.svelte';
@@ -42,7 +43,8 @@
     item_type_id: null,
     workspace_id: null,
     submit_button_text: '',
-    success_message: ''
+    success_message: '',
+    is_active: true
   });
 
   let isFormInitialized = $state(false);
@@ -94,7 +96,8 @@
               item_type_id: assetReport.item_type_id || null,
               workspace_id: assetReport.workspace_id || null,
               submit_button_text: cfg.submit_button_text || '',
-              success_message: cfg.success_message || ''
+              success_message: cfg.success_message || '',
+              is_active: assetReport.is_active ?? true
             };
           } else {
             formData = {
@@ -108,7 +111,8 @@
               item_type_id: null,
               workspace_id: null,
               submit_button_text: '',
-              success_message: ''
+              success_message: '',
+              is_active: true
             };
           }
           isFormInitialized = true;
@@ -166,7 +170,7 @@
         item_type_id: formData.run_mode === 'form' ? formData.item_type_id : null,
         workspace_id: formData.run_mode === 'form' ? formData.workspace_id : null,
         config: configJson,
-        is_active: mode === 'edit' ? (assetReport.is_active ?? true) : true
+        is_active: formData.is_active
       };
 
       if (mode === 'create') {
@@ -311,6 +315,13 @@
             {formData.run_mode === 'form' ? t('portal.qlQueryFormHint') : t('portal.qlQueryHint')}
           </p>
         </div>
+
+        <Checkbox
+          bind:checked={formData.is_active}
+          label={t('common.active')}
+          hint={t('portal.assetReportActiveHint')}
+          dataTestid="asset-report-active"
+        />
 
         {#if formData.run_mode === 'form'}
           <div class="pt-4 border-t" style="border-color: {isDarkMode ? '#334155' : '#e5e7eb'};">

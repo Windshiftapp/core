@@ -411,6 +411,7 @@ export default {
     successMessage: 'Сообщение об успехе (необязательно)',
     successMessagePlaceholder: 'Ресурсы, соответствующие вашим условиям.',
     assetReportConfigureFieldsHint: 'Используйте действие «Настроить поля» на карточке отчёта, чтобы выбрать поля формы.',
+    assetReportActiveHint: 'Неактивные отчёты скрыты из портала.',
     assetReportFieldsAfterCreate: 'После создания используйте «Настроить поля» на карточке отчёта, чтобы выбрать поля формы.',
     runReport: 'Создать отчёт',
     failedToRunReport: 'Не удалось создать отчёт',

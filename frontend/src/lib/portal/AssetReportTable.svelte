@@ -244,7 +244,7 @@ import EmptyState from '../components/EmptyState.svelte';
       <div>
         <h3 class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
           {report.name}
-          {#if !report.is_active}
+          {#if report.is_active === false}
             <span
               class="px-1.5 py-0.5 text-[10px] font-medium rounded"
               style="background-color: {portalStore.isDarkMode ? 'rgba(156, 163, 175, 0.2)' : '#f3f4f6'}; color: {portalStore.isDarkMode ? '#9ca3af' : '#6b7280'};"

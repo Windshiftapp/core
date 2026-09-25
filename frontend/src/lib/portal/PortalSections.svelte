@@ -313,7 +313,7 @@
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium leading-5 flex items-center gap-2" style="color: var(--ds-text);">
                           {entry.item.name}
-                          {#if !entry.item.is_active}
+                          {#if entry.item.is_active === false}
                             <span
                               class="px-1.5 py-0.5 text-[10px] font-medium rounded"
                               style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"

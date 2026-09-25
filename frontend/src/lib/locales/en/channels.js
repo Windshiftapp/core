@@ -438,6 +438,7 @@ export default {
     successMessage: 'Success message (optional)',
     successMessagePlaceholder: 'Here are the assets matching your criteria.',
     assetReportConfigureFieldsHint: 'Use the "Configure fields" action on the report card to select which form fields appear.',
+    assetReportActiveHint: 'Inactive reports are hidden from the portal.',
     assetReportFieldsAfterCreate: 'After creating, use "Configure fields" on the report card to pick which fields appear in the form.',
     runReport: 'Run Report',
     failedToRunReport: 'Failed to run report',
