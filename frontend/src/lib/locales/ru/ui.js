@@ -5,6 +5,7 @@
 export default {
   pickers: {
     selectStatus: 'Выберите статус',
+    selectTeam: 'Выберите команду',
     select: 'Выбрать',
     search: 'Поиск',
     options: 'Варианты',

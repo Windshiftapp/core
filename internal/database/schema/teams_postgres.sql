@@ -240,29 +240,7 @@ CREATE INDEX IF NOT EXISTS idx_on_call_swap_requests_requester_user_id ON on_cal
 CREATE INDEX IF NOT EXISTS idx_on_call_swap_requests_target_user_id ON on_call_swap_requests(target_user_id);
 CREATE INDEX IF NOT EXISTS idx_on_call_swap_requests_status ON on_call_swap_requests(status);
 
--- On-call incidents: tracks incidents and their escalation state
-CREATE TABLE IF NOT EXISTS on_call_incidents (
-	id SERIAL PRIMARY KEY,
-	escalation_policy_id INTEGER NOT NULL,
-	item_id INTEGER,
-	status TEXT DEFAULT 'triggered',
-	triggered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	acknowledged_at TIMESTAMPTZ,
-	acknowledged_by INTEGER,
-	resolved_at TIMESTAMPTZ,
-	resolved_by INTEGER,
-	current_escalation_step INTEGER DEFAULT 0,
-	escalation_repeat_count INTEGER DEFAULT 0,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (escalation_policy_id) REFERENCES on_call_escalation_policies(id) ON DELETE CASCADE,
-	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
-	FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
-	FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_escalation_policy_id ON on_call_incidents(escalation_policy_id);
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_item_id ON on_call_incidents(item_id);
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_status ON on_call_incidents(status);
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_triggered_at ON on_call_incidents(triggered_at);
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_acknowledged_by ON on_call_incidents(acknowledged_by);
-CREATE INDEX IF NOT EXISTS idx_on_call_incidents_resolved_by ON on_call_incidents(resolved_by);
+-- Item team assignment. Declared here, not in items_postgres.sql, because the
+-- PostgreSQL schema builds teams after items.
+ALTER TABLE items ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_items_team_id ON items(team_id);

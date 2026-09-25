@@ -9,6 +9,7 @@ export const CREATE_RENDERABLE_SYSTEM_FIELDS = new Set([
   'description',
   'priority',
   'assignee',
+  'team',
   'milestone',
   'iteration',
   'due_date',

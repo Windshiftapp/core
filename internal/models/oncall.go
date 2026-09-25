@@ -201,25 +201,56 @@ type OnCallSwapRequestResponse struct {
 	Status string `json:"status"` // approved, rejected
 }
 
-// OnCallIncident represents an incident routed through on-call
-type OnCallIncident struct {
+// Incident is pager state attached to a work item. The incidents table owns
+// the history; items.incident_id points at the current/latest row.
+type Incident struct {
 	ID                    int        `json:"id"`
-	EscalationPolicyID    int        `json:"escalation_policy_id"`
-	ItemID                *int       `json:"item_id,omitempty"`
+	ItemID                int        `json:"item_id"`
 	Status                string     `json:"status"` // triggered, acknowledged, resolved
+	Urgency               string     `json:"urgency"`
+	Source                string     `json:"source"` // manual, automation, webhook, item
+	EscalationPolicyID    *int       `json:"escalation_policy_id,omitempty"`
 	TriggeredAt           time.Time  `json:"triggered_at"`
 	AcknowledgedAt        *time.Time `json:"acknowledged_at,omitempty"`
 	AcknowledgedBy        *int       `json:"acknowledged_by,omitempty"`
 	ResolvedAt            *time.Time `json:"resolved_at,omitempty"`
 	ResolvedBy            *int       `json:"resolved_by,omitempty"`
-	CurrentEscalationStep int        `json:"current_escalation_step"`
+	EscalationStep        int        `json:"escalation_step"`
 	EscalationRepeatCount int        `json:"escalation_repeat_count"`
+	NextEscalationAt      *time.Time `json:"next_escalation_at,omitempty"`
+	DedupKey              string     `json:"dedup_key,omitempty"`
 	CreatedAt             time.Time  `json:"created_at"`
-	// Joined
+	UpdatedAt             time.Time  `json:"updated_at"`
+	// Joined fields
 	PolicyName         string `json:"policy_name,omitempty"`
 	ItemTitle          string `json:"item_title,omitempty"`
+	ItemKey            string `json:"item_key,omitempty"`
+	WorkspaceID        int    `json:"workspace_id,omitempty"`
+	TeamID             *int   `json:"team_id,omitempty"`
+	TeamName           string `json:"team_name,omitempty"`
 	AcknowledgedByName string `json:"acknowledged_by_name,omitempty"`
 	ResolvedByName     string `json:"resolved_by_name,omitempty"`
+}
+
+// IncidentTriggerRequest is the body for declaring an incident on an item.
+// Both fields are optional: the item team's active policy is used when
+// policy_id is omitted, and urgency defaults to "high".
+type IncidentTriggerRequest struct {
+	PolicyID *int   `json:"policy_id,omitempty"`
+	Urgency  string `json:"urgency,omitempty"`
+}
+
+// IncidentNotificationState tracks a scheduled (delayed or repeated)
+// notification for one incident notification rule.
+type IncidentNotificationState struct {
+	ID                 int       `json:"id"`
+	IncidentID         int       `json:"incident_id"`
+	EscalationRuleID   int       `json:"escalation_rule_id"`
+	NotificationRuleID int       `json:"notification_rule_id"`
+	RepeatIndex        int       `json:"repeat_index"`
+	NextNotificationAt time.Time `json:"next_notification_at"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // CurrentOnCallResponse represents who is currently on call

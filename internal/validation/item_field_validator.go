@@ -65,6 +65,7 @@ var allowedEntityTables = map[string]bool{
 	"item_types":    true,
 	"statuses":      true,
 	"priorities":    true,
+	"teams":         true,
 }
 
 // NewItemFieldValidator creates a new item field validator
@@ -192,6 +193,7 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		v.applyWorkspace,
 		v.checkPriorityAllowedInWorkspace,
 		v.applyAssignee,
+		v.applyTeam,
 		v.applyCreator,
 		v.applyParent,
 		v.applyRelatedWorkItemUpdate,
@@ -413,6 +415,23 @@ func (v *ItemFieldValidator) applyAssignee(item *models.Item, updateData map[str
 		}
 		if !actionable {
 			return &ValidationError{Field: "assignee_id", Message: "Assignee user not found"}
+		}
+	}
+	return nil
+}
+
+// applyTeam validates the team foreign key and that the team is active.
+func (v *ItemFieldValidator) applyTeam(item *models.Item, updateData map[string]any, _ int) error {
+	if err := v.ValidateNullableIDField(updateData, "team_id", &item.TeamID, "teams", "Team"); err != nil {
+		return err
+	}
+	if _, changed := updateData["team_id"]; changed && item.TeamID != nil {
+		var isActive bool
+		if err := v.db.QueryRow("SELECT is_active FROM teams WHERE id = ?", *item.TeamID).Scan(&isActive); err != nil {
+			return fmt.Errorf("failed to validate team: %w", err)
+		}
+		if !isActive {
+			return &ValidationError{Field: "team_id", Message: "Team is inactive"}
 		}
 	}
 	return nil

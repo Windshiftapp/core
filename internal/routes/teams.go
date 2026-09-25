@@ -65,8 +65,12 @@ func RegisterTeamRoutes(deps *Deps) {
 	api.HandleH("DELETE /on-call/escalation-policies/{id}", auth(http.HandlerFunc(deps.Teams.OnCall.DeletePolicy)))
 	api.HandleH("PUT /on-call/escalation-policies/{id}/rules", auth(http.HandlerFunc(deps.Teams.OnCall.SetRules)))
 
-	// Incidents
+	// Incidents. An incident is pager state on a work item, so the lifecycle is
+	// item-scoped; the list stays under on-call for the team overview.
 	api.HandleH("GET /on-call/incidents", auth(http.HandlerFunc(deps.Teams.OnCall.ListIncidents)))
-	api.HandleH("POST /on-call/incidents/{id}/acknowledge", auth(http.HandlerFunc(deps.Teams.OnCall.AcknowledgeIncident)))
-	api.HandleH("POST /on-call/incidents/{id}/resolve", auth(http.HandlerFunc(deps.Teams.OnCall.ResolveIncident)))
+	api.HandleH("GET /items/{id}/incident", auth(http.HandlerFunc(deps.Teams.OnCall.GetItemIncident)))
+	api.HandleH("POST /items/{id}/incident", auth(http.HandlerFunc(deps.Teams.OnCall.TriggerIncident)))
+	api.HandleH("POST /items/{id}/incident/acknowledge", auth(http.HandlerFunc(deps.Teams.OnCall.AcknowledgeIncident)))
+	api.HandleH("POST /items/{id}/incident/unacknowledge", auth(http.HandlerFunc(deps.Teams.OnCall.UnacknowledgeIncident)))
+	api.HandleH("POST /items/{id}/incident/resolve", auth(http.HandlerFunc(deps.Teams.OnCall.ResolveIncident)))
 }

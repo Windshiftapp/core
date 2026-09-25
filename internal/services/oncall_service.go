@@ -190,56 +190,6 @@ func (s *OnCallService) CurrentOnCallForSchedule(schedule *models.OnCallSchedule
 	return resp
 }
 
-// AcknowledgeIncident marks an incident as acknowledged by the given user.
-func (s *OnCallService) AcknowledgeIncident(incidentID, userID int) error {
-	incident, err := s.onCallRepo.GetIncidentByID(incidentID)
-	if err != nil {
-		return fmt.Errorf("failed to get incident: %w", err)
-	}
-
-	now := time.Now()
-	err = s.onCallRepo.UpdateIncident(
-		incident.ID,
-		"acknowledged",
-		&now,
-		&userID,
-		incident.ResolvedAt,
-		incident.ResolvedBy,
-		incident.CurrentEscalationStep,
-		incident.EscalationRepeatCount,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to acknowledge incident: %w", err)
-	}
-
-	return nil
-}
-
-// ResolveIncident marks an incident as resolved by the given user.
-func (s *OnCallService) ResolveIncident(incidentID, userID int) error {
-	incident, err := s.onCallRepo.GetIncidentByID(incidentID)
-	if err != nil {
-		return fmt.Errorf("failed to get incident: %w", err)
-	}
-
-	now := time.Now()
-	err = s.onCallRepo.UpdateIncident(
-		incident.ID,
-		"resolved",
-		incident.AcknowledgedAt,
-		incident.AcknowledgedBy,
-		&now,
-		&userID,
-		incident.CurrentEscalationStep,
-		incident.EscalationRepeatCount,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to resolve incident: %w", err)
-	}
-
-	return nil
-}
-
 // CreateSwapOverride converts an approved swap request into a schedule override,
 // replacing the requester with the target user for the swap window.
 func (s *OnCallService) CreateSwapOverride(swapRequestID int) error {

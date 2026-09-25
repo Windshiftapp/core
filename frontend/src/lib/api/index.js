@@ -51,6 +51,7 @@ import { del, fetchAPI, get, post, put } from './core.js';
 import { emailTemplates } from './email-templates.js';
 import { forms } from './forms.js';
 import { hub } from './hub.js';
+import { itemIncidents } from './incidents.js';
 import {
   integrationProviders,
   itemIntegrationLinks,
@@ -160,6 +161,7 @@ export const api = {
   workspaceRoles,
   screens,
   items,
+  itemIncidents,
   configurationSets,
 
   // Users (standalone functions)

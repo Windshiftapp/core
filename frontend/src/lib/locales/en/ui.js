@@ -6,6 +6,7 @@
 export default {
   pickers: {
     selectStatus: 'Select status',
+    selectTeam: 'Select team',
     // General
     select: 'Select',
     search: 'Search',

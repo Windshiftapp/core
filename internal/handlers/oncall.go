@@ -18,7 +18,9 @@ import (
 type OnCallHandler struct {
 	onCallRepo        *repository.OnCallRepository
 	teamRepo          *repository.TeamRepository
+	itemRepo          *repository.ItemRepository
 	onCallService     *services.OnCallService
+	incidentService   *services.IncidentService
 	permissionService *services.PermissionService
 	auditor           *logger.Auditor
 }
@@ -59,11 +61,13 @@ func sanitizeEscalationPolicy(req *models.OnCallEscalationPolicyRequest) {
 	)
 }
 
-func NewOnCallHandler(onCallRepo *repository.OnCallRepository, teamRepo *repository.TeamRepository, onCallService *services.OnCallService, permissionService *services.PermissionService, auditor *logger.Auditor) *OnCallHandler {
+func NewOnCallHandler(onCallRepo *repository.OnCallRepository, teamRepo *repository.TeamRepository, itemRepo *repository.ItemRepository, onCallService *services.OnCallService, incidentService *services.IncidentService, permissionService *services.PermissionService, auditor *logger.Auditor) *OnCallHandler {
 	return &OnCallHandler{
 		onCallRepo:        onCallRepo,
 		teamRepo:          teamRepo,
+		itemRepo:          itemRepo,
 		onCallService:     onCallService,
+		incidentService:   incidentService,
 		permissionService: permissionService,
 		auditor:           auditor,
 	}
@@ -953,7 +957,7 @@ func (h *OnCallHandler) ListIncidents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	incidents, err := h.onCallRepo.GetActiveIncidents(repository.OnCallIncidentFilter{
+	incidents, err := h.onCallRepo.ListIncidents(repository.IncidentFilter{
 		PolicyID:     policyID,
 		TeamIDs:      teamIDs,
 		WorkspaceIDs: workspaceIDs,
@@ -963,84 +967,228 @@ func (h *OnCallHandler) ListIncidents(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	if incidents == nil {
-		incidents = []models.OnCallIncident{}
-	}
 	respondJSONOK(w, incidents)
 }
 
-// resolveIncidentForManage authorizes through the incident's policy team.
-// Missing incidents or policies return 404 to avoid leaking existence.
-func (h *OnCallHandler) resolveIncidentForManage(w http.ResponseWriter, r *http.Request, paramName string) (int, bool) {
-	id, ok := requireIDParam(w, r, paramName)
+// GetItemIncident returns the incident currently attached to an item. Missing
+// incidents return 404 so item-less workspaces do not leak pager state.
+func (h *OnCallHandler) GetItemIncident(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		return 0, false
+		return
 	}
 
-	incident, err := h.onCallRepo.GetIncidentByID(id)
+	incident, ok := h.itemIncident(w, r)
+	if !ok {
+		return
+	}
+
+	allowed, err := h.canViewIncidentItem(user.ID, incident)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Incident")
-			return 0, false
-		}
 		respondInternalError(w, r, err)
-		return 0, false
+		return
 	}
-
-	policy, err := h.onCallRepo.GetPolicyByID(incident.EscalationPolicyID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Incident")
-			return 0, false
-		}
-		respondInternalError(w, r, err)
-		return 0, false
+	if !allowed {
+		respondForbidden(w, r)
+		return
 	}
-
-	if !h.canManageTeamOnCall(w, r, policy.TeamID) {
-		return 0, false
-	}
-
-	return id, true
+	respondJSONOK(w, incident)
 }
 
-// AcknowledgeIncident marks an incident as acknowledged.
+// TriggerIncident declares an incident on an item. The item must have an
+// assigned team, and the item's team must have an active escalation policy
+// unless one is named explicitly. Gated on item edit permission.
+func (h *OnCallHandler) TriggerIncident(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	item, err := h.itemRepo.FindByIDWithDetails(itemID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Item")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	allowed, err := h.permissionService.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemEdit)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !allowed {
+		respondForbidden(w, r)
+		return
+	}
+
+	var req models.IncidentTriggerRequest
+	if r.Body != nil && r.ContentLength != 0 {
+		decoded, ok := decodeJSON[models.IncidentTriggerRequest](w, r)
+		if !ok {
+			return
+		}
+		req = decoded
+	}
+
+	incident, err := h.incidentService.Trigger(itemID, req.PolicyID, req.Urgency, "manual")
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrIncidentItemTeamRequired), errors.Is(err, services.ErrIncidentPolicyUnknown):
+			respondValidationError(w, r, err.Error())
+		case errors.Is(err, services.ErrIncidentAlreadyOpen):
+			respondConflict(w, r, err.Error())
+		default:
+			respondInternalError(w, r, err)
+		}
+		return
+	}
+
+	respondJSONCreated(w, incident)
+}
+
+// AcknowledgeIncident records the ack handshake. Gated on responder-ship, not
+// item permission: the 3am responder may have no rights in the item workspace.
 func (h *OnCallHandler) AcknowledgeIncident(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := h.resolveIncidentForManage(w, r, "id")
+	incident, ok := h.itemIncident(w, r)
 	if !ok {
 		return
 	}
+	if !h.requireResponderShip(w, r, user, incident) {
+		return
+	}
 
-	if err := h.onCallService.AcknowledgeIncident(id, user.ID); err != nil {
+	if err := h.incidentService.Acknowledge(incident.ID, user.ID); err != nil {
+		if errors.Is(err, services.ErrIncidentResolved) {
+			respondConflict(w, r, err.Error())
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
 
-	respondJSONOK(w, map[string]string{"status": "acknowledged"})
+	respondJSONOK(w, h.reloadItemIncident(incident))
 }
 
-// ResolveIncident marks an incident as resolved.
+// UnacknowledgeIncident returns an acknowledged incident to the triggered state.
+func (h *OnCallHandler) UnacknowledgeIncident(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	incident, ok := h.itemIncident(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireResponderShip(w, r, user, incident) {
+		return
+	}
+
+	if err := h.incidentService.Unacknowledge(incident.ID); err != nil {
+		if errors.Is(err, services.ErrIncidentResolved) {
+			respondConflict(w, r, err.Error())
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, h.reloadItemIncident(incident))
+}
+
+// ResolveIncident ends the incident. It does not complete the item.
 func (h *OnCallHandler) ResolveIncident(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := h.resolveIncidentForManage(w, r, "id")
+	incident, ok := h.itemIncident(w, r)
 	if !ok {
 		return
 	}
+	if !h.requireResponderShip(w, r, user, incident) {
+		return
+	}
 
-	if err := h.onCallService.ResolveIncident(id, user.ID); err != nil {
+	if err := h.incidentService.Resolve(incident.ID, user.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	respondJSONOK(w, map[string]string{"status": "resolved"})
+	respondJSONOK(w, h.reloadItemIncident(incident))
+}
+
+// itemIncident loads the incident attached to the {id} item path parameter.
+func (h *OnCallHandler) itemIncident(w http.ResponseWriter, r *http.Request) (*models.Incident, bool) {
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return nil, false
+	}
+	incident, err := h.onCallRepo.GetIncidentForItem(itemID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Incident")
+			return nil, false
+		}
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return incident, true
+}
+
+// reloadItemIncident re-reads an incident after a mutation so the response
+// carries the updated ack/resolve actors. Write failures only drop the
+// enrichment; the status change itself already committed.
+func (h *OnCallHandler) reloadItemIncident(incident *models.Incident) *models.Incident {
+	updated, err := h.onCallRepo.GetIncidentByID(incident.ID)
+	if err != nil {
+		return incident
+	}
+	return updated
+}
+
+// canViewIncidentItem permits workspace viewers or responders to read an item's
+// incident.
+func (h *OnCallHandler) canViewIncidentItem(userID int, incident *models.Incident) (bool, error) {
+	allowed, err := h.permissionService.HasWorkspacePermission(userID, incident.WorkspaceID, models.PermissionItemView)
+	if err != nil || allowed {
+		return allowed, err
+	}
+	if incident.TeamID == nil {
+		return false, nil
+	}
+	return h.hasTeamOnCallViewAccess(userID, *incident.TeamID)
+}
+
+// requireResponderShip enforces that the caller can respond to the incident:
+// a member or admin of the incident's team, or a global team manager. It is
+// deliberately independent of item workspace permission.
+func (h *OnCallHandler) requireResponderShip(w http.ResponseWriter, r *http.Request, user *models.User, incident *models.Incident) bool {
+	if incident.TeamID == nil {
+		respondForbidden(w, r)
+		return false
+	}
+	allowed, err := h.hasTeamOnCallViewAccess(user.ID, *incident.TeamID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if !allowed {
+		respondForbidden(w, r)
+		return false
+	}
+	return true
 }

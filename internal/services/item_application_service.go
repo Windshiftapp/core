@@ -1513,6 +1513,8 @@ func (s *ItemApplicationService) resolveHistoryValue(field, value string, allowe
 	switch field {
 	case "assignee_id":
 		return s.resolver.ResolveUserName(id)
+	case "team_id":
+		return s.resolver.ResolveTeamName(id)
 	case "priority_id":
 		return s.resolver.ResolvePriorityName(id)
 	case "status_id":

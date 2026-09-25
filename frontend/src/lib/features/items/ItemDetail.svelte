@@ -350,8 +350,8 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   }
   
   async function handleSaveField(detail) {
-    const { field, value, assigneeName, iterationName } = detail;
-    await saveField(field, value, assigneeName, iterationName);
+    const { field, value, assigneeName, iterationName, teamName } = detail;
+    await saveField(field, value, assigneeName, iterationName, teamName);
   }
 
   function handleCancelEdit(detail) {
@@ -359,9 +359,9 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     cancelEdit(field);
   }
 
-  async function saveField(field, directValue = null, assigneeName = null, iterationName = null) {
+  async function saveField(field, directValue = null, assigneeName = null, iterationName = null, teamName = null) {
     try {
-      await itemDetailStore.saveField(field, directValue, assigneeName, iterationName);
+      await itemDetailStore.saveField(field, directValue, assigneeName, iterationName, teamName);
     } catch (err) {
       console.error('Failed to update item:', err);
       showError('Failed to update item', err.message || String(err));

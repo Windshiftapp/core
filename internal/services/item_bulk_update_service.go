@@ -34,7 +34,7 @@ var bulkEditableItemFields = map[string]struct{}{
 	"title": {}, "description": {}, "priority_id": {},
 	"due_date": {}, "start_date": {}, "end_date": {},
 	"iteration_id": {}, "project_id": {}, "inherit_project": {}, "time_project_id": {},
-	"assignee_id": {}, "creator_id": {}, "parent_id": {}, "related_work_item_id": {},
+	"assignee_id": {}, "team_id": {}, "creator_id": {}, "parent_id": {}, "related_work_item_id": {},
 	"story_points": {}, "estimate_minutes": {}, "custom_field_values": {}, "is_task": {},
 }
 

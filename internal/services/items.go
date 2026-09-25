@@ -99,6 +99,7 @@ type ItemCreationParams struct {
 	InheritProject          bool
 	TimeProjectID           *int
 	AssigneeID              *int
+	TeamID                  *int // Team assigned to own/handle the item
 	ReporterID              *int // Reporter/submitter of the item
 	CreatorID               *int
 	CreatorPortalCustomerID *int

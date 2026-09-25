@@ -11,6 +11,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
+  import TeamPicker from '../../pickers/TeamPicker.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
@@ -822,6 +823,44 @@
       </div>
     {/snippet}
 
+    {#snippet teamField()}
+      <div class="mb-3" data-testid="item-team-field">
+        <TeamPicker
+          value={item.team_id ?? null}
+          placeholder={t('items.selectTeam')}
+          disabled={!canEdit || !isSystemFieldEditable('team')}
+          class="w-full"
+          onSelect={(selectedTeam) => {
+            onsaveField?.({
+              field: 'team',
+              value: selectedTeam?.id || null,
+              teamName: selectedTeam ? selectedTeam.name : null
+            });
+          }}
+        >
+          {#snippet children()}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+            >
+              <Text variant="subtle" size="sm">{t('common.team')}</Text>
+              <div class="flex items-center gap-2">
+                {#if item.team_id && item.team_name}
+                  <span
+                    class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style="background-color: {item.team_color || '#9ca3af'};"
+                  ></span>
+                  <span style="color: var(--ds-text);">{item.team_name}</span>
+                {:else}
+                  <Text variant="subtle" size="sm">{t('items.noTeam')}</Text>
+                {/if}
+              </div>
+            </div>
+          {/snippet}
+        </TeamPicker>
+      </div>
+    {/snippet}
+
     {#snippet milestoneField()}
       {@const itemMilestones = (item.milestones || []).map(m => m.id)}
       {@const selectedMilestones = (item.milestones || [])}
@@ -1011,6 +1050,7 @@
       {#if ident === 'priority'}{@render priorityField()}
       {:else if ident === 'project'}{@render projectField()}
       {:else if ident === 'assignee'}{@render assigneeField()}
+      {:else if ident === 'team'}{@render teamField()}
       {:else if ident === 'milestone'}{@render milestoneField()}
       {:else if ident === 'iteration'}{@render iterationField()}
       {:else if ident === 'labels'}{@render labelsField()}

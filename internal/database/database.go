@@ -128,6 +128,9 @@ var dailyBriefingsSchema string
 //go:embed schema/teams.sql
 var teamsSchema string
 
+//go:embed schema/incidents.sql
+var incidentsSchema string
+
 //go:embed schema/condition_sets.sql
 var conditionSetsSchema string
 

@@ -151,7 +151,9 @@ type Server struct {
 	assetActionService           *services.AssetActionService
 	eventEngine                  *events.Engine
 	approvalEscalationSweeper    *services.ApprovalEscalationSweeper
+	incidentEscalationSweeper    *services.IncidentEscalationSweeper
 	emailScheduler               *scheduler.EmailScheduler
+	ticketImport                 *services.TicketImportService
 	emailTrackingRetention       *scheduler.EmailTrackingRetentionSweeper
 	briefingScheduler            *scheduler.BriefingScheduler
 	pluginScheduleScheduler      *scheduler.PluginScheduleScheduler
@@ -729,9 +731,11 @@ func (s *Server) initialize() error {
 	onCallRepo := repository.NewOnCallRepository(s.db)
 	teamService := services.NewTeamService(s.db, teamRepo, leaveRepo)
 	onCallService := services.NewOnCallService(s.db, onCallRepo, leaveRepo)
+	itemRepo := repository.NewItemRepository(s.db)
+	incidentService := services.NewIncidentService(s.db, onCallRepo, itemRepo, onCallService, teamRepo, s.notificationService)
 	teamHandler := handlers.NewTeamHandler(teamRepo, leaveRepo, permService, logger.NewAuditor(s.db))
 	leaveHandler := handlers.NewLeaveHandler(leaveRepo, repository.NewUserRepository(s.db), permService)
-	onCallHandler := handlers.NewOnCallHandler(onCallRepo, teamRepo, onCallService, permService, logger.NewAuditor(s.db))
+	onCallHandler := handlers.NewOnCallHandler(onCallRepo, teamRepo, itemRepo, onCallService, incidentService, permService, logger.NewAuditor(s.db))
 	s.actionService.SetTeamService(teamService)
 
 	milestoneCategoryConfig := services.NewMilestoneCategoryConfig()
@@ -953,6 +957,7 @@ func (s *Server) initialize() error {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
 	go s.runAssetImportRecovery(assetApplication)
+	go s.runTicketImportRecovery(s.ticketImport)
 	itemLinkService.WithAssetPermissionChecker(assetHandler)
 	assetRepo := repository.NewAssetRepository(s.db)
 	assetReportHandler := handlers.NewAssetReportHandler(
@@ -975,6 +980,7 @@ func (s *Server) initialize() error {
 	emailProviderHandler := handlers.NewEmailProviderHandler(s.db, scmProviderHandler.GetEncryption(), baseURL, channelService)
 	emailProviderHandler.SetCredentialManager(emailCredManager)
 
+	s.ticketImport = services.NewTicketImportService(s.db, permService, cfg.AttachmentPath)
 	s.emailScheduler = scheduler.NewEmailScheduler(s.db, emailCredManager, cfg.AttachmentPath)
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
@@ -1008,6 +1014,7 @@ func (s *Server) initialize() error {
 	eventCoordinator.SetNotificationService(s.notificationService)
 	eventCoordinator.SetActivityTracker(s.activityTracker)
 	eventCoordinator.SetWebhookDispatcher(webhookSender)
+	incidentService.SetWebhookDispatcher(webhookSender)
 	eventCoordinator.SetActionService(s.actionService)
 	eventCoordinator.SetMagicLinkService(magicLinkService)
 	s.actionService.SetEventCoordinator(eventCoordinator)
@@ -1125,6 +1132,10 @@ func (s *Server) initialize() error {
 	// Background sweeper drives time-based escalation for pending approval steps.
 	s.approvalEscalationSweeper = services.NewApprovalEscalationSweeper(s.db, approvalService, services.DefaultApprovalEscalationSweeperConfig())
 	s.approvalEscalationSweeper.Start()
+
+	// Drives time-based escalation for triggered on-call incidents.
+	s.incidentEscalationSweeper = services.NewIncidentEscalationSweeper(s.db, incidentService, services.DefaultIncidentEscalationSweeperConfig())
+	s.incidentEscalationSweeper.Start()
 
 	// Wire smart-commit dependencies into the SCM sync service and start its
 	// scheduler. Must be done after commentService and conditionService exist.
@@ -1761,6 +1772,7 @@ func (s *Server) initialize() error {
 		Tokens:             tokenManager,
 		Users:              services.NewUserReadService(s.db),
 		Statuses:           services.NewStatusService(s.db),
+		Teams:              teamRepo,
 		Workflows:          workflowService,
 		Configuration:      services.NewConfigReadService(s.db),
 		ObjectTranslations: objectTranslationService,
@@ -1851,6 +1863,7 @@ func (s *Server) initialize() error {
 		ItemApplication:   itemApplication,
 		ItemDetail:        itemDetailApplication,
 		ItemLifecycle:     services.NewItemLifecycleService(s.db, permService),
+		TicketImport:      services.NewTicketImportService(s.db, permService, cfg.AttachmentPath),
 		SessionMiddleware: authMiddleware.OptionalAuth,
 		SearchAllowed:     s.searchLimiter.AllowRequest,
 		DBRequestTimeout:  s.config.DB.RequestTimeout,
@@ -2205,6 +2218,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.approvalEscalationSweeper.Stop()
 	}
 
+	if s.incidentEscalationSweeper != nil {
+		slog.Info("stopping incident escalation sweeper")
+		s.incidentEscalationSweeper.Stop()
+	}
+
 	if s.assetActionService != nil {
 		slog.Info("stopping asset action service")
 		s.assetActionService.Stop()
@@ -2513,6 +2531,23 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 		case <-s.magicLinkStopChan:
 			slog.Info("magic link cleanup scheduler stopped")
 			return
+		}
+	}
+}
+
+// runTicketImportRecovery rolls back abandoned ticket CSV imports so a
+// retried upload starts from a clean slate.
+func (s *Server) runTicketImportRecovery(tickets *services.TicketImportService) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.cleanupStopChan:
+			return
+		case <-ticker.C:
+			if _, err := tickets.ReconcileInterrupted(); err != nil {
+				slog.Error("ticket import recovery failed", "error", err)
+			}
 		}
 	}
 }

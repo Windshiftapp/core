@@ -39,6 +39,7 @@ type ItemCreateInput struct {
 	InheritProject    bool
 	TimeProjectID     *int
 	AssigneeID        *int
+	TeamID            *int
 	ParentID          *int
 	RelatedWorkItemID *int
 	StoryPoints       *float64
@@ -161,6 +162,7 @@ func (s *ItemCreationService) create(
 		InheritProject:        input.InheritProject,
 		TimeProjectID:         input.TimeProjectID,
 		AssigneeID:            input.AssigneeID,
+		TeamID:                input.TeamID,
 		CreatorID:             &actorUserID,
 		DueDate:               input.DueDate,
 		StartDate:             input.StartDate,

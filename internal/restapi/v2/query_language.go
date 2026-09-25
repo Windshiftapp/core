@@ -59,6 +59,7 @@ type qlCompletionValueReader interface {
 type queryLanguageValueLoader struct {
 	configuration configurationReader
 	statuses      statusReader
+	teams         teamReader
 	catalog       catalogReader
 	planning      planningApplication
 	timeProjects  timeProjectApplication
@@ -151,6 +152,19 @@ func (l queryLanguageValueLoader) Load(_ context.Context, userID int, source cql
 		rows, err := l.statuses.ListCategories()
 		if err != nil {
 			return nil, fmt.Errorf("list status categories for query completion: %w", err)
+		}
+		values := make([]qlCompletionValueDTO, len(rows))
+		for i, row := range rows {
+			values[i] = qlCompletionValue(row.ID, row.Name, "", valueField, row.Name)
+		}
+		return values, nil
+	case cql.CompletionValuesTeams:
+		if l.teams == nil {
+			return []qlCompletionValueDTO{}, nil
+		}
+		rows, err := l.teams.List()
+		if err != nil {
+			return nil, fmt.Errorf("list teams for query completion: %w", err)
 		}
 		values := make([]qlCompletionValueDTO, len(rows))
 		for i, row := range rows {
@@ -326,6 +340,7 @@ func validQLCompletionValueField(source cql.CompletionValueSource, field string)
 		return field == "id" || field == "name" || field == "key"
 	case cql.CompletionValuesStatuses, cql.CompletionValuesStatusCategories,
 		cql.CompletionValuesPriorities, cql.CompletionValuesUsers,
+		cql.CompletionValuesTeams,
 		cql.CompletionValuesMilestones, cql.CompletionValuesIterations,
 		cql.CompletionValuesProjects, cql.CompletionValuesItemTypes,
 		cql.CompletionValuesLabels:
@@ -467,6 +482,8 @@ func completionValueHelp(source cql.CompletionValueSource, valueType, valueField
 		return &qlCompletionValueHelp{Source: source, ValueField: valueField}
 	case cql.CompletionValuesUsers:
 		return &qlCompletionValueHelp{Source: source, ValueField: "id"}
+	case cql.CompletionValuesTeams:
+		return &qlCompletionValueHelp{Source: source, ValueField: valueField}
 	case cql.CompletionValuesMilestones:
 		return &qlCompletionValueHelp{Source: source, ValueField: valueField}
 	case cql.CompletionValuesIterations:

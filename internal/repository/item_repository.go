@@ -289,7 +289,9 @@ const itemDetailsSelectBody = `
 	       rw.title as related_work_item_title,
 	       rw_ws.key as related_work_item_workspace_key,
 	       rw.workspace_id as related_work_item_workspace_id,
-	       rw.workspace_item_number as related_work_item_number
+	       rw.workspace_item_number as related_work_item_number,
+	       i.team_id, i.incident_id,
+	       t.name as team_name, t.color as team_color, t.avatar_url as team_avatar
 	FROM items i
 	JOIN workspaces w ON i.workspace_id = w.id
 	LEFT JOIN iterations iter ON i.iteration_id = iter.id
@@ -302,7 +304,8 @@ const itemDetailsSelectBody = `
 	LEFT JOIN statuses s ON i.status_id = s.id
 	LEFT JOIN item_types it ON i.item_type_id = it.id
 	LEFT JOIN items rw ON i.related_work_item_id = rw.id
-	LEFT JOIN workspaces rw_ws ON rw.workspace_id = rw_ws.id`
+	LEFT JOIN workspaces rw_ws ON rw.workspace_id = rw_ws.id
+	LEFT JOIN teams t ON i.team_id = t.id`
 
 // scanItemDetailsRow scans the shared projection. Milestones are attached by
 // the caller to avoid a per-row query.
@@ -325,6 +328,8 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	var relatedWorkItemTitle, relatedWorkItemWorkspaceKey sql.NullString
 	var relatedWorkItemWorkspaceID, relatedWorkItemNumber sql.NullInt64
 	var creatorPortalCustomerID, channelID, requestTypeID sql.NullInt64
+	var teamID, incidentID sql.NullInt64
+	var teamName, teamColor, teamAvatar sql.NullString
 
 	var storyPoints sql.NullFloat64
 	var estimateMinutes sql.NullInt64
@@ -347,6 +352,11 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 		&relatedWorkItemWorkspaceKey,
 		&relatedWorkItemWorkspaceID,
 		&relatedWorkItemNumber,
+		&teamID,
+		&incidentID,
+		&teamName,
+		&teamColor,
+		&teamAvatar,
 	)
 	if err != nil {
 		return models.Item{}, false, err
@@ -365,6 +375,8 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	assignNullableInt(&item.CreatorPortalCustomerID, creatorPortalCustomerID)
 	assignNullableInt(&item.ChannelID, channelID)
 	assignNullableInt(&item.RequestTypeID, requestTypeID)
+	assignNullableInt(&item.TeamID, teamID)
+	assignNullableInt(&item.IncidentID, incidentID)
 
 	assignNullableTime(&item.DueDate, dueDate)
 	assignNullableTime(&item.StartDate, startDate)
@@ -390,6 +402,9 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
 	assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
+	assignNullableString(&item.TeamName, teamName)
+	assignNullableString(&item.TeamColor, teamColor)
+	assignNullableString(&item.TeamAvatarURL, teamAvatar)
 
 	assignNullableInt(&item.RelatedWorkItemID, relatedWorkItemID)
 	assignNullableString(&item.RelatedWorkItemTitle, relatedWorkItemTitle)
@@ -815,13 +830,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
 		    due_date = ?, start_date = ?, end_date = ?, is_task = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
-		    time_project_id = ?, assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
+		    time_project_id = ?, assignee_id = ?, team_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, story_points = ?, estimate_minutes = ?, updated_at = ?, last_active_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
 		item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
-		item.TimeProjectID, item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
+		item.TimeProjectID, item.AssigneeID, item.TeamID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, item.StoryPoints, item.EstimateMinutes, now, now, item.ID,
 	)
 
@@ -837,7 +852,7 @@ var allowedItemColumns = map[string]bool{
 	"title": true, "description": true, "status_id": true, "priority_id": true,
 	"due_date": true, "start_date": true, "end_date": true,
 	"iteration_id": true, "project_id": true, "inherit_project": true,
-	"assignee_id": true, "creator_id": true, "custom_field_values": true,
+	"assignee_id": true, "team_id": true, "creator_id": true, "custom_field_values": true,
 	"parent_id": true, "related_work_item_id": true, "item_type_id": true,
 	"frac_index": true, "is_task": true, "time_project_id": true,
 	"story_points": true, "estimate_minutes": true,

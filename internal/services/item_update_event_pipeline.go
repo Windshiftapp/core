@@ -71,6 +71,7 @@ func newStatusTransitionActionEvent(original, updated *models.Item, actorUserID 
 			"status_id":   updated.StatusID,
 			"title":       updated.Title,
 			"assignee_id": updated.AssigneeID,
+			"team_id":     updated.TeamID,
 			"creator_id":  updated.CreatorID,
 		},
 	}

@@ -42,6 +42,15 @@ export const SYSTEM_FIELDS = [
     cardSelectable: false,
     listColumn: { required: false },
   },
+  // Manually-added system field: available in the screen editor but not a
+  // default board card or list column.
+  {
+    identifier: 'team',
+    name: 'Team',
+    type: 'select',
+    cardSelectable: false,
+    listColumn: null,
+  },
   {
     identifier: 'milestone',
     name: 'Milestone',

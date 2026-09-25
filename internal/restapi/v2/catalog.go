@@ -16,6 +16,10 @@ import (
 	"windshift/internal/services"
 )
 
+type teamReader interface {
+	List() ([]models.Team, error)
+}
+
 type statusReader interface {
 	ListStatuses() ([]services.StatusResult, error)
 	GetStatus(int) (*services.StatusResult, error)
@@ -44,6 +48,7 @@ func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
 	builder.Read("/query-language/values", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionValues(queryLanguageValueLoader{
 		configuration: deps.Configuration,
 		statuses:      deps.Statuses,
+		teams:         deps.Teams,
 		catalog:       deps.Catalog,
 		planning:      deps.Planning,
 		timeProjects:  deps.TimeProjects,

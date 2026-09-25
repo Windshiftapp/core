@@ -32,6 +32,16 @@ func (s *IDResolverService) ResolveUserName(id int) string {
 	return name
 }
 
+// ResolveTeamName returns the name for a team ID
+func (s *IDResolverService) ResolveTeamName(id int) string {
+	var name string
+	err := s.db.QueryRow(`SELECT name FROM teams WHERE id = ?`, id).Scan(&name)
+	if err != nil {
+		return ""
+	}
+	return name
+}
+
 // ResolvePriorityName returns the name for a priority ID
 func (s *IDResolverService) ResolvePriorityName(id int) string {
 	var name string

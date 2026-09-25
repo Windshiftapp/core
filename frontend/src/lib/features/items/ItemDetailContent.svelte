@@ -7,6 +7,7 @@
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
+  import ItemIncidentPanel from '../items/ItemIncidentPanel.svelte';
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
@@ -393,6 +394,8 @@
             onexecuteAction={handleExecuteAction}
             onaiaction={handleAIAction}
           />
+
+          <ItemIncidentPanel itemId={item.id} {item} {canEdit} />
 
           <ItemDetailLinks
             {item}

@@ -58,6 +58,7 @@ type ItemFilters struct {
 	StatusIDNot   *int
 	PriorityID    *int
 	AssigneeID    *int
+	TeamID        *int
 	CreatorID     *int
 	ItemTypeID    *int
 	MilestoneID   *int
@@ -87,7 +88,7 @@ type ItemFilters struct {
 
 func (f ItemFilters) hasScalarFilters() bool {
 	return f.StatusID != nil || f.StatusIDNot != nil || f.PriorityID != nil ||
-		f.AssigneeID != nil || f.CreatorID != nil || f.ItemTypeID != nil ||
+		f.AssigneeID != nil || f.TeamID != nil || f.CreatorID != nil || f.ItemTypeID != nil ||
 		f.MilestoneID != nil || f.IterationID != nil || f.ParentIDIsSet ||
 		f.Level != nil || f.MaxLevel != nil || f.CreatedSince != nil ||
 		f.CompletedSince != nil || f.CompletedActivitySince != nil || f.ItemID != nil
@@ -179,6 +180,7 @@ var systemFieldSortColumns = map[string]string{
 	"status":         "i.status_id",
 	"priority":       "i.priority_id",
 	"assignee":       "i.assignee_id",
+	"team":           "i.team_id",
 	"milestone":      "(SELECT MIN(milestone_id) FROM item_milestones WHERE item_id = i.id)",
 	"iteration":      "i.iteration_id",
 	"due_date":       "i.due_date",
@@ -266,13 +268,15 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
 		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
 		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
-		COALESCE(%s, i.created_at) as status_since
+		COALESCE(%s, i.created_at) as status_since,
+		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar
 	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
 
 	fromClause := ItemListFilterFromClause() + `
 		LEFT JOIN items p ON i.parent_id = p.id
 		LEFT JOIN users assignee ON i.assignee_id = assignee.id
 		LEFT JOIN users creator ON i.creator_id = creator.id
+		LEFT JOIN teams team ON i.team_id = team.id
 	`
 
 	whereClause, args := r.buildWhereClause(params)
@@ -655,6 +659,11 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 		args = append(args, *params.Filters.AssigneeID)
 	}
 
+	if params.Filters.TeamID != nil {
+		whereClause += " AND i.team_id = ?"
+		args = append(args, *params.Filters.TeamID)
+	}
+
 	if params.Filters.CreatorID != nil {
 		whereClause += " AND i.creator_id = ?"
 		args = append(args, *params.Filters.CreatorID)
@@ -867,7 +876,9 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		var itemTypeID, parentID, parentWorkspaceItemNumber, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
 		var dueDate, startDate, endDate sql.NullTime
 		var statusSince sql.NullString
+		var teamID, incidentID sql.NullInt64
 		var itemTypeName, itemTypeBuiltinKey, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
+		var teamName, teamColor, teamAvatar sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName, statusColor sql.NullString
 		var statusBuiltinKey, priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
 		var fracIndex sql.NullString
@@ -884,6 +895,7 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
 			&statusSince,
+			&teamID, &incidentID, &teamName, &teamColor, &teamAvatar,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan item: %w", err)
@@ -904,6 +916,8 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		assignNullableInt(&item.TimeProjectID, timeProjectID)
 		assignNullableInt(&item.PriorityID, priorityID)
 		assignNullableInt(&item.AssigneeID, assigneeID)
+		assignNullableInt(&item.TeamID, teamID)
+		assignNullableInt(&item.IncidentID, incidentID)
 		assignNullableInt(&item.CreatorID, creatorID)
 
 		if dueDate.Valid {
@@ -945,6 +959,9 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		assignNullableString(&item.AssigneeAvatar, assigneeAvatar)
 		assignNullableString(&item.CreatorName, creatorName)
 		assignNullableString(&item.CreatorEmail, creatorEmail)
+		assignNullableString(&item.TeamName, teamName)
+		assignNullableString(&item.TeamColor, teamColor)
+		assignNullableString(&item.TeamAvatarURL, teamAvatar)
 
 		if fracIndex.Valid {
 			item.FracIndex = &fracIndex.String

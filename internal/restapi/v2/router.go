@@ -226,6 +226,16 @@ func (b *routeBuilder) RawResponse[Response any](method, path string, status int
 
 // RawDocument registers a handler that parses a non-JSON request itself and
 // writes the standard data envelope.
+// RawHandler mounts a fully custom handler for non-JSON bodies (e.g. CSV
+// streaming). ResponseMediaType declares the body the handler writes itself.
+func (b *routeBuilder) RawHandler(method, path, responseMediaType string, status int, auth AuthClass, scopes []string, handler Handler) {
+	metadata := b.metadata(method, path, auth, scopes)
+	metadata.ResponseMediaType = responseMediaType
+	metadata.SuccessStatus = status
+	metadata.ResponseShape = ResponseRaw
+	b.routes = append(b.routes, route{Route: metadata, handler: handler})
+}
+
 func (b *routeBuilder) RawDocument[Request, Response any](method, path string, status int, requestMediaType string, auth AuthClass, scopes []string, handler Handler) {
 	metadata := b.metadata(method, path, auth, scopes)
 	metadata.RequestType = reflect.TypeFor[Request]()
@@ -525,6 +535,7 @@ type Deps struct {
 	Tokens                       tokenAuthenticator
 	Users                        userReader
 	Statuses                     statusReader
+	Teams                        teamReader
 	Workflows                    workflowReader
 	Configuration                configurationReader
 	ObjectTranslations           objectLocalizer
@@ -584,6 +595,7 @@ type Deps struct {
 	ItemApplication              *services.ItemApplicationService
 	ItemDetail                   *services.ItemDetailApplicationService
 	ItemLifecycle                *services.ItemLifecycleService
+	TicketImport                 *services.TicketImportService
 	SessionMiddleware            func(http.Handler) http.Handler
 	SearchAllowed                func(*http.Request) bool
 	DBRequestTimeout             time.Duration
@@ -819,6 +831,7 @@ func buildRoutes(deps Deps) []route {
 	registerTestManagementRoutes(&builder, deps.TestManagement)
 	registerAssetRoutes(&builder, deps.Assets)
 	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.ItemLifecycle, deps.Access, deps.StoryPointRollup, deps.DBRequestTimeout)
+	registerTicketImportRoutes(&builder, deps.TicketImport)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	return builder.routes
 }
@@ -927,6 +940,14 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
 	}
 	switch route.Method + " " + route.Path {
+	case "POST /workspaces/{workspace_id}/tickets/import/upload",
+		"POST /workspaces/{workspace_id}/tickets/import/start":
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+	case "GET /workspaces/{workspace_id}/tickets/import/jobs/{job_id}":
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+		upsertParameter(route, ParameterMetadata{Name: "job_id", In: "path", Required: true, Description: "The import job identifier.", Schema: map[string]any{"type": "string"}})
+	case "GET /workspaces/{workspace_id}/tickets/export":
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
 	case "POST /workspaces/{workspace_id}/actions/validate":
 		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
 	case "GET /items/changes":
@@ -1069,6 +1090,17 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("days", "Number of recent civil days included in trend calculations.", 365, 30))
 	case "DELETE /asset-sets/{asset_set_id}/roles/{assignment_id}":
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
+	case "POST /workspaces/{workspace_id}/tickets/import/upload",
+		"POST /workspaces/{workspace_id}/tickets/import/start",
+		"GET /workspaces/{workspace_id}/tickets/import/jobs/{job_id}",
+		"GET /workspaces/{workspace_id}/tickets/export":
+		route.Tag = "Work items"
+		route.Summary = map[string]string{
+			"POST /workspaces/{workspace_id}/tickets/import/upload":       "Stage a ticket CSV import upload",
+			"POST /workspaces/{workspace_id}/tickets/import/start":        "Start a ticket CSV import",
+			"GET /workspaces/{workspace_id}/tickets/import/jobs/{job_id}": "Read ticket import progress",
+			"GET /workspaces/{workspace_id}/tickets/export":               "Export tickets as CSV",
+		}[route.Method+" "+route.Path]
 	case "GET /items/changes":
 		route.Description = "Returns visible changed and removed item IDs from a stable (since, through] window. Supply limit to page, passing next_cursor as since and the first watermark as through until has_more is false. Pages count log events before deduplication and membership filtering. Cursors ahead of the server require reset_required and a full reload. Omitting limit preserves the full-reload fallback on overflow."
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items from the change window. Values true and 1 enable exclusion.", false))

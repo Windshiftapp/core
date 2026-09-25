@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown, FileText, Briefcase, Hash, Clock } from '@lucide/svelte';
+  import { MoreHorizontal, Calendar, Flag, User, Users, Layers, ChevronDown, FileText, Briefcase, Hash, Clock } from '@lucide/svelte';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore, workspacePermissions } from '../stores';
@@ -11,6 +11,7 @@
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
+  import TeamPicker from '../pickers/TeamPicker.svelte';
   import WorkspaceLabelCombobox from '../pickers/WorkspaceLabelCombobox.svelte';
   import Label from '../components/Label.svelte';
   import Input from '../components/Input.svelte';
@@ -328,6 +329,26 @@
           </div>
         {/snippet}
       </UserPicker>
+    {/if}
+
+    <!-- Team Chip -->
+    {#if store.isFieldConfigured('team') && !store.isFieldRequired('team')}
+      <TeamPicker bind:value={store.formData.team_id} placeholder={t('createModal.team')}>
+        {#snippet children()}
+          <!-- svelte-ignore a11y_no_static_element_interactions a11y_no_noninteractive_element_to_interactive_role -->
+          <div
+            role="button"
+            tabindex="0"
+            data-testid="create-team-chip"
+            class="chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
+            style="color: {store.formData.team_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+          >
+            <Users size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+            <span class="truncate max-w-[120px]">{store.selectedTeam?.name || t('createModal.team')}</span>
+            <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+          </div>
+        {/snippet}
+      </TeamPicker>
     {/if}
 
     <!-- Due Date Chip -->
@@ -681,6 +702,13 @@
               placeholder={t('createModal.unassigned')}
               workspaceId={store.formData.workspace_id}
             />
+          </div>
+        {:else if field.field_identifier === 'team'}
+          <div class="space-y-1">
+            <Label color="default">
+              {t('createModal.team')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+            </Label>
+            <TeamPicker bind:value={store.formData.team_id} placeholder={t('items.noTeam')} />
           </div>
         {:else if field.field_identifier === 'iteration'}
           <div class="space-y-1">

@@ -38,6 +38,7 @@ function defaultFormData({ itemTypeId = null } = {}) {
     priority_id: null,
     milestone_ids: [],
     assignee_id: null,
+    team_id: null,
     iteration_id: null,
     project_id: null,
     label_names: [],
@@ -63,6 +64,9 @@ class WorkItemFormStore {
   // === Data Loading State ===
   users = $state([]);
   usersLoaded = $state(false);
+
+  teams = $state([]);
+  teamsLoaded = $state(false);
 
   allMilestones = $state([]);
   milestones = $state([]);
@@ -157,6 +161,13 @@ class WorkItemFormStore {
   }
 
   /**
+   * Get the currently selected team object.
+   */
+  get selectedTeam() {
+    return this.teams.find((team) => team.id === this.formData.team_id) || null;
+  }
+
+  /**
    * Get the currently selected milestone objects (multi-select).
    */
   get selectedMilestones() {
@@ -243,6 +254,19 @@ class WorkItemFormStore {
    * Load assignable users. When workspaceId is provided, fetches only active users
    * via the assignable-users endpoint; otherwise falls back to the general users endpoint.
    */
+  async loadTeams() {
+    if (this.teamsLoaded) return;
+    try {
+      this.teams = (await api.teams.getAll()) || [];
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error('Failed to load teams:', error);
+      this.teams = [];
+    } finally {
+      this.teamsLoaded = true;
+    }
+  }
+
   async loadUsers(workspaceId = null) {
     if (this.usersLoaded) return;
     try {
@@ -921,6 +945,7 @@ class WorkItemFormStore {
       priority_id: this.formData.priority_id || null,
       milestone_ids: Array.isArray(this.formData.milestone_ids) ? this.formData.milestone_ids : [],
       assignee_id: this.formData.assignee_id || null,
+      team_id: this.formData.team_id || null,
       label_ids: this.selectedLabelIds,
       iteration_id: this.formData.iteration_id || null,
       project_id: this.formData.project_id || null,
@@ -1018,6 +1043,7 @@ class WorkItemFormStore {
     this.loadStoredSelections();
     await Promise.all([
       this.loadUsers(),
+      this.loadTeams(),
       this.loadMilestones(),
       this.loadItemTypes(),
       this.loadCustomFields(),

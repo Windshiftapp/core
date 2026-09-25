@@ -12,6 +12,7 @@ const (
 	CompletionValuesStatusCategories CompletionValueSource = "status_categories"
 	CompletionValuesPriorities       CompletionValueSource = "priorities"
 	CompletionValuesUsers            CompletionValueSource = "users"
+	CompletionValuesTeams            CompletionValueSource = "teams"
 	CompletionValuesMilestones       CompletionValueSource = "milestones"
 	CompletionValuesIterations       CompletionValueSource = "iterations"
 	CompletionValuesProjects         CompletionValueSource = "projects"
@@ -54,6 +55,7 @@ var (
 		{Name: "completed_at", ValueType: "date", Operators: orderedOperators},
 		{Name: "dueDate", Aliases: []string{"due_date", "due-date"}, ValueType: "date", Operators: orderedOperators},
 		{Name: "assignee", Aliases: []string{"assigneeId", "assignee_id"}, ValueType: "number", ValueSource: CompletionValuesUsers, Operators: equalityOperators},
+		{Name: "team", Aliases: []string{"teamId", "team_id"}, ValueType: "number", ValueSource: CompletionValuesTeams, Operators: equalityOperators},
 		{Name: "creator", Aliases: []string{"creatorId", "creator_id"}, ValueType: "number", ValueSource: CompletionValuesUsers, Operators: equalityOperators},
 		{Name: "reporter", Aliases: []string{"reporterId", "reporter_id"}, ValueType: "number", ValueSource: CompletionValuesUsers, Operators: equalityOperators},
 		{Name: "milestone", ValueType: "string", ValueSource: CompletionValuesMilestones, Operators: textOperators},

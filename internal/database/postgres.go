@@ -136,6 +136,9 @@ var dailyBriefingsSchemaPostgres string
 //go:embed schema/teams_postgres.sql
 var teamsSchemaPostgres string
 
+//go:embed schema/incidents_postgres.sql
+var incidentsSchemaPostgres string
+
 //go:embed schema/condition_sets_postgres.sql
 var conditionSetsSchemaPostgres string
 
@@ -549,6 +552,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"ldap_postgres.sql", ldapSchemaPostgres},
 		{"daily_briefings_postgres.sql", dailyBriefingsSchemaPostgres},
 		{"teams_postgres.sql", teamsSchemaPostgres},
+		{"incidents_postgres.sql", incidentsSchemaPostgres},
 		{"condition_sets_postgres.sql", conditionSetsSchemaPostgres},
 		{"approvals_postgres.sql", approvalsSchemaPostgres},
 		{"integrations_postgres.sql", integrationsSchemaPostgres},

@@ -124,6 +124,7 @@ func (ec *EventCoordinator) emitItemCreatedInternal(item *models.Item, actorUser
 				"status_id":    item.StatusID,
 				"item_type_id": item.ItemTypeID,
 				"assignee_id":  item.AssigneeID,
+				"team_id":      item.TeamID,
 				"creator_id":   item.CreatorID,
 				"priority_id":  item.PriorityID,
 			},
@@ -287,6 +288,7 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 				"status_id":   newStatusID,
 				"title":       item.Title,
 				"assignee_id": item.AssigneeID,
+				"team_id":     item.TeamID,
 				"creator_id":  item.CreatorID,
 			},
 		})

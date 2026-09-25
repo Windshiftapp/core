@@ -1028,25 +1028,29 @@ var Catalog = []Migration{
 	{
 		Version:       "20260905_asset_import_leases",
 		Name:          "Fence asset import workers and recovery with expiring leases",
-		CheckSQLite:   sqliteColumnCheck("asset_import_jobs", "lease_expires_at"),
-		CheckPostgres: pgColumnCheck("asset_import_jobs", "lease_expires_at"),
-		SQLite:        "ALTER TABLE asset_import_jobs ADD COLUMN lease_expires_at BIGINT",
-		Postgres:      "ALTER TABLE asset_import_jobs ADD COLUMN lease_expires_at BIGINT",
+		CheckSQLite:   sqliteColumnCheck("import_jobs", "lease_expires_at"),
+		CheckPostgres: pgColumnCheck("import_jobs", "lease_expires_at"),
+		Superseded:    []string{"616606ef9da70200801ed9df1b8bc266f1b90ec9efe7e9d72e47ab4398beaf5a"},
+		SQLite:        "ALTER TABLE import_jobs ADD COLUMN lease_expires_at BIGINT",
+		Postgres:      "ALTER TABLE import_jobs ADD COLUMN lease_expires_at BIGINT",
 	},
 	{
 		Version:       "20260905_asset_import_upload_ownership",
 		Name:          "Bind asset import uploads to their uploader and set",
-		CheckSQLite:   sqliteTableCheck("asset_import_uploads"),
-		CheckPostgres: pgTableCheck("asset_import_uploads"),
-		SQLite: `CREATE TABLE IF NOT EXISTS asset_import_uploads (
+		CheckSQLite:   sqliteTableCheck("import_uploads"),
+		CheckPostgres: pgTableCheck("import_uploads"),
+		Superseded:    []string{"d64288c0cab5f1b271aad7f328535cb3abbae551f7e8e603cfbac6aca6cecf14"},
+		SQLite: `CREATE TABLE IF NOT EXISTS import_uploads (
  id TEXT PRIMARY KEY,
- set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL DEFAULT 'asset',
+ scope_id INTEGER NOT NULL,
  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  created_at BIGINT NOT NULL
 );`,
-		Postgres: `CREATE TABLE IF NOT EXISTS asset_import_uploads (
+		Postgres: `CREATE TABLE IF NOT EXISTS import_uploads (
  id TEXT PRIMARY KEY,
- set_id INTEGER NOT NULL REFERENCES asset_management_sets(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL DEFAULT 'asset',
+ scope_id INTEGER NOT NULL,
  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  created_at BIGINT NOT NULL
 );`,
@@ -1446,6 +1450,130 @@ var Catalog = []Migration{
 		`,
 		Postgres: `
 			ALTER TABLE items ADD COLUMN IF NOT EXISTS merged_into_item_id BIGINT REFERENCES items(id) ON DELETE SET NULL;
+		`,
+	},
+	{
+		Version:       "20260925_items_team",
+		Name:          "Assign a team to work items",
+		CheckSQLite:   sqliteColumnCheck("items", "team_id"),
+		CheckPostgres: pgColumnCheck("items", "team_id"),
+		SQLite: `
+			ALTER TABLE items ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_team_id ON items(team_id);
+		`,
+		Postgres: `
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_team_id ON items(team_id);
+		`,
+	},
+	{
+		Version:       "20260925_incidents",
+		Name:          "Model incidents as pager state on work items",
+		CheckSQLite:   sqliteTableCheck("incidents"),
+		CheckPostgres: pgTableCheck("incidents"),
+		SQLite: `
+			CREATE TABLE incidents (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				item_id INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'triggered',
+				urgency TEXT NOT NULL DEFAULT 'high',
+				source TEXT NOT NULL DEFAULT 'manual',
+				escalation_policy_id INTEGER,
+				triggered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				acknowledged_at DATETIME,
+				acknowledged_by INTEGER,
+				resolved_at DATETIME,
+				resolved_by INTEGER,
+				escalation_step INTEGER NOT NULL DEFAULT 0,
+				escalation_repeat_count INTEGER NOT NULL DEFAULT 0,
+				next_escalation_at DATETIME,
+				dedup_key TEXT,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+				FOREIGN KEY (escalation_policy_id) REFERENCES on_call_escalation_policies(id) ON DELETE SET NULL,
+				FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
+				FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+			);
+			CREATE INDEX idx_incidents_item_id ON incidents(item_id);
+			CREATE INDEX idx_incidents_status ON incidents(status);
+			CREATE INDEX idx_incidents_escalation_policy_id ON incidents(escalation_policy_id);
+			CREATE INDEX idx_incidents_next_escalation ON incidents(next_escalation_at) WHERE status = 'triggered';
+			CREATE UNIQUE INDEX uq_incidents_open_item ON incidents(item_id) WHERE status = 'triggered';
+			ALTER TABLE items ADD COLUMN incident_id INTEGER REFERENCES incidents(id) ON DELETE SET NULL;
+			CREATE UNIQUE INDEX uq_items_incident ON items(incident_id) WHERE incident_id IS NOT NULL;
+			DROP TABLE IF EXISTS on_call_incidents;
+		`,
+		Postgres: `
+			CREATE TABLE incidents (
+				id SERIAL PRIMARY KEY,
+				item_id INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'triggered',
+				urgency TEXT NOT NULL DEFAULT 'high',
+				source TEXT NOT NULL DEFAULT 'manual',
+				escalation_policy_id INTEGER,
+				triggered_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				acknowledged_at TIMESTAMPTZ,
+				acknowledged_by INTEGER,
+				resolved_at TIMESTAMPTZ,
+				resolved_by INTEGER,
+				escalation_step INTEGER NOT NULL DEFAULT 0,
+				escalation_repeat_count INTEGER NOT NULL DEFAULT 0,
+				next_escalation_at TIMESTAMPTZ,
+				dedup_key TEXT,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+				FOREIGN KEY (escalation_policy_id) REFERENCES on_call_escalation_policies(id) ON DELETE SET NULL,
+				FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
+				FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_incidents_item_id ON incidents(item_id);
+			CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+			CREATE INDEX IF NOT EXISTS idx_incidents_escalation_policy_id ON incidents(escalation_policy_id);
+			CREATE INDEX IF NOT EXISTS idx_incidents_next_escalation ON incidents(next_escalation_at) WHERE status = 'triggered';
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_incidents_open_item ON incidents(item_id) WHERE status = 'triggered';
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS incident_id INTEGER REFERENCES incidents(id) ON DELETE SET NULL;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_items_incident ON items(incident_id) WHERE incident_id IS NOT NULL;
+			DROP TABLE IF EXISTS on_call_incidents;
+		`,
+	},
+	{
+		Version:       "20260926_incident_notification_state",
+		Name:          "Schedule delayed and repeated incident notifications",
+		CheckSQLite:   sqliteTableCheck("incident_notification_state"),
+		CheckPostgres: pgTableCheck("incident_notification_state"),
+		SQLite: `
+			CREATE TABLE incident_notification_state (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				incident_id INTEGER NOT NULL,
+				escalation_rule_id INTEGER NOT NULL,
+				notification_rule_id INTEGER NOT NULL,
+				repeat_index INTEGER NOT NULL DEFAULT 0,
+				next_notification_at DATETIME NOT NULL,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE,
+				FOREIGN KEY (notification_rule_id) REFERENCES on_call_notification_rules(id) ON DELETE CASCADE
+			);
+			CREATE UNIQUE INDEX uq_incident_notification_state ON incident_notification_state(incident_id, notification_rule_id, repeat_index);
+			CREATE INDEX idx_incident_notification_state_due ON incident_notification_state(next_notification_at);
+		`,
+		Postgres: `
+			CREATE TABLE incident_notification_state (
+				id SERIAL PRIMARY KEY,
+				incident_id INTEGER NOT NULL,
+				escalation_rule_id INTEGER NOT NULL,
+				notification_rule_id INTEGER NOT NULL,
+				repeat_index INTEGER NOT NULL DEFAULT 0,
+				next_notification_at TIMESTAMPTZ NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE,
+				FOREIGN KEY (notification_rule_id) REFERENCES on_call_notification_rules(id) ON DELETE CASCADE
+			);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_incident_notification_state ON incident_notification_state(incident_id, notification_rule_id, repeat_index);
+			CREATE INDEX IF NOT EXISTS idx_incident_notification_state_due ON incident_notification_state(next_notification_at);
 		`,
 	},
 }

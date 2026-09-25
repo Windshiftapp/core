@@ -50,6 +50,7 @@ type itemCreateRequest struct {
 	InheritProject    bool           `json:"inherit_project"`
 	TimeProjectID     *int           `json:"time_project_id"`
 	AssigneeID        *int           `json:"assignee_id"`
+	TeamID            *int           `json:"team_id"`
 	ParentID          *int           `json:"parent_id"`
 	RelatedWorkItemID *int           `json:"related_work_item_id"`
 	StoryPoints       *float64       `json:"story_points"`
@@ -64,6 +65,7 @@ type itemPatchRequest struct {
 	Description       Optional[string]         `json:"description"`
 	PriorityID        Optional[int]            `json:"priority_id"`
 	AssigneeID        Optional[int]            `json:"assignee_id"`
+	TeamID            Optional[int]            `json:"team_id"`
 	ParentID          Optional[int]            `json:"parent_id"`
 	IterationID       Optional[int]            `json:"iteration_id"`
 	ProjectID         Optional[int]            `json:"project_id"`
@@ -144,7 +146,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 			DueDate: input.DueDate, StartDate: input.StartDate, EndDate: input.EndDate,
 			IsTask: input.IsTask, IterationID: input.IterationID, ProjectID: input.ProjectID,
 			InheritProject: input.InheritProject, TimeProjectID: input.TimeProjectID,
-			AssigneeID: input.AssigneeID, ParentID: input.ParentID,
+			AssigneeID: input.AssigneeID, TeamID: input.TeamID, ParentID: input.ParentID,
 			RelatedWorkItemID: input.RelatedWorkItemID, StoryPoints: input.StoryPoints,
 			EstimateMinutes: input.EstimateMinutes, CustomFieldValues: input.CustomFieldValues,
 			MilestoneIDs: input.MilestoneIDs, LabelIDs: input.LabelIDs,
@@ -840,7 +842,7 @@ func parseItemFilters(r *http.Request, filters *services.ItemFilters) error {
 	query := r.URL.Query()
 	for name, target := range map[string]**int{
 		"status_id": &filters.StatusID, "priority_id": &filters.PriorityID,
-		"assignee_id": &filters.AssigneeID, "item_type_id": &filters.ItemTypeID,
+		"assignee_id": &filters.AssigneeID, "team_id": &filters.TeamID, "item_type_id": &filters.ItemTypeID,
 		"iteration_id": &filters.IterationID, "milestone_id": &filters.MilestoneID,
 		"id": &filters.ItemID, "level": &filters.Level, "max_level": &filters.MaxLevel,
 	} {
@@ -874,6 +876,7 @@ func itemPatchFields(input itemPatchRequest) map[string]json.RawMessage {
 	putOptional(fields, "description", input.Description)
 	putOptional(fields, "priority_id", input.PriorityID)
 	putOptional(fields, "assignee_id", input.AssigneeID)
+	putOptional(fields, "team_id", input.TeamID)
 	putOptional(fields, "parent_id", input.ParentID)
 	putOptional(fields, "iteration_id", input.IterationID)
 	putOptional(fields, "project_id", input.ProjectID)

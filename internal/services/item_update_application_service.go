@@ -151,7 +151,7 @@ func itemUpdateData(fields map[string]json.RawMessage) (map[string]any, error) {
 		}
 		updateData["description"] = value
 	}
-	for _, field := range []string{"priority_id", "assignee_id", "parent_id", "iteration_id", "project_id"} {
+	for _, field := range []string{"priority_id", "assignee_id", "team_id", "parent_id", "iteration_id", "project_id"} {
 		raw, ok := fields[field]
 		if !ok {
 			continue

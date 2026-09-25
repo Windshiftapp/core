@@ -33,6 +33,9 @@ type Item struct {
 	ProjectID      *int `json:"project_id,omitempty"`
 	InheritProject bool `json:"inherit_project"` // If true, ProjectID is ignored and the parent item's effective project is used
 	TimeProjectID  *int `json:"time_project_id,omitempty"`
+	// Team assignment. Mirrors AssigneeID at the team level and is the team
+	// whose on-call policy governs an incident on this item.
+	TeamID *int `json:"team_id,omitempty"`
 	// User assignment fields
 	AssigneeID              *int `json:"assignee_id,omitempty"`                // User assigned to this item
 	CreatorID               *int `json:"creator_id,omitempty"`                 // Internal user who created this item
@@ -49,6 +52,10 @@ type Item struct {
 	ParentKey string `json:"parent_key,omitempty" db:"-"`
 	// Personal task relationship (for linking personal workspace tasks to work items)
 	RelatedWorkItemID *int `json:"related_work_item_id,omitempty"` // Link to work item (for personal tasks)
+	// Current/latest incident. Non-nil means this item is an incident; the
+	// incident's own history lives in the incidents table.
+	IncidentID *int      `json:"incident_id,omitempty"`
+	Incident   *Incident `json:"incident,omitempty" db:"-"`
 	// Estimation
 	StoryPoints     *float64 `json:"story_points,omitempty"`     // Story points for velocity tracking
 	EstimateMinutes *int     `json:"estimate_minutes,omitempty"` // Time estimate in minutes (compared against logged worklog time)
@@ -87,6 +94,10 @@ type Item struct {
 	EffectiveProjectID     *int   `json:"effective_project_id,omitempty"`
 	EffectiveProjectName   string `json:"effective_project_name,omitempty"`
 	ProjectInheritanceMode string `json:"project_inheritance_mode,omitempty"` // "none" | "inherit" | "direct"
+	// Team information for API responses
+	TeamName      string `json:"team_name,omitempty"`
+	TeamColor     string `json:"team_color,omitempty"`
+	TeamAvatarURL string `json:"team_avatar_url,omitempty"`
 	// User information for API responses
 	AssigneeName               string `json:"assignee_name,omitempty"`                 // Full name of assigned user
 	AssigneeEmail              string `json:"assignee_email,omitempty"`                // Email of assigned user

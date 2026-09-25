@@ -92,6 +92,7 @@ export default {
     assignTo: 'Assign To',
     assign: 'Assign',
     assignee: 'Assignee',
+    team: 'Team',
     allAssignees: 'All Assignees',
     unassigned: 'Unassigned',
     members: 'Members',

@@ -749,6 +749,7 @@ export default {
   createModal: {
     // Type labels
     workItem: 'Work Item',
+    team: 'Team',
     milestone: 'Milestone',
     workspace: 'Workspace',
     collection: 'Collection',

@@ -15,6 +15,7 @@ const FIELD_MAP = {
   milestone: 'milestones',
   iteration: 'iteration_id',
   assignee: 'assignee_id',
+  team: 'team_id',
   project: 'project_id',
 };
 
@@ -65,6 +66,7 @@ const RELATED_ITEM_FIELDS = {
   priority: ['priority_id', 'priority_name', 'priority_color'],
   iteration: ['iteration_id', 'iteration_name', 'iteration_end_date'],
   assignee: ['assignee_id', 'assignee_name', 'assignee_email'],
+  team: ['team_id', 'team_name', 'team_color', 'team_avatar_url'],
   project: ['project_id', 'project_name', 'inherit_project'],
 };
 
@@ -80,6 +82,7 @@ const DEFAULT_EDITING_STATE = {
   iteration: { active: false, value: null },
   project: { active: false, value: null },
   assignee: { active: false, value: null },
+  team: { active: false, value: null },
   customFields: { active: {}, values: {} },
 };
 
@@ -854,7 +857,13 @@ class ItemDetailStore {
     }
   }
 
-  async saveField(field, directValue = null, assigneeName = null, iterationName = null) {
+  async saveField(
+    field,
+    directValue = null,
+    assigneeName = null,
+    iterationName = null,
+    teamName = null
+  ) {
     if (this.saving) {
       // A save is in flight; remember the latest requested value per field
       // and replay it when that save finishes so rapid edits are not lost.
@@ -862,6 +871,7 @@ class ItemDetailStore {
         directValue: this.#resolveSaveValue(field, directValue),
         assigneeName,
         iterationName,
+        teamName,
       });
       return;
     }
@@ -1002,6 +1012,18 @@ class ItemDetailStore {
           assignee_id: newAssignee,
           assignee_name: assigneeName !== undefined ? assigneeName : this.item.assignee_name,
         };
+      } else if (field === 'team') {
+        const newTeamId = directValue !== undefined ? directValue : this.editing.team.value;
+        if (newTeamId === this.item.team_id) {
+          this.cancelEditing('team');
+          return;
+        }
+        updateData.team_id = newTeamId;
+        this.item = {
+          ...this.item,
+          team_id: newTeamId,
+          team_name: teamName !== undefined ? teamName : this.item.team_name,
+        };
       } else if (field.startsWith('custom_field_')) {
         const fieldId = field.replace('custom_field_', '');
         let newValue =
@@ -1082,7 +1104,8 @@ class ItemDetailStore {
           field,
           pending.directValue,
           pending.assigneeName,
-          pending.iterationName
+          pending.iterationName,
+          pending.teamName
         );
       }
     } finally {

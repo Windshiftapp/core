@@ -1873,6 +1873,8 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []a
 
 	case "assignee", "assignee_id", "assigneeid":
 		return prefix + "i.assignee_id", nil, nil
+	case "team", "team_id", "teamid":
+		return prefix + "i.team_id", nil, nil
 	case "creator", "creator_id", "creatorid":
 		return prefix + "i.creator_id", nil, nil
 	case "reporter", "reporter_id", "reporterid":

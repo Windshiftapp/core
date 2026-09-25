@@ -90,6 +90,7 @@ export default {
     assignTo: 'Назначить исполнителя',
     assign: 'Назначить',
     assignee: 'Исполнитель',
+    team: 'Команда',
     allAssignees: 'Все исполнители',
     unassigned: 'Не назначено',
     members: 'Участники',
