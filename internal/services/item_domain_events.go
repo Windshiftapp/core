@@ -97,6 +97,49 @@ func itemCreateEventMetadata(params ItemCreationParams, occurredAt time.Time) it
 	return mergeItemEventMetadata(params.EventMetadata, fallback)
 }
 
+// historySourceForAgent reports the surface that produced an item-history row
+// when an agent acted on a human's behalf, and "" otherwise. Only agent-actor
+// writes are stamped: the item_history.source column exists to answer "did the
+// AI do this?" in the history feed, not to re-encode provenance that a direct
+// cookie-auth click already makes obvious.
+//
+// Callers must pass the *merged* metadata (mergeItemEventMetadata) so an adapter
+// that supplies a partial Metadata still resolves its SourceKind.
+func historySourceForAgent(metadata itemevents.Metadata) string {
+	if metadata.ActorKind != "agent" {
+		return ""
+	}
+	return metadata.SourceKind
+}
+
+// historyRunForAgent reports the agent run behind an agent-authored history row,
+// or nil when the surface has no run to point at (MCP) or the write was direct.
+// Without it a history row can say an agent acted but not which turn, and the
+// feed could not report that turn's model or cost.
+func historyRunForAgent(metadata itemevents.Metadata) *int {
+	if metadata.ActorKind != "agent" || metadata.AgentRunID <= 0 {
+		return nil
+	}
+	runID := metadata.AgentRunID
+	return &runID
+}
+
+// stampHistorySource applies the agent provenance to every entry in a batch.
+// History rows are written in one transaction by one actor, so the whole batch
+// shares one source and one originating run.
+func stampHistorySource(history []repository.HistoryEntry, metadata itemevents.Metadata) []repository.HistoryEntry {
+	source := historySourceForAgent(metadata)
+	if source == "" {
+		return history
+	}
+	runID := historyRunForAgent(metadata)
+	for i := range history {
+		history[i].Source = source
+		history[i].AgentRunID = runID
+	}
+	return history
+}
+
 func itemHistoryEventChanges(history []repository.HistoryEntry) []itemevents.FieldChange {
 	changes := make([]itemevents.FieldChange, 0, len(history))
 	for _, entry := range history {

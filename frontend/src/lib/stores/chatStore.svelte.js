@@ -33,12 +33,25 @@ function applyGeneralSession(session, storedMessages, afterMessageId = 0) {
   sessionType = 'general';
   sessionWorkspaceId = 0;
   agentProfileId = 0;
-  messages = (Array.isArray(storedMessages) ? storedMessages : []).map((message) => ({
+  messages = (Array.isArray(storedMessages) ? storedMessages : []).map(toChatMessage);
+  historyAfterMessageId = afterMessageId;
+}
+
+/**
+ * Normalize a stored or live message into the shape the panel renders. Model
+ * and usage are carried through so a turn's metering survives a reload — the
+ * fields are absent on user turns, which is why this maps defensively rather
+ * than spreading.
+ */
+function toChatMessage(message) {
+  const normalized = {
     id: message.id,
     role: message.role,
     content: message.content,
-  }));
-  historyAfterMessageId = afterMessageId;
+  };
+  if (message.model) normalized.model = message.model;
+  if (message.usage) normalized.usage = message.usage;
+  return normalized;
 }
 
 async function loadGeneralHistory() {
@@ -91,11 +104,7 @@ async function loadSession(session) {
     sessionWorkspaceId = session.workspace_id || 0;
     agentProfileId = session.agent_profile_id || 0;
     historyAfterMessageId = 0;
-    messages = (Array.isArray(stored) ? stored : []).map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-    }));
+    messages = (Array.isArray(stored) ? stored : []).map(toChatMessage);
     error = '';
     itemKeyMap = {};
     historyLoaded = true;
@@ -261,6 +270,8 @@ async function sendMessage(text, context) {
       stopReason: result.stop_reason || '',
       needsReview: result.needs_review || false,
       reviewReasons: result.review_reasons || [],
+      model: result.model || '',
+      usage: result.usage || null,
     };
     messages = [...messages, assistantMsg];
     extractItemKeys(assistantMsg.toolCalls);

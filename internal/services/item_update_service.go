@@ -265,12 +265,13 @@ func (s *ItemUpdateService) recordMilestoneAddition(
 		NewValue:  joinIntsCSV(newIDs),
 		ChangedAt: now,
 	}}
-	if err := s.recordItemHistory(tx, history); err != nil {
-		return nil, fmt.Errorf("failed to record history: %w", err)
-	}
 	metadata := mergeItemEventMetadata(req.EventMetadata, itemEventMetadata(req.UserID, "application", nil))
 	if metadata.OccurredAt.IsZero() {
 		metadata.OccurredAt = now
+	}
+	stampHistorySource(history, metadata)
+	if err := s.recordItemHistory(tx, history); err != nil {
+		return nil, fmt.Errorf("failed to record history: %w", err)
 	}
 	if _, err := itemevents.NewRecorder(s.db).Updated(
 		context.Background(), tx, originalItem, itemHistoryEventChanges(history), metadata,

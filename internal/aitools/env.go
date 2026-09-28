@@ -3,9 +3,11 @@
 package aitools
 
 import (
+	"fmt"
 	"log/slog"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/services"
 )
@@ -22,11 +24,16 @@ const (
 // Env provides tools their caller, services, and readable workspaces. Tools
 // must gate workspace data through AccessibleWorkspaceIDs regardless of adapter.
 type Env struct {
-	DB                     database.Database
-	UserID                 int
-	Username               string // Cached at Env-construction time for audit logs
-	Timezone               string // Validated IANA timezone for the acting user
-	Source                 string // SourceAIChat | SourceMCP — for audit trail
+	DB       database.Database
+	UserID   int
+	Username string // Cached at Env-construction time for audit logs
+	Timezone string // Validated IANA timezone for the acting user
+	Source   string // SourceAIChat | SourceMCP — for audit trail
+	// RunID is the agent_runs row this invocation belongs to, when the caller
+	// has one (the chat, the coding agent). It is what lets a resulting change
+	// name the turn that caused it — the model and cost behind the edit. Zero
+	// for surfaces with no run to point at, such as MCP.
+	RunID                  int
 	AccessibleWorkspaceIDs []int
 	// AuditDetails contains adapter-supplied correlation identifiers only.
 	// Raw tool arguments and results must never be placed here.
@@ -125,4 +132,34 @@ func (e *Env) HasWorkspaceAccess(workspaceID int) bool {
 		}
 	}
 	return false
+}
+
+// eventMetadata describes this adapter's writes as agent-actor provenance, so
+// the durable event store and the item-history feed can both answer "an agent
+// did this on the user's behalf, through which surface?". ActorRef carries the
+// human the agent acts as — the identity every tool's permission check already
+// used, so the audit trail attributes the change to the same principal.
+//
+// Source falls back to "agent" when an embedder left it unset: writing
+// "application" would be a lie (this is not a direct UI click) and would make
+// the history feed's source column non-empty but unmatchable.
+func (e *Env) eventMetadata() itemevents.Metadata {
+	source := e.Source
+	if source == "" {
+		source = "agent"
+	}
+	metadata := itemevents.Agent(fmt.Sprintf("user:%d", e.UserID), source)
+	metadata.AgentRunID = e.RunID
+	return metadata
+}
+
+// historyRunID is the agent run to attribute a history row to, or nil when this
+// surface has no run to point at (MCP) — a row must not claim a turn that does
+// not exist.
+func (e *Env) historyRunID() *int {
+	if e.RunID <= 0 {
+		return nil
+	}
+	runID := e.RunID
+	return &runID
 }

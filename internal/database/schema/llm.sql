@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS llm_provider_model_cache (
 CREATE TABLE IF NOT EXISTS llm_usage (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id            INTEGER NOT NULL,
+    calls             INTEGER NOT NULL DEFAULT 1,
     model             TEXT NOT NULL,
     prompt_tokens     INTEGER NOT NULL DEFAULT 0,
     completion_tokens INTEGER NOT NULL DEFAULT 0,

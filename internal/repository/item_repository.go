@@ -1793,13 +1793,20 @@ func (r *ItemRepository) ClearRelatedWorkItem(itemID int) error {
 
 // GetHistoryWithApprovals returns item history plus approval decision events as a single chronological feed.
 func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner bool) ([]models.ItemHistory, error) {
+	// The metered model/tokens/cost for an agent-written change are deliberately
+	// NOT joined here: aggregating llm_usage is not scoped to the item, so doing
+	// it inline would scan the whole metering table on every history load, which
+	// is a hot path. The response carries only agent_run_id; the client fetches
+	// that run's usage on demand from the indexed per-run endpoint.
 	query := `
 		SELECT
 			ih.id, ih.item_id, ih.user_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value,
 			COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
 			COALESCE(u.email, '') as user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
-			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name
+			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
+			COALESCE(ih.source, '') AS source,
+			ih.agent_run_id
 		FROM item_history ih
 		LEFT JOIN users u ON ih.user_id = u.id
 		LEFT JOIN users owner ON owner.id = u.agent_owner_user_id
@@ -1816,7 +1823,9 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 			COALESCE(u.first_name || ' ' || u.last_name, u.username, 'System') AS user_name,
 			COALESCE(u.email, '') AS user_email,
 			COALESCE(u.is_agent, FALSE) AS is_agent,
-			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name
+			COALESCE(NULLIF(TRIM(COALESCE(owner.first_name, '') || ' ' || COALESCE(owner.last_name, '')), ''), owner.username, '') AS agent_owner_name,
+			'' AS source,
+			NULL AS agent_run_id
 		FROM approval_decisions d
 		JOIN approval_requests ar ON ar.id = d.approval_request_id
 		LEFT JOIN users u ON u.id = d.actor_user_id
@@ -1834,8 +1843,13 @@ func (r *ItemRepository) GetHistoryWithApprovals(itemID int, includeAgentOwner b
 	history := []models.ItemHistory{}
 	for rows.Next() {
 		var entry models.ItemHistory
-		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName); err != nil {
+		var runID sql.NullInt64
+		if err := rows.Scan(&entry.ID, &entry.ItemID, &entry.UserID, &entry.ChangedAt, &entry.FieldName, &entry.OldValue, &entry.NewValue, &entry.UserName, &entry.UserEmail, &entry.IsAgent, &entry.AgentOwnerName, &entry.Source, &runID); err != nil {
 			return nil, err
+		}
+		if runID.Valid {
+			v := int(runID.Int64)
+			entry.AgentRunID = &v
 		}
 		if !includeAgentOwner {
 			entry.AgentOwnerName = ""

@@ -388,6 +388,8 @@
                     stopReason={msg.stopReason}
                     needsReview={msg.needsReview}
                     reviewReasons={msg.reviewReasons}
+                    model={msg.model}
+                    usage={msg.usage}
                   />
                 {/if}
               </div>

@@ -2238,6 +2238,10 @@
                 "nullable": true,
                 "type": "number"
               },
+              "model": {
+                "description": "The model value.",
+                "type": "string"
+              },
               "prompt_tokens": {
                 "description": "The prompt tokens value.",
                 "type": "integer"
@@ -19067,6 +19071,11 @@
                   "description": "The agent owner name value.",
                   "type": "string"
                 },
+                "agent_run_id": {
+                  "description": "The agent run id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "changed_at": {
                   "description": "The changed at value.",
                   "format": "date-time",
@@ -19106,6 +19115,10 @@
                 "resolved_old_value": {
                   "description": "The resolved old value value.",
                   "nullable": true,
+                  "type": "string"
+                },
+                "source": {
+                  "description": "The source value.",
                   "type": "string"
                 },
                 "user_email": {

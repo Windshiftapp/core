@@ -1685,6 +1685,30 @@ var Catalog = []Migration{
 		SQLite:        slaImportSchema,
 		Postgres:      slaImportSchemaPostgres,
 	},
+	{
+		Version:       "20260931_item_history_source",
+		Name:          "Record the acting surface on item history rows",
+		CheckSQLite:   sqliteColumnCheck("item_history", "source"),
+		CheckPostgres: pgColumnCheck("item_history", "source"),
+		SQLite:        "ALTER TABLE item_history ADD COLUMN source TEXT",
+		Postgres:      "ALTER TABLE item_history ADD COLUMN IF NOT EXISTS source TEXT",
+	},
+	{
+		Version:       "20260931_item_history_agent_run",
+		Name:          "Link agent-written item history rows to the run that made them",
+		CheckSQLite:   sqliteColumnCheck("item_history", "agent_run_id"),
+		CheckPostgres: pgColumnCheck("item_history", "agent_run_id"),
+		SQLite:        "ALTER TABLE item_history ADD COLUMN agent_run_id INTEGER",
+		Postgres:      "ALTER TABLE item_history ADD COLUMN IF NOT EXISTS agent_run_id INTEGER",
+	},
+	{
+		Version:       "20260931_llm_usage_calls",
+		Name:          "Count provider round-trips on metered LLM usage rows",
+		CheckSQLite:   sqliteColumnCheck("llm_usage", "calls"),
+		CheckPostgres: pgColumnCheck("llm_usage", "calls"),
+		SQLite:        "ALTER TABLE llm_usage ADD COLUMN calls INTEGER NOT NULL DEFAULT 1",
+		Postgres:      "ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS calls INTEGER NOT NULL DEFAULT 1",
+	},
 }
 
 func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {

@@ -437,6 +437,7 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		Username:               snapshot.ActingName,
 		Timezone:               timezone,
 		Source:                 aitools.SourceStandardAgent,
+		RunID:                  run.ID,
 		AccessibleWorkspaceIDs: []int{run.WorkspaceID},
 		AuditDetails: map[string]any{
 			"agent_run_id":              run.ID,

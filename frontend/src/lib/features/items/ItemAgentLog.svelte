@@ -8,6 +8,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../../utils/authenticatedDateFormatter.js';
+  import { formatCostUSD, hasMeteredUsage } from '../../utils/llmUsage.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { workspacePermissions } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
@@ -87,12 +88,6 @@
     } finally {
       canceling = false;
     }
-  }
-
-  function formatCost(usd) {
-    if (usd == null) return null;
-    if (usd > 0 && usd < 0.01) return '<$0.01';
-    return `$${usd.toFixed(usd < 1 ? 4 : 2)}`;
   }
 
   function statusAppearance(status) {
@@ -376,12 +371,12 @@
           {selectedRun.error}
         </div>
       {/if}
-      {#if usage && usage.calls > 0}
+      {#if hasMeteredUsage(usage)}
         <div data-testid="agent-run-usage" class="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs" style="color: var(--ds-text-subtle);">
           <span>{usage.total_tokens.toLocaleString()} tokens</span>
           <span>({usage.prompt_tokens.toLocaleString()} in · {usage.completion_tokens.toLocaleString()} out)</span>
-          {#if formatCost(usage.cost_usd)}
-            <span style="color: var(--ds-text);">{formatCost(usage.cost_usd)}</span>
+          {#if formatCostUSD(usage.cost_usd)}
+            <span style="color: var(--ds-text);">{formatCostUSD(usage.cost_usd)}</span>
           {:else}
             <span>cost unknown</span>
           {/if}

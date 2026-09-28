@@ -55,15 +55,27 @@ type Pricing struct {
 // Reasoning tokens are already included in CompletionTokens and are reported
 // separately for visibility, so charging them again would double bill them.
 func (p *Pricing) CostUSD(usage Usage, images int) float64 {
+	return p.CostUSDForCalls(usage, images, 1)
+}
+
+// CostUSDForCalls extends CostUSD to an agentic turn that made several provider
+// round-trips. Per-token and per-image rates scale with the aggregated usage
+// and image count, but the flat per-request rate applies once per call — an
+// agent loop that took six steps paid the request fee six times, and pricing it
+// once would under-report the spend.
+func (p *Pricing) CostUSDForCalls(usage Usage, images, calls int) float64 {
 	if p == nil {
 		return 0
+	}
+	if calls < 1 {
+		calls = 1
 	}
 	return float64(usage.PromptTokens)*p.PromptUSD +
 		float64(usage.CacheReadTokens)*p.CacheReadUSD +
 		float64(usage.CacheWriteTokens)*p.CacheWriteUSD +
 		float64(usage.CompletionTokens)*p.CompletionUSD +
 		float64(images)*p.ImageUSD +
-		p.RequestUSD
+		float64(calls)*p.RequestUSD
 }
 
 // HasCompleteCacheRates reports whether cache placement can be enabled without

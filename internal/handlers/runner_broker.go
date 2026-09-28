@@ -234,7 +234,7 @@ func (h *RunnerBrokerHandler) ProxyLLM(w http.ResponseWriter, r *http.Request) {
 			response.Choices[i].Message.ProviderBinding = binding
 		}
 	}
-	h.persistLLMUsage(runID, cfg, request, response.Usage)
+	h.persistLLMUsage(r.Context(), runID, cfg, request, response.Usage)
 	w.Header().Set("Cache-Control", "no-store")
 	respondJSON(w, http.StatusOK, response)
 }
@@ -244,56 +244,25 @@ func llmBindingFingerprint(connectionID int, providerType, model string) string 
 	return fmt.Sprintf("sha256:%x", sum[:])
 }
 
-func (h *RunnerBrokerHandler) persistLLMUsage(runID int, cfg *llm.ConnectionRuntimeConfig, request llm.CompletionRequest, usage llm.Usage) {
+func (h *RunnerBrokerHandler) persistLLMUsage(ctx context.Context, runID int, cfg *llm.ConnectionRuntimeConfig, request llm.CompletionRequest, usage llm.Usage) {
 	if h.usage == nil {
 		return
 	}
-	record := repository.LLMUsageRecord{
-		RunID: runID, Model: cfg.Model, PromptTokens: usage.PromptTokens,
-		CompletionTokens: usage.CompletionTokens, TotalTokens: usage.TotalTokens,
-		CacheReadTokens: usage.CacheReadTokens, CacheWriteTokens: usage.CacheWriteTokens,
-		ReasoningTokens: usage.ReasoningTokens,
+	// The descriptor carries only non-secret identity plus catalog pricing; the
+	// client holding the decrypted key stays inside the manager.
+	descriptor := llm.ConnectionDescriptor{
+		ProviderType: llm.ProviderType(cfg.ProviderType),
+		Model:        cfg.Model,
+		Pricing:      h.llmConns.ModelPricing(llm.ProviderType(cfg.ProviderType), cfg.Model),
 	}
-	pricing := h.llmConns.ModelPricing(llm.ProviderType(cfg.ProviderType), cfg.Model)
-	switch {
-	case usage.ProviderCostUSD != nil:
-		// The provider billed a number; it beats any rate we could apply.
-		record.CostUSD = usage.ProviderCostUSD
-		record.CostSource = "provider"
-	case pricing != nil && pricing.CanPriceUsage(usage):
-		cost := pricing.CostUSD(usage, completionRequestImageCount(request))
-		record.CostUSD = &cost
-		record.CostSource = "computed"
-	case pricing != nil:
-		// Rates exist but not for every class this call actually used. Pricing
-		// it anyway would bill a cache write at the base input rate, so the row
-		// stays costless — but it is recorded as unpriced rather than left
-		// indistinguishable from a model with no configured rates at all.
-		record.CostSource = "unpriced"
-		slog.Warn("llm usage not priced: model pricing is missing a rate for a token class this call used",
-			slog.Int("run_id", runID),
-			slog.String("model", cfg.Model),
-			slog.Int("cache_read_tokens", usage.CacheReadTokens),
-			slog.Int("cache_write_tokens", usage.CacheWriteTokens),
-		)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := h.usage.Insert(ctx, record); err != nil {
+	_, err := services.RecordLLMCall(ctx, h.usage, runID, descriptor, services.MeteredCall{
+		Usage:  usage,
+		Images: llm.CompletionRequestImageCount(request),
+		Calls:  1,
+	})
+	if err != nil {
 		slog.Warn("persist llm usage", slog.Int("run_id", runID), slog.Any("error", err))
 	}
-}
-
-func completionRequestImageCount(request llm.CompletionRequest) int {
-	count := 0
-	for _, message := range request.Messages {
-		for _, attachment := range message.Attachments {
-			if strings.HasPrefix(strings.ToLower(attachment.MimeType), "image/") {
-				count++
-			}
-		}
-	}
-	return count
 }
 
 // allowedGitProxyPath reports whether the {gitpath...} tail is one of the three

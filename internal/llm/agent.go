@@ -57,6 +57,13 @@ type AgentResult struct {
 	MaxIter    int              `json:"max_iterations"`
 	StopReason StopReason       `json:"stop_reason"`
 	Usage      Usage            `json:"usage"`
+	// Calls is the number of provider round-trips the loop actually made, and
+	// Images the total image parts sent across them. Neither is derivable from
+	// Usage, but both change the price: a flat per-request rate is charged once
+	// per call and images carry their own per-part rate. Callers that price the
+	// run need them to avoid under-reporting the spend.
+	Calls  int `json:"calls"`
+	Images int `json:"images"`
 }
 
 // RunAgent runs an agentic loop: sends the user message to the LLM with tools,
@@ -83,6 +90,7 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 
 	var allToolCalls []ToolCallRecord
 	var totalUsage Usage
+	var totalImages int
 	terminalResults := map[string]string{}
 	forceFinalWithoutTools := false
 
@@ -94,13 +102,14 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 			toolChoice = nil
 		}
 
-		resp, err := client.Complete(ctx, CompletionRequest{
+		request := CompletionRequest{
 			Messages:    messages,
 			Tools:       tools,
 			ToolChoice:  toolChoice,
 			MaxTokens:   cfg.MaxTokens,
 			Temperature: cfg.Temperature,
-		})
+		}
+		resp, err := client.Complete(ctx, request)
 		if err != nil {
 			return nil, fmt.Errorf("LLM request failed (iteration %d): %w", i+1, err)
 		}
@@ -111,6 +120,7 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 		totalUsage.CacheReadTokens += resp.Usage.CacheReadTokens
 		totalUsage.CacheWriteTokens += resp.Usage.CacheWriteTokens
 		totalUsage.ReasoningTokens += resp.Usage.ReasoningTokens
+		totalImages += CompletionRequestImageCount(request)
 		if resp.Usage.ProviderCostUSD != nil {
 			runCost := *resp.Usage.ProviderCostUSD
 			if totalUsage.ProviderCostUSD != nil {
@@ -141,6 +151,8 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 				MaxIter:    maxIter,
 				StopReason: StopReasonDone,
 				Usage:      totalUsage,
+				Calls:      i + 1,
+				Images:     totalImages,
 			}, nil
 		}
 
@@ -241,6 +253,8 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 			MaxIter:    maxIter,
 			StopReason: StopReasonDone,
 			Usage:      totalUsage,
+			Calls:      maxIter,
+			Images:     totalImages,
 		}, nil
 	}
 
@@ -260,6 +274,8 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 		MaxIter:    maxIter,
 		StopReason: StopReasonMaxIterations,
 		Usage:      totalUsage,
+		Calls:      maxIter,
+		Images:     totalImages,
 	}, nil
 }
 
