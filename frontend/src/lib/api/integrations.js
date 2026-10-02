@@ -79,6 +79,10 @@ export const zammadTickets = {
   resolve: (correlationKey) =>
     fetchAPI(`/zammad-ticket-links/resolve/${encodeURIComponent(correlationKey)}`),
   forItem: (itemId) => fetchAPI(`/items/${itemId}/zammad-links`),
+  history: (itemId, { limit = 6 } = {}) =>
+    fetchAPI(`/items/${itemId}/zammad-history?limit=${encodeURIComponent(limit)}`),
+  workspaceOverview: (workspaceId, { limit = 5 } = {}) =>
+    fetchAPI(`/workspaces/${workspaceId}/zammad-overview?limit=${encodeURIComponent(limit)}`),
   create: (itemId, data) =>
     fetchAPI(`/items/${itemId}/zammad-tickets`, {
       method: 'POST',

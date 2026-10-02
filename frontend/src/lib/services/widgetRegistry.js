@@ -120,6 +120,18 @@ export const widgetRegistry = [
     defaultWidth: 2,
     maxWidth: 3,
   },
+  {
+    type: 'zammad-support-overview',
+    name: 'Zammad support overview',
+    description: 'Current linked-ticket status and recent observed changes',
+    nameKey: 'workspaceDashboard.widgets.zammadSupportOverview.name',
+    descriptionKey: 'workspaceDashboard.widgets.zammadSupportOverview.description',
+    category: widgetCategories.ADDITIONAL,
+    icon: 'TicketCheck',
+    minWidth: 2,
+    defaultWidth: 3,
+    maxWidth: 3,
+  },
 
   // Additional widgets (calendar/timeline widgets)
   {

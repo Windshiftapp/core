@@ -2263,6 +2263,45 @@ var Catalog = []Migration{
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_queues_coll_builtin ON queues(collection_id, builtin_key) WHERE collection_id IS NOT NULL AND builtin_key IS NOT NULL;
 		`,
 	},
+	{
+		Version: "20261002_zammad_ticket_change_history",
+		Name:    "Record observed Zammad ticket field changes",
+		CheckSQLite: `
+			SELECT CASE WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'zammad_ticket_changes')
+			THEN 1 ELSE 0 END
+		`,
+		CheckPostgres: `
+			SELECT CASE WHEN EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'zammad_ticket_changes')
+			THEN 1 ELSE 0 END
+		`,
+		SQLite: `
+			CREATE TABLE zammad_ticket_changes (
+				id TEXT PRIMARY KEY,
+				ticket_link_id TEXT NOT NULL,
+				field_name TEXT NOT NULL CHECK (field_name IN ('status', 'owner', 'group')),
+				old_value_id INTEGER,
+				old_value_name TEXT NOT NULL DEFAULT '',
+				new_value_id INTEGER,
+				new_value_name TEXT NOT NULL DEFAULT '',
+				observed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (ticket_link_id) REFERENCES zammad_ticket_links(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_zammad_ticket_changes_link_observed ON zammad_ticket_changes(ticket_link_id, observed_at DESC);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS zammad_ticket_changes (
+				id TEXT PRIMARY KEY,
+				ticket_link_id TEXT NOT NULL REFERENCES zammad_ticket_links(id) ON DELETE CASCADE,
+				field_name TEXT NOT NULL CHECK (field_name IN ('status', 'owner', 'group')),
+				old_value_id INTEGER,
+				old_value_name TEXT NOT NULL DEFAULT '',
+				new_value_id INTEGER,
+				new_value_name TEXT NOT NULL DEFAULT '',
+				observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+			);
+			CREATE INDEX IF NOT EXISTS idx_zammad_ticket_changes_link_observed ON zammad_ticket_changes(ticket_link_id, observed_at DESC);
+		`,
+	},
 }
 
 // viewSettingsToolsBackfillIDs lists the workspace tools ids as they existed

@@ -32,3 +32,21 @@ export function isCurrentZammadMetadataRequest(
 export function isUsableZammadGroup(group) {
   return group?.active !== false && Boolean(group?.name?.trim());
 }
+
+export function isCurrentZammadTimelineRequest(
+  requestVersion,
+  currentVersion,
+  requestItemId,
+  itemId,
+  requestWorkspaceId,
+  workspaceId
+) {
+  return isCurrentZammadPanelContext(
+    requestVersion,
+    currentVersion,
+    requestItemId,
+    itemId,
+    requestWorkspaceId,
+    workspaceId
+  );
+}

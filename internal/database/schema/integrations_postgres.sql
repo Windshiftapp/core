@@ -218,4 +218,16 @@ CREATE TABLE IF NOT EXISTS zammad_ticket_links (
 CREATE INDEX IF NOT EXISTS idx_zammad_ticket_links_item ON zammad_ticket_links(item_id);
 CREATE INDEX IF NOT EXISTS idx_zammad_ticket_links_sync ON zammad_ticket_links(sync_state, last_synced_at);
 
+CREATE TABLE IF NOT EXISTS zammad_ticket_changes (
+	id TEXT PRIMARY KEY,
+	ticket_link_id TEXT NOT NULL REFERENCES zammad_ticket_links(id) ON DELETE CASCADE,
+	field_name TEXT NOT NULL CHECK (field_name IN ('status', 'owner', 'group')),
+	old_value_id INTEGER,
+	old_value_name TEXT NOT NULL DEFAULT '',
+	new_value_id INTEGER,
+	new_value_name TEXT NOT NULL DEFAULT '',
+	observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_zammad_ticket_changes_link_observed ON zammad_ticket_changes(ticket_link_id, observed_at DESC);
+
 -- migration: 20260829_zammad_integration

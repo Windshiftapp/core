@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +40,7 @@ const zammadOAuthRefreshLeaseDuration = 2 * zammadHTTPTimeout
 const zammadOAuthRefreshWaitDuration = 5 * time.Second
 const zammadOAuthRefreshPollInterval = 50 * time.Millisecond
 const zammadSyncLeaseDuration = 5 * time.Minute
+const zammadOverviewTicketLimit = 25
 
 type ZammadOAuthCallbackResult = coreintegrations.SystemOAuthCallbackResult
 
@@ -912,6 +915,102 @@ func (s *ZammadService) GetTicketLink(id string) (*models.ZammadTicketLink, erro
 	return s.repo.GetTicketLink(id)
 }
 
+func (s *ZammadService) TicketHistoryForItem(itemID, limit int) ([]models.ZammadTicketChange, error) {
+	return s.repo.ListTicketChangesForItem(itemID, limit)
+}
+
+func (s *ZammadService) WorkspaceOverview(workspaceID, recentLimit int) (*models.ZammadWorkspaceOverview, error) {
+	ctx := context.Background()
+	var tx database.Tx
+	var err error
+	if database.IsPostgresDriver(s.db.GetDriverName()) {
+		tx, err = s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	} else {
+		// The SQLite wrapper normally starts transactions on its single writer
+		// connection. This is a read-only snapshot, so keep it on the read pool
+		// instead of serializing unrelated synchronization writes.
+		var sqliteTx *sql.Tx
+		sqliteTx, err = s.db.GetDB().BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+		if err == nil {
+			tx = database.NewSQLiteTx(sqliteTx)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	links, err := s.repo.ListTicketLinksForWorkspaceTx(tx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	tickets, err := s.repo.ListOverviewTicketsForWorkspaceTx(tx, workspaceID, zammadOverviewTicketLimit)
+	if err != nil {
+		return nil, err
+	}
+	recent, err := s.repo.ListRecentTicketChangesForWorkspaceTx(tx, workspaceID, recentLimit)
+	if err != nil {
+		return nil, err
+	}
+	syncFailed, creationUncertain, err := s.repo.CountProblemTicketLinksForWorkspaceTx(tx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	overview := &models.ZammadWorkspaceOverview{
+		ByStatus: []models.ZammadOverviewBucket{}, RecentChanges: recent, Tickets: tickets,
+	}
+	overview.SyncFailed = syncFailed
+	overview.CreationUncertain = creationUncertain
+	ticketIndexByLinkID := make(map[string]int, len(overview.Tickets))
+	for index := range overview.Tickets {
+		ticketIndexByLinkID[overview.Tickets[index].ID] = index
+	}
+	statusBuckets := map[string]*models.ZammadOverviewBucket{}
+	for _, entry := range links {
+		link := entry.Link
+		overview.Total++
+		closed := link.LastStatusID > 0 && slices.Contains(entry.ClosedStateIDs, link.LastStatusID)
+		if index, ok := ticketIndexByLinkID[link.ID]; ok {
+			overview.Tickets[index].Closed = closed
+		}
+		if link.LastStatusID <= 0 {
+			overview.UnknownStatus++
+		} else if closed {
+			overview.Closed++
+		} else {
+			overview.Active++
+		}
+		if link.OwnerID <= 1 {
+			overview.Unassigned++
+		}
+		key := fmt.Sprintf("%s:%d:%t", link.ProviderID, link.LastStatusID, closed)
+		bucket := statusBuckets[key]
+		if bucket == nil {
+			bucket = &models.ZammadOverviewBucket{
+				ConnectionID: link.ProviderID, ConnectionName: link.ProviderName,
+				ID: link.LastStatusID, Name: link.LastStatusName, Closed: closed,
+			}
+			statusBuckets[key] = bucket
+		}
+		bucket.Count++
+	}
+	for _, bucket := range statusBuckets {
+		overview.ByStatus = append(overview.ByStatus, *bucket)
+	}
+	sort.Slice(overview.ByStatus, func(i, j int) bool {
+		if overview.ByStatus[i].ConnectionID != overview.ByStatus[j].ConnectionID {
+			return overview.ByStatus[i].ConnectionID < overview.ByStatus[j].ConnectionID
+		}
+		if overview.ByStatus[i].Name == overview.ByStatus[j].Name {
+			return overview.ByStatus[i].ID < overview.ByStatus[j].ID
+		}
+		return overview.ByStatus[i].Name < overview.ByStatus[j].Name
+	})
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return overview, nil
+}
+
 func (s *ZammadService) ResolveTicketLink(correlationKey string) (itemID, workspaceID int, err error) {
 	correlationKey = strings.TrimSpace(correlationKey)
 	if correlationKey == "" || len(correlationKey) > 512 {
@@ -1061,6 +1160,7 @@ func (s *ZammadService) LinkExistingTicket(ctx context.Context, itemID, actorID 
 		return nil, zammadValidationError("Zammad ticket is already linked through another correlation key")
 	}
 
+	ticketTitle := ticket.Title
 	if remoteCorrelation == "" {
 		if err := s.renewZammadSyncClaim(link.ID, syncOwner); err != nil {
 			return nil, err
@@ -1069,6 +1169,9 @@ func (s *ZammadService) LinkExistingTicket(ctx context.Context, itemID, actorID 
 		if err != nil {
 			_ = s.repo.MarkTicketLinkSetupError(link.ID, syncOwner, RedactString(err.Error()))
 			return nil, err
+		}
+		if ticket.Title == "" {
+			ticket.Title = ticketTitle
 		}
 	}
 	link.TicketID = ticket.ID
@@ -1083,7 +1186,7 @@ func (s *ZammadService) LinkExistingTicket(ctx context.Context, itemID, actorID 
 	if err := s.renewZammadSyncClaim(link.ID, syncOwner); err != nil {
 		return nil, err
 	}
-	if err := s.completeExistingTicketLinkWithCurrentGroupPolicy(link, syncOwner, actorID); err != nil {
+	if err := s.completeExistingTicketLinkWithCurrentGroupPolicy(link, ticket.Title, syncOwner, actorID); err != nil {
 		_ = s.repo.MarkTicketLinkSetupError(link.ID, syncOwner, RedactString(err.Error()))
 		return nil, s.mapZammadSyncClaimError(err)
 	}
@@ -1227,7 +1330,7 @@ func (s *ZammadService) CreateTicket(ctx context.Context, itemID, actorID int, r
 	if err := s.renewZammadSyncClaim(link.ID, syncOwner); err != nil {
 		return nil, err
 	}
-	if err := s.completeTicketCreationWithCurrentGroupPolicy(link.ProviderID, link.ID, syncOwner, ticket.ID, ticket.Number, ticketURL,
+	if err := s.completeTicketCreationWithCurrentGroupPolicy(link.ProviderID, link.ID, syncOwner, ticket.ID, ticket.Number, ticket.Title, ticketURL,
 		ticket.StateID, statusName, ticketGroupID, ticketGroupName, ticket.OwnerID, ticket.OwnerName, actorID); err != nil {
 		// The remote ticket is known to exist. Keep retries search-only until
 		// the durable local association has been completed.
@@ -1529,7 +1632,7 @@ func (s *ZammadService) syncClaimedTicketLink(ctx context.Context, link *models.
 	}
 	if !connection.Enabled {
 		if err := s.repo.UpdateTicketLinkSync(link.ID, syncOwner, link.LastStatusID, link.LastStatusName,
-			link.GroupID, link.GroupName, link.OwnerID, link.OwnerName, "", time.Now(), false, false); err != nil {
+			link.GroupID, link.GroupName, link.OwnerID, link.OwnerName, "", "", time.Now(), false, false); err != nil {
 			return nil, s.mapZammadSyncClaimError(err)
 		}
 		return s.repo.GetTicketLink(link.ID)
@@ -1571,7 +1674,7 @@ func (s *ZammadService) syncClaimedTicketLink(ctx context.Context, link *models.
 func (s *ZammadService) recordZammadSyncError(link *models.ZammadTicketLink, syncOwner string, err error) {
 	if updateErr := s.repo.UpdateTicketLinkSync(link.ID, syncOwner, link.LastStatusID, link.LastStatusName,
 		link.GroupID, link.GroupName, link.OwnerID, link.OwnerName,
-		RedactString(err.Error()), time.Now(), false, false); updateErr == nil {
+		"", RedactString(err.Error()), time.Now(), false, false); updateErr == nil {
 		PublishItemChange(link.ItemID, ItemChangeZammad)
 	}
 }
@@ -1635,7 +1738,7 @@ func (s *ZammadService) persistTicketSnapshot(ctx context.Context, link *models.
 			if completionErr != nil {
 				safeError := RedactString(completionErr.Error())
 				updateErr := s.updateTicketLinkSyncWithCurrentGroupPolicy(link.ProviderID, link.ID, syncOwner, ticket.StateID, statusName,
-					ticket.GroupID, groupName, ticket.OwnerID, ownerName,
+					ticket.GroupID, groupName, ticket.OwnerID, ownerName, ticket.Title,
 					safeError, time.Now(), completionCommitted, completionCommitted)
 				if updateErr == nil {
 					PublishItemChange(link.ItemID, ItemChangeZammad)
@@ -1647,7 +1750,7 @@ func (s *ZammadService) persistTicketSnapshot(ctx context.Context, link *models.
 	}
 	setCompletionApplied := !isClosed || completionApplied
 	err = s.updateTicketLinkSyncWithCurrentGroupPolicy(link.ProviderID, link.ID, syncOwner, ticket.StateID, statusName,
-		ticket.GroupID, groupName, ticket.OwnerID, ownerName,
+		ticket.GroupID, groupName, ticket.OwnerID, ownerName, ticket.Title,
 		"", time.Now(), setCompletionApplied, completionApplied)
 	if errors.Is(err, ErrZammadTicketGroupPolicyChanged) {
 		s.recordZammadSyncError(link, syncOwner, err)
@@ -1655,7 +1758,7 @@ func (s *ZammadService) persistTicketSnapshot(ctx context.Context, link *models.
 	return s.mapZammadSyncClaimError(err)
 }
 
-func (s *ZammadService) updateTicketLinkSyncWithCurrentGroupPolicy(providerID, linkID, syncOwner string, statusID int, statusName string, groupID int, groupName string, ownerID int, ownerName, safeError string, now time.Time, setCompletionApplied, completionApplied bool) error {
+func (s *ZammadService) updateTicketLinkSyncWithCurrentGroupPolicy(providerID, linkID, syncOwner string, statusID int, statusName string, groupID int, groupName string, ownerID int, ownerName, ticketTitle, safeError string, now time.Time, setCompletionApplied, completionApplied bool) error {
 	if s.persistBeforeLock != nil {
 		s.persistBeforeLock()
 	}
@@ -1667,7 +1770,7 @@ func (s *ZammadService) updateTicketLinkSyncWithCurrentGroupPolicy(providerID, l
 			return err
 		}
 		return s.repo.UpdateTicketLinkSyncTx(tx, linkID, syncOwner, statusID, statusName, groupID, groupName,
-			ownerID, ownerName, safeError, now, setCompletionApplied, completionApplied)
+			ownerID, ownerName, ticketTitle, safeError, now, setCompletionApplied, completionApplied)
 	})
 }
 
@@ -1702,7 +1805,7 @@ func (s *ZammadService) failZammadTicketCreationBeforePost(linkID, syncOwner str
 	return cause
 }
 
-func (s *ZammadService) completeTicketCreationWithCurrentGroupPolicy(providerID, linkID, syncOwner string, ticketID int, number, ticketURL string, statusID int, statusName string, groupID int, groupName string, ownerID int, ownerName string, linkedBy int) error {
+func (s *ZammadService) completeTicketCreationWithCurrentGroupPolicy(providerID, linkID, syncOwner string, ticketID int, number, ticketTitle, ticketURL string, statusID int, statusName string, groupID int, groupName string, ownerID int, ownerName string, linkedBy int) error {
 	if s.persistBeforeLock != nil {
 		s.persistBeforeLock()
 	}
@@ -1713,12 +1816,12 @@ func (s *ZammadService) completeTicketCreationWithCurrentGroupPolicy(providerID,
 		if err := s.requireCurrentZammadGroupTx(tx, providerID, groupID, groupName); err != nil {
 			return err
 		}
-		return s.repo.CompleteTicketCreationTx(tx, linkID, syncOwner, ticketID, number, ticketURL, statusID, statusName,
+		return s.repo.CompleteTicketCreationTx(tx, linkID, syncOwner, ticketID, number, ticketTitle, ticketURL, statusID, statusName,
 			groupID, groupName, ownerID, ownerName, linkedBy)
 	})
 }
 
-func (s *ZammadService) completeExistingTicketLinkWithCurrentGroupPolicy(link *models.ZammadTicketLink, syncOwner string, linkedBy int) error {
+func (s *ZammadService) completeExistingTicketLinkWithCurrentGroupPolicy(link *models.ZammadTicketLink, ticketTitle, syncOwner string, linkedBy int) error {
 	if s.persistBeforeLock != nil {
 		s.persistBeforeLock()
 	}
@@ -1729,7 +1832,7 @@ func (s *ZammadService) completeExistingTicketLinkWithCurrentGroupPolicy(link *m
 		if err := s.requireCurrentZammadGroupTx(tx, link.ProviderID, link.GroupID, link.GroupName); err != nil {
 			return err
 		}
-		return s.repo.CompleteExistingTicketLinkTx(tx, link.ID, syncOwner, link.ID+"-external", link, linkedBy)
+		return s.repo.CompleteExistingTicketLinkTx(tx, link.ID, syncOwner, link.ID+"-external", link, ticketTitle, linkedBy)
 	})
 }
 

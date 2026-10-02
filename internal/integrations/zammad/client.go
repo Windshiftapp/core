@@ -62,6 +62,7 @@ func NewOAuthClient(baseURL, accessToken string, transport Transport) *Client {
 type Ticket struct {
 	ID         int
 	Number     string
+	Title      string
 	GroupID    int
 	GroupName  string
 	StateID    int
@@ -308,6 +309,7 @@ func decodeTicket(raw map[string]json.RawMessage) (*Ticket, error) {
 	if err := decodeRequired(raw, "number", &ticket.Number); err != nil {
 		return nil, err
 	}
+	_ = json.Unmarshal(raw["title"], &ticket.Title)
 	_ = json.Unmarshal(raw["group_id"], &ticket.GroupID)
 	_ = json.Unmarshal(raw["group"], &ticket.GroupName)
 	_ = json.Unmarshal(raw["state_id"], &ticket.StateID)

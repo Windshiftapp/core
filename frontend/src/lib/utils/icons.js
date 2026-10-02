@@ -94,6 +94,7 @@ import {
   Tag,
   Target,
   Terminal,
+  TicketCheck,
   Trash,
   Truck,
   Upload,
@@ -262,6 +263,7 @@ export const workspaceIconMap = {
   Watch,
   Cloud,
   BarChart,
+  TicketCheck,
 };
 
 /**
