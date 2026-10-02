@@ -972,11 +972,12 @@ func (s *ZammadService) WorkspaceOverview(workspaceID, recentLimit int) (*models
 		if index, ok := ticketIndexByLinkID[link.ID]; ok {
 			overview.Tickets[index].Closed = closed
 		}
-		if link.LastStatusID <= 0 {
+		switch {
+		case link.LastStatusID <= 0:
 			overview.UnknownStatus++
-		} else if closed {
+		case closed:
 			overview.Closed++
-		} else {
+		default:
 			overview.Active++
 		}
 		if link.OwnerID <= 1 {
