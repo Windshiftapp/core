@@ -425,4 +425,9 @@ export default {
     selectWorkspace: 'Wählen Sie einen Workspace zum Starten',
     noWorkspacesAvailable: 'Es sind noch keine Workspaces verfügbar. Bitte kontaktieren Sie Ihren Administrator, um Zugang zu einem Workspace zu erhalten.',
   },
+  workspaceDashboard: {
+    widgets: {
+      zammadSupportOverview: { name: 'Zammad-Supportübersicht', description: 'Workspaceweiter Stand verknüpfter Tickets und beobachtete Änderungen' },
+    },
+  },
 };

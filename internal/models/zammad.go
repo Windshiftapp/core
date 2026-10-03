@@ -169,6 +169,7 @@ type ZammadTicketLink struct {
 	ItemIntegrationLinkID string          `json:"item_integration_link_id,omitempty"`
 	TicketID              int             `json:"ticket_id,omitempty"`
 	TicketNumber          string          `json:"ticket_number,omitempty"`
+	TicketTitle           string          `json:"-"`
 	TicketURL             string          `json:"ticket_url,omitempty"`
 	GroupID               int             `json:"group_id,omitempty"`
 	GroupName             string          `json:"group_name,omitempty"`
@@ -178,6 +179,7 @@ type ZammadTicketLink struct {
 	SyncState             ZammadSyncState `json:"sync_state"`
 	LastStatusID          int             `json:"last_status_id,omitempty"`
 	LastStatusName        string          `json:"last_status_name,omitempty"`
+	Closed                bool            `json:"-"`
 	LastSyncedAt          *time.Time      `json:"last_synced_at,omitempty"`
 	LastAttemptAt         *time.Time      `json:"-"`
 	NextAttemptAt         *time.Time      `json:"-"`
@@ -218,4 +220,74 @@ func (link *ZammadTicketLink) Response() ZammadTicketLinkResponse {
 		LastSyncedAt: link.LastSyncedAt, LastError: link.LastError,
 		CreatedAt: link.CreatedAt, UpdatedAt: link.UpdatedAt,
 	}
+}
+
+type ZammadItemTicketLinkResponse struct {
+	ZammadTicketLinkResponse
+	TicketTitle string `json:"ticket_title,omitempty"`
+	Closed      bool   `json:"closed"`
+}
+
+func (link *ZammadTicketLink) ItemResponse() ZammadItemTicketLinkResponse {
+	return ZammadItemTicketLinkResponse{
+		ZammadTicketLinkResponse: link.Response(),
+		TicketTitle:              link.TicketTitle,
+		Closed:                   link.Closed,
+	}
+}
+
+type ZammadTicketChangeValue struct {
+	ID   int    `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+type ZammadTicketChange struct {
+	ID           string                  `json:"id"`
+	LinkID       string                  `json:"link_id"`
+	ItemID       int                     `json:"item_id"`
+	ItemKey      string                  `json:"item_key"`
+	TicketTitle  string                  `json:"ticket_title"`
+	TicketNumber string                  `json:"ticket_number,omitempty"`
+	TicketURL    string                  `json:"ticket_url,omitempty"`
+	CurrentGroup ZammadTicketChangeValue `json:"current_group"`
+	CurrentOwner ZammadTicketChangeValue `json:"current_owner"`
+	Field        string                  `json:"field"`
+	OldValue     ZammadTicketChangeValue `json:"old_value"`
+	NewValue     ZammadTicketChangeValue `json:"new_value"`
+	ObservedAt   time.Time               `json:"observed_at"`
+}
+
+type ZammadOverviewBucket struct {
+	ConnectionID   string `json:"connection_id"`
+	ConnectionName string `json:"connection_name"`
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Count          int    `json:"count"`
+	Closed         bool   `json:"closed,omitempty"`
+}
+
+type ZammadOverviewTicket struct {
+	ID           string                  `json:"id"`
+	ItemID       int                     `json:"item_id"`
+	ItemKey      string                  `json:"item_key"`
+	TicketNumber string                  `json:"ticket_number"`
+	TicketTitle  string                  `json:"ticket_title"`
+	TicketURL    string                  `json:"ticket_url"`
+	Closed       bool                    `json:"closed"`
+	Status       ZammadTicketChangeValue `json:"status"`
+	Group        ZammadTicketChangeValue `json:"group"`
+	Owner        ZammadTicketChangeValue `json:"owner"`
+}
+
+type ZammadWorkspaceOverview struct {
+	Total             int                    `json:"total"`
+	Active            int                    `json:"active"`
+	Closed            int                    `json:"closed"`
+	Unassigned        int                    `json:"unassigned"`
+	SyncFailed        int                    `json:"sync_failed"`
+	CreationUncertain int                    `json:"creation_uncertain"`
+	UnknownStatus     int                    `json:"unknown_status"`
+	ByStatus          []ZammadOverviewBucket `json:"by_status"`
+	RecentChanges     []ZammadTicketChange   `json:"recent_changes"`
+	Tickets           []ZammadOverviewTicket `json:"tickets"`
 }

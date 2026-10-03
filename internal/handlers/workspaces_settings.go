@@ -143,6 +143,22 @@ func (h *WorkspaceHandler) loadHomepageLayout(workspaceID int) (models.Workspace
 	return layout, nil
 }
 
+var validWorkspaceWidgetTypes = map[string]bool{
+	"stats":                    true,
+	"completion-chart":         true,
+	"created-chart":            true,
+	"milestone-progress":       true,
+	"story-points-by-assignee": true,
+	"recent-items":             true,
+	"my-tasks":                 true,
+	"overdue-items":            true,
+	"upcoming-deadlines":       true,
+	"iteration-timeline":       true,
+	"test-coverage":            true,
+	"saved-search":             true,
+	"zammad-support-overview":  true,
+}
+
 // UpdateHomepageLayout handles PUT /api/workspaces/:id/homepage/layout
 func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
@@ -166,21 +182,6 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	// Validate widgets. Keep this list in sync with
 	// frontend/src/lib/services/widgetRegistry.js — types missing a frontend
 	// component would render as empty cards.
-	validTypes := map[string]bool{
-		"stats":                    true,
-		"completion-chart":         true,
-		"created-chart":            true,
-		"milestone-progress":       true,
-		"story-points-by-assignee": true,
-		"recent-items":             true,
-		"my-tasks":                 true,
-		"overdue-items":            true,
-		"upcoming-deadlines":       true,
-		"iteration-timeline":       true,
-		"test-coverage":            true,
-		"saved-search":             true,
-	}
-
 	const (
 		maxSections = 20
 		maxWidgets  = 100
@@ -209,7 +210,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 
 	widgetIDs := make(map[string]bool, len(layout.Widgets))
 	for _, widget := range layout.Widgets {
-		if !validTypes[widget.Type] {
+		if !validWorkspaceWidgetTypes[widget.Type] {
 			respondValidationError(w, r, fmt.Sprintf("Invalid widget type: %s", widget.Type))
 			return
 		}

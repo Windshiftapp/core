@@ -335,6 +335,7 @@ export default {
       upcomingDeadlines: { name: 'Ближайшие сроки', description: 'Элементы с приближающимся сроком' },
       iterationTimeline: { name: 'График итераций', description: 'Текущие и ближайшие итерации' },
       testCoverage: { name: 'Покрытие тестами', description: 'Требования, связанные с тест-кейсами' },
+      zammadSupportOverview: { name: 'Обзор поддержки Zammad', description: 'Статус связанных заявок всего пространства и наблюдаемые изменения' },
     },
     customization: {
       widgets: 'Виджеты', builtIn: 'Основные виджеты', builtInDescription: 'Основные показатели и графики пространства',
