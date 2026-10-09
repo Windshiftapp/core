@@ -18,9 +18,12 @@ import (
 //   - member items' updated_at (item_milestones)
 //   - comments on member items, including edits: creating a comment only
 //     moves the item's last_active_at, not its updated_at
-//   - items added to or removed from the milestone (item_history 'milestones'
-//     rows whose old and new lists differ on this milestone), including items
-//     that have since left it
+//   - items added to the milestone (item_milestones.created_at)
+//
+// Every source is an indexed lookup by milestone or item. Removing an item
+// does not count: finding removals means matching the milestone ID inside
+// every item_history 'milestones' value, a scan that grows with the whole
+// history on each list request.
 //
 // Item sources count only items in the viewer's accessible workspaces, the
 // rule the Activity tab and the progress view apply. With no accessible
@@ -35,7 +38,6 @@ func milestoneLastUpdatedColumns(workspaceIDs []int) (columns string, args []any
 		return columns + `, NULL, NULL, NULL`, nil
 	}
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(workspaceIDs)), ",")
-	membership := `'%,' || CAST(m.id AS TEXT) || ',%'`
 	columns += `,
 	       (SELECT MAX(lui.updated_at) FROM item_milestones luim
 	         JOIN items lui ON lui.id = luim.item_id
@@ -44,12 +46,9 @@ func milestoneLastUpdatedColumns(workspaceIDs []int) (columns string, args []any
 	         JOIN item_milestones luim ON luim.item_id = luc.item_id
 	         JOIN items lui ON lui.id = luc.item_id
 	         WHERE luim.milestone_id = m.id AND lui.workspace_id IN (` + placeholders + `)),
-	       (SELECT MAX(luh.changed_at) FROM item_history luh
-	         JOIN items lui ON lui.id = luh.item_id
-	         WHERE luh.field_name = 'milestones'
-	           AND ((',' || COALESCE(luh.old_value, '') || ',') LIKE ` + membership + `)
-	               <> ((',' || COALESCE(luh.new_value, '') || ',') LIKE ` + membership + `)
-	           AND lui.workspace_id IN (` + placeholders + `))`
+	       (SELECT MAX(luim.created_at) FROM item_milestones luim
+	         JOIN items lui ON lui.id = luim.item_id
+	         WHERE luim.milestone_id = m.id AND lui.workspace_id IN (` + placeholders + `))`
 	for range 3 {
 		for _, id := range workspaceIDs {
 			args = append(args, id)

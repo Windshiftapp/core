@@ -8,7 +8,7 @@ import (
 
 // TestListMilestonesLastUpdated checks that each listed milestone's
 // LastUpdatedAt is the latest of its own updated_at, its history, comments,
-// page links, member items, comments on them, and membership changes. Item
+// page links, member items, comments on them, and items added to it. Item
 // sources count only for items in the viewer's workspaces.
 func TestListMilestonesLastUpdated(t *testing.T) {
 	planning, db := newMilestoneReleaseTestService(t)
@@ -34,9 +34,10 @@ func TestListMilestonesLastUpdated(t *testing.T) {
 		return activityInsert(t, db, `INSERT INTO items (workspace_id, workspace_item_number, title, description, frac_index, status_id, creator_id, created_at, updated_at)
 			VALUES (?, ?, ?, '', ?, ?, 1, ?, ?)`, workspaceID, number, "Item "+strconv.Itoa(number), "a"+strconv.Itoa(number), statusID, base, updated)
 	}
-	member := func(itemID, milestoneID int) {
-		exec(`INSERT INTO item_milestones (item_id, milestone_id) VALUES (?, ?)`, itemID, milestoneID)
+	memberSince := func(itemID, milestoneID int, added time.Time) {
+		exec(`INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)`, itemID, milestoneID, added)
 	}
+	member := func(itemID, milestoneID int) { memberSince(itemID, milestoneID, base) }
 	milestone := func(name string) int {
 		id := insertGlobalMilestone(t, db, name)
 		exec(`UPDATE milestones SET created_at = ?, updated_at = ? WHERE id = ?`, base, base, id)
@@ -60,13 +61,15 @@ func TestListMilestonesLastUpdated(t *testing.T) {
 	commented := item(hub, base)
 	member(commented, itemComment)
 	exec(`INSERT INTO comments (item_id, author_id, content, created_at, updated_at) VALUES (?, 1, 'x', ?, ?)`, commented, at(5), at(5))
-	// An item that left the milestone: only its membership history remains.
+	// An item added later than its last edit moves the milestone to when it
+	// was added.
 	membership := milestone("Membership")
-	left := item(hub, base)
-	exec(`INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at) VALUES (?, 1, 'milestones', ?, '', ?)`, left, strconv.Itoa(membership), at(6))
-	// A membership row that keeps the milestone on both sides is not a change.
-	exec(`INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at) VALUES (?, 1, 'milestones', ?, ?, ?)`,
-		left, strconv.Itoa(history), strconv.Itoa(history)+",77", at(20))
+	memberSince(item(hub, base), membership, at(6))
+	// An item that left the milestone does not count: only its membership
+	// history remains, and the list does not scan item history.
+	removed := milestone("Removed")
+	exec(`INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at) VALUES (?, 1, 'milestones', ?, '', ?)`,
+		item(hub, base), strconv.Itoa(removed), at(20))
 	// SEC items count only for viewers who can access SEC.
 	hidden := milestone("Hidden")
 	member(item(sec, at(7)), hidden)
@@ -95,7 +98,7 @@ func TestListMilestonesLastUpdated(t *testing.T) {
 	got := list([]int{hub})
 	want := map[int]time.Time{
 		untouched: base, history: at(1), comment: at(2), page: at(3), itemChange: at(4),
-		itemComment: at(5), membership: at(6), hidden: base, textStamp: base.Add(8*time.Hour + 30*time.Minute),
+		itemComment: at(5), membership: at(6), removed: base, hidden: base, textStamp: base.Add(8*time.Hour + 30*time.Minute),
 	}
 	for id, expected := range want {
 		if !got[id].Equal(expected) {
