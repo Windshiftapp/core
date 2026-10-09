@@ -116,4 +116,26 @@ describe('milestones activity client', () => {
     });
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/activity?page=2&page_size=20');
   });
+
+  it('reports no more entries when has_more is false or missing', async () => {
+    const entry = { id: 'milestone_comment:5', type: 'milestone_comment_added' };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ data: { entries: [entry], has_more: false } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { entries: [] } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(milestones.getActivity(7)).resolves.toEqual({
+      entries: [entry],
+      page: 1,
+      hasMore: false,
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/activity?page=1&page_size=50');
+
+    await expect(milestones.getActivity(7, { page: 3 })).resolves.toEqual({
+      entries: [],
+      page: 3,
+      hasMore: false,
+    });
+  });
 });
