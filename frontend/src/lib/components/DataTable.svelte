@@ -4,7 +4,7 @@
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
-  import { nextColumnSort } from './dataTableSort.js';
+  import { activeColumnSort, nextColumnSort } from './dataTableSort.js';
 
   let {
     columns = [],
@@ -31,9 +31,10 @@
     ...slotProps
   } = $props();
 
-  // Sort state
-  let sortKey = $derived(sort?.key ?? null);
-  let sortDirection = $derived(sort?.key ? sort.direction : null); // 'asc' | 'desc' | null
+  // Sort state. A sort without a key or a valid direction counts as none.
+  let activeSort = $derived(activeColumnSort(sort));
+  let sortKey = $derived(activeSort?.key ?? null);
+  let sortDirection = $derived(activeSort?.direction ?? null); // 'asc' | 'desc' | null
 
   function getRawSortValue(item, column) {
     if (column.sortValue) return column.sortValue(item);
@@ -45,7 +46,7 @@
 
   function toggleSort(column) {
     if (!column.sortable) return;
-    sort = nextColumnSort(sort, column);
+    sort = nextColumnSort(activeSort, column);
   }
 
   let sortedData = $derived.by(() => {

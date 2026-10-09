@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextColumnSort } from './dataTableSort.js';
+import { activeColumnSort, nextColumnSort } from './dataTableSort.js';
 
 const name = { key: 'name', sortable: true };
 const updated = { key: 'last_updated_at', sortable: true };
@@ -30,5 +30,27 @@ describe('nextColumnSort', () => {
     const sort = { key: 'name', direction: 'asc' };
     expect(nextColumnSort(sort, actions)).toBe(sort);
     expect(nextColumnSort(null, actions)).toBeNull();
+  });
+});
+
+describe('activeColumnSort', () => {
+  it('keeps a sort with a key and a valid direction', () => {
+    const sort = { key: 'name', direction: 'desc' };
+    expect(activeColumnSort(sort)).toBe(sort);
+  });
+
+  it('treats a missing or malformed sort as no sort', () => {
+    expect(activeColumnSort(null)).toBeNull();
+    expect(activeColumnSort(undefined)).toBeNull();
+    expect(activeColumnSort({ key: 'name' })).toBeNull();
+    expect(activeColumnSort({ key: 'name', direction: 'up' })).toBeNull();
+    expect(activeColumnSort({ direction: 'asc' })).toBeNull();
+  });
+
+  it('lets a click on a malformed sort start the column ascending', () => {
+    expect(nextColumnSort(activeColumnSort({ key: 'name' }), name)).toEqual({
+      key: 'name',
+      direction: 'asc',
+    });
   });
 });

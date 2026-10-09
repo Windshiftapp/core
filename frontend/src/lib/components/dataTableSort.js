@@ -15,3 +15,17 @@ export function nextColumnSort(sort, column) {
   if (sort.direction === 'asc') return { key: column.key, direction: 'desc' };
   return null;
 }
+
+/**
+ * The sort DataTable applies: `sort` when it names a column and a valid
+ * direction, otherwise null. A malformed value then leaves the rows unsorted
+ * and the header without an arrow, instead of showing a sort the rows don't
+ * follow.
+ * @param {{ key?: string, direction?: string } | null | undefined} sort
+ * @returns {{ key: string, direction: 'asc' | 'desc' } | null}
+ */
+export function activeColumnSort(sort) {
+  if (!sort?.key) return null;
+  if (sort.direction !== 'asc' && sort.direction !== 'desc') return null;
+  return /** @type {{ key: string, direction: 'asc' | 'desc' }} */ (sort);
+}
