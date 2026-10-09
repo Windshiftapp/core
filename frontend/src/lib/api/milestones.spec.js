@@ -111,7 +111,6 @@ describe('milestones activity client', () => {
 
     await expect(milestones.getActivity(7, { page: 2, pageSize: 20 })).resolves.toEqual({
       entries: [entry],
-      page: 2,
       hasMore: true,
     });
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/activity?page=2&page_size=20');
@@ -127,15 +126,14 @@ describe('milestones activity client', () => {
 
     await expect(milestones.getActivity(7)).resolves.toEqual({
       entries: [entry],
-      page: 1,
       hasMore: false,
     });
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/activity?page=1&page_size=50');
 
     await expect(milestones.getActivity(7, { page: 3 })).resolves.toEqual({
       entries: [],
-      page: 3,
       hasMore: false,
     });
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v2/milestones/7/activity?page=3&page_size=50');
   });
 });

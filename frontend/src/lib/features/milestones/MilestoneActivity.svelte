@@ -78,7 +78,7 @@
 			const result = await api.milestones.getActivity(milestoneId, { page: page + 1, pageSize: PAGE_SIZE });
 			const seen = new Set(entries.map((entry) => entry.id));
 			entries = [...entries, ...result.entries.filter((entry) => !seen.has(entry.id))];
-			page = result.page;
+			page += 1;
 			hasMore = result.hasMore;
 		} catch (err) {
 			console.error('Failed to load more milestone activity:', err);

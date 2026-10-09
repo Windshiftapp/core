@@ -107,13 +107,12 @@ export const milestones = {
   unlinkPage: (id, linkId) =>
     fetchV2Data(`/milestones/${id}/page-links/${linkId}`, { method: 'DELETE' }),
   // Activity feed: one page of the shared feed, newest first.
-  // Resolves to { entries, page, hasMore }; the feed has no total.
+  // Resolves to { entries, hasMore }; the feed has no total.
   getActivity: async (id, { page = 1, pageSize = 50 } = {}) => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
     const feed = await fetchV2Data(`/milestones/${id}/activity?${params}`);
     return {
       entries: feed?.entries ?? [],
-      page,
       hasMore: feed?.has_more === true,
     };
   },
