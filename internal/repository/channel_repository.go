@@ -406,8 +406,8 @@ func (r *ChannelRepository) Delete(ctx context.Context, tx database.Tx, id int) 
 	// A deleted portal leaves no target for the mailboxes that fed it. Remove
 	// those intakes so the scheduler stops polling folders that can only fail.
 	if _, err := tx.Exec(
-		`DELETE FROM intakes WHERE target_type = ? AND target_id = ?`,
-		models.IntakeTargetPortal, id,
+		`DELETE FROM intakes WHERE portal_channel_id = ?`,
+		id,
 	); err != nil {
 		return fmt.Errorf("failed to delete intakes targeting channel %d: %w", id, err)
 	}
@@ -865,12 +865,12 @@ func (r *ChannelRepository) GetDeleteImpact(ctx context.Context, channelID int) 
 		*item.target = value
 	}
 
-	// Intakes reference a portal target polymorphically (target_type + target_id)
-	// rather than through channel_id, so count them separately.
+	// Intakes link to a portal by portal_channel_id rather than channel_id, so
+	// count them separately.
 	var intakeTargets int
 	if err := r.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM intakes WHERE target_type = ? AND target_id = ?
-	`, models.IntakeTargetPortal, channelID).Scan(&intakeTargets); err != nil {
+		SELECT COUNT(*) FROM intakes WHERE portal_channel_id = ?
+	`, channelID).Scan(&intakeTargets); err != nil {
 		return ChannelDeleteImpact{}, fmt.Errorf("count intakes targeting channel %d: %w", channelID, err)
 	}
 	out.IntakeTargets = intakeTargets
@@ -899,8 +899,12 @@ type ChannelRequestTypeRoute struct {
 // including legacy NULL workspace routes that resolve to the channel's first
 // configured workspace at runtime.
 func (r *ChannelRepository) ListRequestTypeRoutes(channelID int) ([]ChannelRequestTypeRoute, error) {
+	// The system Email request type's workspace is advisory (email intakes route
+	// by their own workspace), so it must not block a portal from dropping a
+	// workspace the intake links can still be re-pointed away from.
 	rows, err := r.db.Query(
-		`SELECT id, name, item_type_id, workspace_id FROM request_types WHERE channel_id = ?`,
+		`SELECT id, name, item_type_id, workspace_id FROM request_types
+		 WHERE channel_id = ? AND COALESCE(kind, '') <> 'email'`,
 		channelID,
 	)
 	if err != nil {

@@ -164,8 +164,38 @@ func (s *ChannelConfigUpdateService) Update(ctx context.Context, actorUserID, ch
 			slog.Warn("failed to provision portal email request type",
 				"channel_id", channelID, "error", err)
 		}
+		s.markOrphanedPortalIntakes(ctx, channelID, final.PortalWorkspaceIDs)
 	}
 	return true, nil
+}
+
+// markOrphanedPortalIntakes parks intakes whose linked portal no longer serves
+// their routing workspace, so the admin sees a needs_attention warning instead
+// of a mailbox that keeps polling a target the customer cannot see.
+func (s *ChannelConfigUpdateService) markOrphanedPortalIntakes(ctx context.Context, portalChannelID int, servedWorkspaceIDs []int) {
+	repo := repository.NewIntakeRepository(s.channels.db)
+	intakes, err := repo.ListByPortal(ctx, portalChannelID)
+	if err != nil {
+		slog.Warn("failed to list portal intakes for workspace check", "channel_id", portalChannelID, "error", err)
+		return
+	}
+	served := make(map[int]struct{}, len(servedWorkspaceIDs))
+	for _, id := range servedWorkspaceIDs {
+		served[id] = struct{}{}
+	}
+	reasons := map[int]string{}
+	for _, intake := range intakes {
+		if intake.Status != models.IntakeStatusEnabled {
+			continue
+		}
+		if _, ok := served[intake.WorkspaceID]; ok {
+			continue
+		}
+		reasons[intake.ID] = fmt.Sprintf("Portal no longer serves workspace %d; re-point this intake and re-enable it", intake.WorkspaceID)
+	}
+	if err := repo.MarkNeedsAttention(ctx, reasons); err != nil {
+		slog.Warn("failed to mark orphaned portal intakes", "channel_id", portalChannelID, "error", err)
+	}
 }
 
 // PrepareEnable validates that a channel may transition to "enabled" and
@@ -296,39 +326,35 @@ func (s *ChannelConfigUpdateService) prepareEmailEnable(ctx context.Context, act
 
 // validateEmailIntakeEnable checks one enabled intake before the mailbox is
 // activated: its workspace item type must still be valid and, for non-admins,
-// the actor must manage the intake target.
+// the actor must manage the routing workspace and any linked portal.
 func (s *ChannelConfigUpdateService) validateEmailIntakeEnable(ctx context.Context, actorUserID int, intake models.Intake, admin bool) error {
-	if intake.TargetType == models.IntakeTargetWorkspace {
-		if intake.ItemTypeID == nil || *intake.ItemTypeID <= 0 {
-			return channelConfigInvalid(fmt.Sprintf("Email intake %d has no item type", intake.ID))
-		}
-		allowed, err := s.channels.ItemTypeAllowedInWorkspace(intake.TargetID, *intake.ItemTypeID)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return channelConfigInvalid(fmt.Sprintf("Item type %d is not allowed in workspace %d", *intake.ItemTypeID, intake.TargetID))
-		}
+	if intake.ItemTypeID == nil || *intake.ItemTypeID <= 0 {
+		return channelConfigInvalid(fmt.Sprintf("Email intake %d has no item type", intake.ID))
+	}
+	allowed, err := s.channels.ItemTypeAllowedInWorkspace(intake.WorkspaceID, *intake.ItemTypeID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return channelConfigInvalid(fmt.Sprintf("Item type %d is not allowed in workspace %d", *intake.ItemTypeID, intake.WorkspaceID))
 	}
 	if admin {
 		return nil
 	}
-	switch intake.TargetType {
-	case models.IntakeTargetWorkspace:
-		allowed, err := s.permission.HasWorkspacePermission(actorUserID, intake.TargetID, models.PermissionWorkspaceAdmin)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return channelConfigForbidden("workspace administration permission is required to connect the email intake target workspace")
-		}
-	case models.IntakeTargetPortal:
-		canManage, err := s.channels.UserCanManage(ctx, actorUserID, intake.TargetID)
+	canAdmin, err := s.permission.HasWorkspacePermission(actorUserID, intake.WorkspaceID, models.PermissionWorkspaceAdmin)
+	if err != nil {
+		return err
+	}
+	if !canAdmin {
+		return channelConfigForbidden("workspace administration permission is required to connect the email intake target workspace")
+	}
+	if intake.PortalChannelID != nil {
+		canManage, err := s.channels.UserCanManage(ctx, actorUserID, *intake.PortalChannelID)
 		if err != nil {
 			return err
 		}
 		if !canManage {
-			return channelConfigForbidden("permission to manage the email intake target portal is required")
+			return channelConfigForbidden("permission to manage the email intake portal is required")
 		}
 	}
 	return nil

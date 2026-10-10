@@ -222,7 +222,7 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	}
 	// Route replies back to the monitored intake mailbox, not the SMTP sender.
 	// Persisted per row so a retry is stable if the channel config changes.
-	replyToEmail, replyToName := s.resolveReplyToAddress(*item.ChannelID)
+	replyToEmail, replyToName := s.resolveReplyToAddress(params.ItemID, *item.ChannelID)
 	outboxIDs := make([]int, 0, len(recipients))
 	for _, recipient := range recipients {
 		messageID := recipientMessageID(params.CommentID, recipient.Email, smtpDomain)
@@ -267,7 +267,24 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 // replies should route back to for an item on the given channel. Empty when no
 // monitored mailbox applies; the transport then omits Reply-To and falls back
 // to From.
-func (s *EmailReplyService) resolveReplyToAddress(channelID int) (address, name string) {
+//
+// The item's own intake is authoritative: the mailbox that fed it owns the
+// reply address, so a portal with several intakes never answers from an
+// unrelated one. A portal web submission has no feeding intake, so it falls
+// back to the oldest enabled intake exposing requests to that portal.
+func (s *EmailReplyService) resolveReplyToAddress(itemID, channelID int) (address, name string) {
+	var intakeMailboxID sql.NullInt64
+	if err := s.db.QueryRow(`
+		SELECT i.mailbox_id
+		FROM items it
+		JOIN intakes i ON i.id = it.intake_id
+		WHERE it.id = ?
+	`, itemID).Scan(&intakeMailboxID); err == nil && intakeMailboxID.Valid {
+		if address, name = s.mailboxAddress(int(intakeMailboxID.Int64)); address != "" {
+			return address, name
+		}
+	}
+	// Email-originated items also carry the mailbox as their own channel.
 	if address, name = s.mailboxAddress(channelID); address != "" {
 		return address, name
 	}
@@ -279,10 +296,10 @@ func (s *EmailReplyService) resolveReplyToAddress(channelID int) (address, name 
 		SELECT i.mailbox_id
 		FROM intakes i
 		JOIN channels c ON c.id = i.mailbox_id
-		WHERE i.target_type = 'portal' AND i.target_id = ?
-		  AND i.status = 'enabled' AND c.status = 'enabled'
+		WHERE i.portal_channel_id = ?
+		  AND i.status = ? AND c.status = 'enabled'
 		ORDER BY i.id
-	`, channelID)
+	`, channelID, models.IntakeStatusEnabled)
 	if err != nil {
 		return "", ""
 	}
@@ -499,7 +516,7 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 
 	smtpDomain := s.getSMTPDomain()
 	messageID := fmt.Sprintf("<ws-notice-%d-%d@%s>", item.ID, time.Now().UnixNano(), smtpDomain)
-	replyToEmail, replyToName := s.resolveReplyToAddress(*item.ChannelID)
+	replyToEmail, replyToName := s.resolveReplyToAddress(item.ID, *item.ChannelID)
 	if err := s.smtpSender.SendThreadedEmail(smtp.ThreadedEmailParams{
 		ToEmail:      toEmail,
 		ToName:       toName,

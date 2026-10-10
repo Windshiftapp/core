@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,8 +16,8 @@ import (
 // intakeRequest is the create/update payload for a mailbox intake.
 type intakeRequest struct {
 	Folder                string `json:"folder"`
-	TargetType            string `json:"target_type"`
-	TargetID              int    `json:"target_id"`
+	PortalChannelID       *int   `json:"portal_channel_id"`
+	WorkspaceID           int    `json:"workspace_id"`
 	ItemTypeID            *int   `json:"item_type_id"`
 	RateLimitPerHour      *int   `json:"rate_limit_per_hour"`
 	ProcessingDisposition string `json:"processing_disposition"`
@@ -36,30 +37,41 @@ func (h *ChannelHandler) loadMailboxChannel(ctx context.Context, channelID int) 
 	return channel, nil
 }
 
-// authorizeIntakeTarget enforces the permission rule for an intake: the actor
-// must manage the mailbox (channelMgmt middleware) and the target. System
-// admins bypass the target check.
-func (h *ChannelHandler) authorizeIntakeTarget(ctx context.Context, actorID int, targetType string, targetID int) error {
-	if targetID <= 0 {
-		return fmt.Errorf("target_id is required")
+// portalServesWorkspace reports whether the portal's config lists the workspace
+// as a target. An intake's routing workspace must be one the linked portal
+// exposes, otherwise the customer could never see the ticket.
+func (h *ChannelHandler) portalServesWorkspace(ctx context.Context, portalChannelID, workspaceID int) (bool, error) {
+	raw, err := h.service.GetConfig(ctx, portalChannelID)
+	if err != nil {
+		return false, err
 	}
+	var cfg models.ChannelConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return false, fmt.Errorf("parse portal config: %w", err)
+	}
+	for _, id := range cfg.PortalWorkspaceIDs {
+		if id == workspaceID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
-	// Shape checks run for every actor, including system admins: a portal
-	// intake must point at an inbound portal, not any channel the actor manages.
-	switch targetType {
-	case models.IntakeTargetWorkspace:
-		// The workspace shape is enforced by ItemTypeAllowedInWorkspace and the
-		// permission check below.
-	case models.IntakeTargetPortal:
-		portal, err := h.service.GetByID(ctx, targetID)
+// authorizeIntakeTarget enforces the permission rule for an intake: the actor
+// must manage the mailbox (channelMgmt middleware), the routing workspace, and,
+// when linked, the portal. System admins bypass the target checks.
+func (h *ChannelHandler) authorizeIntakeTarget(ctx context.Context, actorID, workspaceID int, portalChannelID *int) error {
+	if workspaceID <= 0 {
+		return fmt.Errorf("%w: workspace_id is required", errIntakeInvalid)
+	}
+	if portalChannelID != nil {
+		portal, err := h.service.GetByID(ctx, *portalChannelID)
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
 			return err
 		}
 		if portal == nil || portal.Type != "portal" || portal.Direction != "inbound" {
-			return fmt.Errorf("%w: target_id must reference an inbound portal channel", errIntakeInvalid)
+			return fmt.Errorf("%w: portal_channel_id must reference an inbound portal channel", errIntakeInvalid)
 		}
-	default:
-		return fmt.Errorf("target_type must be %q or %q", models.IntakeTargetPortal, models.IntakeTargetWorkspace)
 	}
 
 	admin, err := h.permissionService.IsSystemAdmin(actorID)
@@ -70,17 +82,15 @@ func (h *ChannelHandler) authorizeIntakeTarget(ctx context.Context, actorID int,
 		return nil
 	}
 
-	switch targetType {
-	case models.IntakeTargetWorkspace:
-		allowed, err := h.permissionService.HasWorkspacePermission(actorID, targetID, models.PermissionWorkspaceAdmin)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return errIntakeTargetForbidden
-		}
-	case models.IntakeTargetPortal:
-		canManage, err := h.service.UserCanManage(ctx, actorID, targetID)
+	allowed, err := h.permissionService.HasWorkspacePermission(actorID, workspaceID, models.PermissionWorkspaceAdmin)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errIntakeTargetForbidden
+	}
+	if portalChannelID != nil {
+		canManage, err := h.service.UserCanManage(ctx, actorID, *portalChannelID)
 		if err != nil {
 			return err
 		}
@@ -106,12 +116,11 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 	if strings.ContainsAny(folder, "\r\n") {
 		return nil, fmt.Errorf("%w: folder must not contain line breaks", errIntakeInvalid)
 	}
-	req.TargetType = strings.TrimSpace(req.TargetType)
-	if req.TargetType != models.IntakeTargetPortal && req.TargetType != models.IntakeTargetWorkspace {
-		return nil, fmt.Errorf("%w: target_type must be %q or %q", errIntakeInvalid, models.IntakeTargetPortal, models.IntakeTargetWorkspace)
+	if req.WorkspaceID <= 0 {
+		return nil, fmt.Errorf("%w: workspace_id is required", errIntakeInvalid)
 	}
-	if req.TargetID <= 0 {
-		return nil, fmt.Errorf("%w: target_id is required", errIntakeInvalid)
+	if req.ItemTypeID == nil || *req.ItemTypeID <= 0 {
+		return nil, fmt.Errorf("%w: item_type_id is required", errIntakeInvalid)
 	}
 	if !email.IsValidEmailDisposition(req.ProcessingDisposition) {
 		return nil, fmt.Errorf("%w: processing_disposition must be leave, mark_read, or delete", errIntakeInvalid)
@@ -121,26 +130,30 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 	}
 	status := req.Status
 	if status == "" {
-		status = "enabled"
+		status = models.IntakeStatusEnabled
 	}
-	if status != "enabled" && status != "disabled" {
+	if status != models.IntakeStatusEnabled && status != models.IntakeStatusDisabled {
 		return nil, fmt.Errorf("%w: status must be enabled or disabled", errIntakeInvalid)
 	}
 
-	if req.TargetType == models.IntakeTargetWorkspace {
-		if req.ItemTypeID == nil || *req.ItemTypeID <= 0 {
-			return nil, fmt.Errorf("%w: item_type_id is required for a workspace intake", errIntakeInvalid)
-		}
-		allowed, err := h.service.ItemTypeAllowedInWorkspace(req.TargetID, *req.ItemTypeID)
+	allowed, err := h.service.ItemTypeAllowedInWorkspace(req.WorkspaceID, *req.ItemTypeID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, fmt.Errorf("%w: item type %d is not allowed in workspace %d", errIntakeInvalid, *req.ItemTypeID, req.WorkspaceID)
+	}
+	if req.PortalChannelID != nil {
+		served, err := h.portalServesWorkspace(ctx, *req.PortalChannelID, req.WorkspaceID)
 		if err != nil {
 			return nil, err
 		}
-		if !allowed {
-			return nil, fmt.Errorf("%w: item type %d is not allowed in workspace %d", errIntakeInvalid, *req.ItemTypeID, req.TargetID)
+		if !served {
+			return nil, fmt.Errorf("%w: portal %d does not serve workspace %d", errIntakeInvalid, *req.PortalChannelID, req.WorkspaceID)
 		}
 	}
 
-	if err := h.authorizeIntakeTarget(ctx, actorID, req.TargetType, req.TargetID); err != nil {
+	if err := h.authorizeIntakeTarget(ctx, actorID, req.WorkspaceID, req.PortalChannelID); err != nil {
 		return nil, err
 	}
 
@@ -152,18 +165,17 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 		return nil, repository.ErrDuplicateEntry
 	}
 
-	intake := &models.Intake{
+	return &models.Intake{
 		ID:                    intakeID,
 		MailboxID:             mailboxID,
 		Folder:                folder,
-		TargetType:            req.TargetType,
-		TargetID:              req.TargetID,
+		WorkspaceID:           req.WorkspaceID,
+		PortalChannelID:       req.PortalChannelID,
 		ItemTypeID:            req.ItemTypeID,
 		RateLimitPerHour:      req.RateLimitPerHour,
 		ProcessingDisposition: req.ProcessingDisposition,
 		Status:                status,
-	}
-	return intake, nil
+	}, nil
 }
 
 // ListChannelIntakes returns the intakes reading from a mailbox channel.
@@ -227,10 +239,10 @@ func (h *ChannelHandler) CreateChannelIntake(w http.ResponseWriter, r *http.Requ
 	}
 	intake.ID = id
 	h.auditor.LogWithDetails(r, user, "channel_intake_create", "channel_intake", &id, channel.Name, map[string]any{
-		"mailbox_id":  channelID,
-		"folder":      intake.Folder,
-		"target_type": intake.TargetType,
-		"target_id":   intake.TargetID,
+		"mailbox_id":        channelID,
+		"folder":            intake.Folder,
+		"workspace_id":      intake.WorkspaceID,
+		"portal_channel_id": intake.PortalChannelID,
 	})
 	respondJSONCreated(w, intake)
 }
@@ -285,10 +297,10 @@ func (h *ChannelHandler) UpdateChannelIntake(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	h.auditor.LogWithDetails(r, user, "channel_intake_update", "channel_intake", &intakeID, channel.Name, map[string]any{
-		"mailbox_id":  channelID,
-		"folder":      intake.Folder,
-		"target_type": intake.TargetType,
-		"target_id":   intake.TargetID,
+		"mailbox_id":        channelID,
+		"folder":            intake.Folder,
+		"workspace_id":      intake.WorkspaceID,
+		"portal_channel_id": intake.PortalChannelID,
 	})
 	respondJSONOK(w, intake)
 }
@@ -328,9 +340,9 @@ func (h *ChannelHandler) DeleteChannelIntake(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	// Deleting an intake is a write to its target, so it needs the same target
-	// permission create/update enforce.
-	if err := h.authorizeIntakeTarget(ctx, user.ID, existing.TargetType, existing.TargetID); err != nil {
+	// Deleting an intake is a write to its targets, so it needs the same
+	// workspace/portal permission create/update enforce.
+	if err := h.authorizeIntakeTarget(ctx, user.ID, existing.WorkspaceID, existing.PortalChannelID); err != nil {
 		h.respondIntakeError(w, r, err)
 		return
 	}

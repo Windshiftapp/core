@@ -2,32 +2,41 @@ package models
 
 import "time"
 
-// Intake target types.
+// Intake statuses. An intake is processed only while enabled; needs_attention
+// marks one that a configuration change invalidated (for example the portal
+// stopped serving its workspace) but that keeps its routing config for repair.
 const (
-	IntakeTargetPortal    = "portal"
-	IntakeTargetWorkspace = "workspace"
+	IntakeStatusEnabled        = "enabled"
+	IntakeStatusDisabled       = "disabled"
+	IntakeStatusNeedsAttention = "needs_attention"
 )
 
 // Intake is the routing half of an email mailbox (WI-1644). The mailbox (a
 // type='email' channel) owns the connection, credentials, and monitored
-// address; an intake owns one folder and the target it feeds. One mailbox may
-// feed several intakes, but only via distinct folders.
+// address; an intake owns one folder, the workspace and item type its mail
+// becomes, and an optional portal that exposes the requests to customers.
 type Intake struct {
-	ID         int    `json:"id"`
-	MailboxID  int    `json:"mailbox_id"`
-	Folder     string `json:"folder"`
-	TargetType string `json:"target_type"` // portal | workspace
-	TargetID   int    `json:"target_id"`
-	// RequestTypeID is reserved for a future explicit request-type binding; a
-	// portal intake resolves its system Email request type lazily, so the value
-	// is not part of the API contract.
-	RequestTypeID         *int      `json:"-"`
-	ItemTypeID            *int      `json:"item_type_id,omitempty"` // workspace target
-	RateLimitPerHour      *int      `json:"rate_limit_per_hour,omitempty"`
-	ProcessingDisposition string    `json:"processing_disposition,omitempty"`
-	Status                string    `json:"status"` // enabled | disabled
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID        int    `json:"id"`
+	MailboxID int    `json:"mailbox_id"`
+	Folder    string `json:"folder"`
+	// WorkspaceID is the routing target. When PortalChannelID is set it must be
+	// a workspace the portal serves.
+	WorkspaceID int `json:"workspace_id"`
+	// PortalChannelID is the portal whose customers see requests this intake
+	// creates. NULL means an internal workspace feed.
+	PortalChannelID *int `json:"portal_channel_id,omitempty"`
+	// RequestTypeID is reserved for a cached pointer to the portal's system
+	// Email request type; the processor resolves it lazily from the portal.
+	RequestTypeID *int `json:"-"`
+	// ItemTypeID is the item type for created items (workspace-validated).
+	ItemTypeID            *int   `json:"item_type_id,omitempty"`
+	RateLimitPerHour      *int   `json:"rate_limit_per_hour,omitempty"`
+	ProcessingDisposition string `json:"processing_disposition,omitempty"`
+	Status                string `json:"status"`
+	// StatusReason explains a needs_attention status for the admin UI.
+	StatusReason string    `json:"status_reason,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 
 	// Joined fields for API responses.
 	MailboxName    string `json:"mailbox_name,omitempty"`

@@ -161,6 +161,7 @@ type PortalRequestSummary struct {
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 	ChannelID           *int    `json:"channel_id"`
+	IntakeID            *int    `json:"intake_id,omitempty"`
 	RequestTypeID       *int    `json:"request_type_id"`
 	RequestTypeName     *string `json:"request_type_name"`
 	RequestTypeIcon     *string `json:"request_type_icon"`
@@ -215,6 +216,7 @@ func portalRequestSummaryFromRow(row repository.PortalRequestRow) PortalRequestS
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 		ChannelID:           row.ChannelID,
+		IntakeID:            row.IntakeID,
 		RequestTypeID:       row.RequestTypeID,
 		RequestTypeName:     row.RequestTypeName,
 		RequestTypeIcon:     row.RequestTypeIcon,
@@ -234,14 +236,16 @@ func portalRequestSummariesFromRows(rows []repository.PortalRequestRow) []Portal
 	return requests
 }
 
-// PortalRequestVisibility resolves the WI-1547 visibility rules for one
-// portal: enabled intake email channels whose email_connected_portal_id
-// points at it (so email-originated tickets surface in "My Requests" and
-// pass ownership checks), plus the workspaces the portal serves
-// (defense-in-depth against an intake channel routed at an unrelated
-// workspace). Configs are parsed in Go — no JSON-in-SQL dialect concerns.
-// A missing portal channel yields an empty visibility: nothing extra is
-// exposed and the caller's own-channel query degrades to the portal itself.
+// portalRequestVisibility resolves the WI-1547 visibility rules for one portal:
+// the enabled intakes linked to it (so their email-originated tickets surface
+// in "My Requests" and pass ownership checks), legacy email channels still
+// linked through email_connected_portal_id without an intake, plus the
+// workspaces the portal serves (defense-in-depth against an intake routed at an
+// unrelated workspace). Intake-scoped linking keeps a sibling internal intake
+// on the same mailbox out of the portal. Configs are parsed in Go — no
+// JSON-in-SQL dialect concerns. A missing portal channel yields an empty
+// visibility: nothing extra is exposed and the caller's own-channel query
+// degrades to the portal itself.
 func (s *PortalService) portalRequestVisibility(ctx context.Context, portalChannelID int) (repository.PortalRequestVisibility, error) {
 	vis := repository.PortalRequestVisibility{PortalChannelID: portalChannelID}
 
@@ -258,25 +262,23 @@ func (s *PortalService) portalRequestVisibility(ctx context.Context, portalChann
 		vis.ServedWorkspaceIDs = portalCfg.PortalWorkspaceIDs
 	}
 
-	// Intakes targeting this portal own the mailbox links since WI-1644.
-	linked := map[int]struct{}{}
-	intakes, err := repository.NewIntakeRepository(s.db).ListByTarget(ctx, models.IntakeTargetPortal, portalChannelID)
+	// Intakes linked to this portal own the visibility since WI-1644: an item is
+	// visible when it came from one of those intakes, so a sibling internal
+	// intake on the same mailbox stays private.
+	intakes, err := repository.NewIntakeRepository(s.db).ListByPortal(ctx, portalChannelID)
 	if err != nil {
 		return vis, fmt.Errorf("list portal intakes: %w", err)
 	}
 	for _, intake := range intakes {
-		if intake.Status != "enabled" {
+		if intake.Status != models.IntakeStatusEnabled {
 			continue
 		}
-		if _, seen := linked[intake.MailboxID]; seen {
-			continue
-		}
-		linked[intake.MailboxID] = struct{}{}
-		vis.LinkedEmailChannelIDs = append(vis.LinkedEmailChannelIDs, intake.MailboxID)
+		vis.LinkedIntakeIDs = append(vis.LinkedIntakeIDs, intake.ID)
 	}
 
 	// Legacy fallback: enabled email channels that still carry
-	// email_connected_portal_id but have not been migrated to an intake.
+	// email_connected_portal_id but have no intake row.
+	linked := map[int]struct{}{}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, COALESCE(config, '{}') FROM channels
 		WHERE type = 'email' AND direction = 'inbound' AND status = 'enabled'
@@ -567,6 +569,14 @@ func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID, chan
 			if id == *detail.ChannelID {
 				linked = true
 				break
+			}
+		}
+		if !linked && detail.IntakeID != nil {
+			for _, id := range vis.LinkedIntakeIDs {
+				if id == *detail.IntakeID {
+					linked = true
+					break
+				}
 			}
 		}
 		if !linked {

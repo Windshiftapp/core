@@ -257,7 +257,7 @@ export default {
     dispositionInherit: 'Use the mailbox default',
     intakesTitle: 'Intakes',
     intakesHelp:
-      'Each intake reads one folder on this mailbox and routes it to a portal or workspace. One mailbox can feed several intakes, but only via distinct folders. Creating an intake requires managing both this mailbox and the target.',
+      'Each intake reads one folder on this mailbox and creates items in one workspace and item type. Link a portal to expose those requests to its customers. One mailbox can feed several intakes, but only via distinct folders. Creating an intake requires managing this mailbox, the target workspace, and any linked portal.',
     intakesMailboxAddress: 'Monitoring {address}',
     intakeLastUID: 'Last UID {uid}',
     intakeRateLimited: '{count} held back',
@@ -269,13 +269,18 @@ export default {
     intakeTargetWorkspace: 'Workspace',
     intakeTargetPortal: 'Portal',
     intakeTargetRequired: 'Select a target',
+    intakeNoPortal: 'Internal (no portal)',
+    intakeWorkspaceRequired: 'Select a workspace',
     intakeStatus: 'Status',
     intakeStatusEnabled: 'Enabled',
     intakeStatusDisabled: 'Disabled',
+    intakeStatusNeedsAttention: 'Needs attention',
     intakeFeedsPortal: 'Feeds portal',
     intakeFeedsWorkspace: 'Feeds workspace',
     intakePortalRequestTypeHelp:
       'Email from this folder uses the portal\u2019s system Email request type, so required form fields never block mail.',
+    intakePortalItemTypeHelp:
+      'New items from this folder use the selected item type. The portal\u2019s system Email request type still routes the mail.',
     selectPortal: 'Select a portal',
     intakeSaved: 'Intake saved',
     intakeSaveFailed: 'Failed to save intake',

@@ -2554,6 +2554,16 @@ var Catalog = []Migration{
 		ApplyPostgres:   applyIntakeSplitMigration,
 	},
 	{
+		Version:         "20261026_intake_workspace_portal",
+		Name:            "Route email intakes by workspace with an optional portal link (WI-1644)",
+		CheckSQLiteFn:   checkIntakeWorkspacePortalMigration,
+		CheckPostgresFn: checkIntakeWorkspacePortalMigration,
+		SQLite:          "applyIntakeWorkspacePortalMigration:v1",
+		Postgres:        "applyIntakeWorkspacePortalMigration:v1",
+		ApplySQLite:     applyIntakeWorkspacePortalMigration,
+		ApplyPostgres:   applyIntakeWorkspacePortalMigration,
+	},
+	{
 		Version:       "20261019_email_tracking_completed_at",
 		Name:          "Keep email dedup after an intake-created item is deleted (WI-1658)",
 		CheckSQLite:   sqliteColumnCheck("email_message_tracking", "completed_at"),
@@ -3675,6 +3685,231 @@ func applyIntakeSplitMigration(db Database) error {
 		}
 	}
 	return backfillIntakesFromChannels(db)
+}
+
+// applyIntakeWorkspacePortalMigration reshapes intakes from the
+// portal-XOR-workspace target into explicit workspace routing plus an optional
+// portal link. Existing rows are preserved: workspace intakes keep their target
+// workspace, and portal intakes keep the portal while gaining the workspace and
+// item type their system Email request type already resolved. The apply is
+// idempotent so a partial run can be retried without a transaction.
+func applyIntakeWorkspacePortalMigration(db Database) error {
+	pg := db.GetDriverName() == driverPostgres
+	addColumn := func(column, typ string) error {
+		if pg {
+			if _, err := db.Exec(fmt.Sprintf("ALTER TABLE intakes ADD COLUMN IF NOT EXISTS %s %s", column, typ)); err != nil {
+				return fmt.Errorf("add intakes.%s: %w", column, err)
+			}
+			return nil
+		}
+		exists, err := intakeColumnExists(db, column)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
+		if _, err := db.Exec(fmt.Sprintf("ALTER TABLE intakes ADD COLUMN %s %s", column, typ)); err != nil {
+			return fmt.Errorf("add intakes.%s: %w", column, err)
+		}
+		return nil
+	}
+
+	for _, col := range []struct{ name, typ string }{
+		{"workspace_id", "INTEGER"},
+		{"portal_channel_id", "INTEGER"},
+		{"status_reason", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := addColumn(col.name, col.typ); err != nil {
+			return err
+		}
+	}
+
+	if err := backfillIntakeWorkspacePortal(db); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`DROP INDEX IF EXISTS idx_intakes_target`); err != nil {
+		return fmt.Errorf("drop idx_intakes_target: %w", err)
+	}
+	for _, column := range []string{"target_type", "target_id"} {
+		exists, err := intakeColumnExists(db, column)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+		if _, err := db.Exec("ALTER TABLE intakes DROP COLUMN " + column); err != nil {
+			return fmt.Errorf("drop intakes.%s: %w", column, err)
+		}
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_intakes_portal ON intakes(portal_channel_id)`); err != nil {
+		return fmt.Errorf("create idx_intakes_portal: %w", err)
+	}
+	return nil
+}
+
+// checkIntakeWorkspacePortalMigration reports whether the reshape is complete:
+// the new columns exist and the legacy target columns are gone. A partial run
+// leaves it false so the apply is retried instead of stamped.
+func checkIntakeWorkspacePortalMigration(db Database) (bool, error) {
+	workspace, err := intakeColumnExists(db, "workspace_id")
+	if err != nil {
+		return false, err
+	}
+	portal, err := intakeColumnExists(db, "portal_channel_id")
+	if err != nil {
+		return false, err
+	}
+	targetType, err := intakeColumnExists(db, "target_type")
+	if err != nil {
+		return false, err
+	}
+	targetID, err := intakeColumnExists(db, "target_id")
+	if err != nil {
+		return false, err
+	}
+	return workspace && portal && !targetType && !targetID, nil
+}
+
+func intakeColumnExists(db Database, column string) (bool, error) {
+	var count int
+	query := sqliteColumnCheck("intakes", column)
+	if db.GetDriverName() == driverPostgres {
+		query = pgColumnCheck("intakes", column)
+	}
+	if err := db.QueryRow(query).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// backfillIntakeWorkspacePortal copies the legacy target into the new columns.
+// Workspace intakes keep their workspace; portal intakes keep the portal and
+// inherit the workspace and item type of the portal's system Email request
+// type. Rows that cannot be resolved are parked as needs_attention rather than
+// silently dropped or routed somewhere wrong.
+func backfillIntakeWorkspacePortal(db Database) error {
+	rows, err := db.Query(`SELECT id, target_type, target_id FROM intakes`)
+	if err != nil {
+		return fmt.Errorf("list intakes for workspace/portal backfill: %w", err)
+	}
+	type legacyIntake struct {
+		id         int
+		targetType string
+		targetID   int
+	}
+	var legacy []legacyIntake
+	for rows.Next() {
+		var in legacyIntake
+		if err := rows.Scan(&in.id, &in.targetType, &in.targetID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan intake for workspace/portal backfill: %w", err)
+		}
+		legacy = append(legacy, in)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate intakes for workspace/portal backfill: %w", err)
+	}
+	_ = rows.Close()
+
+	for _, in := range legacy {
+		switch in.targetType {
+		case "workspace":
+			if _, err := db.ExecWrite(`UPDATE intakes SET workspace_id = ? WHERE id = ?`, in.targetID, in.id); err != nil {
+				return fmt.Errorf("backfill workspace intake %d: %w", in.id, err)
+			}
+		case "portal":
+			workspaceID, itemTypeID, ok := migrationLegacyPortalRouting(db, in.targetID)
+			if !ok {
+				if _, err := db.ExecWrite(`
+					UPDATE intakes
+					SET portal_channel_id = ?, status = 'needs_attention',
+					    status_reason = 'Portal no longer resolves a workspace; re-point this intake'
+					WHERE id = ?
+				`, in.targetID, in.id); err != nil {
+					return fmt.Errorf("flag portal intake %d: %w", in.id, err)
+				}
+				continue
+			}
+			if _, err := db.ExecWrite(`
+				UPDATE intakes
+				SET portal_channel_id = ?, workspace_id = ?, item_type_id = COALESCE(item_type_id, ?)
+				WHERE id = ?
+			`, in.targetID, workspaceID, itemTypeID, in.id); err != nil {
+				return fmt.Errorf("backfill portal intake %d: %w", in.id, err)
+			}
+		default:
+			if _, err := db.ExecWrite(`
+				UPDATE intakes SET status = 'needs_attention',
+					status_reason = 'Unknown legacy intake target; re-point this intake'
+				WHERE id = ?
+			`, in.id); err != nil {
+				return fmt.Errorf("flag legacy intake %d: %w", in.id, err)
+			}
+		}
+	}
+	return nil
+}
+
+// migrationLegacyPortalRouting resolves the workspace and item type a legacy
+// portal intake was routing to, preferring the portal's system Email request
+// type and falling back to the portal's single served workspace default.
+func migrationLegacyPortalRouting(db Database, portalID int) (workspaceID, itemTypeID int, ok bool) {
+	var rtWorkspace, rtItemType sql.NullInt64
+	err := db.QueryRow(`
+		SELECT workspace_id, item_type_id FROM request_types
+		WHERE channel_id = ? AND kind = 'email'
+		ORDER BY id
+		LIMIT 1
+	`, portalID).Scan(&rtWorkspace, &rtItemType)
+	if err == nil && rtWorkspace.Valid && rtItemType.Valid {
+		return int(rtWorkspace.Int64), int(rtItemType.Int64), true
+	}
+
+	var configJSON string
+	if err := db.QueryRow(`SELECT COALESCE(config, '{}') FROM channels WHERE id = ?`, portalID).Scan(&configJSON); err != nil {
+		return 0, 0, false
+	}
+	var cfg struct {
+		PortalWorkspaceIDs []int `json:"portal_workspace_ids"`
+	}
+	if json.Unmarshal([]byte(configJSON), &cfg) != nil || len(cfg.PortalWorkspaceIDs) != 1 {
+		return 0, 0, false
+	}
+	itemType, err := migrationDefaultItemTypeForWorkspace(db, cfg.PortalWorkspaceIDs[0])
+	if err != nil {
+		return 0, 0, false
+	}
+	return cfg.PortalWorkspaceIDs[0], itemType, true
+}
+
+func migrationDefaultItemTypeForWorkspace(db Database, workspaceID int) (int, error) {
+	var itemTypeID int
+	err := db.QueryRow(`
+		SELECT cs.default_item_type_id FROM configuration_sets cs
+		INNER JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
+		INNER JOIN configuration_set_item_types csit
+			ON csit.configuration_set_id = cs.id AND csit.item_type_id = cs.default_item_type_id
+		WHERE wcs.workspace_id = ? AND cs.default_item_type_id IS NOT NULL
+		ORDER BY cs.is_default DESC
+		LIMIT 1
+	`, workspaceID).Scan(&itemTypeID)
+	if err != nil {
+		err = db.QueryRow(`
+			SELECT csit.item_type_id FROM configuration_set_item_types csit
+			INNER JOIN workspace_configuration_sets wcs ON wcs.configuration_set_id = csit.configuration_set_id
+			WHERE wcs.workspace_id = ?
+			ORDER BY csit.item_type_id
+			LIMIT 1
+		`, workspaceID).Scan(&itemTypeID)
+	}
+	if err != nil {
+		err = db.QueryRow(`SELECT id FROM item_types WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&itemTypeID)
+	}
+	return itemTypeID, err
 }
 
 // backfillIntakesFromChannels creates one intake per inbound email channel and

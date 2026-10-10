@@ -309,7 +309,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	}
 	intakes := make([]models.Intake, 0, len(allIntakes))
 	for _, intake := range allIntakes {
-		if intake.Status == "enabled" {
+		if intake.Status == models.IntakeStatusEnabled {
 			intakes = append(intakes, intake)
 		}
 	}
@@ -353,23 +353,17 @@ func legacyIntakeFromConfig(config *models.ChannelConfig) *models.Intake {
 	if folder == "" {
 		folder = "INBOX"
 	}
-	intake := &models.Intake{
+	// A channel with no routing still yields an intake so the processor fails
+	// loudly on the missing target rather than silently skipping the mailbox.
+	return &models.Intake{
 		Folder:                folder,
-		TargetType:            models.IntakeTargetWorkspace,
-		TargetID:              config.EmailWorkspaceID,
+		WorkspaceID:           config.EmailWorkspaceID,
+		PortalChannelID:       config.EmailConnectedPortalID,
 		ItemTypeID:            config.EmailItemTypeID,
 		RateLimitPerHour:      config.EmailRateLimitPerHour,
 		ProcessingDisposition: config.EmailProcessingDisposition,
-		Status:                "enabled",
+		Status:                models.IntakeStatusEnabled,
 	}
-	if config.EmailConnectedPortalID != nil {
-		intake.TargetType = models.IntakeTargetPortal
-		intake.TargetID = *config.EmailConnectedPortalID
-		intake.ItemTypeID = nil
-	}
-	// A channel with no routing still yields an intake so the processor fails
-	// loudly on the missing target rather than silently skipping the mailbox.
-	return intake
 }
 
 // pollIntake selects one folder and processes new mail with the intake's
@@ -390,21 +384,14 @@ func (es *EmailScheduler) pollIntake(
 	// The mailbox config carries the connection; the intake carries routing.
 	effective := *base
 	effective.EmailMailbox = intake.Folder
-	effective.EmailConnectedPortalID = nil
-	effective.EmailWorkspaceID = 0
-	effective.EmailItemTypeID = nil
+	effective.EmailWorkspaceID = intake.WorkspaceID
+	effective.EmailItemTypeID = intake.ItemTypeID
+	effective.EmailConnectedPortalID = intake.PortalChannelID
 	effective.EmailRateLimitPerHour = intake.RateLimitPerHour
 	// An empty intake disposition means "inherit the mailbox default", so keep
 	// whatever the mailbox config carries (enum or legacy booleans).
 	if intake.ProcessingDisposition != "" {
 		effective.EmailProcessingDisposition = intake.ProcessingDisposition
-	}
-	if intake.TargetType == models.IntakeTargetPortal {
-		portalID := intake.TargetID
-		effective.EmailConnectedPortalID = &portalID
-	} else {
-		effective.EmailWorkspaceID = intake.TargetID
-		effective.EmailItemTypeID = intake.ItemTypeID
 	}
 
 	mailbox := intake.Folder

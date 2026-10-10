@@ -577,21 +577,22 @@ func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for fu
 	}, nil
 }
 
-// resolveEmailIntakeTarget returns the workspace, item type, and (for portal
-// intake) system Email request type that a new email item is created under.
+// resolveEmailIntakeTarget returns the workspace, item type, and (for a portal-
+// linked intake) the generic system Email request type a new item is created
+// under.
 //
-// A channel linked to a portal routes through the portal's system Email request
-// type, so email items carry a request_type_id and follow the same routing as
-// web submissions. A workspace-only intake channel keeps its configured
-// workspace and item type.
+// Routing is always the intake's workspace and item type. A portal link only
+// adds the portal's system Email request type as the "this arrived by email"
+// marker used by portal display, SLA, and support metrics; the request type's
+// own workspace and item type are not authoritative here.
 func (p *Processor) resolveEmailIntakeTarget(config *models.ChannelConfig) (workspaceID int, itemTypeID, requestTypeID *int, err error) {
+	if config.EmailWorkspaceID == 0 {
+		return 0, nil, nil, fmt.Errorf("no workspace configured for email channel")
+	}
+	if config.EmailItemTypeID == nil || *config.EmailItemTypeID <= 0 {
+		return 0, nil, nil, fmt.Errorf("no item type configured for email channel: EmailItemTypeID is required")
+	}
 	if config.EmailConnectedPortalID == nil {
-		if config.EmailWorkspaceID == 0 {
-			return 0, nil, nil, fmt.Errorf("no workspace configured for email channel")
-		}
-		if config.EmailItemTypeID == nil || *config.EmailItemTypeID == 0 {
-			return 0, nil, nil, fmt.Errorf("no item type configured for email channel: EmailItemTypeID is required")
-		}
 		return config.EmailWorkspaceID, config.EmailItemTypeID, nil, nil
 	}
 
@@ -604,14 +605,7 @@ func (p *Processor) resolveEmailIntakeTarget(config *models.ChannelConfig) (work
 	if err != nil {
 		return 0, nil, nil, fmt.Errorf("resolve portal email request type: %w", err)
 	}
-	resolvedItemTypeID, resolvedWorkspaceID, err := repository.NewRequestTypeRepository(p.db).GetItemTypeAndWorkspace(rtID)
-	if err != nil {
-		return 0, nil, nil, fmt.Errorf("load email request type %d: %w", rtID, err)
-	}
-	if resolvedWorkspaceID == nil {
-		return 0, nil, nil, fmt.Errorf("email request type %d has no workspace", rtID)
-	}
-	return *resolvedWorkspaceID, &resolvedItemTypeID, &rtID, nil
+	return config.EmailWorkspaceID, config.EmailItemTypeID, &rtID, nil
 }
 
 // addCommentFromReply adds a comment to an existing item from an email reply

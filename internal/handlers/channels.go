@@ -1817,8 +1817,8 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	type emailIntakeState struct {
 		IntakeID         int        `json:"intake_id"`
 		Folder           string     `json:"folder"`
-		TargetType       string     `json:"target_type"`
-		TargetID         int        `json:"target_id"`
+		WorkspaceID      int        `json:"workspace_id"`
+		PortalChannelID  *int       `json:"portal_channel_id,omitempty"`
 		Status           string     `json:"status"`
 		LastUID          int        `json:"last_uid"`
 		UIDValidity      uint32     `json:"uid_validity"`
@@ -1867,8 +1867,8 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		state.Intakes = append(state.Intakes, emailIntakeState{
 			IntakeID:         intake.ID,
 			Folder:           intake.Folder,
-			TargetType:       intake.TargetType,
-			TargetID:         intake.TargetID,
+			WorkspaceID:      intake.WorkspaceID,
+			PortalChannelID:  intake.PortalChannelID,
 			Status:           intake.Status,
 			LastUID:          intake.LastUID,
 			UIDValidity:      intake.UIDValidity,
