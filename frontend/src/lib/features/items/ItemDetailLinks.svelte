@@ -8,10 +8,12 @@
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import { api } from '../../api.js';
-  import { objectDisplayName } from '../../utils/systemLabels.js';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemKey from '../../components/ItemKey.svelte';
   import StatusBadge from '../../components/StatusBadge.svelte';
+  import ItemStatusPicker from '../../pickers/ItemStatusPicker.svelte';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let {
     item,
@@ -33,6 +35,7 @@
     onremovelink = undefined,
     onshowlinkmodal = undefined,
     onreorderchildren = undefined,
+    onstatuschanged = undefined,
   } = $props();
 
   const TEST_LINK_TYPE_ID = 1;
@@ -88,6 +91,25 @@
 
   function handleShowLinkModal(preselectLinkTypeId = null) {
     onshowlinkmodal?.({ preselectLinkTypeId });
+  }
+
+  // Rows with a status transition in flight; their picker stays locked until
+  // the refreshed list arrives.
+  let pendingStatusItemIds = $state(new Set());
+
+  async function changeStatus(rowItemId, statusId, kind) {
+    if (pendingStatusItemIds.has(rowItemId)) return;
+    pendingStatusItemIds = new Set(pendingStatusItemIds).add(rowItemId);
+    try {
+      await api.items.transition(rowItemId, statusId);
+      await onstatuschanged?.({ itemId: rowItemId, kind });
+    } catch (error) {
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: `status: ${error.message || error}` }));
+    } finally {
+      const next = new Set(pendingStatusItemIds);
+      next.delete(rowItemId);
+      pendingStatusItemIds = next;
+    }
   }
 
   // Drag and drop state for child items
@@ -251,6 +273,24 @@
   });
 </script>
 
+<!-- Linked and child items can live in another workspace, so the edit
+     permission and status options follow the row's own workspace. -->
+{#snippet statusControl(rowItemId, rowWorkspaceId, statusId, statusName, statusBuiltinKey, statusColor, kind)}
+  {#if statusId && rowWorkspaceId}
+    <span data-testid="{kind}-status">
+      <ItemStatusPicker
+        workspaceId={rowWorkspaceId}
+        {statusId}
+        {statusName}
+        {statusBuiltinKey}
+        {statusColor}
+        canEdit={workspacePermissions.canEdit(rowWorkspaceId) && !pendingStatusItemIds.has(rowItemId)}
+        onselect={(nextStatusId) => changeStatus(rowItemId, nextStatusId, kind)}
+      />
+    </span>
+  {/if}
+{/snippet}
+
 <!-- Links Section (work items, test cases, assets) -->
 {#if workItemLinks.length > 0}
   <div class="mt-6">
@@ -299,6 +339,7 @@
           {@const linkedItemTypeColor = isCurrentSource ? link.target_item_type_color : link.source_item_type_color}
           {@const linkedItemStatusName = isCurrentSource ? link.target_status_name : link.source_status_name}
           {@const linkedItemStatusColor = isCurrentSource ? link.target_status_color : link.source_status_color}
+          {@const linkedItemStatusId = isCurrentSource ? link.target_status_id : link.source_status_id}
           {@const linkTypeName = link.link_type_name}
           {@const linkTypeLabel = getLinkLabel(link)}
           {@const linkTypeColor = link.link_type_color || 'var(--ds-text-subtle)'}
@@ -352,7 +393,9 @@
                   {linkTypeLabel}
                 </span>
               {/if}
-              {#if linkedItemStatusName}
+              {#if linkedItemType === 'item'}
+                {@render statusControl(linkedItemId, linkedItemWorkspaceId, linkedItemStatusId, linkedItemStatusName, '', linkedItemStatusColor, 'linked-item')}
+              {:else if linkedItemStatusName}
                 <StatusBadge
                   status={{ label: linkedItemStatusName, categoryColor: linkedItemStatusColor }}
                   uppercase={false}
@@ -496,15 +539,9 @@
                   {childItem.title}
                 </LinkComponent>
               </div>
-              <!-- Right side: status badge -->
+              <!-- Right side: status picker -->
               <div class="flex items-center gap-2 flex-shrink-0">
-                {#if childItem.status_name}
-                  <StatusBadge
-                    status={{ label: objectDisplayName({ name: childItem.status_name, builtin_key: childItem.status_builtin_key }, 'status'), categoryColor: childItem.status_color }}
-                    uppercase={false}
-                    showDot={false}
-                  />
-                {/if}
+                {@render statusControl(childItem.id, childItem.workspace_id || workspaceId, childItem.status_id, childItem.status_name, childItem.status_builtin_key, childItem.status_color, 'child-item')}
               </div>
             </div>
           {/each}

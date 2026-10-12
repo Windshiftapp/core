@@ -726,6 +726,16 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     }
   }
 
+  // A linked or child item's status changed from the detail view; refresh
+  // only the list that row came from.
+  async function handleRelatedStatusChanged({ kind }) {
+    if (kind === 'child-item') {
+      await itemDetailStore.loadChildItems();
+    } else {
+      await itemDetailStore.loadLinks();
+    }
+  }
+
   async function handleParentChanged() {
     // Reload the item data to get updated parent hierarchy
     try {
@@ -1431,6 +1441,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     ondiagramSaved={handleDiagramSaved}
     onexecuteAction={handleExecuteAction}
     onreorderChildren={handleReorderChildren}
+    onrelatedStatusChanged={handleRelatedStatusChanged}
     onclose={closeModal}
     {recurrenceRule}
     onsetupRecurrence={handleSetupRecurrence}

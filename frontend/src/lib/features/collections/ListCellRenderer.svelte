@@ -10,20 +10,19 @@
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
-  import Lozenge from '../../components/Lozenge.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import ListCustomFieldCell from './ListCustomFieldCell.svelte';
   import { Calendar, User, Target, FolderKanban } from '@lucide/svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import { formatDate, formatDateOnly, formatDateTimeLocale } from '../../utils/dateFormatter.js';
   import {
-    createStatusPickerConfig,
     priorityPickerConfig as priorityConfig,
     projectPickerConfig as projectConfig,
   } from '../../pickers/pickerConfigs.js';
   import UserCellValue from './UserCellValue.svelte';
   import IterationCellEditor from './IterationCellEditor.svelte';
   import MilestoneCellValue from './MilestoneCellValue.svelte';
+  import ItemStatusPicker from '../../pickers/ItemStatusPicker.svelte';
 
   let {
     item,
@@ -109,8 +108,6 @@
     }
   }
 
-  // Configs for pickers
-  const statusConfig = $derived(createStatusPickerConfig(statusCategories));
 </script>
 
 {#if column.field_type === 'workspace'}
@@ -178,40 +175,15 @@
         disabled={!canEdit}
       />
     {:else}
-      {@const selectedStatus = [...editorOptions.statuses, ...statuses].find(s => s.id === item.status_id) || (item.status_name ? { name: item.status_name, category_id: null } : null)}
-      {@const statusCategory = selectedStatus ? statusCategories.find(sc => sc.id === selectedStatus.category_id) : null}
-      {#if canEdit}
-        <ItemPicker
-          value={item.status_id}
-          items={editorOptions.statuses}
-          loading={editorOptions.loading.statuses}
-          config={statusConfig}
-          placeholder="Set status"
-          showUnassigned={false}
-          allowClear={false}
-          onOpen={() => collectionEditorOptions.load(item.workspace_id, 'statuses')}
-          onSelect={async (selected) => {
-            const statusId = selected?.id;
-            if (statusId && statusId !== item.status_id) {
-              await handleItemUpdate('status_id', statusId);
-            }
-          }}
-        >
-          {#snippet children()}
-            <span class="cursor-pointer">
-              <Lozenge
-                text={selectedStatus ? selectedStatus.name : 'Set status'}
-                customBg={statusCategory?.color || '#6b7280'}
-              />
-            </span>
-          {/snippet}
-        </ItemPicker>
-      {:else}
-        <Lozenge
-          text={selectedStatus ? selectedStatus.name : '-'}
-          customBg={statusCategory?.color || '#6b7280'}
-        />
-      {/if}
+      <ItemStatusPicker
+        workspaceId={item.workspace_id}
+        statusId={item.status_id}
+        statusName={item.status_name}
+        {statuses}
+        {statusCategories}
+        {canEdit}
+        onselect={(statusId) => handleItemUpdate('status_id', statusId)}
+      />
     {/if}
 
   {:else if column.field_identifier === 'priority'}

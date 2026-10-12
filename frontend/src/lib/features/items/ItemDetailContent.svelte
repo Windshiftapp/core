@@ -110,6 +110,7 @@
     onexecuteAction = null,
     onaiAction = null,
     onreorderChildren = null,
+    onrelatedStatusChanged = null,
     canCreate = false,
     onclose = null,
     recurrenceRule = null,
@@ -302,6 +303,10 @@
     onreorderChildren?.();
   }
 
+  function handleRelatedStatusChanged(data) {
+    return onrelatedStatusChanged?.(data);
+  }
+
   function handleAIAction(data) {
     onaiAction?.(data);
   }
@@ -421,6 +426,7 @@
             onviewtestcase={handleViewTestCase}
             onshowlinkmodal={handleShowLinkModal}
             onreorderchildren={handleReorderChildren}
+            onstatuschanged={handleRelatedStatusChanged}
           />
 
           <br />
