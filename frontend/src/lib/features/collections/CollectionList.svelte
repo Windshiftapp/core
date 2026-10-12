@@ -1,23 +1,18 @@
 <script>
-  import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { applyCollectionItem, collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
   import {
-    buildListColumnConfiguration,
-    DEFAULT_LIST_COLUMNS,
     getListColumnLabel,
-    listColumnsFromConfig,
     listGridMinWidth,
     listGridTemplateColumns,
   } from '../../utils/workItemListColumns.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { collectionEditorOptions, collectionFieldLinks, workspaceDataStore, authStore } from '../../stores/index.js';
+  import { collectionEditorOptions, collectionFieldLinks, workspaceDataStore } from '../../stores/index.js';
   import { MoreHorizontal, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
@@ -31,7 +26,8 @@
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
-  import { canConfigureListColumns, checkItemVisibility } from './collectionService.js';
+  import { checkItemVisibility } from './collectionService.js';
+  import { useListColumnConfig } from './listColumnConfig.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -51,9 +47,9 @@
   let workItems = $derived(collectionStore.items);
   let itemsPagination = $derived(collectionStore.itemsPagination);
 
-  // Board configuration for list columns
-  let boardConfig = $state(null);
-  let listColumns = $state([]);
+  // List columns from the board configuration (shared with the tree view)
+  const columnConfig = useListColumnConfig(() => ({ workspaceId, collectionId }));
+  let listColumns = $derived(columnConfig.columns);
 
   let loading = $state(true);
   let loadingItems = $state(false);
@@ -80,17 +76,6 @@
 
   // Centralized gradient styling
   const styles = useGradientStyles();
-
-  // Collection columns follow collection ownership; workspace defaults follow
-  // workspace administration. Mirrors the backend board-write authorization.
-  let canConfigureColumns = $derived(
-    canConfigureListColumns({
-      collectionId,
-      collectionOwnerId: collectionStore.boardCollection?.created_by ?? null,
-      currentUserId: authStore.currentUser?.id ?? null,
-      canAdminWorkspace: workspacePermissions.canAdminWorkspace(workspaceId),
-    }),
-  );
 
   // A workspace-scoped list already has these option sets in the shared
   // workspace store. Prime the row-editor cache so opening a cell does not
@@ -134,17 +119,6 @@
     if (belongsToView) applyCollectionItem(item);
   });
 
-  // Board config depends only on the viewed collection/workspace, not on the
-  // item set or load state — fetch it when the view changes, not every time
-  // the collection reloads (which toggles collectionStore.loading).
-  let viewSignature = $derived(`${collectionId ?? ''}|${workspaceId ?? ''}`);
-  $effect(() => {
-    viewSignature;
-    if (collectionId || workspaceId) {
-      untrack(() => loadBoardConfiguration());
-    }
-  });
-
   // Sync collection name + clear local loading from the central store.
   $effect(() => {
     if (!collectionStore.loading) {
@@ -152,52 +126,6 @@
       loading = false;
     }
   });
-
-  async function loadBoardConfiguration() {
-    try {
-      const config = await collectionStore.getBoardConfiguration(workspaceId, collectionId);
-      boardConfig = config;
-      listColumns = listColumnsFromConfig(config);
-    } catch (error) {
-      boardConfig = null;
-      listColumns = [...DEFAULT_LIST_COLUMNS];
-    }
-  }
-
-  async function saveBoardConfiguration(newColumns) {
-    try {
-      const configData = buildListColumnConfiguration(boardConfig, newColumns);
-
-      if (boardConfig?.id) {
-        // Update existing config
-        const updated = await api.collections.updateBoardConfiguration(
-          collectionId,
-          boardConfig.id,
-          configData,
-          workspaceId
-        );
-        boardConfig = updated;
-        listColumns = listColumnsFromConfig(updated);
-      } else {
-        // Create new config - pass raw collectionId so API can detect workspace-level config
-        const created = await api.collections.createBoardConfiguration(
-          collectionId,
-          workspaceId,
-          configData
-        );
-        boardConfig = created;
-        listColumns = listColumnsFromConfig(created);
-      }
-    } catch (error) {
-      console.error('Failed to save board configuration:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
-    }
-  }
-
-  function handleColumnChange(data) {
-    const { columns: newColumns } = data;
-    saveBoardConfiguration(newColumns);
-  }
 
   async function loadWorkItems(page = 1, limit = itemsPerPage) {
     currentPage = page;
@@ -340,8 +268,8 @@
           <ColumnSelector
             columns={listColumns}
             {customFieldDefinitions}
-            canConfigure={canConfigureColumns}
-            onchange={handleColumnChange}
+            canConfigure={columnConfig.canConfigure}
+            onchange={({ columns }) => columnConfig.save(columns)}
           />
         </div>
       </div>
