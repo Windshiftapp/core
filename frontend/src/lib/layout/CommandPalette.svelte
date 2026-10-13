@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { contextCommands } from '../utils/contextCommands.js';
   import { currentRoute } from '../router.js';
+  import { toExternal } from '../runtime/contextPath.js';
   import { permissionStore, workspacesStore, isSystemAdmin, currentWorkspace } from '../stores';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
@@ -226,6 +227,14 @@
     }
   }
 
+  // Rows with a url are real links: modified and middle clicks fall through to
+  // the browser so the target can open in a new tab.
+  function handleOptionClick(e, cmd) {
+    if (cmd.url && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return;
+    e.preventDefault();
+    executeAndClose(cmd);
+  }
+
   function close() {
     isOpen = false;
     open.set(false);
@@ -367,11 +376,13 @@
                     {BUCKET_LABELS[command.bucket] || ''}
                   </div>
                 {/if}
-                <div
+                <svelte:element
+                  this={command.url ? 'a' : 'div'}
+                  href={command.url ? toExternal(command.url) : undefined}
                   use:melt={$option({ value: command.id, label: command.label })}
-                  onclick={() => executeAndClose(command)}
+                  onclick={(e) => handleOptionClick(e, command)}
                   data-testid={`command-palette-option-${command.id}`}
-                  class="w-full text-left px-4 py-2.5 transition-colors cursor-pointer command-option"
+                  class="block w-full text-left px-4 py-2.5 transition-colors cursor-pointer no-underline command-option"
                 >
                   <div class="flex items-center gap-2">
                     <div class="font-medium" style="color: var(--ds-text);">{command.label}</div>
@@ -384,7 +395,7 @@
                   {#if command.description}
                     <div class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">{command.description}</div>
                   {/if}
-                </div>
+                </svelte:element>
               {/each}
             </div>
           {/if}
