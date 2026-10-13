@@ -2,7 +2,6 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
   import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
-  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { api } from '../../api.js';
   import { updateCustomFieldValue } from '../../utils/customFieldValueUpdates.js';
   import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
@@ -29,7 +28,6 @@
     item,
     column,
     workspace,
-    collectionId = null,
     canEdit = true,
     statuses = [],
     statusCategories = [],
@@ -124,13 +122,6 @@
         {item}
         {workspace}
         dataTestid={`list-cell-key-${item.id}`}
-        href={collectionId && workspace
-          ? `/workspaces/${workspace.id}/collections/${collectionId}/items/${item.id}`
-          : `/workspaces/${workspace?.id || item.workspace_id}/items/${item.id}`}
-        onClick={(event) => {
-          event.preventDefault();
-          itemModalStore.open(item.id, item.workspace_id ?? workspace?.id ?? null);
-        }}
       />
     </div>
 

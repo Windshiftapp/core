@@ -648,7 +648,6 @@
                       {item}
                       {column}
                       {workspace}
-                      {collectionId}
                       canEdit={workspacePermissions.canEdit(item.workspace_id)}
                       {statuses}
                       {statusCategories}

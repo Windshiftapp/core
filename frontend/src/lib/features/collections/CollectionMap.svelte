@@ -2,11 +2,10 @@
   import { onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
   import { collectionStore, refreshCollectionDeltas, reloadCollection } from '../../stores/collectionContext.js';
-  import { workspaceDataStore, workspacesStore, capabilitiesStore } from '../../stores/index.js';
+  import { workspaceDataStore, workspacesStore, capabilitiesStore, itemModalStore } from '../../stores/index.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { Plus, ChevronDown, ChevronRight, Home, MapPin, Settings } from '@lucide/svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
@@ -440,12 +439,8 @@
     return itemTypes.find(type => type.id === itemTypeId);
   }
 
-  function navigateToItem(item) {
-    const wsId = workspaceId || item.workspace_id;
-    const url = collectionId && workspaceId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${wsId}/items/${item.id}`;
-    navigate(url);
+  function openItem(item) {
+    itemModalStore.open(item.id, item.workspace_id ?? workspaceId);
   }
 
   function getPriorityColor(priority) {
@@ -802,7 +797,7 @@
             <!-- Title -->
             <button
               data-testid="map-backbone-item-{backboneItem.id}"
-              onclick={() => navigateToItem(backboneItem)}
+              onclick={() => openItem(backboneItem)}
               class="text-sm mb-2 leading-snug text-left w-full line-clamp-2 transition-colors"
               style="{styles.glassTextStyle}"
             >

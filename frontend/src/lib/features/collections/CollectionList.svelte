@@ -2,7 +2,6 @@
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { navigate } from '../../router.js';
   import { applyCollectionItem, collectionStore, refreshCollectionDeltas, reloadCollection } from '../../stores/collectionContext.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
@@ -13,7 +12,7 @@
   } from '../../utils/workItemListColumns.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { collectionEditorOptions, collectionFieldLinks, workspaceDataStore } from '../../stores/index.js';
+  import { collectionEditorOptions, collectionFieldLinks, itemModalStore, workspaceDataStore } from '../../stores/index.js';
   import { MoreHorizontal, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
@@ -213,11 +212,7 @@
   });
 
   function viewItem(item) {
-    const wsId = workspaceId || item.workspace_id;
-    const url = collectionId && workspaceId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${wsId}/items/${item.id}`;
-    navigate(url);
+    itemModalStore.open(item.id, item.workspace_id ?? workspaceId);
   }
 
   const deleteItem = createDeleteItemHandler({
@@ -347,7 +342,6 @@
                             {item}
                             {column}
                             {workspace}
-                            {collectionId}
                             canEdit={workspacePermissions.canEdit(item.workspace_id)}
                             {statuses}
                             {statusCategories}

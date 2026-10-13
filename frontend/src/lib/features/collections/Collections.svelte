@@ -528,7 +528,6 @@
         statuses={listStatuses.length > 0 ? listStatuses : allStatuses}
         statusCategories={listStatusCategories.length > 0 ? listStatusCategories : statusCategories}
         priorities={listPriorities.length > 0 ? listPriorities : allPriorities}
-        collectionId={null}
         canEdit={false}
         testId="collection-search-results-table"
         emptyMessage={t('collections.noWorkItemsFound')}
