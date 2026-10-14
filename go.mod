@@ -43,7 +43,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.10
 	github.com/teambition/rrule-go v1.8.2
-	github.com/yuin/goldmark v1.7.17
+	github.com/yuin/goldmark v1.8.6
 	github.com/zitadel/oidc/v3 v3.45.3
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.45.0
