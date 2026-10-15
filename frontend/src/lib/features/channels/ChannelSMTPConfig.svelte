@@ -21,6 +21,7 @@
       from_name: '',
       encryption: 'tls',
       skip_tls_verify: false,
+      auth_method: 'auto',
       enabled: false
     }),
     onSave = () => {}
@@ -98,7 +99,8 @@
       smtp_from_email: formData.from_email,
       smtp_from_name: formData.from_name || '',
       smtp_encryption: formData.encryption || 'tls',
-      smtp_skip_tls_verify: plaintext ? false : formData.skip_tls_verify || false
+      smtp_skip_tls_verify: plaintext ? false : formData.skip_tls_verify || false,
+      smtp_auth_method: plaintext ? 'none' : formData.auth_method || 'auto'
     };
   }
 
@@ -175,6 +177,24 @@
         <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('channel.authentication')}</h5>
         <div class="space-y-4">
           <div>
+            <SelectField
+              label={t('channel.smtpAuthMethod')}
+              id="smtp-auth-method"
+              labelColor="default"
+              ariaLabel={t('channel.smtpAuthMethod')}
+              options={[
+              { value: 'auto', label: t('channel.smtpAuthAuto') },
+              { value: 'plain', label: 'PLAIN' },
+              { value: 'login', label: 'LOGIN' },
+              { value: 'cram-md5', label: 'CRAM-MD5' },
+              { value: 'none', label: t('channel.smtpAuthNone') }
+              ]}
+              bind:value={formData.auth_method}
+            />
+            <DescriptionText>{t('channel.smtpAuthMethodDescription')}</DescriptionText>
+          </div>
+          {#if formData.auth_method !== 'none'}
+          <div>
             <TextField
               label={t('channel.smtpUsername')}
               labelColor="default"
@@ -197,6 +217,7 @@
               {t('channel.leaveBlankPassword')}
             </DescriptionText>
           </div>
+          {/if}
         </div>
       </div>
     {/if}

@@ -50,6 +50,9 @@ func ValidateTransport(config *models.ChannelConfig) error {
 	if mode == "none" && (strings.TrimSpace(config.SMTPUsername) != "" || config.SMTPPassword != "") {
 		return ErrSMTPAuthenticationRequiresTLS
 	}
+	if !AuthMethodAllowed(config.SMTPAuthMethod) {
+		return fmt.Errorf("SMTP auth method %q not allowed; use \"auto\", \"plain\", \"login\", \"cram-md5\", or \"none\"", config.SMTPAuthMethod)
+	}
 	return nil
 }
 
@@ -336,7 +339,7 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 	}
 
 	// SMTPPassword stays encrypted in the returned config — dispatch decrypts
-	// it just before AUTH PLAIN. Keeping the encrypted value in the struct
+	// it just before SMTP AUTH. Keeping the encrypted value in the struct
 	// avoids handing plaintext to any code paths that don't strictly need it.
 	return &config, nil
 }
@@ -559,7 +562,7 @@ func formatMessageIDHeader(value string) string {
 // authentication; empty or unknown modes are errors rather than downgrades.
 //
 // It is a method (rather than a free function) so it can decrypt the at-rest
-// SMTPPassword before passing it to AUTH PLAIN — every caller goes through the
+// SMTPPassword before passing it to SMTP AUTH — every caller goes through the
 // encryption-aware sender, even the channel-test path that loads raw config
 // from the DB on its own.
 func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *models.ChannelConfig, toEmail, message string) error {
@@ -588,9 +591,9 @@ func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *mo
 		return err
 	}
 
-	var auth smtp.Auth
-	if config.SMTPUsername != "" && password != "" {
-		auth = smtp.PlainAuth("", config.SMTPUsername, password, config.SMTPHost)
+	auth, err := newSMTPAuth(config.SMTPAuthMethod, config.SMTPUsername, password, config.SMTPHost)
+	if err != nil {
+		return err
 	}
 
 	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)

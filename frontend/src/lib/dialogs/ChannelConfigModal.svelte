@@ -109,6 +109,7 @@
     from_name: '',
     encryption: 'tls',
     skip_tls_verify: false,
+    auth_method: 'auto',
     enabled: false
   });
 
@@ -266,6 +267,7 @@
           from_name: config.smtp_from_name || '',
           encryption: config.smtp_encryption || 'tls',
           skip_tls_verify: config.smtp_skip_tls_verify || false,
+          auth_method: config.smtp_auth_method || 'auto',
           enabled: channel.status === 'enabled'
         };
       } else if (channel.type === 'form') {

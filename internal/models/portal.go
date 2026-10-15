@@ -45,6 +45,7 @@ type ChannelConfig struct {
 	SMTPFromName      string `json:"smtp_from_name,omitempty"`
 	SMTPEncryption    string `json:"smtp_encryption,omitempty"` // tls/starttls, ssl, none
 	SMTPSkipTLSVerify bool   `json:"smtp_skip_tls_verify,omitempty"`
+	SMTPAuthMethod    string `json:"smtp_auth_method,omitempty"` // auto (default), plain, login, cram-md5, none
 
 	// Webhook Configuration
 	WebhookURL              string            `json:"webhook_url,omitempty"`
