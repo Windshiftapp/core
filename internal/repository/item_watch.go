@@ -1,9 +1,12 @@
 package repository
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 )
 
 // IsWatching reports whether the user has an active watch on the item.
@@ -78,6 +81,64 @@ func (r *ItemRepository) GetWatchers(itemID int) ([]int, error) {
 	}
 
 	return userIDs, nil
+}
+
+// ListWatchers returns the users with an active watch on the item, joined
+// with their profile fields, in the order they started watching.
+func (r *ItemRepository) ListWatchers(itemID int) ([]models.ItemWatcher, error) {
+	rows, err := r.db.Query(`
+		SELECT u.id, u.first_name, u.last_name, u.email, u.username, u.avatar_url,
+			w.watch_reason, w.updated_at
+		FROM item_watches w
+		JOIN users u ON u.id = w.user_id
+		WHERE w.item_id = ? AND w.is_active = true
+		ORDER BY w.updated_at ASC, u.id ASC
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list watchers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	watchers := []models.ItemWatcher{}
+	for rows.Next() {
+		var w models.ItemWatcher
+		if err := rows.Scan(&w.UserID, &w.FirstName, &w.LastName, &w.Email, &w.Username, &w.AvatarURL,
+			&w.WatchReason, &w.WatchedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan watcher: %w", err)
+		}
+		watchers = append(watchers, w)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate watchers: %w", err)
+	}
+	return watchers, nil
+}
+
+// CountWatchers returns how many users have an active watch on the item.
+func (r *ItemRepository) CountWatchers(itemID int) (int, error) {
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM item_watches
+		WHERE item_id = ? AND is_active = true
+	`, itemID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count watchers: %w", err)
+	}
+	return count, nil
+}
+
+// IsActiveUser reports whether the user exists and is not deactivated, so a
+// watch is never added on behalf of an account that cannot receive it.
+func (r *ItemRepository) IsActiveUser(userID int) (bool, error) {
+	var active bool
+	err := r.db.QueryRow(`SELECT COALESCE(is_active, true) FROM users WHERE id = ?`, userID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to check user: %w", err)
+	}
+	return active, nil
 }
 
 // GetUserWatchedItems returns item IDs the user has an active watch on,
