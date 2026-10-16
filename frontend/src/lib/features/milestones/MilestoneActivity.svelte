@@ -46,6 +46,9 @@
 	let loading = $state(true);
 	let loadingMore = $state(false);
 	let error = $state('');
+	// Each first-page load starts a new feed. Responses that arrive after a
+	// newer load started belong to the old feed and are dropped.
+	let feedVersion = 0;
 
 	$effect(() => {
 		// Track the inputs that require a fresh first page.
@@ -55,36 +58,44 @@
 	});
 
 	async function loadFirstPage() {
+		const version = ++feedVersion;
 		loading = true;
+		loadingMore = false;
 		error = '';
 		try {
 			const result = await api.milestones.getActivity(milestoneId, { page: 1, pageSize: PAGE_SIZE });
+			if (version !== feedVersion) return;
 			entries = result.entries;
 			page = 1;
 			hasMore = result.hasMore;
 		} catch (err) {
+			if (version !== feedVersion) return;
 			console.error('Failed to load milestone activity:', err);
 			error = t('dialogs.alerts.failedToLoad', { error: t('milestones.activity.tabActivity') });
 			entries = [];
 		} finally {
-			loading = false;
+			if (version === feedVersion) loading = false;
 		}
 	}
 
 	async function loadMore() {
 		if (loadingMore || !hasMore) return;
+		const version = feedVersion;
 		loadingMore = true;
+		error = '';
 		try {
 			const result = await api.milestones.getActivity(milestoneId, { page: page + 1, pageSize: PAGE_SIZE });
+			if (version !== feedVersion) return;
 			const seen = new Set(entries.map((entry) => entry.id));
 			entries = [...entries, ...result.entries.filter((entry) => !seen.has(entry.id))];
 			page += 1;
 			hasMore = result.hasMore;
 		} catch (err) {
+			if (version !== feedVersion) return;
 			console.error('Failed to load more milestone activity:', err);
 			error = t('dialogs.alerts.failedToLoad', { error: t('milestones.activity.tabActivity') });
 		} finally {
-			loadingMore = false;
+			if (version === feedVersion) loadingMore = false;
 		}
 	}
 </script>

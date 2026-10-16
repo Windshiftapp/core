@@ -54,6 +54,7 @@ cx
 !frontend/src/lib/features/milestones/MilestonePages.spec.js
 !frontend/src/lib/features/milestones/milestoneScope.spec.js
 !frontend/src/lib/features/milestones/milestoneActivity.spec.js
+!frontend/src/lib/features/milestones/MilestoneActivity.paging.spec.js
 !frontend/src/lib/api/milestones.spec.js
 !frontend/src/lib/features/milestones/MilestoneComments.spec.js
 !frontend/src/lib/features/milestones/milestoneCommentOrder.spec.js
