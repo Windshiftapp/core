@@ -11,6 +11,7 @@
     Briefcase,
     Grip,
     ListChecks,
+    PenLine,
     Search,
   } from '@lucide/svelte';
   import {
@@ -34,6 +35,7 @@
     Briefcase,
     Grip,
     ListChecks,
+    PenLine,
     Search,
   };
 

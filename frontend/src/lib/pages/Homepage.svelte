@@ -38,6 +38,7 @@
   import WatchedItemsWidget from '../widgets/dashboard/WatchedItemsWidget.svelte';
   import RecentWorkspacesWidget from '../widgets/dashboard/RecentWorkspacesWidget.svelte';
   import AssignedToMeWidget from '../widgets/dashboard/AssignedToMeWidget.svelte';
+  import CreatedByMeWidget from '../widgets/dashboard/CreatedByMeWidget.svelte';
   import PersonalTasksWidget from '../widgets/dashboard/PersonalTasksWidget.svelte';
   import SupportOverviewWidget from '../widgets/SupportOverviewWidget.svelte';
   import SavedSearchWidget from '../widgets/dashboard/SavedSearchWidget.svelte';
@@ -524,6 +525,8 @@
                         <RecentWorkspacesWidget />
                       {:else if widget.type === 'assigned-to-me'}
                         <AssignedToMeWidget config={widget.config ?? {}} />
+                      {:else if widget.type === 'created-by-me'}
+                        <CreatedByMeWidget config={widget.config ?? {}} />
                       {:else if widget.type === 'personal-tasks'}
                         <PersonalTasksWidget config={widget.config ?? {}} />
                       {:else if widget.type === 'support-overview'}

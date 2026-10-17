@@ -47,6 +47,7 @@ var validDashboardWidgetTypes = map[string]bool{
 	"watched-items":       true,
 	"recent-workspaces":   true,
 	"assigned-to-me":      true,
+	"created-by-me":       true,
 	"personal-tasks":      true,
 	"saved-search":        true,
 	"support-overview":    true,

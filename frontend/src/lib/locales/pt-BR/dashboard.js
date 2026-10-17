@@ -43,6 +43,10 @@ export default {
         name: 'Atribuídos a mim',
         description: 'Itens abertos atribuídos a você em todos os espaços de trabalho',
       },
+      createdByMe: {
+        name: 'Criados por mim',
+        description: 'Itens abertos criados por você em todos os espaços de trabalho',
+      },
       watchedItems: {
         name: 'Itens observados',
         description: 'Itens que você acompanha',
@@ -106,6 +110,8 @@ export default {
     states: {
       assignedLoadError: 'Não foi possível carregar os itens atribuídos a você',
       assignedEmpty: 'Nada foi atribuído a você no momento',
+      createdLoadError: 'Não foi possível carregar os itens criados por você',
+      createdEmpty: 'Você não criou nenhum item em aberto',
       personalTasksLoadError: 'Não foi possível carregar suas tarefas pessoais',
       personalTasksEmpty: 'Sua lista pessoal de tarefas está vazia',
       supportMetricsLoadError: 'Não foi possível carregar as métricas de suporte',

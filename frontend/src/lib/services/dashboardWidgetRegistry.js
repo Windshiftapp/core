@@ -70,6 +70,15 @@ export const dashboardWidgetRegistry = [
     minWidth: 3,
   },
   {
+    type: 'created-by-me',
+    nameKey: 'dashboard.widgetCatalog.createdByMe.name',
+    descriptionKey: 'dashboard.widgetCatalog.createdByMe.description',
+    category: dashboardWidgetCategories.WORK,
+    icon: 'PenLine',
+    defaultWidth: 6,
+    minWidth: 3,
+  },
+  {
     type: 'watched-items',
     nameKey: 'dashboard.widgetCatalog.watchedItems.name',
     descriptionKey: 'dashboard.widgetCatalog.watchedItems.description',
@@ -201,7 +210,11 @@ export function buildDefaultDashboardLayout() {
       'default-your-activity',
       'default-whats-new',
     ]),
-    section('default-work', 1, ['default-personal-tasks', 'default-assigned-to-me']),
+    section('default-work', 1, [
+      'default-personal-tasks',
+      'default-assigned-to-me',
+      'default-created-by-me',
+    ]),
     section('default-workspaces', 2, ['default-recent-workspaces', 'default-quick-access']),
   ];
 
@@ -220,6 +233,7 @@ export function buildDefaultDashboardLayout() {
     widget('default-whats-new', 'whats-new', 'default-your-day', 2),
     widget('default-personal-tasks', 'personal-tasks', 'default-work', 0, 6),
     widget('default-assigned-to-me', 'assigned-to-me', 'default-work', 1, 6),
+    widget('default-created-by-me', 'created-by-me', 'default-work', 2, 6),
     widget('default-recent-workspaces', 'recent-workspaces', 'default-workspaces', 0),
     widget('default-quick-access', 'quick-access', 'default-workspaces', 1),
   ];

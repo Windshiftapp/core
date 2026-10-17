@@ -43,6 +43,10 @@ export default {
         name: 'Asignados a mí',
         description: 'Elementos abiertos que tienes asignados en todos los espacios de trabajo',
       },
+      createdByMe: {
+        name: 'Creados por mí',
+        description: 'Elementos abiertos que creaste en todos los espacios de trabajo',
+      },
       watchedItems: {
         name: 'Elementos observados',
         description: 'Elementos que sigues',
@@ -106,6 +110,8 @@ export default {
     states: {
       assignedLoadError: 'No se pudieron cargar los elementos que tienes asignados',
       assignedEmpty: 'No tienes nada asignado en este momento',
+      createdLoadError: 'No se pudieron cargar los elementos que creaste',
+      createdEmpty: 'No has creado ningún elemento abierto',
       personalTasksLoadError: 'No se pudieron cargar tus tareas personales',
       personalTasksEmpty: 'Tu lista personal de tareas está vacía',
       supportMetricsLoadError: 'No se pudieron cargar las métricas de soporte',
