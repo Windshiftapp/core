@@ -95,6 +95,14 @@
       "created_at": "2026-10-15T13:35:28Z",
       "repoId": 1116890888,
       "pullRequestNo": 347
+    },
+    {
+      "name": "Faks",
+      "id": 1909645,
+      "comment_id": 6273937957,
+      "created_at": "2026-10-19T18:07:50Z",
+      "repoId": 1116890888,
+      "pullRequestNo": 351
     }
   ]
 }
