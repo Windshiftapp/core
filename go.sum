@@ -302,8 +302,8 @@ github.com/kaptinlin/jsonpointer v0.4.27 h1:5FOnhlkqQ4/lvHudaAWS8HJCXjN4yAHSIGl7
 github.com/kaptinlin/jsonpointer v0.4.27/go.mod h1:dfub/n58cWS32Dyf3AZsnKblSAgrz9PyOU76GDPpx8Q=
 github.com/kaptinlin/jsonschema v0.9.3 h1:uDVd3w4aXwO0tbycblKYvFofhl3hVuE31vOl5JkDXI0=
 github.com/kaptinlin/jsonschema v0.9.3/go.mod h1:LvtQ/mO0E1e/3c3DiOWTj05LTeot8cTv7DyQq7eJMQg=
-github.com/klauspost/compress v1.19.1 h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJnhSlk=
-github.com/klauspost/compress v1.19.1/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
+github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
+github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=

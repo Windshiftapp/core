@@ -32,7 +32,7 @@ require (
 	github.com/grafana/sobek v0.0.0-20260406180825-6d789dcdd177
 	github.com/jimlambrt/gldap v0.1.14
 	github.com/jub0bs/cors v0.13.2
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.20.3
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/modelcontextprotocol/go-sdk v1.4.1
