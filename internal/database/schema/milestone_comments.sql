@@ -1,7 +1,7 @@
 -- Milestone comments: Markdown discussion on a milestone's detail
 -- page. Kept apart from the item-only comments table so milestone comments
--- never reach item events, notifications, mentions, or webhooks. Anyone who
--- can view the milestone may comment; authors edit and delete their own rows.
+-- never reach item events, notifications, mentions, or webhooks. Who may
+-- comment is decided by MilestoneCommentService.
 -- Rows cascade away with their milestone or author.
 
 CREATE TABLE IF NOT EXISTS milestone_comments (
