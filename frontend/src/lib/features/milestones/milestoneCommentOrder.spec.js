@@ -4,13 +4,13 @@ import { newestCommentsFirst } from './milestoneCommentOrder.js';
 const comment = (id, created_at, extra = {}) => ({ id, created_at, ...extra });
 
 describe('newestCommentsFirst', () => {
-  it('reverses the API oldest-first order', () => {
-    const apiOrder = [
+  it('sorts comments newest first', () => {
+    const loaded = [
       comment(1, '2026-01-01T10:00:00Z'),
       comment(2, '2026-01-02T10:00:00Z'),
       comment(3, '2026-01-03T10:00:00Z'),
     ];
-    expect(newestCommentsFirst(apiOrder).map((c) => c.id)).toEqual([3, 2, 1]);
+    expect(newestCommentsFirst(loaded).map((c) => c.id)).toEqual([3, 2, 1]);
   });
 
   it('puts a just-created comment, appended at the end, first', () => {

@@ -13,23 +13,26 @@ describe('milestones comments client', () => {
     vi.unstubAllGlobals();
   });
 
-  it('lists every page of a milestone thread', async () => {
+  it('reads one page of the comment feed, passing page size and cursor', async () => {
+    const feed = {
+      comments: [{ id: 2, content: 'second' }],
+      next_cursor: 'older-than-2',
+      has_more: true,
+      total: 3,
+    };
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ data: [{ id: 1, content: 'first' }], pagination: { total_pages: 2 } })
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ data: [{ id: 2, content: 'second' }], pagination: { total_pages: 2 } })
-      );
+      .mockResolvedValueOnce(jsonResponse({ data: feed }))
+      .mockResolvedValueOnce(jsonResponse({ data: { comments: [], has_more: false } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(milestones.getComments(7)).resolves.toEqual([
-      { id: 1, content: 'first' },
-      { id: 2, content: 'second' },
-    ]);
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/comments?page_size=100&page=1');
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/v2/milestones/7/comments?page_size=100&page=2');
+    await expect(milestones.getComments(7, { limit: 25 })).resolves.toEqual(feed);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v2/milestones/7/comments?page_size=25');
+
+    await milestones.getComments(7, { limit: 25, cursor: 'older-than-2' });
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      '/api/v2/milestones/7/comments?page_size=25&cursor=older-than-2'
+    );
   });
 
   it('creates a comment with only its Markdown content', async () => {

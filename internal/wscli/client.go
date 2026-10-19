@@ -630,21 +630,28 @@ func (c *Client) DeleteComment(commentID int) error {
 // Milestone comment methods. The routes serve global and workspace-local
 // milestones alike, so no workspace is needed.
 
-// ListMilestoneComments returns every comment on a milestone, oldest first.
+// ListMilestoneComments returns every comment on a milestone, newest first,
+// following next_cursor like GetComments.
 func (c *Client) ListMilestoneComments(milestoneID int) ([]MilestoneComment, error) {
 	const pageSize = 100
 	comments := make([]MilestoneComment, 0)
-	for page := 1; ; page++ {
-		var response PaginatedResponse[MilestoneComment]
-		path := fmt.Sprintf("/rest/api/v2/milestones/%d/comments?sort=created_at&page=%d&page_size=%d", milestoneID, page, pageSize)
+	path := fmt.Sprintf("/rest/api/v2/milestones/%d/comments?page_size=%d", milestoneID, pageSize)
+	for {
+		var response struct {
+			Comments   []MilestoneComment `json:"comments"`
+			NextCursor string             `json:"next_cursor"`
+			HasMore    bool               `json:"has_more"`
+		}
 		if err := c.GET(path, &response); err != nil {
 			return nil, err
 		}
-		comments = append(comments, response.Data...)
-		if page >= response.Pagination.TotalPages || len(response.Data) == 0 {
-			return comments, nil
+		comments = append(comments, response.Comments...)
+		if !response.HasMore || response.NextCursor == "" || len(response.Comments) == 0 {
+			break
 		}
+		path = fmt.Sprintf("/rest/api/v2/milestones/%d/comments?page_size=%d&cursor=%s", milestoneID, pageSize, url.QueryEscape(response.NextCursor))
 	}
+	return comments, nil
 }
 
 func (c *Client) CreateMilestoneComment(milestoneID int, content string) (*MilestoneComment, error) {

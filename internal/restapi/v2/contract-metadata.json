@@ -8147,7 +8147,7 @@
     },
     "/milestones/{milestone_id}/comments": {
       "get": {
-        "description": "List milestone comments. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only.",
         "parameters": [
           {
             "Name": "milestone_id",
@@ -8160,38 +8160,24 @@
             }
           },
           {
-            "Name": "page",
-            "In": "query",
-            "Description": "One-based page number.",
-            "Required": false,
-            "Schema": {
-              "default": 1,
-              "minimum": 1,
-              "type": "integer"
-            }
-          },
-          {
             "Name": "page_size",
             "In": "query",
             "Description": "Maximum number of resources to return.",
             "Required": false,
             "Schema": {
               "default": 50,
-              "maximum": 1000,
+              "maximum": 200,
               "minimum": 1,
               "type": "integer"
             }
           },
           {
-            "Name": "sort",
+            "Name": "cursor",
             "In": "query",
-            "Description": "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.",
+            "Description": "Opaque continuation cursor returned by the preceding response. Cursors are operation-specific and cannot be combined with removed timestamp or ID boundaries.",
             "Required": false,
             "Schema": {
-              "enum": [
-                "created_at",
-                "-created_at"
-              ],
+              "minLength": 1,
               "type": "string"
             }
           }

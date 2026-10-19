@@ -363,6 +363,12 @@ func requireCommentEdit(r *http.Request, deps Deps, userID int, comment *service
 }
 
 func parseCommentOptions(r *http.Request) (services.CommentFeedOptions, error) {
+	return parseCommentFeedOptions(r, "comments")
+}
+
+// parseCommentFeedOptions reads page_size and an opaque cursor of the given
+// kind, so a cursor from one comment feed is rejected by another.
+func parseCommentFeedOptions(r *http.Request, kind string) (services.CommentFeedOptions, error) {
 	limit, err := parsePositiveInt(r, "page_size", services.DefaultCommentFeedLimit, services.MaxCommentFeedLimit)
 	if err != nil {
 		return services.CommentFeedOptions{}, err
@@ -379,7 +385,7 @@ func parseCommentOptions(r *http.Request) (services.CommentFeedOptions, error) {
 		return options, nil
 	}
 	var cursor commentCursor
-	if err := decodeOpaqueCursor("comments", raw, &cursor); err != nil || cursor.ID == 0 || cursor.CreatedAt.IsZero() {
+	if err := decodeOpaqueCursor(kind, raw, &cursor); err != nil || cursor.ID == 0 || cursor.CreatedAt.IsZero() {
 		return options, newError(http.StatusBadRequest, "invalid_request", "cursor is invalid")
 	}
 	value := services.CommentFeedCursor{CreatedAt: cursor.CreatedAt, ID: cursor.ID}
@@ -395,26 +401,36 @@ func parseCommentOptions(r *http.Request) (services.CommentFeedOptions, error) {
 }
 
 func commentResponseCursors(comments []models.Comment, options services.CommentFeedOptions, hasMore bool) (nextCursor, refreshCursor string) {
-	if len(comments) == 0 {
+	positions := make([]services.CommentFeedCursor, len(comments))
+	for i, comment := range comments {
+		positions[i] = services.CommentFeedCursor{CreatedAt: comment.CreatedAt, ID: comment.ID}
+	}
+	return commentFeedCursors("comments", positions, options, hasMore)
+}
+
+// commentFeedCursors returns the next and refresh cursors of a comment feed
+// page, given the positions of its rows.
+func commentFeedCursors(kind string, positions []services.CommentFeedCursor, options services.CommentFeedOptions, hasMore bool) (nextCursor, refreshCursor string) {
+	if len(positions) == 0 {
 		return "", ""
 	}
-	oldest, newest := comments[0], comments[0]
-	for _, comment := range comments[1:] {
-		if comment.CreatedAt.Before(oldest.CreatedAt) || comment.CreatedAt.Equal(oldest.CreatedAt) && comment.ID < oldest.ID {
-			oldest = comment
+	oldest, newest := positions[0], positions[0]
+	for _, position := range positions[1:] {
+		if position.CreatedAt.Before(oldest.CreatedAt) || position.CreatedAt.Equal(oldest.CreatedAt) && position.ID < oldest.ID {
+			oldest = position
 		}
-		if comment.CreatedAt.After(newest.CreatedAt) || comment.CreatedAt.Equal(newest.CreatedAt) && comment.ID > newest.ID {
-			newest = comment
+		if position.CreatedAt.After(newest.CreatedAt) || position.CreatedAt.Equal(newest.CreatedAt) && position.ID > newest.ID {
+			newest = position
 		}
 	}
-	refresh := encodeOpaqueCursor("comments", commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID})
+	refresh := encodeOpaqueCursor(kind, commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID})
 	if !hasMore {
 		return "", refresh
 	}
 	if options.Since != nil {
-		return encodeOpaqueCursor("comments", commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID}), refresh
+		return encodeOpaqueCursor(kind, commentCursor{Direction: "newer", CreatedAt: newest.CreatedAt, ID: newest.ID}), refresh
 	}
-	return encodeOpaqueCursor("comments", commentCursor{Direction: "older", CreatedAt: oldest.CreatedAt, ID: oldest.ID}), refresh
+	return encodeOpaqueCursor(kind, commentCursor{Direction: "older", CreatedAt: oldest.CreatedAt, ID: oldest.ID}), refresh
 }
 
 func renderCommentHTML(comments []models.Comment) error {

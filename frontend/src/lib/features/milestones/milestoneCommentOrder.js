@@ -1,6 +1,6 @@
-// Display order for milestone comments. The API and the CLI list
-// them oldest first; the milestone page shows them newest first, so a new
-// comment lands right below the composer.
+// Display order for milestone comments: newest first, so a new comment
+// lands right below the composer. The API returns pages newest first; this
+// keeps that order once older pages and newly posted comments are merged in.
 
 function createdTime(comment) {
   const time = Date.parse(comment?.created_at ?? '');
@@ -9,7 +9,7 @@ function createdTime(comment) {
 
 /**
  * A newest-first copy of the comments: by creation time, then id, both
- * descending (the API's oldest-first order reversed). Editing a comment
+ * descending, the API's feed order. Editing a comment
  * leaves its creation time alone, so it keeps its place.
  */
 export function newestCommentsFirst(comments) {

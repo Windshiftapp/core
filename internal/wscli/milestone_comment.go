@@ -21,7 +21,7 @@ var milestoneCommentCmd = &cobra.Command{
 var milestoneCommentListCmd = &cobra.Command{
 	Use:   "list <milestone-id>",
 	Short: "List comments on a milestone",
-	Long: `List all comments on a milestone, oldest first.
+	Long: `List all comments on a milestone, newest first.
 
 Examples:
   ws milestone comment list 5

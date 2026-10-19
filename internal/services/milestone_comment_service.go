@@ -24,7 +24,7 @@ type MilestoneReadAuthorizer interface {
 // MilestoneCommentStore is the persistence the comment service needs.
 // repository.MilestoneCommentRepository implements it.
 type MilestoneCommentStore interface {
-	ListByMilestone(milestoneID, limit, offset int, desc bool) ([]models.MilestoneComment, error)
+	ListFeed(milestoneID int, feed repository.MilestoneCommentFeedQuery) ([]models.MilestoneComment, error)
 	CountByMilestone(milestoneID int) (int, error)
 	GetByID(id int) (*models.MilestoneComment, error)
 	Create(milestoneID, authorID int, content string) (int, error)
@@ -46,27 +46,45 @@ func NewMilestoneCommentService(comments MilestoneCommentStore, access Milestone
 	return &MilestoneCommentService{comments: comments, access: access}
 }
 
-// MilestoneCommentListParams selects one page of a milestone's comments.
-type MilestoneCommentListParams struct {
-	Limit  int
-	Offset int
-	Desc   bool
+// MilestoneCommentFeedPage is a bounded slice of a milestone's comment feed,
+// like CommentFeedPage for items. HasMore applies in the requested direction:
+// older for default and Before reads, newer for Since reads.
+type MilestoneCommentFeedPage struct {
+	Comments []models.MilestoneComment
+	HasMore  bool
 }
 
-// List returns one page of a milestone's comments and the total count.
-func (s *MilestoneCommentService) List(userID, milestoneID int, params MilestoneCommentListParams) ([]models.MilestoneComment, int, error) {
+// GetFeed returns one page of a milestone's comment feed. It pages like the
+// item comment feed: newest first, Before for older comments, and Since for
+// newer ones, oldest first.
+func (s *MilestoneCommentService) GetFeed(userID, milestoneID int, options CommentFeedOptions) (*MilestoneCommentFeedPage, error) {
 	if _, err := s.access.AuthorizeMilestoneRead(userID, milestoneID); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	rows, err := s.comments.ListByMilestone(milestoneID, params.Limit, params.Offset, params.Desc)
+	limit := normalizeCommentFeedLimit(options.Limit)
+	// One row past the page shows whether more follow.
+	feed := repository.MilestoneCommentFeedQuery{Limit: limit + 1}
+	switch {
+	case options.Before != nil:
+		feed.Before = &repository.MilestoneCommentPosition{CreatedAt: options.Before.CreatedAt, ID: options.Before.ID}
+	case options.Since != nil:
+		feed.Since = &repository.MilestoneCommentPosition{CreatedAt: options.Since.CreatedAt, ID: options.Since.ID}
+	}
+	rows, err := s.comments.ListFeed(milestoneID, feed)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	total, err := s.comments.CountByMilestone(milestoneID)
-	if err != nil {
-		return nil, 0, err
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
 	}
-	return rows, total, nil
+	return &MilestoneCommentFeedPage{Comments: rows, HasMore: hasMore}, nil
+}
+
+// CountFeed counts a milestone's comments. Like CountFeedByItemID it does not
+// check access; callers count only after GetFeed authorized the read.
+func (s *MilestoneCommentService) CountFeed(milestoneID int) (int, error) {
+	return s.comments.CountByMilestone(milestoneID)
 }
 
 // Create adds a comment authored by userID to a milestone the user can view.

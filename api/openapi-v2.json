@@ -26258,71 +26258,95 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "author_avatar": {
-                  "description": "The author avatar value.",
-                  "type": "string"
+            "additionalProperties": false,
+            "properties": {
+              "comments": {
+                "description": "The comments value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "author_avatar": {
+                      "description": "The author avatar value.",
+                      "type": "string"
+                    },
+                    "author_id": {
+                      "description": "The author id value.",
+                      "type": "integer"
+                    },
+                    "author_name": {
+                      "description": "The author name value.",
+                      "type": "string"
+                    },
+                    "content": {
+                      "description": "The content value.",
+                      "type": "string"
+                    },
+                    "content_html": {
+                      "description": "The content html value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "is_agent": {
+                      "description": "The is agent value.",
+                      "type": "boolean"
+                    },
+                    "milestone_id": {
+                      "description": "The milestone id value.",
+                      "type": "integer"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "author_id",
+                    "content",
+                    "created_at",
+                    "id",
+                    "milestone_id",
+                    "updated_at"
+                  ],
+                  "type": "object"
                 },
-                "author_id": {
-                  "description": "The author id value.",
-                  "type": "integer"
-                },
-                "author_name": {
-                  "description": "The author name value.",
-                  "type": "string"
-                },
-                "content": {
-                  "description": "The content value.",
-                  "type": "string"
-                },
-                "content_html": {
-                  "description": "The content html value.",
-                  "type": "string"
-                },
-                "created_at": {
-                  "description": "The created at value.",
-                  "format": "date-time",
-                  "type": "string"
-                },
-                "id": {
-                  "description": "The id value.",
-                  "type": "integer"
-                },
-                "is_agent": {
-                  "description": "The is agent value.",
-                  "type": "boolean"
-                },
-                "milestone_id": {
-                  "description": "The milestone id value.",
-                  "type": "integer"
-                },
-                "updated_at": {
-                  "description": "The updated at value.",
-                  "format": "date-time",
-                  "type": "string"
-                }
+                "type": "array"
               },
-              "required": [
-                "author_id",
-                "content",
-                "created_at",
-                "id",
-                "milestone_id",
-                "updated_at"
-              ],
-              "type": "object"
+              "has_more": {
+                "description": "The has more value.",
+                "type": "boolean"
+              },
+              "next_cursor": {
+                "description": "The next cursor value.",
+                "type": "string"
+              },
+              "refresh_cursor": {
+                "description": "The refresh cursor value.",
+                "type": "string"
+              },
+              "total": {
+                "description": "The total value.",
+                "nullable": true,
+                "type": "integer"
+              }
             },
-            "type": "array"
-          },
-          "pagination": {
-            "$ref": "#/components/schemas/Pagination"
+            "required": [
+              "comments",
+              "has_more"
+            ],
+            "type": "object"
           }
         },
         "required": [
-          "data",
-          "pagination"
+          "data"
         ],
         "type": "object"
       },
@@ -111829,7 +111853,7 @@
     },
     "/milestones/{milestone_id}/comments": {
       "get": {
-        "description": "List milestone comments. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "description": "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only.",
         "operationId": "getMilestonesMilestoneIdComments",
         "parameters": [
           {
@@ -111843,38 +111867,24 @@
             }
           },
           {
-            "description": "One-based page number.",
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "type": "integer"
-            }
-          },
-          {
             "description": "Maximum number of resources to return.",
             "in": "query",
             "name": "page_size",
             "required": false,
             "schema": {
               "default": 50,
-              "maximum": 1000,
+              "maximum": 200,
               "minimum": 1,
               "type": "integer"
             }
           },
           {
-            "description": "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.",
+            "description": "Opaque continuation cursor returned by the preceding response. Cursors are operation-specific and cannot be combined with removed timestamp or ID boundaries.",
             "in": "query",
-            "name": "sort",
+            "name": "cursor",
             "required": false,
             "schema": {
-              "enum": [
-                "created_at",
-                "-created_at"
-              ],
+              "minLength": 1,
               "type": "string"
             }
           }

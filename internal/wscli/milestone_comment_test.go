@@ -83,19 +83,21 @@ func milestoneCommentJSON(id int, content string) map[string]any {
 	}
 }
 
-func TestMilestoneCommentListReadsEveryPageOldestFirst(t *testing.T) {
+func TestMilestoneCommentListFollowsCursorNewestFirst(t *testing.T) {
 	server, requests := milestoneCommentServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("page") == "1" {
-			writeJSON(w, http.StatusOK, map[string]any{
-				"data":       []any{milestoneCommentJSON(1, "first"), milestoneCommentJSON(2, "second")},
-				"pagination": map[string]int{"page": 1, "page_size": 2, "total_items": 3, "total_pages": 2},
-			})
+		if r.URL.Query().Get("cursor") == "" {
+			writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+				"comments":    []any{milestoneCommentJSON(3, "third"), milestoneCommentJSON(2, "second")},
+				"next_cursor": "older-than-2",
+				"has_more":    true,
+				"total":       3,
+			}})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data":       []any{milestoneCommentJSON(3, "third")},
-			"pagination": map[string]int{"page": 2, "page_size": 2, "total_items": 3, "total_pages": 2},
-		})
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+			"comments": []any{milestoneCommentJSON(1, "first")},
+			"has_more": false,
+		}})
 	})
 
 	code, out, errOut := runWS(t, server.URL, "", "milestone", "comment", "list", "5")
@@ -106,7 +108,7 @@ func TestMilestoneCommentListReadsEveryPageOldestFirst(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &comments); err != nil {
 		t.Fatalf("output is not a JSON comment list: %v\n%s", err, out)
 	}
-	if len(comments) != 3 || comments[0].ID != 1 || comments[2].ID != 3 || comments[2].Content != "third" {
+	if len(comments) != 3 || comments[0].ID != 3 || comments[2].ID != 1 || comments[2].Content != "first" {
 		t.Fatalf("unexpected comments: %+v", comments)
 	}
 
@@ -121,18 +123,21 @@ func TestMilestoneCommentListReadsEveryPageOldestFirst(t *testing.T) {
 		if req.Auth != "Bearer test-token" {
 			t.Fatalf("request %d: missing bearer token", i)
 		}
-		if !strings.Contains(req.Query, "sort=created_at") || !strings.Contains(req.Query, fmt.Sprintf("page=%d", i+1)) {
+		if !strings.Contains(req.Query, "page_size=100") {
 			t.Fatalf("request %d: unexpected query %q", i, req.Query)
 		}
+	}
+	if strings.Contains(got[0].Query, "cursor=") || !strings.Contains(got[1].Query, "cursor=older-than-2") {
+		t.Fatalf("expected the second request to pass next_cursor, got %q then %q", got[0].Query, got[1].Query)
 	}
 }
 
 func TestMilestoneCommentListTableOutput(t *testing.T) {
 	server, _ := milestoneCommentServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data":       []any{milestoneCommentJSON(1, "line one\nline two")},
-			"pagination": map[string]int{"page": 1, "page_size": 100, "total_items": 1, "total_pages": 1},
-		})
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+			"comments": []any{milestoneCommentJSON(1, "line one\nline two")},
+			"has_more": false,
+		}})
 	})
 
 	code, out, errOut := runWS(t, server.URL, "", "milestone", "comment", "list", "5", "-o", "table")

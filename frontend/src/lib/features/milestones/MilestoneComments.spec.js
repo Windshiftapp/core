@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MilestoneComments from './MilestoneComments.svelte';
 
@@ -19,12 +19,16 @@ vi.mock('../../editors/LazyMilkdownEditor.svelte', () => ({ default: () => {} })
 describe('MilestoneComments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // The API returns the whole thread oldest first.
-    mocks.getComments.mockResolvedValue([
-      { id: 1, author_id: 1, content: 'first', created_at: '2026-01-01T10:00:00Z' },
-      { id: 2, author_id: 2, content: 'second', created_at: '2026-01-02T10:00:00Z' },
-      { id: 3, author_id: 1, content: 'third', created_at: '2026-01-03T10:00:00Z' },
-    ]);
+    // The API returns the newest page first.
+    mocks.getComments.mockResolvedValue({
+      comments: [
+        { id: 3, author_id: 1, content: 'third', created_at: '2026-01-03T10:00:00Z' },
+        { id: 2, author_id: 2, content: 'second', created_at: '2026-01-02T10:00:00Z' },
+        { id: 1, author_id: 1, content: 'first', created_at: '2026-01-01T10:00:00Z' },
+      ],
+      has_more: false,
+      total: 3,
+    });
   });
 
   afterEach(() => cleanup());
@@ -39,6 +43,32 @@ describe('MilestoneComments', () => {
     expect(
       composer.compareDocumentPosition(rows[0]) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(mocks.getComments).toHaveBeenCalledWith(50);
+    expect(mocks.getComments).toHaveBeenCalledWith(50, { limit: 25 });
+    expect(screen.queryByTestId('milestone-comments-load-more')).not.toBeInTheDocument();
+  });
+
+  it('loads older comments with the next cursor and appends them', async () => {
+    mocks.getComments
+      .mockResolvedValueOnce({
+        comments: [{ id: 3, author_id: 1, content: 'third', created_at: '2026-01-03T10:00:00Z' }],
+        next_cursor: 'older-than-3',
+        has_more: true,
+        total: 2,
+      })
+      .mockResolvedValueOnce({
+        comments: [{ id: 2, author_id: 2, content: 'second', created_at: '2026-01-02T10:00:00Z' }],
+        has_more: false,
+      });
+    render(MilestoneComments, { milestoneId: 50 });
+
+    await fireEvent.click(await screen.findByTestId('milestone-comments-load-more'));
+
+    await waitFor(() => {
+      const rows = screen.getAllByTestId('milestone-comment');
+      expect(rows.map((row) => row.dataset.commentId)).toEqual(['3', '2']);
+    });
+    expect(mocks.getComments).toHaveBeenLastCalledWith(50, { limit: 25, cursor: 'older-than-3' });
+    expect(screen.queryByTestId('milestone-comments-load-more')).not.toBeInTheDocument();
+    expect(screen.getByText('(2)')).toBeInTheDocument();
   });
 });

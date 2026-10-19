@@ -80,9 +80,18 @@ export const milestones = {
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(data),
     }),
-  // Milestone comments: oldest first, author-only edit/delete.
-  // They send no notifications and are separate from item comments.
-  getComments: (id) => fetchAllV2Pages(`/milestones/${id}/comments`),
+  // Milestone comments: author-only edit/delete, no notifications, and a
+  // separate table from item comments. The list pages like the item comment
+  // feed: newest first, and `cursor` takes the previous response's next_cursor
+  // to read older comments. Resolves to
+  // { comments, next_cursor, refresh_cursor, has_more, total }.
+  getComments: (id, params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.set('page_size', params.limit);
+    if (params.cursor) searchParams.set('cursor', params.cursor);
+    const query = searchParams.toString();
+    return fetchV2Data(`/milestones/${id}/comments${query ? `?${query}` : ''}`);
+  },
   createComment: (id, content) =>
     fetchV2Data(`/milestones/${id}/comments`, {
       method: 'POST',

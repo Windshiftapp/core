@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"windshift/internal/database"
 )
@@ -54,22 +55,15 @@ func TestMilestoneCommentRepositoryLifecycle(t *testing.T) {
 		t.Fatalf("expected joined author fields and timestamps, got %+v", first)
 	}
 
-	rows, err := repo.ListByMilestone(milestoneID, 10, 0, false)
+	rows, err := repo.ListFeed(milestoneID, MilestoneCommentFeedQuery{Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].ID != firstID || rows[1].ID != secondID {
-		t.Fatalf("expected oldest-first order, got %+v", rows)
+	if len(rows) != 2 || rows[0].ID != secondID || rows[1].ID != firstID {
+		t.Fatalf("expected newest-first order, got %+v", rows)
 	}
-	if rows[1].AuthorName != "bob" {
-		t.Fatalf("expected username fallback for author without a name, got %q", rows[1].AuthorName)
-	}
-	desc, err := repo.ListByMilestone(milestoneID, 1, 0, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(desc) != 1 || desc[0].ID != secondID {
-		t.Fatalf("expected newest comment first with limit 1, got %+v", desc)
+	if rows[0].AuthorName != "bob" {
+		t.Fatalf("expected username fallback for author without a name, got %q", rows[0].AuthorName)
 	}
 	count, err := repo.CountByMilestone(milestoneID)
 	if err != nil || count != 2 {
@@ -115,5 +109,61 @@ func TestMilestoneCommentsCascadeWithMilestone(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("expected comments to cascade with their milestone, got %d", count)
+	}
+}
+
+// TestMilestoneCommentRepositoryFeed checks the keyset reads behind the
+// comment feed: newest first by default, older rows before a position, and
+// newer rows after one, oldest first. Comments with the same created_at are
+// ordered by ID.
+func TestMilestoneCommentRepositoryFeed(t *testing.T) {
+	repo, db, milestoneID := newMilestoneCommentFixture(t)
+	base := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
+	ids := make([]int, 4)
+	// The middle two share a timestamp.
+	for i, at := range []time.Time{base, base.Add(time.Hour), base.Add(time.Hour), base.Add(2 * time.Hour)} {
+		if err := db.QueryRow(`INSERT INTO milestone_comments (milestone_id, author_id, content, created_at, updated_at)
+			VALUES (?, 1, 'c', ?, ?) RETURNING id`, milestoneID, at, at).Scan(&ids[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	feedIDs := func(query MilestoneCommentFeedQuery) []int {
+		t.Helper()
+		rows, err := repo.ListFeed(milestoneID, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]int, len(rows))
+		for i, row := range rows {
+			out[i] = row.ID
+		}
+		return out
+	}
+	equal := func(got, want []int) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				return false
+			}
+		}
+		return true
+	}
+	at := func(i int, created time.Time) *MilestoneCommentPosition {
+		return &MilestoneCommentPosition{CreatedAt: created, ID: ids[i]}
+	}
+
+	if got, want := feedIDs(MilestoneCommentFeedQuery{Limit: 2}), []int{ids[3], ids[2]}; !equal(got, want) {
+		t.Errorf("newest page = %v, want %v", got, want)
+	}
+	if got, want := feedIDs(MilestoneCommentFeedQuery{Limit: 10, Before: at(2, base.Add(time.Hour))}), []int{ids[1], ids[0]}; !equal(got, want) {
+		t.Errorf("before the later tied comment = %v, want %v", got, want)
+	}
+	if got, want := feedIDs(MilestoneCommentFeedQuery{Limit: 10, Since: at(1, base.Add(time.Hour))}), []int{ids[2], ids[3]}; !equal(got, want) {
+		t.Errorf("since the earlier tied comment = %v, want %v", got, want)
+	}
+	if got := feedIDs(MilestoneCommentFeedQuery{Limit: 10, Since: at(3, base.Add(2*time.Hour))}); len(got) != 0 {
+		t.Errorf("since the newest comment = %v, want none", got)
 	}
 }
