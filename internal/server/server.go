@@ -1876,6 +1876,7 @@ func (s *Server) initialize() error {
 	milestoneCommentService := services.NewMilestoneCommentService(
 		repository.NewMilestoneCommentRepository(s.db),
 		planningApplication,
+		permService,
 	)
 	milestonePageLinkService := services.NewMilestonePageLinkService(
 		repository.NewMilestonePageLinkRepository(s.db),

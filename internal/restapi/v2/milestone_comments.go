@@ -8,12 +8,14 @@ import (
 	"windshift/internal/markdown"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/validation"
 )
 
 // registerMilestoneCommentRoutes publishes Markdown comments on milestones.
-// The same routes serve global and workspace-local milestones:
-// anyone who can view the milestone reads and adds comments, and authors
-// edit and delete their own. Milestone comments send no notifications.
+// The same routes serve global and workspace-local milestones. Viewers read
+// comments; local milestones apply their workspace's item comment
+// permissions (see MilestoneCommentService). Milestone comments send no
+// notifications.
 func registerMilestoneCommentRoutes(builder *routeBuilder, deps Deps) {
 	const comments = "/milestones/{milestone_id}/comments"
 	const comment = comments + "/{comment_id}"
@@ -149,12 +151,13 @@ func renderMilestoneCommentHTML(comment *models.MilestoneComment) error {
 	return nil
 }
 
-// milestoneCommentError maps service errors. Unreadable milestones and
-// comments on other milestones read as not found (planningError); editing
-// someone else's comment is forbidden.
+// milestoneCommentError maps service errors. Invalid Markdown is a bad
+// request, like item comments. Missing permissions and comments on other
+// milestones read as not found (planningError).
 func milestoneCommentError(err error) error {
-	if errors.Is(err, services.ErrMilestoneCommentNotAuthor) {
-		return newError(http.StatusForbidden, "insufficient_permission", "Only the author can change this comment")
+	var invalid *validation.ValidationError
+	if errors.As(err, &invalid) {
+		return newError(http.StatusBadRequest, "invalid_request", invalid.Message)
 	}
 	return planningError(err)
 }

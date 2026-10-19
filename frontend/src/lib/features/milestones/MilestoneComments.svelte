@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api } from '../../api.js';
 	import { authStore } from '../../stores';
+	import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
 	import Avatar from '../../components/Avatar.svelte';
@@ -13,8 +14,9 @@
 	import { confirm } from '../../composables/useConfirm.js';
 	import { newestCommentsFirst } from './milestoneCommentOrder.js';
 
-	// Milestone comments. Anyone who can view the milestone can
-	// comment; authors edit and delete their own. Unlike item comments these
+	// Milestone comments. Local milestones apply their workspace's item
+	// comment permissions; on global ones any viewer comments and authors
+	// change their own (mirrors MilestoneCommentService). Unlike item comments these
 	// send no notifications, so @mentions notify nobody, and milestones have
 	// no attachments, so image upload is off in every editor here.
 	// The thread shows newest first under the composer. It pages like the
@@ -42,6 +44,11 @@
 	let editEditorRef = $state(null);
 
 	const currentUserId = $derived(authStore.currentUser?.id ?? null);
+	// comment.edit_others holders may moderate foreign comments on local
+	// milestones. Global milestones (workspaceId null) have no workspace.
+	const canEditOthersComments = $derived(
+		workspaceId != null && workspacePermissions.canEditOthersComments(workspaceId)
+	);
 	// Loaded pages plus comments posted here, newest first.
 	const orderedComments = $derived(newestCommentsFirst(comments));
 
@@ -267,7 +274,7 @@
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">({t('comments.edited')})</span>
 								{/if}
 							</div>
-							{#if currentUserId != null && comment.author_id === currentUserId && editingCommentId !== comment.id}
+							{#if currentUserId != null && (comment.author_id === currentUserId || canEditOthersComments) && editingCommentId !== comment.id}
 								<div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
 									<button
 										type="button"

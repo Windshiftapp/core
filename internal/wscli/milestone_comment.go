@@ -8,9 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Milestone comments. Anyone who can view a milestone can list
-// and add comments; only the author can edit or delete one, which the server
-// enforces.
+// Milestone comments. Anyone who can view a milestone can list its
+// comments; the server enforces who may add, edit, or delete them.
 
 var milestoneCommentCmd = &cobra.Command{
 	Use:   "comment",

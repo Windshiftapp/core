@@ -246,15 +246,15 @@ func TestMilestoneCommentEditUsesMergePatch(t *testing.T) {
 	}
 }
 
-func TestMilestoneCommentEditReportsAuthorOnlyError(t *testing.T) {
+func TestMilestoneCommentEditReportsServerError(t *testing.T) {
 	server, _ := milestoneCommentServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": map[string]string{
-			"code": "insufficient_permission", "message": "Only the author can change this comment",
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]string{
+			"code": "not_found", "message": "Planning object was not found",
 		}})
 	})
 
 	code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "edit", "5", "9", "-m", "edited")
-	if code == 0 || !strings.Contains(errOut, "Only the author can change this comment") {
+	if code == 0 || !strings.Contains(errOut, "Planning object was not found") {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 }
