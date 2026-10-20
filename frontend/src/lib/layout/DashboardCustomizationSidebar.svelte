@@ -11,6 +11,7 @@
     Briefcase,
     Grip,
     ListChecks,
+    PenLine,
     Search,
     Palette,
   } from '@lucide/svelte';
@@ -36,6 +37,7 @@
     Briefcase,
     Grip,
     ListChecks,
+    PenLine,
     Search,
   };
 

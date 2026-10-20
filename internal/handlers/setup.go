@@ -17,6 +17,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// bcrypt's input limit. x/crypto/bcrypt refuses inputs longer than this instead
+// of truncating them, so a password over 72 bytes cannot be hashed at all.
+const maxPasswordBytes = 72
+
 // AuthMiddleware interface to avoid circular imports
 type AuthMiddleware interface {
 	MarkSetupCompleted()
@@ -501,6 +505,13 @@ func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
 	}
 	if req.AdminUser.Password == "" {
 		return fmt.Errorf("admin password is required")
+	}
+	// bcrypt's input limit is 72 bytes, and x/crypto/bcrypt errors instead of
+	// truncating. An over-long password therefore surfaces as a 500 here and the
+	// UI shows a generic setup failure. Validate before hashing so the client gets
+	// an actionable message. len(string) counts bytes, which is what matters.
+	if len(req.AdminUser.Password) > maxPasswordBytes {
+		return fmt.Errorf("admin password must be %d bytes or fewer (bcrypt input limit)", maxPasswordBytes)
 	}
 
 	// Basic email validation

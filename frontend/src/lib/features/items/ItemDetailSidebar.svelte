@@ -25,6 +25,7 @@
 	import RequesterOpenTickets from './RequesterOpenTickets.svelte';
   import CustomerContextSection from './CustomerContextSection.svelte';
   import ParticipantsSection from './ParticipantsSection.svelte';
+  import WatchersSection from './WatchersSection.svelte';
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
   import AddIntegrationLinkModal from '../../dialogs/AddIntegrationLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
@@ -1430,6 +1431,12 @@
     {#if item?.id && isExternalRequest(item)}
       <RequesterOpenTickets itemId={item.id} {canEdit} {onrequestmerge} />
       <CustomerContextSection {item} />
+    {/if}
+
+    <!-- Internal users watching the item. Editors can add or remove other
+         users; everyone else can only manage their own watch. -->
+    {#if item?.id}
+      <WatchersSection itemId={item.id} workspaceId={item.workspace_id} {canEdit} />
     {/if}
 
     <!-- External request participants (WI-1136). Internal items have no

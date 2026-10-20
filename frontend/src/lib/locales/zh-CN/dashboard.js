@@ -43,6 +43,10 @@ export default {
         name: '分配给我的',
         description: '所有工作区中分配给你的未完成事项',
       },
+      createdByMe: {
+        name: '我创建的',
+        description: '所有工作区中你创建的未完成事项',
+      },
       watchedItems: {
         name: '关注的事项',
         description: '你正在关注的事项',
@@ -110,6 +114,8 @@ export default {
     states: {
       assignedLoadError: '无法加载分配给你的事项',
       assignedEmpty: '目前没有分配给你的事项',
+      createdLoadError: '无法加载你创建的事项',
+      createdEmpty: '你没有创建任何未完成的事项',
       personalTasksLoadError: '无法加载你的个人任务',
       personalTasksEmpty: '你的个人待办列表为空',
       supportMetricsLoadError: '无法加载支持指标',

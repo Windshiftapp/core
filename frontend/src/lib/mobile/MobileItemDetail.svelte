@@ -31,6 +31,7 @@
   let transitions = $state([]);
   let transitioning = $state(false);
   let isWatching = $state(false);
+  let watcherCount = $state(0);
   let watchBusy = $state(false);
 
   // Workflow-less personal tasks use the permitted transition endpoint to toggle
@@ -114,6 +115,7 @@
       item = summary?.item ?? null;
       transitions = summary?.transitions?.available_transitions ?? [];
       isWatching = summary?.watching || false;
+      watcherCount = summary?.watcher_count ?? 0;
       personalTaskCount = summary?.personal_task_count ?? 0;
       const childItems = Array.isArray(summary?.children) ? summary.children : [];
       children = childItems.filter((child) => child?.id).map(normalizeChild);
@@ -206,13 +208,11 @@
     if (watchBusy) return;
     watchBusy = true;
     try {
-      if (isWatching) {
-        await api.items.removeWatch(itemId);
-        isWatching = false;
-      } else {
-        await api.items.addWatch(itemId);
-        isWatching = true;
-      }
+      const status = isWatching
+        ? await api.items.removeWatch(itemId)
+        : await api.items.addWatch(itemId);
+      isWatching = status?.watching ?? !isWatching;
+      watcherCount = status?.watcher_count ?? watcherCount;
     } catch (err) {
       console.error('Failed to toggle watch:', err);
     } finally {
@@ -268,6 +268,7 @@
     item = null;
     transitions = [];
     isWatching = false;
+    watcherCount = 0;
     personalTaskCount = 0;
     children = [];
     ancestors = [];
@@ -322,7 +323,10 @@
     } catch { /* keep prior */ }
     try {
       const res = await api.items.getWatchStatus(itemId);
-      if (token === loadToken) isWatching = res?.watching || false;
+      if (token === loadToken) {
+        isWatching = res?.watching || false;
+        watcherCount = res?.watcher_count ?? watcherCount;
+      }
     } catch { /* keep prior */ }
   }
 
@@ -507,6 +511,9 @@
       <button class="act" class:on={isWatching} onclick={toggleWatch} disabled={watchBusy} data-testid="detail-watch" type="button">
         <Star size={16} fill={isWatching ? 'currentColor' : 'none'} />
         {isWatching ? t('mobile.item.watching') : t('mobile.item.watch')}
+        {#if watcherCount > 0}
+          <span class="watch-count" data-testid="detail-watcher-count">{watcherCount}</span>
+        {/if}
       </button>
       {#if canStartTimer}
         <button class="act" onclick={startTimer} disabled={startingTimer} data-testid="detail-start-timer" type="button">
@@ -778,6 +785,7 @@
   }
   .act.on { color: var(--ds-interactive); border-color: var(--ds-interactive); }
   .act:disabled { opacity: 0.6; }
+  .watch-count { font-size: 0.75rem; color: var(--ds-text-subtle); }
 
   .panel { border: 1px solid var(--ds-border); border-radius: var(--radius-lg, 8px); margin-bottom: 0.75rem; overflow: hidden; }
   .panel-head {

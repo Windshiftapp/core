@@ -43,6 +43,10 @@ export default {
         name: 'Mir zugewiesen',
         description: 'Ihnen zugewiesene offene Vorgänge aus allen Arbeitsbereichen',
       },
+      createdByMe: {
+        name: 'Von mir erstellt',
+        description: 'Von Ihnen erstellte offene Einträge aus allen Arbeitsbereichen',
+      },
       watchedItems: {
         name: 'Beobachtete Vorgänge',
         description: 'Vorgänge, denen Sie folgen',
@@ -110,6 +114,8 @@ export default {
     states: {
       assignedLoadError: 'Die Ihnen zugewiesenen Vorgänge konnten nicht geladen werden',
       assignedEmpty: 'Ihnen ist derzeit nichts zugewiesen',
+      createdLoadError: 'Die von Ihnen erstellten Einträge konnten nicht geladen werden',
+      createdEmpty: 'Sie haben keine offenen Einträge erstellt',
       personalTasksLoadError: 'Ihre persönlichen Aufgaben konnten nicht geladen werden',
       personalTasksEmpty: 'Ihre persönliche Aufgabenliste ist leer',
       supportMetricsLoadError: 'Support-Kennzahlen konnten nicht geladen werden',

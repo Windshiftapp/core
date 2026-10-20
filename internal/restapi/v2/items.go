@@ -559,6 +559,38 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		result, err := app.Unwatch(r.Context(), user.ID, id)
 		return result, itemError(err)
 	})
+	builder.Read(path+"/watchers", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.Watchers(r.Context(), user.ID, id)
+		return result, itemError(err)
+	})
+	builder.Action(http.MethodPut, path+"/watchers/{user_id}", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		targetID, err := pathID(r, "user_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.AddWatcher(r.Context(), user.ID, id, targetID)
+		return result, itemError(err)
+	})
+	builder.Action(http.MethodDelete, path+"/watchers/{user_id}", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		targetID, err := pathID(r, "user_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.RemoveWatcher(r.Context(), user.ID, id, targetID)
+		return result, itemError(err)
+	})
 	builder.Read(path+"/personal-tasks", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, error) {
 		user, id, err := itemTarget(r)
 		if err != nil {
@@ -1039,6 +1071,9 @@ func itemError(err error) error {
 	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
+	}
+	if errors.Is(err, services.ErrItemWatcherForbidden) {
+		return newError(http.StatusForbidden, "forbidden", "Managing other watchers requires edit permission")
 	}
 	if errors.Is(err, services.ErrBulkItemForbidden) {
 		return newError(http.StatusForbidden, "forbidden", "Item update is not permitted")

@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { childItemTypesForParent } from '../utils/hierarchy.js';
 import { buildDetailScreenFieldConfig } from '../utils/screenFields.js';
+import { authStore } from './auth.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { workspacesStore } from './workspaces.svelte.js';
 
@@ -170,6 +171,9 @@ class ItemDetailStore {
 
   // Watch
   isWatching = $state(false);
+  watcherCount = $state(0);
+  // Full watcher list; null until the watchers section asks for it.
+  watchers = $state(null);
   // Set when the open ticket is a merged duplicate pointing at its canonical.
   mergedIntoItemId = $state(null);
   loadingWatchStatus = $state(false);
@@ -368,6 +372,8 @@ class ItemDetailStore {
       this.availableStatusTransitions = summary.transitions?.available_transitions || [];
       this.pendingApproval = summary.transitions?.pending_approval || null;
       this.isWatching = summary.watching || false;
+      this.watcherCount = summary.watcher_count || 0;
+      this.watchers = null;
       this.mergedIntoItemId = summary.merged_into_item_id || null;
       this.childItems = summary.children || [];
       this.currentItemType = summary.current_item_type || null;
@@ -1216,17 +1222,50 @@ class ItemDetailStore {
 
   async toggleWatch() {
     if (!this.item?.id) return;
+    const itemId = this.item.id;
     try {
-      if (this.isWatching) {
-        await api.items.removeWatch(this.item.id);
-        this.isWatching = false;
-      } else {
-        await api.items.addWatch(this.item.id);
-        this.isWatching = true;
-      }
+      const status = this.isWatching
+        ? await api.items.removeWatch(itemId)
+        : await api.items.addWatch(itemId);
+      if (this.item?.id !== itemId) return;
+      this.isWatching = status?.watching ?? !this.isWatching;
+      if (typeof status?.watcher_count === 'number') this.watcherCount = status.watcher_count;
+      if (this.watchers !== null) await this.loadWatchers();
     } catch (err) {
       console.error('Failed to toggle watch:', err);
       throw err;
+    }
+  }
+
+  async loadWatchers() {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await api.items.listWatchers(itemId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  async addWatcher(userId) {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await api.items.addWatcher(itemId, userId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  async removeWatcher(userId) {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await api.items.removeWatcher(itemId, userId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  // Adding or removing yourself from the watchers section also flips the
+  // header watch toggle, so both derive from the same list.
+  #applyWatchers(watchers) {
+    this.watchers = watchers;
+    this.watcherCount = watchers.length;
+    const currentUserId = authStore.currentUser?.id;
+    if (currentUserId != null) {
+      this.isWatching = watchers.some((watcher) => watcher.user_id === currentUserId);
     }
   }
 
@@ -1396,6 +1435,8 @@ class ItemDetailStore {
     this.linkTypes = [];
     this.loadingLinks = false;
     this.isWatching = false;
+    this.watcherCount = 0;
+    this.watchers = null;
     this.loadingWatchStatus = false;
     this.timeProjects = [];
     this.timeWorklogs = [];

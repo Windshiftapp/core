@@ -1374,6 +1374,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -1381,9 +1385,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "DeleteItemsItemIdWatchersUserIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -19068,6 +19134,10 @@
                 ],
                 "type": "object"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -19088,6 +19158,7 @@
               "screen_context",
               "section_errors",
               "transitions",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
@@ -22904,6 +22975,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -22911,9 +22986,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetItemsItemIdWatchersResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -48789,6 +48926,10 @@
                 ],
                 "type": "object"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -48809,6 +48950,7 @@
               "screen_context",
               "section_errors",
               "transitions",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
@@ -94924,6 +95066,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -94931,9 +95077,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PutItemsItemIdWatchersUserIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -110293,6 +110501,195 @@
           }
         ],
         "summary": "Watch item",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers": {
+      "get": {
+        "description": "List item watchers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getItemsItemIdWatchers",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetItemsItemIdWatchersResult"
+                }
+              }
+            },
+            "description": "List item watchers response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List item watchers",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers/{user_id}": {
+      "delete": {
+        "description": "Remove item watcher. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteItemsItemIdWatchersUserId",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The user identifier.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteItemsItemIdWatchersUserIdResult"
+                }
+              }
+            },
+            "description": "Remove item watcher response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove item watcher",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      },
+      "put": {
+        "description": "Add item watcher. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "putItemsItemIdWatchersUserId",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The user identifier.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutItemsItemIdWatchersUserIdResult"
+                }
+              }
+            },
+            "description": "Add item watcher response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Add item watcher",
         "tags": [
           "Work items"
         ],

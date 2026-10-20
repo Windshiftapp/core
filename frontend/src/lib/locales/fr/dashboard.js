@@ -43,6 +43,10 @@ export default {
         name: 'Mes éléments attribués',
         description: 'Éléments ouverts qui vous sont attribués dans tous les espaces de travail',
       },
+      createdByMe: {
+        name: 'Créés par moi',
+        description: 'Éléments ouverts que vous avez créés dans tous les espaces de travail',
+      },
       watchedItems: {
         name: 'Éléments suivis',
         description: 'Éléments que vous suivez',
@@ -110,6 +114,8 @@ export default {
     states: {
       assignedLoadError: 'Impossible de charger les éléments qui vous sont attribués',
       assignedEmpty: 'Rien ne vous est attribué pour le moment',
+      createdLoadError: 'Impossible de charger les éléments que vous avez créés',
+      createdEmpty: "Vous n'avez créé aucun élément ouvert",
       personalTasksLoadError: 'Impossible de charger vos tâches personnelles',
       personalTasksEmpty: 'Votre liste de tâches personnelles est vide',
       supportMetricsLoadError: 'Impossible de charger les métriques d’assistance',

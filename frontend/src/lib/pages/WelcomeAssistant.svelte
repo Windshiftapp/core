@@ -144,7 +144,9 @@
       window.location.reload();
     } catch (err) {
       console.error('Setup error:', err);
-      error = t('setup.setupError');
+      // Show the server's message when it sends one, for example a password over
+      // bcrypt's 72 byte input limit. The generic string stays as the fallback.
+      error = err?.message || t('setup.setupError');
       submitting = false;
     }
   }

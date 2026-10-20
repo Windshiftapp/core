@@ -43,6 +43,10 @@ export default {
         name: 'Assigned to Me',
         description: 'Open items assigned to you across all workspaces',
       },
+      createdByMe: {
+        name: 'Created by Me',
+        description: 'Open items you created across all workspaces',
+      },
       watchedItems: {
         name: 'Watched Items',
         description: 'Items you are following',
@@ -110,6 +114,8 @@ export default {
     states: {
       assignedLoadError: "Couldn't load your assigned items",
       assignedEmpty: 'Nothing assigned to you right now',
+      createdLoadError: "Couldn't load the items you created",
+      createdEmpty: "You haven't created any open items",
       storyPointsLoadError: "Couldn't load the story points summary",
       storyPointsEmpty: 'No open story points assigned yet',
       personalTasksLoadError: "Couldn't load your personal tasks",

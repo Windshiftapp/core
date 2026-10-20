@@ -7227,6 +7227,108 @@
         ]
       }
     },
+    "/items/{item_id}/watchers": {
+      "get": {
+        "description": "List item watchers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List item watchers",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers/{user_id}": {
+      "delete": {
+        "description": "Remove item watcher. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Remove item watcher",
+        "tags": [
+          "Work items"
+        ]
+      },
+      "put": {
+        "description": "Add item watcher. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Add item watcher",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/items/{item_id}/worklogs": {
       "get": {
         "description": "List item worklogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

@@ -10,7 +10,12 @@ export const DEFAULT_DONE_RANGE_DAYS = 7;
 /**
  * Widget types that support the row-count / density controls.
  */
-export const ROW_COUNT_WIDGETS = new Set(['assigned-to-me', 'personal-tasks', 'saved-search']);
+export const ROW_COUNT_WIDGETS = new Set([
+  'assigned-to-me',
+  'created-by-me',
+  'personal-tasks',
+  'saved-search',
+]);
 
 /**
  * Row count options offered in the widget menu.
@@ -90,6 +95,20 @@ export function completedSinceCutoff(days = DEFAULT_DONE_RANGE_DAYS) {
 export function assignedToMeQuery(userId, limit = 30) {
   return {
     ql: `assignee_id = ${userId} AND status_completed = false`,
+    limit,
+    order_by: 'updated_at',
+  };
+}
+
+/**
+ * Query params for "items I created and not yet completed", newest first.
+ * Counterpart to assignedToMeQuery for the created-by-me widget.
+ * @param {number|string} userId
+ * @param {number} [limit]
+ */
+export function createdByMeQuery(userId, limit = 30) {
+  return {
+    ql: `creator_id = ${userId} AND status_completed = false`,
     limit,
     order_by: 'updated_at',
   };

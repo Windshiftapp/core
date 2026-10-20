@@ -23,6 +23,7 @@ import (
 
 var (
 	ErrItemForbidden             = errors.New("item access forbidden")
+	ErrItemWatcherForbidden      = errors.New("managing other watchers requires edit permission")
 	ErrItemConflict              = errors.New("item mutation conflict")
 	ErrItemTypeMigrationRequired = errors.New("item type migration requires a target status")
 )
@@ -135,8 +136,9 @@ func (s *ItemApplicationService) WithMutationEffects(mentions *MentionService) *
 }
 
 type ItemWatchStatus struct {
-	ItemID   int  `json:"item_id"`
-	Watching bool `json:"watching"`
+	ItemID       int  `json:"item_id"`
+	Watching     bool `json:"watching"`
+	WatcherCount int  `json:"watcher_count"`
 }
 
 type ItemDeleteInfo struct {
@@ -1535,10 +1537,8 @@ func (s *ItemApplicationService) Watch(ctx context.Context, userID, itemID int, 
 	if err := s.items.Watch(userID, itemID, reason); err != nil {
 		return ItemWatchStatus{}, err
 	}
-	if s.activity != nil {
-		_ = s.activity.InvalidateUserCache(userID)
-	}
-	return ItemWatchStatus{ItemID: itemID, Watching: true}, nil
+	s.invalidateWatchCache(userID)
+	return s.watchStatus(userID, itemID)
 }
 
 func (s *ItemApplicationService) Unwatch(ctx context.Context, userID, itemID int) (ItemWatchStatus, error) {
@@ -1548,18 +1548,119 @@ func (s *ItemApplicationService) Unwatch(ctx context.Context, userID, itemID int
 	if err := s.items.Unwatch(userID, itemID); err != nil {
 		return ItemWatchStatus{}, err
 	}
-	if s.activity != nil {
-		_ = s.activity.InvalidateUserCache(userID)
-	}
-	return ItemWatchStatus{ItemID: itemID, Watching: false}, nil
+	s.invalidateWatchCache(userID)
+	return s.watchStatus(userID, itemID)
 }
 
 func (s *ItemApplicationService) WatchStatus(ctx context.Context, userID, itemID int) (ItemWatchStatus, error) {
 	if err := s.requireView(ctx, userID, itemID); err != nil {
 		return ItemWatchStatus{}, err
 	}
+	return s.watchStatus(userID, itemID)
+}
+
+// Watchers lists every user watching the item. Anyone who can view the item
+// may see who else is watching it.
+func (s *ItemApplicationService) Watchers(ctx context.Context, userID, itemID int) ([]models.ItemWatcher, error) {
+	if err := s.requireView(ctx, userID, itemID); err != nil {
+		return nil, err
+	}
+	return s.items.ListWatchers(itemID)
+}
+
+// AddWatcher subscribes targetUserID to the item on the actor's behalf.
+// Adding yourself only needs view access; adding someone else needs edit
+// access, and the target must be an active user who can view the item.
+func (s *ItemApplicationService) AddWatcher(ctx context.Context, actorID, itemID, targetUserID int) ([]models.ItemWatcher, error) {
+	if targetUserID == actorID {
+		if _, err := s.Watch(ctx, actorID, itemID, ""); err != nil {
+			return nil, err
+		}
+		return s.items.ListWatchers(itemID)
+	}
+	workspaceID, err := s.requireManageWatchers(ctx, actorID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	active, err := s.items.IsActiveUser(targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	canView := false
+	if active {
+		if canView, err = s.canView(ctx, targetUserID, itemID, workspaceID); err != nil {
+			return nil, err
+		}
+	}
+	if !canView {
+		return nil, &validation.ValidationError{Field: "user_id", Message: "user cannot view this item"}
+	}
+	reason := fmt.Sprintf("Added as watcher by user %d", actorID)
+	if err := s.items.Watch(targetUserID, itemID, reason); err != nil {
+		return nil, err
+	}
+	s.invalidateWatchCache(targetUserID)
+	return s.items.ListWatchers(itemID)
+}
+
+// RemoveWatcher unsubscribes targetUserID from the item. Removing yourself
+// only needs view access; removing someone else needs edit access.
+func (s *ItemApplicationService) RemoveWatcher(ctx context.Context, actorID, itemID, targetUserID int) ([]models.ItemWatcher, error) {
+	if targetUserID == actorID {
+		if _, err := s.Unwatch(ctx, actorID, itemID); err != nil {
+			return nil, err
+		}
+		return s.items.ListWatchers(itemID)
+	}
+	if _, err := s.requireManageWatchers(ctx, actorID, itemID); err != nil {
+		return nil, err
+	}
+	if err := s.items.Unwatch(targetUserID, itemID); err != nil {
+		return nil, err
+	}
+	s.invalidateWatchCache(targetUserID)
+	return s.items.ListWatchers(itemID)
+}
+
+// requireManageWatchers hides the item from users who cannot view it and
+// returns ErrItemWatcherForbidden for viewers without edit access.
+func (s *ItemApplicationService) requireManageWatchers(ctx context.Context, actorID, itemID int) (int, error) {
+	workspaceID, err := s.items.GetWorkspaceIDCtx(ctx, itemID)
+	if err != nil {
+		return 0, err
+	}
+	canView, err := s.canView(ctx, actorID, itemID, workspaceID)
+	if err != nil {
+		return 0, err
+	}
+	if !canView {
+		return 0, repository.ErrNotFound
+	}
+	if err := s.require(actorID, workspaceID, models.PermissionItemEdit); err != nil {
+		if errors.Is(err, ErrItemForbidden) {
+			return 0, ErrItemWatcherForbidden
+		}
+		return 0, err
+	}
+	return workspaceID, nil
+}
+
+func (s *ItemApplicationService) watchStatus(userID, itemID int) (ItemWatchStatus, error) {
 	watching, err := s.items.IsWatching(userID, itemID)
-	return ItemWatchStatus{ItemID: itemID, Watching: watching}, err
+	if err != nil {
+		return ItemWatchStatus{}, err
+	}
+	count, err := s.items.CountWatchers(itemID)
+	if err != nil {
+		return ItemWatchStatus{}, err
+	}
+	return ItemWatchStatus{ItemID: itemID, Watching: watching, WatcherCount: count}, nil
+}
+
+func (s *ItemApplicationService) invalidateWatchCache(userID int) {
+	if s.activity != nil {
+		_ = s.activity.InvalidateUserCache(userID)
+	}
 }
 
 func (s *ItemApplicationService) PersonalTasks(ctx context.Context, userID, itemID int) ([]models.Item, error) {

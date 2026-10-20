@@ -411,6 +411,16 @@ export const items = {
       method: 'DELETE',
     }),
   getWatchStatus: (id, requestOptions = {}) => fetchV2Data(`/items/${id}/watch`, requestOptions),
+  // Everyone watching an item; add/remove return the updated watcher list.
+  listWatchers: (id) => fetchV2Data(`/items/${id}/watchers`),
+  addWatcher: (id, userId) =>
+    fetchV2Data(`/items/${id}/watchers/${userId}`, {
+      method: 'PUT',
+    }),
+  removeWatcher: (id, userId) =>
+    fetchV2Data(`/items/${id}/watchers/${userId}`, {
+      method: 'DELETE',
+    }),
 
   // Personal tasks relationship
   getPersonalTasks: (itemId, requestOptions = {}) =>
