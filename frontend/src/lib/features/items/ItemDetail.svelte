@@ -1,3 +1,9 @@
+<script module>
+  // Site title from index.html, captured once so nested item views (e.g. a modal
+  // over an item page) don't stack item titles on top of each other.
+  const siteTitle = typeof document !== 'undefined' ? document.title : '';
+</script>
+
 <script>
   import { onMount, onDestroy, untrack } from 'svelte';
   import { copyToClipboard } from '../../utils/clipboard.js';
@@ -66,6 +72,19 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   // Bind to store values using $derived
   let item = $derived(itemDetailStore.item);
   let workspace = $derived(itemDetailStore.workspace);
+
+  // Show "KEY-123 Title - <site title>" in the browser tab while the item is open;
+  // restore the previous title when the detail view closes.
+  const previousDocumentTitle = document.title;
+  $effect(() => {
+    if (!item?.workspace_item_number) return;
+    const k = item.workspace_key || workspace?.key;
+    const itemKey = k ? `${k}-${item.workspace_item_number}` : `ITEM-${item.workspace_item_number}`;
+    document.title = `${itemKey} ${item.title || ''}`.trim() + ` - ${siteTitle}`;
+  });
+  onDestroy(() => {
+    document.title = previousDocumentTitle;
+  });
 
   // A reconcile request that arrives while the detail is loading must not be
   // dropped: queue it and run once the in-flight load settles.
