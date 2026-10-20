@@ -407,12 +407,14 @@
       : []
   );
 
-  // Leading hierarchy track holds indent + expander (+ test case badge). It is
-  // sized for the deepest visible row so the configured columns stay aligned.
-  let hierarchyWidth = $derived.by(() => {
-    const maxLevel = treeData.reduce((max, row) => Math.max(max, row.level), 0);
-    return maxLevel * 1.5 + 1.5 + (showTestCases ? 3 : 0);
-  });
+  // Leading hierarchy track holds the expander (+ test case badge); the depth
+  // indent is applied to the title cell so every child row shows its nesting.
+  let hierarchyWidth = $derived(1.5 + (showTestCases ? 3 : 0));
+  let indentColumnId = $derived(
+    listColumns.some((column) => column.field_identifier === 'title')
+      ? 'title'
+      : listColumns[0]?.field_identifier
+  );
   let gridTemplateColumns = $derived(`${hierarchyWidth}rem ${listGridTemplateColumns(listColumns)}`);
   let gridMinWidth = $derived(`calc(${listGridMinWidth(listColumns)} + ${hierarchyWidth + 1}rem)`);
 </script>
@@ -520,14 +522,17 @@
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
               >
                 <!-- Hierarchy Indent + Icon -->
-                <div class="flex items-center gap-1" style="padding-left: {getIndentLevel(item.level)}">
+                <div class="flex items-center gap-1">
                   <div class="w-4 h-4 rounded flex items-center justify-center bg-ds-accent-green">
                     <FileCheck class="w-2.5 h-2.5 text-white" />
                   </div>
                 </div>
 
                 {#each listColumns as column (column.field_identifier)}
-                  <div class="min-w-0 overflow-hidden">
+                  <div
+                    class="min-w-0 overflow-hidden"
+                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                  >
                     {#if column.field_identifier === 'key'}
                       <LinkComponent
                         href="#view-test-case"
@@ -560,7 +565,7 @@
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));{idx === 0 ? 'border-top: none;' : ''}"
               >
                 <!-- Hierarchy Indent + Expand/Collapse + Test Case Count -->
-                <div class="flex items-center gap-1" style="padding-left: {getIndentLevel(item.level)}">
+                <div class="flex items-center gap-1">
                   {#if item.hasChildren}
                     <button
                       class="w-6 h-6 flex items-center justify-center rounded transition-colors cursor-pointer expand-btn"
@@ -586,7 +591,10 @@
                 </div>
 
                 {#each listColumns as column (column.field_identifier)}
-                  <div class="min-w-0 overflow-hidden">
+                  <div
+                    class="min-w-0 overflow-hidden"
+                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                  >
                     <ListCellRenderer
                       {item}
                       {column}
