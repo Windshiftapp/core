@@ -41,6 +41,9 @@ type ResponsesReasoningConfig struct {
 	Effort       string `json:"effort,omitempty"`
 	Summary      string `json:"summary,omitempty"`
 	BudgetTokens int64  `json:"budget_tokens,omitempty"`
+	// Enabled is supported by OpenAI-compatible Chat Completions providers,
+	// but not by the Responses or Anthropic contracts.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // ValidateProviderConfig verifies the per-connection provider_config blob.
@@ -84,10 +87,17 @@ func ValidateProviderConfig(raw string) error {
 		}
 		var reasoning ResponsesReasoningConfig
 		if err := json.Unmarshal(rawReasoning, &reasoning); err != nil {
-			return fmt.Errorf("provider_config.reasoning must contain valid effort, summary, and budget_tokens fields")
+			return fmt.Errorf("provider_config.reasoning must contain valid effort, summary, budget_tokens, and enabled fields")
 		}
 		if reasoning.BudgetTokens < 0 {
 			return fmt.Errorf("provider_config.reasoning.budget_tokens must be non-negative")
+		}
+		for key := range reasoningObject {
+			switch key {
+			case "effort", "summary", "budget_tokens", "enabled":
+			default:
+				return fmt.Errorf("provider_config.reasoning.%s is unsupported", key)
+			}
 		}
 	}
 	if rawMax, ok := cfg[providerConfigMaxOutputTokensKey]; ok {
@@ -212,7 +222,7 @@ func ProviderConfigResponsesReasoning(raw string) *ResponsesReasoningConfig {
 	}
 	reasoning.Effort = strings.TrimSpace(reasoning.Effort)
 	reasoning.Summary = strings.TrimSpace(reasoning.Summary)
-	if reasoning.Effort == "" && reasoning.Summary == "" && reasoning.BudgetTokens == 0 {
+	if reasoning.Effort == "" && reasoning.Summary == "" && reasoning.BudgetTokens == 0 && reasoning.Enabled == nil {
 		return nil
 	}
 	return &reasoning

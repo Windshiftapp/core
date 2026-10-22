@@ -125,26 +125,40 @@ func newFantasyClient(opts fantasyClientOptions) *fantasyClient {
 	var err error
 	switch opts.protocol {
 	case APIContractAnthropic:
+		if reasoning := ProviderConfigResponsesReasoning(opts.providerConfig); reasoning != nil && reasoning.Enabled != nil {
+			client.initErr = fmt.Errorf("provider_config.reasoning.enabled is unsupported for Anthropic")
+			return client
+		}
 		provider, err = anthropic.New(
 			anthropic.WithBaseURL(strings.TrimRight(opts.baseURL, "/")),
 			anthropic.WithAPIKey(opts.apiKey),
 			anthropic.WithHTTPClient(httpClient),
 		)
 	case APIContractResponses:
+		providerOptions, optionsErr := providerConfigSDKOptions(opts.providerConfig, opts.protocol)
+		if optionsErr != nil {
+			client.initErr = optionsErr
+			return client
+		}
 		provider, err = openai.New(
 			openai.WithBaseURL(fantasyOpenAIBaseURL(opts.baseURL, "/v1/responses")),
 			openai.WithAPIKey(opts.apiKey),
 			openai.WithHTTPClient(httpClient),
 			openai.WithUseResponsesAPI(),
 			openai.WithResponsesAPIFunc(func(string) bool { return true }),
-			openai.WithSDKOptions(providerConfigSDKOptions(opts.providerConfig, opts.protocol)...),
+			openai.WithSDKOptions(providerOptions...),
 		)
 	default:
+		providerOptions, optionsErr := providerConfigSDKOptions(opts.providerConfig, opts.protocol)
+		if optionsErr != nil {
+			client.initErr = optionsErr
+			return client
+		}
 		provider, err = openai.New(
 			openai.WithBaseURL(fantasyOpenAIBaseURL(opts.baseURL, opts.chatPath)),
 			openai.WithAPIKey(opts.apiKey),
 			openai.WithHTTPClient(httpClient),
-			openai.WithSDKOptions(providerConfigSDKOptions(opts.providerConfig, opts.protocol)...),
+			openai.WithSDKOptions(providerOptions...),
 		)
 	}
 	if err != nil {
@@ -155,10 +169,18 @@ func newFantasyClient(opts fantasyClientOptions) *fantasyClient {
 	return client
 }
 
-func providerConfigSDKOptions(raw, protocol string) []sdkoption.RequestOption {
+func providerConfigSDKOptions(raw, protocol string) ([]sdkoption.RequestOption, error) {
 	var config map[string]json.RawMessage
 	if json.Unmarshal([]byte(raw), &config) != nil {
-		return nil
+		return nil, nil
+	}
+	if reasoning := ProviderConfigResponsesReasoning(raw); reasoning != nil && protocol == APIContractChatCompletions {
+		if reasoning.Summary != "" || reasoning.BudgetTokens != 0 {
+			return nil, fmt.Errorf("provider_config.reasoning summary and budget_tokens are unsupported for Chat Completions")
+		}
+	}
+	if reasoning := ProviderConfigResponsesReasoning(raw); reasoning != nil && protocol == APIContractResponses && reasoning.Enabled != nil {
+		return nil, fmt.Errorf("provider_config.reasoning.enabled is unsupported for Responses")
 	}
 	generated := map[string]bool{
 		"model": true, "messages": true, "input": true, "temperature": true,
@@ -172,6 +194,18 @@ func providerConfigSDKOptions(raw, protocol string) []sdkoption.RequestOption {
 		generated["parallel_tool_calls"] = true
 	}
 	var options []sdkoption.RequestOption
+	if protocol == APIContractChatCompletions {
+		if reasoning := ProviderConfigResponsesReasoning(raw); reasoning != nil {
+			value := map[string]any{}
+			if reasoning.Effort != "" {
+				value["effort"] = reasoning.Effort
+			}
+			if reasoning.Enabled != nil {
+				value["enabled"] = *reasoning.Enabled
+			}
+			options = append(options, sdkoption.WithJSONSet("reasoning", value))
+		}
+	}
 	for key, rawValue := range config {
 		if reservedProviderConfigKeys[key] || generated[key] {
 			continue
@@ -181,7 +215,7 @@ func providerConfigSDKOptions(raw, protocol string) []sdkoption.RequestOption {
 			options = append(options, sdkoption.WithJSONSet(key, value))
 		}
 	}
-	return options
+	return options, nil
 }
 
 func fantasyOpenAIBaseURL(baseURL, endpointPath string) string {
