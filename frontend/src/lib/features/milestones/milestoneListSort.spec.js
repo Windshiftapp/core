@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_MILESTONE_SORT,
   milestoneLastUpdated,
   milestoneStatusSortValue,
   milestoneTimelineSortValue,
@@ -8,10 +7,6 @@ import {
 } from './milestoneListSort.js';
 
 describe('milestone list sorting', () => {
-  it('opens sorted by Updated, newest first', () => {
-    expect(DEFAULT_MILESTONE_SORT).toEqual({ key: 'last_updated_at', direction: 'desc' });
-  });
-
   it('prefers the list last-updated time over the milestone updated_at', () => {
     expect(
       milestoneLastUpdated({

@@ -38,7 +38,6 @@
   import { loadMilestoneTestStatistics } from './milestoneStatisticsData.js';
   import { canReorderMilestoneRow } from './milestoneScope.js';
   import {
-    DEFAULT_MILESTONE_SORT,
     milestoneLastUpdated,
     milestoneStatusSortValue,
     milestoneTimelineSortValue,
@@ -145,10 +144,11 @@
     searchQuery = defaults.search;
   }
 
-  // Column sort of the global view's table, bound to its DataTable.
-  // A column sort replaces the manual order, so rows only drag (and show the
-  // grip column) once the user clears the sort.
-  let globalSort = $state({ ...DEFAULT_MILESTONE_SORT });
+  // Column sort of the global view's table, bound to its DataTable. The page
+  // opens in the manual order, like the workspace view. A column sort
+  // replaces that order, so rows only drag (and show the grip column) while
+  // no sort is active.
+  let globalSort = $state(null);
   const columnSortActive = $derived(isGlobalView && globalSort != null);
 
   // Drag-and-drop reorder state. One set of cleanups per render; the

@@ -3,9 +3,6 @@
 
 import { MILESTONE_STATUSES } from './milestoneListFilters.js';
 
-/** The page opens sorted by Updated, newest first. */
-export const DEFAULT_MILESTONE_SORT = Object.freeze({ key: 'last_updated_at', direction: 'desc' });
-
 /** Milliseconds since the epoch, or null for a missing or invalid date. */
 export function timestampSortValue(value) {
   if (!value) return null;
