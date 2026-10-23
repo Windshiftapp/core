@@ -14,10 +14,6 @@ var (
 	// workspace, so only workspace (local) milestones link pages.
 	ErrMilestonePageLinksGlobal = errors.New("page links are only available on workspace milestones")
 
-	// ErrMilestonePageLinksForbidden rejects page-link changes by a user who
-	// can view the milestone but not edit it.
-	ErrMilestonePageLinksForbidden = errors.New("changing page links requires edit rights on the milestone")
-
 	// ErrMilestonePageNotFound covers a page that does not exist, lives in
 	// another workspace, or is hidden from the user. They share one response
 	// so page existence does not leak.
@@ -174,9 +170,6 @@ func (s *MilestonePageLinkService) requireEditable(userID, milestoneID int) (int
 		return 0, ErrMilestonePageLinksGlobal
 	}
 	if _, err := s.access.AuthorizeMilestoneWrite(userID, milestoneID); err != nil {
-		if errors.Is(err, ErrPlanningForbidden) {
-			return 0, ErrMilestonePageLinksForbidden
-		}
 		return 0, err
 	}
 	return *milestone.WorkspaceID, nil

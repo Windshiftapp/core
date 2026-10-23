@@ -206,11 +206,11 @@ func TestMilestonePageLinkServiceRequiresEditRights(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := service.Create(pageLinkViewer, pageLinkLocalMilestone, 101); !errors.Is(err, ErrMilestonePageLinksForbidden) {
-		t.Fatalf("viewer create: got %v, want ErrMilestonePageLinksForbidden", err)
+	if _, err := service.Create(pageLinkViewer, pageLinkLocalMilestone, 101); !errors.Is(err, ErrPlanningForbidden) {
+		t.Fatalf("viewer create: got %v, want ErrPlanningForbidden", err)
 	}
-	if err := service.Delete(pageLinkViewer, pageLinkLocalMilestone, created.ID); !errors.Is(err, ErrMilestonePageLinksForbidden) {
-		t.Fatalf("viewer delete: got %v, want ErrMilestonePageLinksForbidden", err)
+	if err := service.Delete(pageLinkViewer, pageLinkLocalMilestone, created.ID); !errors.Is(err, ErrPlanningForbidden) {
+		t.Fatalf("viewer delete: got %v, want ErrPlanningForbidden", err)
 	}
 	if _, err := service.Create(pageLinkEditor, 99, 100); !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("missing milestone: got %v, want ErrNotFound", err)
