@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { linkTypes as linkTypesApi } from '../api/configuration.js';
   import { writable } from 'svelte/store';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -12,7 +12,12 @@
   import DataTable from '../components/DataTable.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import { Plus, Link, Edit, Trash2, Power, PowerOff } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Link from '@lucide/svelte/icons/link';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Power from '@lucide/svelte/icons/power';
+  import PowerOff from '@lucide/svelte/icons/power-off';
   import IconSelector from '../pickers/IconSelector.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
@@ -47,7 +52,7 @@
 
   async function loadLinkTypes() {
     try {
-      const types = await api.linkTypes.getAll(true); // include inactive
+      const types = await linkTypesApi.getAll(true); // include inactive
       linkTypes.set(types || []);
     } catch (error) {
       console.error('Failed to load link types:', error);
@@ -88,10 +93,10 @@
     try {
       if (editingLinkType) {
         translationEditor?.validate();
-        await api.linkTypes.update(editingLinkType.id, formData);
+        await linkTypesApi.update(editingLinkType.id, formData);
         await translationEditor?.save();
       } else {
-        await api.linkTypes.create(formData);
+        await linkTypesApi.create(formData);
       }
       await loadLinkTypes();
       showForm = false;
@@ -116,7 +121,7 @@
     });
     if (confirmed) {
       try {
-        await api.linkTypes.delete(id);
+        await linkTypesApi.delete(id);
         await loadLinkTypes();
       } catch (error) {
         console.error('Failed to delete link type:', error);
@@ -127,7 +132,7 @@
 
   async function toggleActive(linkType) {
     try {
-      await api.linkTypes.update(linkType.id, { active: !linkType.active });
+      await linkTypesApi.update(linkType.id, { active: !linkType.active });
       await loadLinkTypes();
     } catch (error) {
       console.error('Failed to toggle link type status:', error);

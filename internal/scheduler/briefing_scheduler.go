@@ -126,7 +126,7 @@ func (bs *BriefingScheduler) generateAllBriefings(stop <-chan struct{}) {
 	start := time.Now()
 	var usersProcessed int
 	var runErr error
-	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr)
+	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr, bs.now)
 
 	// Check per-feature config for daily_briefing
 	llmClient, err := bs.llmManager.ResolveForFeature("daily_briefing")

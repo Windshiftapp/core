@@ -1,5 +1,6 @@
 <script>
-  import { KeyRound, X } from '@lucide/svelte';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import X from '@lucide/svelte/icons/x';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

@@ -1,5 +1,6 @@
 <script>
-  import { IconChevronDown, IconChevronRight } from '@tabler/icons-svelte-runes';
+  import IconChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
+  import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
   import EmptyState from './EmptyState.svelte';
   import { itemUrl } from '../utils/urls.js';
   import { objectDisplayName } from '../utils/systemLabels.js';

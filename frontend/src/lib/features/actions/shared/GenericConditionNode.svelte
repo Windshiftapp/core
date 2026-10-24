@@ -1,6 +1,6 @@
 <script>
   import { Handle } from '@xyflow/svelte';
-  import { HelpCircle } from '@lucide/svelte';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
   import { getConditionOutputPositions } from '../nodes/flowDirection.js';
 
   let {

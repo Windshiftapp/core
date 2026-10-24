@@ -3,7 +3,6 @@
  */
 
 import { getTextColorForBackground as _getTextColorForBackground } from './colorUtils.js';
-import { escapeHtml } from './sanitize.ts';
 
 // Re-export getTextColorForBackground from colorUtils for backward compatibility
 export { getTextColorForBackground } from './colorUtils.js';
@@ -191,58 +190,6 @@ export function getStatusColor(status, statuses, statusCategories) {
 // ============================================
 
 /**
- * Get test status badge styles (inline CSS for theme support)
- */
-function getTestStatusBadgeStyle(status) {
-  const styles = {
-    not_run: {
-      background: 'var(--ds-status-neutral-bg)',
-      color: 'var(--ds-status-neutral-text)',
-      border: 'var(--ds-status-neutral-border)',
-    },
-    passed: {
-      background: 'var(--ds-status-success-bg)',
-      color: 'var(--ds-status-success-text)',
-      border: 'var(--ds-status-success-border)',
-    },
-    failed: {
-      background: 'var(--ds-status-danger-bg)',
-      color: 'var(--ds-status-danger-text)',
-      border: 'var(--ds-status-danger-border)',
-    },
-    blocked: {
-      background: 'var(--ds-status-warning-bg)',
-      color: 'var(--ds-status-warning-text)',
-      border: 'var(--ds-status-warning-border)',
-    },
-    skipped: {
-      background: 'var(--ds-status-neutral-bg)',
-      color: 'var(--ds-status-neutral-text)',
-      border: 'var(--ds-status-neutral-border)',
-    },
-    in_progress: {
-      background: 'var(--ds-status-info-bg)',
-      color: 'var(--ds-status-info-text)',
-      border: 'var(--ds-status-info-border)',
-    },
-    completed: {
-      background: 'var(--ds-status-success-bg)',
-      color: 'var(--ds-status-success-text)',
-      border: 'var(--ds-status-success-border)',
-    },
-  };
-  return styles[status] || styles.not_run;
-}
-
-/**
- * Get CSS string for test status badge
- */
-export function getStatusBadgeCSS(status) {
-  const style = getTestStatusBadgeStyle(status);
-  return `background-color: ${style.background}; color: ${style.color}; border: 1px solid ${style.border};`;
-}
-
-/**
  * Get test status button styles (for Pass/Fail/Blocked/Skip buttons)
  */
 export function getStatusButtonStyle(status, isSelected) {
@@ -294,20 +241,17 @@ export function getStatusLabel(status) {
 }
 
 /**
- * Generate test status badge HTML for DataTable render functions
+ * Map a test status to a Lozenge color name.
  */
-export function renderStatusBadge(status) {
-  const style = getStatusBadgeCSS(status);
-  const label = getStatusLabel(status);
-  return `<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" style="${style}">${label}</span>`;
-}
-
-/**
- * Generate milestone badge HTML for DataTable render functions
- */
-export function renderMilestoneBadge(name) {
-  if (!name) {
-    return `<span style="color: var(--ds-text-subtle);">No milestone</span>`;
-  }
-  return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-status-info-bg); color: var(--ds-status-info-text);">${escapeHtml(name)}</span>`;
+export function getTestStatusColor(status) {
+  const colors = {
+    passed: 'green',
+    failed: 'red',
+    blocked: 'amber',
+    skipped: 'gray',
+    not_run: 'gray',
+    in_progress: 'blue',
+    completed: 'green',
+  };
+  return colors[status] || 'gray';
 }

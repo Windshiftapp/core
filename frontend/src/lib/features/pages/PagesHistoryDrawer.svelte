@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { pages } from '../../api/pages.js';
   import { formatRelativeTime } from '../../utils/dateFormatter.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -9,7 +9,9 @@
   import Spinner from '../../components/Spinner.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Badge from '../../components/Badge.svelte';
-  import { IconX, IconHistory, IconRestore } from '@tabler/icons-svelte-runes';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconHistory from '@tabler/icons-svelte-runes/icons/history';
+  import IconRestore from '@tabler/icons-svelte-runes/icons/restore';
   import { loadPageHistory, pageRevisionAuthorName } from './pageHistoryData.js';
 
   /** Persistent page-revision drawer with read-only previews and restore. It
@@ -17,7 +19,7 @@
   let {
     workspaceId,
     pageId = null,
-    /** Effective level resolved by PagesView via api.pages.getPermissions.
+    /** Effective level resolved by PagesView via pages.getPermissions.
      *  Used to hide the per-row Restore button for view-only callers. */
     canRestore = true,
     open = $bindable(false),
@@ -43,7 +45,7 @@
     loading = true;
     error = '';
     try {
-      history = await loadPageHistory(api, workspaceId, pageId, { limit: 50 });
+      history = await loadPageHistory(workspaceId, pageId, { limit: 50 });
     } catch (e) {
       error = e?.message || t('pages.history.loadError');
       history = [];
@@ -83,7 +85,7 @@
     if (!ok) return;
     pendingRestoreId = rev.id;
     try {
-      await api.pages.restoreRevision(workspaceId, pageId, rev.id);
+      await pages.restoreRevision(workspaceId, pageId, rev.id);
       successToast(t('pages.history.restoredOK', { rev: rev.revision_number }));
       // The restore endpoint creates a new revision and reloads via
       // the parent (which also re-derives the page body shown in the

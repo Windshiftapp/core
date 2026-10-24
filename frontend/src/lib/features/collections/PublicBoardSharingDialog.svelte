@@ -1,5 +1,6 @@
 <script>
-  import { IconExternalLink, IconWorld } from '@tabler/icons-svelte-runes';
+  import IconExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
+  import IconWorld from '@tabler/icons-svelte-runes/icons/world';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import CopyButton from '../../components/CopyButton.svelte';
@@ -9,11 +10,13 @@
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import { publicBaseURL } from '../../runtime/contextPath.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let {
     isOpen = false,
     isPublic = false,
     publicSlug = null,
+    publicMilestoneSwimlanes = false,
     slugSaved = false,
     saving = false,
     onclose = null,
@@ -22,13 +25,16 @@
 
   let draftIsPublic = $state(false);
   let draftSlug = $state('');
+  let draftPublicMilestoneSwimlanes = $state(false);
   let saveError = $state('');
   let wasOpen = false;
 
   const normalizedSlug = $derived(draftSlug.trim());
   const slugIsValid = $derived(/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(normalizedSlug));
   const hasChanges = $derived(
-    draftIsPublic !== isPublic || normalizedSlug !== (publicSlug || '')
+    draftIsPublic !== isPublic ||
+      normalizedSlug !== (publicSlug || '') ||
+      draftPublicMilestoneSwimlanes !== publicMilestoneSwimlanes
   );
   const persistedUrlAvailable = $derived(
     isPublic && slugSaved && normalizedSlug === (publicSlug || '')
@@ -41,6 +47,7 @@
     if (isOpen && !wasOpen) {
       draftIsPublic = isPublic;
       draftSlug = publicSlug || '';
+      draftPublicMilestoneSwimlanes = publicMilestoneSwimlanes;
       saveError = '';
     }
     wasOpen = isOpen;
@@ -56,9 +63,10 @@
     const result = await onsave?.({
       isPublic: draftIsPublic,
       publicSlug: normalizedSlug || null,
+      publicMilestoneSwimlanes: draftIsPublic ? draftPublicMilestoneSwimlanes : false,
     });
     if (result?.ok === false) {
-      saveError = result.error || 'Failed to save public sharing settings.';
+      saveError = result.error || t('collections.publicBoardSharing.saveError');
       return;
     }
     close();
@@ -76,8 +84,8 @@
   dataTestid="public-board-dialog"
 >
   <ModalHeader
-    title="Share public board"
-    subtitle="Publish this collection as a read-only Kanban board."
+    title={t('collections.publicBoardSharing.title')}
+    subtitle={t('collections.publicBoardSharing.subtitle')}
     icon={IconWorld}
     onclose={close}
   />
@@ -91,8 +99,8 @@
         id="public-board-enabled-input"
         checked={draftIsPublic}
         onchange={(checked) => (draftIsPublic = checked)}
-        label="Enable public sharing"
-        hint="Anyone with the link can view the board without signing in."
+        label={t('collections.publicBoardSharing.enable')}
+        hint={t('collections.publicBoardSharing.enableHint')}
         dataTestid="public-board-enabled"
       />
     </div>
@@ -104,7 +112,7 @@
           class="mb-1.5 block text-sm font-medium"
           style="color: var(--ds-text);"
         >
-          Board URL
+          {t('collections.publicBoardSharing.boardUrl')}
         </label>
         <div class="flex items-center gap-2">
           <span class="shrink-0 text-sm" style="color: var(--ds-text-subtle);">/board/</span>
@@ -120,7 +128,7 @@
           />
         </div>
         <DescriptionText variant="subtlest">
-          Use 3–64 lowercase letters, numbers, and hyphens.
+          {t('collections.publicBoardSharing.slugHint')}
         </DescriptionText>
       </div>
 
@@ -129,8 +137,8 @@
           <CopyButton
             getText={() => publicBoardUrl}
             size="sm"
-            label="Copy public link"
-            copiedLabel="Copied!"
+            label={t('collections.publicBoardSharing.copyLink')}
+            copiedLabel={t('collections.publicBoardSharing.copied')}
           />
           <Button
             href={publicBoardUrl}
@@ -140,18 +148,31 @@
             icon={IconExternalLink}
             dataTestid="public-board-preview"
           >
-            Open board
+            {t('collections.publicBoardSharing.openBoard')}
           </Button>
         </div>
       {/if}
+
+      <div
+        class="rounded-lg border p-4"
+        style="border-color: var(--ds-border); background-color: var(--ds-surface);"
+      >
+        <Checkbox
+          id="public-board-milestone-swimlanes-input"
+          checked={draftPublicMilestoneSwimlanes}
+          onchange={(checked) => (draftPublicMilestoneSwimlanes = checked)}
+          label={t('collections.publicBoardSharing.milestoneSwimlanes')}
+          hint={t('collections.publicBoardSharing.milestoneSwimlanesHint')}
+          dataTestid="public-board-milestone-swimlanes"
+        />
+      </div>
     {/if}
 
     <div
       class="rounded-md border px-3 py-2.5 text-xs leading-5"
       style="border-color: var(--ds-border); background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
     >
-      The collection query must include a <code>workspaceKey</code> scope. You must be a
-      workspace administrator in every referenced workspace.
+      {t('collections.publicBoardSharing.scopeNote')}
     </div>
 
     {#if saveError}
@@ -166,9 +187,13 @@
   </div>
 
   <DialogFooter
-    cancelLabel="Cancel"
-    confirmLabel={draftIsPublic ? 'Save sharing' : isPublic ? 'Disable sharing' : 'Save sharing'}
-    loadingLabel="Saving…"
+    cancelLabel={t('dialogs.cancel')}
+    confirmLabel={draftIsPublic
+      ? t('collections.publicBoardSharing.save')
+      : isPublic
+        ? t('collections.publicBoardSharing.disable')
+        : t('collections.publicBoardSharing.save')}
+    loadingLabel={t('common.saving')}
     loading={saving}
     confirmDisabled={!hasChanges || (draftIsPublic && !slugIsValid)}
     onCancel={close}

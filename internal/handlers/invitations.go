@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"windshift/internal/auth"
 	"windshift/internal/services"
 )
 
@@ -33,6 +34,8 @@ func (h *InvitationHandler) requireInvitationAccess(w http.ResponseWriter, r *ht
 		respondBadRequest(w, r, "invitation token has expired")
 	case services.ErrInvitationAlreadyUsed:
 		respondBadRequest(w, r, "invitation has already been used")
+	case auth.ErrPasswordTooLong:
+		respondBadRequest(w, r, err.Error())
 	default:
 		respondInternalError(w, r, err)
 	}
@@ -88,6 +91,11 @@ func (h *InvitationHandler) AcceptInvitation(w http.ResponseWriter, r *http.Requ
 	// Validate password strength (optional, but recommended)
 	if len(req.Password) < 8 {
 		respondBadRequest(w, r, "password must be at least 8 characters long")
+		return
+	}
+
+	if err := auth.ValidatePasswordLength(req.Password); err != nil {
+		respondBadRequest(w, r, err.Error())
 		return
 	}
 

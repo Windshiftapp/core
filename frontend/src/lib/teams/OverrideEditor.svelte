@@ -1,5 +1,5 @@
 <script>
-  import { api } from '../api.js';
+  import { onCallSchedules } from '../api/oncall.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import Modal from '../dialogs/Modal.svelte';
@@ -48,7 +48,7 @@
     }
     busy = true;
     try {
-      await api.onCallSchedules.createOverride(scheduleId, {
+      await onCallSchedules.createOverride(scheduleId, {
         user_id: formData.user_id,
         override_user_id: formData.override_user_id,
         start_time: toRFC3339(formData.start_time),

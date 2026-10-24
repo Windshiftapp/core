@@ -6,8 +6,9 @@
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import { Camera, Trash2 } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Camera from '@lucide/svelte/icons/camera';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { attachments } from '../api/misc.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, warningToast } from '../stores/toasts.svelte.js';
 	import TextField from '../components/TextField.svelte';
@@ -57,7 +58,7 @@
       uploadFormData.append('item_id', '0');
       uploadFormData.append('category', 'customer_avatar');
 
-      const uploadResult = await api.attachments.upload(uploadFormData);
+      const uploadResult = await attachments.upload(uploadFormData);
 
       if (uploadResult && uploadResult.success && uploadResult.avatar_url) {
         formData = { ...formData, avatar_url: uploadResult.avatar_url };

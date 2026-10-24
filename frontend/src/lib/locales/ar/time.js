@@ -25,6 +25,7 @@ export default {
     resumeTimer: 'استئناف المؤقت',
     timeLogged: 'تم تسجيل الوقت بنجاح',
     timeTrackingProject: 'مشروع تتبع الوقت',
+    noCustomer: 'بدون عميل',
     workItemOptional: 'عنصر العمل (اختياري)',
     whatDidYouWorkOn: 'على ماذا عملت؟',
     start: 'البداية',

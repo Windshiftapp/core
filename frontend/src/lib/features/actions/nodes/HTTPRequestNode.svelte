@@ -1,5 +1,5 @@
 <script>
-  import { Globe } from '@lucide/svelte';
+  import Globe from '@lucide/svelte/icons/globe';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

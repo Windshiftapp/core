@@ -1,15 +1,11 @@
 <script>
-  import { currentRoute, navigate } from '../router.js';
+  import { currentRoute } from '../router.js';
   import PermissionManager from '../settings/PermissionManager.svelte';
-  import PermissionSetManager from '../settings/PermissionSetManager.svelte';
+  import TabNav from '../components/TabNav.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  // Get active subtab from URL query params, default to 'permissions'
+  // Active subtab is read from the URL query so deep links keep working.
   let subtab = $derived($currentRoute.query?.subtab || 'permissions');
-
-  function switchSubtab(newSubtab) {
-    navigate(`/admin/permissions?subtab=${newSubtab}`);
-  }
 
   let tabs = $derived([
     { id: 'permissions', label: t('permissions.title') }
@@ -19,25 +15,7 @@
 </script>
 
 <div class="space-y-6">
-  <!-- Tab Navigation -->
-  <div class="border-b" style="border-color: var(--ds-border);">
-    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-      {#each tabs as tab}
-        <button
-          onclick={() => switchSubtab(tab.id)}
-          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors {
-            subtab === tab.id
-              ? ''
-              : 'border-transparent hover:border-ds-border-bold'
-          }"
-          style="{subtab === tab.id ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-          aria-current={subtab === tab.id ? 'page' : undefined}
-        >
-          {tab.label}
-        </button>
-      {/each}
-    </nav>
-  </div>
+  <TabNav {tabs} basePath="/admin/permissions" paramName="subtab" defaultTab="permissions" />
 
   <!-- Tab Content -->
   <div>

@@ -48,7 +48,7 @@ func (e *Engine) resolveGoals(ctx context.Context, queryer database.Tx, config *
 	for _, id := range itemIDs {
 		queryArgs = append(queryArgs, id)
 	}
-	query := `SELECT i.id, i.priority_id, ` + caseSQL.String() + ` ` + repository.ItemListFilterFromClause() + ` WHERE i.id IN (` + placeholders + `)`
+	query := `SELECT i.id, ` + caseSQL.String() + ` ` + repository.ItemListFilterFromClause() + ` WHERE i.id IN (` + placeholders + `)`
 
 	rows, err := queryer.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
@@ -62,8 +62,8 @@ func (e *Engine) resolveGoals(ctx context.Context, queryer database.Tx, config *
 	}
 	for rows.Next() {
 		var itemID int
-		var priorityID, matchedGoalID sql.NullInt64
-		if err := rows.Scan(&itemID, &priorityID, &matchedGoalID); err != nil {
+		var matchedGoalID sql.NullInt64
+		if err := rows.Scan(&itemID, &matchedGoalID); err != nil {
 			return nil, fmt.Errorf("scan goal match: %w", err)
 		}
 		if !matchedGoalID.Valid {
@@ -71,32 +71,17 @@ func (e *Engine) resolveGoals(ctx context.Context, queryer database.Tx, config *
 			continue
 		}
 		goal := goalsByID[int(matchedGoalID.Int64)]
-		var priority *int
-		if priorityID.Valid {
-			value := int(priorityID.Int64)
-			priority = &value
-		}
-		target := selectTarget(goal, priority)
+		target := firstTarget(goal)
 		resolved[itemID] = goalTarget{goalID: goal.id, target: target, query: goal.ql, matched: target != nil}
 	}
 	return resolved, rows.Err()
 }
 
-// selectTarget picks the priority-scoped target matching the item's priority,
-// falling back to the goal's fallback target last.
-func selectTarget(goal *compiledGoal, priority *int) *models.SLAGoalTarget {
-	var fallback *models.SLAGoalTarget
-	for i := range goal.targets {
-		target := &goal.targets[i]
-		if target.IsFallback {
-			if fallback == nil {
-				fallback = target
-			}
-			continue
-		}
-		if priority != nil && target.PriorityID != nil && *target.PriorityID == *priority {
-			return target
-		}
+// firstTarget returns a goal's target. A goal has exactly one target; the
+// native API and the import expansion both guarantee that.
+func firstTarget(goal *compiledGoal) *models.SLAGoalTarget {
+	if len(goal.targets) == 0 {
+		return nil
 	}
-	return fallback
+	return &goal.targets[0]
 }

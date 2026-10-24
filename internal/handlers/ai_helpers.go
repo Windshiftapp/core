@@ -22,11 +22,17 @@ func parseConnectionIDParam(r *http.Request) int {
 }
 
 // requireLLMClientForFeature resolves an LLM client respecting per-feature admin
+// llmFeatureResolver resolves an LLM client for one AI feature. Implemented by
+// *llm.ConnectionManager; the narrow interface keeps AI handlers testable.
+type llmFeatureResolver interface {
+	ResolveForFeatureWithOverride(featureKey string, userOverrideConnectionID int) (llm.Client, error)
+}
+
 // configuration. The user-supplied override (Chat UI's connection selector) is
 // only honored when the feature is in default mode — a feature that's pinned
 // to a specific connection or fully disabled cannot be bypassed by sending a
 // different connection_id.
-func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager *llm.ConnectionManager, featureKey string, userOverrideConnectionID int) llm.Client {
+func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager llmFeatureResolver, featureKey string, userOverrideConnectionID int) llm.Client {
 	client, err := manager.ResolveForFeatureWithOverride(featureKey, userOverrideConnectionID)
 	if err != nil {
 		if errors.Is(err, llm.ErrFeatureDisabled) {

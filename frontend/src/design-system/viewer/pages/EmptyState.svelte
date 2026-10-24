@@ -1,7 +1,12 @@
 <script>
   import EmptyState from '../../../lib/components/EmptyState.svelte'
   import Button from '../../../lib/components/Button.svelte'
-  import { Inbox, Search, FileText, Users, Plus, FolderOpen } from '@lucide/svelte'
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import Search from '@lucide/svelte/icons/search';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Users from '@lucide/svelte/icons/users';
+  import Plus from '@lucide/svelte/icons/plus';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
 </script>
 
 <div class="p-8 max-w-6xl">

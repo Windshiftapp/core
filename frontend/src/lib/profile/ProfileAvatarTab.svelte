@@ -1,13 +1,16 @@
 <script>
-  import { Trash2, Upload, User } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Upload from '@lucide/svelte/icons/upload';
+  import User from '@lucide/svelte/icons/user';
+  import { attachments } from '../api/misc.js';
+  import { updateUserAvatar } from '../api/users.js';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import FileInput from '../components/FileInput.svelte';
   import Spinner from '../components/Spinner.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { authStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let { user = $bindable(null), userId = null } = $props();
@@ -33,9 +36,9 @@
       formData.append('item_id', '0');
       formData.append('category', 'avatar');
 
-      const uploadResult = await api.attachments.upload(formData);
+      const uploadResult = await attachments.upload(formData);
       if (uploadResult?.success && uploadResult.avatar_url) {
-        user = await api.updateUserAvatar(userId, uploadResult.avatar_url);
+        user = await updateUserAvatar(userId, uploadResult.avatar_url);
         authStore.patchCurrentUser({ avatar_url: user.avatar_url || uploadResult.avatar_url });
         showUpload = false;
       }
@@ -58,7 +61,7 @@
     if (!confirmed) return;
 
     try {
-      user = await api.updateUserAvatar(userId, null);
+      user = await updateUserAvatar(userId, null);
       authStore.patchCurrentUser({ avatar_url: '' });
     } catch (err) {
       error = err.message || t('dialogs.alerts.failedToDelete', { error: 'avatar' });

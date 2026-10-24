@@ -1,40 +1,38 @@
-import {
-  IconActivity,
-  IconAlertCircle,
-  IconArrowsShuffle,
-  IconBarrierBlock,
-  IconBell,
-  IconBolt,
-  IconCloudDownload,
-  IconDatabase,
-  IconFileText,
-  IconGitBranch,
-  IconGitMerge,
-  IconHierarchy2,
-  IconKey,
-  IconLayout,
-  IconLayoutGrid,
-  IconLifebuoy,
-  IconLink,
-  IconMail,
-  IconMessage,
-  IconPackage,
-  IconPalette,
-  IconPaperclip,
-  IconPlug,
-  IconPuzzle,
-  IconRosetteDiscountCheck,
-  IconRubberStamp,
-  IconSettings,
-  IconSettings2,
-  IconShield,
-  IconShieldLock,
-  IconSparkles,
-  IconStack2,
-  IconUserCheck,
-  IconUserStar,
-  IconUsers,
-} from '@tabler/icons-svelte-runes';
+import IconActivity from '@tabler/icons-svelte-runes/icons/activity';
+import IconAlertCircle from '@tabler/icons-svelte-runes/icons/alert-circle';
+import IconArrowsShuffle from '@tabler/icons-svelte-runes/icons/arrows-shuffle';
+import IconBarrierBlock from '@tabler/icons-svelte-runes/icons/barrier-block';
+import IconBell from '@tabler/icons-svelte-runes/icons/bell';
+import IconBolt from '@tabler/icons-svelte-runes/icons/bolt';
+import IconCloudDownload from '@tabler/icons-svelte-runes/icons/cloud-download';
+import IconDatabase from '@tabler/icons-svelte-runes/icons/database';
+import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+import IconGitBranch from '@tabler/icons-svelte-runes/icons/git-branch';
+import IconGitMerge from '@tabler/icons-svelte-runes/icons/git-merge';
+import IconHierarchy2 from '@tabler/icons-svelte-runes/icons/hierarchy-2';
+import IconKey from '@tabler/icons-svelte-runes/icons/key';
+import IconLayout from '@tabler/icons-svelte-runes/icons/layout';
+import IconLayoutGrid from '@tabler/icons-svelte-runes/icons/layout-grid';
+import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
+import IconLink from '@tabler/icons-svelte-runes/icons/link';
+import IconMail from '@tabler/icons-svelte-runes/icons/mail';
+import IconMessage from '@tabler/icons-svelte-runes/icons/message';
+import IconPackage from '@tabler/icons-svelte-runes/icons/package';
+import IconPalette from '@tabler/icons-svelte-runes/icons/palette';
+import IconPaperclip from '@tabler/icons-svelte-runes/icons/paperclip';
+import IconPlug from '@tabler/icons-svelte-runes/icons/plug';
+import IconPuzzle from '@tabler/icons-svelte-runes/icons/puzzle';
+import IconRosetteDiscountCheck from '@tabler/icons-svelte-runes/icons/rosette-discount-check';
+import IconRubberStamp from '@tabler/icons-svelte-runes/icons/rubber-stamp';
+import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
+import IconSettings2 from '@tabler/icons-svelte-runes/icons/settings-2';
+import IconShield from '@tabler/icons-svelte-runes/icons/shield';
+import IconShieldLock from '@tabler/icons-svelte-runes/icons/shield-lock';
+import IconSparkles from '@tabler/icons-svelte-runes/icons/sparkles';
+import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
+import IconUserCheck from '@tabler/icons-svelte-runes/icons/user-check';
+import IconUserStar from '@tabler/icons-svelte-runes/icons/user-star';
+import IconUsers from '@tabler/icons-svelte-runes/icons/users';
 
 /**
  * @typedef {Object} AdminTab

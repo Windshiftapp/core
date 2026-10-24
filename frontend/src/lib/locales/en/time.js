@@ -24,6 +24,7 @@ export default {
     resumeTimer: 'Resume Timer',
     timeLogged: 'Time logged successfully',
     timeTrackingProject: 'Time Tracking Project',
+    noCustomer: 'No customer',
     workItemOptional: 'Work Item (Optional)',
     whatDidYouWorkOn: 'What did you work on?',
     start: 'Start',

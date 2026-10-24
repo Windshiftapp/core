@@ -4,10 +4,17 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { IconArrowLeft as ArrowLeft, IconCalendar as Calendar, IconFlag as Flag, IconEdit as Edit, IconTrash as Trash2, IconDots as MoreHorizontal, IconTag as Tag, IconExternalLink as ExternalLink } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import Calendar from '@tabler/icons-svelte-runes/icons/calendar';
+  import Flag from '@tabler/icons-svelte-runes/icons/flag';
+  import Edit from '@tabler/icons-svelte-runes/icons/edit';
+  import Trash2 from '@tabler/icons-svelte-runes/icons/trash';
+  import MoreHorizontal from '@tabler/icons-svelte-runes/icons/dots';
+  import Tag from '@tabler/icons-svelte-runes/icons/tag';
+  import ExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
+  import { milestones } from '../../api/milestones.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
@@ -92,8 +99,8 @@
     error = null;
     try {
       [progress, milestone] = await Promise.all([
-        api.milestones.getProgress(milestoneId),
-        api.milestones.get(milestoneId)
+        milestones.getProgress(milestoneId),
+        milestones.get(milestoneId)
       ]);
       // Expand all categories by default
       if (progress?.status_breakdown) {
@@ -217,14 +224,7 @@
   <div class="flex-1 max-w-5xl mx-auto p-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <button
-        onclick={goBack}
-        class="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
-        style="color: var(--ds-text-subtle);"
-      >
-        <ArrowLeft class="w-4 h-4" />
-        {t('common.back')}
-      </button>
+      <BackButton onclick={goBack} label={t('common.back')} />
 
       {#if progress}
         <DropdownMenu

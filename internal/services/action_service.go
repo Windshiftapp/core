@@ -1427,6 +1427,8 @@ func (as *ActionService) normalizeSetFieldCustomValue(customFieldID int, value s
 		}
 	case "multiselect":
 		values[fieldKey] = parseActionMultiselectValue(value)
+	case "multi_milestone":
+		values[fieldKey] = parseActionMultiselectValue(value)
 	case models.CustomFieldTypeBoolean, models.CustomFieldTypeCheckbox:
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "":

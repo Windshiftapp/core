@@ -1,7 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
-  import { Plus, Edit, Trash2, AlertCircle } from '@lucide/svelte';
+  import { priorities as prioritiesApi } from '../api/configuration.js';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { priorityIconMap, priorityIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -57,7 +60,7 @@
     try {
       isLoading = true;
       error = null;
-      priorities = await api.priorities.getAll();
+      priorities = await prioritiesApi.getAll();
       // Sort by sort_order
       priorities = priorities.sort((a, b) => a.sort_order - b.sort_order);
     } catch (err) {
@@ -122,10 +125,10 @@
 
       if (editingId) {
         translationEditor?.validate();
-        await api.priorities.update(editingId, formData);
+        await prioritiesApi.update(editingId, formData);
         await translationEditor?.save();
       } else {
-        await api.priorities.create(formData);
+        await prioritiesApi.create(formData);
       }
 
       await loadPriorities();
@@ -148,7 +151,7 @@
     if (!confirmed) return;
 
     try {
-      await api.priorities.delete(id);
+      await prioritiesApi.delete(id);
       await loadPriorities();
       error = null;
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));

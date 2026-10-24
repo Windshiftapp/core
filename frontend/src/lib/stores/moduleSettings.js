@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { api } from '../api.js';
+import { setup } from '../api/admin.js';
 
 // Create the module settings store with default values
 function createModuleSettingsStore() {
@@ -33,7 +33,7 @@ function createModuleSettingsStore() {
       });
 
       try {
-        const settings = await api.setup.getModuleSettings();
+        const settings = await setup.getModuleSettings();
         set({
           ...settings,
           loaded: true,
@@ -53,7 +53,7 @@ function createModuleSettingsStore() {
     // Update module settings both in store and API
     async update(newSettings) {
       try {
-        await api.setup.updateModuleSettings(newSettings);
+        await setup.updateModuleSettings(newSettings);
         update((state) => ({
           ...state,
           ...newSettings,

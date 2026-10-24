@@ -3,17 +3,22 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import {
-    IconCalendar, IconCircleCheck, IconClock, IconPlus, IconEdit, IconTrash,
-    IconWorld, IconBuilding, IconTarget
-  } from '@tabler/icons-svelte-runes';
+  import IconCalendar from '@tabler/icons-svelte-runes/icons/calendar';
+  import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconEdit from '@tabler/icons-svelte-runes/icons/edit';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconWorld from '@tabler/icons-svelte-runes/icons/world';
+  import IconBuilding from '@tabler/icons-svelte-runes/icons/building';
+  import IconTarget from '@tabler/icons-svelte-runes/icons/target';
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import IterationModal from '../../dialogs/IterationModal.svelte';
   import { preservePlanningScope } from '../../utils/planningScope.js';
   import IterationNavigation from './IterationNavigation.svelte';
   import { formatDateShort } from '../../utils/dateFormatter.js';
-  import { api } from '../../api.js';
+  import { iterationTypes as iterationTypesApi, iterations as iterationsApi } from '../../api/milestones.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { currentRoute, navigate } from '../../router.js';
@@ -88,8 +93,8 @@
         ? { is_global: true }
         : { workspace_id: workspaceId, include_global: true };
       const [iterationsData, typesData] = await Promise.all([
-        api.iterations.getAll(filters),
-        api.iterationTypes.getAll()
+        iterationsApi.getAll(filters),
+        iterationTypesApi.getAll()
       ]);
       // Force reactivity by creating new array
       iterations = Array.isArray(iterationsData) ? [...iterationsData] : [];
@@ -121,12 +126,12 @@
   async function handleSave(data) {
     try {
       if (editingIteration) {
-        await api.iterations.update(
+        await iterationsApi.update(
           editingIteration.id,
           preservePlanningScope(data, editingIteration)
         );
       } else {
-        await api.iterations.create(data);
+        await iterationsApi.create(data);
       }
       await loadData();
       showModal = false;
@@ -152,7 +157,7 @@
     });
     if (confirmed) {
       try {
-        await api.iterations.delete(iteration.id);
+        await iterationsApi.delete(iteration.id);
         await loadData();
       } catch (error) {
         console.error('Failed to delete iteration:', error);

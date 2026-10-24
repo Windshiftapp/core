@@ -101,7 +101,7 @@ func NewTimeWorklogRepository(db database.Database) *TimeWorklogRepository {
 
 const worklogDetailSelect = `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
        w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
+       c.name, COALESCE(c.builtin_key, ''), p.name, i.title, ws.id, ws.key, i.workspace_item_number,
        p.settings,
        (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id),
        w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '')
@@ -125,7 +125,7 @@ func scanWorklogDetail(scanner worklogDetailScanner) (models.Worklog, error) {
 	err := scanner.Scan(
 		&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description,
 		&worklog.Date, &worklog.StartTime, &worklog.EndTime, &worklog.DurationMins,
-		&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
+		&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.CustomerBuiltinKey, &worklog.ProjectName, &itemTitle,
 		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
 		&userID, &userName,
 	)
@@ -181,15 +181,16 @@ type WorklogDetailFilter struct {
 // WorklogAggregateInput is the slim projection feeding server-side report
 // aggregation: no description, item, or label columns.
 type WorklogAggregateInput struct {
-	StartTimeUnix   int64
-	EndTimeUnix     int64
-	DurationMinutes int
-	UserID          int
-	UserName        string
-	ProjectID       int
-	ProjectName     string
-	CustomerID      int
-	CustomerName    string
+	StartTimeUnix      int64
+	EndTimeUnix        int64
+	DurationMinutes    int
+	UserID             int
+	UserName           string
+	ProjectID          int
+	ProjectName        string
+	CustomerID         int
+	CustomerName       string
+	CustomerBuiltinKey string
 }
 
 // StreamAggregateInputs invokes fn for every worklog matching the filter,
@@ -203,7 +204,7 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 	where, args := worklogDetailWhere(filter)
 	query := `SELECT w.start_time, w.end_time, w.duration_minutes,
 	       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, ''),
-	       w.project_id, p.name, w.customer_id, c.name
+	       w.project_id, p.name, w.customer_id, c.name, COALESCE(c.builtin_key, '')
 	FROM time_worklogs w
 	JOIN customer_organisations c ON w.customer_id = c.id
 	JOIN time_projects p ON w.project_id = p.id
@@ -220,7 +221,7 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 		var item WorklogAggregateInput
 		if scanErr := rows.Scan(&item.StartTimeUnix, &item.EndTimeUnix, &item.DurationMinutes,
 			&item.UserID, &item.UserName, &item.ProjectID, &item.ProjectName,
-			&item.CustomerID, &item.CustomerName); scanErr != nil {
+			&item.CustomerID, &item.CustomerName, &item.CustomerBuiltinKey); scanErr != nil {
 			return fmt.Errorf("scan worklog aggregate input: %w", scanErr)
 		}
 		if err := fn(&item); err != nil {
@@ -448,7 +449,7 @@ type WorklogListFilter struct {
 func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Worklog, int, error) {
 	query := `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
 	       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-	       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
+	       c.name, COALESCE(c.builtin_key, ''), p.name, i.title, ws.id, ws.key, i.workspace_item_number,
 	       p.settings as project_settings,
 	       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
 	FROM time_worklogs w
@@ -495,7 +496,7 @@ func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Workl
 		var projectTotalHours sql.NullFloat64
 		if err := rows.Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description,
 			&wl.Date, &wl.StartTime, &wl.EndTime, &wl.DurationMins,
-			&wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
+			&wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.CustomerBuiltinKey, &wl.ProjectName, &itemTitle,
 			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours); err != nil {
 			continue
 		}

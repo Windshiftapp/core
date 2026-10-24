@@ -68,6 +68,9 @@ type ProcessingResult struct {
 	CommentID    *int
 	CustomerID   *int
 	ErrorMessage string
+	// SkipReason is set for ActionSkipped when the message was machine-generated
+	// (see SystemMailCategory). Empty for a skipped empty reply.
+	SkipReason string
 }
 
 // ProcessingAction represents what happened when processing an email
@@ -102,6 +105,11 @@ type Provider interface {
 }
 
 // OAuthProvider extends Provider with OAuth-specific functionality
+//
+// The monitored mailbox address is configuration, not something the provider
+// discovers: it is entered by the admin and stored as
+// ChannelConfig.EmailOAuthMailbox before the flow starts. Callbacks therefore
+// read it from config rather than calling a provider identity endpoint.
 type OAuthProvider interface {
 	Provider
 
@@ -113,9 +121,6 @@ type OAuthProvider interface {
 
 	// RefreshToken refreshes an expired access token
 	RefreshToken(ctx context.Context, refreshToken string) (*OAuthTokens, error)
-
-	// GetUserEmail retrieves the email address of the authenticated user
-	GetUserEmail(ctx context.Context, accessToken string) (string, error)
 }
 
 // IMAPAuth represents authentication method for IMAP

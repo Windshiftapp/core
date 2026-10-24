@@ -1,5 +1,10 @@
 <script>
-  import { ArrowLeft, Clock, ShieldCheck, Check, MessageSquare, X } from '@lucide/svelte';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Clock from '@lucide/svelte/icons/clock';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
+  import Check from '@lucide/svelte/icons/check';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import X from '@lucide/svelte/icons/x';
   import StateDisplay from '../components/StateDisplay.svelte';
   import Badge from '../components/Badge.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -7,7 +12,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import { portalApprovalsStore } from '../stores/portalActivity.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { authStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
 
   // Resolve "is this customer in the active pool" so we know whether to show

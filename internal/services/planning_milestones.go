@@ -152,15 +152,20 @@ func scanMilestoneRow(sc milestoneScanner, extra ...any) (MilestoneResult, error
 	return m, nil
 }
 
-// scanMilestones scans all rows from a milestone query into a slice.
-func scanMilestones(rows *sql.Rows) ([]MilestoneResult, error) { //nolint:unparam // error is always nil but kept for consistency with scan pattern
+// scanMilestones scans all rows from a milestone query into a slice. A scan or
+// iteration failure is returned rather than silently dropping rows, so callers
+// never mistake an incomplete read for a complete empty result.
+func scanMilestones(rows *sql.Rows) ([]MilestoneResult, error) {
 	var milestones []MilestoneResult
 	for rows.Next() {
 		m, err := scanMilestoneRow(rows)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan milestone row: %w", err)
 		}
 		milestones = append(milestones, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate milestones: %w", err)
 	}
 	if milestones == nil {
 		milestones = []MilestoneResult{}
@@ -305,11 +310,11 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 	var milestones []MilestoneResult
 	if params.IncludeLastUpdated {
 		milestones, err = scanMilestonesWithLastUpdated(rows)
-		if err != nil {
-			return nil, 0, err
-		}
 	} else {
-		milestones, _ = scanMilestones(rows)
+		milestones, err = scanMilestones(rows)
+	}
+	if err != nil {
+		return nil, 0, err
 	}
 
 	var total int
@@ -1189,10 +1194,66 @@ func (s *PlanningService) DeleteMilestone(id int, auditActors ...AuditActor) err
 	if err != nil {
 		return err
 	}
+	s.enqueueMilestoneReferenceCleanup(id)
 	if actor := optionalAuditActor(auditActors); actor != nil {
 		emitServiceAudit(s.db, *actor, logger.ActionMilestoneDelete, logger.ResourceMilestone, &id, resourceName, nil)
 	}
 	return nil
+}
+
+// enqueueMilestoneReferenceCleanup strips a deleted milestone from single- and
+// multi-value milestone custom fields. Cleanup runs asynchronously so a large
+// item population does not block deletion.
+func (s *PlanningService) enqueueMilestoneReferenceCleanup(milestoneID int) {
+	rows, err := s.db.Query(`SELECT id, field_type FROM custom_field_definitions WHERE field_type IN ('milestone', 'multi_milestone')`)
+	if err != nil {
+		slog.Warn("failed to load milestone custom fields for cleanup", slog.Int("milestone_id", milestoneID), slog.Any("error", err))
+		return
+	}
+	type fieldRef struct {
+		id        int
+		fieldType string
+	}
+	var fields []fieldRef
+	for rows.Next() {
+		var field fieldRef
+		if err := rows.Scan(&field.id, &field.fieldType); err != nil {
+			slog.Warn("failed to read milestone custom field for cleanup", slog.Int("milestone_id", milestoneID), slog.Any("error", err))
+			break
+		}
+		fields = append(fields, field)
+	}
+	if err := rows.Err(); err != nil {
+		slog.Warn("failed to list milestone custom fields for cleanup", slog.Int("milestone_id", milestoneID), slog.Any("error", err))
+	}
+	_ = rows.Close()
+
+	for _, field := range fields {
+		payload, err := json.Marshal(milestoneCleanupPayload{
+			FieldID:    field.id,
+			FieldType:  field.fieldType,
+			RemovedIDs: []int{milestoneID},
+		})
+		if err != nil {
+			slog.Warn("failed to encode milestone reference cleanup", slog.Int("milestone_id", milestoneID), slog.Int("field_id", field.id), slog.Any("error", err))
+			continue
+		}
+		// The payload matches scheduler.optionRemovalPayload; importing the
+		// scheduler here would create an import cycle through email/services.
+		if _, err := s.db.ExecWrite(
+			`INSERT INTO pending_custom_field_cleanups (field_id, job_type, payload, status, created_at)
+			 VALUES (?, 'option_removal', ?, 'pending', ?)`,
+			field.id, string(payload), time.Now(),
+		); err != nil {
+			slog.Warn("failed to enqueue milestone reference cleanup", slog.Int("milestone_id", milestoneID), slog.Int("field_id", field.id), slog.Any("error", err))
+		}
+	}
+}
+
+type milestoneCleanupPayload struct {
+	FieldID    int    `json:"field_id"`
+	FieldType  string `json:"field_type"`
+	RemovedIDs []int  `json:"removed_ids"`
 }
 
 // MilestoneTestStats aggregates test-plan activity for a milestone.

@@ -2,7 +2,9 @@
   import { onDestroy } from 'svelte';
   import { get } from 'svelte/store';
   import { useDebounce } from 'runed';
-  import { api } from '../api.js';
+  import { workspaces } from '../api/workspaces.js';
+  import { statusCategories as statusCategoriesApi, statuses } from '../api/workflows.js';
+  import { items as itemsApi } from '../api/items.js';
   import {
     useGradientStyles,
     loadWorkspaceGradient,
@@ -13,9 +15,15 @@
   } from '../stores/workspaceGradient.svelte.js';
 
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from '@lucide/svelte';
+  import Edit3 from '@lucide/svelte/icons/edit-3';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateOnly } from '../utils/dateFormatter.js';
+  import { createId } from '../utils/uuid.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -103,7 +111,7 @@
   function getDefaultSections() {
     return [
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         title: t('workspaceDashboard.overview'),
         subtitle: t('workspaceDashboard.overviewDescription'),
         system_key: 'overview',
@@ -111,7 +119,7 @@
         widget_ids: []
       },
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         title: t('workspaceDashboard.progress'),
         subtitle: t('workspaceDashboard.progressDescription'),
         system_key: 'progress',
@@ -128,10 +136,10 @@
 
     if (!section1Id || !section2Id) return [];
 
-    const widget1 = { id: crypto.randomUUID(), type: 'stats', section_id: section1Id, position: 0, width: 3, config: {} };
-    const widget2 = { id: crypto.randomUUID(), type: 'completion-chart', section_id: section2Id, position: 0, width: 2, config: {} };
-    const widget3 = { id: crypto.randomUUID(), type: 'created-chart', section_id: section2Id, position: 1, width: 1, config: {} };
-    const widget4 = { id: crypto.randomUUID(), type: 'milestone-progress', section_id: section2Id, position: 2, width: 3, config: {} };
+    const widget1 = { id: createId(), type: 'stats', section_id: section1Id, position: 0, width: 3, config: {} };
+    const widget2 = { id: createId(), type: 'completion-chart', section_id: section2Id, position: 0, width: 2, config: {} };
+    const widget3 = { id: createId(), type: 'created-chart', section_id: section2Id, position: 1, width: 1, config: {} };
+    const widget4 = { id: createId(), type: 'milestone-progress', section_id: section2Id, position: 2, width: 3, config: {} };
 
     // Update section widget_ids
     sections[0].widget_ids = [widget1.id];
@@ -230,7 +238,7 @@
 
   async function loadWorkspace() {
     try {
-      workspace = await api.workspaces.get(workspaceId);
+      workspace = await workspaces.get(workspaceId);
     } catch (error) {
       console.error('Failed to load workspace:', error);
     }
@@ -238,7 +246,7 @@
 
   async function loadStatusCategories() {
     try {
-      statusCategories = await api.statusCategories.getAll();
+      statusCategories = await statusCategoriesApi.getAll();
     } catch (error) {
       console.error('Failed to load status categories:', error);
     }
@@ -250,7 +258,7 @@
       if (collectionId) {
         params.collection_id = collectionId;
       }
-      const statsData = await api.workspaces.getStats(workspaceId, params);
+      const statsData = await workspaces.getStats(workspaceId, params);
       stats.totalCollections = statsData.total_collections || 0;
       stats.totalItems = statsData.total_items || 0;
       stats.itemsByStatusCategory = statsData.items_by_status_category || {};
@@ -267,9 +275,9 @@
         filters.collection_id = collectionId;
       }
 
-      const itemsResponse = await api.items.getAll(filters);
+      const itemsResponse = await itemsApi.getAll(filters);
       const items = itemsResponse?.data ?? [];
-      const fetchedStatuses = await api.statuses.getAll();
+      const fetchedStatuses = await statuses.getAll();
       const statusList = Array.isArray(fetchedStatuses) ? fetchedStatuses : [];
       const localStatusById = new Map(
         statusList
@@ -381,7 +389,7 @@
         backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
       };
 
-      await api.workspaces.updateHomepageLayout(workspaceId, attemptedLayout);
+      await workspaces.updateHomepageLayout(workspaceId, attemptedLayout);
       hydrateWorkspaceGradientLayout(workspaceId, attemptedLayout);
       savedWidgetWidths = captureWorkspaceWidgetWidths(attemptedLayout.widgets);
     } catch (error) {
@@ -437,7 +445,7 @@
   // Section management
   function addSection() {
     const newSection = {
-      id: crypto.randomUUID(),
+      id: createId(),
       title: t('dashboard.sections.new'),
       subtitle: '',
       display_order: sections.length,
@@ -512,7 +520,7 @@
   // Widget management
   function addWidgetToSection(sectionId, widgetType) {
     const newWidget = {
-      id: crypto.randomUUID(),
+      id: createId(),
       type: widgetType,
       section_id: sectionId,
       position: widgets.filter(w => w.section_id === sectionId).length,

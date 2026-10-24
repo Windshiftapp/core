@@ -3,9 +3,17 @@
  * Uses Svelte 5 runes pattern following theme.svelte.js
  */
 
-import { api } from '../api.js';
-import { authStore } from '../stores';
+import { assetSets } from '../api/assets.js';
+import {
+  assetReports as assetReportsApi,
+  channels,
+  requestTypes as requestTypesApi,
+} from '../api/channels.js';
+import { attachments } from '../api/misc.js';
+import { portal } from '../api/portal.js';
 import { safeCssUrl } from '../utils/sanitize';
+import { createId } from '../utils/uuid.js';
+import { authStore } from './auth.svelte.js';
 import { createFooterLinkHelpers } from './footerLinks.js';
 import {
   configurePortalActivityStore,
@@ -126,7 +134,7 @@ async function loadPortal(slug) {
       return;
     }
 
-    const bootstrap = await api.portal.getBootstrap(slug);
+    const bootstrap = await portal.getBootstrap(slug);
     portalData = bootstrap.portal;
 
     // Initialize editable state with portal data
@@ -264,7 +272,7 @@ async function handleBackgroundUpload(files) {
       uploadFormData.append('entity_id', String(portalData.channel_id));
     }
 
-    const uploadResult = await api.attachments.upload(uploadFormData);
+    const uploadResult = await attachments.upload(uploadFormData);
 
     if (uploadResult?.success && uploadResult.background_url) {
       selectBackgroundImage(uploadResult.background_url);
@@ -297,7 +305,7 @@ async function handleLogoUpload(files) {
       uploadFormData.append('entity_id', String(portalData.channel_id));
     }
 
-    const uploadResult = await api.attachments.upload(uploadFormData);
+    const uploadResult = await attachments.upload(uploadFormData);
 
     if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
@@ -390,7 +398,7 @@ async function saveCustomizations() {
 
   saveTimeout = setTimeout(async () => {
     try {
-      await api.channels.updateConfig(portalData.channel_id, buildPortalConfig());
+      await channels.updateConfig(portalData.channel_id, buildPortalConfig());
     } catch (err) {
       console.error('Failed to save customizations:', err);
     }
@@ -408,7 +416,7 @@ async function saveKnowledgeBaseConfig() {
   }
 
   try {
-    await api.channels.updateConfig(portalData.channel_id, buildPortalConfig());
+    await channels.updateConfig(portalData.channel_id, buildPortalConfig());
   } catch (err) {
     console.error('Failed to save knowledge base configuration:', err);
     errorToast(`Failed to save knowledge base configuration: ${err.message || err}`);
@@ -445,8 +453,8 @@ async function loadRequestTypes({ forCustomization = isEditing || showCustomizeP
     // Clear stale data while switching response shape.
     requestTypes = [];
     const types = forCustomization
-      ? await api.requestTypes.getForChannel(portalData.channel_id)
-      : await api.requestTypes.getForPortal(currentSlug);
+      ? await requestTypesApi.getForChannel(portalData.channel_id)
+      : await requestTypesApi.getForPortal(currentSlug);
 
     if (loadId !== requestTypesLoadId) return;
     // Field counts are internal-only.
@@ -497,8 +505,8 @@ async function loadAssetReports({ forCustomization = isEditing || showCustomizeP
     hasAssetSets = false;
 
     const response = forCustomization
-      ? await api.assetReports.getForChannel(portalData.channel_id)
-      : await api.assetReports.getForPortal(currentSlug);
+      ? await assetReportsApi.getForChannel(portalData.channel_id)
+      : await assetReportsApi.getForPortal(currentSlug);
     const reports = Array.isArray(response) ? response : [];
     const assetSetsExist =
       reports.length > 0 || (forCustomization && (await checkAssetSetsExist()));
@@ -523,7 +531,7 @@ async function loadAssetReports({ forCustomization = isEditing || showCustomizeP
  */
 async function checkAssetSetsExist() {
   try {
-    const sets = await api.assetSets.getAll();
+    const sets = await assetSets.getAll();
     return sets && sets.length > 0;
   } catch (_err) {
     return false;
@@ -554,7 +562,7 @@ function getSectionRequestTypes(section, inCustomizeMode = false) {
 // Portal Sections Management
 function addSection() {
   const newSection = {
-    id: crypto.randomUUID(),
+    id: createId(),
     title: '',
     subtitle: '',
     display_order: portalSections.length,

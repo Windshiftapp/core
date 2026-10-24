@@ -2,14 +2,15 @@
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
+  import { itemIntegrationLinks, userIntegrations } from '../api/integrations.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
-  import { Search, ExternalLink } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
@@ -47,8 +48,8 @@
     loading = true;
     try {
       const [avail, conns] = await Promise.all([
-        api.userIntegrations.getAvailableProviders(),
-        api.userIntegrations.getConnections(),
+        userIntegrations.getAvailableProviders(),
+        userIntegrations.getConnections(),
       ]);
       providers = avail || [];
       connections = conns || [];
@@ -88,7 +89,7 @@
     error = null;
 
     try {
-      searchResults = await api.itemIntegrationLinks.search(itemId, searchQuery, selectedProviderId) || [];
+      searchResults = await itemIntegrationLinks.search(itemId, searchQuery, selectedProviderId) || [];
     } catch (err) {
       console.error('Failed to search:', err);
       error = t('integrations.failedToSearch');
@@ -103,7 +104,7 @@
     error = null;
 
     try {
-      await api.itemIntegrationLinks.create(itemId, {
+      await itemIntegrationLinks.create(itemId, {
         provider_id: selectedProviderId,
         external_id: result.external_id,
         external_url: result.external_url,

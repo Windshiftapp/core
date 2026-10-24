@@ -205,6 +205,9 @@ func (s *SLAMetricService) build(ctx context.Context, workspaceID int, input SLA
 	if err := validateSLAConditions(metric.Conditions); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrSLAMetricInvalid, err)
 	}
+	if len(metric.Goals) == 0 {
+		return nil, fmt.Errorf("%w: at least one goal is required", ErrSLAMetricInvalid)
+	}
 	if err := s.validateTargets(ctx, workspaceID, metric.Goals); err != nil {
 		return nil, err
 	}
@@ -250,26 +253,27 @@ func validateSLAConditions(conditions []models.SLACondition) error {
 	return nil
 }
 
-// validateTargets ensures every referenced calendar belongs to the workspace or
-// to a team bound to it. A promise may never depend on an unauthorized
-// calendar.
+// validateTargets ensures every goal has exactly one usable target whose
+// calendar belongs to the workspace or a bound team. A promise may never
+// depend on an unauthorized calendar.
 func (s *SLAMetricService) validateTargets(ctx context.Context, workspaceID int, goals []models.SLAGoal) error {
 	for i := range goals {
-		for j := range goals[i].Targets {
-			target := &goals[i].Targets[j]
-			if target.CalendarID == 0 {
-				return fmt.Errorf("%w: each goal target needs a calendar_id", ErrSLAMetricInvalid)
-			}
-			if target.TargetMs <= 0 {
-				return fmt.Errorf("%w: each goal target needs a positive target_ms", ErrSLAMetricInvalid)
-			}
-			accessible, err := s.calendarAccessible(ctx, workspaceID, target.CalendarID)
-			if err != nil {
-				return err
-			}
-			if !accessible {
-				return fmt.Errorf("%w: goal target references a calendar this workspace cannot use", ErrSLAMetricInvalid)
-			}
+		if len(goals[i].Targets) != 1 {
+			return fmt.Errorf("%w: each goal needs exactly one target", ErrSLAMetricInvalid)
+		}
+		target := &goals[i].Targets[0]
+		if target.CalendarID == 0 {
+			return fmt.Errorf("%w: each goal target needs a calendar_id", ErrSLAMetricInvalid)
+		}
+		if target.TargetMs <= 0 {
+			return fmt.Errorf("%w: each goal target needs a positive target_ms", ErrSLAMetricInvalid)
+		}
+		accessible, err := s.calendarAccessible(ctx, workspaceID, target.CalendarID)
+		if err != nil {
+			return err
+		}
+		if !accessible {
+			return fmt.Errorf("%w: goal target references a calendar this workspace cannot use", ErrSLAMetricInvalid)
 		}
 	}
 	return nil

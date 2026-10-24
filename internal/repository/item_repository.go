@@ -336,7 +336,7 @@ const itemDetailsSelectBody = `
 	       creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
 	       pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
 	       s.name as status_name, COALESCE(s.builtin_key, '') as status_builtin_key,
-	       it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key,
+	       it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
 	       i.related_work_item_id,
 	       rw.title as related_work_item_title,
 	       rw_ws.key as related_work_item_workspace_key,
@@ -380,7 +380,7 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail sql.NullString
 	var priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
 	var statusName, statusBuiltinKey sql.NullString
-	var itemTypeName, itemTypeBuiltinKey sql.NullString
+	var itemTypeName, itemTypeBuiltinKey, itemTypeIcon, itemTypeColor sql.NullString
 	var relatedWorkItemID sql.NullInt64
 	var relatedWorkItemTitle, relatedWorkItemWorkspaceKey sql.NullString
 	var relatedWorkItemWorkspaceID, relatedWorkItemNumber sql.NullInt64
@@ -406,7 +406,7 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
 		&priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
 		&statusName, &statusBuiltinKey,
-		&itemTypeName, &itemTypeBuiltinKey,
+		&itemTypeName, &itemTypeBuiltinKey, &itemTypeIcon, &itemTypeColor,
 		&relatedWorkItemID,
 		&relatedWorkItemTitle,
 		&relatedWorkItemWorkspaceKey,
@@ -466,6 +466,8 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
 	assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
+	assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
+	assignNullableString(&item.ItemTypeColor, itemTypeColor)
 	assignNullableString(&item.TeamName, teamName)
 	assignNullableString(&item.TeamColor, teamColor)
 	assignNullableString(&item.TeamAvatarURL, teamAvatar)
@@ -956,9 +958,12 @@ func (r *ItemRepository) GetNextWorkspaceItemNumber(tx database.Tx, workspaceID 
 	return int(maxNumber + 1), nil
 }
 
-// Create inserts an item in a caller-owned transaction. Production creation
-// flows should use CreateWithRetry so rank and item-number conflicts restart
-// the full transaction.
+// Create inserts an item in a caller-owned transaction. It is the single
+// items-row insert: every creation path (services.CreateItem, workspace clone,
+// and the CreateWithRetry wrapper) goes through it, so all callers write the
+// same columns. WorkspaceItemNumber, FracIndex, and the timestamps are honored
+// when set (imports backdate rows; clone pins numbers and ranks) and defaulted
+// otherwise.
 func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) {
 	if err := acquireGlobalRankMutationLock(tx, r.db.GetDriverName()); err != nil {
 		return 0, err
@@ -966,6 +971,10 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 	customFieldValuesJSON, err := marshalCustomFields(item.CustomFieldValues)
 	if err != nil {
 		return 0, err
+	}
+	virtualFieldDataJSON, err := marshalCustomFields(item.VirtualFieldData)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal virtual field data: %w", err)
 	}
 	fracIndex := item.FracIndex
 	if fracIndex == nil || *fracIndex == "" {
@@ -977,20 +986,36 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 	}
 
 	now := time.Now()
+	createdAt := item.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	updatedAt := item.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+	}
+	lastActiveAt := item.LastActiveAt
+	if lastActiveAt.IsZero() {
+		lastActiveAt = updatedAt
+	}
+
 	var id int64
 	err = tx.QueryRow(`
 		INSERT INTO items (
-			workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-			priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
-			assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
-			story_points, estimate_minutes, frac_index, created_at, updated_at, last_active_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
+			iteration_id, project_id, inherit_project, time_project_id, assignee_id, team_id, reporter_id, creator_id, creator_portal_customer_id,
+			channel_id, request_type_id, intake_id, portal_org_shared, due_date, start_date, end_date, related_work_item_id,
+			story_points, estimate_minutes, custom_field_values, virtual_field_data, parent_id,
+			frac_index, created_at, updated_at, last_active_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
-		item.StatusID, item.PriorityID, item.DueDate, item.StartDate, item.EndDate, item.IsTask,
-		item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID,
-		customFieldValuesJSON, item.ParentID, item.RelatedWorkItemID,
-		item.StoryPoints, item.EstimateMinutes, fracIndex, now, now, now,
+		item.StatusID, item.PriorityID, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
+		item.TimeProjectID, item.AssigneeID, item.TeamID, item.ReporterID, item.CreatorID, item.CreatorPortalCustomerID,
+		item.ChannelID, item.RequestTypeID, item.IntakeID, item.PortalOrgShared,
+		item.DueDate, item.StartDate, item.EndDate, item.RelatedWorkItemID,
+		item.StoryPoints, item.EstimateMinutes, customFieldValuesJSON, virtualFieldDataJSON, item.ParentID,
+		fracIndex, createdAt, updatedAt, lastActiveAt,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create item: %w", err)
@@ -1463,7 +1488,8 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 			i.item_type_id,
 			COALESCE(it.name, '') AS item_type_name,
 			COALESCE(it.icon, '') AS item_type_icon,
-			COALESCE(it.color, '') AS item_type_color
+			COALESCE(it.color, '') AS item_type_color,
+			i.creator_portal_customer_id
 		FROM items i
 		LEFT JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
@@ -1484,13 +1510,14 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 	for rows.Next() {
 		var item models.LinkableItem
 		var description, workspaceName, workspaceKey, statusName, priorityName, itemTypeName, itemTypeIcon, itemTypeColor sql.NullString
-		var workspaceID, workspaceItemNumber, itemTypeID sql.NullInt64
+		var workspaceID, workspaceItemNumber, itemTypeID, creatorPortalCustomerID sql.NullInt64
 
 		if err := rows.Scan(
 			&item.ID, &item.Title, &description,
 			&workspaceID, &workspaceName, &workspaceKey, &workspaceItemNumber,
 			&statusName, &priorityName,
 			&itemTypeID, &itemTypeName, &itemTypeIcon, &itemTypeColor,
+			&creatorPortalCustomerID,
 		); err != nil {
 			return nil, err
 		}
@@ -1515,6 +1542,10 @@ func (r *ItemRepository) SearchLinkableItems(query string, workspaceIDs, itemTyp
 		item.ItemTypeName = itemTypeName.String
 		item.ItemTypeIcon = itemTypeIcon.String
 		item.ItemTypeColor = itemTypeColor.String
+		if creatorPortalCustomerID.Valid {
+			v := int(creatorPortalCustomerID.Int64)
+			item.CreatorPortalCustomerID = &v
+		}
 		item.Type = "item"
 		items = append(items, item)
 	}
@@ -1656,17 +1687,19 @@ func (r *ItemRepository) ResolveItemKeyReferencesInWorkspaces(keys []string, wor
 }
 
 type CandidateItem struct {
-	ID          int
-	ItemKey     string
-	Title       string
-	StatusName  string
-	Description string
+	ID                      int
+	ItemKey                 string
+	Title                   string
+	StatusName              string
+	Description             string
+	CreatorPortalCustomerID *int
 }
 
 func (r *ItemRepository) ListOpenCandidatesInWorkspace(workspaceID, excludeID, limit int) ([]CandidateItem, error) {
 	rows, err := r.db.Query(
 		`SELECT i.id, w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.title,
-		        COALESCE(s.name, '') as status_name, COALESCE(i.description, '') as description
+		        COALESCE(s.name, '') as status_name, COALESCE(i.description, '') as description,
+		        i.creator_portal_customer_id
 		 FROM items i
 		 JOIN workspaces w ON i.workspace_id = w.id
 		 LEFT JOIN statuses s ON i.status_id = s.id
@@ -1684,8 +1717,13 @@ func (r *ItemRepository) ListOpenCandidatesInWorkspace(workspaceID, excludeID, l
 	results := []CandidateItem{}
 	for rows.Next() {
 		var c CandidateItem
-		if err := rows.Scan(&c.ID, &c.ItemKey, &c.Title, &c.StatusName, &c.Description); err != nil {
+		var creatorPortalCustomerID sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.ItemKey, &c.Title, &c.StatusName, &c.Description, &creatorPortalCustomerID); err != nil {
 			return nil, fmt.Errorf("scan candidate row: %w", err)
+		}
+		if creatorPortalCustomerID.Valid {
+			v := int(creatorPortalCustomerID.Int64)
+			c.CreatorPortalCustomerID = &v
 		}
 		results = append(results, c)
 	}

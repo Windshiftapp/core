@@ -148,12 +148,18 @@
 
       <!-- Item Type Icon -->
       {#if showIcon}
-        <ItemTypeIcon itemType={itemType} />
+        <ItemTypeIcon
+          itemType={itemType}
+          icon={item.item_type_icon}
+          color={item.item_type_color}
+          title={item.item_type_name || undefined}
+          testId={`work-item-type-icon-${item.id}`}
+        />
       {/if}
 
       <!-- Item Key -->
       {#if showKey}
-        <ItemKey {item} {workspace} variant="badge" />
+        <ItemKey {item} {workspace} variant="badge" clickable={false} />
       {/if}
 
       <!-- Priority Badge -->

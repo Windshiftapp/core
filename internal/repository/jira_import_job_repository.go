@@ -25,6 +25,10 @@ type JiraImportJobInsert struct {
 	ConnectionID string
 	ConfigJSON   string
 	CreatedBy    *int
+	// LeaseExpiresAt reserves the job the moment it is queued, so a reconcile
+	// between the insert commit and worker startup does not treat it as an
+	// interrupted job and admit an overlapping import.
+	LeaseExpiresAt int64
 }
 
 // JiraImportJobStore exposes the job operations available while a connection
@@ -54,7 +58,7 @@ func (r *JiraImportJobRepository) WithLockedConnection(
 ) error {
 	return database.WithTx(r.db, func(tx database.Tx) error {
 		lockResult, err := tx.ExecWrite(`
-			UPDATE jira_import_connections SET id = id WHERE id = ?
+			UPDATE jira_import_connections SET id = id WHERE id = ? AND deleted_at IS NULL
 		`, connectionID)
 		if err != nil {
 			return fmt.Errorf("lock Jira import connection: %w", err)
@@ -86,9 +90,9 @@ func (s jiraImportJobTxStore) ListCandidates(connectionID string) ([]JiraImportJ
 
 func (s jiraImportJobTxStore) Insert(job JiraImportJobInsert) error {
 	if _, err := s.tx.ExecWrite(`
-		INSERT INTO jira_import_jobs (id, connection_id, status, scope, config_json, created_by)
-		VALUES (?, ?, 'queued', 'work_items', ?, ?)
-	`, job.ID, job.ConnectionID, job.ConfigJSON, job.CreatedBy); err != nil {
+		INSERT INTO jira_import_jobs (id, connection_id, status, scope, config_json, created_by, lease_expires_at)
+		VALUES (?, ?, 'queued', 'work_items', ?, ?, ?)
+	`, job.ID, job.ConnectionID, job.ConfigJSON, job.CreatedBy, job.LeaseExpiresAt); err != nil {
 		return fmt.Errorf("create Jira import job: %w", err)
 	}
 	return nil

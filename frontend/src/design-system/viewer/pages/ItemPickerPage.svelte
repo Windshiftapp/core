@@ -1,6 +1,9 @@
 <script>
   import ItemPicker from '../../../lib/pickers/ItemPicker.svelte'
-  import { User, Folder, Tag, Calendar } from '@lucide/svelte'
+  import User from '@lucide/svelte/icons/user';
+  import Folder from '@lucide/svelte/icons/folder';
+  import Tag from '@lucide/svelte/icons/tag';
+  import Calendar from '@lucide/svelte/icons/calendar';
 
   // Mock data for demos
   const simpleItems = [

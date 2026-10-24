@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { FileText, Plus, Trash2 } from '@lucide/svelte';
-	import { api } from '../../api.js';
+	import { milestones as milestonesApi } from '../../api/milestones.js';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import LinkComponent from '../../components/Link.svelte';
 	import DialogFooter from '../../dialogs/DialogFooter.svelte';
@@ -46,7 +46,7 @@
 		loading = true;
 		error = '';
 		try {
-			links = (await api.milestones.getPageLinks(milestoneId)) || [];
+			links = (await milestonesApi.getPageLinks(milestoneId)) || [];
 		} catch (err) {
 			console.error('Failed to load milestone page links:', err);
 			error = t('dialogs.alerts.failedToLoad', { error: t('items.linkedPages') });
@@ -90,7 +90,7 @@
 		if (!canSubmit) return;
 		linking = true;
 		try {
-			const created = await api.milestones.linkPage(milestoneId, selectedPage.id);
+			const created = await milestonesApi.linkPage(milestoneId, selectedPage.id);
 			links = [...links.filter((link) => link.id !== created.id), created];
 			linking = false;
 			closeDialog();
@@ -104,7 +104,7 @@
 
 	async function unlinkPage(linkId) {
 		try {
-			await api.milestones.unlinkPage(milestoneId, linkId);
+			await milestonesApi.unlinkPage(milestoneId, linkId);
 			links = links.filter((link) => link.id !== linkId);
 			// The focused remove button is gone; keep keyboard focus in the section.
 			addButton?.focus();

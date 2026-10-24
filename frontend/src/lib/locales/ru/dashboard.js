@@ -19,6 +19,10 @@ export default {
       },
     },
     widgetCatalog: {
+      customWidget: {
+        name: 'Свой виджет',
+        description: 'Виджет, который вы создаёте с помощью ИИ или программы OpenUI',
+      },
       dailyBriefing: {
         name: 'Сводка дня',
         description: 'Сформированная ИИ сводка важных событий на сегодня',
@@ -42,6 +46,10 @@ export default {
       assignedToMe: {
         name: 'Назначено мне',
         description: 'Открытые элементы, назначенные вам во всех рабочих пространствах',
+      },
+      createdByMe: {
+        name: 'Созданные мной',
+        description: 'Открытые элементы, созданные вами, во всех рабочих пространствах',
       },
       watchedItems: {
         name: 'Отслеживаемые элементы',
@@ -82,8 +90,50 @@ export default {
         name: 'Навигация',
         description: 'Быстрый доступ к рабочим пространствам',
       },
+      custom: {
+        name: 'Свои',
+        description: 'Создайте собственный виджет по описанию',
+      },
+      background: {
+        name: 'Фон',
+        description: 'Градиенты и готовые изображения для вашей панели',
+      },
       tipLabel: 'Совет',
       tip: 'Перетащите отсюда виджеты в любой раздел панели.',
+    },
+    widgetBuilder: {
+      createTitle: "Создать виджет",
+      editTitle: "Изменить виджет",
+      subtitle: "Опишите его или напишите программу OpenUI сами",
+      nameLabel: "Название",
+      namePlaceholder: "Моя текущая работа",
+      promptLabel: "Что он должен показывать?",
+      promptPlaceholder: "Мои задачи со счётчиками и таблицей",
+      generate: "Сгенерировать",
+      generating: "Генерация...",
+      itemQueryLabel: "Запрос элементов (CQL)",
+      assetQueryLabel: "Запрос активов (CQL)",
+      assetSetLabel: "Набор активов",
+      assetSetNone: "Нет",
+      previewLabel: "Предпросмотр",
+      previewEmpty: "Пока нечего показать",
+      loading: "Загрузка...",
+      aiUnavailable: "Генерация ИИ недоступна, поэтому новый виджет создать нельзя.",
+      aiUnavailableEditing: "Генерация ИИ недоступна. Название и запросы всё ещё можно изменить.",
+      generateFailed: "Не удалось сгенерировать",
+      saveFailed: "Не удалось сохранить",
+      loadFailed: "Не удалось загрузить виджет",
+      saving: "Сохранение...",
+    },
+    customWidgets: {
+      sourceError: "Не удалось загрузить данные этого виджета",
+      truncated: 'На основе {shown} из {total} строк',
+      renderError: "Не удалось отобразить этот виджет",
+      unavailable: "Этот виджет больше недоступен",
+      notConfigured: "Этот виджет ещё не настроен",
+      noLinks: "Нет связей между этими элементами и активами",
+      canvasUnavailable: "Для этого графика нужен canvas, который здесь недоступен",
+      renderedNodes: "Отображено {shown} из {total} узлов",
     },
     editor: {
       newSection: 'Новый раздел',
@@ -106,6 +156,8 @@ export default {
     states: {
       assignedLoadError: 'Не удалось загрузить назначенные вам элементы',
       assignedEmpty: 'Сейчас вам ничего не назначено',
+      createdLoadError: 'Не удалось загрузить созданные вами элементы',
+      createdEmpty: 'У вас нет открытых элементов, созданных вами',
       storyPointsLoadError: 'Не удалось загрузить сводку стори-поинтов',
       storyPointsEmpty: 'Открытых стори-поинтов пока не назначено',
       personalTasksLoadError: 'Не удалось загрузить личные задачи',

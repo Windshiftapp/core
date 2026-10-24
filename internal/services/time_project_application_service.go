@@ -454,9 +454,11 @@ func (s *TimeProjectApplicationService) prepareProject(project *models.TimeProje
 	if project.Name == "" {
 		return &TimeProjectValidationError{Message: "project name is required"}
 	}
-	if project.CustomerID == nil || *project.CustomerID <= 0 {
-		return &TimeProjectValidationError{Message: "customer is required"}
+	customerID, err := s.resolveCustomerID(project.CustomerID)
+	if err != nil {
+		return err
 	}
+	project.CustomerID = customerID
 	if _, err := s.customers.GetByID(*project.CustomerID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return &TimeProjectValidationError{Message: "customer was not found"}
@@ -475,6 +477,23 @@ func (s *TimeProjectApplicationService) prepareProject(project *models.TimeProje
 	return nil
 }
 
+// resolveCustomerID returns an explicitly chosen customer, or the built-in
+// no-customer placeholder when none was supplied. The placeholder keeps the
+// required-customer invariant without forcing callers to create a real one.
+func (s *TimeProjectApplicationService) resolveCustomerID(customerID *int) (*int, error) {
+	if customerID != nil && *customerID > 0 {
+		return customerID, nil
+	}
+	id, err := s.customers.FindIDByBuiltinKey(models.CustomerOrganisationBuiltinNoCustomer)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, &TimeProjectValidationError{Message: "customer is required"}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
 func sanitizeTimeProjectCategory(category *models.TimeProjectCategory) {
 	category.Name = sanitize.PlainTextField.Sanitize(category.Name)
 	category.Description = sanitize.RichText.Sanitize(category.Description)
@@ -487,5 +506,6 @@ func timeProjectModel(detail repository.TimeProjectDetail) models.TimeProject {
 		Name: detail.Name, Description: detail.Description, Status: detail.Status,
 		Color: detail.Color, HourlyRate: detail.HourlyRate, Settings: detail.Settings,
 		CreatedAt: detail.CreatedAt, UpdatedAt: detail.UpdatedAt,
+		CustomerBuiltinKey: detail.CustomerBuiltinKey,
 	}
 }

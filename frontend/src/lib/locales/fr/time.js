@@ -24,6 +24,7 @@ export default {
     resumeTimer: 'Reprendre',
     timeLogged: 'Temps enregistré avec succès',
     timeTrackingProject: 'Projet de suivi du temps',
+    noCustomer: 'Aucun client',
     workItemOptional: 'Élément de travail (optionnel)',
     whatDidYouWorkOn: 'Sur quoi avez-vous travaillé ?',
     start: 'Début',

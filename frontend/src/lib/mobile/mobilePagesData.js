@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { pages } from '../api/pages.js';
 
 /**
  * Shared data helpers for the mobile pages surface. Workspace-scoped page
@@ -16,7 +16,7 @@ import { api } from '../api.js';
  * @returns {Promise<Array<{workspace: Object, pages: any[]}>>}
  */
 export async function fetchWorkspacePageSections(workspaces) {
-  const settled = await Promise.allSettled((workspaces ?? []).map((ws) => api.pages.getAll(ws.id)));
+  const settled = await Promise.allSettled((workspaces ?? []).map((ws) => pages.getAll(ws.id)));
   const sections = [];
   for (let i = 0; i < (workspaces ?? []).length; i++) {
     const result = settled[i];
@@ -43,7 +43,7 @@ export async function searchPagesAcrossWorkspaces(
 ) {
   const settled = await Promise.allSettled(
     (workspaces ?? []).map((ws) =>
-      api.pages.searchPages(ws.id, query, { limit: limitPerWorkspace, signal })
+      pages.searchPages(ws.id, query, { limit: limitPerWorkspace, signal })
     )
   );
   const out = [];

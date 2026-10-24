@@ -2,6 +2,13 @@
   import { useResizeObserver } from 'runed';
   import { t } from '../stores/i18n.svelte.js';
 
+  // Categorical palette for pie slices, where every slice is its own series.
+  const PIE_COLORS = [
+    '#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4',
+    '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#84cc16'
+  ];
+  const PIE_OTHER_COLOR = '#94a3b8';
+
   let {
     type = 'line',
     series = [],
@@ -26,7 +33,12 @@
     barRadius = 3,
     barHeight: barHeightProp = 24,
     barGap = 8,
-    tooltipContent = null
+    tooltipContent = null,
+    // Pie charts take their slices from `series`, one per category, unless the
+    // caller passes an explicit `slices` array of {label, value, color?}.
+    slices: slicesProp = null,
+    maxSlices = 10,
+    donut = false
   } = $props();
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -38,6 +50,7 @@
       case 'bar': return { top: 32, right: 24, bottom: 64, left: 56 };
       case 'stacked-area': return { top: 32, right: 24, bottom: 48, left: 56 };
       case 'horizontal-bar': return { top: 16, right: 24, bottom: 16, left: 120 };
+      case 'pie': return { top: 8, right: 8, bottom: 8, left: 8 };
       default: return { top: 32, right: showYAxis ? 16 : 32, bottom: 40, left: showYAxis ? 48 : 32 };
     }
   });
@@ -55,6 +68,7 @@
   const cw = $derived(Math.max(containerWidth - pad.left - pad.right, 100));
   const ch = $derived.by(() => {
     if (type === 'horizontal-bar') return categories.length * (barHeightProp + barGap);
+    if (type === 'pie') return clamp(cw * heightRatio, Math.min(minHeight, maxHeight), Math.max(minHeight, maxHeight));
     return clamp(cw * heightRatio, Math.min(minHeight, maxHeight), Math.max(minHeight, maxHeight));
   });
   const sw = $derived(cw + pad.left + pad.right);
@@ -93,9 +107,10 @@
     return pad.top + ch - ((value - dMin) / vRange) * ch;
   });
 
-  // Grid lines with smart integer-step dedup when max <= 5
+  // Grid lines with smart integer-step dedup when max <= 5. A pie has no value
+  // axis, so it draws none.
   const gridLines = $derived.by(() => {
-    if (type === 'horizontal-bar') return [];
+    if (type === 'horizontal-bar' || type === 'pie') return [];
     if (dMax <= 5 && dMin === 0) {
       const steps = dMax + 1;
       return Array.from({ length: steps }, (_, i) => ({
@@ -115,9 +130,10 @@
     });
   });
 
-  // X-axis labels with max count + always-include-last
+  // X-axis labels with max count + always-include-last. A pie labels its
+  // slices instead.
   const xLabels = $derived.by(() => {
-    if (type === 'horizontal-bar') return [];
+    if (type === 'horizontal-bar' || type === 'pie') return [];
     const n = categories.length;
     if (n <= maxXLabels) return categories.map((l, i) => ({ x: getX(i), label: l }));
     const step = Math.ceil(n / (maxXLabels - 1));
@@ -228,8 +244,109 @@
     return Math.min((cw / categories.length) * 0.6, barMaxWidth);
   });
 
-  // Legend visibility
-  const legendVisible = $derived(showLegend === 'auto' ? series.length > 1 : showLegend);
+  // Legend visibility. `auto` shows it only when there is more than one series;
+  // a pie always lists its slices unless the caller turns the legend off.
+  const legendVisible = $derived.by(() => {
+    if (showLegend === 'never') return false;
+    if (showLegend === 'always') return true;
+    if (type === 'pie') return true;
+    return series.length > 1;
+  });
+
+  // Pie charts fold the categorical series into one value axis: one slice per
+  // category. A long tail collapses into an "Other" slice so the drawing stays
+  // readable, and the legend lists every slice with its share.
+  const pieSlices = $derived.by(() => {
+    if (type !== 'pie') return [];
+    const raw = slicesProp
+      ? slicesProp.map((slice, index) => ({
+          label: String(slice.label ?? ''),
+          value: Math.max(Number(slice.value) || 0, 0),
+          color: slice.color ?? PIE_COLORS[index % PIE_COLORS.length]
+        }))
+      : series.map((s, index) => ({
+          label: String(categories[index] ?? s.label ?? ''),
+          value: Math.max(Number(s.values[0]) || 0, 0),
+          color: s.color ?? PIE_COLORS[index % PIE_COLORS.length]
+        }));
+
+    const sorted = raw.filter((slice) => slice.value > 0).sort((a, b) => b.value - a.value);
+    if (sorted.length <= maxSlices) return sorted;
+
+    const kept = sorted.slice(0, maxSlices - 1);
+    const rest = sorted.slice(maxSlices - 1);
+    const restValue = rest.reduce((sum, slice) => sum + slice.value, 0);
+    const otherLabel = t('widgets.chart.otherSlices', { count: rest.length });
+    kept.push({ label: otherLabel, value: restValue, color: PIE_OTHER_COLOR, isOther: true });
+    return kept;
+  });
+  const pieTotal = $derived(pieSlices.reduce((sum, slice) => sum + slice.value, 0));
+  const pieRadius = $derived(Math.max(Math.min(cw, ch) / 2, 20));
+  const pieCenter = $derived({
+    x: pad.left + cw / 2,
+    y: pad.top + ch / 2
+  });
+
+  function polar(angle, radius) {
+    return {
+      x: pieCenter.x + radius * Math.sin(angle),
+      y: pieCenter.y - radius * Math.cos(angle)
+    };
+  }
+  function slicePath(startAngle, endAngle, radius) {
+    // A single slice covering the whole circle has no meaningful arc, so draw it
+    // as two half-circle wedges instead of one degenerate path.
+    if (endAngle - startAngle >= Math.PI * 2 - 1e-6) {
+      const a = polar(0, radius);
+      const b = polar(Math.PI, radius);
+      return `M ${a.x} ${a.y} A ${radius} ${radius} 0 1 1 ${b.x} ${b.y} A ${radius} ${radius} 0 1 1 ${a.x} ${a.y} Z`;
+    }
+    const start = polar(startAngle, radius);
+    const end = polar(endAngle, radius);
+    const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+    return `M ${pieCenter.x} ${pieCenter.y} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+  }
+  const pieData = $derived.by(() => {
+    if (type !== 'pie' || pieTotal <= 0) return [];
+    const innerRadius = donut ? pieRadius * 0.55 : 0;
+    let angle = 0;
+    return pieSlices.map((slice, index) => {
+      const sweep = (slice.value / pieTotal) * Math.PI * 2;
+      const start = angle;
+      const end = angle + sweep;
+      angle = end;
+      const mid = start + sweep / 2;
+      return {
+        ...slice,
+        index,
+        percent: (slice.value / pieTotal) * 100,
+        startAngle: start,
+        endAngle: end,
+        path: slicePath(start, end, pieRadius),
+        innerRadius,
+        labelPoint: polar(mid, (pieRadius + innerRadius) / 2)
+      };
+    });
+  });
+  const pieCenterLabel = $derived(valueFormat ? valueFormat(pieTotal) : pieTotal);
+
+  // Labels inside slices need room for the text, so short sweeps keep their
+  // label in the legend only instead of printing a clipped fragment.
+  const sliceShowsLabel = (slice) => slice.percent >= 8;
+
+  // Tooltip for a pie slice.
+  function showSliceTip(slice, x, y) {
+    hoveredIndex = slice.index;
+    hoveredSeries = 'pie';
+    tooltip = {
+      index: slice.index,
+      category: slice.label,
+      seriesValues: [{ key: 'pie', label: slice.label, color: slice.color, value: slice.value }],
+      percent: slice.percent,
+      x,
+      y
+    };
+  }
 
   // Tooltip state
   let tooltip = $state(null);
@@ -258,9 +375,9 @@
   }
 </script>
 
-{#if series.length > 0 && categories.length > 0}
-  <div class="chart" class:chart--hbar={type === 'horizontal-bar'}>
-    {#if legendVisible}
+{#if type === 'pie' ? pieSlices.length > 0 : series.length > 0 && categories.length > 0}
+  <div class="chart" class:chart--hbar={type === 'horizontal-bar'} class:chart--pie={type === 'pie'}>
+    {#if legendVisible && type !== 'pie'}
       <div class="chart-legend">
         {#each series as s}
           <div class="legend-item">
@@ -275,179 +392,268 @@
       </div>
     {/if}
 
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="chart-wrapper" bind:this={container} onmouseleave={hideTip}>
-      <svg viewBox="0 0 {sw} {sh}" style="height:{sh}px;width:100%;">
-        <!-- Gradient defs for line areas -->
-        {#if type === 'line'}
-          <defs>
-            {#each series as s}
-              {#if s.showArea !== false}
-                <linearGradient id="{chartId}-{s.key}" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" style="stop-color:{s.color};stop-opacity:{s.opacity ?? 0.35}" />
-                  <stop offset="100%" style="stop-color:{s.color};stop-opacity:0.05" />
-                </linearGradient>
+    <!-- Pie keeps its legend beside the chart when the tile is wide enough,
+         and stacks it underneath in a narrow tile. -->
+    <div class="chart-body" class:chart-body--pie={type === 'pie'}>
+      <div class="chart-body-inner" class:chart-body-inner--pie={type === 'pie'}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="chart-wrapper" bind:this={container} onmouseleave={hideTip}>
+          <svg viewBox="0 0 {sw} {sh}" style="height:{sh}px;width:100%;">
+            <!-- Gradient defs for line areas -->
+            {#if type === 'line'}
+              <defs>
+                {#each series as s}
+                  {#if s.showArea !== false}
+                    <linearGradient id="{chartId}-{s.key}" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" style="stop-color:{s.color};stop-opacity:{s.opacity ?? 0.35}" />
+                      <stop offset="100%" style="stop-color:{s.color};stop-opacity:0.05" />
+                    </linearGradient>
+                  {/if}
+                {/each}
+              </defs>
+            {/if}
+
+            <!-- Grid lines + Y-axis labels -->
+            {#each gridLines as gl}
+              <line
+                x1={pad.left} y1={gl.y} x2={pad.left + cw} y2={gl.y}
+                stroke="var(--ds-border)" stroke-width="1"
+                stroke-dasharray={gridDashed ? '3,3' : 'none'}
+              />
+              {#if showYAxis}
+                <text x={pad.left - 8} y={gl.y + 4} text-anchor="end" font-size="11" fill="var(--ds-text-subtle)">
+                  {yAxisFormat ? yAxisFormat(gl.value) : gl.value}
+                </text>
               {/if}
             {/each}
-          </defs>
-        {/if}
 
-        <!-- Grid lines + Y-axis labels -->
-        {#each gridLines as gl}
-          <line
-            x1={pad.left} y1={gl.y} x2={pad.left + cw} y2={gl.y}
-            stroke="var(--ds-border)" stroke-width="1"
-            stroke-dasharray={gridDashed ? '3,3' : 'none'}
-          />
-          {#if showYAxis}
-            <text x={pad.left - 8} y={gl.y + 4} text-anchor="end" font-size="11" fill="var(--ds-text-subtle)">
-              {yAxisFormat ? yAxisFormat(gl.value) : gl.value}
-            </text>
-          {/if}
-        {/each}
+            <!-- ── LINE ── -->
+            {#if type === 'line'}
+              {#each lineData as ld}
+                {#if ld.area}
+                  <path d={ld.area} fill="url(#{chartId}-{ld.key})" opacity="0.8" />
+                {/if}
+              {/each}
+              {#each lineData as ld}
+                {#if ld.path}
+                  <path
+                    d={ld.path} fill="none" stroke={ld.color}
+                    stroke-width={ld.strokeWidth ?? 2.5}
+                    stroke-linecap="round" stroke-linejoin="round"
+                    stroke-dasharray={ld.dashed ? '6,4' : 'none'}
+                    data-testid="chart-series-{ld.key}"
+                  />
+                {/if}
+              {/each}
+              {#each lineData as ld}
+                {#if ld.showPoints !== false}
+                  {#each ld.pts as pt, idx}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <circle
+                      cx={pt.x} cy={pt.y}
+                      r={hoveredIndex === idx ? (ld.pointRadius ?? 4) + 2 : (ld.pointRadius ?? 4)}
+                      fill={ld.color} stroke="white" stroke-width="2"
+                      class="chart-point"
+                      tabindex="-1"
+                      aria-label="{categories[idx]}: {pt.value}"
+                      data-testid="chart-point-{ld.key}-{idx}"
+                      onmouseenter={() => showTip(idx, pt.x, pt.y, ld.key)}
+                      onfocus={() => showTip(idx, pt.x, pt.y, ld.key)}
+                      onmouseleave={hideTip}
+                      onblur={hideTip}
+                    />
+                  {/each}
+                {/if}
+              {/each}
 
-        <!-- ── LINE ── -->
-        {#if type === 'line'}
-          {#each lineData as ld}
-            {#if ld.area}
-              <path d={ld.area} fill="url(#{chartId}-{ld.key})" opacity="0.8" />
-            {/if}
-          {/each}
-          {#each lineData as ld}
-            {#if ld.path}
-              <path
-                d={ld.path} fill="none" stroke={ld.color}
-                stroke-width={ld.strokeWidth ?? 2.5}
-                stroke-linecap="round" stroke-linejoin="round"
-                stroke-dasharray={ld.dashed ? '6,4' : 'none'}
-                data-testid="chart-series-{ld.key}"
-              />
-            {/if}
-          {/each}
-          {#each lineData as ld}
-            {#if ld.showPoints !== false}
-              {#each ld.pts as pt, idx}
+            <!-- ── BAR ── -->
+            {:else if type === 'bar'}
+              {#each categories as _, i}
+                {@const s = series[0]}
+                {@const v = s.values[i] || 0}
+                {@const h = ((v - dMin) / vRange) * ch}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <circle
-                  cx={pt.x} cy={pt.y}
-                  r={hoveredIndex === idx ? (ld.pointRadius ?? 4) + 2 : (ld.pointRadius ?? 4)}
-                  fill={ld.color} stroke="white" stroke-width="2"
+                <rect
+                  x={getX(i) - bw / 2} y={pad.top + ch - h}
+                  width={bw} height={h}
+                  rx={barRadius} fill={s.color}
+                  opacity={hoveredIndex === i ? 1 : 0.85}
                   class="chart-point"
                   tabindex="-1"
-                  aria-label="{categories[idx]}: {pt.value}"
-                  data-testid="chart-point-{ld.key}-{idx}"
-                  onmouseenter={() => showTip(idx, pt.x, pt.y, ld.key)}
-                  onfocus={() => showTip(idx, pt.x, pt.y, ld.key)}
+                  onmouseenter={() => showTip(i, getX(i), getY(v))}
                   onmouseleave={hideTip}
-                  onblur={hideTip}
                 />
               {/each}
-            {/if}
-          {/each}
 
-        <!-- ── BAR ── -->
-        {:else if type === 'bar'}
-          {#each categories as _, i}
-            {@const s = series[0]}
-            {@const v = s.values[i] || 0}
-            {@const h = ((v - dMin) / vRange) * ch}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <rect
-              x={getX(i) - bw / 2} y={pad.top + ch - h}
-              width={bw} height={h}
-              rx={barRadius} fill={s.color}
-              opacity={hoveredIndex === i ? 1 : 0.85}
-              class="chart-point"
-              tabindex="-1"
-              onmouseenter={() => showTip(i, getX(i), getY(v))}
-              onmouseleave={hideTip}
-            />
-          {/each}
-
-        <!-- ── STACKED AREA ── -->
-        {:else if type === 'stacked-area'}
-          {#each stackedAreas as a}
-            <path d={a.path} fill={a.color} opacity="0.6" />
-          {/each}
-
-        <!-- ── HORIZONTAL BAR ── -->
-        {:else if type === 'horizontal-bar'}
-          {#each categories as cat, i}
-            {@const y = pad.top + i * (barHeightProp + barGap)}
-            <!-- Category label on Y-axis -->
-            <text x={pad.left - 8} y={y + barHeightProp / 2 + 4} text-anchor="end" font-size="11" fill="var(--ds-text-subtle)">
-              {cat.length > 16 ? cat.slice(0, 15) + '\u2026' : cat}
-            </text>
-            <!-- Overlapping bars: first series is background (wider, lower opacity) -->
-            {#each series as s, si}
-              {@const v = s.values[i] || 0}
-              {@const w = (v / dMax) * cw}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <rect
-                x={pad.left} y={si === 0 ? y : y + 4}
-                width={Math.max(w, 2)}
-                height={si === 0 ? barHeightProp : barHeightProp - 8}
-                rx={barRadius + 1} fill={s.color}
-                opacity={s.opacity ?? (si === 0 ? 0.3 : 0.85)}
-                tabindex="-1"
-                onmouseenter={() => showTip(i, pad.left + w, y)}
-                onmouseleave={hideTip}
-              />
-            {/each}
-            <!-- Value label after widest bar -->
-            {@const maxW = Math.max(...series.map(s => ((s.values[i] || 0) / dMax) * cw))}
-            <text x={pad.left + Math.max(maxW, 2) + 6} y={y + barHeightProp / 2 + 4} font-size="10" fill="var(--ds-text-subtle)">
-              {fmtVal(series[series.length - 1].values[i])}
-            </text>
-          {/each}
-        {/if}
-
-        <!-- Reference lines -->
-        {#each referenceLines as rl}
-          {@const ry = getY(rl.value)}
-          <line
-            x1={pad.left} y1={ry} x2={pad.left + cw} y2={ry}
-            stroke={rl.color} stroke-width="1.5"
-            stroke-dasharray={rl.dashed ? '6,4' : 'none'}
-          />
-          {#if rl.label}
-            <text x={pad.left + cw + 4} y={ry + 4} font-size="10" fill={rl.color}>{rl.label}</text>
-          {/if}
-        {/each}
-
-        <!-- X-axis labels -->
-        {#each xLabels as xl}
-          {@const ly = pad.top + ch + (shouldRotate ? 16 : 20)}
-          <text
-            x={xl.x} y={ly}
-            text-anchor={shouldRotate ? 'end' : 'middle'}
-            font-size={type === 'bar' ? '10' : '11'}
-            fill="var(--ds-text-subtle)"
-            transform={shouldRotate ? `rotate(-45, ${xl.x}, ${ly})` : undefined}
-          >
-            {xl.label.length > 12 ? xl.label.slice(0, 11) + '\u2026' : xl.label}
-          </text>
-        {/each}
-      </svg>
-
-      <!-- HTML tooltip -->
-      {#if tooltip}
-        <div class="chart-tooltip" style="left:{tooltip.x}px;top:{tooltip.y}px;">
-          {#if tooltipContent}
-            {@render tooltipContent(tooltip)}
-          {:else}
-            <div class="tooltip-cat">{tooltip.category}</div>
-            {#each tooltip.seriesValues as sv}
-              <div class="tooltip-row">
-                {#if series.length > 1}
-                  <span class="tooltip-dot" style="background:{sv.color};"></span>
+            <!-- ── PIE ── -->
+            {:else if type === 'pie'}
+              {#if pieData.length === 0}
+                <text x={pieCenter.x} y={pieCenter.y} text-anchor="middle" font-size="12" fill="var(--ds-text-subtle)">
+                  {emptyMessage}
+                </text>
+              {:else}
+                {#each pieData as slice (slice.label)}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <path
+                    d={slice.path}
+                    fill={slice.color}
+                    stroke="var(--ds-surface-raised, white)"
+                    stroke-width={pieData.length > 1 ? 1 : 0}
+                    opacity={hoveredIndex === null || hoveredIndex === slice.index ? 1 : 0.55}
+                    class="chart-point"
+                    tabindex="-1"
+                    role="img"
+                    aria-label="{slice.label}: {fmtVal(slice.value)}"
+                    data-testid="chart-slice-{slice.index}"
+                    onmouseenter={() => showSliceTip(slice, slice.labelPoint.x, slice.labelPoint.y)}
+                    onfocus={() => showSliceTip(slice, slice.labelPoint.x, slice.labelPoint.y)}
+                    onmouseleave={hideTip}
+                    onblur={hideTip}
+                  />
+                {/each}
+                {#each pieData as slice (slice.label)}
+                  {#if sliceShowsLabel(slice)}
+                    <text
+                      x={slice.labelPoint.x}
+                      y={slice.labelPoint.y + 4}
+                      text-anchor="middle"
+                      font-size="11"
+                      fill="#ffffff"
+                      pointer-events="none"
+                      data-testid="chart-slice-label-{slice.index}"
+                    >
+                      {Math.round(slice.percent)}%
+                    </text>
+                  {/if}
+                {/each}
+                {#if donut}
+                  <text
+                    x={pieCenter.x}
+                    y={pieCenter.y + 5}
+                    text-anchor="middle"
+                    font-size="16"
+                    font-weight="600"
+                    fill="var(--ds-text)"
+                    pointer-events="none"
+                  >
+                    {pieCenterLabel}
+                  </text>
                 {/if}
-                <span class="tooltip-val">{fmtVal(sv.value)}</span>
-              </div>
+              {/if}
+
+            <!-- ── STACKED AREA ── -->
+            {:else if type === 'stacked-area'}
+              {#each stackedAreas as a}
+                <path d={a.path} fill={a.color} opacity="0.6" />
+              {/each}
+
+            <!-- ── HORIZONTAL BAR ── -->
+            {:else if type === 'horizontal-bar'}
+              {#each categories as cat, i}
+                {@const y = pad.top + i * (barHeightProp + barGap)}
+                <!-- Category label on Y-axis -->
+                <text x={pad.left - 8} y={y + barHeightProp / 2 + 4} text-anchor="end" font-size="11" fill="var(--ds-text-subtle)">
+                  {cat.length > 16 ? cat.slice(0, 15) + '\u2026' : cat}
+                </text>
+                <!-- Overlapping bars: first series is background (wider, lower opacity) -->
+                {#each series as s, si}
+                  {@const v = s.values[i] || 0}
+                  {@const w = (v / dMax) * cw}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <rect
+                    x={pad.left} y={si === 0 ? y : y + 4}
+                    width={Math.max(w, 2)}
+                    height={si === 0 ? barHeightProp : barHeightProp - 8}
+                    rx={barRadius + 1} fill={s.color}
+                    opacity={s.opacity ?? (si === 0 ? 0.3 : 0.85)}
+                    tabindex="-1"
+                    onmouseenter={() => showTip(i, pad.left + w, y)}
+                    onmouseleave={hideTip}
+                  />
+                {/each}
+                <!-- Value label after widest bar -->
+                {@const maxW = Math.max(...series.map(s => ((s.values[i] || 0) / dMax) * cw))}
+                <text x={pad.left + Math.max(maxW, 2) + 6} y={y + barHeightProp / 2 + 4} font-size="10" fill="var(--ds-text-subtle)">
+                  {fmtVal(series[series.length - 1].values[i])}
+                </text>
+              {/each}
+            {/if}
+
+            <!-- Reference lines -->
+            {#if type !== 'pie'}
+              {#each referenceLines as rl}
+                {@const ry = getY(rl.value)}
+                <line
+                  x1={pad.left} y1={ry} x2={pad.left + cw} y2={ry}
+                  stroke={rl.color} stroke-width="1.5"
+                  stroke-dasharray={rl.dashed ? '6,4' : 'none'}
+                />
+                {#if rl.label}
+                  <text x={pad.left + cw + 4} y={ry + 4} font-size="10" fill={rl.color}>{rl.label}</text>
+                {/if}
+              {/each}
+            {/if}
+
+            <!-- X-axis labels -->
+            {#each xLabels as xl}
+              {@const ly = pad.top + ch + (shouldRotate ? 16 : 20)}
+              <text
+                x={xl.x} y={ly}
+                text-anchor={shouldRotate ? 'end' : 'middle'}
+                font-size={type === 'bar' ? '10' : '11'}
+                fill="var(--ds-text-subtle)"
+                transform={shouldRotate ? `rotate(-45, ${xl.x}, ${ly})` : undefined}
+              >
+                {xl.label.length > 12 ? xl.label.slice(0, 11) + '\u2026' : xl.label}
+              </text>
             {/each}
+          </svg>
+
+          <!-- HTML tooltip -->
+          {#if tooltip}
+            <div class="chart-tooltip" style="left:{tooltip.x}px;top:{tooltip.y}px;">
+              {#if tooltipContent}
+                {@render tooltipContent(tooltip)}
+              {:else}
+                <div class="tooltip-cat">{tooltip.category}</div>
+                {#each tooltip.seriesValues as sv}
+                  <div class="tooltip-row">
+                    {#if series.length > 1 || type === 'pie'}
+                      <span class="tooltip-dot" style="background:{sv.color};"></span>
+                    {/if}
+                    <span class="tooltip-val">{fmtVal(sv.value)}</span>
+                    {#if type === 'pie' && tooltip.percent !== undefined}
+                      <span class="tooltip-percent">{Math.round(tooltip.percent)}%</span>
+                    {/if}
+                  </div>
+                {/each}
+              {/if}
+            </div>
           {/if}
         </div>
+
+      <!-- Pie legend: every slice is listed with its value and share, so a
+           slice too small to label stays readable. -->
+      {#if type === 'pie' && pieData.length > 0 && legendVisible}
+        <ul class="pie-legend" data-testid="chart-pie-legend">
+          {#each pieData as slice (slice.label)}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <li
+              class="pie-legend-item"
+              class:pie-legend-item--muted={hoveredIndex !== null && hoveredIndex !== slice.index}
+              data-testid="chart-slice-legend-{slice.index}"
+              onmouseenter={() => showSliceTip(slice, slice.labelPoint.x, slice.labelPoint.y)}
+              onmouseleave={hideTip}
+            >
+              <span class="pie-legend-dot" style="background:{slice.color};"></span>
+              <span class="pie-legend-label" title={slice.label}>{slice.label}</span>
+              <span class="pie-legend-value">{fmtVal(slice.value)}</span>
+              <span class="pie-legend-percent">{Math.round(slice.percent)}%</span>
+            </li>
+          {/each}
+        </ul>
       {/if}
+      </div>
     </div>
   </div>
 {:else}
@@ -571,5 +777,109 @@
     font-size: 0.875rem;
     border: 1px dashed var(--ds-border);
     border-radius: 0.5rem;
+  }
+
+  .chart--pie {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Wide tiles put the legend beside the pie so the circle and the labels
+     both get the horizontal room; narrow tiles stack them. The query has to
+     live on a wrapper: a container cannot match its own size. */
+  .chart-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .chart-body--pie {
+    container-type: inline-size;
+  }
+
+  .chart-body-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .chart-body-inner--pie {
+    gap: 1rem;
+  }
+
+  .chart-body-inner--pie .chart-wrapper {
+    max-width: 320px;
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  @container (min-width: 420px) {
+    .chart-body-inner--pie {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .chart-body-inner--pie .chart-wrapper {
+      width: 55%;
+    }
+
+    .chart-body-inner--pie .pie-legend {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  .pie-legend {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .pie-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--ds-text-subtle);
+    transition: opacity 0.1s ease;
+  }
+
+  .pie-legend-item--muted {
+    opacity: 0.5;
+  }
+
+  .pie-legend-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0.125rem;
+    flex-shrink: 0;
+  }
+
+  .pie-legend-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pie-legend-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--ds-text);
+  }
+
+  .pie-legend-percent {
+    font-variant-numeric: tabular-nums;
+    min-width: 2.25rem;
+    text-align: right;
+  }
+
+  .tooltip-percent {
+    color: var(--ds-text-subtle);
   }
 </style>

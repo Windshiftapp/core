@@ -1,5 +1,5 @@
 <script>
-  import { Users } from '@lucide/svelte';
+  import Users from '@lucide/svelte/icons/users';
   import { logbookActionFlowStore } from '../../../stores/logbookActionFlowStore.svelte.js';
   import BaseActionNode from '../../actions/shared/BaseActionNode.svelte';
 

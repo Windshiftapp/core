@@ -1,6 +1,6 @@
 <script>
-  import { AlertCircle } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import { deleteDiagram } from '../../api/misc.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
@@ -8,7 +8,6 @@
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
   import ItemIncidentPanel from '../items/ItemIncidentPanel.svelte';
-  import ItemSLAPanel from '../items/ItemSLAPanel.svelte';
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
   import ItemDetailSidebar from '../items/ItemDetailSidebar.svelte';
@@ -110,6 +109,7 @@
     onexecuteAction = null,
     onaiAction = null,
     onreorderChildren = null,
+    onrelatedStatusChanged = null,
     canCreate = false,
     onclose = null,
     recurrenceRule = null,
@@ -132,7 +132,7 @@
   let editingDiagram = $state(null);
 
   // Panel resizing state
-  let panelWidth = $state(320);
+  let panelWidth = $state(290);
   function updatePanelWidth(width) {
     panelWidth = width;
     document.documentElement.style.setProperty('--panel-width', `${width}px`);
@@ -285,7 +285,7 @@
     if (!confirmed) return;
 
     try {
-      await api.deleteDiagram(diagram.id);
+      await deleteDiagram(diagram.id);
       await ondiagramSaved?.();
       successToast(t('editors.diagramDeleted'));
     } catch (err) {
@@ -300,6 +300,10 @@
 
   function handleReorderChildren() {
     onreorderChildren?.();
+  }
+
+  function handleRelatedStatusChanged(data) {
+    return onrelatedStatusChanged?.(data);
   }
 
   function handleAIAction(data) {
@@ -399,8 +403,6 @@
 
           <ItemIncidentPanel itemId={item.id} {item} {canEdit} />
 
-          <ItemSLAPanel itemId={item.id} />
-
           <ItemDetailLinks
             {item}
             {workspace}
@@ -421,6 +423,7 @@
             onviewtestcase={handleViewTestCase}
             onshowlinkmodal={handleShowLinkModal}
             onreorderchildren={handleReorderChildren}
+            onstatuschanged={handleRelatedStatusChanged}
           />
 
           <br />
@@ -442,12 +445,12 @@
         </div>
 
         <!-- Resizable Right Panel -->
-        <div class="flex-shrink-0 relative {isModal ? 'h-full' : ''}" style="width: var(--panel-width, 320px); min-width: 280px; max-width: 600px;">
+        <div class="flex-shrink-0 relative {isModal ? 'h-full' : ''}" style="width: var(--panel-width, 290px); min-width: 280px; max-width: 600px;">
           <SidebarResizeHandle
             width={panelWidth}
             minWidth={280}
             maxWidth={600}
-            defaultWidth={320}
+            defaultWidth={290}
             edge="left"
             label="Resize item details"
             title="Drag to resize, double-click to reset"

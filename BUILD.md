@@ -41,6 +41,11 @@ go build -o ws
 cd ../..
 ```
 
+`frontend/.npmrc` sets `ignore-scripts=true`, so package install scripts never
+run. The OpenUI packages ship a telemetry postinstall; keep
+`OPENUI_TELEMETRY_DISABLED=1` and `DO_NOT_TRACK=1` set in any environment that
+re-enables install scripts (CI, Docker, or an explicit `npm rebuild`).
+
 ## Build Output
 
 ### Development Builds (Makefile)
@@ -127,12 +132,12 @@ make build-windows-arm64
 ## Build Requirements
 
 ### For Server + Frontend
-- **Go 1.27.2** - Exact version declared in `go.mod`
+- **Go 1.27.3** - Exact version declared in `go.mod`
 - **Node.js 24.18.0** - Exact version pinned in `.nvmrc` and `frontend/package.json`
 - **npm 11.16.0** - Exact version pinned in `frontend/package.json`
 
 ### For WS Client Only
-- **Go 1.27.2** - Exact version declared in `go.mod`
+- **Go 1.27.3** - Exact version declared in `go.mod`
 
 ### For Cross-Compilation (release.sh)
 - **Docker + Buildx** - Multi-arch Docker images

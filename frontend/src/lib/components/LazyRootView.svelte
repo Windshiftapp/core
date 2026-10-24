@@ -1,5 +1,6 @@
 <script>
   import Button from './Button.svelte';
+  import DelayedMount from './DelayedMount.svelte';
   import Spinner from './Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -13,18 +14,20 @@
 </script>
 
 {#await loadPromise}
-  <div
-    class="flex flex-1 min-h-[40vh] items-center justify-center"
-    style="color: var(--ds-text);"
-    role="status"
-    data-testid="root-view-loading"
-    data-root-label={label}
-  >
-    <div class="text-center">
-      <Spinner class="mx-auto mb-3" />
-      <p class="text-sm" style="color: var(--ds-text-subtle);">{t('common.loading')}</p>
+  <DelayedMount>
+    <div
+      class="flex flex-1 min-h-[40vh] items-center justify-center"
+      style="color: var(--ds-text);"
+      role="status"
+      data-testid="root-view-loading"
+      data-root-label={label}
+    >
+      <div class="text-center">
+        <Spinner class="mx-auto mb-3" />
+        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('common.loading')}</p>
+      </div>
     </div>
-  </div>
+  </DelayedMount>
 {:then loadedModule}
   {@const Component = loadedModule.default}
   <Component {...componentProps} />

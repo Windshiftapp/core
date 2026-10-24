@@ -1,5 +1,5 @@
-import { api } from '../api.js';
+import { channelCategories } from '../api/channels.js';
 import { createCategoryStore } from './categoryStoreFactory.js';
 
 // Channel Categories store
-export const channelCategoriesStore = createCategoryStore(api.channelCategories, 'channel');
+export const channelCategoriesStore = createCategoryStore(channelCategories, 'channel');

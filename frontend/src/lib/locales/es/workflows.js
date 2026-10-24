@@ -178,7 +178,7 @@ export default {
       'No se puede eliminar la pantalla predeterminada. Esta pantalla es necesaria para espacios de trabajo sin un conjunto de configuración.',
     confirmDeleteScreen:
       '¿Estás seguro de que deseas eliminar la pantalla "{name}"? Esto afectará a todos los espacios de trabajo que usen esta pantalla.',
-    defaults: { default: { name: 'Pantalla predeterminada', description: 'Pantalla predeterminada con los campos esenciales del elemento de trabajo' } },
+    defaults: { default: { name: 'Pantalla predeterminada', description: 'Pantalla predeterminada con los campos esenciales del elemento de trabajo' }, default_create: { name: 'Pantalla de creación predeterminada', description: 'Pantalla enfocada en crear elementos de trabajo' } },
     fieldWidths: {
       full: 'Ancho completo',
       half: 'Medio ancho',

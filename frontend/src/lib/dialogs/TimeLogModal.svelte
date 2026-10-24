@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { api } from '../api.js';
+  import { links } from '../api/configuration.js';
   import { BasePicker } from '../pickers';
   import Label from '../components/Label.svelte';
   import StatusPill from '../components/StatusPill.svelte';
@@ -15,6 +15,7 @@
   import Modal from './Modal.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { customerDisplayName } from '../utils/customerLabel.js';
   import { getUserTimezone } from '../utils/dateFormatter.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { dateKeyInZone, formatClockInZone } from '../utils/worklogTimezone.js';
@@ -95,7 +96,11 @@
       return {
         id: project.id,
         name: project.name,
-        subtitle: customer?.name || 'Unknown Customer',
+        subtitle: customerDisplayName(
+          project.customer_name ?? customer?.name,
+          project.customer_builtin_key ?? customer?.builtin_key,
+          t
+        ) || 'Unknown Customer',
         project
       };
     }));
@@ -123,7 +128,7 @@
     searchingWorkItems = true;
     workItemResults = [];
     try {
-      const results = await api.links.search(trimmedQuery, 'item', 20);
+      const results = await links.search(trimmedQuery, 'item', 20);
       if (version !== workItemSearchVersion) return;
       workItemResults = Array.isArray(results) ? results : [];
     } catch (error) {
@@ -213,7 +218,9 @@
       : {};
     const data = {
       project_id: parseInt(formData.project_id),
-      item_id: formData.item_id ? parseInt(formData.item_id) : undefined,
+      // An explicit null clears an existing link under merge-PATCH; an omitted
+      // key would preserve the stored link after the user cleared the picker.
+      item_id: formData.item_id ? parseInt(formData.item_id) : null,
       description: formData.description,
       ...timeFields
     };

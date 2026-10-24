@@ -643,10 +643,7 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []any
 
 	isCustomFieldComparison := false
 	if !isReferenceFieldComparison && node.Left.Type == NodeIdentifier {
-		fieldLower := strings.ToLower(node.Left.Value)
-		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
-			isCustomFieldComparison = true
-		}
+		isCustomFieldComparison = g.isCustomFieldIdentifier(node.Left.Value)
 	}
 	caseInsensitive := semantics.caseInsensitive &&
 		(semantics.referenceNameField == "" || isReferenceFieldComparison)
@@ -730,7 +727,7 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []any
 			case "title", "description", "tag", "assettag", "asset_tag":
 				isTextFieldComparison = true
 			default:
-				if strings.HasPrefix(fieldName, "cf_") || strings.HasPrefix(fieldName, "custom.") {
+				if g.isCustomFieldIdentifier(node.Left.Value) {
 					isTextFieldComparison = true
 				}
 			}
@@ -871,12 +868,9 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []a
 
 	// Custom field NUMERIC cast for IN expressions with number values.
 	// Both PostgreSQL ->> and SQLite ->> return TEXT, so CAST for numeric comparisons.
-	if node.Field.Type == NodeIdentifier {
-		fieldLower := strings.ToLower(node.Field.Value)
-		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
-			if len(node.Values.Arguments) > 0 && node.Values.Arguments[0].DataType == NUMBER {
-				fieldSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", fieldSQL)
-			}
+	if node.Field.Type == NodeIdentifier && g.isCustomFieldIdentifier(node.Field.Value) {
+		if len(node.Values.Arguments) > 0 && node.Values.Arguments[0].DataType == NUMBER {
+			fieldSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", fieldSQL)
 		}
 	}
 
@@ -1376,17 +1370,20 @@ func (g *SQLGenerator) lookupCustomFieldByID(id int) CustomFieldInfo {
 	return CustomFieldInfo{ID: id, Kind: CFKindScalar}
 }
 
-// lookupCustomFieldInfo resolves a cf_/custom./cfid_ identifier to its info.
-// Returns the field info and true when the identifier is a custom-field
-// reference resolvable to a numeric ID — either via the customFieldMap (for
-// name-based forms) or directly (for the cfid_<id> form).
+// lookupCustomFieldInfo resolves a bare, cf_/custom., or cfid_ identifier to
+// its custom-field info. Bare names resolve only when no system field owns the
+// name, so built-in fields always take precedence. Returns true when the
+// identifier resolves to a custom field.
 func (g *SQLGenerator) lookupCustomFieldInfo(identifier string) (CustomFieldInfo, bool) {
 	if id, ok := customFieldIDFromIdentifier(identifier); ok {
 		return g.lookupCustomFieldByID(id), true
 	}
-	name, ok := customFieldNameFromIdentifier(identifier)
-	if !ok {
-		return CustomFieldInfo{}, false
+	name, prefixed := customFieldNameFromIdentifier(identifier)
+	if !prefixed {
+		if g.isSystemField(identifier) {
+			return CustomFieldInfo{}, false
+		}
+		name = identifier
 	}
 	if !validCustomFieldNameRegex.MatchString(name) {
 		return CustomFieldInfo{}, false
@@ -1400,6 +1397,28 @@ func (g *SQLGenerator) lookupCustomFieldInfo(identifier string) (CustomFieldInfo
 	}
 	info.LegacyName = name
 	return info, true
+}
+
+// isSystemField reports whether the entity's built-in field mapping recognizes
+// the identifier. Used to keep bare system fields ahead of custom fields with
+// the same name. The probe clears the custom-field map so the bare-name
+// fallback in mapFieldName cannot claim the identifier itself.
+func (g *SQLGenerator) isSystemField(identifier string) bool {
+	probe := *g
+	probe.customFieldMap = nil
+	_, _, err := probe.mapFieldName(identifier)
+	return err == nil
+}
+
+// isCustomFieldIdentifier reports whether the identifier addresses a custom
+// field by any supported form: bare name, cf_/custom. prefix, or cfid_ id.
+func (g *SQLGenerator) isCustomFieldIdentifier(identifier string) bool {
+	lower := strings.ToLower(identifier)
+	if strings.HasPrefix(lower, "cf_") || strings.HasPrefix(lower, "custom.") || strings.HasPrefix(lower, "cfid_") {
+		return true
+	}
+	_, ok := g.lookupCustomFieldInfo(identifier)
+	return ok
 }
 
 // itemCustomFieldColumn returns the JSON column expression for the active entity.
@@ -1868,6 +1887,14 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []
 		return prefix + "a.id", nil, nil
 
 	default:
+		// Bare custom-field names resolve after system fields, so a system
+		// field with the same name always wins.
+		if g.customFieldMap != nil {
+			if _, ok := g.customFieldMap[strings.ToLower(fieldName)]; ok {
+				sql, args := g.extractCustomFieldScalar(prefix+"a.custom_field_values", fieldName)
+				return sql, args, nil
+			}
+		}
 		return "", nil, fmt.Errorf("unknown field: %s", fieldName)
 	}
 }
@@ -2036,6 +2063,14 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []a
 		return prefix + "w.key || '-' || " + prefix + "i.workspace_item_number", nil, nil
 
 	default:
+		// Bare custom-field names resolve after system fields, so a system
+		// field with the same name always wins.
+		if g.customFieldMap != nil {
+			if _, ok := g.customFieldMap[strings.ToLower(fieldName)]; ok {
+				sql, args := g.extractItemCustomFieldScalar(prefix, fieldName)
+				return sql, args, nil
+			}
+		}
 		return "", nil, fmt.Errorf("unknown field: %s", fieldName)
 	}
 }

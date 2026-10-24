@@ -1,15 +1,16 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { api } from '../../api.js';
+  import { collections } from '../../api/collections.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { IconFilter as Filter, IconSearch as Search } from '@tabler/icons-svelte-runes';
+  import Filter from '@tabler/icons-svelte-runes/icons/filter';
+  import Search from '@tabler/icons-svelte-runes/icons/search';
   import Card from '../../components/Card.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import CollectionsSidebar from './CollectionsSidebar.svelte';
   import CollectionsBreadcrumbs from './CollectionsBreadcrumbs.svelte';
-  import { buildCollectionAssociationUpdate } from './collectionService.js';
+  import { applyCollectionPrivacyToggle, buildCollectionAssociationUpdate } from './collectionService.js';
   import QlQueryBar from '../shared/QlQueryBar.svelte';
   import { createWorkItemSearchStore } from '../../stores/searchStore.svelte.js';
   import { createWorkItemSearchHandlers } from '../../composables/useWorkItemSearch.svelte.js';
@@ -22,7 +23,9 @@
   import Modal from '../../dialogs/Modal.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
-  import { permissionStore, isSystemAdmin, authStore, workspaceDataStore } from '../../stores';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { authStore } from '../../stores/auth.svelte.js';
+  import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
   import ColumnSelector from './ColumnSelector.svelte';
   import WorkItemListTable from './WorkItemListTable.svelte';
   import {
@@ -134,7 +137,7 @@
 
   async function loadCollectionById(id, restoreURLQuery = false) {
     try {
-      const collection = await api.collections.get(id);
+      const collection = await collections.get(id);
       if (!collection) return;
       currentCollection = collection;
       slugSaved = !!(collection.is_public && collection.public_slug);
@@ -156,7 +159,7 @@
 
   async function loadBoardConfiguration(id) {
     try {
-      const bootstrap = await api.collections.getBoardConfigurationBootstrap(id);
+      const bootstrap = await collections.getBoardConfigurationBootstrap(id);
       const config = bootstrap?.board_configuration ?? null;
       boardConfig = config;
       listColumns = listColumnsFromConfig(config);
@@ -175,12 +178,12 @@
     try {
       const configData = buildListColumnConfiguration(boardConfig, newColumns);
       const savedConfig = boardConfig?.id
-        ? await api.collections.updateBoardConfiguration(
+        ? await collections.updateBoardConfiguration(
             currentCollection.id,
             boardConfig.id,
             configData,
           )
-        : await api.collections.createBoardConfiguration(
+        : await collections.createBoardConfiguration(
             currentCollection.id,
             null,
             configData,
@@ -293,6 +296,7 @@
       workspace_id: currentCollection.workspace_id ?? null,
       category_id: currentCollection.category_id ?? null,
       is_private: currentCollection.is_private ?? false,
+      public_milestone_swimlanes: currentCollection.public_milestone_swimlanes ?? false,
       ...overrides,
     };
   }
@@ -301,29 +305,36 @@
     if (!currentCollection) return;
     const next = !currentCollection.is_private;
     try {
-      await api.collections.update(currentCollection.id, buildCollectionUpdate({ is_private: next }));
-      currentCollection = { ...currentCollection, is_private: next };
+      const updated = await collections.update(
+        currentCollection.id,
+        buildCollectionUpdate({ is_private: next })
+      );
+      // Marking a collection private unpublishes its board server-side.
+      currentCollection = applyCollectionPrivacyToggle(currentCollection, updated, next);
+      slugSaved = Boolean(updated.is_public && updated.public_slug);
     } catch (error) {
       console.error('Failed to update collection privacy:', error);
       errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
-  async function handlePublicSharingSave({ isPublic, publicSlug }) {
+  async function handlePublicSharingSave({ isPublic, publicSlug, publicMilestoneSwimlanes }) {
     if (!currentCollection) return { ok: false, error: 'Collection not found.' };
     savingPublicSharing = true;
     try {
       const update = buildCollectionUpdate({
         is_public: isPublic,
         public_slug: publicSlug,
+        public_milestone_swimlanes: isPublic ? publicMilestoneSwimlanes === true : false,
       });
-      await api.collections.update(currentCollection.id, update);
+      await collections.update(currentCollection.id, update);
       currentCollection = {
         ...currentCollection,
         ql_query: update.ql_query,
         filter_state: update.filter_state,
         is_public: isPublic,
         public_slug: publicSlug,
+        public_milestone_swimlanes: update.public_milestone_swimlanes,
       };
       slugSaved = Boolean(isPublic && publicSlug);
       return { ok: true };
@@ -345,7 +356,7 @@
       return;
     }
     try {
-      await api.collections.update(currentCollection.id, buildCollectionUpdate());
+      await collections.update(currentCollection.id, buildCollectionUpdate());
       navigate(returnPath || '/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
@@ -375,7 +386,7 @@
     try {
       // Association is not a publishing operation: omit public-sharing fields so
       // an ordinary owner without public_board.manage can move the collection.
-      await api.collections.update(
+      await collections.update(
         currentCollection.id,
         buildCollectionAssociationUpdate({
           collection: currentCollection,
@@ -473,6 +484,7 @@
       showPublicBoard={canManagePublicBoard}
       isPublic={currentCollection?.is_public || false}
       publicSlug={currentCollection?.public_slug || null}
+      publicMilestoneSwimlanes={currentCollection?.public_milestone_swimlanes || false}
       {slugSaved}
       saving={savingPublicSharing}
       onpublicsave={handlePublicSharingSave}
@@ -528,7 +540,6 @@
         statuses={listStatuses.length > 0 ? listStatuses : allStatuses}
         statusCategories={listStatusCategories.length > 0 ? listStatusCategories : statusCategories}
         priorities={listPriorities.length > 0 ? listPriorities : allPriorities}
-        collectionId={null}
         canEdit={false}
         testId="collection-search-results-table"
         emptyMessage={t('collections.noWorkItemsFound')}

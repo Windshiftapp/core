@@ -1,7 +1,8 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import { controlSizeClasses } from '../utils/controlSizes.js';
-  import { ChevronDown, Check } from '@lucide/svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Check from '@lucide/svelte/icons/check';
   import { tick, untrack } from 'svelte';
 
   /**

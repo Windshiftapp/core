@@ -1,5 +1,8 @@
 <script>
-  import { ExternalLink, FileText, GripVertical, X } from '@lucide/svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import X from '@lucide/svelte/icons/x';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl } from '../utils/urls.js';
@@ -107,7 +110,7 @@
       </span>
 
       {#if !hubStore.isEditing}
-        <span class="text-xs flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--ds-text-subtle);">
+        <span class="text-xs flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity" style="color: var(--ds-text-subtle);">
           {t('common.open', 'Open')}
           <ExternalLink class="w-3 h-3" />
         </span>

@@ -107,7 +107,7 @@ func (s *PortalAuthRetentionSweeper) tick() {
 	start := time.Now()
 	var runErr error
 	items := 0
-	defer recordSchedulerRun(s.runRepo, "portal_auth_retention", start, &items, &runErr)
+	defer recordSchedulerRun(s.runRepo, "portal_auth_retention", start, &items, &runErr, time.Now)
 
 	sessionDays := readRetentionDaysSetting(ctx, s.db, systemSettingSessionRetentionDays, DefaultPortalSessionRetentionDays)
 	linkDays := readRetentionDaysSetting(ctx, s.db, systemSettingMagicLinkRetentionDays, DefaultPortalMagicLinkRetentionDays)

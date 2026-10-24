@@ -231,7 +231,7 @@ func (s *GlobalRankMigrationScheduler) tick(parent context.Context) (continueAct
 	start := time.Now()
 	itemsProcessed := 0
 	var runErr error
-	defer recordSchedulerRun(s.runRepo, globalRankMigrationSchedulerName, start, &itemsProcessed, &runErr)
+	defer recordSchedulerRun(s.runRepo, globalRankMigrationSchedulerName, start, &itemsProcessed, &runErr, time.Now)
 	defer func() {
 		if s.afterTick != nil {
 			s.afterTick()

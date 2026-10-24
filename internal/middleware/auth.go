@@ -326,58 +326,11 @@ func (am *AuthMiddleware) handleAuthError(w http.ResponseWriter, r *http.Request
 	_, _ = w.Write([]byte("Authentication required"))
 }
 
-// getClientIP extracts the client IP address from request with proxy validation
+// getClientIP extracts the client IP address from request with proxy validation.
+// See utils.ExtractClientIP for the forwarded-header rules; this must stay the
+// same computation used for session validation and audit logging.
 func (am *AuthMiddleware) getClientIP(r *http.Request) string {
-	// Get the immediate client IP (could be proxy). SplitHostPort handles both
-	// "1.2.3.4:5678" and "[::1]:5678" forms; the bare-host fallback covers the
-	// rare case where RemoteAddr has no port at all.
-	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteAddr = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
-		return remoteAddr // Return as-is if parsing fails
-	}
-
-	// Only trust proxy headers if the request comes from a trusted proxy
-	if utils.IsTrustedProxy(clientIP, am.useProxy, am.additionalProxies) {
-		// Check X-Forwarded-For header (for proxies)
-		forwarded := r.Header.Get("X-Forwarded-For")
-		if forwarded != "" {
-			// Validate and extract the first (original client) IP
-			ips := strings.Split(forwarded, ",")
-			for _, ipStr := range ips {
-				ipStr = strings.TrimSpace(ipStr)
-				if ip := net.ParseIP(ipStr); ip != nil && am.isValidClientIP(ip) {
-					return ipStr
-				}
-			}
-		}
-
-		// Check X-Real-IP header
-		realIP := r.Header.Get("X-Real-IP")
-		if realIP != "" {
-			if ip := net.ParseIP(realIP); ip != nil && am.isValidClientIP(ip) {
-				return realIP
-			}
-		}
-	}
-
-	// Fall back to direct connection IP
-	return remoteAddr
-}
-
-// isValidClientIP validates that an IP address is a valid client IP
-func (am *AuthMiddleware) isValidClientIP(ip net.IP) bool {
-	// Reject private/reserved ranges that shouldn't be forwarded
-	if ip.IsLoopback() || ip.IsMulticast() || ip.IsUnspecified() {
-		return false
-	}
-
-	// Allow both public and private IPs (private IPs are valid in internal networks)
-	return true
+	return utils.ExtractClientIP(r, am.useProxy, am.additionalProxies)
 }
 
 // CleanupMiddleware periodically cleans up expired sessions
@@ -486,46 +439,10 @@ func NewPortalAuthMiddleware(sessionManager *auth.SessionManager, portalSessionM
 	}
 }
 
-// getClientIP extracts the client IP address from request with proxy validation
+// getClientIP extracts the client IP address from request with proxy validation.
+// See utils.ExtractClientIP for the forwarded-header rules.
 func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
-	// SplitHostPort handles both "1.2.3.4:5678" and "[::1]:5678"; the bare-host
-	// fallback covers the rare case where RemoteAddr has no port at all.
-	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteAddr = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
-		return remoteAddr // Return as-is if parsing fails
-	}
-
-	// Only trust proxy headers if the request comes from a trusted proxy
-	if utils.IsTrustedProxy(clientIP, pam.useProxy, pam.additionalProxies) {
-		// Check X-Forwarded-For header (for proxies)
-		forwarded := r.Header.Get("X-Forwarded-For")
-		if forwarded != "" {
-			// Validate and extract the first (original client) IP
-			ips := strings.Split(forwarded, ",")
-			for _, ipStr := range ips {
-				ipStr = strings.TrimSpace(ipStr)
-				if ip := net.ParseIP(ipStr); ip != nil && !ip.IsLoopback() && !ip.IsMulticast() && !ip.IsUnspecified() {
-					return ipStr
-				}
-			}
-		}
-
-		// Check X-Real-IP header
-		realIP := r.Header.Get("X-Real-IP")
-		if realIP != "" {
-			if ip := net.ParseIP(realIP); ip != nil && !ip.IsLoopback() && !ip.IsMulticast() && !ip.IsUnspecified() {
-				return realIP
-			}
-		}
-	}
-
-	// Fall back to direct connection IP
-	return remoteAddr
+	return utils.ExtractClientIP(r, pam.useProxy, pam.additionalProxies)
 }
 
 // tryPortalAuthenticate resolves any valid session (internal header, internal cookie,

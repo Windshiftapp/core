@@ -151,3 +151,52 @@ var SchemaDecompose = json.RawMessage(`{
 	"required": ["sub_tasks", "reasoning"],
 	"additionalProperties": false
 }`)
+
+// SchemaCustomWidget is the JSON Schema for a generated dashboard widget.
+// The program is OpenUI Lang; queries are the slots that program reads.
+var SchemaCustomWidget = json.RawMessage(`{
+	"type": "object",
+	"properties": {
+		"name": {
+			"type": "string",
+			"description": "Short widget name shown in the widget list"
+		},
+		"description": {
+			"type": "string",
+			"description": "One line describing what the widget answers"
+		},
+		"program": {
+			"type": "string",
+			"description": "The OpenUI Lang program, starting with root ="
+		},
+		"queries": {
+			"type": "object",
+			"description": "Data slots used by the program; omit a slot the program does not use",
+			"properties": {
+				"item": {
+					"type": "object",
+					"properties": {
+						"ql": {"type": "string"},
+						"sort": {"type": "string"},
+						"limit": {"type": "integer"}
+					},
+					"required": ["ql"],
+					"additionalProperties": false
+				},
+				"asset": {
+					"type": "object",
+					"properties": {
+						"ql": {"type": "string"},
+						"sort": {"type": "string"},
+						"limit": {"type": "integer"}
+					},
+					"required": ["ql"],
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"required": ["name", "description", "program", "queries"],
+	"additionalProperties": false
+}`)

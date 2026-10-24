@@ -1,6 +1,7 @@
 <script>
   import { resolveRef } from './openapi-store.svelte.js';
-  import { ChevronRight, ChevronDown } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Self from './ApiSchema.svelte';
 
   /**

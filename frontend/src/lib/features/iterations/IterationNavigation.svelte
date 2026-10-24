@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate, currentRoute } from '../../router.js';
-  import { api } from '../../api.js';
+  import { iterationTypes as iterationTypesApi } from '../../api/milestones.js';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import NavigationSidebar from '../../layout/NavigationSidebar.svelte';
@@ -18,7 +18,7 @@
 
   async function loadIterationTypes() {
     try {
-      iterationTypes = await api.iterationTypes.getAll() || [];
+      iterationTypes = await iterationTypesApi.getAll() || [];
     } catch (err) {
       console.error('Failed to load iteration types:', err);
       iterationTypes = [];

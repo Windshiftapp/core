@@ -1,5 +1,10 @@
 <script>
-  import { X, MessageCircle, UserPlus, Activity, Clock, Target } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import UserPlus from '@lucide/svelte/icons/user-plus';
+  import Activity from '@lucide/svelte/icons/activity';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Target from '@lucide/svelte/icons/target';
   import { notificationActions } from '../../stores/notifications.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -103,7 +108,7 @@
         <!-- Dismiss button (shows on hover) -->
         <button
           onclick={handleDismiss}
-          class="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded dismiss-btn"
+          class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity p-1 rounded dismiss-btn"
           title={t('notifications.dismiss')}
           tabindex="-1"
         >

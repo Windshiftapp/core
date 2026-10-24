@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { ai, llmProviders } from '../api/ai.js';
 import { agentRuns } from './agentRuns.svelte.js';
 
 let open = $state(false);
@@ -59,10 +59,10 @@ async function loadGeneralHistory() {
   if (historyPromise) return historyPromise;
   historyPromise = (async () => {
     try {
-      const session = await api.ai.getGeneralSession();
+      const session = await ai.getGeneralSession();
       let stored = [];
       if (session?.id) {
-        stored = await api.ai.getSessionMessages(session.id);
+        stored = await ai.getSessionMessages(session.id);
       }
       applyGeneralSession(session, stored);
       historyLoaded = true;
@@ -79,8 +79,8 @@ async function startNewGeneralChat() {
   if (conversationLoading) return;
   conversationLoading = true;
   try {
-    const session = await api.ai.getGeneralSession();
-    const stored = session?.id ? await api.ai.getSessionMessages(session.id) : [];
+    const session = await ai.getGeneralSession();
+    const stored = session?.id ? await ai.getSessionMessages(session.id) : [];
     applyGeneralSession(session, stored, messageID(Array.isArray(stored) ? stored : []));
     messages = [];
     error = '';
@@ -98,7 +98,7 @@ async function loadSession(session) {
   conversationLoading = true;
   historyLoaded = false;
   try {
-    const stored = await api.ai.getSessionMessages(session.id);
+    const stored = await ai.getSessionMessages(session.id);
     sessionId = session.id;
     sessionType = session.session_type || 'standard';
     sessionWorkspaceId = session.workspace_id || 0;
@@ -132,8 +132,8 @@ async function prepareWorkspaceOptions(workspaceId, allowStandard) {
 
   try {
     const [sessionResult, agentResult] = await Promise.all([
-      api.ai.listSessions(),
-      api.ai.listAvailableStandardAgents(normalizedWorkspaceId),
+      ai.listSessions(),
+      ai.listAvailableStandardAgents(normalizedWorkspaceId),
     ]);
     sessions = (Array.isArray(sessionResult) ? sessionResult : []).filter(
       (session) =>
@@ -173,7 +173,7 @@ async function startStandardConversation(workspaceId, profileId = agentProfileId
   conversationLoading = true;
   try {
     const agent = availableAgents.find((candidate) => candidate.id === normalizedProfileId);
-    const session = await api.ai.createStandardSession(normalizedWorkspaceId, {
+    const session = await ai.createStandardSession(normalizedWorkspaceId, {
       agent_profile_id: normalizedProfileId,
       ...(agent?.name ? { title: agent.name } : {}),
     });
@@ -191,7 +191,7 @@ async function archiveCurrentSession() {
   conversationLoading = true;
   const archivedID = sessionId;
   try {
-    await api.ai.archiveSession(archivedID);
+    await ai.archiveSession(archivedID);
     sessions = sessions.filter((session) => session.id !== archivedID);
     historyLoaded = false;
     await loadGeneralHistory();
@@ -205,7 +205,7 @@ async function archiveCurrentSession() {
 async function loadConnections() {
   if (connectionsLoaded) return;
   try {
-    const result = await api.llmProviders.getEnabled();
+    const result = await llmProviders.getEnabled();
     connections = Array.isArray(result) ? result : [];
     connectionsLoaded = true;
   } catch (err) {
@@ -251,14 +251,14 @@ async function sendMessage(text, context) {
   try {
     const result =
       sessionType === 'general'
-        ? await api.ai.chat(
+        ? await ai.chat(
             text,
             connectionId || undefined,
             sessionId || undefined,
             context,
             historyAfterMessageId
           )
-        : await api.ai.chat(text, undefined, sessionId || undefined, context);
+        : await ai.chat(text, undefined, sessionId || undefined, context);
     sessionId = result.session_id || sessionId;
     const assistantMsg = {
       id: result.message_id,

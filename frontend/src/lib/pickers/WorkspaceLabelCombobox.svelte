@@ -1,5 +1,5 @@
 <script>
-  import { api } from '../api.js';
+  import { labels as labelsApi } from '../api/misc.js';
   import ScopedLabelCombobox from './ScopedLabelCombobox.svelte';
 
   let {
@@ -19,13 +19,13 @@
   } = $props();
 
   function loadLabels() {
-    return workspaceId ? api.labels.getAll(workspaceId) : [];
+    return workspaceId ? labelsApi.getAll(workspaceId) : [];
   }
 
   function createLabel(name) {
     const scopedWorkspaceId = Number(workspaceId);
     if (!Number.isFinite(scopedWorkspaceId) || scopedWorkspaceId <= 0) return null;
-    return api.labels.create({ name, workspace_id: scopedWorkspaceId });
+    return labelsApi.create({ name, workspace_id: scopedWorkspaceId });
   }
 </script>
 

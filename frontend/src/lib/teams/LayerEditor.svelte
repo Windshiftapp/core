@@ -1,6 +1,12 @@
 <script>
-  import { IconPlus, IconChevronUp, IconChevronDown, IconTrash, IconX, IconUserPlus, IconEdit } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconChevronUp from '@tabler/icons-svelte-runes/icons/chevron-up';
+  import IconChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconUserPlus from '@tabler/icons-svelte-runes/icons/user-plus';
+  import IconEdit from '@tabler/icons-svelte-runes/icons/edit';
+  import { onCallSchedules } from '../api/oncall.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
@@ -116,15 +122,15 @@
 
       let layerId;
       if (editingLayer) {
-        await api.onCallSchedules.updateLayer(schedule.id, editingLayer.id, payload);
+        await onCallSchedules.updateLayer(schedule.id, editingLayer.id, payload);
         layerId = editingLayer.id;
       } else {
-        const result = await api.onCallSchedules.addLayer(schedule.id, payload);
+        const result = await onCallSchedules.addLayer(schedule.id, payload);
         layerId = result.id;
       }
 
       if (layerId) {
-        await api.onCallSchedules.setLayerMembers(
+        await onCallSchedules.setLayerMembers(
           schedule.id,
           layerId,
           memberStaging.map((m) => m.id)
@@ -149,7 +155,7 @@
     });
     if (!confirmed) return;
     try {
-      await api.onCallSchedules.deleteLayer(schedule.id, layer.id);
+      await onCallSchedules.deleteLayer(schedule.id, layer.id);
       successToast(t('teams.oncall.layerDeleted'));
       await onChange?.();
     } catch (err) {

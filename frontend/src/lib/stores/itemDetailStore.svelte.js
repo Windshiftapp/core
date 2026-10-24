@@ -1,6 +1,12 @@
-import { api } from '../api.js';
+import { actions } from '../api/actions.js';
+import { hierarchyLevels as hierarchyLevelsApi, links as linksApi } from '../api/configuration.js';
+import { items } from '../api/items.js';
+import { getDiagrams } from '../api/misc.js';
+import { customerOrganisations } from '../api/portal.js';
+import { time } from '../api/time.js';
 import { childItemTypesForParent } from '../utils/hierarchy.js';
 import { buildDetailScreenFieldConfig } from '../utils/screenFields.js';
+import { authStore } from './auth.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { workspacesStore } from './workspaces.svelte.js';
 
@@ -34,10 +40,10 @@ function isAbortError(error) {
 // item by the time the caller resumes.
 const LOAD_SUPERSEDED = Object.freeze({ status: 'superseded' });
 
-function hasSharedWorkspaceReferences(workspaceId) {
-  return (
-    workspaceDataStore.initialized && Number(workspaceDataStore.workspaceId) === Number(workspaceId)
-  );
+function filterMilestonesByWorkspace(milestones = [], workspace) {
+  const allowedCategoryIds = workspace?.milestone_categories;
+  if (!allowedCategoryIds?.length) return milestones;
+  return milestones.filter((milestone) => allowedCategoryIds.includes(milestone.category_id));
 }
 
 function childItemListsMatch(current = [], next = []) {
@@ -170,6 +176,9 @@ class ItemDetailStore {
 
   // Watch
   isWatching = $state(false);
+  watcherCount = $state(0);
+  // Full watcher list; null until the watchers section asks for it.
+  watchers = $state(null);
   // Set when the open ticket is a merged duplicate pointing at its canonical.
   mergedIntoItemId = $state(null);
   loadingWatchStatus = $state(false);
@@ -286,16 +295,19 @@ class ItemDetailStore {
     this.loadingChildItems = true;
 
     try {
-      let workspaceInitPromise = isNumericID(effectiveWorkspaceId)
-        ? workspaceDataStore.initialize(effectiveWorkspaceId)
+      // Do not activate a different scope (e.g. a global board) just because
+      // the item lives in a workspace; the reference snapshot below handles it.
+      const activeScope = workspaceDataStore.initialized
+        ? Number(workspaceDataStore.workspaceId)
         : null;
+      let workspaceInitPromise =
+        isNumericID(effectiveWorkspaceId) &&
+        (activeScope === null || activeScope === Number(effectiveWorkspaceId))
+          ? workspaceDataStore.initialize(effectiveWorkspaceId)
+          : null;
       const summary = lookupWorkspaceKey
-        ? await api.items.getDetailSummaryByKey(
-            lookupWorkspaceKey,
-            lookupItemNumber,
-            requestOptions
-          )
-        : await api.items.getDetailSummary(effectiveItemId, requestOptions);
+        ? await items.getDetailSummaryByKey(lookupWorkspaceKey, lookupItemNumber, requestOptions)
+        : await items.getDetailSummary(effectiveItemId, requestOptions);
       if (token !== this.#loadToken) return LOAD_SUPERSEDED;
 
       const itemData = summary?.item;
@@ -319,37 +331,40 @@ class ItemDetailStore {
       const wsId = effectiveWorkspaceId || itemData.workspace_id;
       this.workspaceId = wsId;
 
-      // Share MainApp's in-flight workspace bootstrap.
-      workspaceInitPromise ??= workspaceDataStore.initialize(wsId);
-      await workspaceInitPromise;
-      if (token !== this.#loadToken) return LOAD_SUPERSEDED;
-      const useSharedReferences = hasSharedWorkspaceReferences(wsId);
-
-      this.workspace = useSharedReferences
-        ? workspaceDataStore.workspace
-        : await api.workspaces.get(wsId, requestOptions);
-      this.customFieldDefinitions = useSharedReferences
-        ? workspaceDataStore.customFieldDefinitions
-        : [];
-
-      // Filter milestones by workspace restrictions
-      const allMilestones = useSharedReferences ? workspaceDataStore.milestones : [];
-      if (this.workspace?.milestone_categories?.length > 0) {
-        const allowedCategoryIds = this.workspace.milestone_categories;
-        this.milestones = allMilestones.filter((m) => allowedCategoryIds.includes(m.category_id));
-      } else {
-        this.milestones = allMilestones;
+      // Activate the item's workspace only when no other scope is active. A
+      // global board must keep its own references; the snapshot below is
+      // fetched without clobbering it.
+      const currentScope = workspaceDataStore.initialized
+        ? Number(workspaceDataStore.workspaceId)
+        : null;
+      if (currentScope === null || currentScope === Number(wsId)) {
+        workspaceInitPromise ??= workspaceDataStore.initialize(wsId);
+        await workspaceInitPromise;
+        if (token !== this.#loadToken) return LOAD_SUPERSEDED;
       }
 
-      this.iterations = useSharedReferences ? workspaceDataStore.iterations : [];
-      this.timeProjects = useSharedReferences ? workspaceDataStore.projects : [];
-      this.itemTypes = useSharedReferences ? workspaceDataStore.itemTypes : [];
+      // One aggregate bootstrap request instead of six independent domain
+      // reads when the shared store serves a different scope. A fresh
+      // snapshot needs no recovery request.
+      const references = await workspaceDataStore.getReferenceSnapshot(wsId);
+      if (token !== this.#loadToken) return LOAD_SUPERSEDED;
+      this.workspace = references?.workspace ?? null;
+      this.customFieldDefinitions = references?.custom_field_definitions ?? [];
+      this.milestones = filterMilestonesByWorkspace(references?.milestones ?? [], this.workspace);
+      this.iterations = references?.iterations ?? [];
+      this.timeProjects = references?.projects ?? [];
+      this.itemTypes = references?.item_types ?? [];
+      // The loaded-scope priorities are only a valid fallback for the active
+      // scope. A null snapshot for a foreign item must not borrow them.
+      const referencesInActiveScope =
+        workspaceDataStore.initialized && Number(workspaceDataStore.workspaceId) === Number(wsId);
+      const fallbackPriorities = referencesInActiveScope
+        ? (workspaceDataStore.priorities ?? [])
+        : [];
       this.priorities = [
         ...(summary.priorities?.length
           ? summary.priorities
-          : useSharedReferences
-            ? workspaceDataStore.priorities
-            : []),
+          : (references?.priorities ?? fallbackPriorities)),
       ].sort((a, b) => a.sort_order - b.sort_order);
 
       this.requestTypeFields = summary.request_type_fields || [];
@@ -358,6 +373,8 @@ class ItemDetailStore {
       this.availableStatusTransitions = summary.transitions?.available_transitions || [];
       this.pendingApproval = summary.transitions?.pending_approval || null;
       this.isWatching = summary.watching || false;
+      this.watcherCount = summary.watcher_count || 0;
+      this.watchers = null;
       this.mergedIntoItemId = summary.merged_into_item_id || null;
       this.childItems = summary.children || [];
       this.currentItemType = summary.current_item_type || null;
@@ -424,7 +441,7 @@ class ItemDetailStore {
       // An SSE refresh must not share a pre-mutation GET that happens to still
       // be in flight. Otherwise the event can be consumed while the UI is
       // reconciled with the response captured before that mutation.
-      const nextItem = await api.items.get(itemId, {
+      const nextItem = await items.get(itemId, {
         cache: 'no-store',
         signal: controller.signal,
       });
@@ -515,7 +532,7 @@ class ItemDetailStore {
     this.#worklogsPromiseItemId = itemId;
     this.timeWorklogsLoading = true;
 
-    const promise = api.time.worklogs
+    const promise = time.worklogs
       .getByItem(itemId, { signal: controller.signal })
       .then((worklogs) => {
         if (this.itemId === itemId) {
@@ -558,8 +575,8 @@ class ItemDetailStore {
       });
 
     const promise = Promise.all([
-      fallback(api.customerOrganisations.getAll({}, requestOptions), 'customers'),
-      fallback(api.items.getAll({ limit: 100 }, requestOptions), 'work items'),
+      fallback(customerOrganisations.getAll({}, requestOptions), 'customers'),
+      fallback(items.getAll({ limit: 100 }, requestOptions), 'work items'),
       fallback(workspacesStore.load(), 'workspaces'),
     ])
       .then(([customers, workItems, workspaces]) => {
@@ -594,7 +611,7 @@ class ItemDetailStore {
     if (this.timeRollup && !force) return;
     this.timeRollupLoading = true;
     try {
-      this.timeRollup = await api.items.getTimeRollup(this.itemId);
+      this.timeRollup = await items.getTimeRollup(this.itemId);
     } catch (err) {
       console.error('Failed to load time rollup:', err);
       this.timeRollup = null;
@@ -607,7 +624,7 @@ class ItemDetailStore {
     if (!this.itemId) return;
     try {
       this.loadingChildItems = true;
-      const response = await api.items.getChildren(this.itemId, requestOptions);
+      const response = await items.getChildren(this.itemId, requestOptions);
       let nextChildItems = [];
       if (Array.isArray(response)) {
         nextChildItems = response;
@@ -638,7 +655,7 @@ class ItemDetailStore {
     const itemId = this.itemId;
     try {
       this.loadingLinks = true;
-      const links = await api.links.getForItem('items', itemId, {
+      const links = await linksApi.getForItem('items', itemId, {
         signal: controller.signal,
       });
       if (this.itemId !== itemId) return;
@@ -668,8 +685,7 @@ class ItemDetailStore {
     this.#diagramsPromiseItemId = itemId;
     this.loadingDiagrams = true;
 
-    const promise = api
-      .getDiagrams(itemId, { signal: controller.signal })
+    const promise = getDiagrams(itemId, { signal: controller.signal })
       .then((diagrams) => {
         if (this.item?.id === itemId) {
           this.diagrams = diagrams || [];
@@ -717,7 +733,7 @@ class ItemDetailStore {
     const itemId = this.item.id;
     try {
       this.loadingStatusTransitions = true;
-      const result = await api.items.getAvailableStatusTransitions(itemId, requestOptions);
+      const result = await items.getAvailableStatusTransitions(itemId, requestOptions);
       if (this.item?.id !== itemId) return;
       this.availableStatusTransitions = result.available_transitions || [];
       this.pendingApproval = result.pending_approval || null;
@@ -739,16 +755,12 @@ class ItemDetailStore {
 
   async #loadParentHierarchy(requestOptions = {}) {
     try {
-      const ancestors = await api.items.getAncestors(this.item.id, requestOptions);
+      const ancestors = await items.getAncestors(this.item.id, requestOptions);
       try {
-        // Reuse the already-loaded type list (set by #loadItemTypeData, which
-        // runs first); only fetch as a fallback if it isn't populated yet.
-        const itemTypesData = this.itemTypes?.length
-          ? this.itemTypes
-          : await api.itemTypes.getAll({}, requestOptions);
+        // The type list came with the workspace reference snapshot.
         this.parentHierarchy = ancestors.map((ancestor) => {
           if (ancestor.item_type_id) {
-            const itemType = itemTypesData.find((type) => type.id === ancestor.item_type_id);
+            const itemType = this.itemTypes.find((type) => type.id === ancestor.item_type_id);
             return { ...ancestor, itemType };
           }
           return ancestor;
@@ -767,15 +779,9 @@ class ItemDetailStore {
 
   async #loadItemTypeData(requestOptions = {}) {
     try {
-      const useSharedReferences = hasSharedWorkspaceReferences(this.workspaceId);
-      const [itemTypesData, hierarchyLevels] = await Promise.all([
-        useSharedReferences
-          ? Promise.resolve(workspaceDataStore.itemTypes)
-          : api.itemTypes.getAll({}, requestOptions),
-        api.hierarchyLevels.getAll({}, requestOptions),
-      ]);
-
-      this.itemTypes = itemTypesData || [];
+      // The type list already came with the workspace reference snapshot; only
+      // the hierarchy-level catalog needs its own read here.
+      const hierarchyLevels = await hierarchyLevelsApi.getAll({}, requestOptions);
 
       if (this.item.item_type_id) {
         this.currentItemType = this.itemTypes.find((type) => type.id === this.item.item_type_id);
@@ -917,7 +923,7 @@ class ItemDetailStore {
           return;
         }
         // Status changes must use the transition endpoint for workflow validation.
-        const updatedItem = await api.items.transition(this.item.id, newStatusId);
+        const updatedItem = await items.transition(this.item.id, newStatusId);
         this.item = { ...this.item, ...updatedItem };
         this.cancelEditing('status');
         await this.refreshAvailableTransitions();
@@ -1072,7 +1078,7 @@ class ItemDetailStore {
       }
 
       // Update via API
-      const updatedItem = await api.items.update(this.item.id, updateData);
+      const updatedItem = await items.update(this.item.id, updateData);
       this.item = { ...this.item, ...updatedItem };
 
       // Update assignee/iteration names if provided
@@ -1216,17 +1222,50 @@ class ItemDetailStore {
 
   async toggleWatch() {
     if (!this.item?.id) return;
+    const itemId = this.item.id;
     try {
-      if (this.isWatching) {
-        await api.items.removeWatch(this.item.id);
-        this.isWatching = false;
-      } else {
-        await api.items.addWatch(this.item.id);
-        this.isWatching = true;
-      }
+      const status = this.isWatching
+        ? await items.removeWatch(itemId)
+        : await items.addWatch(itemId);
+      if (this.item?.id !== itemId) return;
+      this.isWatching = status?.watching ?? !this.isWatching;
+      if (typeof status?.watcher_count === 'number') this.watcherCount = status.watcher_count;
+      if (this.watchers !== null) await this.loadWatchers();
     } catch (err) {
       console.error('Failed to toggle watch:', err);
       throw err;
+    }
+  }
+
+  async loadWatchers() {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await items.listWatchers(itemId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  async addWatcher(userId) {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await items.addWatcher(itemId, userId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  async removeWatcher(userId) {
+    if (!this.item?.id) return;
+    const itemId = this.item.id;
+    const watchers = (await items.removeWatcher(itemId, userId)) ?? [];
+    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+  }
+
+  // Adding or removing yourself from the watchers section also flips the
+  // header watch toggle, so both derive from the same list.
+  #applyWatchers(watchers) {
+    this.watchers = watchers;
+    this.watcherCount = watchers.length;
+    const currentUserId = authStore.currentUser?.id;
+    if (currentUserId != null) {
+      this.isWatching = watchers.some((watcher) => watcher.user_id === currentUserId);
     }
   }
 
@@ -1234,7 +1273,7 @@ class ItemDetailStore {
 
   async createLink(linkTypeId, targetId, targetType = 'item') {
     try {
-      await api.links.create({
+      await linksApi.create({
         source_type: 'item',
         source_id: parseInt(this.itemId, 10),
         target_type: targetType,
@@ -1250,7 +1289,7 @@ class ItemDetailStore {
 
   async removeLink(linkId) {
     try {
-      await api.links.delete(linkId);
+      await linksApi.delete(linkId);
       await this.loadLinks();
     } catch (err) {
       console.error('Error removing link:', err);
@@ -1262,7 +1301,7 @@ class ItemDetailStore {
 
   async copyItem() {
     try {
-      const copiedItem = await api.items.copy(this.item.id);
+      const copiedItem = await items.copy(this.item.id);
       return copiedItem;
     } catch (err) {
       console.error('Failed to copy item:', err);
@@ -1274,7 +1313,7 @@ class ItemDetailStore {
 
   async executeAction(actionId) {
     try {
-      await api.actions.execute(this.workspaceId, actionId, this.item.id);
+      await actions.execute(this.workspaceId, actionId, this.item.id);
     } catch (err) {
       console.error('Failed to execute action:', err);
       throw err;
@@ -1396,6 +1435,8 @@ class ItemDetailStore {
     this.linkTypes = [];
     this.loadingLinks = false;
     this.isWatching = false;
+    this.watcherCount = 0;
+    this.watchers = null;
     this.loadingWatchStatus = false;
     this.timeProjects = [];
     this.timeWorklogs = [];

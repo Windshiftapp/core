@@ -1,7 +1,10 @@
 <script>
-  import { api } from '../../api.js';
+  import { createApiToken } from '../../api/users.js';
   import Input from '../../components/Input.svelte';
-  import { IconX, IconKey, IconCheck, IconLoader2 } from '@tabler/icons-svelte-runes';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconKey from '@tabler/icons-svelte-runes/icons/key';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconLoader2 from '@tabler/icons-svelte-runes/icons/loader-2';
 
   let { folderPath, workspaceKey = '', serverUrl = '', onComplete, onCancel } = $props();
 
@@ -15,7 +18,7 @@
     try {
       generating = true;
       error = '';
-      const result = await api.createApiToken({
+      const result = await createApiToken({
         name: `ws-cli-${workspaceKey}`,
       });
       token = result.token;

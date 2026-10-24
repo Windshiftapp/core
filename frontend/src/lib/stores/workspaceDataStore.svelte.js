@@ -1,4 +1,9 @@
-import { api } from '../api.js';
+import { customFields, itemTypes, priorities } from '../api/configuration.js';
+import { iterations, milestones } from '../api/milestones.js';
+import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
+import { getAssignableUsers, getUser } from '../api/users.js';
+import { statusCategories, statuses } from '../api/workflows.js';
+import { workspaces } from '../api/workspaces.js';
 import {
   canRunBackgroundSync,
   isExpectedBackgroundSyncError,
@@ -19,6 +24,8 @@ class WorkspaceDataStore {
   #screenConfigPromises = new Map();
   /** @type {Map<number, Promise<object|null>>} */
   #userHydrationPromises = new Map();
+  /** @type {Map<number, Promise<object|null>>} */
+  #bootstrapPromises = new Map();
   /** @type {Set<number>} */
   #userHydrationFailed = new Set();
   workspace = $state(null);
@@ -36,6 +43,9 @@ class WorkspaceDataStore {
   // Resolved effective configuration per item type, keyed by item type id or
   // 'default'. Fetched once per workspace, invalidated on workspace switch.
   screenConfigs = $state({});
+  // Whether bootstrap's milestone/iteration lists are complete directories.
+  // null means the server did not report completeness (unknown, not complete).
+  planningCompleteness = $state(null);
 
   initialLoading = $state(false);
   initialized = $state(false);
@@ -159,6 +169,54 @@ class WorkspaceDataStore {
   }
 
   /**
+   * Reference data for one workspace without activating it. Returns the active
+   * scope's loaded fields when they match; otherwise issues one deduplicated
+   * bootstrap request instead of a fan-out of domain reads. A different active
+   * scope (e.g. a global board) is left intact.
+   * @param {number|string} workspaceId
+   * @returns {Promise<object|null>}
+   */
+  async getReferenceSnapshot(workspaceId) {
+    const id = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
+    if (!Number.isInteger(id) || id <= 0) return null;
+
+    const isActive = Number(this.workspaceId) === id;
+    if (isActive && this._initPromise) {
+      await this._initPromise;
+    }
+    if (isActive && this.workspaceId === id && this.initialized) {
+      return {
+        workspace: this.workspace,
+        custom_field_definitions: this.customFieldDefinitions,
+        milestones: this.milestones,
+        iterations: this.iterations,
+        projects: this.projects,
+        item_types: this.itemTypes,
+        statuses: this.statuses,
+        users: this.users,
+        priorities: this.priorities,
+        planning_completeness: this.planningCompleteness,
+      };
+    }
+
+    const pending = this.#bootstrapPromises.get(id);
+    if (pending) return pending;
+    const promise = workspaces
+      .getBootstrap(id, FOREGROUND_READ)
+      .catch((error) => {
+        if (error?.status === 404) return null;
+        throw error;
+      })
+      .finally(() => {
+        if (this.#bootstrapPromises.get(id) === promise) {
+          this.#bootstrapPromises.delete(id);
+        }
+      });
+    this.#bootstrapPromises.set(id, promise);
+    return promise;
+  }
+
+  /**
    * Silent re-fetch of all reference data. On error, keeps stale data.
    */
   async refresh() {
@@ -222,9 +280,11 @@ class WorkspaceDataStore {
     this.customFieldDefinitions = [];
     this.labels = [];
     this.screenConfigs = {};
+    this.planningCompleteness = null;
     this.#screenConfigPromises.clear();
     this.#userHydrationPromises.clear();
     this.#userHydrationFailed.clear();
+    this.#bootstrapPromises.clear();
     this.lastRefreshedAt = null;
   }
 
@@ -248,8 +308,7 @@ class WorkspaceDataStore {
       missing.map((id) => {
         const pending = this.#userHydrationPromises.get(id);
         if (pending) return pending;
-        const promise = api
-          .getUser(id)
+        const promise = getUser(id, BACKGROUND_READ)
           .catch((error) => {
             // A denied or missing user is permanent for this scope; do not
             // retry it on every row update. Transient failures may retry.
@@ -293,8 +352,8 @@ class WorkspaceDataStore {
     if (pending) return pending;
 
     const workspaceId = this.workspaceId;
-    const promise = api.workspaces
-      .getEffectiveConfig(workspaceId, itemTypeId)
+    const promise = workspaces
+      .getEffectiveConfig(workspaceId, itemTypeId, FOREGROUND_READ)
       .then((config) => {
         if (this.workspaceId === workspaceId) {
           this.screenConfigs = { ...this.screenConfigs, [key]: config };
@@ -324,7 +383,7 @@ class WorkspaceDataStore {
       keys.map(async (key) => {
         const itemTypeId = key === 'default' ? null : Number(key);
         try {
-          const config = await api.workspaces.getEffectiveConfig(workspaceId, itemTypeId);
+          const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId);
           if (this.workspaceId === workspaceId) {
             this.screenConfigs = { ...this.screenConfigs, [key]: config };
           }
@@ -364,7 +423,7 @@ class WorkspaceDataStore {
 
   /** @private */
   async _fetchAll(workspaceId) {
-    const bootstrap = await api.workspaces.getBootstrap(workspaceId);
+    const bootstrap = await workspaces.getBootstrap(workspaceId, FOREGROUND_READ);
 
     // Race condition guard
     if (this.workspaceId !== workspaceId) return;
@@ -380,6 +439,8 @@ class WorkspaceDataStore {
     this.priorities = bootstrap?.priorities ?? [];
     this.projects = bootstrap?.projects ?? [];
     this.customFieldDefinitions = bootstrap?.custom_field_definitions ?? [];
+    // Absent metadata means unknown; never treat it as complete.
+    this.planningCompleteness = bootstrap?.planning_completeness ?? null;
   }
 
   hydrateHomepageLayout(workspaceId, layout) {
@@ -390,10 +451,10 @@ class WorkspaceDataStore {
   /** @private */
   async _fetchAllGlobal() {
     const [itemTypesData, statusesData, statusCategoriesData, prioritiesData] = await Promise.all([
-      api.itemTypes.getAll(),
-      api.statuses.getAll(),
-      api.statusCategories.getAll(),
-      api.priorities.getAll(),
+      itemTypes.getAll({}, FOREGROUND_READ),
+      statuses.getAll({}, FOREGROUND_READ),
+      statusCategories.getAll({}, FOREGROUND_READ),
+      priorities.getAll({}, FOREGROUND_READ),
     ]);
 
     if (this.workspaceId !== 'global') return;
@@ -413,7 +474,7 @@ class WorkspaceDataStore {
     this.labels = [];
 
     try {
-      const cfData = await api.customFields.getAll();
+      const cfData = await customFields.getAll({}, FOREGROUND_READ);
       if (this.workspaceId === 'global') {
         this.customFieldDefinitions = cfData || [];
       }
@@ -428,27 +489,25 @@ class WorkspaceDataStore {
   /** @private */
   async _fetchField(workspaceId, field) {
     const fetchers = {
-      workspace: () => api.workspaces.get(workspaceId),
-      homepageLayout: () => api.workspaces.getHomepageLayout(workspaceId),
-      statuses: () => api.workspaces.getStatuses(workspaceId),
-      statusCategories: () => api.statusCategories.getAll(),
-      itemTypes: () => api.itemTypes.getAll(),
+      workspace: () => workspaces.get(workspaceId),
+      homepageLayout: () => workspaces.getHomepageLayout(workspaceId),
+      statuses: () => workspaces.getStatuses(workspaceId),
+      statusCategories: () => statusCategories.getAll(),
+      itemTypes: () => itemTypes.getAll(),
       // Global users are hydrated per referenced ID by hydrateUsers(); a field
       // refresh must not fall back to enumerating the whole directory.
       users: () =>
-        workspaceId === 'global'
-          ? Promise.resolve(this.users)
-          : api.getAssignableUsers(workspaceId),
+        workspaceId === 'global' ? Promise.resolve(this.users) : getAssignableUsers(workspaceId),
       milestones: () =>
         workspaceId === 'global'
-          ? api.milestones.getAll()
-          : api.milestones.getAll({ workspace_id: workspaceId, include_global: true }),
-      iterations: () => api.iterations.getAll(),
-      priorities: () => api.priorities.getAll(),
+          ? milestones.getAll()
+          : milestones.getAll({ workspace_id: workspaceId, include_global: true }),
+      iterations: () => iterations.getAll(),
+      priorities: () => priorities.getAll(),
       projects: () =>
-        api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
+        workspaces.getProjects ? workspaces.getProjects(workspaceId) : Promise.resolve([]),
       customFieldDefinitions: async () => {
-        const res = await api.customFields.getAll();
+        const res = await customFields.getAll();
         return res || [];
       },
     };

@@ -9,7 +9,9 @@
     ConnectionMode
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { Zap, ArrowRight, ArrowDown } from '@lucide/svelte';
+  import Zap from '@lucide/svelte/icons/zap';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import Button from '../../../components/Button.svelte';
   import ActionEdge from '../edges/ActionEdge.svelte';
   import { errorToast } from '../../../stores/toasts.svelte.js';

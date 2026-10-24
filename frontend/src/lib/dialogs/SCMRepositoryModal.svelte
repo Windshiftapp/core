@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
+  import { itemSCMLinks } from '../api/scm.js';
   import EmptyState from '../components/EmptyState.svelte';
   import Label from '../components/Label.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -33,7 +33,7 @@
     loading = true;
     error = null;
     try {
-      repositories = (await api.itemSCMLinks.getRepositories(itemId)) || [];
+      repositories = (await itemSCMLinks.getRepositories(itemId)) || [];
       if (repositories.length === 1) selectedRepoId = repositories[0].id;
     } catch (loadError) {
       console.error('Failed to load repositories:', loadError);

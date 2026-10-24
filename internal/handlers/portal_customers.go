@@ -306,7 +306,9 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 	respondJSONOK(w, channels)
 }
 
-// GetCustomerSubmissions returns all portal submissions by this customer
+// GetCustomerSubmissions returns the portal submissions by this customer that
+// the caller can view. Submissions filed in workspaces the caller cannot view
+// are omitted entirely rather than returned with redacted metadata.
 func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -320,13 +322,18 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		return
 	}
 
+	accessibleWorkspaceIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	type CustomerSubmission struct {
 		ID                  int    `json:"id"`
 		WorkspaceID         int    `json:"workspace_id"`
 		WorkspaceItemNumber int    `json:"workspace_item_number"`
 		WorkspaceName       string `json:"workspace_name"`
 		WorkspaceKey        string `json:"workspace_key"`
-		CanView             bool   `json:"can_view"`
 		Title               string `json:"title"`
 		Description         string `json:"description"`
 		StatusName          string `json:"status_name"`
@@ -334,38 +341,20 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		CreatedAt           string `json:"created_at"`
 	}
 
-	rows, err := repository.NewItemRepository(h.db).ListPortalCustomerSubmissions(customerID)
+	rows, err := repository.NewItemRepository(h.db).ListPortalCustomerSubmissions(customerID, accessibleWorkspaceIDs)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	accessibleWorkspaceIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	workspaceAccess := make(map[int]struct{}, len(accessibleWorkspaceIDs))
-	for _, workspaceID := range accessibleWorkspaceIDs {
-		workspaceAccess[workspaceID] = struct{}{}
 	}
 
 	submissions := make([]CustomerSubmission, len(rows))
 	for i, s := range rows {
-		_, canView := workspaceAccess[s.WorkspaceID]
-		workspaceName, workspaceKey, workspaceItemNumber := "", "", 0
-		if canView {
-			workspaceName = s.WorkspaceName
-			workspaceKey = s.WorkspaceKey
-			workspaceItemNumber = s.WorkspaceItemNumber
-		}
 		submissions[i] = CustomerSubmission{
 			ID:                  s.ID,
 			WorkspaceID:         s.WorkspaceID,
-			WorkspaceItemNumber: workspaceItemNumber,
-			WorkspaceName:       workspaceName,
-			WorkspaceKey:        workspaceKey,
-			CanView:             canView,
+			WorkspaceItemNumber: s.WorkspaceItemNumber,
+			WorkspaceName:       s.WorkspaceName,
+			WorkspaceKey:        s.WorkspaceKey,
 			Title:               s.Title,
 			Description:         s.Description,
 			StatusName:          s.StatusName,
@@ -705,8 +694,14 @@ func (h *PortalCustomersHandler) ExportPortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
+	accessibleWorkspaceIDs, err := GetAccessibleWorkspaceIDs(currentUser, h.db, h.permService)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	actor := services.NewAuditActorFromRequest(r, currentUser, nil, "")
-	export, err := services.ExportCustomerData(h.db, id, actor)
+	export, err := services.ExportCustomerData(h.db, id, actor, accessibleWorkspaceIDs)
 	if err != nil {
 		if se, ok := err.(*services.ServiceError); ok {
 			handleServiceError(w, r, se)
@@ -1021,16 +1016,13 @@ func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r
 		return
 	}
 
-	// Org ACL is the gate; do not intersect with workspace permissions.
-	// Workspace access is still computed so we can scrub workspace_name /
-	// workspace_key for tickets whose workspace the caller can't view —
-	// org membership authorises the ticket itself, but should not double as
-	// "knows the entire workspace catalog".
-	wsAccess := map[int]struct{}{}
-	if wsIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService); err == nil {
-		for _, id := range wsIDs {
-			wsAccess[id] = struct{}{}
-		}
+	// Org ACL authorises reading the org's tickets; workspace visibility then
+	// limits which of those tickets are returned, so an org member never sees a
+	// ticket filed in a workspace they cannot view.
+	accessibleWorkspaceIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	type OrgTicket struct {
@@ -1047,7 +1039,7 @@ func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r
 		CreatorContactEmail string `json:"creator_contact_email"`
 	}
 
-	rows, err := repository.NewItemRepository(h.db).ListOrganisationTickets(orgID, nil)
+	rows, err := repository.NewItemRepository(h.db).ListOrganisationTickets(orgID, accessibleWorkspaceIDs)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -1055,18 +1047,14 @@ func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r
 
 	tickets := make([]OrgTicket, len(rows))
 	for i, t := range rows {
-		name, key := t.WorkspaceName, t.WorkspaceKey
-		if _, ok := wsAccess[t.WorkspaceID]; !ok {
-			name, key = "", ""
-		}
 		tickets[i] = OrgTicket{
 			ID:                  t.ID,
 			WorkspaceID:         t.WorkspaceID,
 			WorkspaceItemNumber: t.WorkspaceItemNumber,
 			Title:               t.Title,
 			CreatedAt:           t.CreatedAt,
-			WorkspaceName:       name,
-			WorkspaceKey:        key,
+			WorkspaceName:       t.WorkspaceName,
+			WorkspaceKey:        t.WorkspaceKey,
 			StatusName:          t.StatusName,
 			StatusColor:         t.StatusColor,
 			CreatorContactName:  t.CreatorContactName,

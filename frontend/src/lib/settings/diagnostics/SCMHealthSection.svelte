@@ -1,5 +1,8 @@
 <script>
-  import { IconAlertTriangle, IconCircleCheck, IconClock, IconPlugOff } from '@tabler/icons-svelte-runes';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconPlugOff from '@tabler/icons-svelte-runes/icons/plug-off';
   import Badge from '../../components/Badge.svelte';
   import Card from '../../components/Card.svelte';
   import { getSCMConnectionHealth } from '../../api/diagnostics.js';

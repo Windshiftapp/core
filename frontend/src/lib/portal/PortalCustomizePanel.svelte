@@ -3,11 +3,22 @@
   import StateDisplay from '../components/StateDisplay.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import {
-    Palette, Navigation, X, TextCursorInput, BookOpen, Check,
-    Plus, Trash2, Edit, MoreHorizontal, GripVertical,
-    Package, Shield, Table2, Edit3, Info
-  } from '@lucide/svelte';
+  import Palette from '@lucide/svelte/icons/palette';
+  import Navigation from '@lucide/svelte/icons/navigation';
+  import X from '@lucide/svelte/icons/x';
+  import TextCursorInput from '@lucide/svelte/icons/text-cursor-input';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import Check from '@lucide/svelte/icons/check';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Edit from '@lucide/svelte/icons/edit';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Package from '@lucide/svelte/icons/package';
+  import Shield from '@lucide/svelte/icons/shield';
+  import Table2 from '@lucide/svelte/icons/table-2';
+  import Edit3 from '@lucide/svelte/icons/edit-3';
+  import Info from '@lucide/svelte/icons/info';
   import Tooltip from '../components/Tooltip.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import RequestTypeVisibilityModal from '../dialogs/RequestTypeVisibilityModal.svelte';
@@ -23,10 +34,11 @@
   } from '../stores/portal.svelte.js';
   import { gradients, iconMap } from '../stores/portalPresentation.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
-  import { api } from '../api.js';
+  import { pages } from '../api/pages.js';
+  import { assetReports, requestTypes } from '../api/channels.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { authStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
   import { loadPermissionProfile } from '../stores/permissionProfile.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -125,7 +137,7 @@
       .filter((id) => kbPageTitles[`ws:${id}`] !== true);
     if (workspaceIds.length === 0) return;
     try {
-      const rows = await api.pages.getTitles(workspaceIds);
+      const rows = await pages.getTitles(workspaceIds);
       const titles = { ...kbPageTitles };
       for (const row of Array.isArray(rows) ? rows : []) {
         titles[row.page_id] = row.title;
@@ -230,7 +242,7 @@
     if (!confirmed) return;
 
     try {
-      await api.assetReports.delete(portalStore.portalData?.channel_id, id);
+      await assetReports.delete(portalStore.portalData?.channel_id, id);
       await portalCatalogStore.loadAssetReports();
     } catch (err) {
       console.error('Failed to delete asset report:', err);
@@ -250,7 +262,7 @@
     if (!confirmed) return;
 
     try {
-      await api.requestTypes.delete(portalStore.portalData?.channel_id, id);
+      await requestTypes.delete(portalStore.portalData?.channel_id, id);
       await portalCatalogStore.loadRequestTypes();
     } catch (err) {
       console.error('Failed to delete request type:', err);

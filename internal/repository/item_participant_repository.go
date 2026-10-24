@@ -180,6 +180,28 @@ func (r *ItemParticipantRepository) IsParticipantEmail(itemID int, email string)
 	return exists, nil
 }
 
+// WasParticipantRemoved reports whether the item's history records removing a
+// participant with this email. Removal hard-deletes the participant row, so the
+// history entry is the durable tombstone that keeps an explicit removal from
+// being overridden by earlier thread participation.
+func (r *ItemParticipantRepository) WasParticipantRemoved(itemID int, email string) (bool, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return false, nil
+	}
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM item_history
+			WHERE item_id = ? AND field_name = 'participant_removed' AND LOWER(old_value) = ?
+		)
+	`, itemID, email).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check participant removal history: %w", err)
+	}
+	return exists, nil
+}
+
 // Add attaches a customer to an item as a participant. It is idempotent: a
 // duplicate add is a no-op and reports created=false.
 func (r *ItemParticipantRepository) Add(itemID, customerID int, addedBy *int) (bool, error) {

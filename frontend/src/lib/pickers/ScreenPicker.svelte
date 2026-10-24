@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { Layout } from '@lucide/svelte';
+  import Layout from '@lucide/svelte/icons/layout';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -21,10 +21,15 @@
     return Boolean(screen?.builtin_key);
   }
 
+  // Built-in screens resolve their display name/description from the locale by
+  // builtin key; fall back to the stored value when no translation exists.
   function getScreenDisplayValue(screen, field) {
-    return isDefaultSystemScreen(screen)
-      ? t(`screensPage.defaults.default.${field}`)
-      : (screen?.[field] || '');
+    if (isDefaultSystemScreen(screen)) {
+      const key = `screensPage.defaults.${screen.builtin_key}.${field}`;
+      const translated = t(key);
+      if (translated !== key) return translated;
+    }
+    return screen?.[field] || '';
   }
 
   // Get the default screen name for the "Default" option label

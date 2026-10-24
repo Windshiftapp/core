@@ -1,10 +1,12 @@
 <script>
   import { useResizeObserver } from 'runed';
-  import { ArrowLeft, ChevronRight, FileText } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import FileText from '@lucide/svelte/icons/file-text';
   import { currentRoute, navigate } from '../../router.js';
-  import { authStore } from '../../stores';
+  import { authStore } from '../../stores/auth.svelte.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import FormRenderer from './FormRenderer.svelte';
   import { loadPublicFormBootstrap } from './publicFormData.js';
 
@@ -144,16 +146,12 @@
         {@const selectedForm = forms.find(f => f.id === selectedFormId)}
         <div class={embed ? 'w-full' : 'mx-auto max-w-3xl'}>
           {#if forms.length > 1 && !embed}
-            <button
-              type="button"
+            <BackButton
               onclick={backToList}
-              data-testid="public-form-back"
-              class="mb-6 flex items-center gap-2 text-sm font-medium focus:outline-none focus-visible:ring-2"
-              style="color: var(--ds-text-link); --tw-ring-color: var(--ds-border-focused);"
-            >
-              <ArrowLeft class="h-4 w-4" />
-              Back to forms
-            </button>
+              testid="public-form-back"
+              label="Back to forms"
+              class="mb-6"
+            />
           {/if}
 
           {#if selectedForm}

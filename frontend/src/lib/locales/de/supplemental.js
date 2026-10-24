@@ -79,21 +79,21 @@ export default {
   },
   "analytics": {
     "deliveryTime": {
-      "missingHistory": "{count} Derzeit abgeschlossene Elemente wurden ausgeschlossen, da ihr Abschlussverlauf fehlt."
+      "missingHistory": "{count} Derzeit abgeschlossene Vorgänge wurden ausgeschlossen, da ihr Abschlussverlauf fehlt."
     }
   },
   "users": {
     "labels": {
-      "tabLabel": "Etiketten",
-      "tabDescription": "Verwalten Sie Ihre persönlichen Etiketten.",
-      "searchPlaceholder": "Suchetiketten",
-      "new": "Neues Etikett",
-      "createTitle": "Etikett erstellen",
-      "editTitle": "Etikett bearbeiten",
+      "tabLabel": "Labels",
+      "tabDescription": "Verwalten Sie Ihre persönlichen Labels.",
+      "searchPlaceholder": "Labels suchen",
+      "new": "Neues Label",
+      "createTitle": "Label erstellen",
+      "editTitle": "Label bearbeiten",
       "namePlaceholder": "z.B. dringend",
-      "mine": "Meine Etiketten",
-      "empty": "Noch keine Etiketten",
-      "emptyHint": "Erstellen Sie Ihr erstes Etikett, um Artikel zu organisieren.",
+      "mine": "Meine Labels",
+      "empty": "Noch keine Labels",
+      "emptyHint": "Erstellen Sie Ihr erstes Label, um Artikel zu organisieren.",
       "created": "Label erstellt",
       "updated": "Label aktualisiert",
       "deleted": "Label gelöscht",
@@ -169,7 +169,7 @@ export default {
     "runModeForm": "Formularanfrage",
     "runModeFormHint": "Wird wie ein Anfragetyp gestartet: Der Benutzer füllt ein Formular aus, dann werden die Ergebnisse angezeigt.",
     "formConfiguration": "Formularkonfiguration",
-    "itemType": "Elementtyp",
+    "itemType": "Vorgangstyp",
     "assetReportItemTypeHint": "Wird verwendet, um aufzulösen, welche benutzerdefinierten Felder im Formular erfasst werden können.",
     "submitButtonLabel": "Beschriftung der Schaltfläche „Senden“ (optional)",
     "submitButtonPlaceholder": "Bericht ausführen",
@@ -315,7 +315,7 @@ export default {
   },
   "commandPalette": {
     "recentlyViewed": {
-      "label": "Zuletzt angesehene Arbeitselemente",
+      "label": "Zuletzt angesehene Vorgänge",
       "description": "Springe zu einem deiner zuletzt 20 angesehenen Artikel",
       "header": "Zuletzt angesehen",
       "searchPlaceholder": "Zuletzt angesehene suchen...",
@@ -344,7 +344,7 @@ export default {
     "execute": "Ausführen",
     "failedToCreateTemplate": "Vorlage konnte nicht erstellt werden",
     "failedToSaveConfig": "Konfiguration konnte nicht gespeichert werden",
-    "noItemTypesAvailable": "Keine Elementtypen verfügbar",
+    "noItemTypesAvailable": "Keine Vorgangstypen verfügbar",
     "notCovered": "Nicht abgedeckt",
     "selectPlanAndName": "Wählen Sie einen Testplan aus und geben Sie einen Namen ein",
     "totalRequirements": "Gesamtanforderungen",
@@ -370,10 +370,10 @@ export default {
     "startTypingToSearch": "Beginnen Sie mit der Eingabe, um zu suchen…",
     "searchPages": "Seiten durchsuchen…",
     "agentOnline": "Agent online – ein Live-Läufer holt zugewiesene Gegenstände ab",
-    "agentOffline": "Agent offline – sein Läuferpool hat keinen Live-Läufer; Zugewiesene Elemente werden in die Warteschlange gestellt",
+    "agentOffline": "Agent offline – sein Läuferpool hat keinen Live-Läufer; Zugewiesene Vorgänge werden in die Warteschlange gestellt",
     "agentLocal": "Agent wird auf diesem Server ausgeführt",
     "agentUnbound": "Keine Agentenbindung in diesem Arbeitsbereich – durch Zuweisen wird keine Ausführung gestartet",
-    "labelCommaNotAllowed": "Etikettennamen dürfen kein Komma enthalten",
+    "labelCommaNotAllowed": "Labelnamen dürfen kein Komma enthalten",
     "selectConditionSet": "Bedingungssatz auswählen",
     "selectApprovalSet": "Genehmigungssatz auswählen"
   },
@@ -409,7 +409,8 @@ export default {
   },
   "widgets": {
     "chart": {
-      "noDataAvailable": "Keine Daten verfügbar"
+      "noDataAvailable": "Keine Daten verfügbar",
+      "otherSlices": "Sonstige ({count} weitere)",
     },
     "completionChart": {
       "title": "Vervollständigungsdiagramm"
@@ -418,10 +419,10 @@ export default {
       "title": "Erstelltes Diagramm"
     },
     "recentItems": {
-      "loadingText": "Letzte Elemente werden geladen...",
-      "emptyTitle": "Keine aktuellen Elemente",
-      "emptySubtitle": "Kürzlich angesehene Elemente werden angezeigt hier",
-      "loadError": "Letzte Elemente konnten nicht geladen werden"
+      "loadingText": "Letzte Vorgänge werden geladen...",
+      "emptyTitle": "Keine aktuellen Vorgänge",
+      "emptySubtitle": "Kürzlich angesehene Vorgänge werden angezeigt hier",
+      "loadError": "Letzte Vorgänge konnten nicht geladen werden"
     }
   },
   "recurrence": {
@@ -475,8 +476,8 @@ export default {
     "searchPlaceholder": "Wiederholungsregeln suchen...",
     "noMatchingResults": "Keine Wiederholungsregeln entsprechen Ihrer Suche",
     "empty": "Keine Wiederholungsregeln",
-    "emptyDesc": "Hier werden Wiederholungsregeln angezeigt wenn für Elemente wiederkehrende Zeitpläne konfiguriert sind.",
-    "createFromItem": "Um eine Wiederholungsregel zu erstellen, öffnen Sie ein Element und richten Sie die Wiederholung in der Detailseitenleiste ein.",
+    "emptyDesc": "Hier werden Wiederholungsregeln angezeigt wenn für Vorgänge wiederkehrende Zeitpläne konfiguriert sind.",
+    "createFromItem": "Um eine Wiederholungsregel zu erstellen, öffnen Sie einen Vorgang und richten Sie die Wiederholung in der Detailseitenleiste ein.",
     "rule": "Regel",
     "everyDay": "Tag",
     "everyDays": "Tage",
@@ -550,7 +551,7 @@ export default {
     "scriptRefAlwaysPresent": "Immer vorhanden",
     "scriptRefIfSet": "Wenn festgelegt",
     "scriptRefGlobals": "Globale Variablen",
-    "scriptRefItemProps": "Elementeigenschaften",
+    "scriptRefItemProps": "Vorgangseigenschaften",
     "noTransitions": "Dieser Workflow hat keine Übergänge. Entwerfen Sie zunächst den Arbeitsablauf.",
     "userEvaluated": "Benutzer",
     "againstRole": "Rolle",
@@ -564,7 +565,7 @@ export default {
     "modeConditionDesc": "Versteckt den Übergang, wenn die Regel fehlschlägt.",
     "modeValidatorDesc": "Zeigt einen Fehler an, wenn die Übergang wird versucht",
     "errorMessage": "Fehlermeldung",
-    "errorMessagePlaceholder": "z. B. „Nur Tester können Elemente zur Qualitätssicherung verschieben“",
+    "errorMessagePlaceholder": "z. B. „Nur Tester können Vorgänge zur Qualitätssicherung verschieben“",
     "errorMessageHelp": "Wird dem Benutzer angezeigt, wenn diese Bedingung fehlschlägt. Für die Standardnachricht leer lassen."
   },
   "approvalSets": {
@@ -623,7 +624,7 @@ export default {
     "rejectionAnyFails": "Bei jeder Ablehnung schlägt der Schritt fehl.",
     "rejectionRequiresQuorum": "Erfordert ein Quorum, um fehlzuschlagen.",
     "approverSource": "Genehmigerquelle",
-    "approverSourceCreator": "Ersteller des Elements",
+    "approverSourceCreator": "Ersteller des Vorgangs",
     "approverSourceAssignee": "Aktueller Beauftragter",
     "approverSourceCurrentUser": "Person, die die Genehmigung ausgelöst hat",
     "approverSourceUser": "Spezifischer Benutzer",
@@ -637,7 +638,7 @@ export default {
     "approverRole": "Rolle",
     "approverGroup": "Gruppe",
     "approverUser": "Benutzer",
-    "allowSelfApproval": "Selbstgenehmigung zulassen – Erlaubt demselben Benutzer, das Element sowohl zu übertragen als auch zu genehmigen.",
+    "allowSelfApproval": "Selbstgenehmigung zulassen – Erlaubt demselben Benutzer, den Vorgang sowohl zu übertragen als auch zu genehmigen.",
     "onLeave": "Bei Urlaub des Genehmigers.",
     "onLeaveUseSubstitute": "Stellvertreter verwenden (Standard).",
     "onLeaveUseSubstituteDesc": "Berücksichtigt den im Urlaubsdatensatz festgelegten Stellvertreter. Fällt auf Eskalation zurück, wenn kein Stellvertreter konfiguriert ist.",
@@ -675,7 +676,7 @@ export default {
   },
   "items": {
     "agentLog": "Agentenprotokoll",
-    "agentLogEmpty": "Für dieses Element wird noch kein Agent ausgeführt",
+    "agentLogEmpty": "Für diesen Vorgang wird noch kein Agent ausgeführt",
     "agentLogTriggeredBy": "ausgelöst durch",
     "agentLogWaiting": "Warten auf Ausgabe…",
     "agentRunSingular": "Ausführen",
@@ -683,18 +684,18 @@ export default {
     "agentRerunLabel": "Agent erneut ausführen",
     "agentRerunStarting": "Startet…",
     "agentRerunBusy": "Ausführung läuft",
-    "agentRerunTitle": "Führen Sie den Agenten für dieses Element erneut aus.",
+    "agentRerunTitle": "Führen Sie den Agenten für diesen Vorgang erneut aus.",
     "agentRerunFailed": "Es konnte kein neuer Lauf gestartet werden.",
     "agentReviewFlagTitle": "Erfordert eine menschliche Überprüfung.",
     "agentReviewFlagBody": "Der Agent hat ein Tool missbraucht und nicht wiederhergestellt. Die Ausgabe ist möglicherweise nicht zuverlässig.",
-    "rollupItemCount": "zusammengefasst über {count} Elemente",
-    "linkToPage": "Verknüpfen Sie dieses Element mit einer Wissensseite im selben Arbeitsbereich.",
+    "rollupItemCount": "zusammengefasst über {count} Vorgänge",
+    "linkToPage": "Verknüpfen Sie diesen Vorgang mit einer Wissensseite im selben Arbeitsbereich.",
     "targetPage": "Zielseite",
     "page": "Seite",
     "linkedPages": "Seiten",
     "pagePickerPlaceholder": "Suchseiten…",
-    "labels": "Beschriftungen",
-    "addLabel": "+ Beschriftung hinzufügen"
+    "labels": "Labels",
+    "addLabel": "+ Label hinzufügen"
   },
   "comments": {
     "agentAuthored": "Verfasst von einem KI-Agenten",
@@ -711,6 +712,24 @@ export default {
     "builderDisabledDesc": "Klicken Sie in der Abfrageleiste auf „Auf Builder zurücksetzen“, um diese Felder wieder zu aktivieren.",
     "builderRecoveryDropped": "Einige Teile Ihrer Abfrage (wie NOT, OR-Gruppen oder nicht unterstützte Felder) konnten nicht rekonstruiert werden und wurden gelöscht.",
     "publicBoard": "Öffentliches Board",
+    "publish": "Veröffentlichen",
+    "publicBoardSharing": {
+      "title": "Öffentliches Board teilen",
+      "subtitle": "Veröffentlichen Sie diese Sammlung als schreibgeschütztes Kanban-Board.",
+      "enable": "Öffentliches Teilen aktivieren",
+      "enableHint": "Jeder mit dem Link kann das Board ohne Anmeldung ansehen.",
+      "boardUrl": "Board-URL",
+      "slugHint": "Verwenden Sie 3–64 Kleinbuchstaben, Ziffern und Bindestriche.",
+      "copyLink": "Öffentlichen Link kopieren",
+      "copied": "Kopiert!",
+      "openBoard": "Board öffnen",
+      "milestoneSwimlanes": "Karten nach Meilenstein gruppieren",
+      "milestoneSwimlanesHint": "Öffentliche Besucher sehen Meilenstein-Swimlanes. Sie können die Gruppierung nicht ändern und keine Karten ziehen.",
+      "scopeNote": "Die Sammlungsabfrage muss einen workspaceKey-Bereich enthalten. Sie müssen in jedem referenzierten Arbeitsbereich Arbeitsbereichsadministrator sein.",
+      "save": "Freigabe speichern",
+      "disable": "Freigabe deaktivieren",
+      "saveError": "Die Einstellungen für das öffentliche Teilen konnten nicht gespeichert werden."
+    },
     "transition_failed": "Statusübergang fehlgeschlagen. Das Forum wurde aktualisiert.",
     "manual_sort_unavailable_title": "Manuelles Sortieren nicht verfügbar",
     "manual_sort_unavailable": "Wechseln Sie in den Rangmodus, um Karten manuell anzuordnen.",
@@ -719,19 +738,19 @@ export default {
   },
   "workspaceSettings": {
     "tabs": {
-      "recurrence": "Wiederholung",
+      "recurrence": "Wiederkehrende Vorgänge",
       "templates": "Vorlagen"
     },
     "headers": {
       "general": "Grundlegende Arbeitsbereichsdetails und Standardeinstellungen",
       "categories": "Einschränken, welche Projektkategorien gelten",
-      "members": "Verwalten, wer darauf zugreifen kann Arbeitsbereich",
+      "members": "Verwalten, wer auf diesen Arbeitsbereich zugreifen kann",
       "configuration": "Konfigurationssätze diesem Arbeitsbereich zuweisen",
-      "sourceControl": "Repositories und Quellcodeverwaltung verbinden",
-      "codingAgents": "Codierungsagenten und ihre Fähigkeiten konfigurieren",
-      "issueSync": "Externe Probleme in diesem Arbeitsbereich synchronisieren",
-      "recurrence": "Regeln für wiederkehrende Elemente verwalten",
-      "templates": "Wiederverwendbare Beschreibungsgerüste für neue Elemente",
+      "sourceControl": "Repositories und Versionskontrolle verbinden",
+      "codingAgents": "Agenten und ihre Fähigkeiten konfigurieren",
+      "issueSync": "Externe Issues in diesen Arbeitsbereich synchronisieren",
+      "recurrence": "Regeln für wiederkehrende Vorgänge verwalten",
+      "templates": "Wiederverwendbare Beschreibungsgerüste für neue Vorgänge",
       "danger": "Diesen Arbeitsbereich dauerhaft entfernen"
     },
     "workspaceKeyPlaceholder": "z. B. DEV, TEST, PROD"

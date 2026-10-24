@@ -1,4 +1,5 @@
-import { api } from '../api.js';
+import { assets } from '../api/assets.js';
+import { getUsers } from '../api/users.js';
 
 const ASSET_CACHE_TTL_MS = 5 * 60_000;
 const MAX_ASSET_CACHE_ENTRIES = 2000;
@@ -25,7 +26,7 @@ class ReferenceDisplayCache {
 
     const generation = this.#generation;
     this.usersLoading = true;
-    const request = Promise.resolve(api.getUsers())
+    const request = Promise.resolve(getUsers())
       .then((users) => {
         if (generation !== this.#generation) return [];
         this.users = users || [];
@@ -109,7 +110,7 @@ class ReferenceDisplayCache {
       for (let start = 0; start < ids.length; start += ASSET_BATCH_SIZE) {
         const chunk = ids.slice(start, start + ASSET_BATCH_SIZE);
         summaries.push(
-          ...((await api.assets.getSummaries(chunk, { signal: controller.signal })) || [])
+          ...((await assets.getSummaries(chunk, { signal: controller.signal })) || [])
         );
       }
 

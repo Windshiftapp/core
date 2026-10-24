@@ -82,7 +82,14 @@ function fetchBacklog(
   workspaceId,
   ql = null,
   collectionId = null,
-  /** @type {any} */ { page, limit, sub_ql, omit_descriptions, include_watermark } = {}
+  /** @type {any} */ {
+    page,
+    limit,
+    sub_ql,
+    omit_descriptions,
+    include_watermark,
+    requestOptions = {},
+  } = {}
 ) {
   const params = new URLSearchParams();
   if (collectionId) {
@@ -96,7 +103,7 @@ function fetchBacklog(
   if (include_watermark) params.append('include_watermark', 'true');
   if (page) params.append('page', String(page));
   if (limit) params.append('page_size', String(Math.min(Number(limit), 100)));
-  return fetchAPIV2(`/items/backlog?${params}`);
+  return fetchAPIV2(`/items/backlog?${params}`, requestOptions);
 }
 
 async function fetchBacklogBoundary(workspaceId, collectionId, subQL, boundary) {
@@ -166,7 +173,8 @@ export const items = {
     );
     return results.flat();
   },
-  getChanges: (filters = {}) => fetchV2Data(`/items/changes${buildQueryString(filters)}`),
+  getChanges: (filters = {}, requestOptions = {}) =>
+    fetchV2Data(`/items/changes${buildQueryString(filters)}`, requestOptions),
   /** Sum of open story points per assignee; optional workspace narrowing. */
   getStoryPointsByAssignee: (filters = {}) =>
     fetchV2Data(`/items/story-points/by-assignee${buildQueryString(filters)}`),
@@ -204,6 +212,27 @@ export const items = {
         body: JSON.stringify({ patches }),
       }),
     'update'
+  ),
+  // Apply one target status to many items in a single server-side request.
+  // Returns per-item failures instead of fanning out one transition call per
+  // item from the client.
+  bulkTransition: withCrossTabNotice(
+    (itemIds, toStatusId) =>
+      fetchV2Data('/items/bulk-transition', {
+        method: 'POST',
+        body: JSON.stringify({ item_ids: itemIds, to_status_id: toStatusId }),
+      }),
+    'transition'
+  ),
+  // Delete many items in a single server-side request. Returns per-item
+  // failures; each deletion keeps its single-item history and audit record.
+  bulkDelete: withCrossTabNotice(
+    (itemIds) =>
+      fetchV2Data('/items/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ item_ids: itemIds }),
+      }),
+    'delete'
   ),
   getRoadmapHierarchyDates: (rootIds) =>
     fetchV2Data('/items/roadmap-hierarchy-dates', {
@@ -382,6 +411,16 @@ export const items = {
       method: 'DELETE',
     }),
   getWatchStatus: (id, requestOptions = {}) => fetchV2Data(`/items/${id}/watch`, requestOptions),
+  // Everyone watching an item; add/remove return the updated watcher list.
+  listWatchers: (id) => fetchV2Data(`/items/${id}/watchers`),
+  addWatcher: (id, userId) =>
+    fetchV2Data(`/items/${id}/watchers/${userId}`, {
+      method: 'PUT',
+    }),
+  removeWatcher: (id, userId) =>
+    fetchV2Data(`/items/${id}/watchers/${userId}`, {
+      method: 'DELETE',
+    }),
 
   // Personal tasks relationship
   getPersonalTasks: (itemId, requestOptions = {}) =>

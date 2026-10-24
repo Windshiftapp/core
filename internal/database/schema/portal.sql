@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS portal_customer_channels (
 );
 
 CREATE INDEX IF NOT EXISTS idx_portal_customers_email ON portal_customers(email);
+CREATE INDEX IF NOT EXISTS idx_portal_customers_email_lower ON portal_customers(LOWER(email));
 CREATE INDEX IF NOT EXISTS idx_portal_customers_user_id ON portal_customers(user_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customers_org_id ON portal_customers(customer_organisation_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_channels_customer_id ON portal_customer_channels(portal_customer_id);

@@ -9,8 +9,8 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import GroupPicker from '../../pickers/GroupPicker.svelte';
   import RolePicker from '../../pickers/RolePicker.svelte';
-  import { IconShield as Shield } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import Shield from '@tabler/icons-svelte-runes/icons/shield';
+  import { pages } from '../../api/pages.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -79,7 +79,7 @@
     loading = true;
     error = '';
     try {
-      const resp = await api.pages.getPermissions(workspaceId, pageId);
+      const resp = await pages.getPermissions(workspaceId, pageId);
       // The Go handler returns `acl: nil` when there are no grants —
       // serialized as JSON `null` — and DataTable does `data.length`
       // unconditionally, which crashes on null. Normalize at the
@@ -99,7 +99,7 @@
     saving = true;
     error = '';
     try {
-      await api.pages.setInheritance(workspaceId, pageId, !data.inherit_permissions);
+      await pages.setInheritance(workspaceId, pageId, !data.inherit_permissions);
       await load();
       onUpdated?.();
     } catch (err) {
@@ -118,7 +118,7 @@
     saving = true;
     error = '';
     try {
-      await api.pages.grantPermission(workspaceId, pageId, {
+      await pages.grantPermission(workspaceId, pageId, {
         principalType: newPrincipalType,
         principalId: newPrincipalId,
         permissionLevel: newLevel,
@@ -146,7 +146,7 @@
     saving = true;
     error = '';
     try {
-      await api.pages.revokePermission(workspaceId, pageId, permissionId);
+      await pages.revokePermission(workspaceId, pageId, permissionId);
       await load();
       onUpdated?.();
     } catch (err) {

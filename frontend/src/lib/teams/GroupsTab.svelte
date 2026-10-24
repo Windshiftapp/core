@@ -1,6 +1,8 @@
 <script>
-  import { IconPlus, IconCircle, IconTrash } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconCircle from '@tabler/icons-svelte-runes/icons/circle';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import { teams } from '../api/teams.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
@@ -47,7 +49,7 @@
     }
     busy = true;
     try {
-      await api.teams.addGroups(team.id, [pickedGroup.id]);
+      await teams.addGroups(team.id, [pickedGroup.id]);
       successToast(t('teams.groupsAdded'));
       closeAddModal();
       await onUpdated?.();
@@ -68,7 +70,7 @@
     });
     if (!confirmed) return;
     try {
-      await api.teams.removeGroups(team.id, [mapping.group_id]);
+      await teams.removeGroups(team.id, [mapping.group_id]);
       successToast(t('teams.groupRemoved'));
       await onUpdated?.();
     } catch (err) {

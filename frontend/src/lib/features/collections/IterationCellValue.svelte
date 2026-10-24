@@ -1,5 +1,6 @@
 <script>
-  import { Building2, Globe } from '@lucide/svelte';
+  import Building2 from '@lucide/svelte/icons/building-2';
+  import Globe from '@lucide/svelte/icons/globe';
 
   let { iteration, interactive = false } = $props();
 </script>

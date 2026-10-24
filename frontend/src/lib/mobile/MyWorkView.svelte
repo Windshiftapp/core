@@ -1,7 +1,11 @@
 <script>
-  import { Search, Sparkles, Command as CommandIcon } from '@lucide/svelte';
-  import { authStore, aiStore } from '../stores';
-  import { api } from '../api.js';
+  import Search from '@lucide/svelte/icons/search';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import CommandIcon from '@lucide/svelte/icons/command';
+  import { authStore } from '../stores/auth.svelte.js';
+  import { aiStore } from '../stores/aiStore.svelte.js';
+  import { items } from '../api/items.js';
+  import { homepage as homepageApi } from '../api/misc.js';
   import { navigate } from '../router.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import { formatItemKey } from '../utils/itemKey.js';
@@ -56,7 +60,7 @@
         statusColor: w.status_color,
         priorityName: w.priority_name,
         priorityColor: w.priority_color,
-        timestamp: w.last_activity ? formatRelativeCompact(new Date(w.last_activity)) : null,
+        timestamp: w.last_active_at ? formatRelativeCompact(new Date(w.last_active_at)) : null,
       }));
   }
 
@@ -95,12 +99,12 @@
           data = { ...data, assigned: [] };
           return;
         }
-        const res = await api.items.getAll(assignedToMeQuery(currentUserId));
+        const res = await items.getAll(assignedToMeQuery(currentUserId));
         if (v !== version) return;
         data = { ...data, assigned: loadAssigned(res) };
       } else {
         // Watched + Recent both come from the homepage payload — fetch once.
-        const homepage = await api.homepage.get();
+        const homepage = await homepageApi.get();
         if (v !== version) return;
         data = { ...data, watched: loadWatched(homepage), recent: loadRecent(homepage) };
       }
@@ -193,6 +197,7 @@
   .seg {
     flex: 1;
     min-height: 36px;
+    white-space: nowrap;
     border: 1px solid var(--ds-border);
     border-radius: var(--radius-md, 6px);
     background-color: var(--ds-surface);

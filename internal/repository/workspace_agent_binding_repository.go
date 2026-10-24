@@ -425,6 +425,23 @@ func (r *WorkspaceAgentBindingRepository) UpdateConfig(ctx context.Context, b *m
 	return nil
 }
 
+// UpdateLLMConnection rewrites a binding's model connection in place, scoped by
+// (id, workspace_id). It does not touch the lifecycle or profile version: the
+// caller's instruction rewrite in UpdateAgentConfig owns the single Draft/version
+// transition for the whole configuration change.
+func (r *WorkspaceAgentBindingRepository) UpdateLLMConnection(ctx context.Context, id, workspaceID, connectionID int) error {
+	_, err := r.db.ExecWriteContext(ctx, `
+		UPDATE workspace_agent_bindings
+		SET llm_connection_id = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND workspace_id = ?
+	`, connectionID, id, workspaceID)
+	if err != nil {
+		return fmt.Errorf("update binding llm connection: %w", err)
+	}
+	return nil
+}
+
 // UpdateRunnerImage rewrites a binding's custom runner image, scoped by
 // workspace. An empty image clears the override (NULL = the runner's default
 // windshift-agent image) (WI-450).

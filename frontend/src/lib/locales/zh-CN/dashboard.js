@@ -19,6 +19,10 @@ export default {
       },
     },
     widgetCatalog: {
+      customWidget: {
+        name: '自定义组件',
+        description: '通过 AI 或编写 OpenUI 程序创建的组件',
+      },
       dailyBriefing: {
         name: '每日简报',
         description: '由 AI 生成的今日重点摘要',
@@ -42,6 +46,10 @@ export default {
       assignedToMe: {
         name: '分配给我的',
         description: '所有工作区中分配给你的未完成事项',
+      },
+      createdByMe: {
+        name: '我创建的',
+        description: '所有工作区中你创建的未完成事项',
       },
       watchedItems: {
         name: '关注的事项',
@@ -82,8 +90,50 @@ export default {
         name: '导航',
         description: '快速访问工作区',
       },
+      custom: {
+        name: '自定义',
+        description: '根据描述构建你自己的组件',
+      },
+      background: {
+        name: '背景',
+        description: '用于仪表板的渐变和预设图片',
+      },
       tipLabel: '提示',
       tip: '将小部件从这里拖到面板中的任意分区。',
+    },
+    widgetBuilder: {
+      createTitle: "创建组件",
+      editTitle: "编辑组件",
+      subtitle: "描述它，或自己编写 OpenUI 程序",
+      nameLabel: "名称",
+      namePlaceholder: "我的待办工作",
+      promptLabel: "它应该显示什么？",
+      promptPlaceholder: "我的未完成事项，含计数和表格",
+      generate: "生成",
+      generating: "生成中...",
+      itemQueryLabel: "工作项查询 (CQL)",
+      assetQueryLabel: "资产查询 (CQL)",
+      assetSetLabel: "资产集",
+      assetSetNone: "无",
+      previewLabel: "预览",
+      previewEmpty: "暂无可预览内容",
+      loading: "加载中...",
+      aiUnavailable: "AI 生成不可用，因此无法创建新组件。",
+      aiUnavailableEditing: "AI 生成不可用。你仍然可以修改名称和查询。",
+      generateFailed: "生成失败",
+      saveFailed: "保存失败",
+      loadFailed: "无法加载此组件",
+      saving: "保存中...",
+    },
+    customWidgets: {
+      sourceError: "无法加载此组件的数据",
+      truncated: '基于 {total} 行中的 {shown} 行',
+      renderError: "无法渲染此组件",
+      unavailable: "此组件已不可用",
+      notConfigured: "此组件尚未设置",
+      noLinks: "这些工作项与资产之间没有关联",
+      canvasUnavailable: "此图表需要 canvas，当前环境不可用",
+      renderedNodes: "正在绘制 {total} 个节点中的 {shown} 个",
     },
     editor: {
       newSection: '新建分区',
@@ -106,6 +156,8 @@ export default {
     states: {
       assignedLoadError: '无法加载分配给你的事项',
       assignedEmpty: '目前没有分配给你的事项',
+      createdLoadError: '无法加载你创建的事项',
+      createdEmpty: '你没有创建任何未完成的事项',
       personalTasksLoadError: '无法加载你的个人任务',
       personalTasksEmpty: '你的个人待办列表为空',
       supportMetricsLoadError: '无法加载支持指标',

@@ -1,8 +1,8 @@
 <script>
-  import { IconCheck } from '@tabler/icons-svelte-runes';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { api } from '../../api.js';
+  import { channels } from '../../api/channels.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
@@ -23,6 +23,7 @@
       oauth_tenant_id: 'common',
       oauth_connected: false,
       oauth_email: '',
+      oauth_mailbox: '',
       connected_oauth_provider_type: '',
       connected_oauth_client_id: '',
       connected_oauth_tenant_id: '',
@@ -33,7 +34,6 @@
       imap_password: '',
       workspace_id: null,
       item_type_id: null,
-      connected_portal_id: null,
       mailbox: 'INBOX',
       processing_disposition: 'mark_read',
       rate_limit_per_hour: null,
@@ -46,11 +46,6 @@
     onOAuthStartFailed = async () => {}
   } = $props();
 
-  // A missing key would crash the select's bind:value (undefined + fallback);
-  // normalize once at init so older callers without the field keep working.
-  if (formData.connected_portal_id === undefined) {
-    formData.connected_portal_id = null;
-  }
   // Older callers (and stored configs) carry the two legacy booleans instead of
   // the single disposition. Derive it once so the select always has a value.
   if (formData.processing_disposition === undefined) {
@@ -65,6 +60,7 @@
     formData.oauth_connected && (
       formData.oauth_provider_type !== formData.connected_oauth_provider_type ||
       formData.oauth_client_id.trim() !== formData.connected_oauth_client_id.trim() ||
+      formData.oauth_mailbox.trim() !== formData.connected_oauth_mailbox.trim() ||
       (formData.oauth_provider_type === 'microsoft' &&
         formData.oauth_tenant_id.trim() !== formData.connected_oauth_tenant_id.trim())
     )
@@ -79,11 +75,16 @@
       return;
     }
 
+    if (!formData.oauth_mailbox?.trim()) {
+      errorToast(t('channel.oauthMailboxRequired'));
+      return;
+    }
+
     let restoreEnabled = false;
     try {
       loading = true;
       restoreEnabled = await onSaveBeforeOAuth();
-      const result = await api.channels.startEmailOAuth(channelId, restoreEnabled);
+      const result = await channels.startEmailOAuth(channelId, restoreEnabled);
       if (result.auth_url) {
         window.location.href = result.auth_url;
       } else {
@@ -114,6 +115,9 @@
       if (!formData.oauth_client_id?.trim()) {
         return { valid: false, message: t('channel.clientIdRequired') };
       }
+      if (!formData.oauth_mailbox?.trim()) {
+        return { valid: false, message: t('channel.oauthMailboxRequired') };
+      }
       if (!oauthIsConnected && !formData.oauth_client_secret?.trim()) {
         return { valid: false, message: t('channel.clientSecretRequired') };
       }
@@ -137,6 +141,7 @@
         email_oauth_provider_type: formData.oauth_provider_type,
         email_oauth_client_id: formData.oauth_client_id.trim(),
         email_oauth_client_secret: formData.oauth_client_secret || undefined,
+        email_oauth_mailbox: formData.oauth_mailbox.trim(),
         email_oauth_tenant_id: formData.oauth_provider_type === 'microsoft' ? formData.oauth_tenant_id.trim() : undefined
       };
     } else {
@@ -263,6 +268,20 @@
           </div>
         {/if}
 
+        <div>
+          <TextField
+            label={t('channel.oauthMailbox')}
+            required
+            labelColor="default"
+            placeholder="support@example.com"
+            dataTestid="channel-oauth-mailbox"
+            bind:value={formData.oauth_mailbox}
+          />
+          <DescriptionText>
+            {t('channel.oauthMailboxHelp')}
+          </DescriptionText>
+        </div>
+
         <!-- Connection Status -->
         {#if oauthIsConnected}
           <div class="p-4 rounded-lg border" style="background: var(--ds-background-success-subtle); border-color: var(--ds-border-success);">
@@ -290,7 +309,7 @@
                   {t('channel.saveAndConnect')}
                 </div>
               </div>
-              <Button variant="primary" onclick={startOAuthFlow} disabled={loading}>
+              <Button variant="primary" onclick={startOAuthFlow} disabled={loading} dataTestid="channel-oauth-connect">
                 {t('channel.connectMailbox')}
               </Button>
             </div>

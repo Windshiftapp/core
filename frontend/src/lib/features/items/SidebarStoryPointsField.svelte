@@ -52,7 +52,7 @@
   }
 </script>
 
-<div class="mb-3" data-testid="item-story-points-field">
+<div class="mb-1" data-testid="item-story-points-field">
   {#if editing}
     <div class="w-full flex items-center justify-between px-2 py-1.5 text-sm">
       <Text variant="subtle" size="sm">{t('items.storyPoints')}</Text>

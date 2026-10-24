@@ -205,6 +205,7 @@ CREATE TABLE IF NOT EXISTS collections (
 	filter_state TEXT,
 	is_public BOOLEAN DEFAULT false,
 	is_private BOOLEAN NOT NULL DEFAULT false,
+	public_milestone_swimlanes BOOLEAN NOT NULL DEFAULT false,
 	workspace_id INTEGER,
 	category_id INTEGER,
 	created_by INTEGER,

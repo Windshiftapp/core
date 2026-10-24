@@ -1,10 +1,13 @@
 <script>
-  import { Plus, RefreshCw, Search } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import Plus from '@lucide/svelte/icons/plus';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Search from '@lucide/svelte/icons/search';
+  import { collections as collectionsApi } from '../../api/collections.js';
+  import { items as itemsApi } from '../../api/items.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { navigate } from '../../router.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import DashboardItemRow from './DashboardItemRow.svelte';
   import {
     resolveDensity,
@@ -79,7 +82,7 @@
 
     try {
       const filters = workspaceId ? { workspace_id: workspaceId } : {};
-      const collectionResponse = await api.collections.getAll(filters);
+      const collectionResponse = await collectionsApi.getAll(filters);
       if (version !== collectionLoadVersion) return;
 
       collections = Array.isArray(collectionResponse) ? collectionResponse : [];
@@ -119,7 +122,7 @@
     error = null;
 
     try {
-      const response = await api.items.getAll({
+      const response = await itemsApi.getAll({
         collection_id: selectedCollectionId,
         limit: fetchLimit,
         order_by: 'updated_at',
@@ -160,7 +163,7 @@
   }
 
   function openItem(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
+    itemModalStore.open(item.id, item.workspace_id);
   }
 </script>
 
@@ -288,6 +291,7 @@
           <DashboardItemRow
             title={item.title}
             itemKey={getItemKey(item)}
+            href={`/workspaces/${item.workspace_id}/items/${item.id}`}
             statusName={item.status_name}
             statusBuiltinKey={item.status_builtin_key}
             statusColor={item.status_color}

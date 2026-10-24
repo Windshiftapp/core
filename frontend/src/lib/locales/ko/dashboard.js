@@ -44,6 +44,10 @@ export default {
         "name": "내 담당 작업",
         "description": "전체 워크스페이스에서 나에게 배정된 미완료 작업"
       },
+      "createdByMe": {
+        "name": "내가 만든 작업",
+        "description": "전체 워크스페이스에서 내가 만든 미완료 작업"
+      },
       "watchedItems": {
         "name": "관찰 중인 작업",
         "description": "내가 지켜보는 작업"
@@ -83,6 +87,10 @@ export default {
         "name": "탐색",
         "description": "워크스페이스에 빠르게 접근"
       },
+      "background": {
+        "name": "배경",
+        "description": "대시보드용 그라데이션 및 사전 설정 이미지"
+      },
       "tipLabel": "도움말",
       "tip": "여기에서 대시보드의 원하는 섹션으로 위젯을 드래그하세요."
     },
@@ -107,6 +115,8 @@ export default {
     "states": {
       "assignedLoadError": "내 담당 작업을 불러오지 못했습니다",
       "assignedEmpty": "현재 나에게 배정된 작업이 없습니다",
+      "createdLoadError": "내가 만든 작업을 불러오지 못했습니다",
+      "createdEmpty": "내가 만든 미완료 작업이 없습니다",
       "storyPointsLoadError": "스토리 포인트 요약을 불러오지 못했습니다",
       "storyPointsEmpty": "아직 배정된 미완료 스토리 포인트가 없습니다",
       "personalTasksLoadError": "개인 작업을 불러오지 못했습니다",

@@ -1,6 +1,7 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
-  import { ChevronRight, ChevronDown } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
   import ScreenPicker from '../pickers/ScreenPicker.svelte';

@@ -1,5 +1,6 @@
 <script>
-  import { AlertTriangle, X } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import X from '@lucide/svelte/icons/x';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';

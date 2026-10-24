@@ -1,5 +1,18 @@
 <script>
-  import { IconUsers as Users, IconMail as Mail, IconSearch as Search, IconGripVertical as GripVertical, IconPlus as Plus, IconEdit as Edit2, IconTrash as Trash2, IconDots as MoreHorizontal, IconFile as FileIcon, IconTicket as Ticket, IconFileText as FileText, IconNote as StickyNote, IconExternalLink as ExternalLink, IconShare as Share } from '@tabler/icons-svelte-runes';
+  import Users from '@tabler/icons-svelte-runes/icons/users';
+  import Mail from '@tabler/icons-svelte-runes/icons/mail';
+  import Search from '@tabler/icons-svelte-runes/icons/search';
+  import GripVertical from '@tabler/icons-svelte-runes/icons/grip-vertical';
+  import Plus from '@tabler/icons-svelte-runes/icons/plus';
+  import Edit2 from '@tabler/icons-svelte-runes/icons/edit';
+  import Trash2 from '@tabler/icons-svelte-runes/icons/trash';
+  import MoreHorizontal from '@tabler/icons-svelte-runes/icons/dots';
+  import FileIcon from '@tabler/icons-svelte-runes/icons/file';
+  import Ticket from '@tabler/icons-svelte-runes/icons/ticket';
+  import FileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import StickyNote from '@tabler/icons-svelte-runes/icons/note';
+  import ExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
+  import Share from '@tabler/icons-svelte-runes/icons/share';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -18,7 +31,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { api } from '../api.js';
+  import { contactRoles as contactRolesApi, customerOrganisations } from '../api/portal.js';
   import { logbook } from '../api/logbook.js';
   import { capabilitiesStore } from '../stores/capabilities.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
@@ -80,7 +93,7 @@
   $effect(() => {
     if (activeTab !== 'sharing' || contactRolesLoaded) return;
     contactRolesLoaded = true;
-    api.contactRoles
+    contactRolesApi
       .getAll()
       .then((roles) => {
         contactRoles = Array.isArray(roles) ? roles : (roles?.data ?? []);
@@ -114,7 +127,7 @@
     sharingSaving = true;
     sharingSaved = false;
     try {
-      await api.customerOrganisations.setRequestSharing(organisation.id, {
+      await customerOrganisations.setRequestSharing(organisation.id, {
         request_sharing: sharingMode,
         request_sharing_audience: sharingAudience,
         visible_role_ids: sharingAudience === 'roles' ? sharingRoleIDs : [],
@@ -182,7 +195,7 @@
     orgTickets = [];
     orgTicketsLoading = true;
     orgTicketsLoaded = false;
-    api.customerOrganisations.getTickets(orgId)
+    customerOrganisations.getTickets(orgId)
       .then((result) => {
         if (orgTicketsOrgID !== orgId) return;
         const list = result?.data ?? result ?? [];
@@ -406,7 +419,7 @@
               {/if}
 
               <!-- Open in new tab button -->
-              <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                 <button
                   onclick={(e) => { e.stopPropagation(); window.open(logbook.getDocumentFileUrl(doc.id), '_blank'); }}
                   class="p-1.5 rounded-lg shadow-sm border transition-colors hover:bg-opacity-90"
@@ -462,7 +475,7 @@
                 {item.title}
               </div>
               <div class="text-xs">
-                <ItemKey item={item} />
+                <ItemKey item={item} clickable={false} />
               </div>
             </a>
           {:else}

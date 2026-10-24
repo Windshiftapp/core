@@ -242,6 +242,7 @@ export default {
     numberedList: 'Lista Numerada',
     insertImage: 'Inserir Imagem',
     userNotFound: 'Usuário não encontrado',
+    multipleUsersMatch: 'Vários usuários correspondem',
   },
   dialogs: {
     cancel: 'Cancelar',

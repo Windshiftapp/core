@@ -15,7 +15,8 @@ export const workspaces = {
   getPage: (filters = {}, requestOptions = {}) =>
     fetchAPIV2(`/workspaces${buildQueryString(filters)}`, requestOptions),
   get: (id, requestOptions = {}) => fetchV2Data(`/workspaces/${id}`, requestOptions),
-  getBootstrap: (id) => fetchAPI(`/workspaces/${id}/bootstrap`),
+  getBootstrap: (id, requestOptions = {}) =>
+    fetchAPI(`/workspaces/${id}/bootstrap`, requestOptions),
   getProjects: (id) => fetchV2Data(`/workspaces/${id}/time-projects`),
   getOrCreatePersonal: () => fetchAPI('/workspaces/personal'),
   getStats: (id, params = {}) => {

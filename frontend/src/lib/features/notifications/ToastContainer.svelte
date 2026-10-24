@@ -1,5 +1,8 @@
 <script>
-  import { XCircle, CircleCheck, AlertTriangle, Info } from '@lucide/svelte';
+  import XCircle from '@lucide/svelte/icons/x-circle';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Info from '@lucide/svelte/icons/info';
   import { toasts, removeToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { portal } from '../../actions/portal.js';

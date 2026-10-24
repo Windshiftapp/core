@@ -273,43 +273,10 @@ func (rl *RateLimiter) Stop() {
 	})
 }
 
-// getClientIP extracts the client IP from request headers with proxy validation
+// getClientIP extracts the client IP from request headers with proxy
+// validation. See utils.ExtractClientIP for the forwarded-header rules.
 func (rl *RateLimiter) getClientIP(r *http.Request) string {
-	// Get the immediate client IP (could be proxy). SplitHostPort handles both
-	// "1.2.3.4:5678" and "[::1]:5678" forms; the bare-host fallback covers the
-	// rare case where RemoteAddr has no port at all.
-	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteAddr = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
-		return remoteAddr // Return as-is if parsing fails
-	}
-
-	// Only trust proxy headers if the request comes from a trusted proxy
-	if utils.IsTrustedProxy(clientIP, rl.useProxy, rl.additionalProxies) {
-		// Check X-Forwarded-For header (for proxies)
-		forwarded := r.Header.Get("X-Forwarded-For")
-		if forwarded != "" {
-			// Take the first (original client) IP
-			ips := strings.Split(forwarded, ",")
-			firstIP := strings.TrimSpace(ips[0])
-			if firstIP != "" {
-				return firstIP
-			}
-		}
-
-		// Check X-Real-IP header
-		realIP := r.Header.Get("X-Real-IP")
-		if realIP != "" {
-			return realIP
-		}
-	}
-
-	// Fall back to direct connection IP
-	return remoteAddr
+	return utils.ExtractClientIP(r, rl.useProxy, rl.additionalProxies)
 }
 
 // GetFailedAttemptCount returns the number of failed attempts for an IP (for testing/monitoring)

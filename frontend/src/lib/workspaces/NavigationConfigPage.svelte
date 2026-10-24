@@ -1,11 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import {
-    IconHome as Home,
-    IconPalette as Palette,
-    IconRotate as Rotate,
-    IconSettings as Settings,
-  } from '@tabler/icons-svelte-runes';
+  import Home from '@tabler/icons-svelte-runes/icons/home';
+  import Palette from '@tabler/icons-svelte-runes/icons/palette';
+  import Rotate from '@tabler/icons-svelte-runes/icons/rotate';
+  import Settings from '@tabler/icons-svelte-runes/icons/settings';
   import Toggle from '../components/Toggle.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import {
@@ -15,9 +13,11 @@
     workspaceViewItems,
   } from '../navigation/workspaceNavigation.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
-  import { workspacePermissions, currentWorkspace } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
+  import { currentWorkspace } from '../stores/workspaces.svelte.js';
   import { moduleSettings } from '../stores/moduleSettings.js';
-  import { api } from '../api.js';
+  import { collections } from '../api/collections.js';
+  import { workspaces } from '../api/workspaces.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 
@@ -102,12 +102,12 @@
     loadError = null;
     try {
       const requests = [
-        api.collections.getBoardConfiguration(collectionId ?? null, workspaceId ?? null),
+        collections.getBoardConfiguration(collectionId ?? null, workspaceId ?? null),
       ];
       if (isCollectionScope) {
-        requests.push(api.collections.get(collectionId));
+        requests.push(collections.get(collectionId));
       } else {
-        requests.push(api.workspaces.get(workspaceId));
+        requests.push(workspaces.get(workspaceId));
       }
       const [data, scope] = await Promise.all(requests);
       config = data;
@@ -205,14 +205,19 @@
       // settings; adopt it without touching the local toggle state so rows
       // do not re-render from a refetch.
       config = config?.id
-        ? await api.collections.updateBoardConfiguration(collectionId, config.id, payload, workspaceId)
-        : await api.collections.createBoardConfiguration(collectionId, workspaceId, payload);
+        ? await collections.updateBoardConfiguration(collectionId, config.id, payload, workspaceId)
+        : await collections.createBoardConfiguration(collectionId, workspaceId, payload);
       persisted = sent;
       inherited = Boolean(config?.view_settings_inherited) || !config?.view_settings;
+      // Reflect the saved set immediately: navigation reads this store, and
+      // dropping the entry would fall back to the everything-enabled default
+      // until some later refetch. A workspace-scope save also changes every
+      // inheriting collection, so drop those caches and let them refetch.
       if (collectionId) {
-        viewSettingsStore.invalidate(workspaceId, collectionId);
+        viewSettingsStore.applyEnabledViews(workspaceId, collectionId, sent, inherited);
       } else {
         viewSettingsStore.invalidateWorkspace(workspaceId);
+        viewSettingsStore.applyEnabledViews(workspaceId, null, sent, inherited);
       }
     } finally {
       saving = false;
@@ -226,13 +231,13 @@
       try {
         saving = true;
         try {
-          await api.collections.updateBoardConfiguration(collectionId, config?.id, {
+          await collections.updateBoardConfiguration(collectionId, config?.id, {
             view_settings: { enabled_views: null },
           }, workspaceId);
-          viewSettingsStore.invalidate(workspaceId, collectionId);
           applyEffectiveViews(
-            await api.collections.getBoardConfiguration(collectionId ?? null, workspaceId ?? null)
+            await collections.getBoardConfiguration(collectionId ?? null, workspaceId ?? null)
           );
+          viewSettingsStore.applyEnabledViews(workspaceId, collectionId, enabled, inherited);
         } finally {
           saving = false;
         }

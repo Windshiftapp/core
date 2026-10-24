@@ -1,9 +1,15 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { items } from '../../api/items.js';
   import { navigate } from '../../router.js';
-  import { ChevronDown, ChevronRight, Plus, Check, X, ExternalLink, CheckCircle2 } from '@lucide/svelte';
-  import { workspacesStore } from '../../stores';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import CheckCircle2 from '@lucide/svelte/icons/check-circle-2';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Text from '../../components/Text.svelte';
   import Input from '../../components/Input.svelte';
@@ -117,7 +123,7 @@
     try {
       loading = true;
       error = null;
-      const tasks = await api.items.getPersonalTasks(currentItemId, { signal });
+      const tasks = await items.getPersonalTasks(currentItemId, { signal });
       if (signal.aborted) return;
       personalTasks = tasks || [];
 
@@ -154,7 +160,7 @@
       adding = true;
       error = null;
 
-      const newTask = await api.items.create({
+      const newTask = await items.create({
         workspace_id: personalWorkspace.id,
         title: newTaskTitle.trim(),
         related_work_item_id: itemId
@@ -180,7 +186,7 @@
       const isDone = isTaskCompleted(task);
       const newStatusId = isDone ? STATUS_ID_OPEN : STATUS_ID_DONE;
 
-      await api.items.transition(task.id, newStatusId);
+      await items.transition(task.id, newStatusId);
 
       // Update in list with new status_id
       personalTasks = personalTasks.map(t =>
@@ -195,7 +201,7 @@
   // Unlink task from work item
   async function handleUnlink(task) {
     try {
-      await api.items.unlinkPersonalTask(task.id);
+      await items.unlinkPersonalTask(task.id);
 
       // Remove from list
       personalTasks = personalTasks.filter(t => t.id !== task.id);
@@ -371,7 +377,7 @@
                 </button>
 
                 <!-- Actions -->
-                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                   <button
                     class="p-0.5 rounded action-btn"
                     onclick={() => handleNavigateToTask(task)}

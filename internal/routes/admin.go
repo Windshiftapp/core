@@ -48,6 +48,7 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("POST /admin/diagnostics/frac-index/migration", admin(http.HandlerFunc(deps.Admin.Diagnostics.ControlGlobalRankMigration)))
 	api.HandleH("GET /admin/diagnostics/llm-providers", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetLLMProviderStatus)))
 	api.HandleH("GET /admin/diagnostics/briefing-failures", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetBriefingFailures)))
+	api.HandleH("GET /admin/diagnostics/briefing-health", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetBriefingHealth)))
 	api.HandleH("GET /admin/diagnostics/runner-pools", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetRunnerPools)))
 	api.HandleH("GET /admin/diagnostics/database-pool", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetDatabasePool)))
 	api.HandleH("GET /admin/diagnostics/cache-memory", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetCacheMemory)))
@@ -56,6 +57,7 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("PUT /admin/diagnostics/recurrence-volume", admin(http.HandlerFunc(deps.Admin.Diagnostics.UpdateRecurrenceVolumeSettings)))
 	api.HandleH("GET /admin/diagnostics/domain-events", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetDomainEvents)))
 	api.HandleH("GET /admin/diagnostics/scm-connections", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSCMConnections)))
+	api.HandleH("GET /admin/diagnostics/email-intake", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetEmailIntakeDiagnostics)))
 	api.HandleH("POST /admin/diagnostics/domain-events/{eventID}/{consumerKey}/replay", admin(http.HandlerFunc(deps.Admin.Diagnostics.ReplayDomainEvent)))
 	api.HandleH("POST /admin/diagnostics/domain-events/{eventID}/{consumerKey}/skip", admin(http.HandlerFunc(deps.Admin.Diagnostics.SkipDomainEvent)))
 
@@ -149,6 +151,7 @@ func RegisterAdminRoutes(deps *Deps) {
 
 	// Jira import.
 	api.HandleH("GET /admin/jira-import/connections", admin(http.HandlerFunc(deps.Admin.JiraImport.GetConnections)))
+	api.HandleH("PUT /admin/jira-import/connections/{connectionId}", admin(http.HandlerFunc(deps.Admin.JiraImport.UpdateConnection)))
 	api.HandleH("DELETE /admin/jira-import/connections/{connectionId}", admin(http.HandlerFunc(deps.Admin.JiraImport.DeleteConnection)))
 	api.HandleH("POST /admin/jira-import/connect", admin(http.HandlerFunc(deps.Admin.JiraImport.Connect)))
 	api.HandleH("GET /admin/jira-import/projects", admin(http.HandlerFunc(deps.Admin.JiraImport.GetProjects)))

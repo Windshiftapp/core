@@ -1,5 +1,5 @@
 <script>
-  import { ArrowRightCircle } from '@lucide/svelte';
+  import ArrowRightCircle from '@lucide/svelte/icons/arrow-right-circle';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import StatusBadge from '../../../components/StatusBadge.svelte';

@@ -1,4 +1,4 @@
-import { api } from '../../../api.js';
+import { assetCategories, assetStatuses } from '../../../api/assets.js';
 
 /**
  * Flatten a tree of asset categories (each potentially carrying `children`)
@@ -24,7 +24,7 @@ export function flattenCategories(categories, level = 0) {
 export async function fetchAssetCategories(setId) {
   if (!setId) return [];
   try {
-    return (await api.assetCategories.getAll(setId, true)) || [];
+    return (await assetCategories.getAll(setId, true)) || [];
   } catch (error) {
     console.error('Failed to load asset categories:', error);
     return [];
@@ -38,7 +38,7 @@ export async function fetchAssetCategories(setId) {
 export async function fetchAssetStatuses(setId) {
   if (!setId) return [];
   try {
-    return (await api.assetStatuses.getAll(setId)) || [];
+    return (await assetStatuses.getAll(setId)) || [];
   } catch (error) {
     console.error('Failed to load statuses:', error);
     return [];

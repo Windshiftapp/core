@@ -1,5 +1,5 @@
 <script>
-  import { FileText } from '@lucide/svelte';
+  import FileText from '@lucide/svelte/icons/file-text';
   import { logbookActionFlowStore } from '../../../stores/logbookActionFlowStore.svelte.js';
   import BaseActionNode from '../../actions/shared/BaseActionNode.svelte';
 

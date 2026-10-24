@@ -176,7 +176,7 @@ export default {
       'Não é possível excluir a tela padrão. Esta tela é necessária para espaços de trabalho sem um conjunto de configurações.',
     confirmDeleteScreen:
       'Tem certeza de que deseja excluir a tela "{name}"? Isso afetará todos os espaços de trabalho que utilizam esta tela.',
-    defaults: { default: { name: 'Tela padrão', description: 'Tela padrão com os campos essenciais do item de trabalho' } },
+    defaults: { default: { name: 'Tela padrão', description: 'Tela padrão com os campos essenciais do item de trabalho' }, default_create: { name: 'Tela de criação padrão', description: 'Tela focada em criar itens de trabalho' } },
     fieldWidths: {
       full: 'Largura Total',
       half: 'Meia Largura',

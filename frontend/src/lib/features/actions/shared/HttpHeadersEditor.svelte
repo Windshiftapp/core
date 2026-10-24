@@ -1,5 +1,6 @@
 <script>
-  import { Plus, Trash2 } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { t } from '../../../stores/i18n.svelte.js';
   import Input from '../../../components/Input.svelte';
 

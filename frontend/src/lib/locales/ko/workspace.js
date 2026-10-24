@@ -83,7 +83,7 @@ export default {
       "failedToLoadCustomer": "고객을 불러오지 못했습니다",
       "submissions": "제출 내역",
       "channels": "채널",
-      "noSubmissions": "아직 제출 내역이 없습니다",
+      "noSubmissions": "표시할 제출 내역이 없습니다",
       "noChannels": "아직 채널이 없습니다"
     }
   },
@@ -186,6 +186,13 @@ export default {
     "itemCreated": "작업을 만들었습니다",
     "itemUpdated": "작업을 수정했습니다",
     "itemDeleted": "작업을 삭제했습니다",
+    "deleted": "이 항목이 삭제되었습니다.",
+    "itemTypeChanged": "항목 유형이 변경되었습니다",
+    "subtasksCreated": "하위 작업 {count}개를 만들었습니다",
+    "subtasksCreated_one": "하위 작업 {count}개를 만들었습니다",
+    "subtasksCreated_other": "하위 작업 {count}개를 만들었습니다",
+    "noChildItemType": "사용 가능한 하위 항목 유형이 없습니다",
+    "subtasksCreateFailed": "하위 작업을 만들지 못했습니다",
     "assignedToYou": "내 담당 작업",
     "createdByYou": "내가 만든 작업",
     "recentlyViewed": "최근 본 항목",

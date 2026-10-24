@@ -1,6 +1,18 @@
 <script>
-  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal, Bot, Activity, CalendarClock, TimerReset, RefreshCw } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Play from '@lucide/svelte/icons/play';
+  import Info from '@lucide/svelte/icons/info';
+  import History from '@lucide/svelte/icons/history';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import Bot from '@lucide/svelte/icons/bot';
+  import Activity from '@lucide/svelte/icons/activity';
+  import CalendarClock from '@lucide/svelte/icons/calendar-clock';
+  import TimerReset from '@lucide/svelte/icons/timer-reset';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { items } from '../../api/items.js';
   import Button from '../../components/Button.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Comments from '../items/Comments.svelte';
@@ -18,15 +30,19 @@
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { isExternalRequest } from '../../utils/requestOrigin.js';
   import Badge from '../../components/Badge.svelte';
+  import TabStrip from '../../components/TabStrip.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import DataTable from '../../components/DataTable.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
   import Toggle from '../../components/Toggle.svelte';
   import Spinner from '../../components/Spinner.svelte';
   // Direct store access for the child-item rollup keeps the time-tab logic
   // co-located and avoids threading four extra props through ItemDetail and
   // ItemDetailContent for a feature that only lives in this tab.
-  import { itemDetailStore, workItemStalenessSettings, workspaceDataStore } from '../../stores';
+  import { itemDetailStore } from '../../stores/itemDetailStore.svelte.js';
+  import { workItemStalenessSettings } from '../../stores/workItemStalenessSettings.svelte.js';
+  import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
 
   let {
     item,
@@ -58,6 +74,18 @@
       .then((runs) => { if (item?.id === id) hasAgentRuns = (runs?.length ?? 0) > 0; })
       .catch(() => {});
   });
+
+  let tabs = $derived([
+    { id: 'comments', label: t('items.comments'), icon: MessageSquare, count: commentCount },
+    ...(moduleSettings.time_tracking_enabled
+      ? [{ id: 'time', label: t('items.timeTracking'), icon: Clock, count: timeWorklogs?.length ?? 0, testid: 'item-detail-time-tab' }]
+      : []),
+    { id: 'details', label: t('items.details'), icon: Info, testid: 'item-detail-details-tab' },
+    { id: 'history', label: t('items.history'), icon: History, testid: 'item-detail-history-tab' },
+    ...(hasAgentRuns
+      ? [{ id: 'agent-log', label: t('items.agentLog'), icon: Bot, testid: 'item-detail-agent-log-tab' }]
+      : []),
+  ]);
 
   // Sum logged worklog minutes for the time tab header. When the
   // "Include child items" toggle is on, swap to the server-side rollup totals
@@ -105,7 +133,7 @@
     const controller = new AbortController();
     statusDurationsLoading = true;
     statusDurationsError = false;
-    api.items.getStatusDurations(id, { signal: controller.signal })
+    items.getStatusDurations(id, { signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted && item?.id === id && statusDurationsRetry === requestVersion) {
           statusDurations = Array.isArray(result?.statuses) ? result.statuses : [];
@@ -296,14 +324,15 @@
     ];
   }
 
+  function formatWorklogTime(timestamp) {
+    return timestamp ? formatAuthenticatedInstant(timestamp * 1000, { hour: '2-digit', minute: '2-digit' }) : '—';
+  }
+
   const worklogColumns = [
     { key: 'date', label: t('common.date'), render: (w) => dateKeyInZone(w.start_time, getUserTimezone(authStore?.currentUser)), textColor: 'var(--ds-text-subtle)' },
-    { key: 'description', label: t('common.description'), render: (w) => w.description || t('items.noDescription') },
+    { key: 'description', label: t('common.description'), slot: 'description' },
     { key: 'user_name', label: t('common.user'), render: (w) => w.user_name || '—' },
-    { key: 'start_time', label: t('time.start'), render: (w) => w.start_time ? formatAuthenticatedInstant(w.start_time * 1000, { hour: '2-digit', minute: '2-digit' }) : '—', textColor: 'var(--ds-text-subtle)' },
-    { key: 'end_time', label: t('time.end'), render: (w) => w.end_time ? formatAuthenticatedInstant(w.end_time * 1000, { hour: '2-digit', minute: '2-digit' }) : '—', textColor: 'var(--ds-text-subtle)' },
-    { key: 'duration_minutes', label: t('time.duration'), render: (w) => `${Math.floor(w.duration_minutes / 60)}h ${w.duration_minutes % 60}m` },
-    { key: 'project_name', label: t('common.project'), textColor: 'var(--ds-text-subtle)' },
+    { key: 'duration_minutes', label: t('time.duration'), slot: 'duration' },
     { key: 'actions', label: '', width: 'w-12' },
   ];
 </script>
@@ -311,62 +340,7 @@
 <div class="mt-6">
   <div>
     <!-- Tab Navigation -->
-    <div class="flex border-b" style="border-color: var(--ds-border);">
-      <button
-        class="flex items-center gap-2 pl-0 pr-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'comments' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-        onclick={() => switchTab('comments')}
-      >
-        <MessageSquare class="w-4 h-4" />
-        {t('items.comments')}
-        {#if commentCount > 0}
-          <Badge variant="neutral" size="xs">{commentCount}</Badge>
-        {/if}
-      </button>
-      {#if moduleSettings.time_tracking_enabled}
-        <button
-          data-testid="item-detail-time-tab"
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-          style="{tab === 'time' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-          onclick={() => switchTab('time')}
-        >
-          <Clock class="w-4 h-4" />
-          {t('items.timeTracking')}
-          {#if timeWorklogs && timeWorklogs.length > 0}
-            <Badge variant="neutral" size="xs">{timeWorklogs.length}</Badge>
-          {/if}
-        </button>
-      {/if}
-      <button
-        data-testid="item-detail-details-tab"
-        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'details' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-        onclick={() => switchTab('details')}
-      >
-        <Info class="w-4 h-4" />
-        {t('items.details')}
-      </button>
-      <button
-        data-testid="item-detail-history-tab"
-        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-        style="{tab === 'history' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-        onclick={() => switchTab('history')}
-      >
-        <History class="w-4 h-4" />
-        {t('items.history')}
-      </button>
-      {#if hasAgentRuns}
-        <button
-          data-testid="item-detail-agent-log-tab"
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
-          style="{tab === 'agent-log' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
-          onclick={() => switchTab('agent-log')}
-        >
-          <Bot class="w-4 h-4" />
-          {t('items.agentLog')}
-        </button>
-      {/if}
-    </div>
+    <TabStrip {tabs} activeTab={tab} onTabChange={switchTab} />
 
     <!-- Tab Content -->
     <div class="pt-6">
@@ -575,6 +549,7 @@
                   variant="default"
                   size="small"
                   onclick={handleLogTime}
+                  dataTestid="log-time-btn"
                   title={t('items.logTimeTitle')}
                   keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
                   hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled }}
@@ -588,7 +563,27 @@
               data={timeWorklogs}
               keyField="id"
               actionItems={buildWorklogDropdownItems}
-            />
+            >
+              {#snippet description(worklog)}
+                <span
+                  class="line-clamp-2 text-sm"
+                  style="color: var(--ds-text);"
+                  title={worklog.description || t('items.noDescription')}
+                >
+                  {worklog.description || t('items.noDescription')}
+                </span>
+              {/snippet}
+              {#snippet duration(worklog)}
+                {@const durationLabel = `${Math.floor(worklog.duration_minutes / 60)}h ${worklog.duration_minutes % 60}m`}
+                {#if worklog.start_time}
+                  <Tooltip content={`${formatWorklogTime(worklog.start_time)} — ${formatWorklogTime(worklog.end_time)}`}>
+                    <span class="text-sm tabular-nums" style="color: var(--ds-text);">{durationLabel}</span>
+                  </Tooltip>
+                {:else}
+                  <span class="text-sm tabular-nums" style="color: var(--ds-text);">{durationLabel}</span>
+                {/if}
+              {/snippet}
+            </DataTable>
           </div>
         {:else}
           <div class="mb-3 flex items-center">
@@ -653,6 +648,7 @@
                 variant="default"
                 size="small"
                 onclick={handleLogTime}
+                dataTestid="log-time-btn"
                 title={t('items.logTimeTitle')}
                 keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
                 hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled }}

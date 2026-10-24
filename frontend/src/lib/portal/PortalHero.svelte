@@ -1,5 +1,6 @@
 <script>
-  import { Search, BookOpen } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import BookOpen from '@lucide/svelte/icons/book-open';
   import StateDisplay from '../components/StateDisplay.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Input from '../components/Input.svelte';

@@ -1,8 +1,12 @@
 <script>
-  import { IconUser as User, IconBriefcase as Briefcase, IconClock as Clock, IconCalendarEvent as CalendarDays, IconChartBar as BarChart3 } from '@tabler/icons-svelte-runes';
+  import User from '@tabler/icons-svelte-runes/icons/user';
+  import Briefcase from '@tabler/icons-svelte-runes/icons/briefcase';
+  import Clock from '@tabler/icons-svelte-runes/icons/clock';
+  import CalendarDays from '@tabler/icons-svelte-runes/icons/calendar-event';
+  import BarChart3 from '@tabler/icons-svelte-runes/icons/chart-bar';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { permissionStore, isSystemAdmin } from '../../stores';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import NavigationSidebar from '../../layout/NavigationSidebar.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import Button from '../../components/Button.svelte';

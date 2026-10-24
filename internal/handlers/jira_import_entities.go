@@ -983,11 +983,26 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, im *jiraImportConte
 // reuse. A fork (changed project→workspace mapping) deliberately leaves the
 // old workspace's item and its comments, attachments, and worklogs intact, so
 // forked imports never reuse a previous mapping and always create new rows.
-func (h *JiraImportHandler) previousSubresourceMapping(jobID, entityType, jiraID string, forked bool) (*previousJiraImportMapping, error) {
+// Even when the item is reused, a prior mapping is only reusable when the
+// resource it points at is owned by the destination item; otherwise a partial
+// fork retry would move the original workspace's resource instead of copying
+// it.
+func (h *JiraImportHandler) previousSubresourceMapping(jobID, entityType, jiraID string, itemID int, forked bool) (*previousJiraImportMapping, error) {
 	if forked {
 		return nil, nil
 	}
-	return h.findPreviousJiraImportMapping(jobID, entityType, jiraID)
+	previous, err := h.findPreviousJiraImportMapping(jobID, entityType, jiraID)
+	if err != nil || previous == nil {
+		return previous, err
+	}
+	owned, err := h.imports.SubresourceBelongsToItem(entityType, previous.WindshiftID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if !owned {
+		return nil, nil
+	}
+	return previous, nil
 }
 
 // resolveJiraIssueReferences maps the issue's direct Jira fields onto
@@ -1687,7 +1702,7 @@ func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira
 		var importErr error
 		var previousMapping *previousJiraImportMapping
 		if comment.ID != "" {
-			previousMapping, _ = h.previousSubresourceMapping(jobID, "comment", comment.ID, forked)
+			previousMapping, _ = h.previousSubresourceMapping(jobID, "comment", comment.ID, itemID, forked)
 		}
 		if previousMapping != nil {
 			if !h.imports.CommentExists(previousMapping.WindshiftID) {
@@ -2013,7 +2028,7 @@ func (h *JiraImportHandler) importWorklogs(jobID string, itemID int, issue *jira
 			updatedAt = updated.Unix()
 		}
 
-		previousMapping, lookupErr := h.previousSubresourceMapping(jobID, "worklog", worklog.ID, forked)
+		previousMapping, lookupErr := h.previousSubresourceMapping(jobID, "worklog", worklog.ID, itemID, forked)
 		if lookupErr != nil {
 			slog.Warn("Failed to find prior Jira worklog mapping",
 				slog.String("component", "jira"),
@@ -2136,7 +2151,7 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 
 		progress.TotalAttachments++
 
-		previousMapping, lookupErr := h.previousSubresourceMapping(jobID, "attachment", attachment.ID, forked)
+		previousMapping, lookupErr := h.previousSubresourceMapping(jobID, "attachment", attachment.ID, itemID, forked)
 		if lookupErr != nil {
 			slog.Warn("Failed to find prior Jira attachment mapping",
 				slog.String("component", "jira"),

@@ -34,10 +34,11 @@
   onapply={applyFilters}
   onclear={() => collectionStore.clearSubFilter()}
 >
-  {#snippet filterRow({ filter, onchange, onremove, onexecute })}
+  {#snippet filterRow({ filter, index, onchange, onremove, onexecute })}
     <DynamicFieldFilter
       {filter}
       compact
+      testIdPrefix={`collection-dynamic-filter-${index}`}
       {onchange}
       {onremove}
       {onexecute}

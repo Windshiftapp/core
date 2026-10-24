@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
 	"windshift/internal/models"
@@ -179,6 +180,9 @@ func (s *InvitationService) AcceptInvitation(token, password string) error {
 	}
 
 	// 2. Hash password
+	if err := auth.ValidatePasswordLength(password); err != nil {
+		return err
+	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)

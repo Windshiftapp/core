@@ -94,6 +94,20 @@
       ]
     },
     {
+      "type": "opencode-go",
+      "name": "OpenCode Go",
+      "api_format": "openai",
+      "base_url": "https://opencode.ai/inference/go",
+      "chat_path": "/v1/chat/completions",
+      "models_endpoint": "/v1/models",
+      "models_auth_scheme": "bearer",
+      "models_response_format": "openai",
+      "user_agent": "windshift/{version}",
+      "session_header": "x-opencode-session",
+      "usage_note": "OpenCode Go is intended for coding agents. Windshift sends its own User-Agent and a stable session ID so Go can route and cache requests. Traffic is monitored for abuse, and a workspace with a Go subscription cannot invite members.",
+      "models": []
+    },
+    {
       "type": "local",
       "name": "Local / Custom",
       "api_format": "openai",

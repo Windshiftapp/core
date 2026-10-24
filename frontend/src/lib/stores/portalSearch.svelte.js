@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { portal } from '../api/portal.js';
 
 let context = {
   getKnowledgeBaseShareLink: () => '',
@@ -37,7 +37,7 @@ async function search() {
   results = null;
   visible = true;
   try {
-    const response = await api.portal.searchKnowledgeBase(slug, normalizedQuery);
+    const response = await portal.searchKnowledgeBase(slug, normalizedQuery);
     if (currentSearchId === searchId) results = response;
   } catch (err) {
     if (currentSearchId !== searchId) return;

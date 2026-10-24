@@ -1,5 +1,9 @@
 <script>
-  import { ListChecks, SquareCheckBig, BookOpen, Timer, Bell } from '@lucide/svelte';
+  import ListChecks from '@lucide/svelte/icons/list-checks';
+  import SquareCheckBig from '@lucide/svelte/icons/square-check-big';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import Timer from '@lucide/svelte/icons/timer';
+  import Bell from '@lucide/svelte/icons/bell';
   import { currentRoute } from '../router.js';
   import { notifications } from '../stores/notifications.js';
   import { timerStore } from '../stores/timerStore.svelte.js';

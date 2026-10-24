@@ -91,6 +91,7 @@ var validFieldTypes = map[string]bool{
 	"multiselect":                  true,
 	"number":                       true,
 	"milestone":                    true,
+	"multi_milestone":              true,
 	"date":                         true,
 	"user":                         true,
 	"multi_user":                   true,

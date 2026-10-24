@@ -2,7 +2,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
   import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
-  import { api } from '../../api.js';
+  import { items } from '../../api/items.js';
   import { updateCustomFieldValue } from '../../utils/customFieldValueUpdates.js';
   import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -10,26 +10,28 @@
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
-  import Lozenge from '../../components/Lozenge.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import ListCustomFieldCell from './ListCustomFieldCell.svelte';
-  import { Calendar, User, Target, FolderKanban } from '@lucide/svelte';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import User from '@lucide/svelte/icons/user';
+  import Target from '@lucide/svelte/icons/target';
+  import FolderKanban from '@lucide/svelte/icons/folder-kanban';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import { formatDate, formatDateOnly, formatDateTimeLocale } from '../../utils/dateFormatter.js';
+  import { durationToString } from '../../utils/timeUtils.js';
   import {
-    createStatusPickerConfig,
     priorityPickerConfig as priorityConfig,
     projectPickerConfig as projectConfig,
   } from '../../pickers/pickerConfigs.js';
   import UserCellValue from './UserCellValue.svelte';
   import IterationCellEditor from './IterationCellEditor.svelte';
   import MilestoneCellValue from './MilestoneCellValue.svelte';
+  import ItemStatusPicker from '../../pickers/ItemStatusPicker.svelte';
 
   let {
     item,
     column,
     workspace,
-    collectionId = null,
     canEdit = true,
     statuses = [],
     statusCategories = [],
@@ -75,8 +77,8 @@
   async function handleItemUpdate(field, value) {
     try {
       const updatedItem = field === 'status_id'
-        ? await api.items.transition(item.id, value)
-        : await api.items.update(item.id, { [field]: value });
+        ? await items.transition(item.id, value)
+        : await items.update(item.id, { [field]: value });
       onitemUpdated?.({ item: updatedItem, field, value });
     } catch (error) {
       onupdateError?.({ error: error.message, field, value });
@@ -87,7 +89,7 @@
   // is sent.
   async function handleCustomFieldUpdate(fieldIdentifier, value) {
     try {
-      const updatedItem = await updateCustomFieldValue(api, item.id, fieldIdentifier, value);
+      const updatedItem = await updateCustomFieldValue(item.id, fieldIdentifier, value);
       onitemUpdated?.({ item: updatedItem, field: fieldIdentifier, value });
     } catch (error) {
       onupdateError?.({ error: error.message, field: fieldIdentifier, value });
@@ -101,7 +103,7 @@
     const PERSONAL_STATUS_OPEN = 1;
     const PERSONAL_STATUS_DONE = 3;
     try {
-      const updatedItem = await api.items.transition(item.id, isCompleted ? PERSONAL_STATUS_DONE : PERSONAL_STATUS_OPEN);
+      const updatedItem = await items.transition(item.id, isCompleted ? PERSONAL_STATUS_DONE : PERSONAL_STATUS_OPEN);
       item = { ...item, status_id: updatedItem.status_id, status_name: updatedItem.status_name };
       onitemUpdated?.({ item, field: 'status', value: updatedItem.status_id });
     } catch (error) {
@@ -109,8 +111,6 @@
     }
   }
 
-  // Configs for pickers
-  const statusConfig = $derived(createStatusPickerConfig(statusCategories));
 </script>
 
 {#if column.field_type === 'workspace'}
@@ -125,19 +125,25 @@
       <ItemKey
         {item}
         {workspace}
-        href={collectionId && workspace
-          ? `/workspaces/${workspace.id}/collections/${collectionId}/items/${item.id}`
-          : `/workspaces/${workspace?.id || item.workspace_id}/items/${item.id}`}
+        dataTestid={`list-cell-key-${item.id}`}
       />
     </div>
 
   {:else if column.field_identifier === 'title'}
     <!-- Title with type icon -->
     <div class="flex items-center gap-2 min-w-0">
-      {#if item.item_type_id && itemTypes.length > 0}
-        {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
-        {#if itemType}
-          <ItemTypeIcon {itemType} />
+      {#if item.item_type_icon || item.item_type_id}
+        {@const itemType = item.item_type_id
+          ? itemTypes.find((type) => type.id === item.item_type_id) ?? null
+          : null}
+        {#if item.item_type_icon || itemType}
+          <ItemTypeIcon
+            {itemType}
+            icon={item.item_type_icon}
+            color={item.item_type_color}
+            title={item.item_type_name || undefined}
+            testId={`list-cell-type-icon-${item.id}`}
+          />
         {/if}
       {/if}
       <div class="flex-1 min-w-0" data-testid={`workspace-item-title-${item.id}`}>
@@ -170,40 +176,15 @@
         disabled={!canEdit}
       />
     {:else}
-      {@const selectedStatus = [...editorOptions.statuses, ...statuses].find(s => s.id === item.status_id) || (item.status_name ? { name: item.status_name, category_id: null } : null)}
-      {@const statusCategory = selectedStatus ? statusCategories.find(sc => sc.id === selectedStatus.category_id) : null}
-      {#if canEdit}
-        <ItemPicker
-          value={item.status_id}
-          items={editorOptions.statuses}
-          loading={editorOptions.loading.statuses}
-          config={statusConfig}
-          placeholder="Set status"
-          showUnassigned={false}
-          allowClear={false}
-          onOpen={() => collectionEditorOptions.load(item.workspace_id, 'statuses')}
-          onSelect={async (selected) => {
-            const statusId = selected?.id;
-            if (statusId && statusId !== item.status_id) {
-              await handleItemUpdate('status_id', statusId);
-            }
-          }}
-        >
-          {#snippet children()}
-            <span class="cursor-pointer">
-              <Lozenge
-                text={selectedStatus ? selectedStatus.name : 'Set status'}
-                customBg={statusCategory?.color || '#6b7280'}
-              />
-            </span>
-          {/snippet}
-        </ItemPicker>
-      {:else}
-        <Lozenge
-          text={selectedStatus ? selectedStatus.name : '-'}
-          customBg={statusCategory?.color || '#6b7280'}
-        />
-      {/if}
+      <ItemStatusPicker
+        workspaceId={item.workspace_id}
+        statusId={item.status_id}
+        statusName={item.status_name}
+        {statuses}
+        {statusCategories}
+        {canEdit}
+        onselect={(statusId) => handleItemUpdate('status_id', statusId)}
+      />
     {/if}
 
   {:else if column.field_identifier === 'priority'}
@@ -361,6 +342,42 @@
         <Calendar class="w-4 h-4 flex-shrink-0" />
         {item.due_date ? formatDateOnly(item.due_date) : '-'}
       </div>
+    {/if}
+
+  {:else if column.field_identifier === 'story_points'}
+    <!-- Story Points -->
+    {#if canEdit}
+      <InlineFieldEditor
+        {item}
+        field="story_points"
+        fieldType="number"
+        placeholder={t('items.setField', { field: t('items.storyPoints').toLowerCase() })}
+        onitemUpdated={(detail) => onitemUpdated?.(detail)}
+        onupdateError={(detail) => onupdateError?.(detail)}
+      />
+    {:else}
+      <span class="text-sm tabular-nums" style="color: var(--ds-text-subtle);">
+        {item.story_points ?? '-'}
+      </span>
+    {/if}
+
+  {:else if column.field_identifier === 'estimate'}
+    <!-- Estimate (stored in minutes, shown as a duration) -->
+    {#if canEdit}
+      <InlineFieldEditor
+        {item}
+        field="estimate_minutes"
+        fieldType="duration"
+        placeholder={t('items.setField', { field: t('items.estimate').toLowerCase() })}
+        onitemUpdated={(detail) => onitemUpdated?.(detail)}
+        onupdateError={(detail) => onupdateError?.(detail)}
+      />
+    {:else}
+      <span class="text-sm" style="color: var(--ds-text-subtle);">
+        {item.estimate_minutes != null && item.estimate_minutes > 0
+          ? durationToString(item.estimate_minutes, { withDays: true })
+          : '-'}
+      </span>
     {/if}
 
   {:else if column.field_identifier === 'created_at'}

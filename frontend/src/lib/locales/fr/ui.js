@@ -126,7 +126,7 @@ export default {
       createdAt: { name: 'Créé le', description: 'Date de création de l’élément' },
       updatedAt: { name: 'Mis à jour le', description: 'Dernière mise à jour de l’élément' },
       dueDate: { name: 'Date d’échéance', description: 'Date d’échéance de l’élément' },
-      startDate: { name: 'Date de début', description: 'Début des travaux' },
+      startDate: { name: 'Date de début', description: 'Début de l’élément' },
       estimate: { name: 'Estimation', description: 'Effort estimé' },
       labels: { name: 'Étiquettes', description: 'Étiquettes de l’élément' },
       sprint: { name: 'Sprint', description: 'Sprint associé' },
@@ -236,6 +236,7 @@ export default {
     numberedList: 'Liste numérotée',
     insertImage: 'Insérer une image',
     userNotFound: 'Utilisateur introuvable',
+    multipleUsersMatch: 'Plusieurs utilisateurs correspondent',
     insertDiagram: 'Insérer un schéma',
     diagramEdit: 'Modifier le schéma',
     diagramOpen: 'Ouvrir le schéma',
@@ -447,6 +448,7 @@ export default {
     chart: {
       items: 'éléments',
       noDataAvailable: 'Aucune donnée disponible',
+      otherSlices: 'Autres ({count} de plus)',
     },
     completionChart: {
       title: 'Graphique de réalisation',

@@ -111,8 +111,10 @@ func (r *ModelRefresher) Refresh(ctx context.Context, provider ProviderInfo, api
 	}
 	// Fill SupportsVision from the curated map for models the catalog didn't
 	// mark, so the persisted cache carries vision capability even when the
-	// provider doesn't advertise input modalities.
+	// provider doesn't advertise input modalities. Per-model wire protocols are
+	// classified here too because the /models payload carries no protocol hint.
 	EnrichModelsVision(provider.Type, models)
+	EnrichModelsAPIFormat(provider.Type, models)
 	if err := r.cache.SaveSuccess(provider.Type, models, time.Now()); err != nil {
 		return nil, err
 	}
@@ -126,6 +128,14 @@ func (r *ModelRefresher) fetch(ctx context.Context, provider ProviderInfo, url, 
 	}
 	setCatalogAuth(req, provider.AuthScheme(), apiKey)
 	req.Header.Set("Accept", "application/json")
+	if provider.UserAgent != "" {
+		req.Header.Set("User-Agent", provider.UserAgent)
+	}
+	if provider.SessionHeader != "" {
+		// A catalog fetch is its own short-lived operation, distinct from any
+		// user conversation, so it gets a dedicated session id.
+		req.Header.Set(provider.SessionHeader, NewSessionID("ws-model-refresh"))
+	}
 
 	resp, err := r.http.Do(req)
 	if err != nil {

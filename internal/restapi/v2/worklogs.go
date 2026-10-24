@@ -62,6 +62,7 @@ type worklogDTO struct {
 	CreatedAt           int64    `json:"created_at"`
 	UpdatedAt           int64    `json:"updated_at"`
 	CustomerName        string   `json:"customer_name"`
+	CustomerBuiltinKey  string   `json:"customer_builtin_key,omitempty"`
 	ProjectName         string   `json:"project_name"`
 	UserName            string   `json:"user_name"`
 	ItemTitle           string   `json:"item_title"`
@@ -541,7 +542,8 @@ func worklogFromModel(worklog *models.Worklog, warnings []string) worklogDTO {
 		UserID: worklog.UserID, ItemID: worklog.ItemID, Description: worklog.Description,
 		Date: worklog.Date, StartTime: worklog.StartTime, EndTime: worklog.EndTime,
 		DurationMinutes: worklog.DurationMins, CreatedAt: worklog.CreatedAt, UpdatedAt: worklog.UpdatedAt,
-		CustomerName: worklog.CustomerName, ProjectName: worklog.ProjectName, UserName: worklog.UserName,
+		CustomerName: worklog.CustomerName, CustomerBuiltinKey: worklog.CustomerBuiltinKey,
+		ProjectName: worklog.ProjectName, UserName: worklog.UserName,
 		ItemTitle: worklog.ItemTitle, WorkspaceID: worklog.WorkspaceID, WorkspaceKey: worklog.WorkspaceKey,
 		WorkspaceItemNumber: worklog.WorkspaceItemNumber, ProjectMaxHours: worklog.ProjectMaxHours,
 		ProjectTotalHours: worklog.ProjectTotalHours, Warnings: warnings,

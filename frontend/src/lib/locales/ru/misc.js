@@ -171,7 +171,7 @@ export default {
   createModal: {
     workItem: 'Рабочий элемент', team: 'Команда', milestone: 'Этап', workspace: 'Рабочее пространство', collection: 'Коллекция', planning: 'Планирование', inProgress: 'В работе', completed: 'Завершено', cancelled: 'Отменено', newChildItem: 'Новый дочерний элемент', new: 'Создать', issueTitle: 'Название задачи', milestoneName: 'Название этапа', workspaceName: 'Название: {type}', workspaceKeyPlaceholder: 'Ключ пространства, например PROJ или TEAM', addDescription: 'Добавить описание…', workspaceTemplate: 'Шаблон', workspaceTemplateBlank: 'Пустое рабочее пространство', workspaceTemplateLoading: 'Загрузка шаблонов…', workspaceTemplateError: 'Не удалось загрузить шаблоны рабочих пространств',
     workspaceRestrict: 'Ограничить видимость',
-    workspaceRestrictHint: 'Только вы и назначенные пользователи могут видеть это рабочее пространство', workspaceTemplateMeta: 'Шаблонов: {templates} · элементов: {items}', workspacePackTemplate: 'Встроенный пакет', workspacePackMeta: 'v{version} · набор конфигурации и содержимое', workspacePackError: 'Не удалось загрузить встроенные пакеты', type: 'Тип', template: 'Шаблон', priority: 'Приоритет', noPriority: 'Без приоритета', assignee: 'Исполнитель', unassigned: 'Не назначено', dueDate: 'Срок', milestoneField: 'Этап', noMilestone: 'Без этапа', additionalFields: 'Дополнительные поля', targetDate: 'Целевая дата', status: 'Статус', category: 'Категория', noCategory: 'Без категории', parent: 'Родитель', fillRequiredFields: 'Заполните обязательные поля:', selectWorkspaceFirst: 'Сначала выберите рабочее пространство', create: 'Создать',
+    workspaceRestrictHint: 'Только вы и назначенные пользователи могут видеть это рабочее пространство', workspaceTemplateMeta: 'Шаблонов: {templates} · элементов: {items}', workspacePackTemplate: 'Встроенный пакет', workspacePackMeta: 'v{version} · набор конфигурации и содержимое', workspacePackError: 'Не удалось загрузить встроенные пакеты', type: 'Тип', template: 'Шаблон', priority: 'Приоритет', noPriority: 'Без приоритета', assignee: 'Исполнитель', unassigned: 'Не назначено', dueDate: 'Срок', milestoneField: 'Этап', noMilestone: 'Без этапа', additionalFields: 'Дополнительные поля', targetDate: 'Целевая дата', status: 'Статус', category: 'Категория', noCategory: 'Без категории', parent: 'Родитель', fillRequiredFields: 'Заполните обязательные поля:', selectWorkspaceFirst: 'Сначала выберите рабочее пространство', createdPartialError: 'Элемент создан, но завершить его не удалось: {error}. Нажмите «Создать» ещё раз, чтобы повторить.', create: 'Создать',
   },
 
   scm: {
@@ -200,6 +200,13 @@ export default {
     bulkAssignMe: 'Назначить себе',
     bulkAssignTeam: 'Назначить команде',
     bulkApplyTeam: 'Применить',
+    bulkTransition: 'Задать статус',
+    bulkApplyStatus: 'Применить',
+    bulkDelete: 'Удалить',
+    bulkDeleteConfirm: 'Удалить выбранные заявки ({n})?',
+    bulkDeleteSuccess: 'Удалено заявок: {n}',
+    bulkTransitionSuccess: 'Перемещено заявок: {n}',
+    bulkPartial: 'Обновлено {updated} из {requested} заявок; ошибок: {failed}',
     bulkClear: 'Снять выделение',
     bulkSuccess: 'Обновлено заявок: {n}',
     columnTitle: 'Заявка',

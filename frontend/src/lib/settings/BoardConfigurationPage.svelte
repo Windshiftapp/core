@@ -5,7 +5,7 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { navigate } from '../router.js';
-  import { api } from '../api.js';
+  import { collections } from '../api/collections.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { CARD_SELECTABLE_FIELDS } from '../stores/fieldConfig.js';
@@ -14,7 +14,13 @@
   import { collectionStore } from '../stores/collectionContext.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { loadBoardConfigurationPageData } from './boardConfigurationData.js';
-  import { Plus, GripVertical, X, Grip, Settings, ListChecks, Columns3 } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import X from '@lucide/svelte/icons/x';
+  import Grip from '@lucide/svelte/icons/grip';
+  import Settings from '@lucide/svelte/icons/settings';
+  import ListChecks from '@lucide/svelte/icons/list-checks';
+  import Columns3 from '@lucide/svelte/icons/columns-3';
   import IconSelector from '../pickers/IconSelector.svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
@@ -170,9 +176,7 @@
 
   async function loadData() {
     try {
-      const data = await loadBoardConfigurationPageData(
-        api,
-        workspaceDataStore,
+      const data = await loadBoardConfigurationPageData(workspaceDataStore,
         workspaceId,
         collectionId
       );
@@ -755,9 +759,9 @@
       }
 
       if (boardConfig && boardConfig.id) {
-        await api.collections.updateBoardConfiguration(collectionId, boardConfig.id, payload, workspaceId);
+        await collections.updateBoardConfiguration(collectionId, boardConfig.id, payload, workspaceId);
       } else {
-        const newConfig = await api.collections.createBoardConfiguration(collectionId, workspaceId, payload);
+        const newConfig = await collections.createBoardConfiguration(collectionId, workspaceId, payload);
         boardConfig = newConfig;
       }
       collectionStore.invalidateBoardConfiguration(workspaceId, collectionId);
@@ -791,7 +795,7 @@
 
     if (boardConfig) {
       try {
-        await api.collections.deleteBoardConfiguration(collectionId, boardConfig.id, workspaceId);
+        await collections.deleteBoardConfiguration(collectionId, boardConfig.id, workspaceId);
         boardConfig = null;
         columns = [];
         backlogStatusIDs = [];
@@ -1137,7 +1141,7 @@
                         <!-- Remove button -->
                         <button
                           onclick={() => removeStatusFromColumn(colIndex, statusId)}
-                          class="remove-btn opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all flex-shrink-0"
+                          class="remove-btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 p-0.5 rounded transition-all flex-shrink-0"
                           title={t('common.remove')}
                         >
                           <X class="w-3.5 h-3.5" />

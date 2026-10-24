@@ -20,6 +20,8 @@ func registerCommentRoutes(builder *routeBuilder, deps Deps) {
 	builder.JSON(http.MethodPatch, "/comments/{comment_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, updateComment(deps))
 	builder.Command(http.MethodDelete, "/comments/{comment_id}", AuthAuthenticated, []string{"items:delete"}, deleteComment(deps))
 	builder.JSON(http.MethodPost, "/comments/batch", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, commentsBatch(deps))
+	builder.JSON(http.MethodPost, "/comments/{comment_id}/reactions", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, addCommentReaction(deps))
+	builder.Command(http.MethodDelete, "/comments/{comment_id}/reactions/{reaction}", AuthAuthenticated, []string{"items:write"}, removeCommentReaction(deps))
 }
 
 type commentFeedDTO struct {
@@ -44,8 +46,9 @@ type commentCreateRequest struct {
 const maxCommentBatchItems = 500
 
 type commentBatchRequest struct {
-	ItemIDs  []int `json:"item_ids"`
-	PageSize int   `json:"page_size"`
+	ItemIDs          []int `json:"item_ids"`
+	PageSize         int   `json:"page_size"`
+	IncludeReactions bool  `json:"include_reactions,omitempty"`
 }
 
 type commentBatchEntry struct {
@@ -113,6 +116,11 @@ func commentsBatch(deps Deps) jsonOperation[commentBatchRequest, []commentBatchE
 		if err != nil {
 			return nil, internalError(err)
 		}
+		if input.IncludeReactions {
+			if err := attachBatchReactions(deps, pages); err != nil {
+				return nil, internalError(err)
+			}
+		}
 		entries := make([]commentBatchEntry, 0, len(visible))
 		for _, itemID := range visible {
 			page := pages[itemID]
@@ -162,6 +170,10 @@ func normalizeCommentBatchItemIDs(input []int) ([]int, error) {
 	return ids, nil
 }
 
+type commentReactionRequest struct {
+	Reaction string `json:"reaction"`
+}
+
 type commentPatchRequest struct {
 	Content Optional[string] `json:"content"`
 }
@@ -189,6 +201,13 @@ func listComments(deps Deps) readOperation[commentFeedDTO] {
 		}
 		if err := renderCommentHTML(page.Comments); err != nil {
 			return commentFeedDTO{}, internalError(err)
+		}
+		if includeReactions, err := optionalBoolQuery(r, "include_reactions"); err != nil {
+			return commentFeedDTO{}, err
+		} else if includeReactions {
+			if err := deps.Comments.AttachReactions(page.Comments); err != nil {
+				return commentFeedDTO{}, internalError(err)
+			}
 		}
 		var total *int
 		if options.Before == nil && options.Since == nil {
@@ -244,9 +263,16 @@ func getComment(deps Deps) readOperation[models.Comment] {
 		if err := requireCommentRead(r, deps, user.ID, comment.ItemID, comment.WorkspaceID); err != nil {
 			return models.Comment{}, err
 		}
-		body := comment.Comment
-		body.ContentHTML, err = markdown.Render(body.Content)
-		return body, commentError(err)
+		body := []models.Comment{comment.Comment}
+		if includeReactions, err := optionalBoolQuery(r, "include_reactions"); err != nil {
+			return models.Comment{}, err
+		} else if includeReactions {
+			if err := deps.Comments.AttachReactions(body); err != nil {
+				return models.Comment{}, internalError(err)
+			}
+		}
+		body[0].ContentHTML, err = markdown.Render(body[0].Content)
+		return body[0], commentError(err)
 	}
 }
 
@@ -270,9 +296,90 @@ func updateComment(deps Deps) jsonOperation[commentPatchRequest, models.Comment]
 		if err != nil {
 			return models.Comment{}, commentError(err)
 		}
-		updated.ContentHTML, err = markdown.Render(updated.Content)
-		return *updated, commentError(err)
+		body := []models.Comment{*updated}
+		if includeReactions, err := optionalBoolQuery(r, "include_reactions"); err != nil {
+			return models.Comment{}, err
+		} else if includeReactions {
+			if err := deps.Comments.AttachReactions(body); err != nil {
+				return models.Comment{}, internalError(err)
+			}
+		}
+		body[0].ContentHTML, err = markdown.Render(body[0].Content)
+		return body[0], commentError(err)
 	}
+}
+
+// addCommentReaction records the caller's reaction (core#298) and returns the
+// comment's grouped reactions. Reacting needs the same permission as
+// commenting; adding an existing reaction is a no-op.
+func addCommentReaction(deps Deps) jsonOperation[commentReactionRequest, []models.CommentReaction] {
+	return func(r *http.Request, input commentReactionRequest) ([]models.CommentReaction, error) {
+		user, comment, err := commentReactionTarget(r, deps, input.Reaction)
+		if err != nil {
+			return nil, err
+		}
+		reactions, err := deps.Comments.AddReaction(comment.ID, user.ID, input.Reaction)
+		return reactions, commentError(err)
+	}
+}
+
+// removeCommentReaction withdraws the caller's own reaction; removing a
+// reaction that does not exist is a no-op.
+func removeCommentReaction(deps Deps) commandOperation {
+	return func(r *http.Request) error {
+		reaction := r.PathValue("reaction")
+		user, comment, err := commentReactionTarget(r, deps, reaction)
+		if err != nil {
+			return err
+		}
+		return commentError(deps.Comments.RemoveReaction(comment.ID, user.ID, reaction))
+	}
+}
+
+func commentReactionTarget(r *http.Request, deps Deps, reaction string) (*models.User, *services.CommentWithDetails, error) {
+	if !services.ValidCommentReaction(reaction) {
+		err := newError(http.StatusBadRequest, "invalid_request", "reaction must be one of "+strings.Join(services.CommentReactionKeys, ", "))
+		err.Details = map[string]string{"field": "reaction"}
+		return nil, nil, err
+	}
+	user, comment, err := commentTarget(r, deps)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := requireCommentRead(r, deps, user.ID, comment.ItemID, comment.WorkspaceID); err != nil {
+		return nil, nil, err
+	}
+	if err := requireCommentPermission(deps, user.ID, comment.WorkspaceID, models.PermissionItemComment); err != nil {
+		return nil, nil, err
+	}
+	return user, comment, nil
+}
+
+func attachBatchReactions(deps Deps, pages map[int]*services.CommentFeedPage) error {
+	var all []models.Comment
+	for _, page := range pages {
+		if page != nil {
+			all = append(all, page.Comments...)
+		}
+	}
+	if err := deps.Comments.AttachReactions(all); err != nil {
+		return err
+	}
+	byID := make(map[int][]models.CommentReaction, len(all))
+	for _, comment := range all {
+		if comment.Reactions != nil {
+			byID[comment.ID] = comment.Reactions
+		}
+	}
+	for _, page := range pages {
+		if page == nil {
+			continue
+		}
+		for i := range page.Comments {
+			page.Comments[i].Reactions = byID[page.Comments[i].ID]
+		}
+	}
+	return nil
 }
 
 func deleteComment(deps Deps) commandOperation {
@@ -455,6 +562,8 @@ func commentError(err error) error {
 		return newError(http.StatusNotFound, "not_found", "Comment was not found")
 	case errors.As(err, &invalid):
 		return newError(http.StatusBadRequest, "invalid_request", invalid.Message)
+	case errors.Is(err, services.ErrInvalidCommentReaction):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.As(err, &serviceErr):
 		return newError(serviceErr.StatusCode, "conflict", serviceErr.Message)
 	default:

@@ -1,6 +1,7 @@
+import { tests } from '../../api/tests/index.js';
 /** Load and normalize the complete read model shared by both run screens. */
-export async function loadTestRunDetail(apiClient, workspaceId, runId) {
-  const detail = await apiClient.tests.testRuns.getDetail(workspaceId, runId);
+export async function loadTestRunDetail(workspaceId, runId) {
+  const detail = await tests.testRuns.getDetail(workspaceId, runId);
   if (!detail?.run) throw new Error('Test run not found');
 
   return {

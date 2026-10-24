@@ -1,8 +1,19 @@
 <script>
 	import { currentRoute, navigate } from '../router.js';
-	import { authStore, securityStore } from '../stores';
+	import { authStore } from '../stores/auth.svelte.js';
+	import { securityStore } from '../stores/securityStore.svelte.js';
 	import { t } from '../stores/i18n.svelte.js';
-	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from '@lucide/svelte';
+	import User from '@lucide/svelte/icons/user';
+	import Shield from '@lucide/svelte/icons/shield';
+	import Key from '@lucide/svelte/icons/key';
+	import Smartphone from '@lucide/svelte/icons/smartphone';
+	import Plus from '@lucide/svelte/icons/plus';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Code from '@lucide/svelte/icons/code';
+	import Copy from '@lucide/svelte/icons/copy';
+	import Terminal from '@lucide/svelte/icons/terminal';
+	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+	import X from '@lucide/svelte/icons/x';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import TextField from '../components/TextField.svelte';

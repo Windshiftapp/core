@@ -1,3 +1,4 @@
+import { assetTypes } from '../../api/assets.js';
 export const assetActionConditionFields = [
   { value: 'asset_title', label: 'Title' },
   { value: 'asset_tag', label: 'Asset Tag' },
@@ -5,9 +6,9 @@ export const assetActionConditionFields = [
   { value: 'asset_status_name', label: 'Status Name' },
 ];
 
-export async function loadAssetActionCustomFields(apiClient, assetTypeId) {
+export async function loadAssetActionCustomFields(assetTypeId) {
   if (!assetTypeId) return [];
-  const fields = await apiClient.assetTypes.getFields(assetTypeId);
+  const fields = await assetTypes.getFields(assetTypeId);
   return (fields || []).map((field) => ({
     id: String(field.custom_field_id),
     name: field.field_name,

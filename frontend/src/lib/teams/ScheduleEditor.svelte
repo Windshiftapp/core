@@ -1,5 +1,5 @@
 <script>
-  import { api } from '../api.js';
+  import { onCallSchedules } from '../api/oncall.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import Modal from '../dialogs/Modal.svelte';
@@ -7,9 +7,8 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import Select from '../components/Select.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import { listIanaTimezones } from '../utils/timeUtils.js';
+  import TimezonePicker from '../pickers/TimezonePicker.svelte';
 
   let { teamId, schedule = null, onSaved, onCancel } = $props();
 
@@ -22,15 +21,6 @@
     is_active: schedule?.is_active ?? true,
   });
   let busy = $state(false);
-
-  // Offer every IANA zone; keep a stored alias visible if the runtime omits it.
-  const baseTimezoneIds = listIanaTimezones();
-  const timezoneOptions = $derived.by(() => {
-    const zones = formData.timezone && !baseTimezoneIds.includes(formData.timezone)
-      ? [formData.timezone, ...baseTimezoneIds]
-      : baseTimezoneIds;
-    return zones.map((tz) => ({ value: tz, label: tz }));
-  });
 
   async function save() {
     if (!formData.name?.trim()) {
@@ -46,10 +36,10 @@
         is_active: formData.is_active,
       };
       if (schedule?.id) {
-        await api.onCallSchedules.update(schedule.id, payload);
+        await onCallSchedules.update(schedule.id, payload);
         successToast(t('teams.oncall.scheduleUpdated'));
       } else {
-        await api.onCallSchedules.createForTeam(teamId, payload);
+        await onCallSchedules.createForTeam(teamId, payload);
         successToast(t('teams.oncall.scheduleCreated'));
       }
       onSaved?.();
@@ -84,7 +74,13 @@
         <label for="schedule-timezone" class="block text-sm font-medium" style="color: var(--ds-text)">
           {t('teams.oncall.timezone')}
         </label>
-        <Select id="schedule-timezone" bind:value={formData.timezone} options={timezoneOptions} />
+        <TimezonePicker
+          id="schedule-timezone"
+          bind:value={formData.timezone}
+          inputTestid="schedule-timezone"
+          menuTestid="schedule-timezone-listbox"
+          optionTestid={() => 'schedule-timezone-option'}
+        />
       </div>
       <div>
         <Checkbox

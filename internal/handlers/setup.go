@@ -32,13 +32,17 @@ type SetupHandler struct {
 	DB             database.Database
 	SessionManager SessionCreator
 	AuthMiddleware AuthMiddleware
+	// ipExtractor is the shared proxy-aware client-IP extractor. When nil,
+	// forwarded headers are ignored and RemoteAddr is used.
+	ipExtractor *utils.IPExtractor
 }
 
-func NewSetupHandler(db database.Database, sessionManager SessionCreator, authMiddleware AuthMiddleware) *SetupHandler {
+func NewSetupHandler(db database.Database, sessionManager SessionCreator, authMiddleware AuthMiddleware, ipExtractor *utils.IPExtractor) *SetupHandler {
 	return &SetupHandler{
 		DB:             db,
 		SessionManager: sessionManager,
 		AuthMiddleware: authMiddleware,
+		ipExtractor:    ipExtractor,
 	}
 }
 
@@ -502,6 +506,12 @@ func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
 	if req.AdminUser.Password == "" {
 		return fmt.Errorf("admin password is required")
 	}
+	// An over-long password would otherwise surface as a 500 from bcrypt during
+	// hashing and the UI would show a generic setup failure. Validate before
+	// hashing so the client gets an actionable message.
+	if err := auth.ValidatePasswordLength(req.AdminUser.Password); err != nil {
+		return fmt.Errorf("admin %w", err)
+	}
 
 	// Basic email validation
 	if !strings.Contains(req.AdminUser.Email, "@") {
@@ -511,28 +521,12 @@ func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
 	return nil
 }
 
-// getClientIP extracts the client IP address from request
+// getClientIP extracts the client IP address from request. It uses the shared
+// proxy-aware extractor so the admin session created during setup stores the
+// same IP that the auth middleware will later compute for session validation.
 func (h *SetupHandler) getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (for proxies)
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		// Take the first IP if multiple are present
-		ips := strings.Split(forwarded, ",")
-		return strings.TrimSpace(ips[0])
+	if h.ipExtractor != nil {
+		return h.ipExtractor.GetClientIP(r)
 	}
-
-	// Check X-Real-IP header
-	realIP := r.Header.Get("X-Real-IP")
-	if realIP != "" {
-		return realIP
-	}
-
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	// Remove port if present
-	if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
-		ip = ip[:colonIndex]
-	}
-
-	return ip
+	return utils.ExtractClientIP(r, false, nil)
 }

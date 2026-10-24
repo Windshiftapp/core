@@ -1,13 +1,14 @@
 <script>
   import ItemPicker from './ItemPicker.svelte';
-  import { api } from '../api.js';
+  import { milestones as milestonesApi } from '../api/milestones.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { milestonesStore } from '../stores/milestones.js';
+  import { collectionEditorOptions } from '../stores/collectionEditorOptions.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import MilestoneFormDialog from '../features/milestones/MilestoneFormDialog.svelte';
-  import { Plus } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
   import Checkbox from '../components/Checkbox.svelte';
 
   // When `multiple` is false (the default), `value` is a single milestone ID
@@ -26,9 +27,17 @@
     unassignedLabel = '',
     children = null,
     multiple = false,
+    // When false, never offer inline creation. Configuration surfaces use this
+    // so building a selection cannot create a milestone as a side effect.
+    allowCreate = null,
+    // When true, list terminal milestones too and drop the footer toggle.
+    includeCompleted = false,
     // (value) => string | null. Labels a selected milestone that is not in the
     // loaded options yet; forwarded to ItemPicker's trigger rendering.
     resolveMissingLabel = null,
+    // E2E instrumentation, forwarded to the underlying ItemPicker.
+    searchTestid = undefined,
+    optionTestid = null,
     onOpen = null,
     onSelect = () => {},
     onCancel = () => {}
@@ -72,7 +81,11 @@
     )
   );
   const canCreate = $derived(
-    hasWorkspaceContext ? canCreateWorkspace || canCreateGlobal : canCreateGlobal
+    allowCreate === false
+      ? false
+      : hasWorkspaceContext
+        ? canCreateWorkspace || canCreateGlobal
+        : canCreateGlobal
   );
 
   let showCreateDialog = $state(false);
@@ -116,7 +129,7 @@
         filters.include_global = true;
       }
 
-      const response = await api.milestones.getAll(filters, requestOptions);
+      const response = await milestonesApi.getAll(filters, requestOptions);
       if (token !== loadToken) return;
       loadedMilestones = response || [];
       createdMilestones = [];
@@ -182,6 +195,13 @@
 
       const created = await milestonesStore.add(data);
       createdMilestones = [...createdMilestones, created];
+      // A successful planning mutation invalidates the selectable family so a
+      // later open reloads the directory. Global creations touch every scope.
+      if (data.is_global) {
+        collectionEditorOptions.invalidateFamily('milestones');
+      } else if (data.workspace_id) {
+        collectionEditorOptions.invalidate(data.workspace_id, 'milestones');
+      }
 
       if (multiple) {
         const nextIds = [
@@ -208,8 +228,9 @@
   }
 
   // Terminal milestones hidden by default; surfaced via the footer toggle.
+  // Callers that need every milestone listed opt out with includeCompleted.
   const hasCompletedMilestones = $derived(
-    milestones.some((m) => TERMINAL_STATUSES.has(m.status))
+    !includeCompleted && milestones.some((m) => TERMINAL_STATUSES.has(m.status))
   );
 
   // The currently-selected value(s) must always stay visible so the trigger
@@ -227,7 +248,7 @@
   });
 
   const visibleMilestones = $derived.by(() => {
-    if (showCompleted) return milestones;
+    if (includeCompleted || showCompleted) return milestones;
     return milestones.filter(
       (m) => !TERMINAL_STATUSES.has(m.status) || selectedIds.has(m.id)
     );
@@ -293,6 +314,8 @@
     onCreate={openCreateDialog}
     onSelect={handleSelectMulti}
     {resolveMissingLabel}
+    {searchTestid}
+    {optionTestid}
     onOpen={() => onOpen?.()}
     onCancel={() => onCancel()}
   >
@@ -344,6 +367,8 @@
     onCreate={openCreateDialog}
     onSelect={handleSelectSingle}
     {resolveMissingLabel}
+    {searchTestid}
+    {optionTestid}
     onOpen={() => onOpen?.()}
     onCancel={() => onCancel()}
   >

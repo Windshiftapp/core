@@ -102,11 +102,22 @@ const (
 	notificationEmailClaimed = "claimed"
 	notificationEmailSent    = "sent"
 	notificationEmailFailed  = "failed"
+	// notificationEmailSuppressed is terminal: the recipient is not allowed to
+	// see the notification, so it must never be emailed. Keeping it pending
+	// would re-select the recipient on every tick and starve other recipients
+	// out of the per-tick cap (WI-1768).
+	notificationEmailSuppressed = "suppressed"
 
-	// maxNotificationEmailRecipients caps how many distinct recipients one
-	// batching tick resolves. Recipients beyond the cap are served on the
-	// next tick; their notifications stay eligible until then.
+	// maxNotificationEmailRecipients caps how many deliverable recipients one
+	// batching tick resolves.
 	maxNotificationEmailRecipients = 200
+
+	// maxNotificationEmailRecipientScan bounds how many candidate recipients
+	// one tick inspects while it suppresses invisible rows and skips recipients
+	// the scheduler is holding back. Recipients beyond the cap are served on
+	// the next tick, so a backlog of undeliverable rows drains instead of
+	// turning one tick into an unbounded scan.
+	maxNotificationEmailRecipientScan = 2000
 )
 
 var ErrNotificationEmailClaimLost = errors.New("notification email claim lost")
@@ -143,6 +154,10 @@ type NotificationService struct {
 	durableIngress *DurableNotificationIngress
 	wg             sync.WaitGroup
 
+	// recipientEligible lets the scheduler hold recipients back (per-user SMTP
+	// failure cooldown) before they claim a per-tick slot. nil admits all.
+	recipientEligible func(email string) bool
+
 	// Statistics
 	eventsProcessed  int64
 	eventsDropped    int64
@@ -157,26 +172,51 @@ type NotificationService struct {
 }
 
 // UnreadEmailBatches resolves one current workspace scope per recipient, then
-// bulk-filters and caps that recipient's pending rows. Legacy scopes fail closed.
+// bulk-filters and caps that recipient's pending rows. Rows the recipient may
+// not see are moved to a terminal suppressed state so they do not consume the
+// per-tick recipient budget forever. Legacy scopes fail closed.
 func (ns *NotificationService) UnreadEmailBatches(maxBatchSize int) (map[string]*UserNotificationBatch, error) {
 	return ns.unreadEmailBatches(maxBatchSize, time.Now())
 }
 
+// SetRecipientEligibility installs a predicate the digest recipient scan
+// consults before claiming a per-tick slot for a recipient. The scheduler uses
+// it to hold back users in an SMTP failure cooldown instead of claiming and
+// releasing their rows every tick. nil admits every recipient.
+func (ns *NotificationService) SetRecipientEligibility(eligible func(email string) bool) {
+	ns.recipientEligible = eligible
+}
+
 func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Time) (map[string]*UserNotificationBatch, error) {
-	// The cap keeps each tick's recipient scan bounded; recipients beyond it
-	// are served on the next tick.
+	// Return expired claims to pending before scanning. This keeps lease
+	// recovery in one place and lets the recipient query match a partial index
+	// on the active delivery states instead of an OR over claimed rows.
+	if _, err := ns.db.ExecWrite(`
+		UPDATE notifications
+		SET email_delivery_state = ?, email_claim_owner = NULL, email_claim_token = NULL,
+		    email_claim_expires_at = NULL, updated_at = ?
+		WHERE email_delivery_state = ? AND (email_claim_expires_at IS NULL OR email_claim_expires_at <= ?)
+	`, notificationEmailPending, now, notificationEmailClaimed, now); err != nil {
+		return nil, fmt.Errorf("recover expired notification email claims: %w", err)
+	}
+
+	// Recipients are ordered by their oldest eligible notification so the
+	// backlog drains fairly, and the scan is capped so one tick stays bounded.
+	// Rows the recipient may not see are suppressed below; without that a
+	// recipient whose whole backlog is invisible would be re-selected forever.
 	rows, err := ns.db.Query(`
-		SELECT DISTINCT u.id, u.email, u.first_name, u.last_name
+		SELECT u.id, u.email, u.first_name, u.last_name
 		FROM notifications n
 		JOIN users u ON n.user_id = u.id
 		WHERE n.sent_at IS NULL AND n.read = false AND u.email != '' AND u.is_active = true
-		  AND (n.email_delivery_state IN (?, ?) OR
-		       (n.email_delivery_state = ? AND (n.email_claim_expires_at IS NULL OR n.email_claim_expires_at <= ?)))
+		  AND n.email_delivery_state IN (?, ?)
 		  AND n.authorization_scope IN (?, ?, ?)
+		GROUP BY u.id, u.email, u.first_name, u.last_name
+		ORDER BY MIN(n.timestamp) ASC, u.id ASC
 		LIMIT ?
-	`, notificationEmailPending, notificationEmailFailed, notificationEmailClaimed, now,
+	`, notificationEmailPending, notificationEmailFailed,
 		models.NotificationScopeSystem, models.NotificationScopeWorkspace, models.NotificationScopeAsset,
-		maxNotificationEmailRecipients)
+		maxNotificationEmailRecipientScan)
 	if err != nil {
 		return nil, fmt.Errorf("query notification email recipients: %w", err)
 	}
@@ -201,16 +241,24 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 		return nil, fmt.Errorf("close notification email recipients: %w", err)
 	}
 
-	batches := make(map[string]*UserNotificationBatch, len(recipients))
+	batches := make(map[string]*UserNotificationBatch, maxNotificationEmailRecipients)
+	var suppressed []int
 	for _, candidate := range recipients {
+		if len(batches) >= maxNotificationEmailRecipients {
+			break
+		}
+		if ns.recipientEligible != nil && !ns.recipientEligible(candidate.email) {
+			continue
+		}
 		snapshot, err := ns.notificationAuth.Snapshot(candidate.id)
 		if err != nil {
 			return nil, fmt.Errorf("resolve notification scope for user %d: %w", candidate.id, err)
 		}
-		notifications, err := ns.unreadEmailNotificationsForUser(candidate.id, snapshot, maxBatchSize, now)
+		notifications, invisible, err := ns.unreadEmailNotificationsForUser(candidate.id, snapshot, maxBatchSize, now)
 		if err != nil {
 			return nil, err
 		}
+		suppressed = append(suppressed, invisible...)
 		if len(notifications) == 0 {
 			continue
 		}
@@ -226,7 +274,45 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 		}
 		batches[candidate.email] = batch
 	}
+	if err := ns.suppressNotificationEmails(suppressed, now); err != nil {
+		return nil, err
+	}
 	return batches, nil
+}
+
+// suppressNotificationEmails moves rows the recipient may not see to the
+// terminal suppressed state so they are not rescanned every tick. Only rows
+// still in an eligible state are touched, so a concurrent live claim is not
+// disturbed. The IDs are written in bounded batches: a recipient can hold far
+// more invisible rows than a single statement accepts bind variables, and one
+// oversized UPDATE must not fail the whole digest tick (WI-1768).
+func (ns *NotificationService) suppressNotificationEmails(ids []int, now time.Time) error {
+	// SQLite's default SQLITE_MAX_VARIABLE_NUMBER is 32766 and PostgreSQL's is
+	// 65535; 500 stays well clear of both while keeping the statement count low.
+	const suppressBatchSize = 500
+	for start := 0; start < len(ids); start += suppressBatchSize {
+		end := min(start+suppressBatchSize, len(ids))
+		chunk := ids[start:end]
+		placeholders := make([]string, len(chunk))
+		args := []any{notificationEmailSuppressed, now}
+		for i, id := range chunk {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		args = append(args, notificationEmailPending, notificationEmailFailed, notificationEmailClaimed, now)
+		if _, err := ns.db.ExecWrite(`
+			UPDATE notifications
+			SET email_delivery_state = ?, email_claim_owner = NULL, email_claim_token = NULL,
+			    email_claim_expires_at = NULL, updated_at = ?
+			WHERE id IN (`+strings.Join(placeholders, ",")+`)
+			  AND sent_at IS NULL AND read = false
+			  AND (email_delivery_state IN (?, ?) OR
+			       (email_delivery_state = ? AND (email_claim_expires_at IS NULL OR email_claim_expires_at <= ?)))
+		`, args...); err != nil {
+			return fmt.Errorf("suppress invisible notification emails: %w", err)
+		}
+	}
+	return nil
 }
 
 // notificationPageCursor is the (timestamp, id) keyset for paging one
@@ -240,15 +326,16 @@ type notificationPageCursor struct {
 // for one recipient. Each SQL page reads at most the remaining row count;
 // authorization filtering happens in Go between pages, so a backlog full of
 // invisible rows still never loads more than one bounded page per query.
-func (ns *NotificationService) unreadEmailNotificationsForUser(userID int, snapshot *NotificationAuthorizationSnapshot, limit int, now time.Time) ([]models.Notification, error) {
+func (ns *NotificationService) unreadEmailNotificationsForUser(userID int, snapshot *NotificationAuthorizationSnapshot, limit int, now time.Time) ([]models.Notification, []int, error) {
 	notifications := make([]models.Notification, 0, limit)
+	var invisible []int
 	seen := make(map[int]bool, limit)
 	cursor := notificationPageCursor{}
 	for len(notifications) < limit {
 		pageSize := limit - len(notifications)
 		page, err := ns.queryUnreadEmailNotificationPage(userID, pageSize, now, cursor)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(page) == 0 {
 			break
@@ -262,17 +349,19 @@ func (ns *NotificationService) unreadEmailNotificationsForUser(userID int, snaps
 			seen[notification.ID] = true
 			visible, err := snapshot.Visible(notification)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if visible {
 				notifications = append(notifications, notification)
+			} else {
+				invisible = append(invisible, notification.ID)
 			}
 		}
 		if len(page) < pageSize || cursor == previous {
 			break
 		}
 	}
-	return notifications, nil
+	return notifications, invisible, nil
 }
 
 func (ns *NotificationService) queryUnreadEmailNotificationPage(userID, pageSize int, now time.Time, cursor notificationPageCursor) ([]models.Notification, error) {
@@ -584,15 +673,23 @@ func itemActionURL(workspaceID, itemID int) string {
 // config use this to avoid the event→rule→recipient pipeline which can't
 // express "notify exactly these users".
 func (ns *NotificationService) NotifyUsers(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message string) error {
+	_, err := ns.NotifyUsersWithRecords(userIDs, workspaceID, itemID, actorUserID, notifType, title, message)
+	return err
+}
+
+// NotifyUsersWithRecords is NotifyUsers but returns the persisted
+// notifications so callers can correlate follow-up delivery. The mention
+// email path needs the notification id to suppress the content-less digest
+// copy once the dedicated email carrying the message body has gone out.
+func (ns *NotificationService) NotifyUsersWithRecords(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message string) ([]models.Notification, error) {
 	var authorize func(int) (bool, error)
 	if ns.permService != nil {
 		authorize = func(userID int) (bool, error) {
 			return ns.permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
 		}
 	}
-	_, err := ns.notifyUsersAtURL(userIDs, actorUserID, notifType, title, message, itemActionURL(workspaceID, itemID),
+	return ns.notifyUsersAtURL(userIDs, actorUserID, notifType, title, message, itemActionURL(workspaceID, itemID),
 		models.NotificationScopeWorkspace, &workspaceID, &itemID, "item", &itemID, authorize)
-	return err
 }
 
 // NotifyUsersForAsset creates direct notifications for users who currently
@@ -610,8 +707,16 @@ func (ns *NotificationService) NotifyUsersForAsset(userIDs []int, setID, assetID
 	authorize := func(userID int) (bool, error) {
 		return checker.HasAssetSetPermission(userID, setID, AssetPermissionKeyView)
 	}
-	return ns.notifyUsersAtURL(userIDs, actorUserID, notifType, title, message, actionURL,
+	notifications, err := ns.notifyUsersAtURL(userIDs, actorUserID, notifType, title, message, actionURL,
 		models.NotificationScopeAsset, nil, nil, "asset", &assetID, authorize)
+	if err != nil {
+		return nil, err
+	}
+	delivered := make([]int, len(notifications))
+	for i, notification := range notifications {
+		delivered[i] = notification.UserID
+	}
+	return delivered, nil
 }
 
 func (ns *NotificationService) notifyUsersAtURL(
@@ -622,7 +727,7 @@ func (ns *NotificationService) notifyUsersAtURL(
 	sourceType string,
 	sourceID *int,
 	authorize func(int) (bool, error),
-) ([]int, error) {
+) ([]models.Notification, error) {
 	if ns.notificationManager == nil {
 		return nil, fmt.Errorf("notification manager not configured")
 	}
@@ -632,7 +737,6 @@ func (ns *NotificationService) notifyUsersAtURL(
 	}
 	seen := make(map[int]bool, len(userIDs))
 	notifications := make([]models.Notification, 0, len(userIDs))
-	deliveredUserIDs := make([]int, 0, len(userIDs))
 	now := time.Now()
 	for _, uid := range userIDs {
 		if uid <= 0 || uid == actorUserID || seen[uid] || skipAsAgent[uid] {
@@ -662,15 +766,15 @@ func (ns *NotificationService) notifyUsersAtURL(
 			SourceType:         sourceType,
 			SourceID:           sourceID,
 		})
-		deliveredUserIDs = append(deliveredUserIDs, uid)
 	}
 	if len(notifications) == 0 {
-		return []int{}, nil
+		return []models.Notification{}, nil
 	}
-	if _, err := ns.notificationManager.AddNotifications(notifications); err != nil {
+	stored, err := ns.notificationManager.AddNotifications(notifications)
+	if err != nil {
 		return nil, fmt.Errorf("add notifications for %d users: %w", len(notifications), err)
 	}
-	return deliveredUserIDs, nil
+	return stored, nil
 }
 
 // CreateNotification stores a single notification through the notification

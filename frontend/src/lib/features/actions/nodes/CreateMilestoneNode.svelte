@@ -1,5 +1,5 @@
 <script>
-  import { Milestone } from '@lucide/svelte';
+  import Milestone from '@lucide/svelte/icons/milestone';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

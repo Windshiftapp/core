@@ -3,7 +3,7 @@
  * Uses Svelte 5 class-based reactive state pattern.
  * Manages form (request type) fields, drag-and-drop, and per-form config.
  */
-import { api } from '../api.js';
+import { requestTypes } from '../api/channels.js';
 import { createSearchFilteredFields } from '../utils/fieldSearchUtils.js';
 import { DragStateStore } from './DragStateStore.svelte.js';
 import { getSystemFieldName } from './fieldConfig.js';
@@ -88,7 +88,7 @@ class FormBuilderStore extends DragStateStore {
     try {
       this.loading = true;
       this.channelId = channelId;
-      const result = await api.requestTypes.getAllForChannel(channelId);
+      const result = await requestTypes.getAllForChannel(channelId);
       this.forms = result || [];
     } catch (err) {
       console.error('Failed to load forms:', err);
@@ -99,7 +99,7 @@ class FormBuilderStore extends DragStateStore {
   }
 
   async deleteForm(formId) {
-    await api.requestTypes.delete(this.channelId, formId);
+    await requestTypes.delete(this.channelId, formId);
     this.forms = this.forms.filter((f) => f.id !== formId);
   }
 
@@ -119,8 +119,8 @@ class FormBuilderStore extends DragStateStore {
 
     try {
       const [fields, available] = await Promise.all([
-        api.requestTypes.getFields(form.id),
-        api.requestTypes.getAvailableFields(form.id),
+        requestTypes.getFields(form.id),
+        requestTypes.getAvailableFields(form.id),
       ]);
 
       this.formFields = fields || [];
@@ -193,7 +193,7 @@ class FormBuilderStore extends DragStateStore {
 
   async saveFormFields() {
     try {
-      await api.requestTypes.updateFields(this.channelId, this.editingForm.id, this.formFields);
+      await requestTypes.updateFields(this.channelId, this.editingForm.id, this.formFields);
       this.savedFieldsSnapshot = JSON.stringify(this.formFields);
     } catch (err) {
       console.error('Failed to save form fields:', err);
@@ -203,7 +203,7 @@ class FormBuilderStore extends DragStateStore {
 
   async saveFormConfig() {
     try {
-      await api.requestTypes.updateConfig(this.editingForm.id, this.formConfig);
+      await requestTypes.updateConfig(this.editingForm.id, this.formConfig);
       this.savedConfigSnapshot = JSON.stringify(this.formConfig);
     } catch (err) {
       console.error('Failed to save form config:', err);
@@ -215,7 +215,7 @@ class FormBuilderStore extends DragStateStore {
     try {
       // The Update endpoint preserves omitted fields; send the editable
       // identity and routing fields the builder exposes.
-      const updated = await api.requestTypes.update(this.channelId, this.editingForm.id, {
+      const updated = await requestTypes.update(this.channelId, this.editingForm.id, {
         name: this.routingMeta.name.trim(),
         description: (this.routingMeta.description || '').trim(),
         icon: this.routingMeta.icon,

@@ -23,6 +23,14 @@ type JiraConnectResponse struct {
 	InstanceInfo *jira.JiraInstanceInfo `json:"instance_info"`
 }
 
+// JiraConnectionUpdateRequest replaces the credentials of an existing
+// connection. The instance URL and deployment type identify the tenant and
+// cannot change through this endpoint.
+type JiraConnectionUpdateRequest struct {
+	Email    string `json:"email"`
+	APIToken string `json:"api_token"`
+}
+
 // JiraProjectInfo contains information about a Jira project for display.
 // IssueCount is a pointer so the JSON omits it when the caller hasn't asked
 // for counts — distinguishes "not loaded yet" from "zero issues" on the

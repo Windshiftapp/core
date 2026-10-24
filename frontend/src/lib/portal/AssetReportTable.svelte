@@ -1,8 +1,14 @@
 <script>
-import { X, Table2, ChevronLeft, ChevronRight, AlertCircle, Package } from '@lucide/svelte';
+import X from '@lucide/svelte/icons/x';
+import Table2 from '@lucide/svelte/icons/table-2';
+import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+import ChevronRight from '@lucide/svelte/icons/chevron-right';
+import AlertCircle from '@lucide/svelte/icons/alert-circle';
+import Package from '@lucide/svelte/icons/package';
 import EmptyState from '../components/EmptyState.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
+  import { assetReports } from '../api/channels.js';
+  import { portal } from '../api/portal.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -68,13 +74,13 @@ import EmptyState from '../components/EmptyState.svelte';
 
       let result;
       if (isFormMode && formSubmitted) {
-        result = await api.assetReports.submit(slug, report.id, {
+        result = await assetReports.submit(slug, report.id, {
           params: formValues,
           page,
           perPage: pageSize
         });
       } else if (!isFormMode) {
-        result = await api.assetReports.execute(slug, report.id, { page, pageSize });
+        result = await assetReports.execute(slug, report.id, { page, pageSize });
       } else {
         // Form mode, not yet submitted — don't run the query.
         loading = false;
@@ -104,7 +110,7 @@ import EmptyState from '../components/EmptyState.svelte';
     try {
       formLoading = true;
       error = null;
-      formFields = await api.assetReports.getPortalFields(slug, report.id);
+      formFields = await assetReports.getPortalFields(slug, report.id);
       const initial = {};
       for (const f of formFields) initial[f.field_identifier] = '';
       formValues = initial;
@@ -123,7 +129,7 @@ import EmptyState from '../components/EmptyState.svelte';
     }
     const myToken = ++definitionLoadToken;
     try {
-      const definitions = await api.portal.getCustomFields(slug);
+      const definitions = await portal.getCustomFields(slug);
       if (myToken === definitionLoadToken) {
         customFieldDefinitions = definitions || [];
       }
@@ -270,7 +276,7 @@ import EmptyState from '../components/EmptyState.svelte';
     {#if isEditing}
       <button
         onclick={() => onRemove(report.id)}
-        class="p-2 rounded transition-opacity opacity-0 group-hover:opacity-100"
+        class="p-2 rounded transition-opacity opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
         style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
         title={t('portal.removeFromSection')}
       >

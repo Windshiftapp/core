@@ -26,27 +26,28 @@ func NewTimeProjectRepository(db database.Database) *TimeProjectRepository {
 // TimeProjectDetail is a time project joined with its customer/category names
 // and the project's booked total hours.
 type TimeProjectDetail struct {
-	ID            int
-	CustomerID    *int
-	CategoryID    *int
-	Name          string
-	Description   string
-	Status        string
-	Color         string
-	HourlyRate    float64
-	Settings      map[string]any // parsed settings JSON; nil when empty
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	CustomerName  string
-	CategoryName  string
-	CategoryColor string
-	TotalHours    *float64
+	ID                 int
+	CustomerID         *int
+	CategoryID         *int
+	Name               string
+	Description        string
+	Status             string
+	Color              string
+	HourlyRate         float64
+	Settings           map[string]any // parsed settings JSON; nil when empty
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CustomerName       string
+	CustomerBuiltinKey string
+	CategoryName       string
+	CategoryColor      string
+	TotalHours         *float64
 }
 
 const timeProjectDetailSelect = `SELECT tp.id, tp.customer_id, tp.category_id, tp.name, COALESCE(tp.description, ''),
        tp.status, COALESCE(tp.color, ''), tp.hourly_rate, COALESCE(tp.settings, ''),
        tp.created_at, tp.updated_at,
-       COALESCE(co.name, ''), COALESCE(tpc.name, ''), COALESCE(tpc.color, ''),
+       COALESCE(co.name, ''), COALESCE(co.builtin_key, ''), COALESCE(tpc.name, ''), COALESCE(tpc.color, ''),
        (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = tp.id) as total_hours
 FROM time_projects tp
 LEFT JOIN customer_organisations co ON tp.customer_id = co.id
@@ -58,7 +59,7 @@ func scanTimeProjectDetail(scan func(dest ...any) error) (TimeProjectDetail, err
 	var totalHours sql.NullFloat64
 	err := scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description,
 		&p.Status, &p.Color, &p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
-		&p.CategoryName, &p.CategoryColor, &totalHours)
+		&p.CustomerBuiltinKey, &p.CategoryName, &p.CategoryColor, &totalHours)
 	if err != nil {
 		return p, err
 	}

@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { tests } from '../../api/tests/index.js';
+  import { milestones as milestonesApi } from '../../api/milestones.js';
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { IconFiles } from '@tabler/icons-svelte-runes';
+  import IconFiles from '@tabler/icons-svelte-runes/icons/files';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
@@ -76,9 +77,9 @@
   async function loadData() {
     try {
       const [sets, templates, milestonesData] = await Promise.all([
-        api.tests.testPlans.getAll(workspaceId, { page_size: 200 }),
-        api.tests.testRunTemplates.getAll(workspaceId, { page_size: 200 }),
-        api.milestones.getAll({ workspace_id: workspaceId })
+        tests.testPlans.getAll(workspaceId, { page_size: 200 }),
+        tests.testRunTemplates.getAll(workspaceId, { page_size: 200 }),
+        milestonesApi.getAll({ workspace_id: workspaceId })
       ]);
 
       testSets.set(sets || []);
@@ -108,7 +109,7 @@
     }
 
     try {
-      await api.tests.testRunTemplates.create(workspaceId, {
+      await tests.testRunTemplates.create(workspaceId, {
         plan_id: parseInt(selectedSetId),
         name: templateName,
         description: templateDescription || ''
@@ -130,7 +131,7 @@
     });
     if (!ok) return;
     try {
-      await api.tests.testRunTemplates.delete(workspaceId, template.id);
+      await tests.testRunTemplates.delete(workspaceId, template.id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete template:', error);
@@ -140,7 +141,7 @@
 
   async function executeTemplate(template) {
     try {
-      const newRun = await api.tests.testRunTemplates.execute(workspaceId, template.id);
+      const newRun = await tests.testRunTemplates.execute(workspaceId, template.id);
       // Navigate to the execution page
       navigate(testPath(`/runs/${newRun.id}/execute`));
     } catch (error) {

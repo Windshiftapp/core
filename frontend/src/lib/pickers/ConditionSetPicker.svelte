@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { ShieldCheck } from '@lucide/svelte';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

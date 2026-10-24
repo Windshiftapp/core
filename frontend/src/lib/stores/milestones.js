@@ -1,13 +1,13 @@
-import { api } from '../api.js';
+import { milestones } from '../api/milestones.js';
 import { createEntityStore } from './entityStoreFactory.js';
 
 // Create base store using factory (with set exposed for direct updates)
 const baseStore = createEntityStore(
   {
-    getAll: () => api.milestones.getAll(),
-    create: (data) => api.milestones.create(data),
-    update: (id, updates) => api.milestones.update(id, updates),
-    delete: (id) => api.milestones.delete(id),
+    getAll: () => milestones.getAll(),
+    create: (data) => milestones.create(data),
+    update: (id, updates) => milestones.update(id, updates),
+    delete: (id) => milestones.delete(id),
   },
   'milestone',
   { exposeSet: true }
@@ -35,7 +35,7 @@ export const milestonesStore = {
     milestonesStore.set(next);
 
     try {
-      await api.milestones.reorder(scope, orderedIds);
+      await milestones.reorder(scope, orderedIds);
     } catch (error) {
       // Roll back to the pre-drag snapshot.
       milestonesStore.set(previous);

@@ -1,15 +1,14 @@
 <script>
   import { onMount } from 'svelte';
-  import {
-    IconBolt as Bolt,
-    IconCode as Code,
-    IconMessage as Message,
-    IconActivity as Activity,
-    IconPlus as Plus,
-    IconUserStar as AgentIcon,
-  } from '@tabler/icons-svelte-runes';
-  import { agentBindings, agentRuns } from '../../api.js';
-  import { workspacePermissions } from '../../stores';
+  import Bolt from '@tabler/icons-svelte-runes/icons/bolt';
+  import Code from '@tabler/icons-svelte-runes/icons/code';
+  import Message from '@tabler/icons-svelte-runes/icons/message';
+  import Activity from '@tabler/icons-svelte-runes/icons/activity';
+  import Plus from '@tabler/icons-svelte-runes/icons/plus';
+  import AgentIcon from '@tabler/icons-svelte-runes/icons/user-star';
+  import { agentBindings } from '../../api/agentBindings.js';
+  import { agentRuns } from '../../api/agentRuns.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Avatar from '../../components/Avatar.svelte';

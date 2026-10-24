@@ -1,11 +1,14 @@
 <script>
   import { createCombobox, melt } from '@melt-ui/svelte';
-  import { api } from '../api.js';
+  import { homepage, search } from '../api/misc.js';
   import { contextCommands } from '../utils/contextCommands.js';
   import { currentRoute } from '../router.js';
-  import { permissionStore, workspacesStore, isSystemAdmin, currentWorkspace } from '../stores';
+  import { toExternal } from '../runtime/contextPath.js';
+  import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
+  import { workspacesStore, currentWorkspace } from '../stores/workspaces.svelte.js';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
+  import { loadExtensions } from '../stores/extensions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
@@ -18,6 +21,7 @@
   import {
     adminProvider,
     createProvider,
+    delegatedAdminProvider,
     globalNavigationProvider,
     makeExternalProvider,
     recentlyViewedProvider,
@@ -37,6 +41,9 @@
   let workspaces = $state([]);
   let workItems = $state([]);
   let searchTimeout;
+  // Plugin admin tabs are fetched once per session, on first palette open by a
+  // system admin; adminProvider reads them from the extensions store.
+  let extensionsRequested = false;
 
   // Sub-palette state. `mode` is 'commands' (the default command list) or
   // 'recent' (the recently-viewed work-item picker reached from the launcher
@@ -58,6 +65,11 @@
     } catch (err) {
       console.error('Failed to load data for command palette:', err);
     }
+
+    if ($permissionStore.canAccessAdmin && !extensionsRequested) {
+      extensionsRequested = true;
+      void loadExtensions();
+    }
   }
 
   async function searchWorkItems(query) {
@@ -66,7 +78,7 @@
       return;
     }
     try {
-      const results = await api.search.items({ query: query.trim(), limit: 6 });
+      const results = await search.items({ query: query.trim(), limit: 6 });
       workItems = results || [];
     } catch (err) {
       console.error('Failed to search work items:', err);
@@ -114,6 +126,7 @@
     workspacesProvider,
     createProvider,
     adminProvider,
+    delegatedAdminProvider,
     timeProvider,
     searchProvider,
     systemProvider,
@@ -184,7 +197,7 @@
   async function loadRecentItems() {
     recentLoading = true;
     try {
-      const data = await api.homepage.get();
+      const data = await homepage.get();
       const list = (data?.recently_viewed ?? [])
         .filter((a) => a && a.item_id)
         .map((a) => ({ ...a, lastActivityDate: a.last_activity ? new Date(a.last_activity) : null }));
@@ -224,6 +237,14 @@
     } finally {
       close();
     }
+  }
+
+  // Rows with a url are real links: modified and middle clicks fall through to
+  // the browser so the target can open in a new tab.
+  function handleOptionClick(e, cmd) {
+    if (cmd.url && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return;
+    e.preventDefault();
+    executeAndClose(cmd);
   }
 
   function close() {
@@ -367,11 +388,13 @@
                     {BUCKET_LABELS[command.bucket] || ''}
                   </div>
                 {/if}
-                <div
+                <svelte:element
+                  this={command.url ? 'a' : 'div'}
+                  href={command.url ? toExternal(command.url) : undefined}
                   use:melt={$option({ value: command.id, label: command.label })}
-                  onclick={() => executeAndClose(command)}
+                  onclick={(e) => handleOptionClick(e, command)}
                   data-testid={`command-palette-option-${command.id}`}
-                  class="w-full text-left px-4 py-2.5 transition-colors cursor-pointer command-option"
+                  class="block w-full text-left px-4 py-2.5 transition-colors cursor-pointer no-underline command-option"
                 >
                   <div class="flex items-center gap-2">
                     <div class="font-medium" style="color: var(--ds-text);">{command.label}</div>
@@ -384,7 +407,7 @@
                   {#if command.description}
                     <div class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">{command.description}</div>
                   {/if}
-                </div>
+                </svelte:element>
               {/each}
             </div>
           {/if}

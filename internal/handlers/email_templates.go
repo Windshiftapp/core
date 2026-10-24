@@ -14,7 +14,8 @@ import (
 )
 
 // EmailTemplateHandler exposes admin CRUD for built-in transactional email
-// templates (magic_link, email_verification, invitation, notification_batch).
+// templates (magic_link, email_verification, invitation, mention,
+// notification_batch, portal_reply, approval_requested, intake_confirmation).
 // Only update + read + preview are exposed — the rows are seeded by the
 // system and admins are not allowed to add or remove them.
 type EmailTemplateHandler struct {

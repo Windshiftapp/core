@@ -15,6 +15,7 @@
   import RecurrenceVolumeSection from './diagnostics/RecurrenceVolumeSection.svelte';
   import DomainEventsSection from './diagnostics/DomainEventsSection.svelte';
   import SCMHealthSection from './diagnostics/SCMHealthSection.svelte';
+  import EmailIntakeSection from './diagnostics/EmailIntakeSection.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let diagnosticGroups = $derived([
@@ -27,6 +28,7 @@
         { id: 'schedulers', label: t('diagnostics.tabs.schedulers') },
         { id: 'recurrence-volume', label: t('diagnostics.tabs.recurrence') },
         { id: 'domain-events', label: t('diagnostics.tabs.domainEvents') },
+        { id: 'email-intake', label: 'Email intake' },
       ],
     },
     { label: t('diagnostics.groups.data'), tabs: [{ id: 'frac-index', label: t('diagnostics.tabs.fracIndex') }] },
@@ -92,6 +94,8 @@
         <DomainEventsSection />
       {:else if subtab === 'scm-health'}
         <SCMHealthSection />
+      {:else if subtab === 'email-intake'}
+        <EmailIntakeSection />
       {/if}
     </div>
   </div>

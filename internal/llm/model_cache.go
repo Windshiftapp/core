@@ -58,8 +58,10 @@ func (c *ModelCache) Get(providerType ProviderType) (CacheEntry, error) {
 	}
 	// Re-apply the curated vision map on read so caches persisted before the
 	// flag existed (or before a map entry was added) still resolve correctly.
-	// Idempotent: never downgrades a model the catalog marked vision-capable.
+	// Per-model protocols are re-applied the same way. Both are idempotent:
+	// neither downgrades a value the catalog already carried.
 	EnrichModelsVision(providerType, models)
+	EnrichModelsAPIFormat(providerType, models)
 
 	entry := CacheEntry{Models: models, LastError: lastError.String}
 	if lastRefreshedAt.Valid {

@@ -1,8 +1,13 @@
 <script>
-  import { X, Mail, Lock, KeyRound } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import Mail from '@lucide/svelte/icons/mail';
+  import Lock from '@lucide/svelte/icons/lock';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import { get } from 'svelte/store';
+  import { currentRoute } from '../router.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { authStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { isWebAuthnSupported } from '../utils/webauthn-utils.js';
   import Button from '../components/Button.svelte';
@@ -51,11 +56,52 @@
     authStore.clearError();
   }
 
+  // The portal page the customer was on when they asked for a sign-in link.
+  // The server echoes it through the emailed verify URL so the link returns
+  // them to the same request instead of the portal home. Recovery from an
+  // expired/used link stashes its intended destination; prefer that over the
+  // verify page sitting in the address bar.
+  function isSamePortalPath(value, slug) {
+    if (!value || typeof value !== 'string' || !value.startsWith('/')) return false;
+    if (value.startsWith('//')) return false;
+    const base = `/portal/${slug}`;
+    return value === base || value.startsWith(`${base}/`) || value.startsWith(`${base}?`);
+  }
+
+  function resolveNextPath() {
+    if (typeof window === 'undefined') return null;
+    const slug = portalStore.currentSlug;
+    if (!slug) return null;
+
+    const stashed = window.sessionStorage.getItem('portal_pending_next');
+    if (stashed && isSamePortalPath(stashed, slug)) return stashed;
+
+    const route = get(currentRoute);
+    const path = route.path || '';
+    const base = `/portal/${slug}`;
+    if (path === `${base}/verify`) return null;
+    if (path !== base && !path.startsWith(`${base}/`)) return null;
+
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(route.query || {})) {
+      // Never echo a one-time token back through the emailed link.
+      if (key === 'token' || value === undefined || value === null) continue;
+      params.append(key, String(value));
+    }
+    const query = params.toString();
+    const candidate = query ? `${path}?${query}` : path;
+    return isSamePortalPath(candidate, slug) ? candidate : null;
+  }
+
   async function handleMagicLinkSubmit(e) {
     e.preventDefault();
     if (!email.trim()) return;
 
-    const result = await portalAuthStore.requestMagicLink(portalStore.currentSlug, email.trim());
+    const result = await portalAuthStore.requestMagicLink(
+      portalStore.currentSlug,
+      email.trim(),
+      resolveNextPath()
+    );
     if (result.success) {
       // Email sent - the store will update emailSent state
     }

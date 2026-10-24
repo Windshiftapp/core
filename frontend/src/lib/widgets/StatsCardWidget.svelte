@@ -1,5 +1,8 @@
 <script>
-  import { FolderOpen, CheckCircle, Clock, AlertCircle } from '@lucide/svelte';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import Clock from '@lucide/svelte/icons/clock';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { t } from '../stores/i18n.svelte.js';
   import { objectDisplayName } from '../utils/systemLabels.js';
 

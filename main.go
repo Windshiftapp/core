@@ -13,6 +13,12 @@ import (
 	"syscall"
 	"time"
 
+	// Embed the IANA time zone database. Windows has no system zoneinfo and the
+	// shipped binary has no GOROOT, so time.LoadLocation would otherwise fail for
+	// every named zone (e.g. "Europe/Berlin") on the Windows sidecar and on any
+	// host without tzdata.
+	_ "time/tzdata"
+
 	"windshift/internal/auth"
 	"windshift/internal/config"
 	"windshift/internal/database"

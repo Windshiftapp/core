@@ -566,3 +566,46 @@ export function getMainAppLazyState(lazyComponents, view) {
     loaderKey,
   };
 }
+
+// Route chunks already prefetched in this session. The dynamic import cache
+// makes a later load() call resolve instantly, so each chunk is only fetched
+// once even if the user hovers the same link repeatedly.
+const prefetchedLoaderKeys = new Set();
+
+/** Fetches a route chunk ahead of navigation without touching the lazy loader
+ * state, so failures stay silent and the pending spinner never appears. */
+export function prefetchMainAppComponent(key) {
+  if (!key || prefetchedLoaderKeys.has(key)) return;
+  const loader = MAIN_APP_COMPONENT_LOADERS[key];
+  if (!loader) return;
+
+  prefetchedLoaderKeys.add(key);
+  Promise.resolve()
+    .then(loader)
+    .catch(() => prefetchedLoaderKeys.delete(key));
+}
+
+/** Prefetches the chunk behind a route view name (hover/focus on a link). */
+export function prefetchMainAppForView(view) {
+  const { key } = resolveMainAppRoute(view);
+  if (key) prefetchMainAppComponent(key);
+}
+
+// Destinations users most often open next; warmed while the browser is idle.
+// Kept small: every entry pulls its route chunk's full static subtree.
+const IDLE_PREFETCH_LOADER_KEYS = [
+  'homepage',
+  'collections-list',
+  'workspaces',
+  'search',
+  'notifications',
+];
+
+/** Prefetches the likely next routes once the browser is idle. Uses
+ * requestIdleCallback, so test environments without it simply skip. */
+export function prefetchIdleMainAppComponents() {
+  if (typeof requestIdleCallback !== 'function') return;
+  requestIdleCallback(() => {
+    for (const key of IDLE_PREFETCH_LOADER_KEYS) prefetchMainAppComponent(key);
+  });
+}

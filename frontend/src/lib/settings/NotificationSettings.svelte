@@ -1,17 +1,23 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
+  import { notificationSettings as notificationSettingsApi } from '../api/notifications.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { currentWorkspace } from '../stores';
+  import { currentWorkspace } from '../stores/workspaces.svelte.js';
   import { navigate } from '../router.js';
   import { confirm } from '../composables/useConfirm.js';
-  import {
-    Bell, Plus, Edit, Trash2, Save, X, Check,
-    AlertCircle, Settings, ArrowRight
-  } from '@lucide/svelte';
+  import Bell from '@lucide/svelte/icons/bell';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Save from '@lucide/svelte/icons/save';
+  import X from '@lucide/svelte/icons/x';
+  import Check from '@lucide/svelte/icons/check';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Settings from '@lucide/svelte/icons/settings';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
@@ -57,7 +63,7 @@
   async function loadNotificationSettings() {
     try {
       loading = true;
-      const data = await api.notificationSettings.getAll();
+      const data = await notificationSettingsApi.getAll();
       notificationSettings = data || [];
     } catch (err) {
       console.error('Failed to load notification settings:', err);
@@ -69,7 +75,7 @@
 
   async function loadAvailableEvents() {
     try {
-      const data = await api.notificationSettings.getAvailableEvents();
+      const data = await notificationSettingsApi.getAvailableEvents();
       availableEvents = data || [];
     } catch (err) {
       console.error('Failed to load available events:', err);
@@ -151,12 +157,12 @@
     try {
       if (editingSetting) {
         translationEditor?.validate();
-        await api.notificationSettings.update(editingSetting.id, formData);
+        await notificationSettingsApi.update(editingSetting.id, formData);
         await translationEditor?.save();
       } else {
         // Add created_by from current user
         formData.created_by = /** @type {any} */ (authStore.currentUser)?.id;
-        await api.notificationSettings.create(formData);
+        await notificationSettingsApi.create(formData);
       }
 
       await loadNotificationSettings();
@@ -178,7 +184,7 @@
     if (!confirmed) return;
 
     try {
-      await api.notificationSettings.delete(setting.id);
+      await notificationSettingsApi.delete(setting.id);
       await loadNotificationSettings();
     } catch (err) {
       console.error('Failed to delete notification setting:', err);

@@ -4,13 +4,17 @@
   // existing requester/organisation/linked-asset endpoints and only loads when
   // the agent expands the section, so internal items never trigger the calls.
   import { onDestroy } from 'svelte';
-  import { Building2, ChevronRight, Package, User } from '@lucide/svelte';
+  import Building2 from '@lucide/svelte/icons/building-2';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Package from '@lucide/svelte/icons/package';
+  import User from '@lucide/svelte/icons/user';
   import Spinner from '../../components/Spinner.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Text from '../../components/Text.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { customerOrganisations } from '../../api/portal.js';
+  import { itemLinkedAssets } from '../../api/assets.js';
   import { itemUrl } from '../../utils/urls.js';
 
   let { item } = $props();
@@ -39,11 +43,11 @@
     // still shows the requester and any linked assets.
     const [orgResult, assetResult] = await Promise.all([
       organisationId
-        ? api.customerOrganisations
+        ? customerOrganisations
             .getTickets(organisationId, { signal: controller.signal })
             .catch(() => [])
         : Promise.resolve([]),
-      api.itemLinkedAssets
+      itemLinkedAssets
         .get(item.id, { signal: controller.signal })
         .catch(() => []),
     ]);
@@ -89,7 +93,7 @@
         <div class="flex items-start gap-2" data-testid="customer-context-requester">
           <User class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           <div class="min-w-0">
-            <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">
+            <Text variant="subtle" size="xs" weight="medium">
               {t('items.customerContextRequester')}
             </Text>
             <div class="text-sm truncate" style="color: var(--ds-text);">
@@ -107,7 +111,7 @@
           <div class="flex items-start gap-2" data-testid="customer-context-organisation">
             <Building2 class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
             <div class="min-w-0">
-              <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">
+              <Text variant="subtle" size="xs" weight="medium">
                 {t('items.customerContextOrganisation')}
               </Text>
               <div class="text-sm truncate" style="color: var(--ds-text);">
@@ -119,7 +123,7 @@
 
         {#if organisationId}
           <div data-testid="customer-context-org-tickets">
-            <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">
+            <Text variant="subtle" size="xs" weight="medium">
               {t('items.customerContextOrgTickets')}
             </Text>
             {#if organisationTickets.length === 0}
@@ -136,7 +140,7 @@
                     style="border-color: var(--ds-border); background: var(--ds-surface-raised);"
                   >
                     <div class="flex items-center justify-between gap-2">
-                      <ItemKey item={ticket} />
+                      <ItemKey item={ticket} clickable={false} />
                       {#if ticket.status_name}
                         <Lozenge color="gray">{ticket.status_name}</Lozenge>
                       {/if}
@@ -159,7 +163,7 @@
         <div class="flex items-start gap-2" data-testid="customer-context-assets">
           <Package class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           <div class="min-w-0 flex-1">
-            <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">
+            <Text variant="subtle" size="xs" weight="medium">
               {t('items.customerContextAssets')}
             </Text>
             {#if assets.length === 0}

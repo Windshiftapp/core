@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { currentRoute, initRouter, isMobileRoute, navigate } from './lib/router.js';
-  import { authStore } from './lib/stores';
+  import { authStore } from './lib/stores/auth.svelte.js';
   import { moduleSettings } from './lib/stores/moduleSettings.js';
-  import { api } from './lib/api.js';
+  import { setup, themes } from './lib/api/admin.js';
   import { APP_NAME } from './lib/constants.js';
   import { themeStore } from './lib/stores/theme.svelte.js';
   import { i18n, SUPPORTED_LOCALES, t } from './lib/stores/i18n.svelte.js';
@@ -15,6 +15,7 @@
     loadAuthenticatedShellUI,
     resetAuthenticatedShellUILoad,
   } from './lib/services/authenticatedShellUI.js';
+  import { installAppShellHandlers } from './lib/services/appShellHandlers.js';
   import BrandedLoader from './lib/components/BrandedLoader.svelte';
   import Button from './lib/components/Button.svelte';
   import LazyRootDialog from './lib/components/LazyRootDialog.svelte';
@@ -76,6 +77,9 @@
   }
 
   onMount(() => {
+    // Wire the API, service-worker and cross-tab side effects here rather than
+    // in main.js so store, API and router edits stay hot updates.
+    installAppShellHandlers();
     initRouter();
     themeStore.init();
     void initializeApp();
@@ -327,7 +331,7 @@
     // flag survives backend/DB swaps under the same origin (e.g. dev worktrees
     // behind the vite proxy), making a fresh, unconfigured instance look
     // already set up and silently skipping the setup wizard.
-    const status = await api.setup.getStatus({ timeout: BOOTSTRAP_TIMEOUT_MS });
+    const status = await setup.getStatus({ timeout: BOOTSTRAP_TIMEOUT_MS });
     setupCompleted = status.setup_completed;
     if (!status.setup_completed) {
       showWelcomeAssistant = true;
@@ -353,7 +357,7 @@
     }
 
     try {
-      const activeTheme = await api.themes.getActive({ timeout: BOOTSTRAP_TIMEOUT_MS });
+      const activeTheme = await themes.getActive({ timeout: BOOTSTRAP_TIMEOUT_MS });
       if (generation !== themeLoadGeneration) return;
       // Store the active theme in the theme store
       themeStore.setActiveTheme(activeTheme);

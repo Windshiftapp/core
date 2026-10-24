@@ -1,5 +1,8 @@
 <script>
-  import { AlertCircle, CircleCheck, Info, AlertTriangle } from '@lucide/svelte';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import Info from '@lucide/svelte/icons/info';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
 
   /**
    * @type {{

@@ -1573,7 +1573,8 @@ func (h *ChannelHandler) ListEmailReplies(w http.ResponseWriter, r *http.Request
 	}
 
 	type emailReply struct {
-		CommentID     int        `json:"comment_id"`
+		ID            int        `json:"id"`
+		CommentID     *int       `json:"comment_id,omitempty"`
 		ItemID        int        `json:"item_id"`
 		ToEmail       string     `json:"to_email"`
 		ToName        string     `json:"to_name"`
@@ -1591,7 +1592,7 @@ func (h *ChannelHandler) ListEmailReplies(w http.ResponseWriter, r *http.Request
 	replies := make([]emailReply, 0, len(rows))
 	for _, row := range rows {
 		reply := emailReply{
-			CommentID:    row.CommentID,
+			ID:           row.ID,
 			ItemID:       row.ItemID,
 			ToEmail:      row.ToEmail,
 			ToName:       row.ToName,
@@ -1600,6 +1601,10 @@ func (h *ChannelHandler) ListEmailReplies(w http.ResponseWriter, r *http.Request
 			LastError:    row.LastError.String,
 			CreatedAt:    row.CreatedAt,
 			WorkspaceKey: row.WorkspaceKey,
+		}
+		if row.CommentID.Valid {
+			commentID := int(row.CommentID.Int64)
+			reply.CommentID = &commentID
 		}
 		if row.NextAttemptAt.Valid {
 			t := row.NextAttemptAt.Time
@@ -1817,8 +1822,8 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	type emailIntakeState struct {
 		IntakeID         int        `json:"intake_id"`
 		Folder           string     `json:"folder"`
-		TargetType       string     `json:"target_type"`
-		TargetID         int        `json:"target_id"`
+		WorkspaceID      int        `json:"workspace_id"`
+		PortalChannelID  *int       `json:"portal_channel_id,omitempty"`
 		Status           string     `json:"status"`
 		LastUID          int        `json:"last_uid"`
 		UIDValidity      uint32     `json:"uid_validity"`
@@ -1867,8 +1872,8 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		state.Intakes = append(state.Intakes, emailIntakeState{
 			IntakeID:         intake.ID,
 			Folder:           intake.Folder,
-			TargetType:       intake.TargetType,
-			TargetID:         intake.TargetID,
+			WorkspaceID:      intake.WorkspaceID,
+			PortalChannelID:  intake.PortalChannelID,
 			Status:           intake.Status,
 			LastUID:          intake.LastUID,
 			UIDValidity:      intake.UIDValidity,
@@ -1959,21 +1964,16 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Default OAuth scopes for email providers
+// Default OAuth scopes for email providers. The monitored mailbox address is
+// entered by the admin (EmailOAuthMailbox), so no identity/userinfo scopes are
+// requested and no separate Graph/Google resource token is needed.
 var defaultEmailOAuthScopes = map[string][]string{
 	"microsoft": {
 		"https://outlook.office365.com/IMAP.AccessAsUser.All",
-		"https://outlook.office365.com/SMTP.Send",
-		"openid",
-		"profile",
-		"email",
 		"offline_access",
 	},
 	"google": {
 		"https://mail.google.com/",
-		"openid",
-		"email",
-		"profile",
 	},
 }
 
@@ -2041,6 +2041,13 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	}
 	if config.EmailOAuthClientSecret == "" {
 		respondValidationError(w, r, "OAuth client secret not configured")
+		return
+	}
+	// The monitored mailbox is entered by the admin and is what IMAP XOAUTH2
+	// authenticates as. Require it before starting so the callback never has to
+	// guess an identity from the token.
+	if _, ok := bareEmailAddress(config.EmailOAuthMailbox); !ok {
+		respondValidationError(w, r, "Enter the mailbox address to connect before starting OAuth")
 		return
 	}
 
@@ -2201,9 +2208,15 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	// Build redirect URI (must match the one used in StartOAuth)
 	redirectURI := fmt.Sprintf("%s/api/channels/inline-oauth/callback", h.baseURL)
 
-	// Exchange code for tokens
+	// Exchange code for tokens. The mailbox address is configuration the admin
+	// already saved, not a value discovered from the token.
 	var tokens *email.OAuthTokens
-	var userEmail string
+	userEmail, ok := bareEmailAddress(config.EmailOAuthMailbox)
+	if !ok {
+		slog.Error("email channel OAuth callback has no usable mailbox address", "channel_id", channelID)
+		http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
+		return
+	}
 	scopes := defaultEmailOAuthScopes[config.EmailOAuthProviderType]
 
 	switch config.EmailOAuthProviderType {
@@ -2219,12 +2232,6 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
 			return
 		}
-		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
-		if err != nil || strings.TrimSpace(userEmail) == "" {
-			slog.Error("failed to get Microsoft mailbox identity", "error", err)
-			http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
-			return
-		}
 
 	case "google":
 		p := email.NewGoogleProvider(config.EmailOAuthClientID, clientSecret, scopes)
@@ -2232,12 +2239,6 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		if err != nil {
 			slog.Error("failed to exchange code", "error", err)
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
-			return
-		}
-		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
-		if err != nil || strings.TrimSpace(userEmail) == "" {
-			slog.Error("failed to get Google mailbox identity", "error", err)
-			http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
 			return
 		}
 

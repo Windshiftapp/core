@@ -57,13 +57,14 @@ func (h *ItemHandler) RequesterOpenTickets(w http.ResponseWriter, r *http.Reques
 	// workspaces the caller can view so cross-workspace candidates never
 	// leak.
 	type candidate struct {
-		ID                  int    `json:"id"`
-		WorkspaceID         int    `json:"workspace_id"`
-		WorkspaceKey        string `json:"workspace_key"`
-		WorkspaceItemNumber int    `json:"workspace_item_number"`
-		Title               string `json:"title"`
-		StatusName          string `json:"status_name"`
-		UpdatedAt           string `json:"updated_at"`
+		ID                      int    `json:"id"`
+		WorkspaceID             int    `json:"workspace_id"`
+		WorkspaceKey            string `json:"workspace_key"`
+		WorkspaceItemNumber     int    `json:"workspace_item_number"`
+		Title                   string `json:"title"`
+		StatusName              string `json:"status_name"`
+		UpdatedAt               string `json:"updated_at"`
+		CreatorPortalCustomerID *int   `json:"creator_portal_customer_id,omitempty"`
 	}
 	candidates := []candidate{}
 	checked := map[int]bool{}
@@ -82,13 +83,14 @@ func (h *ItemHandler) RequesterOpenTickets(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		candidates = append(candidates, candidate{
-			ID:                  row.ID,
-			WorkspaceID:         row.WorkspaceID,
-			WorkspaceKey:        row.WorkspaceKey,
-			WorkspaceItemNumber: row.WorkspaceItemNumber,
-			Title:               row.Title,
-			StatusName:          row.StatusName,
-			UpdatedAt:           row.UpdatedAt.UTC().Format(time.RFC3339),
+			ID:                      row.ID,
+			WorkspaceID:             row.WorkspaceID,
+			WorkspaceKey:            row.WorkspaceKey,
+			WorkspaceItemNumber:     row.WorkspaceItemNumber,
+			Title:                   row.Title,
+			StatusName:              row.StatusName,
+			UpdatedAt:               row.UpdatedAt.UTC().Format(time.RFC3339),
+			CreatorPortalCustomerID: requesterCustomerID,
 		})
 	}
 

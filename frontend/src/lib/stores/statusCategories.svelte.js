@@ -3,7 +3,7 @@
  * Provides shared access to status categories with color lookup utilities
  */
 
-import { api } from '../api.js';
+import { statusCategories } from '../api/workflows.js';
 import { getStatusType, getTextColorForBackground } from '../utils/statusColors.js';
 
 // Reactive state using Svelte 5 runes
@@ -14,7 +14,7 @@ let categories = $state([]);
  */
 async function init() {
   try {
-    categories = (await api.statusCategories.getAll()) || [];
+    categories = (await statusCategories.getAll()) || [];
   } catch (error) {
     console.error('Failed to load status categories:', error);
     categories = [];

@@ -493,6 +493,7 @@ func sameOAuthIdentity(left, right *models.ChannelConfig) bool {
 		left.EmailOAuthProviderType == right.EmailOAuthProviderType &&
 		left.EmailOAuthClientID == right.EmailOAuthClientID &&
 		left.EmailOAuthTenantID == right.EmailOAuthTenantID &&
+		left.EmailOAuthMailbox == right.EmailOAuthMailbox &&
 		sameOptionalInt(left.EmailProviderID, right.EmailProviderID)
 }
 
@@ -566,7 +567,7 @@ func (m *CredentialManager) saveOAuthTokens(
 	}
 	mailboxEmail = strings.TrimSpace(mailboxEmail)
 	if mailboxEmail == "" {
-		return "", fmt.Errorf("OAuth provider returned an empty mailbox address")
+		return "", fmt.Errorf("email channel has no monitored mailbox address configured")
 	}
 	if m.encryption == nil {
 		return "", fmt.Errorf("OAuth token encryption is not configured")
@@ -605,6 +606,9 @@ func (m *CredentialManager) saveOAuthTokens(
 			return fmt.Errorf("OAuth provider returned no refresh token")
 		}
 		setOptionalConfigTime(config, "email_oauth_expires_at", tokens.ExpiresAt)
+		// Keep the intent and verified address in lockstep after a successful
+		// connection, so an enable check can compare them.
+		config["email_oauth_mailbox"] = mailboxEmail
 		config["email_oauth_email"] = mailboxEmail
 		if providerID != nil {
 			config["email_provider_id"] = *providerID

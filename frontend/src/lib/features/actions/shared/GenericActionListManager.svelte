@@ -1,5 +1,12 @@
 <script>
-  import { Zap, Play, Eye, ToggleLeft, ToggleRight, Pencil, Trash2, Plus } from '@lucide/svelte';
+  import Zap from '@lucide/svelte/icons/zap';
+  import Play from '@lucide/svelte/icons/play';
+  import Eye from '@lucide/svelte/icons/eye';
+  import ToggleLeft from '@lucide/svelte/icons/toggle-left';
+  import ToggleRight from '@lucide/svelte/icons/toggle-right';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Plus from '@lucide/svelte/icons/plus';
   import Button from '../../../components/Button.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { confirm } from '../../../composables/useConfirm.js';

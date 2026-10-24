@@ -114,6 +114,15 @@ type itemBulkPatchRequest struct {
 	} `json:"patches"`
 }
 
+type itemBulkTransitionRequest struct {
+	ItemIDs    []int `json:"item_ids"`
+	ToStatusID int   `json:"to_status_id"`
+}
+
+type itemBulkDeleteRequest struct {
+	ItemIDs []int `json:"item_ids"`
+}
+
 type roadmapHierarchyDatesRequest struct {
 	RootIDs []int `json:"root_ids"`
 }
@@ -442,6 +451,22 @@ func registerItemSetRoutes(builder *routeBuilder, app *services.ItemApplicationS
 		result, err := app.BulkPatch(r.Context(), auditActor(r, user), patches)
 		return result, itemError(err)
 	})
+	builder.JSON(http.MethodPost, "/items/bulk-transition", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, func(r *http.Request, input itemBulkTransitionRequest) (services.ItemBulkTransitionResult, error) {
+		user, err := principal(r)
+		if err != nil {
+			return services.ItemBulkTransitionResult{}, err
+		}
+		result, err := app.BulkTransition(r.Context(), auditActor(r, user), input.ItemIDs, input.ToStatusID)
+		return result, itemError(err)
+	})
+	builder.JSON(http.MethodPost, "/items/bulk-delete", http.StatusOK, false, AuthAuthenticated, []string{"items:delete"}, func(r *http.Request, input itemBulkDeleteRequest) (services.ItemBulkDeleteResult, error) {
+		user, err := principal(r)
+		if err != nil {
+			return services.ItemBulkDeleteResult{}, err
+		}
+		result, err := app.BulkDelete(auditActor(r, user), input.ItemIDs)
+		return result, itemError(err)
+	})
 	builder.JSON(http.MethodPost, "/items/roadmap-hierarchy-dates", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, func(r *http.Request, input roadmapHierarchyDatesRequest) (services.RoadmapHierarchyDatesResult, error) {
 		user, err := principal(r)
 		if err != nil {
@@ -532,6 +557,38 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 			return services.ItemWatchStatus{}, err
 		}
 		result, err := app.Unwatch(r.Context(), user.ID, id)
+		return result, itemError(err)
+	})
+	builder.Read(path+"/watchers", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.Watchers(r.Context(), user.ID, id)
+		return result, itemError(err)
+	})
+	builder.Action(http.MethodPut, path+"/watchers/{user_id}", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		targetID, err := pathID(r, "user_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.AddWatcher(r.Context(), user.ID, id, targetID)
+		return result, itemError(err)
+	})
+	builder.Action(http.MethodDelete, path+"/watchers/{user_id}", http.StatusOK, AuthAuthenticated, []string{"items:write"}, func(r *http.Request) ([]models.ItemWatcher, error) {
+		user, id, err := itemTarget(r)
+		if err != nil {
+			return nil, err
+		}
+		targetID, err := pathID(r, "user_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.RemoveWatcher(r.Context(), user.ID, id, targetID)
 		return result, itemError(err)
 	})
 	builder.Read(path+"/personal-tasks", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, error) {
@@ -806,10 +863,9 @@ func parseItemListAt(r *http.Request, userID int, now time.Time) (Pagination, se
 	if err := parseItemFilters(r, &request.Filters); err != nil {
 		return Pagination{}, services.ItemListRequest{}, err
 	}
-	request.Filters.TextQuery = strings.TrimSpace(query.Get("search"))
-	if request.Filters.TextQuery == "" {
-		request.Filters.TextQuery = ""
-	}
+	// Smart search matches title/description text and, when the query resolves
+	// to a full KEY-NUMBER reference, the item key too.
+	request.Filters.SearchQuery = strings.TrimSpace(query.Get("search"))
 	request.Filters.StatusIDs, err = itemIDList(query.Get("status_id"))
 	if err != nil {
 		return Pagination{}, services.ItemListRequest{}, invalidQuery("status_id")
@@ -1015,6 +1071,9 @@ func itemError(err error) error {
 	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
+	}
+	if errors.Is(err, services.ErrItemWatcherForbidden) {
+		return newError(http.StatusForbidden, "forbidden", "Managing other watchers requires edit permission")
 	}
 	if errors.Is(err, services.ErrBulkItemForbidden) {
 		return newError(http.StatusForbidden, "forbidden", "Item update is not permitted")

@@ -712,6 +712,8 @@ export default {
         invitation: 'New user invitation',
         notification_batch: 'Batched notifications',
         portal_reply: 'Portal customer reply',
+        approval_requested: 'Portal approval request',
+        intake_confirmation: 'Email intake receipt',
       },
     },
 

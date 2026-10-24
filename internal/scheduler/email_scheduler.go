@@ -69,6 +69,12 @@ func (es *EmailScheduler) SetEventCoordinator(ec *services.EventCoordinator) {
 	es.processor.SetEventCoordinator(ec)
 }
 
+// SetConfirmationSender forwards the optional intake receipt sender to the
+// processor.
+func (es *EmailScheduler) SetConfirmationSender(sender email.IntakeConfirmationSender) {
+	es.processor.SetConfirmationSender(sender)
+}
+
 // Start begins the email polling scheduler
 func (es *EmailScheduler) Start() {
 	es.mu.Lock()
@@ -124,7 +130,7 @@ func (es *EmailScheduler) processEmailChannels() {
 	start := time.Now()
 	var channelsProcessed int
 	var runErr error
-	defer recordSchedulerRun(es.runRepo, "email", start, &channelsProcessed, &runErr)
+	defer recordSchedulerRun(es.runRepo, "email", start, &channelsProcessed, &runErr, time.Now)
 
 	ctx := context.Background()
 
@@ -309,7 +315,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	}
 	intakes := make([]models.Intake, 0, len(allIntakes))
 	for _, intake := range allIntakes {
-		if intake.Status == "enabled" {
+		if intake.Status == models.IntakeStatusEnabled {
 			intakes = append(intakes, intake)
 		}
 	}
@@ -353,23 +359,17 @@ func legacyIntakeFromConfig(config *models.ChannelConfig) *models.Intake {
 	if folder == "" {
 		folder = "INBOX"
 	}
-	intake := &models.Intake{
+	// A channel with no routing still yields an intake so the processor fails
+	// loudly on the missing target rather than silently skipping the mailbox.
+	return &models.Intake{
 		Folder:                folder,
-		TargetType:            models.IntakeTargetWorkspace,
-		TargetID:              config.EmailWorkspaceID,
+		WorkspaceID:           config.EmailWorkspaceID,
+		PortalChannelID:       config.EmailConnectedPortalID,
 		ItemTypeID:            config.EmailItemTypeID,
 		RateLimitPerHour:      config.EmailRateLimitPerHour,
 		ProcessingDisposition: config.EmailProcessingDisposition,
-		Status:                "enabled",
+		Status:                models.IntakeStatusEnabled,
 	}
-	if config.EmailConnectedPortalID != nil {
-		intake.TargetType = models.IntakeTargetPortal
-		intake.TargetID = *config.EmailConnectedPortalID
-		intake.ItemTypeID = nil
-	}
-	// A channel with no routing still yields an intake so the processor fails
-	// loudly on the missing target rather than silently skipping the mailbox.
-	return intake
 }
 
 // pollIntake selects one folder and processes new mail with the intake's
@@ -390,21 +390,14 @@ func (es *EmailScheduler) pollIntake(
 	// The mailbox config carries the connection; the intake carries routing.
 	effective := *base
 	effective.EmailMailbox = intake.Folder
-	effective.EmailConnectedPortalID = nil
-	effective.EmailWorkspaceID = 0
-	effective.EmailItemTypeID = nil
+	effective.EmailWorkspaceID = intake.WorkspaceID
+	effective.EmailItemTypeID = intake.ItemTypeID
+	effective.EmailConnectedPortalID = intake.PortalChannelID
 	effective.EmailRateLimitPerHour = intake.RateLimitPerHour
 	// An empty intake disposition means "inherit the mailbox default", so keep
 	// whatever the mailbox config carries (enum or legacy booleans).
 	if intake.ProcessingDisposition != "" {
 		effective.EmailProcessingDisposition = intake.ProcessingDisposition
-	}
-	if intake.TargetType == models.IntakeTargetPortal {
-		portalID := intake.TargetID
-		effective.EmailConnectedPortalID = &portalID
-	} else {
-		effective.EmailWorkspaceID = intake.TargetID
-		effective.EmailItemTypeID = intake.ItemTypeID
 	}
 
 	mailbox := intake.Folder
@@ -450,14 +443,6 @@ func (es *EmailScheduler) pollIntake(
 	var offenderUID uint32
 	deferredClaim := false
 	disposition := email.ResolveEmailDisposition(&effective)
-	// A synthetic legacy intake (ID 0) is channel-scoped: leave the tracking
-	// row's intake_id NULL so channel-level rate-limit requeue still finds it.
-	var intakeID *int
-	if intake.ID > 0 {
-		id := intake.ID
-		intakeID = &id
-	}
-
 	for _, msg := range messages {
 		if msg.FetchError != nil {
 			slog.Error("failed to fetch bounded email body, stopping batch to avoid skipping the UID",
@@ -468,7 +453,10 @@ func (es *EmailScheduler) pollIntake(
 			break
 		}
 		parsed := es.parser.Parse(msg)
-		result, processErr := es.processor.ProcessEmailWithIntake(ctx, parsed, ch.ID, currentValidity, &effective, intakeID)
+		// A synthetic legacy intake (ID 0) is channel-scoped: the processor
+		// leaves the tracking row's intake_id NULL so channel-level rate-limit
+		// requeue still finds it.
+		result, processErr := es.processor.ProcessEmailWithIntake(ctx, parsed, ch.ID, currentValidity, &effective, intake)
 		if processErr != nil {
 			slog.Error("failed to process email, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID, "intake_id", intake.ID, "uid", msg.UID,
@@ -489,6 +477,7 @@ func (es *EmailScheduler) pollIntake(
 			"intake_id", intake.ID,
 			"message_id", parsed.MessageID,
 			"action", result.Action,
+			"skip_reason", result.SkipReason,
 			"item_id", result.ItemID,
 			"comment_id", result.CommentID,
 		)

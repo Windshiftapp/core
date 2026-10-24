@@ -48,20 +48,22 @@ CREATE TABLE IF NOT EXISTS intakes (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	mailbox_id INTEGER NOT NULL,
 	folder TEXT NOT NULL DEFAULT 'INBOX',
-	target_type TEXT NOT NULL, -- 'portal' | 'workspace'
-	target_id INTEGER NOT NULL,
+	workspace_id INTEGER, -- routing target; required for new intakes
+	portal_channel_id INTEGER, -- optional portal that exposes the requests
 	request_type_id INTEGER, -- portal target: system Email request type (resolved lazily when NULL)
-	item_type_id INTEGER, -- workspace target
+	item_type_id INTEGER, -- item type created for the routing workspace
 	rate_limit_per_hour INTEGER,
 	processing_disposition TEXT NOT NULL DEFAULT '',
+	send_confirmation BOOLEAN NOT NULL DEFAULT false,
 	status TEXT NOT NULL DEFAULT 'enabled',
+	status_reason TEXT NOT NULL DEFAULT '',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (mailbox_id) REFERENCES channels(id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_intakes_mailbox_folder ON intakes(mailbox_id, folder);
-CREATE INDEX IF NOT EXISTS idx_intakes_target ON intakes(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_intakes_portal ON intakes(portal_channel_id);
 
 -- Per-folder IMAP watermark. The mailbox connection is polled once, but each
 -- intake keeps its own UIDVALIDITY/UID cursor so folders advance independently.
@@ -142,6 +144,11 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- reprocessing the same email. It is only cleared when the channel is
 	-- deleted and cascades the tracking rows.
 	completed_at DATETIME,
+	-- skipped_reason records machine-generated mail (bounces, auto-replies)
+	-- that intake deliberately did not turn into a ticket. The value is a
+	-- SystemMailCategory; NULL for mail that was processed normally. Surfaced
+	-- by the admin email-intake diagnostics view.
+	skipped_reason TEXT,
 	processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
@@ -154,13 +161,18 @@ CREATE INDEX IF NOT EXISTS idx_email_message_tracking_in_reply_to ON email_messa
 CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_sender ON email_message_tracking(from_email);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_channel_sender_time ON email_message_tracking(channel_id, LOWER(from_email), processed_at);
+CREATE INDEX IF NOT EXISTS idx_email_message_tracking_intake_sender_time ON email_message_tracking(intake_id, LOWER(from_email), processed_at);
+CREATE INDEX IF NOT EXISTS idx_email_message_tracking_item_time ON email_message_tracking(item_id, processed_at);
 
 -- Durable at-least-once queue for comment replies. Sending SMTP inline is an
 -- optimization; a transient failure leaves this row pending for the
 -- notification scheduler instead of silently losing the customer reply.
 CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	comment_id INTEGER NOT NULL,
+	-- kind separates comment replies from intake receipts. Receipts have no
+	-- comment_id; the partial unique indexes below keep each kind idempotent.
+	kind TEXT NOT NULL DEFAULT 'reply',
+	comment_id INTEGER,
 	channel_id INTEGER NOT NULL,
 	item_id INTEGER NOT NULL,
 	to_email TEXT NOT NULL,
@@ -200,7 +212,14 @@ CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_pending
 -- One outbound reply per comment recipient (WI-1136): the creator plus every
 -- external request participant gets their own row.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_reply_outbox_comment_recipient
-	ON email_reply_outbox(comment_id, to_email);
+	ON email_reply_outbox(comment_id, to_email)
+	WHERE comment_id IS NOT NULL;
+
+-- One intake receipt per item (WI-1769), so re-processing the same email
+-- cannot enqueue a second receipt.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_email_reply_outbox_confirmation
+	ON email_reply_outbox(item_id)
+	WHERE kind = 'intake_confirmation';
 
 -- Email OAuth state for tracking OAuth flow state
 CREATE TABLE IF NOT EXISTS email_oauth_state (

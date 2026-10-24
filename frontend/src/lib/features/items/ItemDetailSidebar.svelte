@@ -1,5 +1,14 @@
 <script>
-  import { AlertCircle, ChevronDown, ChevronUp, MoreHorizontal, Briefcase, Globe, Building2, Repeat, Shield } from '@lucide/svelte';
+  import { untrack } from 'svelte';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import Globe from '@lucide/svelte/icons/globe';
+  import Building2 from '@lucide/svelte/icons/building-2';
+  import Repeat from '@lucide/svelte/icons/repeat';
+  import Shield from '@lucide/svelte/icons/shield';
   import { priorityIconMap } from '../../utils/icons.js';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { rruleToText } from '../../editors/rruleUtils.js';
@@ -7,7 +16,6 @@
   import Avatar from '../../components/Avatar.svelte';
   import Input from '../../components/Input.svelte';
   import Text from '../../components/Text.svelte';
-  import TruncatedFieldValue from '../../components/TruncatedFieldValue.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
@@ -16,26 +24,28 @@
   import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import PersonalTasksPanel from '../personal/PersonalTasksPanel.svelte';
-  import { api } from '../../api.js';
+  import { approvals } from '../../api/approvals.js';
+  import { labels } from '../../api/misc.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import ItemSCMLinks from './ItemSCMLinks.svelte';
   import ItemIntegrationLinks from './ItemIntegrationLinks.svelte';
+  import ItemSLAPanel from './ItemSLAPanel.svelte';
   import ZammadItemPanel from './ZammadItemPanel.svelte';
 	import RequesterOpenTickets from './RequesterOpenTickets.svelte';
   import CustomerContextSection from './CustomerContextSection.svelte';
   import ParticipantsSection from './ParticipantsSection.svelte';
+  import WatchersSection from './WatchersSection.svelte';
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
   import AddIntegrationLinkModal from '../../dialogs/AddIntegrationLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
   import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDateOnly, formatCustomFieldDate } from '../../utils/dateFormatter.js';
+  import { formatDateOnly } from '../../utils/dateFormatter.js';
   import { parseDuration, durationToString } from '../../utils/timeUtils.js';
-  import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
-  import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
-  import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { isSystemFieldConfigured, systemFieldIdentifiers } from '../../utils/screenFields.js';
   import { isExternalRequest } from '../../utils/requestOrigin.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
@@ -146,6 +156,71 @@
     onrequestmerge = null,
   } = $props();
 
+  // Detail owns one scoped milestone options loader. Complete workspace
+  // snapshots seed it; partial/unknown lists load every page on first open.
+  function filterMilestonesByWorkspace(list = [], scope) {
+    const allowedCategoryIds = scope?.milestone_categories;
+    if (!allowedCategoryIds?.length) return list;
+    return list.filter((milestone) => allowedCategoryIds.includes(milestone.category_id));
+  }
+
+  // The item's owning workspace scopes every lazily loaded editor option.
+  const detailWorkspaceId = $derived(item?.workspace_id ?? workspace?.id ?? null);
+  const editorOptionsEntry = $derived(collectionEditorOptions.get(detailWorkspaceId));
+
+  $effect(() => {
+    const wsId = detailWorkspaceId;
+    if (!wsId || !Array.isArray(milestones)) return;
+    // While an item switch is in flight the store keeps the previous item's
+    // references, so `item.workspace_id` can already be the new workspace
+    // while `milestones` still belong to the old one. Priming that foreign
+    // list as complete would poison the scoped option cache and leave the
+    // picker empty. Only seed options once the loaded references match the
+    // item's workspace; the scoped snapshot fetches them alongside iterations.
+    if (Number(workspace?.id) !== Number(wsId)) return;
+    const isActiveWorkspace = Number(workspaceDataStore.workspaceId) === Number(wsId);
+    const complete =
+      isActiveWorkspace && workspaceDataStore.planningCompleteness?.milestones === true;
+    const isPersonal = workspace?.is_personal === true;
+    untrack(() =>
+      collectionEditorOptions.prime(
+        wsId,
+        { milestones: milestones.filter((milestone) => !isPersonal || !milestone.is_global) },
+        { milestones: complete }
+      )
+    );
+  });
+
+  async function openMilestoneOptions() {
+    if (detailWorkspaceId) {
+      await collectionEditorOptions.load(detailWorkspaceId, 'milestones');
+    }
+  }
+
+  // Assignee and team options load on first open only. The authorized
+  // assignable-users endpoint (not the user-display cache) keeps agent
+  // presence and assignability semantics intact.
+  async function openAssigneeOptions() {
+    if (detailWorkspaceId) {
+      await collectionEditorOptions.load(detailWorkspaceId, 'users');
+    }
+  }
+
+  async function openTeamOptions() {
+    if (detailWorkspaceId) {
+      await collectionEditorOptions.load(detailWorkspaceId, 'teams');
+    }
+  }
+
+  const milestonePickerOptions = $derived(
+    filterMilestonesByWorkspace(editorOptionsEntry.milestones, workspace)
+  );
+  const milestonePickerLoading = $derived(editorOptionsEntry.loading.milestones === true);
+  const assigneeOptions = $derived(editorOptionsEntry.users);
+  const assigneeOptionsLoading = $derived(editorOptionsEntry.loading.users === true);
+  const teamOptions = $derived(editorOptionsEntry.teams);
+  const teamOptionsLoading = $derived(editorOptionsEntry.loading.teams === true);
+
   // State for SCM Link modals
   let showAddSCMLinkModal = $state(false);
   let showCreateBranchModal = $state(false);
@@ -180,7 +255,7 @@
 
   async function loadApprovalRequests(id) {
     try {
-      approvalRequests = (await api.approvals.forItem(id)) ?? [];
+      approvalRequests = (await approvals.forItem(id)) ?? [];
     } catch {
       approvalRequests = [];
     }
@@ -240,7 +315,7 @@
     editingLabels = false;
 
     try {
-      const updated = await api.labels.setForItem(item.id, labelIds);
+      const updated = await labels.setForItem(item.id, labelIds);
       if (item) item.labels = updated || [];
     } catch (err) {
       console.error('Failed to save labels:', err);
@@ -290,31 +365,6 @@
 
   function getCustomFieldDefinition(fieldId) {
     return customFieldDefinitions.find(field => field.id === parseInt(fieldId));
-  }
-
-  function formatCustomFieldValue(fieldDef, value) {
-    if (isBooleanCustomFieldType(fieldDef.field_type)) {
-      return booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no');
-    }
-    if (fieldDef.field_type === 'select') {
-      return resolveOptionLabel(fieldDef.options, value);
-    }
-    if (fieldDef.field_type === 'multiselect') {
-      return resolveOptionLabels(fieldDef.options, Array.isArray(value) ? value : []).join(', ');
-    }
-    if (fieldDef.field_type === 'date') {
-      return formatCustomFieldDate(value);
-    }
-    if (fieldDef.field_type === 'user' && typeof value === 'object') {
-      return value.name || t('common.selected');
-    }
-    if (Array.isArray(value)) {
-      return value.map(v => typeof v === 'object' ? v.title || v.name || v.label || v.value : v).join(', ');
-    }
-    if (typeof value === 'object') {
-      return value.title || value.name || value.label || value.value || JSON.stringify(value);
-    }
-    return value;
   }
 
   function formatVirtualFieldValue(field, value) {
@@ -574,9 +624,45 @@
   onclickOutside={handleClickOutsideSidebar}
 >
   <!-- Panel Content -->
-  <div class="flex-1 px-4 py-4 overflow-y-auto">
+  <div class="flex-1 px-3 py-3 overflow-y-auto">
+    {#snippet customFieldLabel(name)}
+      <Text variant="subtle" size="sm">{name}</Text>
+    {/snippet}
+
+    <!-- One renderer per custom field: it owns the row chrome and the
+         display→editor swap. Pickers and dates save on change; free-form text
+         types stage keystrokes and save on commit (Enter/blur). -->
+    {#snippet customFieldRow(fieldDef, screenField, currentValue, fieldEditable)}
+      {@const isEditing = editingCustomFields[screenField.field_identifier]}
+      <CustomFieldRenderer
+        field={fieldDef}
+        value={currentValue}
+        label={customFieldLabel}
+        rowTestIdPrefix="item-custom-field"
+        readonly={!isEditing}
+        disabled={!canEdit || !fieldEditable}
+        onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
+        {milestones}
+        {iterations}
+        itemId={item?.id}
+        required={screenField.is_required}
+        onChange={(val) => {
+          editCustomFieldValues[screenField.field_identifier] = val;
+          if (!DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)) {
+            onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
+          }
+        }}
+        onCommit={DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)
+          ? (val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })
+          : null}
+        onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
+      />
+    {/snippet}
+    {#if item?.id}
+      <ItemSLAPanel itemId={item.id} />
+    {/if}
     <!-- DETAILS Section Header -->
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-2">
       <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('common.details')}</Text>
       <div class="flex items-center gap-1" data-testid="item-detail-actions">
         <DropdownMenu
@@ -592,7 +678,7 @@
     </div>
     <!-- Approvals Section -->
     {#if item?.id && showApprovalsSection}
-      <div class="mb-3" data-testid="approvals-sidebar">
+      <div class="mb-2" data-testid="approvals-sidebar">
         <button
           type="button"
           class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded"
@@ -634,7 +720,7 @@
 
     <!-- Status Field -->
     {#if shouldShowSystemField('status')}
-    <div class="mb-3" data-testid="status-field">
+    <div class="mb-1" data-testid="status-field">
       <ItemPicker
         value={item?.status_id ?? null}
         items={statusOptions}
@@ -661,8 +747,8 @@
           >
             <div class="flex items-center gap-2">
               <Text variant="subtle" size="sm">{t('common.status')}</Text>
-              <kbd class="px-1.5 py-0.5 text-xs font-medium rounded border opacity-0 group-hover:opacity-70 transition-opacity"
-                   style="background-color: var(--ds-background-neutral-subtle); border-color: var(--ds-border); color: var(--ds-text-subtle);">
+              <kbd class="px-1.5 py-0.5 text-xs font-medium rounded opacity-0 group-hover:opacity-70 transition-opacity"
+                   style="background-color: var(--ds-background-neutral-subtle); box-shadow: inset 0 0 0 1px var(--ds-border); color: var(--ds-text-subtle);">
                 {getShortcutDisplay('itemDetail', 'focusStatus')}
               </kbd>
             </div>
@@ -700,7 +786,7 @@
     </div>
     {/if}
     {#snippet priorityField()}
-      <div class="mb-3" data-testid="priority-field">
+      <div class="mb-1" data-testid="priority-field">
         <ItemPicker
           value={item?.priority_id ?? null}
           items={priorities}
@@ -740,7 +826,7 @@
 
     {#snippet projectField()}
       {#if moduleSettings.time_tracking_enabled}
-        <div class="mb-3">
+        <div class="mb-1">
           <ItemPicker
             value={selectedProject?.id ?? null}
             items={projectItems}
@@ -792,13 +878,17 @@
     {/snippet}
 
     {#snippet assigneeField()}
-      <div class="mb-3">
+      <div class="mb-1">
         <UserPicker
           value={item.assignee_id ?? null}
           placeholder={t('items.selectAssignee')}
           showUnassigned={true}
           disabled={!canEdit || !isSystemFieldEditable('assignee')}
           workspaceId={item?.workspace_id}
+          users={assigneeOptions}
+          loading={assigneeOptionsLoading}
+          onOpen={openAssigneeOptions}
+          autoOpen={editingAssignee}
           class="w-full"
           onSelect={(selectedUser) => {
             onsaveField?.({
@@ -816,7 +906,7 @@
               <Text variant="subtle" size="sm">{t('common.assignee')}</Text>
               <div class="flex items-center gap-2">
                 {#if item.assignee_id && item.assignee_name}
-                  <Avatar src={item.assignee_avatar} name={item.assignee_name} size="xs" variant="teal" />
+                  <Avatar src={item.assignee_avatar} name={item.assignee_name} size="2xs" variant="teal" />
                   <span style="color: var(--ds-text);">{item.assignee_name}</span>
                 {:else}
                   <Text variant="subtle" size="sm">{t('items.unassigned')}</Text>
@@ -829,11 +919,14 @@
     {/snippet}
 
     {#snippet teamField()}
-      <div class="mb-3" data-testid="item-team-field">
+      <div class="mb-1" data-testid="item-team-field">
         <TeamPicker
           value={item.team_id ?? null}
           placeholder={t('items.selectTeam')}
           disabled={!canEdit || !isSystemFieldEditable('team')}
+          teams={teamOptions}
+          loading={teamOptionsLoading}
+          onOpen={openTeamOptions}
           class="w-full"
           onSelect={(selectedTeam) => {
             onsaveField?.({
@@ -869,11 +962,14 @@
     {#snippet milestoneField()}
       {@const itemMilestones = (item.milestones || []).map(m => m.id)}
       {@const selectedMilestones = (item.milestones || [])}
-      <div class="mb-3" data-testid="milestone-field">
+      <div class="mb-1" data-testid="milestone-field">
         <MilestoneCombobox
           multiple={true}
           value={itemMilestones}
           workspaceId={item.workspace_id}
+          milestones={milestonePickerOptions}
+          loading={milestonePickerLoading}
+          onOpen={openMilestoneOptions}
           disabled={!canEdit || !isSystemFieldEditable('milestone')}
           class="w-full"
           onSelect={({ ids }) => {
@@ -896,7 +992,7 @@
                   {#each selectedMilestones as ms (ms.id)}
                     <span
                       class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
-                      style="background-color: {ms.category_color || '#9CA3AF'}1A; border: 1px solid {ms.category_color || '#9CA3AF'}; color: var(--ds-text);"
+                      style="background-color: {ms.category_color || '#9CA3AF'}1A; box-shadow: inset 0 0 0 1px {ms.category_color || '#9CA3AF'}; color: var(--ds-text);"
                     >
                       {ms.name}
                     </span>
@@ -910,7 +1006,7 @@
     {/snippet}
 
     {#snippet iterationField()}
-      <div class="mb-3" data-testid="iteration-field">
+      <div class="mb-1" data-testid="iteration-field">
         <ItemPicker
           value={item?.iteration_id ?? null}
           items={iterations}
@@ -954,7 +1050,7 @@
 
     {#snippet labelsField()}
       {#if item?.id}
-        <div class="mb-3" data-testid="labels-field">
+        <div class="mb-1" data-testid="labels-field">
           {#if editingLabels}
             <div class="px-2 py-1.5">
               <WorkspaceLabelCombobox
@@ -978,7 +1074,7 @@
                 {#each (item?.labels || []) as label (label.id)}
                   <span
                     class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
-                    style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); border: 1px solid {label.color || '#3B82F6'};"
+                    style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); box-shadow: inset 0 0 0 1px {label.color || '#3B82F6'};"
                     data-testid="item-label"
                   >
                     <span
@@ -1001,7 +1097,7 @@
     {/snippet}
 
     {#snippet estimateField()}
-      <div class="mb-3" data-testid="item-estimate-field">
+      <div class="mb-1" data-testid="item-estimate-field">
         {#if editingEstimate}
           <div class="w-full flex items-center justify-between px-2 py-1.5 text-sm">
             <Text variant="subtle" size="sm">{t('items.estimate') || 'Estimate'}</Text>
@@ -1066,7 +1162,7 @@
 
     <!-- Recurrence Section -->
     {#if recurrenceRule}
-    <div class="mb-3">
+    <div class="mb-1">
       <div
         data-testid="item-recurrence-summary"
         class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
@@ -1089,11 +1185,11 @@
 
     <!-- Scheduling Section (collapsible) -->
     {#if shouldShowSystemField('due_date') || shouldShowSystemField('start_date') || shouldShowSystemField('end_date') || hasDateCustomFields}
-      <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
+      <div class="border-t my-3" style="border-color: var(--ds-border);"></div>
 
       <!-- Scheduling Header -->
       <button
-        class="flex items-center justify-between w-full mb-3"
+        class="flex items-center justify-between w-full mb-2"
         onclick={toggleScheduling}
         disabled={schedulingForcedOpen}
         style="cursor: {schedulingForcedOpen ? 'default' : 'pointer'};"
@@ -1158,41 +1254,8 @@
           {@const currentValue = isEditing ? editCustomFieldValues[screenField.field_identifier] : storedValue}
           {#if fieldDef}
             {@const fieldEditable = isCustomFieldEditable(fieldDef.id)}
-            <div class="mb-3" data-testid={`item-custom-field-${fieldDef.id}`}>
-              {#if isEditing}
-                <CustomFieldRenderer
-                  field={fieldDef}
-                  value={currentValue}
-                  readonly={!fieldEditable}
-                  disabled={!canEdit || !fieldEditable}
-                  {milestones}
-                  {iterations}
-                  itemId={item?.id}
-                  required={screenField.is_required}
-                  onChange={(val) => {
-                    editCustomFieldValues[screenField.field_identifier] = val;
-                    onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
-                  }}
-                  onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
-                  onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
-                />
-              {:else}
-                <button
-                  onclick={() => startEditingCustomField(screenField.field_identifier)}
-                  data-testid={`item-custom-field-edit-${fieldDef.id}`}
-                  class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-                  disabled={!canEdit || !fieldEditable}
-                >
-                  <Text variant="subtle" size="sm">{fieldDef.name}</Text>
-                  <span style="color: {currentValue ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-                    {#if currentValue !== null && currentValue !== undefined && currentValue !== ''}
-                      {formatCustomFieldDate(currentValue)}
-                    {:else}
-                      {t('common.none')}
-                    {/if}
-                  </span>
-                </button>
-              {/if}
+            <div class="mb-1">
+              {@render customFieldRow(fieldDef, screenField, currentValue, fieldEditable)}
             </div>
           {/if}
         {/each}
@@ -1206,10 +1269,10 @@
       {@const nonDateCustomFields = configuredCustomFields.filter(f => getCustomFieldDefinition(f.field_identifier)?.field_type !== 'date')}
       {#if nonDateCustomFields.length > 0}
         <!-- Divider before Custom Fields -->
-        <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
+        <div class="border-t my-3" style="border-color: var(--ds-border);"></div>
 
         <!-- Custom Fields Header -->
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
           <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('fields.title')}</Text>
         </div>
 
@@ -1221,95 +1284,20 @@
             {@const currentValue = isEditing ? editCustomFieldValues[screenField.field_identifier] : storedValue}
             {#if fieldDef}
               {@const fieldEditable = isCustomFieldEditable(fieldDef.id)}
-              <div class="mb-3" data-testid={`item-custom-field-${fieldDef.id}`}>
-                {#if fieldDef.field_type === 'linking'}
-                  <div class="px-2 py-1.5">
-                    <Text variant="subtle" size="sm" class="mb-1">{fieldDef.name}</Text>
-                    <CustomFieldRenderer
-                      field={fieldDef}
-                      value={currentValue}
-                      readonly={!canEdit || !fieldEditable}
-                      disabled={!canEdit || !fieldEditable}
-                      itemId={item?.id}
-                    />
-                  </div>
-                {:else if isEditing}
+              {#if fieldDef.field_type === 'linking'}
+                <div class="px-2 py-1.5" data-testid={`item-custom-field-${fieldDef.id}`}>
+                  <Text variant="subtle" size="sm" class="mb-1">{fieldDef.name}</Text>
                   <CustomFieldRenderer
                     field={fieldDef}
                     value={currentValue}
-                    readonly={!fieldEditable}
+                    readonly={!canEdit || !fieldEditable}
                     disabled={!canEdit || !fieldEditable}
-                    {milestones}
-                    {iterations}
                     itemId={item?.id}
-                    required={screenField.is_required}
-                    onChange={(val) => {
-                      editCustomFieldValues[screenField.field_identifier] = val;
-                      if (!DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)) {
-                        onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
-                      }
-                    }}
-                    onCommit={(val) => onsaveField?.({
-                      field: `custom_field_${screenField.field_identifier}`,
-                      value: val,
-                    })}
-                    onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
-                    onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
                   />
-                {:else}
-                  {@const hasValue = currentValue !== null && currentValue !== undefined && currentValue !== ''}
-                  {@const displayValue = hasValue ? formatCustomFieldValue(fieldDef, currentValue) : t('common.none')}
-                  {@const valueHref = customFieldLinkHref(fieldDef.field_type, currentValue)}
-                  <!-- Unified read-only row: label left, value right. The row owns
-                       padding and hover; the value renderer adds no chrome. -->
-                  <div
-                    class="hover-bg group flex w-full min-w-0 items-center justify-between gap-2 rounded px-2 py-1.5 text-sm transition-colors"
-                  >
-                    <button
-                      type="button"
-                      onclick={() => startEditingCustomField(screenField.field_identifier)}
-                      data-testid={valueHref
-                        ? `item-custom-field-edit-${fieldDef.id}`
-                        : `item-custom-field-label-${fieldDef.id}`}
-                      class="max-w-[45%] shrink-0 truncate rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
-                      style="outline-color: var(--ds-border-focused);"
-                      disabled={!canEdit || !fieldEditable}
-                    >
-                      <Text variant="subtle" size="sm">{fieldDef.name}</Text>
-                    </button>
-
-                    <div class="min-w-0 flex-1 text-right">
-                      {#if ['user', 'multi_user', 'asset'].includes(fieldDef.field_type)}
-                        <CustomFieldRenderer
-                          field={fieldDef}
-                          value={currentValue}
-                          readonly={true}
-                          disabled={!canEdit || !fieldEditable}
-                          bare={true}
-                          displayAlignment="end"
-                          truncateDisplay={true}
-                          displayTestId={`item-custom-field-display-${fieldDef.id}`}
-                          {milestones}
-                          {iterations}
-                          itemId={item?.id}
-                          onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
-                        />
-                      {:else}
-                        <TruncatedFieldValue
-                          value={displayValue}
-                          href={valueHref}
-                          onactivate={valueHref ? null : () => startEditingCustomField(screenField.field_identifier)}
-                          disabled={!canEdit || !fieldEditable}
-                          subtle={!hasValue}
-                          testId={valueHref
-                            ? `item-custom-field-value-${fieldDef.id}`
-                            : `item-custom-field-edit-${fieldDef.id}`}
-                        />
-                      {/if}
-                    </div>
-                  </div>
-                {/if}
-              </div>
+                </div>
+              {:else}
+                {@render customFieldRow(fieldDef, screenField, currentValue, fieldEditable)}
+              {/if}
             {/if}
           {/each}
         </div>
@@ -1324,8 +1312,8 @@
         return v !== undefined && v !== null && v !== '';
       })}
       {#if visibleVirtualFields.length > 0}
-        <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
-        <div class="flex items-center justify-between mb-3">
+        <div class="border-t my-3" style="border-color: var(--ds-border);"></div>
+        <div class="flex items-center justify-between mb-2">
           <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('fields.requestFormFields')}</Text>
         </div>
         <div class="space-y-1">
@@ -1369,6 +1357,12 @@
     {#if item?.id && isExternalRequest(item)}
       <RequesterOpenTickets itemId={item.id} {canEdit} {onrequestmerge} />
       <CustomerContextSection {item} />
+    {/if}
+
+    <!-- Internal users watching the item. Editors can add or remove other
+         users; everyone else can only manage their own watch. -->
+    {#if item?.id}
+      <WatchersSection itemId={item.id} workspaceId={item.workspace_id} {canEdit} />
     {/if}
 
     <!-- External request participants (WI-1136). Internal items have no

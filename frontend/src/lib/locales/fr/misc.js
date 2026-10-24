@@ -78,7 +78,7 @@ export default {
       workspaces: 'Espaces de travail',
       workspacesDesc: 'Chaque projet Jira deviendra un espace de travail Windshift',
       issueTypes: 'Types de tickets',
-      issueTypesDesc: 'Les types de tickets seront créés sous forme de types d’éléments dans Windshift',
+      issueTypesDesc: 'Associez chaque type de ticket Jira à un type d’élément Windshift nouveau ou existant',
       statuses: 'Statuts',
       statusesDesc: 'Les statuts seront créés et regroupés par catégorie',
       customFields: 'Champs personnalisés',
@@ -823,6 +823,8 @@ export default {
     // Validation
     fillRequiredFields: 'Veuillez remplir les champs obligatoires :',
     selectWorkspaceFirst: 'Sélectionnez d’abord un espace de travail',
+    createdPartialError:
+      'Élément créé, mais la finalisation a échoué : {error}. Cliquez à nouveau sur Créer pour réessayer.',
     // Buttons
     create: 'Créer',
   },

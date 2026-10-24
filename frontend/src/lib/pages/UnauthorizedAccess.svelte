@@ -1,5 +1,8 @@
 <script>
-  import { Lock, Home, ArrowLeft, Info } from '@lucide/svelte';
+  import Lock from '@lucide/svelte/icons/lock';
+  import Home from '@lucide/svelte/icons/home';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Info from '@lucide/svelte/icons/info';
   import { navigate } from '../router.js';
   import Button from '../components/Button.svelte';
   import Card from '../components/Card.svelte';

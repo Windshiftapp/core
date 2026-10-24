@@ -1,14 +1,16 @@
 // Broadcasts local work-item mutations so other tabs can refresh active
 // collection views. Polling still covers server-side changes.
 
+import { createId } from './uuid.js';
+
 const CHANNEL_NAME = 'windshift-work-items';
 
 /** Unique-per-tab id used to identify the origin of a broadcast. */
-export const tabId =
-  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
+export const tabId = createId();
 
 let channel = null;
 let initialized = false;
+let activeHandlers = null;
 
 /** @returns {BroadcastChannel | null} */
 function getChannel() {
@@ -44,10 +46,13 @@ export function notifyItemMutation(detail = {}) {
 
 /**
  * Installs one debounced listener for other tabs' mutations.
- * @param {{ refreshCollectionDeltas?: () => Promise<void>|void, debounceMs?: number }} [handlers]
+ * @param {{ onInvalidate?: () => Promise<void>|void, debounceMs?: number }} [handlers]
  * @returns {() => void} disposer
  */
 export function initCrossTabSync(handlers = {}) {
+  // HMR re-executes the injecting module, so a repeat init swaps the handlers
+  // instead of leaving a listener that calls into stale code.
+  activeHandlers = handlers;
   if (initialized) return () => {};
   initialized = true;
 
@@ -65,16 +70,16 @@ export function initCrossTabSync(handlers = {}) {
   const onMessage = (/** @type {MessageEvent} */ event) => {
     const data = event?.data;
     if (!data || data.origin === tabId) return; // ignore self echoes
-    if (typeof handlers.refreshCollectionDeltas !== 'function') return;
+    if (typeof activeHandlers?.onInvalidate !== 'function') return;
 
-    // Coalesce bulk mutations into one refresh.
+    // Coalesce bulk mutations into one invalidation.
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
-      Promise.resolve(handlers.refreshCollectionDeltas()).catch((err) =>
-        console.warn('[crossTabSync] refreshCollectionDeltas failed:', err)
+      Promise.resolve(activeHandlers.onInvalidate()).catch((err) =>
+        console.warn('[crossTabSync] invalidation handler failed:', err)
       );
-    }, debounceMs);
+    }, activeHandlers.debounceMs ?? debounceMs);
   };
 
   ch.addEventListener('message', onMessage);
@@ -89,6 +94,7 @@ export function initCrossTabSync(handlers = {}) {
       /* ignore */
     }
     channel = null;
+    activeHandlers = null;
     initialized = false;
   };
 }

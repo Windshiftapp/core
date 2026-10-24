@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { api } from '../api.js';
+import { workspaces } from '../api/workspaces.js';
 import { gradients } from '../utils/gradients.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 
@@ -80,7 +80,7 @@ export async function loadWorkspaceGradient(workspaceId, { force = false } = {})
 }
 
 async function loadWorkspaceLayout(workspaceId, force) {
-  if (force) return api.workspaces.getHomepageLayout(workspaceId);
+  if (force) return workspaces.getHomepageLayout(workspaceId);
   await workspaceDataStore.initialize(workspaceId);
   const expectedID = Number.parseInt(String(workspaceId), 10);
   if (
@@ -92,7 +92,7 @@ async function loadWorkspaceLayout(workspaceId, force) {
   }
   // Keep standalone/error recovery behavior when the aggregate snapshot could
   // not initialize. A healthy workspace route never reaches this fallback.
-  return api.workspaces.getHomepageLayout(workspaceId);
+  return workspaces.getHomepageLayout(workspaceId);
 }
 
 export function hydrateWorkspaceGradientLayout(workspaceId, layout) {

@@ -11,6 +11,7 @@ const guardedFiles = [
   'src/lib/dialogs/PomodoroSettingsModal.svelte',
   'src/lib/layout/DashboardCustomizationSidebar.svelte',
   'src/lib/pages/Homepage.svelte',
+  'src/lib/features/collections/PublicBoardSharingDialog.svelte',
   'src/lib/features/workflows/WorkflowBuilder.svelte',
   'src/lib/pages/Screens.svelte',
   'src/lib/pickers/ConfigurationSetPicker.svelte',

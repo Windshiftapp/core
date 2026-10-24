@@ -19,6 +19,7 @@ export default {
     resumeTimer: '恢复计时',
     timeLogged: '工时记录成功',
     timeTrackingProject: '时间跟踪项目',
+    noCustomer: '无客户',
     workItemOptional: '工作项（可选）',
     whatDidYouWorkOn: '您做了什么工作？',
     start: '开始',

@@ -43,6 +43,10 @@ export default {
         name: 'مسند إليّ',
         description: 'العناصر المفتوحة المسندة إليك في جميع مساحات العمل',
       },
+      createdByMe: {
+        name: 'أنشأتها',
+        description: 'العناصر المفتوحة التي أنشأتها في جميع مساحات العمل',
+      },
       watchedItems: {
         name: 'العناصر المراقبة',
         description: 'العناصر التي تتابعها',
@@ -82,6 +86,10 @@ export default {
         name: 'التنقل',
         description: 'وصول سريع إلى مساحات العمل',
       },
+      background: {
+        name: 'الخلفية',
+        description: 'تدرجات لونية وصور جاهزة للوحة التحكم',
+      },
       tipLabel: 'تلميح',
       tip: 'اسحب الأدوات من هنا إلى أي قسم في لوحة المعلومات.',
     },
@@ -106,6 +114,8 @@ export default {
     states: {
       assignedLoadError: 'تعذر تحميل العناصر المسندة إليك',
       assignedEmpty: 'لا يوجد شيء مسند إليك حالياً',
+      createdLoadError: 'تعذر تحميل العناصر التي أنشأتها',
+      createdEmpty: 'لم تنشئ أي عناصر مفتوحة',
       personalTasksLoadError: 'تعذر تحميل مهامك الشخصية',
       personalTasksEmpty: 'قائمة مهامك الشخصية فارغة',
       supportMetricsLoadError: 'تعذر تحميل مقاييس الدعم',

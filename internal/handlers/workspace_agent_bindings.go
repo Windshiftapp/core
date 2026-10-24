@@ -1233,12 +1233,16 @@ type updateAgentConfigBody struct {
 	// (including "") sets/clears it.
 	RunnerImage *string `json:"runner_image"`
 	SkillIDs    []int   `json:"skill_ids"`
+	// LLMConnectionID is presence-aware: nil leaves the binding's model
+	// connection untouched; a present value retargets the profile at another
+	// enabled connection and returns it to Draft for re-validation.
+	LLMConnectionID *int `json:"llm_connection_id"`
 }
 
 // UpdateAgentConfig rewrites the binding's prompt-shaping configuration —
-// custom instructions + skill attachments (WI-258). Bindings stay
-// create/delete-only for everything else; this narrow update lets admins
-// iterate on personas without recreating the binding.
+// custom instructions, skill attachments (WI-258), and the model connection.
+// Bindings stay create/delete-only for everything else; this narrow update lets
+// admins iterate on personas and models without recreating the binding.
 func (h *WorkspaceAgentBindingHandler) UpdateAgentConfig(w http.ResponseWriter, r *http.Request) {
 	workspaceID, id, user, ok := h.requireBindingAdmin(w, r)
 	if !ok {
@@ -1250,7 +1254,7 @@ func (h *WorkspaceAgentBindingHandler) UpdateAgentConfig(w http.ResponseWriter, 
 		return
 	}
 	sanitize.Apply(&body.Instructions, sanitize.RichText)
-	if err := h.bindings.UpdateAgentConfig(r.Context(), workspaceID, id, body.Instructions, body.RunnerImage, body.SkillIDs); err != nil {
+	if err := h.bindings.UpdateAgentConfig(r.Context(), workspaceID, id, body.Instructions, body.RunnerImage, body.SkillIDs, body.LLMConnectionID); err != nil {
 		switch {
 		case errors.Is(err, services.ErrBindingNotFound):
 			respondNotFound(w, r, "agent binding")
@@ -1259,6 +1263,7 @@ func (h *WorkspaceAgentBindingHandler) UpdateAgentConfig(w http.ResponseWriter, 
 		case errors.Is(err, services.ErrBindingInstructionsTooLong),
 			errors.Is(err, services.ErrBindingRunnerImageRequiresPool),
 			errors.Is(err, services.ErrBindingInvalidRunnerImage),
+			errors.Is(err, services.ErrLLMConnectionInvalid),
 			isSkillAttachError(err):
 			respondBadRequest(w, r, err.Error())
 		default:

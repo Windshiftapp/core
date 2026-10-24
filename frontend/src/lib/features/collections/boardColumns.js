@@ -28,7 +28,8 @@ function categoryColor(status) {
   return status.category_color ?? status.category?.color;
 }
 
-function categoryIsCompleted(status) {
+/** Whether a status belongs to a completed category. */
+export function statusIsCompleted(status) {
   return status.is_completed ?? status.category?.is_completed ?? false;
 }
 
@@ -40,8 +41,8 @@ function categoryIsCompleted(status) {
  */
 export function sortStatusesForBoard(statuses = []) {
   return statuses.slice().sort((a, b) => {
-    const aCompleted = categoryIsCompleted(a) ? 1 : 0;
-    const bCompleted = categoryIsCompleted(b) ? 1 : 0;
+    const aCompleted = statusIsCompleted(a) ? 1 : 0;
+    const bCompleted = statusIsCompleted(b) ? 1 : 0;
     if (aCompleted !== bCompleted) return aCompleted - bCompleted;
 
     const aOrder = CATEGORY_ORDER[categoryBuiltinKey(a)] || 3;

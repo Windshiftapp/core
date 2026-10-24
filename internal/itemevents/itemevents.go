@@ -348,6 +348,7 @@ type RecordedFact struct {
 	OldStatusID       *int
 	NewStatusID       *int
 	CommentAuthorKind string
+	CommentIsPrivate  bool
 	Snapshot          ItemSnapshot
 	Metadata          Metadata
 }
@@ -698,6 +699,7 @@ func enrichFactFromPayload(fact *RecordedFact, payload any) {
 		fact.Snapshot = typed.Item
 	case CommentCreatedV1:
 		fact.CommentAuthorKind = fact.Metadata.ActorKind
+		fact.CommentIsPrivate = typed.IsPrivate
 	case LinkChangedV1:
 		fact.ItemID = typed.ItemID
 	}

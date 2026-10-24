@@ -1,6 +1,6 @@
 <script>
-  import { Download } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Download from '@lucide/svelte/icons/download';
+  import { support } from '../api/support.js';
   import { useCollectionEventStream } from '../composables/useCollectionEventStream.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { downloadSupportMetricsCSV } from '../features/support/metricColumns.js';
@@ -69,7 +69,7 @@
       } else {
         params.workspace_id = workspaceId;
       }
-      const response = await api.support.getMetricsAggregate(params);
+      const response = await support.getMetricsAggregate(params);
       if (current !== version) return;
       doc = response;
     } catch (error) {

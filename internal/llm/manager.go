@@ -125,12 +125,13 @@ func (m *ConnectionManager) Resolve(connectionID int) (Client, error) {
 // env-var client has no DB row, so usedFallback flags that provider/model are
 // unknown.
 type resolvedConnection struct {
-	client       Client
-	connectionID int
-	providerType ProviderType
-	model        string
-	baseURL      string // effective endpoint (provider default when none stored)
-	usedFallback bool
+	client         Client
+	connectionID   int
+	providerType   ProviderType
+	model          string
+	baseURL        string // effective endpoint (provider default when none stored)
+	providerConfig string
+	usedFallback   bool
 }
 
 // resolve is the metadata-returning core behind Resolve. Keeping Resolve's
@@ -193,10 +194,11 @@ func (m *ConnectionManager) resolve(connectionID int) (*resolvedConnection, erro
 			BaseURL:        baseURL.String,
 			ProviderConfig: providerConfig.String,
 		}),
-		connectionID: id,
-		providerType: ProviderType(providerType),
-		model:        model,
-		baseURL:      effectiveBaseURL,
+		connectionID:   id,
+		providerType:   ProviderType(providerType),
+		model:          model,
+		baseURL:        effectiveBaseURL,
+		providerConfig: providerConfig.String,
 	}, nil
 }
 
@@ -213,6 +215,11 @@ type ConnectionDescriptor struct {
 	// Pricing is the catalog's USD rates for Model, or nil when the catalog
 	// carries none. A nil Pricing means cost stays unknown, never estimated.
 	Pricing *Pricing
+	// MaxOutputTokens is the resolved output cap for Model (the catalog's
+	// advertised limit, else the conservative fallback). Agent loops pass it as
+	// the per-request max so reasoning models are not truncated by an arbitrary
+	// low ceiling.
+	MaxOutputTokens int
 }
 
 // ResolveWithIdentity returns a Client for the given connection ID together
@@ -239,8 +246,51 @@ func (m *ConnectionManager) descriptorFor(rc *resolvedConnection) ConnectionDesc
 	}
 	if desc.Model != "" {
 		desc.Pricing = m.ModelPricing(rc.providerType, rc.model)
+		desc.MaxOutputTokens = m.resolveMaxOutputTokens(rc.providerType, rc.model, rc.providerConfig)
 	}
 	return desc
+}
+
+// resolveMaxOutputTokens returns the model's advertised output cap, or the
+// conservative fallback when the catalog does not publish one. A per-connection
+// provider_config override wins over both.
+func (m *ConnectionManager) resolveMaxOutputTokens(providerType ProviderType, modelID, providerConfig string) int {
+	contextWindow, maxOutput := m.resolveModelLimits(providerType, modelID)
+	cfg := ConnectionRuntimeConfig{ContextWindow: contextWindow, MaxOutputTokens: maxOutput, ProviderConfig: providerConfig}
+	applyFallbackModelLimits(&cfg)
+	applyProviderConfigMaxOutputTokens(&cfg)
+	return cfg.MaxOutputTokens
+}
+
+// applyProviderConfigMaxOutputTokens lets an operator pin the output cap for a
+// connection via the reserved provider_config key. The override still cannot
+// exceed the model's context window, which would guarantee a provider 400.
+func applyProviderConfigMaxOutputTokens(cfg *ConnectionRuntimeConfig) {
+	override := ProviderConfigMaxOutputTokens(cfg.ProviderConfig)
+	if override <= 0 {
+		return
+	}
+	cfg.MaxOutputTokens = override
+	if cfg.ContextWindow > 0 && cfg.MaxOutputTokens > cfg.ContextWindow {
+		cfg.MaxOutputTokens = cfg.ContextWindow
+	}
+}
+
+// MaxOutputTokens returns the resolved output cap for one connection, or 0 when
+// the connection does not exist or is disabled. It reads the connection row
+// directly so callers that already hold a client can size their request without
+// resolving a second client.
+func (m *ConnectionManager) MaxOutputTokens(connectionID int) int {
+	var providerType, model string
+	var providerConfig sql.NullString
+	err := m.db.QueryRow(
+		`SELECT provider_type, model, provider_config FROM llm_connections WHERE id = ? AND is_enabled = true`,
+		connectionID,
+	).Scan(&providerType, &model, &providerConfig)
+	if err != nil {
+		return 0
+	}
+	return m.resolveMaxOutputTokens(ProviderType(providerType), model, providerConfig.String)
 }
 
 // ConnectionRuntimeConfig contains the decrypted runtime fields needed to
@@ -298,7 +348,7 @@ func (m *ConnectionManager) ConnectionRuntime(ctx context.Context, connectionID 
 	if providerConfig.Valid {
 		cfg.ProviderConfig = providerConfig.String
 	}
-	cfg.Protocol = ResolveGenerationProtocol(ProviderType(cfg.ProviderType), cfg.BaseURL, cfg.ProviderConfig)
+	cfg.Protocol = ResolveGenerationProtocolForModel(ProviderType(cfg.ProviderType), cfg.Model, cfg.BaseURL, cfg.ProviderConfig)
 	cfg.VisionMode = ProviderConfigVisionMode(cfg.ProviderConfig)
 	cfg.SupportsVision = EffectiveVision(cfg.VisionMode, m.resolveModelVision(ProviderType(cfg.ProviderType), cfg.Model))
 	resolvedContext, resolvedOutput := m.resolveModelLimits(ProviderType(cfg.ProviderType), cfg.Model)
@@ -317,6 +367,7 @@ func (m *ConnectionManager) ConnectionRuntime(ctx context.Context, connectionID 
 			)
 		}
 	}
+	applyProviderConfigMaxOutputTokens(cfg)
 	return cfg, nil
 }
 
@@ -325,13 +376,12 @@ func (m *ConnectionManager) ConnectionRuntime(ctx context.Context, connectionID 
 // carries neither a context length nor an output cap, and the local provider
 // has no static model list — so refusing to resolve such a connection would
 // take out binding validation, profile creation, and run start along with the
-// inference call. Erring low is deliberate in both directions: an oversized
-// max_tokens is a hard 400 on Anthropic and OpenAI while an undersized one only
-// truncates, and an oversized context window overflows the upstream prompt
-// while an undersized one merely packs less history.
+// inference call. The output default is deliberately generous: modern models
+// commonly support 64k+ output, and the resolved value is still clamped to the
+// model's advertised maximum and to its context window.
 const (
 	fallbackContextWindow   = 128_000
-	fallbackMaxOutputTokens = 4096
+	FallbackMaxOutputTokens = 65_536
 )
 
 // applyFallbackModelLimits fills limits the catalog left unresolved, reporting
@@ -345,7 +395,7 @@ func applyFallbackModelLimits(cfg *ConnectionRuntimeConfig) bool {
 		cfg.ContextWindow = fallbackContextWindow
 	}
 	if cfg.MaxOutputTokens <= 0 {
-		cfg.MaxOutputTokens = fallbackMaxOutputTokens
+		cfg.MaxOutputTokens = FallbackMaxOutputTokens
 		// A model may advertise a context window smaller than the output floor.
 		if cfg.ContextWindow < cfg.MaxOutputTokens {
 			cfg.MaxOutputTokens = cfg.ContextWindow
@@ -703,7 +753,9 @@ func (m *ConnectionManager) TestConnection(id int) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return client.Health(ctx)
+	// A connection test is its own conversation, not a continuation of any user
+	// session, so it gets a dedicated id for the provider's session header.
+	return client.Health(WithSessionID(ctx, NewSessionID("ws-connection-test")))
 }
 
 // PromptConnection runs a one-shot chat completion against an enabled
@@ -735,6 +787,10 @@ func (m *ConnectionManager) PromptConnection(ctx context.Context, connectionID i
 		slog.Int("prompt_chars", len(prompt)),
 	)
 	log.Info("llm test prompt: sending to provider")
+
+	// Isolate the probe from real conversations so provider-side routing and
+	// caching never attribute a test to a user's session.
+	ctx = WithSessionID(ctx, NewSessionID("ws-connection-test"))
 
 	start := time.Now()
 	resp, err := rc.client.Complete(ctx, CompletionRequest{

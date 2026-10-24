@@ -1,7 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconPlus, IconUserMinus, IconCircle } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconUserMinus from '@tabler/icons-svelte-runes/icons/user-minus';
+  import IconCircle from '@tabler/icons-svelte-runes/icons/circle';
+  import { teams } from '../api/teams.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
@@ -32,7 +34,7 @@
 
   async function loadResolved() {
     try {
-      resolvedMembers = await api.teams.getResolvedMembers(team.id);
+      resolvedMembers = await teams.getResolvedMembers(team.id);
     } catch (err) {
       console.warn('Failed to load resolved members', err);
     }
@@ -66,7 +68,7 @@
     }
     busy = true;
     try {
-      await api.teams.addMembers(team.id, [pickedUser.id], pickerRole);
+      await teams.addMembers(team.id, [pickedUser.id], pickerRole);
       successToast(t('teams.membersAdded'));
       closeAddModal();
       await onUpdated?.();
@@ -81,7 +83,7 @@
   async function changeRole(member, newRole) {
     if (!newRole || newRole === member.role) return;
     try {
-      await api.teams.updateMemberRole(team.id, member.user_id, newRole);
+      await teams.updateMemberRole(team.id, member.user_id, newRole);
       successToast(t('teams.roleUpdated'));
       await onUpdated?.();
     } catch (err) {
@@ -99,7 +101,7 @@
     });
     if (!confirmed) return;
     try {
-      await api.teams.removeMembers(team.id, [member.user_id]);
+      await teams.removeMembers(team.id, [member.user_id]);
       successToast(t('teams.memberRemoved'));
       await onUpdated?.();
       await loadResolved();

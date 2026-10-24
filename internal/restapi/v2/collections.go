@@ -33,20 +33,22 @@ func registerBoardConfigurationRoutes(builder *routeBuilder, collections collect
 }
 
 type collectionPatchRequest struct {
-	Name        Optional[string] `json:"name"`
-	Description Optional[string] `json:"description"`
-	QLQuery     Optional[string] `json:"ql_query"`
-	FilterState Optional[string] `json:"filter_state"`
-	WorkspaceID Optional[int]    `json:"workspace_id"`
-	CategoryID  Optional[int]    `json:"category_id"`
-	IsPublic    Optional[bool]   `json:"is_public"`
-	IsPrivate   Optional[bool]   `json:"is_private"`
-	PublicSlug  Optional[string] `json:"public_slug"`
+	Name                     Optional[string] `json:"name"`
+	Description              Optional[string] `json:"description"`
+	QLQuery                  Optional[string] `json:"ql_query"`
+	FilterState              Optional[string] `json:"filter_state"`
+	WorkspaceID              Optional[int]    `json:"workspace_id"`
+	CategoryID               Optional[int]    `json:"category_id"`
+	IsPublic                 Optional[bool]   `json:"is_public"`
+	IsPrivate                Optional[bool]   `json:"is_private"`
+	PublicSlug               Optional[string] `json:"public_slug"`
+	PublicMilestoneSwimlanes Optional[bool]   `json:"public_milestone_swimlanes"`
 }
 
 type collectionSharingRequest struct {
-	IsPublic   Optional[bool]   `json:"is_public"`
-	PublicSlug Optional[string] `json:"public_slug"`
+	IsPublic                 Optional[bool]   `json:"is_public"`
+	PublicSlug               Optional[string] `json:"public_slug"`
+	PublicMilestoneSwimlanes Optional[bool]   `json:"public_milestone_swimlanes"`
 }
 
 type collectionCategoryPatchRequest struct {
@@ -216,6 +218,8 @@ func updateCollection(collections collectionApplication) jsonOperation[collectio
 			IsPublicSet: input.IsPublic.Set, IsPublic: input.IsPublic.Value,
 			IsPrivateSet: input.IsPrivate.Set, IsPrivate: input.IsPrivate.Value,
 			PublicSlugSet: input.PublicSlug.Set, PublicSlug: optionalString(input.PublicSlug),
+			PublicMilestoneSwimlanesSet: input.PublicMilestoneSwimlanes.Set,
+			PublicMilestoneSwimlanes:    input.PublicMilestoneSwimlanes.Value,
 		})
 		if updated == nil {
 			return models.Collection{}, collectionError(err)
@@ -238,7 +242,9 @@ func updateCollectionSharing(collections collectionApplication) jsonOperation[co
 			return models.Collection{}, err
 		}
 		updated, err := collections.UpdateSharing(auditActor(r, user), id, services.CollectionSharingUpdate{
-			IsPublic: input.IsPublic.Value, PublicSlug: optionalString(input.PublicSlug),
+			IsPublic:                 input.IsPublic.Value,
+			PublicSlug:               optionalString(input.PublicSlug),
+			PublicMilestoneSwimlanes: optionalBool(input.PublicMilestoneSwimlanes),
 		})
 		if updated == nil {
 			return models.Collection{}, collectionError(err)
@@ -359,6 +365,14 @@ func optionalInt(value Optional[int]) *int {
 }
 
 func optionalString(value Optional[string]) *string {
+	if !value.Set || value.Null {
+		return nil
+	}
+	result := value.Value
+	return &result
+}
+
+func optionalBool(value Optional[bool]) *bool {
 	if !value.Set || value.Null {
 		return nil
 	}

@@ -1,6 +1,6 @@
 <script>
-  import { api } from '../api.js';
-  import { authStore } from '../stores';
+  import { personalLabels } from '../api/misc.js';
+  import { authStore } from '../stores/auth.svelte.js';
   import ScopedLabelCombobox from './ScopedLabelCombobox.svelte';
 
   let {
@@ -21,7 +21,7 @@
 
   function createLabel(name) {
     const createUserId = userId === undefined ? (authStore.currentUser?.id ?? null) : userId;
-    return api.personalLabels.create({ name, user_id: createUserId });
+    return personalLabels.create({ name, user_id: createUserId });
   }
 </script>
 
@@ -33,7 +33,7 @@
   {labels}
   {loading}
   {loadKey}
-  loadLabels={() => api.personalLabels.getAll(userId)}
+  loadLabels={() => personalLabels.getAll(userId)}
   {createLabel}
   {onOpen}
   {onClose}

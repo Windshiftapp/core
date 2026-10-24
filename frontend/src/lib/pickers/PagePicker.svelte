@@ -1,8 +1,8 @@
 <script>
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
-  import { api } from '../api.js';
-  import { FileText } from '@lucide/svelte';
+  import { pages as pagesApi } from '../api/pages.js';
+  import FileText from '@lucide/svelte/icons/file-text';
   import { onDestroy, untrack } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -31,7 +31,7 @@
     if (!workspaceId) return [];
     const q = (searchQuery || '').trim();
     if (q.length < 1) return [];
-    const result = await api.pages.searchPages(workspaceId, q, { limit: 20 });
+    const result = await pagesApi.searchPages(workspaceId, q, { limit: 20 });
     const items = result?.results ?? (Array.isArray(result) ? result : []);
     return items;
   });

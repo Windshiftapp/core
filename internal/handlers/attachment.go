@@ -971,7 +971,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	// Inline only allowlisted types; MIME may be remote-declared. Other files
 	// download with a restrictive CSP to prevent app-origin execution.
-	if isInlineSafeMimeType(attachment.MimeType) {
+	if fileserve.IsInlineSafeMimeType(attachment.MimeType) {
 		w.Header().Set("Content-Disposition", fileserve.ContentDisposition("inline", attachment.OriginalFilename))
 	} else {
 		w.Header().Set("Content-Disposition", fileserve.ContentDisposition("attachment", attachment.OriginalFilename))
@@ -1245,43 +1245,6 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 
 	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
 	return detectedType, nil
-}
-
-// inlineSafeMimeTypes is the allowlist of Content-Types that may be served with
-// an inline Content-Disposition. Every entry is a non-executable media type that
-// a browser renders without running embedded script. Anything outside this set —
-// including HTML/XHTML/SVG/MathML and any unknown type — is forced to download.
-var inlineSafeMimeTypes = map[string]struct{}{
-	"image/png":                {},
-	"image/jpeg":               {},
-	"image/gif":                {},
-	"image/webp":               {},
-	"image/bmp":                {},
-	"image/x-icon":             {},
-	"image/vnd.microsoft.icon": {},
-	"application/pdf":          {},
-	"text/plain":               {},
-	"audio/mpeg":               {},
-	"audio/ogg":                {},
-	"audio/wav":                {},
-	"audio/x-wav":              {},
-	"audio/webm":               {},
-	"video/mp4":                {},
-	"video/webm":               {},
-	"video/ogg":                {},
-}
-
-// isInlineSafeMimeType reports whether a stored Content-Type may be served
-// inline. The declared type (before any parameters such as "; charset=") is
-// matched case-insensitively against the allowlist; SVG is deliberately absent
-// because it can carry script.
-func isInlineSafeMimeType(mimeType string) bool {
-	base := strings.ToLower(strings.TrimSpace(mimeType))
-	if i := strings.IndexByte(base, ';'); i >= 0 {
-		base = strings.TrimSpace(base[:i])
-	}
-	_, ok := inlineSafeMimeTypes[base]
-	return ok
 }
 
 // isZipBasedMimeType returns true if the MIME type is a known ZIP-based container format.

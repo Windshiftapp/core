@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"slices"
 	"strconv"
 	"time"
 
@@ -264,12 +265,16 @@ func (c *Client) FetchMessages(sinceUID uint32, batchSize int) ([]*FetchedMessag
 	if err := c.setOperationDeadline(); err != nil {
 		return nil, fmt.Errorf("set search deadline: %w", err)
 	}
-	// Search for messages with UID > sinceUID
+	// Search for messages with UID > sinceUID. An explicit upper bound is used
+	// instead of the "*" sentinel: a server that resolves "*" to the mailbox's
+	// highest UID can normalise the resulting inverted range (e.g. "27:*" with a
+	// highest UID of 26) and return the already-processed message, which would
+	// leave the watermark stuck forever.
 	var searchCriteria *imap.SearchCriteria
 	if sinceUID > 0 {
 		searchCriteria = &imap.SearchCriteria{
 			UID: []imap.UIDSet{{
-				imap.UIDRange{Start: imap.UID(sinceUID + 1), Stop: 0}, // 0 means * (max)
+				imap.UIDRange{Start: imap.UID(sinceUID + 1), Stop: imap.UID(math.MaxUint32)},
 			}},
 		}
 	} else {
@@ -282,11 +287,16 @@ func (c *Client) FetchMessages(sinceUID uint32, batchSize int) ([]*FetchedMessag
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
-	if len(searchData.AllUIDs()) == 0 {
+	// Drop anything at or below the cursor even if a server returns it, so the
+	// watermark can always advance past messages that have been processed.
+	uids := searchData.AllUIDs()
+	if sinceUID > 0 {
+		uids = slices.DeleteFunc(uids, func(uid imap.UID) bool { return uint32(uid) <= sinceUID })
+	}
+	if len(uids) == 0 {
 		return nil, nil
 	}
 
-	uids := searchData.AllUIDs()
 	slog.Info("found messages to fetch", "count", len(uids), "since_uid", sinceUID)
 
 	// Limit batch size

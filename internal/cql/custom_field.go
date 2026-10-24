@@ -82,7 +82,7 @@ type CustomFieldMap map[string]CustomFieldInfo
 // generator continues to behave as today.
 func ClassifyCustomFieldKind(fieldType string) CustomFieldKind {
 	switch strings.ToLower(fieldType) {
-	case "multiselect":
+	case "multiselect", "multi_milestone":
 		return CFKindMultiselect
 	case "user", "asset", "portalcustomer", "customerorganisation":
 		return CFKindReference

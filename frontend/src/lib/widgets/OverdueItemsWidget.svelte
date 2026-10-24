@@ -1,6 +1,7 @@
 <script>
-  import { AlertCircle, RefreshCw } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { items as itemsApi } from '../api/items.js';
   import { dateOnlyKey, formatDate, formatDueDate, getDaysOverdue } from '../utils/dateFormatter.js';
   import { serverNow } from '../utils/serverClock.js';
   import WidgetState from './WidgetState.svelte';
@@ -38,7 +39,7 @@
       parts.push('due_date < now()');
       parts.push('status_completed = false');
       const vql = parts.join(' AND ');
-      const response = await api.items.getAll({
+      const response = await itemsApi.getAll({
         ql: vql,
         limit: 50 // fetch more than needed, filter client-side
       });

@@ -1,5 +1,7 @@
 <script>
-  import { IconAlertCircle as AlertCircle, IconInbox as Inbox, IconRefresh as RefreshCw } from '@tabler/icons-svelte-runes';
+  import AlertCircle from '@tabler/icons-svelte-runes/icons/alert-circle';
+  import Inbox from '@tabler/icons-svelte-runes/icons/inbox';
+  import RefreshCw from '@tabler/icons-svelte-runes/icons/refresh';
   import StateDisplay from './StateDisplay.svelte';
   import Button from './Button.svelte';
   import Spinner from './Spinner.svelte';

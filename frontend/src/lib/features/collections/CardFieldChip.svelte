@@ -1,5 +1,7 @@
 <script>
-  import { CalendarDays, Clock, CornerLeftUp } from '@lucide/svelte';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import Clock from '@lucide/svelte/icons/clock';
+  import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
   import Chip from '../../components/Chip.svelte';
   import { formatDate, formatDateOnly, formatDateShort, formatStatusAge } from '../../utils/dateFormatter.js';
   import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
@@ -202,6 +204,11 @@
     {:else if customFieldDef.field_type === 'multi_user' && customFieldUserNames.length > 0}
       <Chip appearance="metadata" title={customFieldDef.name}>
         {customFieldUserNames[0]}{#if customFieldUserNames.length > 1} +{customFieldUserNames.length - 1}{/if}
+      </Chip>
+    {:else if customFieldDef.field_type === 'multi_milestone'}
+      {@const milestoneCount = Array.isArray(customFieldValue) ? customFieldValue.length : 0}
+      <Chip appearance="metadata" title={customFieldDef.name}>
+        {milestoneCount} {t('pickers.milestones')}
       </Chip>
     {:else if customFieldDef.field_type === 'url' && String(customFieldValue).trim()}
       <Chip appearance="metadata" title={customFieldValue}>

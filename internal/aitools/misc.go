@@ -417,7 +417,7 @@ func init() {
 		Group:       CapabilityPlanningActivity,
 		Access:      AccessRead,
 		Risk:        RiskLow,
-		Description: "List available custom field definitions. Use this to discover what custom fields exist before filtering items with cf_<name> in the filter parameter of list_items.",
+		Description: "List available custom field definitions. Use this to discover what custom fields exist before filtering items with cf_<name> or the bare field name in the filter parameter of list_items.",
 		Scopes:      []string{auth.ScopeCustomFieldsRead},
 		Run: func(_ context.Context, env *Env, _ listCustomFieldsArgs) (any, error) {
 			fields, err := repository.NewCustomFieldRepository(env.DB).List()

@@ -3,6 +3,7 @@ package metrics
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -34,8 +35,9 @@ type Metrics struct {
 }
 
 // New creates an isolated registry and registers process, runtime, database,
-// and Windshift collectors.
-func New(db database.Database) *Metrics {
+// and Windshift collectors. When bearerToken is non-empty, the exposition
+// handler requires an "Authorization: Bearer <token>" header.
+func New(db database.Database, bearerToken string) *Metrics {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(
 		collectors.NewGoCollector(),
@@ -121,20 +123,40 @@ func New(db database.Database) *Metrics {
 		Timeout:           5 * time.Second,
 		EnableOpenMetrics: true,
 	})
+	if bearerToken != "" {
+		m.handler = requireBearerToken(bearerToken, m.handler)
+	}
 	return m
 }
 
-// Handler returns the public Prometheus exposition handler. Restrict access at
-// the reverse proxy or network boundary when metrics should not be public.
+// Handler returns the Prometheus exposition handler. It is public when no
+// token was configured, otherwise it requires "Authorization: Bearer <token>".
+// Restrict access at the reverse proxy or network boundary when metrics should
+// not be public.
 //
 // @Summary      Read Prometheus metrics
-// @Description  Returns Go runtime, process, database, HTTP, agent, webhook, and SCM metrics. Public; no authentication required. Restrict access at the reverse proxy or network boundary when metrics should not be publicly reachable.
+// @Description  Returns Go runtime, process, database, HTTP, agent, webhook, and SCM metrics. Public when WINDSHIFT_METRICS_TOKEN is unset; when set, requires an "Authorization: Bearer <token>" header. Restrict access at the reverse proxy or network boundary when metrics should not be publicly reachable.
 // @Tags         operations
 // @Produce      plain,application/openmetrics-text
 // @Success      200  {string}  string  "Prometheus or OpenMetrics text exposition"
+// @Failure      401  {string}  string  "Missing or invalid bearer token"
 // @Router       /metrics [get]
 func (m *Metrics) Handler() http.Handler {
 	return m.handler
+}
+
+// requireBearerToken gates next behind a static bearer token. The comparison is
+// constant-time so response timing does not leak the expected token.
+func requireBearerToken(token string, next http.Handler) http.Handler {
+	expected := []byte("Bearer " + token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), expected) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="metrics"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Instrument records HTTP metrics after the router has resolved the route

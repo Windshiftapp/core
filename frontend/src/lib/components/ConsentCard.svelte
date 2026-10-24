@@ -1,7 +1,7 @@
 <script>
 	// Shared CLI/OAuth consent shell for flow content, scopes, errors, and choices.
 
-	import { Check } from '@lucide/svelte';
+	import Check from '@lucide/svelte/icons/check';
 	import Button from './Button.svelte';
 
 	let {

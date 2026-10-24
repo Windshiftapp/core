@@ -16,10 +16,10 @@ const mocks = vi.hoisted(() => ({
   canEditOthersComments: vi.fn(),
 }));
 
-vi.mock('../../api.js', () => ({
-  api: { milestones: { getComments: mocks.getComments } },
+vi.mock('../../api/milestones.js', () => ({
+  milestones: { getComments: mocks.getComments },
 }));
-vi.mock('../../stores', () => ({
+vi.mock('../../stores/auth.svelte.js', () => ({
   authStore: { currentUser: { id: 1, first_name: 'Ada' } },
 }));
 vi.mock('../../stores/i18n.svelte.js', () => ({ t: (key) => key }));

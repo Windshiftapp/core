@@ -1,13 +1,20 @@
 <script>
   import { onMount } from 'svelte';
   import Badge from '../../components/Badge.svelte';
-  import { api } from '../../api.js';
-  import { Plus, Check, X, Trash2, ChevronDown, ChevronRight } from '@lucide/svelte';
+  import { workspaces } from '../../api/workspaces.js';
+  import { statusCategories as statusCategoriesApi } from '../../api/workflows.js';
+  import { items } from '../../api/items.js';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import WorkItemRow from './WorkItemRow.svelte';
   import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
-  import { authStore } from '../../stores';
+  import { authStore } from '../../stores/auth.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
@@ -156,7 +163,7 @@
 
   async function loadStatuses() {
     try {
-      statuses = await api.workspaces.getStatuses(workspaceId);
+      statuses = await workspaces.getStatuses(workspaceId);
     } catch (error) {
       console.error('Failed to load statuses:', error);
       statuses = [];
@@ -165,7 +172,7 @@
 
   async function loadStatusCategories() {
     try {
-      statusCategories = await api.statusCategories.getAll();
+      statusCategories = await statusCategoriesApi.getAll();
     } catch (error) {
       console.error('Failed to load status categories:', error);
       statusCategories = [];
@@ -179,7 +186,7 @@
         limit: 100
       };
       if (completedSince) filters.completed_since = completedSince;
-      const response = await api.items.getAll(filters);
+      const response = await items.getAll(filters);
       personalTodos = response?.data ?? [];
     } catch (error) {
       console.error('Failed to load personal todos:', error);
@@ -200,7 +207,7 @@
         limit: 100
       };
       if (completedSince) filters.completed_since = completedSince;
-      const response = await api.items.getAll(filters);
+      const response = await items.getAll(filters);
       let allAssigned = response?.data ?? [];
       assignedWork = allAssigned.filter(item => item.workspace_id !== parseInt(workspaceId));
     } catch (error) {
@@ -232,7 +239,7 @@
         workspace_id: parseInt(workspaceId)
       };
 
-      await api.items.create(todoData);
+      await items.create(todoData);
       await loadPersonalTodos();
       cancelAddingTodo();
     } catch (error) {
@@ -243,7 +250,7 @@
 
   async function changeItemStatus(item, newStatusId, isPersonal = true) {
     try {
-      await api.items.transition(item.id, newStatusId);
+      await items.transition(item.id, newStatusId);
 
       if (isPersonal) {
         await loadPersonalTodos();

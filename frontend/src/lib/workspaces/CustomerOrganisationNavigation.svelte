@@ -1,5 +1,7 @@
 <script>
-  import { Search, Users, Plus } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import Users from '@lucide/svelte/icons/users';
+  import Plus from '@lucide/svelte/icons/plus';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Avatar from '../components/Avatar.svelte';

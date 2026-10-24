@@ -1,8 +1,14 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
   import Spinner from '../../components/Spinner.svelte';
-  import { api } from '../../api.js';
-  import { ExternalLink, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight, Link2 } from '@lucide/svelte';
+  import { itemIntegrationLinks, userIntegrations } from '../../api/integrations.js';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import Plus from '@lucide/svelte/icons/plus';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Link2 from '@lucide/svelte/icons/link-2';
   import Button from '../../components/Button.svelte';
   import Text from '../../components/Text.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -36,13 +42,13 @@
 
   async function checkStatus(signal) {
     try {
-      const available = await api.userIntegrations.getAvailableProviders({ signal }) || [];
+      const available = await userIntegrations.getAvailableProviders({ signal }) || [];
       const linkableProviders = available.filter((provider) =>
         LINKABLE_PROVIDER_TYPES.has(provider.provider_type?.toLowerCase())
       );
       hasProviders = linkableProviders.length > 0;
       if (hasProviders) {
-        const connections = await api.userIntegrations.getConnections({ signal }) || [];
+        const connections = await userIntegrations.getConnections({ signal }) || [];
         const connectedProviderIds = new Set(
           connections.map((connection) => connection.integration_provider_id)
         );
@@ -64,7 +70,7 @@
     error = null;
 
     try {
-      links = await api.itemIntegrationLinks.get(itemId, signal ? { signal } : undefined) || [];
+      links = await itemIntegrationLinks.get(itemId, signal ? { signal } : undefined) || [];
     } catch (err) {
       if (signal?.aborted || err?.name === 'AbortError' || err?.status === 404) return;
       console.error('Failed to load integration links:', err);
@@ -78,7 +84,7 @@
   async function refreshLink(linkId) {
     refreshingId = linkId;
     try {
-      const updated = await api.itemIntegrationLinks.refresh(linkId);
+      const updated = await itemIntegrationLinks.refresh(linkId);
       links = links.map(l => l.id === linkId ? updated : l);
       successToast(t('integrations.refreshed'));
     } catch (err) {
@@ -100,7 +106,7 @@
     if (!confirmed) return;
 
     try {
-      await api.itemIntegrationLinks.delete(linkId);
+      await itemIntegrationLinks.delete(linkId);
       links = links.filter(l => l.id !== linkId);
       successToast(t('integrations.removed'));
     } catch (err) {
@@ -143,7 +149,7 @@
     <div class="flex items-center gap-1">
       {#if hasConnection}
         <button
-          class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+          class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
           class:invisible={!expanded}
           onclick={e => { e.stopPropagation(); onaddlink?.(); }}
           title={t('integrations.linkPage')}
@@ -217,7 +223,7 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
               <button
                 class="p-1 rounded hover:bg-[var(--ds-background-neutral-hovered)]"
                 onclick={() => refreshLink(link.id)}

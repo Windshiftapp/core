@@ -1,7 +1,9 @@
 <script>
   import Tooltip from '../../../lib/components/Tooltip.svelte'
   import Button from '../../../lib/components/Button.svelte'
-  import { Info, HelpCircle, Settings } from '@lucide/svelte'
+  import Info from '@lucide/svelte/icons/info';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import Settings from '@lucide/svelte/icons/settings';
 </script>
 
 <div class="p-8 max-w-6xl">

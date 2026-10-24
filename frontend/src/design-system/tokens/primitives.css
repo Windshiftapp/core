@@ -189,6 +189,21 @@
   --text-3xl: 1.875rem; /* 30px */
   --text-4xl: 2.25rem; /* 36px */
 
+  /* Line-height companions for the sizes above. Must live unlayered next to
+     the sizes: lazy Tailwind chunks (e.g. the milkdown editor bundle) re-emit
+     layered @layer theme defaults, and an unlayered declaration is the only
+     thing that beats them regardless of load order. Without these, text-sm
+     falls back to Tailwind's 1.4286 ratio (18.57px on 13px) once such a chunk
+     loads, and rows built from mixed placeholders/values shift by ~1.5px. */
+  --text-xs--line-height: 1rem; /* 16px */
+  --text-sm--line-height: 1.25rem; /* 20px */
+  --text-base--line-height: 1.5rem; /* 24px */
+  --text-lg--line-height: 1.75rem; /* 28px */
+  --text-xl--line-height: 1.75rem; /* 28px */
+  --text-2xl--line-height: 2rem; /* 32px */
+  --text-3xl--line-height: 2.25rem; /* 36px */
+  --text-4xl--line-height: 2.5rem; /* 40px */
+
   /* Line Heights */
   --leading-none: 1;
   --leading-tight: 1.25;

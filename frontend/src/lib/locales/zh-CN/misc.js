@@ -748,6 +748,7 @@ export default {
     parent: '父事项',
     fillRequiredFields: '请填写必填字段：',
     selectWorkspaceFirst: '请先选择工作区',
+    createdPartialError: '条目已创建，但完成失败：{error}。再次点击“创建”重试。',
     create: '创建',
   },
 

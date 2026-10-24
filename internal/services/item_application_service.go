@@ -23,6 +23,7 @@ import (
 
 var (
 	ErrItemForbidden             = errors.New("item access forbidden")
+	ErrItemWatcherForbidden      = errors.New("managing other watchers requires edit permission")
 	ErrItemConflict              = errors.New("item mutation conflict")
 	ErrItemTypeMigrationRequired = errors.New("item type migration requires a target status")
 )
@@ -135,8 +136,9 @@ func (s *ItemApplicationService) WithMutationEffects(mentions *MentionService) *
 }
 
 type ItemWatchStatus struct {
-	ItemID   int  `json:"item_id"`
-	Watching bool `json:"watching"`
+	ItemID       int  `json:"item_id"`
+	Watching     bool `json:"watching"`
+	WatcherCount int  `json:"watcher_count"`
 }
 
 type ItemDeleteInfo struct {
@@ -662,6 +664,15 @@ func (s *ItemApplicationService) Batch(ctx context.Context, userID int, ids []in
 			}
 			permissions[item.WorkspaceID] = allowed
 		}
+		if !allowed {
+			// The single-item read also grants view to an approver with an active
+			// pool membership on the item. Apply the same fallback here so batch
+			// hydration does not drop rows the single read returns.
+			allowed, err = s.canViewViaApproval(ctx, userID, item.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if allowed {
 			items = append(items, *item)
 		}
@@ -739,7 +750,14 @@ func (s *ItemApplicationService) DeleteInfo(userID, itemID int) (ItemDeleteInfo,
 	if err := s.require(userID, item.WorkspaceID, models.PermissionItemEdit); err != nil {
 		return ItemDeleteInfo{}, err
 	}
-	descendants, err := s.items.GetDescendantIDs(itemID)
+	// Cross-workspace children exist by design, so the descendant count must be
+	// scoped to workspaces the caller can view. The item's own workspace is
+	// always allowed: the caller was just authorized on the item there.
+	allowedWorkspaceIDs, err := s.allowedWorkspaceIDs(userID, item.WorkspaceID)
+	if err != nil {
+		return ItemDeleteInfo{}, err
+	}
+	descendants, err := s.items.GetDescendantIDsInWorkspaces(itemID, allowedWorkspaceIDs)
 	if err != nil {
 		return ItemDeleteInfo{}, err
 	}
@@ -793,6 +811,17 @@ func (s *ItemApplicationService) ReparentChildren(ctx context.Context, actor Aud
 	children, err := s.items.GetChildren(itemID)
 	if err != nil || len(children) == 0 {
 		return ItemMutationCount{Count: len(children)}, err
+	}
+	// Cross-workspace children exist by design. Reparenting a child changes its
+	// hierarchy, so require item.edit in every child's workspace and refuse the
+	// whole operation otherwise, mirroring cascade deletion.
+	for _, child := range children {
+		if child.WorkspaceID == item.WorkspaceID {
+			continue
+		}
+		if err := s.require(actor.UserID, child.WorkspaceID, models.PermissionItemEdit); err != nil {
+			return ItemMutationCount{}, err
+		}
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -934,6 +963,21 @@ func (s *ItemApplicationService) UpdateRank(ctx context.Context, actor AuditActo
 }
 
 func (s *ItemApplicationService) Transition(ctx context.Context, actor AuditActor, itemID, statusID int) (*ItemTransitionResult, error) {
+	result, err := s.transitionItem(ctx, actor, itemID, statusID)
+	if err != nil {
+		return nil, err
+	}
+	items := []models.Item{*result.Item}
+	if err := s.enrich(ctx, actor.UserID, items); err != nil {
+		return nil, err
+	}
+	result.Item = &items[0]
+	return result, nil
+}
+
+// transitionItem runs one workflow transition without enriching the returned
+// item, so bulk callers can reuse it without paying for N detail loads.
+func (s *ItemApplicationService) transitionItem(ctx context.Context, actor AuditActor, itemID, statusID int) (*ItemTransitionResult, error) {
 	item, err := s.items.FindByID(itemID)
 	if err != nil {
 		return nil, err
@@ -954,13 +998,141 @@ func (s *ItemApplicationService) Transition(ctx context.Context, actor AuditActo
 		s.events.EmitStatusChanged(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, actor.Username)
 	}
 	s.syncStatus(ctx, result.Item.ID, result.NewStatusID, result.NoOp)
-	items := []models.Item{*result.Item}
-	if err := s.enrich(ctx, actor.UserID, items); err != nil {
-		return nil, err
-	}
 	return &ItemTransitionResult{
-		Item: &items[0], OldStatusID: result.OldStatusID, NewStatusID: result.NewStatusID, NoOp: result.NoOp,
+		Item: result.Item, OldStatusID: result.OldStatusID, NewStatusID: result.NewStatusID, NoOp: result.NoOp,
 	}, nil
+}
+
+// ItemBulkTransitionFailure records one selected item a bulk transition could
+// not move. Rejections and permission denials are reported per item so the
+// rest of the batch can proceed; unexpected errors abort the whole request.
+type ItemBulkTransitionFailure struct {
+	ItemID  int    `json:"item_id"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type ItemBulkTransitionResult struct {
+	RequestedCount    int                         `json:"requested_count"`
+	TransitionedCount int                         `json:"transitioned_count"`
+	UnchangedCount    int                         `json:"unchanged_count"`
+	FailedCount       int                         `json:"failed_count"`
+	Failures          []ItemBulkTransitionFailure `json:"failures"`
+}
+
+// BulkTransition applies one target status to every requested item in a single
+// server-side request, so the client never fans out one transition call per
+// item. Workflow validity, conditions, and approvals are enforced per item,
+// matching the single-item endpoint. The operation is best-effort: items that
+// cannot transition are returned in Failures while the rest commit.
+func (s *ItemApplicationService) BulkTransition(ctx context.Context, actor AuditActor, itemIDs []int, toStatusID int) (ItemBulkTransitionResult, error) {
+	ids := uniquePositiveSortedIDs(itemIDs)
+	if len(ids) == 0 {
+		return ItemBulkTransitionResult{}, ErrBulkItemNotFound
+	}
+	if len(ids) > MaxBulkItemUpdates {
+		return ItemBulkTransitionResult{}, ErrBulkItemLimit
+	}
+	if toStatusID <= 0 {
+		return ItemBulkTransitionResult{}, &validation.ValidationError{Field: "to_status_id", Message: "to_status_id is required"}
+	}
+	result := ItemBulkTransitionResult{RequestedCount: len(ids), Failures: []ItemBulkTransitionFailure{}}
+	for _, id := range ids {
+		transition, err := s.transitionItem(ctx, actor, id, toStatusID)
+		if err != nil {
+			failure, expected := bulkTransitionFailure(id, err)
+			if !expected {
+				return ItemBulkTransitionResult{}, err
+			}
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		if transition.NoOp {
+			result.UnchangedCount++
+		} else {
+			result.TransitionedCount++
+		}
+	}
+	result.FailedCount = len(result.Failures)
+	emitServiceAudit(s.db, actor, logger.ActionItemBulkTransition, logger.ResourceItem, nil, "", map[string]any{
+		"requested":    result.RequestedCount,
+		"transitioned": result.TransitionedCount,
+		"unchanged":    result.UnchangedCount,
+		"failed":       result.FailedCount,
+		"to_status_id": toStatusID,
+	})
+	return result, nil
+}
+
+func bulkTransitionFailure(itemID int, err error) (ItemBulkTransitionFailure, bool) {
+	var rejection *TransitionRejection
+	var validationErr *validation.ValidationError
+	switch {
+	case errors.As(err, &rejection):
+		return ItemBulkTransitionFailure{ItemID: itemID, Code: rejection.Code, Message: rejection.Message}, true
+	case errors.As(err, &validationErr):
+		return ItemBulkTransitionFailure{ItemID: itemID, Code: "validation_failed", Message: validationErr.Error()}, true
+	case errors.Is(err, ErrItemForbidden):
+		return ItemBulkTransitionFailure{ItemID: itemID, Code: "forbidden", Message: "item access forbidden"}, true
+	case errors.Is(err, repository.ErrNotFound):
+		return ItemBulkTransitionFailure{ItemID: itemID, Code: "not_found", Message: "item not found"}, true
+	default:
+		return ItemBulkTransitionFailure{}, false
+	}
+}
+
+// ItemBulkDeleteFailure records one selected item a bulk delete could not
+// remove.
+type ItemBulkDeleteFailure struct {
+	ItemID  int    `json:"item_id"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type ItemBulkDeleteResult struct {
+	RequestedCount int                     `json:"requested_count"`
+	DeletedCount   int                     `json:"deleted_count"`
+	FailedCount    int                     `json:"failed_count"`
+	Failures       []ItemBulkDeleteFailure `json:"failures"`
+}
+
+// BulkDelete deletes every requested item in one server-side request instead
+// of one DELETE per item from the client. Each deletion keeps the single-item
+// history, side effects, and audit record; items that cannot be deleted are
+// reported in Failures while the rest commit.
+func (s *ItemApplicationService) BulkDelete(actor AuditActor, itemIDs []int) (ItemBulkDeleteResult, error) {
+	ids := uniquePositiveSortedIDs(itemIDs)
+	if len(ids) == 0 {
+		return ItemBulkDeleteResult{}, ErrBulkItemNotFound
+	}
+	if len(ids) > MaxBulkItemUpdates {
+		return ItemBulkDeleteResult{}, ErrBulkItemLimit
+	}
+	result := ItemBulkDeleteResult{RequestedCount: len(ids), Failures: []ItemBulkDeleteFailure{}}
+	for _, id := range ids {
+		if err := s.Delete(actor, id); err != nil {
+			failure, expected := bulkDeleteFailure(id, err)
+			if !expected {
+				return ItemBulkDeleteResult{}, err
+			}
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		result.DeletedCount++
+	}
+	result.FailedCount = len(result.Failures)
+	return result, nil
+}
+
+func bulkDeleteFailure(itemID int, err error) (ItemBulkDeleteFailure, bool) {
+	switch {
+	case errors.Is(err, ErrItemDeletionForbidden):
+		return ItemBulkDeleteFailure{ItemID: itemID, Code: "forbidden", Message: "item deletion forbidden"}, true
+	case errors.Is(err, repository.ErrNotFound):
+		return ItemBulkDeleteFailure{ItemID: itemID, Code: "not_found", Message: "item not found"}, true
+	default:
+		return ItemBulkDeleteFailure{}, false
+	}
 }
 
 func (s *ItemApplicationService) AvailableTransitions(ctx context.Context, userID, itemID int) (ItemTransitionSummary, error) {
@@ -1167,11 +1339,60 @@ func (s *ItemApplicationService) Children(ctx context.Context, userID, itemID in
 	return items, nil
 }
 
+// filterViewableByWorkspace drops items whose workspace the caller cannot view.
+// Workspaces in alwaysAllowed are kept without a permission lookup: the caller
+// was already authorized on the starting item there, possibly through an
+// approval pool rather than membership. Decisions are cached per workspace.
+func (s *ItemApplicationService) filterViewableByWorkspace(userID int, items []models.Item, alwaysAllowed ...int) ([]models.Item, error) {
+	if len(items) == 0 {
+		return items, nil
+	}
+	allowed := make(map[int]bool, len(alwaysAllowed))
+	for _, id := range alwaysAllowed {
+		allowed[id] = true
+	}
+	permissions := make(map[int]bool)
+	out := make([]models.Item, 0, len(items))
+	for _, item := range items {
+		if allowed[item.WorkspaceID] {
+			out = append(out, item)
+			continue
+		}
+		viewable, ok := permissions[item.WorkspaceID]
+		if !ok {
+			if s.perm == nil {
+				viewable = false
+			} else {
+				var err error
+				viewable, err = s.perm.HasWorkspacePermission(userID, item.WorkspaceID, models.PermissionItemView)
+				if err != nil {
+					return nil, err
+				}
+			}
+			permissions[item.WorkspaceID] = viewable
+		}
+		if viewable {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
 func (s *ItemApplicationService) Ancestors(ctx context.Context, userID, itemID int) ([]models.Item, error) {
 	if err := s.requireView(ctx, userID, itemID); err != nil {
 		return nil, err
 	}
 	items, err := s.hierarchy.GetAncestorsContext(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	// Cross-workspace ancestors exist by design; drop the ones the caller
+	// cannot view instead of disclosing their content through a visible item.
+	workspaceID, err := s.items.GetWorkspaceIDCtx(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	items, err = s.filterViewableByWorkspace(userID, items, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1224,6 +1445,15 @@ func (s *ItemApplicationService) BatchAncestors(ctx context.Context, userID int,
 	if err != nil {
 		return nil, err
 	}
+	// Ancestor chains can cross into workspaces the caller cannot view; drop
+	// those entries before enrichment so their content never leaves the service.
+	for id, chain := range chains {
+		filtered, err := s.filterViewableByWorkspace(userID, chain)
+		if err != nil {
+			return nil, err
+		}
+		chains[id] = filtered
+	}
 	// Enrich every distinct ancestor once, then index by id for regrouping.
 	seen := make(map[int]struct{})
 	flat := make([]models.Item, 0)
@@ -1264,6 +1494,16 @@ func (s *ItemApplicationService) Descendants(ctx context.Context, userID, itemID
 	if err != nil {
 		return nil, err
 	}
+	// Cross-workspace descendants exist by design; drop the ones the caller
+	// cannot view instead of disclosing their content through a visible item.
+	workspaceID, err := s.items.GetWorkspaceIDCtx(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	items, err = s.filterViewableByWorkspace(userID, items, workspaceID)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.enrich(ctx, userID, items); err != nil {
 		return nil, err
 	}
@@ -1274,7 +1514,31 @@ func (s *ItemApplicationService) TimeRollup(ctx context.Context, userID, itemID,
 	if err := s.requireView(ctx, userID, itemID); err != nil {
 		return nil, err
 	}
-	return s.items.GetTimeRollup(itemID, maxDepth, 0)
+	workspaceID, err := s.items.GetWorkspaceIDCtx(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	allowedWorkspaceIDs, err := s.allowedWorkspaceIDs(userID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return s.items.GetTimeRollup(itemID, maxDepth, 0, allowedWorkspaceIDs)
+}
+
+// allowedWorkspaceIDs returns the caller's accessible workspaces plus
+// alwaysAllowed. The alwaysAllowed entries skip the permission lookup because
+// the caller was already authorized on an item there, possibly through an
+// approval pool rather than membership.
+func (s *ItemApplicationService) allowedWorkspaceIDs(userID int, alwaysAllowed ...int) ([]int, error) {
+	ids := append([]int(nil), alwaysAllowed...)
+	if s.perm == nil {
+		return ids, nil
+	}
+	accessible, err := s.perm.AccessibleWorkspaceIDs(userID)
+	if err != nil {
+		return nil, err
+	}
+	return append(ids, accessible...), nil
 }
 
 func (s *ItemApplicationService) StatusDurations(ctx context.Context, userID, itemID int) (*models.ItemStatusDurations, error) {
@@ -1313,10 +1577,8 @@ func (s *ItemApplicationService) Watch(ctx context.Context, userID, itemID int, 
 	if err := s.items.Watch(userID, itemID, reason); err != nil {
 		return ItemWatchStatus{}, err
 	}
-	if s.activity != nil {
-		_ = s.activity.InvalidateUserCache(userID)
-	}
-	return ItemWatchStatus{ItemID: itemID, Watching: true}, nil
+	s.invalidateWatchCache(userID)
+	return s.watchStatus(userID, itemID)
 }
 
 func (s *ItemApplicationService) Unwatch(ctx context.Context, userID, itemID int) (ItemWatchStatus, error) {
@@ -1326,18 +1588,119 @@ func (s *ItemApplicationService) Unwatch(ctx context.Context, userID, itemID int
 	if err := s.items.Unwatch(userID, itemID); err != nil {
 		return ItemWatchStatus{}, err
 	}
-	if s.activity != nil {
-		_ = s.activity.InvalidateUserCache(userID)
-	}
-	return ItemWatchStatus{ItemID: itemID, Watching: false}, nil
+	s.invalidateWatchCache(userID)
+	return s.watchStatus(userID, itemID)
 }
 
 func (s *ItemApplicationService) WatchStatus(ctx context.Context, userID, itemID int) (ItemWatchStatus, error) {
 	if err := s.requireView(ctx, userID, itemID); err != nil {
 		return ItemWatchStatus{}, err
 	}
+	return s.watchStatus(userID, itemID)
+}
+
+// Watchers lists every user watching the item. Anyone who can view the item
+// may see who else is watching it.
+func (s *ItemApplicationService) Watchers(ctx context.Context, userID, itemID int) ([]models.ItemWatcher, error) {
+	if err := s.requireView(ctx, userID, itemID); err != nil {
+		return nil, err
+	}
+	return s.items.ListWatchers(itemID)
+}
+
+// AddWatcher subscribes targetUserID to the item on the actor's behalf.
+// Adding yourself only needs view access; adding someone else needs edit
+// access, and the target must be an active user who can view the item.
+func (s *ItemApplicationService) AddWatcher(ctx context.Context, actorID, itemID, targetUserID int) ([]models.ItemWatcher, error) {
+	if targetUserID == actorID {
+		if _, err := s.Watch(ctx, actorID, itemID, ""); err != nil {
+			return nil, err
+		}
+		return s.items.ListWatchers(itemID)
+	}
+	workspaceID, err := s.requireManageWatchers(ctx, actorID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	active, err := s.items.IsActiveUser(targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	canView := false
+	if active {
+		if canView, err = s.canView(ctx, targetUserID, itemID, workspaceID); err != nil {
+			return nil, err
+		}
+	}
+	if !canView {
+		return nil, &validation.ValidationError{Field: "user_id", Message: "user cannot view this item"}
+	}
+	reason := fmt.Sprintf("Added as watcher by user %d", actorID)
+	if err := s.items.Watch(targetUserID, itemID, reason); err != nil {
+		return nil, err
+	}
+	s.invalidateWatchCache(targetUserID)
+	return s.items.ListWatchers(itemID)
+}
+
+// RemoveWatcher unsubscribes targetUserID from the item. Removing yourself
+// only needs view access; removing someone else needs edit access.
+func (s *ItemApplicationService) RemoveWatcher(ctx context.Context, actorID, itemID, targetUserID int) ([]models.ItemWatcher, error) {
+	if targetUserID == actorID {
+		if _, err := s.Unwatch(ctx, actorID, itemID); err != nil {
+			return nil, err
+		}
+		return s.items.ListWatchers(itemID)
+	}
+	if _, err := s.requireManageWatchers(ctx, actorID, itemID); err != nil {
+		return nil, err
+	}
+	if err := s.items.Unwatch(targetUserID, itemID); err != nil {
+		return nil, err
+	}
+	s.invalidateWatchCache(targetUserID)
+	return s.items.ListWatchers(itemID)
+}
+
+// requireManageWatchers hides the item from users who cannot view it and
+// returns ErrItemWatcherForbidden for viewers without edit access.
+func (s *ItemApplicationService) requireManageWatchers(ctx context.Context, actorID, itemID int) (int, error) {
+	workspaceID, err := s.items.GetWorkspaceIDCtx(ctx, itemID)
+	if err != nil {
+		return 0, err
+	}
+	canView, err := s.canView(ctx, actorID, itemID, workspaceID)
+	if err != nil {
+		return 0, err
+	}
+	if !canView {
+		return 0, repository.ErrNotFound
+	}
+	if err := s.require(actorID, workspaceID, models.PermissionItemEdit); err != nil {
+		if errors.Is(err, ErrItemForbidden) {
+			return 0, ErrItemWatcherForbidden
+		}
+		return 0, err
+	}
+	return workspaceID, nil
+}
+
+func (s *ItemApplicationService) watchStatus(userID, itemID int) (ItemWatchStatus, error) {
 	watching, err := s.items.IsWatching(userID, itemID)
-	return ItemWatchStatus{ItemID: itemID, Watching: watching}, err
+	if err != nil {
+		return ItemWatchStatus{}, err
+	}
+	count, err := s.items.CountWatchers(itemID)
+	if err != nil {
+		return ItemWatchStatus{}, err
+	}
+	return ItemWatchStatus{ItemID: itemID, Watching: watching, WatcherCount: count}, nil
+}
+
+func (s *ItemApplicationService) invalidateWatchCache(userID int) {
+	if s.activity != nil {
+		_ = s.activity.InvalidateUserCache(userID)
+	}
 }
 
 func (s *ItemApplicationService) PersonalTasks(ctx context.Context, userID, itemID int) ([]models.Item, error) {
@@ -1394,7 +1757,27 @@ func (s *ItemApplicationService) requireWorkspaceMove(userID, itemID, destinatio
 	if err := s.require(userID, sourceWorkspaceID, models.PermissionItemEdit); err != nil {
 		return err
 	}
-	return s.require(userID, destinationWorkspaceID, models.PermissionItemCreate)
+	if err := s.require(userID, destinationWorkspaceID, models.PermissionItemCreate); err != nil {
+		return err
+	}
+	// Moving an item detaches its direct children, including children in other
+	// workspaces. Require item.edit in every child's workspace and refuse the
+	// whole operation otherwise, mirroring ReparentChildren.
+	children, err := s.items.GetChildren(itemID)
+	if err != nil {
+		return err
+	}
+	checked := map[int]bool{sourceWorkspaceID: true}
+	for _, child := range children {
+		if checked[child.WorkspaceID] {
+			continue
+		}
+		if err := s.require(userID, child.WorkspaceID, models.PermissionItemEdit); err != nil {
+			return err
+		}
+		checked[child.WorkspaceID] = true
+	}
+	return nil
 }
 
 func (s *ItemApplicationService) invalidateHierarchy(itemID int) {
@@ -1520,6 +1903,12 @@ func (s *ItemApplicationService) canView(ctx context.Context, userID, itemID, wo
 	} else if !errors.Is(err, ErrItemForbidden) {
 		return false, err
 	}
+	return s.canViewViaApproval(ctx, userID, itemID)
+}
+
+// canViewViaApproval grants view to a user with an active pool membership on
+// the item, the approver-derived fallback the single-item read uses.
+func (s *ItemApplicationService) canViewViaApproval(ctx context.Context, userID, itemID int) (bool, error) {
 	if s.approvals == nil {
 		return false, nil
 	}
@@ -1594,7 +1983,7 @@ func (s *ItemApplicationService) resolveHistoryValue(field, value string, allowe
 		return s.resolver.ResolvePriorityName(id)
 	case "status_id":
 		return s.resolver.ResolveStatusName(id)
-	case "parent_id":
+	case "parent_id", "merged_into_item_id", "merged_item_id", "split_item_id":
 		return s.resolver.ResolveItemKey(id)
 	case "project_id":
 		if allowedProjects != nil {

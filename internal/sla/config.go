@@ -252,12 +252,6 @@ func (e *Engine) compileMetric(ctx context.Context, config *compiledConfig, metr
 		}
 
 		for _, target := range goal.Targets {
-			// A priority-scoped target can change on a priority-only edit, so
-			// the metric must react to priority_id even when no condition or
-			// goal query references it.
-			if target.PriorityID != nil {
-				compiled.inputFields["priority_id"] = struct{}{}
-			}
 			if _, ok := config.calendars[target.CalendarID]; ok {
 				continue
 			}

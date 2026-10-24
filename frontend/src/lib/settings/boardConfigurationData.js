@@ -1,18 +1,14 @@
+import { collections } from '../api/collections.js';
 /**
  * Load the Board Configuration editor's route-specific data with one API
  * request while reusing the shell-owned workspace/global reference snapshot.
  */
-export async function loadBoardConfigurationPageData(
-  apiClient,
-  referenceStore,
-  workspaceId,
-  collectionId
-) {
+export async function loadBoardConfigurationPageData(referenceStore, workspaceId, collectionId) {
   const referenceRequest = workspaceId
     ? referenceStore.initialize(workspaceId)
     : referenceStore.initializeGlobal();
   const [bootstrap] = await Promise.all([
-    apiClient.collections.getBoardConfigurationBootstrap(collectionId, workspaceId),
+    collections.getBoardConfigurationBootstrap(collectionId, workspaceId),
     referenceRequest,
   ]);
 

@@ -52,6 +52,10 @@ services:
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
       # Optional VAPID "sub" contact (mailto: or https:). Defaults to BASE_URL.
       - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+      # Optional bearer token for the Prometheus /metrics endpoint. When set,
+      # scrapers must send "Authorization: Bearer <token>"; when unset, the
+      # endpoint is public and should be restricted at the reverse proxy.
+      - WINDSHIFT_METRICS_TOKEN=${WINDSHIFT_METRICS_TOKEN:-}
       # --- PostgreSQL (uncomment when using postgres service) ---
       # - DB_TYPE=postgres
       # - POSTGRES_HOST=postgres

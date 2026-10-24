@@ -1,4 +1,4 @@
-import { aiStore } from '../../stores';
+import { aiStore } from '../../stores/aiStore.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 

@@ -1,5 +1,5 @@
 <script>
-  import { PlusSquare } from '@lucide/svelte';
+  import PlusSquare from '@lucide/svelte/icons/plus-square';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

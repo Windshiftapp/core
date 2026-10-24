@@ -44,6 +44,8 @@ type Item struct {
 	// Portal submission tracking fields (immutable once set)
 	ChannelID         *int                    `json:"channel_id,omitempty"`      // Portal/channel this request was submitted through
 	RequestTypeID     *int                    `json:"request_type_id,omitempty"` // Request type used for submission
+	IntakeID          *int                    `json:"intake_id,omitempty"`       // Email intake that created this item
+	PortalOrgShared   bool                    `json:"portal_org_shared"`         // Creator opted to share the request with their organisation
 	CustomFieldValues map[string]any          `json:"custom_field_values,omitempty"`
 	VirtualFieldData  map[string]any          `json:"virtual_field_data,omitempty"`
 	CalendarData      []CalendarScheduleEntry `json:"calendar_data,omitempty"`
@@ -72,6 +74,8 @@ type Item struct {
 	WorkspaceKey              string `json:"workspace_key,omitempty"`
 	ItemTypeName              string `json:"item_type_name,omitempty"`
 	ItemTypeBuiltinKey        string `json:"item_type_builtin_key,omitempty"`
+	ItemTypeIcon              string `json:"item_type_icon,omitempty"`
+	ItemTypeColor             string `json:"item_type_color,omitempty"`
 	PriorityName              string `json:"priority_name,omitempty"`
 	PriorityBuiltinKey        string `json:"priority_builtin_key,omitempty"`
 	PriorityIcon              string `json:"priority_icon,omitempty"`
@@ -241,6 +245,18 @@ type Comment struct {
 	IsAgent bool   `json:"is_agent,omitempty"`
 	// AgentOwnerName is permission-filtered by the comment-list handler.
 	AgentOwnerName string `json:"agent_owner_name,omitempty"`
+	// Reactions groups the emoji reactions on a human comment in the fixed
+	// order of services.CommentReactionKeys. Approval rows never carry any.
+	Reactions []CommentReaction `json:"reactions,omitempty" db:"-"`
+}
+
+// CommentReaction is one reaction key on a comment with the users who chose
+// it, oldest first.
+type CommentReaction struct {
+	Reaction  string   `json:"reaction"`
+	Count     int      `json:"count"`
+	UserIDs   []int    `json:"user_ids"`
+	UserNames []string `json:"user_names"`
 }
 
 // Mention represents an @mention in a comment or item description
@@ -396,6 +412,10 @@ type LinkableItem struct {
 	ItemTypeName        string `json:"item_type_name,omitempty"`
 	ItemTypeIcon        string `json:"item_type_icon,omitempty"`
 	ItemTypeColor       string `json:"item_type_color,omitempty"`
+	// CreatorPortalCustomerID is the requester for customer-facing items; nil
+	// for internal items. Merge uses it to warn before folding tickets with
+	// different requesters.
+	CreatorPortalCustomerID *int `json:"creator_portal_customer_id,omitempty"`
 	// For assets
 	AssetSetID        *int   `json:"asset_set_id,omitempty"`
 	AssetSetName      string `json:"asset_set_name,omitempty"`
@@ -440,12 +460,14 @@ type Collection struct {
 	FilterState *string `json:"filter_state"`
 	IsPublic    bool    `json:"is_public"`
 	IsPrivate   bool    `json:"is_private"`
-	WorkspaceID *int    `json:"workspace_id"`
-	CategoryID  *int    `json:"category_id,omitempty"`
-	CreatedBy   *int    `json:"created_by"`
-	PublicSlug  *string `json:"public_slug,omitempty"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	// PublicMilestoneSwimlanes groups the anonymous public board by milestone.
+	PublicMilestoneSwimlanes bool    `json:"public_milestone_swimlanes"`
+	WorkspaceID              *int    `json:"workspace_id"`
+	CategoryID               *int    `json:"category_id,omitempty"`
+	CreatedBy                *int    `json:"created_by"`
+	PublicSlug               *string `json:"public_slug,omitempty"`
+	CreatedAt                string  `json:"created_at"`
+	UpdatedAt                string  `json:"updated_at"`
 	// Joined fields for API responses
 	CreatorName   string `json:"creator_name,omitempty"`
 	CreatorEmail  string `json:"creator_email,omitempty"`

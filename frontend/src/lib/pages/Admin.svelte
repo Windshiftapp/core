@@ -11,7 +11,11 @@
   import LinkComponent from '../components/Link.svelte';
   import SidebarHeader from '../layout/SidebarHeader.svelte';
   import ScrollableSidebar from '../layout/ScrollableSidebar.svelte';
-  import { IconFileText, IconMenu2, IconPuzzle, IconSearch, IconX } from '@tabler/icons-svelte-runes';
+  import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import IconMenu2 from '@tabler/icons-svelte-runes/icons/menu-2';
+  import IconPuzzle from '@tabler/icons-svelte-runes/icons/puzzle';
+  import IconSearch from '@tabler/icons-svelte-runes/icons/search';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
   import { useEventListener } from 'runed';
   import {
     ADMIN_COMPONENT_LOADERS,

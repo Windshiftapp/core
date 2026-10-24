@@ -1,5 +1,10 @@
 <script>
-  import { AlertTriangle, Download, ExternalLink, FileText, Search, ShieldCheck } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Download from '@lucide/svelte/icons/download';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Search from '@lucide/svelte/icons/search';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Input from '../components/Input.svelte';

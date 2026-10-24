@@ -90,7 +90,7 @@ func (s *SLATeamBindingService) delete(ctx context.Context, actorID int, binding
 }
 
 func (s *SLATeamBindingService) requireConsent(userID, teamID, workspaceID int) error {
-	teamAdmin, err := s.teams.IsTeamAdmin(teamID, userID)
+	teamAuthority, err := s.hasTeamAuthority(userID, teamID)
 	if err != nil {
 		return err
 	}
@@ -98,8 +98,21 @@ func (s *SLATeamBindingService) requireConsent(userID, teamID, workspaceID int) 
 	if err != nil {
 		return err
 	}
-	if !teamAdmin || !workspaceAdmin {
+	if !teamAuthority || !workspaceAdmin {
 		return ErrSLABindingForbidden
 	}
 	return nil
+}
+
+// hasTeamAuthority accepts a holder of the global teams.manage permission
+// (which includes system administrators) or a direct team admin.
+func (s *SLATeamBindingService) hasTeamAuthority(userID, teamID int) (bool, error) {
+	global, err := s.permissions.HasGlobalPermission(userID, models.PermissionTeamsManage)
+	if err != nil {
+		return false, err
+	}
+	if global {
+		return true, nil
+	}
+	return s.teams.IsTeamAdmin(teamID, userID)
 }

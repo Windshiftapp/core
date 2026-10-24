@@ -2,7 +2,8 @@
   import ExcalidrawEditor from './ExcalidrawEditor.svelte';
   import Button from './Button.svelte';
   import Input from './Input.svelte';
-  import { api } from '../api.js';
+  import { convertMermaidToExcalidraw } from '../editors/mermaidConversion.js';
+  import { createDiagram, updateDiagram } from '../api/misc.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -45,13 +46,9 @@
 
   async function seedFromMermaid(source) {
     try {
-      const [{ parseMermaidToExcalidraw }, { convertToExcalidrawElements }] = await Promise.all([
-        import('@excalidraw/mermaid-to-excalidraw'),
-        import('@excalidraw/excalidraw'),
-      ]);
-      const { elements: skeletons, files } = await parseMermaidToExcalidraw(source);
+      const { elements, files } = await convertMermaidToExcalidraw(source);
       initialData = {
-        elements: convertToExcalidrawElements(skeletons),
+        elements,
         appState: {},
         files: files || {},
         scrollToContent: true,
@@ -84,10 +81,10 @@
 
       if (diagram) {
         // Update existing diagram
-        await api.updateDiagram(diagram.id, diagramName, diagramData);
+        await updateDiagram(diagram.id, diagramName, diagramData);
       } else {
         // Create new diagram
-        await api.createDiagram(itemId, diagramName, diagramData);
+        await createDiagram(itemId, diagramName, diagramData);
       }
 
       onSave();

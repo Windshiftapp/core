@@ -1,6 +1,8 @@
 <script>
   import { Handle, Position } from '@xyflow/svelte';
-  import { IconBox, IconFileText, IconTestPipe } from '@tabler/icons-svelte-runes';
+  import IconBox from '@tabler/icons-svelte-runes/icons/box';
+  import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import IconTestPipe from '@tabler/icons-svelte-runes/icons/test-pipe';
 
   let { data } = $props();
 

@@ -109,6 +109,8 @@ func CustomFieldCompletion(fieldType string) (valueType string, operators []stri
 	switch fieldType {
 	case "number":
 		return "number", slices.Clone(orderedOperators)
+	case "multi_milestone":
+		return "number", slices.Clone(equalityOperators)
 	case "checkbox", "boolean":
 		return "boolean", slices.Clone(booleanOperators)
 	case "date":

@@ -1,5 +1,8 @@
 <script>
-  import { AlertTriangle, X, Trash2, Users } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import X from '@lucide/svelte/icons/x';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Users from '@lucide/svelte/icons/users';
   import StateDisplay from '../components/StateDisplay.svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
@@ -10,7 +13,7 @@
   import Radio from '../components/Radio.svelte';
   import ItemPicker from '../pickers/ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { api } from '../api';
+  import { items as itemsApi } from '../api/items.js';
 
   let {
     show = $bindable(false),
@@ -89,7 +92,7 @@
     loadingInfo = true;
     error = null;
     try {
-      const result = await api.items.getDeleteInfo(itemId);
+      const result = await itemsApi.getDeleteInfo(itemId);
       if (!show || requestedItemId !== itemId) return;
       deleteInfo = result;
       // If item has a parent, default to that as the new parent
@@ -115,7 +118,7 @@
     try {
       // Get items at the same hierarchy level in the same workspace
       // These are valid candidates for reparenting (siblings at the same level)
-      const response = await api.items.getAll({
+      const response = await itemsApi.getAll({
         workspace_id: deleteInfo.workspace_id,
         level: deleteInfo.hierarchy_level,
         limit: 100
@@ -141,11 +144,11 @@
     try {
       if (selectedMode === 'reparent') {
         // Move children before deleting their parent.
-        await api.items.reparentChildren(item.id, selectedNewParentId);
-        await api.items.delete(item.id);
+        await itemsApi.reparentChildren(item.id, selectedNewParentId);
+        await itemsApi.delete(item.id);
         ondeleted?.({ mode: 'reparent', deletedCount: 1, newParentId: selectedNewParentId });
       } else {
-        await api.items.deleteCascade(item.id);
+        await itemsApi.deleteCascade(item.id);
         ondeleted?.({ mode: 'deleteAll' });
       }
       show = false;

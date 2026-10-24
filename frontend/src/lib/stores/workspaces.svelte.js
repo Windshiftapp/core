@@ -1,5 +1,5 @@
 import { derived, get, writable } from 'svelte/store';
-import { api } from '../api.js';
+import { workspaces as workspacesApi } from '../api/workspaces.js';
 import { isExpectedBackgroundSyncError } from '../utils/backgroundSync.js';
 
 // Current workspace store - automatically syncs with route
@@ -43,7 +43,7 @@ function createCurrentWorkspaceStore() {
 
       const generation = ++loadGeneration;
       try {
-        const workspace = await api.workspaces.get(workspaceId);
+        const workspace = await workspacesApi.get(workspaceId);
         if (generation !== loadGeneration) return;
         set(workspace);
         // Only mark this id as loaded once the fetch actually succeeded —
@@ -135,7 +135,7 @@ function createWorkspacesStore() {
       const generation = ++listLoadGeneration;
       loading.set(true);
 
-      const request = api.workspaces
+      const request = workspacesApi
         .getPage({ page: 1, page_size: DIRECTORY_PAGE_SIZE })
         .then((document) => {
           if (lifecycle !== lifecycleGeneration || generation !== listLoadGeneration) return [];
@@ -177,7 +177,7 @@ function createWorkspacesStore() {
       if (searchPromise?.key === key) return searchPromise.promise;
 
       const generation = ++searchGeneration;
-      const request = api.workspaces
+      const request = workspacesApi
         .getPage({ page: 1, page_size: limit, search: trimmed })
         .then((document) => {
           if (searchPromise?.promise === request) searchPromise = null;
@@ -207,7 +207,7 @@ function createWorkspacesStore() {
 
       const lifecycle = lifecycleGeneration;
       const generation = ++personalLoadGeneration;
-      const request = api.workspaces
+      const request = workspacesApi
         .getOrCreatePersonal()
         .then((personal) => {
           if (lifecycle !== lifecycleGeneration || generation !== personalLoadGeneration) {

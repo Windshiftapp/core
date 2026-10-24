@@ -1,5 +1,5 @@
 <script>
-  import { GitFork } from '@lucide/svelte';
+  import GitFork from '@lucide/svelte/icons/git-fork';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

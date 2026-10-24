@@ -26,36 +26,38 @@ func NewTimeProjectHandler(base BaseHandler, timePerm *services.TimePermissionSe
 }
 
 type timeProjectResponse struct {
-	ID            int            `json:"id"`
-	CustomerID    *int           `json:"customer_id,omitempty"`
-	CategoryID    *int           `json:"category_id,omitempty"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	Status        string         `json:"status"`
-	Color         string         `json:"color,omitempty"`
-	HourlyRate    float64        `json:"hourly_rate"`
-	Settings      map[string]any `json:"settings,omitempty"`
-	CustomerName  string         `json:"customer_name,omitempty"`
-	CategoryName  string         `json:"category_name,omitempty"`
-	CategoryColor string         `json:"category_color,omitempty"`
-	TotalHours    *float64       `json:"total_hours,omitempty"`
+	ID                 int            `json:"id"`
+	CustomerID         *int           `json:"customer_id,omitempty"`
+	CategoryID         *int           `json:"category_id,omitempty"`
+	Name               string         `json:"name"`
+	Description        string         `json:"description"`
+	Status             string         `json:"status"`
+	Color              string         `json:"color,omitempty"`
+	HourlyRate         float64        `json:"hourly_rate"`
+	Settings           map[string]any `json:"settings,omitempty"`
+	CustomerName       string         `json:"customer_name,omitempty"`
+	CustomerBuiltinKey string         `json:"customer_builtin_key,omitempty"`
+	CategoryName       string         `json:"category_name,omitempty"`
+	CategoryColor      string         `json:"category_color,omitempty"`
+	TotalHours         *float64       `json:"total_hours,omitempty"`
 }
 
 func mapTimeProjectToResponse(p repository.TimeProjectDetail) timeProjectResponse {
 	return timeProjectResponse{
-		ID:            p.ID,
-		CustomerID:    p.CustomerID,
-		CategoryID:    p.CategoryID,
-		Name:          p.Name,
-		Description:   p.Description,
-		Status:        p.Status,
-		Color:         p.Color,
-		HourlyRate:    p.HourlyRate,
-		Settings:      p.Settings,
-		CustomerName:  p.CustomerName,
-		CategoryName:  p.CategoryName,
-		CategoryColor: p.CategoryColor,
-		TotalHours:    p.TotalHours,
+		ID:                 p.ID,
+		CustomerID:         p.CustomerID,
+		CategoryID:         p.CategoryID,
+		Name:               p.Name,
+		Description:        p.Description,
+		Status:             p.Status,
+		Color:              p.Color,
+		HourlyRate:         p.HourlyRate,
+		Settings:           p.Settings,
+		CustomerName:       p.CustomerName,
+		CustomerBuiltinKey: p.CustomerBuiltinKey,
+		CategoryName:       p.CategoryName,
+		CategoryColor:      p.CategoryColor,
+		TotalHours:         p.TotalHours,
 	}
 }
 

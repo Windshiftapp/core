@@ -2,7 +2,7 @@
   import ExcalidrawEditor from '../../components/ExcalidrawEditor.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
-  import { api } from '../../api.js';
+  import { pages } from '../../api/pages.js';
   import { themeStore } from '../../stores/theme.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -98,13 +98,13 @@
       };
       const resp =
         mode === 'edit' && initialAttachmentId
-          ? await api.pages.updateDiagram(
+          ? await pages.updateDiagram(
               workspaceId,
               pageId,
               initialAttachmentId,
               request
             )
-          : await api.pages.createDiagram(workspaceId, pageId, {
+          : await pages.createDiagram(workspaceId, pageId, {
               ...request,
               placement: 'end',
             });
@@ -115,7 +115,7 @@
       // The shared service has already mutated the Page. Reload its canonical
       // Markdown so the editor mirrors the exact server placement/fence and
       // does not issue a redundant autosave.
-      const updatedPage = await api.pages.getPage(workspaceId, pageId);
+      const updatedPage = await pages.getPage(workspaceId, pageId);
       onSaved({
         attachmentId,
         name: resp?.name || name,

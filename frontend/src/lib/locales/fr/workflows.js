@@ -177,7 +177,7 @@ export default {
       'Impossible de supprimer l’écran par défaut. Cet écran est requis pour les espaces de travail sans ensemble de configuration.',
     confirmDeleteScreen:
       'Voulez-vous vraiment supprimer l’écran « {name} » ? Cela affectera tous les espaces de travail utilisant cet écran.',
-    defaults: { default: { name: 'Écran par défaut', description: 'Écran par défaut avec les champs essentiels des éléments de travail' } },
+    defaults: { default: { name: 'Écran par défaut', description: 'Écran par défaut avec les champs essentiels des éléments de travail' }, default_create: { name: 'Écran de création par défaut', description: 'Écran ciblé pour créer des éléments de travail' } },
     fieldWidths: {
       full: 'Pleine largeur',
       half: 'Demi-largeur',

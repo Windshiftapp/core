@@ -1,7 +1,10 @@
 <script>
   import SectionHeader from '../../../lib/layout/SectionHeader.svelte'
   import Button from '../../../lib/components/Button.svelte'
-  import { Plus, Settings, Download, Filter } from '@lucide/svelte'
+  import Plus from '@lucide/svelte/icons/plus';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Download from '@lucide/svelte/icons/download';
+  import Filter from '@lucide/svelte/icons/filter';
 </script>
 
 <div class="p-8 max-w-6xl">

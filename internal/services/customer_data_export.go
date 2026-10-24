@@ -128,10 +128,17 @@ type CustomerExportKBEvent struct {
 	CreatedAt *string `json:"created_at"`
 }
 
-// ExportCustomerData assembles the full personal-data payload for one portal
+// ExportCustomerData assembles the personal-data payload for one portal
 // customer and records the disclosure in the audit trail (who exported which
 // customer, when, and how much was disclosed).
-func ExportCustomerData(db database.Database, customerID int, actor AuditActor) (CustomerDataExport, error) {
+//
+// workspaceIDs limits every workspace-scoped section (requested items, drafts,
+// comments, approval decisions, attachments) to workspaces the caller may
+// read, so an export never discloses content the caller cannot view. nil means
+// unscoped; a non-nil empty slice discloses no workspace-scoped rows. Sections
+// that are not workspace-bound (email tracking, sessions, KB events) are
+// always included.
+func ExportCustomerData(db database.Database, customerID int, actor AuditActor, workspaceIDs []int) (CustomerDataExport, error) {
 	export := CustomerDataExport{
 		SchemaVersion:     CustomerDataExportSchemaVersion,
 		ExportedAt:        time.Now().UTC().Format(time.RFC3339),
@@ -143,6 +150,31 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 		EmailTracking:     []CustomerExportEmailTracking{},
 		Sessions:          []CustomerExportSessionMetadata{},
 		KBEvents:          []CustomerExportKBEvent{},
+	}
+
+	// wsFilter builds the workspace-visibility predicate for a query column.
+	// A nil scope leaves the query unscoped; an empty scope matches nothing.
+	wsFilter := func(column string) (string, []any) {
+		if workspaceIDs == nil {
+			return "", nil
+		}
+		if len(workspaceIDs) == 0 {
+			return " AND 1 = 0", nil
+		}
+		placeholders, args := inArgsInt(workspaceIDs)
+		return " AND " + column + " IN (" + placeholders + ")", args
+	}
+	// wsFilterNullable keeps rows whose workspace link is NULL (not
+	// workspace-bound) alongside rows in the caller's workspaces.
+	wsFilterNullable := func(column string) (string, []any) {
+		if workspaceIDs == nil {
+			return "", nil
+		}
+		if len(workspaceIDs) == 0 {
+			return " AND " + column + " IS NULL", nil
+		}
+		placeholders, args := inArgsInt(workspaceIDs)
+		return " AND (" + column + " IS NULL OR " + column + " IN (" + placeholders + "))", args
 	}
 
 	// Profile. The export is meaningless for an unknown customer.
@@ -197,14 +229,15 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 
 	// Requested items with display keys, status names, submitted bodies and
 	// custom-field values.
+	itemClause, itemArgs := wsFilter("i.workspace_id")
 	itemRows, err := db.Query(`
 		SELECT i.id, COALESCE(w.key, ''), i.workspace_item_number, i.title, COALESCE(i.description, ''),
 		       i.custom_field_values, COALESCE(s.name, ''), i.created_at
 		FROM items i
 		JOIN workspaces w ON w.id = i.workspace_id
-		LEFT JOIN statuses s ON s.id = i.status_id
-		WHERE i.creator_portal_customer_id = ? ORDER BY i.id
-	`, customerID)
+		LEFT JOIN statuses s ON i.status_id = s.id
+		WHERE i.creator_portal_customer_id = ?`+itemClause+` ORDER BY i.id
+	`, append([]any{customerID}, itemArgs...)...)
 	if err != nil {
 		return export, fmt.Errorf("load requested items: %w", err)
 	}
@@ -231,12 +264,15 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 
 	// Unfinished submissions the customer saved as drafts. Drafts are the
 	// customer's own personal data, so they are disclosed alongside submitted
-	// requests.
+	// requests. A draft whose request type is not bound to a workspace is not
+	// workspace-scoped and stays visible.
+	draftClause, draftArgs := wsFilterNullable("rt.workspace_id")
 	draftRows, err := db.Query(`
-		SELECT id, request_type_id, title, description, custom_field_values, current_step, created_at, updated_at
-		FROM portal_request_drafts
-		WHERE portal_customer_id = ? ORDER BY id
-	`, customerID)
+		SELECT d.id, d.request_type_id, d.title, d.description, d.custom_field_values, d.current_step, d.created_at, d.updated_at
+		FROM portal_request_drafts d
+		LEFT JOIN request_types rt ON rt.id = d.request_type_id
+		WHERE d.portal_customer_id = ?`+draftClause+` ORDER BY d.id
+	`, append([]any{customerID}, draftArgs...)...)
 	if err != nil {
 		return export, fmt.Errorf("load drafts: %w", err)
 	}
@@ -259,10 +295,13 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 		return export, fmt.Errorf("iterate drafts: %w", err)
 	}
 
+	commentClause, commentArgs := wsFilter("i.workspace_id")
 	commentRows, err := db.Query(`
-		SELECT id, item_id, content, is_private, created_at FROM comments
-		WHERE portal_customer_id = ? ORDER BY id
-	`, customerID)
+		SELECT c.id, c.item_id, c.content, c.is_private, c.created_at
+		FROM comments c
+		JOIN items i ON i.id = c.item_id
+		WHERE c.portal_customer_id = ?`+commentClause+` ORDER BY c.id
+	`, append([]any{customerID}, commentArgs...)...)
 	if err != nil {
 		return export, fmt.Errorf("load comments: %w", err)
 	}
@@ -280,10 +319,14 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 		return export, fmt.Errorf("iterate comments: %w", err)
 	}
 
+	decisionClause, decisionArgs := wsFilter("i.workspace_id")
 	decisionRows, err := db.Query(`
-		SELECT id, approval_request_id, decision, comment, created_at FROM approval_decisions
-		WHERE actor_portal_customer_id = ? ORDER BY id
-	`, customerID)
+		SELECT d.id, d.approval_request_id, d.decision, d.comment, d.created_at
+		FROM approval_decisions d
+		JOIN approval_requests ar ON ar.id = d.approval_request_id
+		JOIN items i ON i.id = ar.item_id
+		WHERE d.actor_portal_customer_id = ?`+decisionClause+` ORDER BY d.id
+	`, append([]any{customerID}, decisionArgs...)...)
 	if err != nil {
 		return export, fmt.Errorf("load approval decisions: %w", err)
 	}
@@ -301,10 +344,15 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 		return export, fmt.Errorf("iterate approval decisions: %w", err)
 	}
 
+	// Attachments without an item link (for example avatars) are not
+	// workspace-bound and stay visible; item attachments follow item visibility.
+	attachmentClause, attachmentArgs := wsFilterNullable("i.workspace_id")
 	attachmentRows, err := db.Query(`
-		SELECT id, item_id, filename, original_filename, mime_type, file_size, created_at FROM attachments
-		WHERE uploaded_by_portal_customer_id = ? ORDER BY id
-	`, customerID)
+		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size, a.created_at
+		FROM attachments a
+		LEFT JOIN items i ON i.id = a.item_id AND a.entity_type = 'item'
+		WHERE a.uploaded_by_portal_customer_id = ?`+attachmentClause+` ORDER BY a.id
+	`, append([]any{customerID}, attachmentArgs...)...)
 	if err != nil {
 		return export, fmt.Errorf("load attachment metadata: %w", err)
 	}
@@ -322,9 +370,11 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor) 
 		return export, fmt.Errorf("iterate attachment metadata: %w", err)
 	}
 
+	// The tracking address is stored as it arrived in the From header, which
+	// may differ in case from the profile email, so match case-insensitively.
 	trackingRows, err := db.Query(`
 		SELECT id, channel_id, message_id, from_email, from_name, subject, direction, processed_at
-		FROM email_message_tracking WHERE from_email = ? ORDER BY id
+		FROM email_message_tracking WHERE UPPER(from_email) = UPPER(?) ORDER BY id
 	`, export.Customer.Email)
 	if err != nil {
 		return export, fmt.Errorf("load email tracking: %w", err)

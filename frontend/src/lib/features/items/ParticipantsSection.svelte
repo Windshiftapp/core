@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { Users, X, Plus } from '@lucide/svelte';
+  import Users from '@lucide/svelte/icons/users';
+  import X from '@lucide/svelte/icons/x';
+  import Plus from '@lucide/svelte/icons/plus';
   import Spinner from '../../components/Spinner.svelte';
   import Text from '../../components/Text.svelte';
   import Input from '../../components/Input.svelte';
@@ -8,7 +10,7 @@
   import PortalCustomerPicker from '../../pickers/PortalCustomerPicker.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { api } from '../../api.js';
+  import { items } from '../../api/items.js';
 
   let { itemId, canEdit = true } = $props();
 
@@ -23,7 +25,7 @@
   async function load() {
     loading = true;
     try {
-      participants = (await api.items.listParticipants(itemId)) ?? [];
+      participants = (await items.listParticipants(itemId)) ?? [];
     } catch {
       participants = [];
     } finally {
@@ -56,7 +58,7 @@
     adding = true;
     try {
       participants =
-        (await api.items.addParticipant(itemId, {
+        (await items.addParticipant(itemId, {
           email: value,
           name: name.trim() || undefined
         })) ?? [];
@@ -71,7 +73,7 @@
   async function addByCustomer(customer) {
     if (!customer?.id) return;
     try {
-      participants = (await api.items.addParticipant(itemId, { portal_customer_id: customer.id })) ?? [];
+      participants = (await items.addParticipant(itemId, { portal_customer_id: customer.id })) ?? [];
       closeAddForm();
     } catch (error) {
       errorToast(error?.message || t('items.participantsAddFailed'));
@@ -80,7 +82,7 @@
 
   async function remove(participant) {
     try {
-      await api.items.removeParticipant(itemId, participant.portal_customer_id);
+      await items.removeParticipant(itemId, participant.portal_customer_id);
       participants = participants.filter((p) => p.portal_customer_id !== participant.portal_customer_id);
     } catch (error) {
       errorToast(error?.message || t('items.participantsRemoveFailed'));

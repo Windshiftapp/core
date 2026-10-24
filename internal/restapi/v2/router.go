@@ -451,6 +451,9 @@ type commentApplication interface {
 	Create(services.CreateCommentParams) (*services.CreateCommentResult, error)
 	UpdateWithEffects(services.UpdateCommentParams) (*models.Comment, error)
 	DeleteWithEffects(services.DeleteCommentParams) error
+	AttachReactions([]models.Comment) error
+	AddReaction(commentID, userID int, reaction string) ([]models.CommentReaction, error)
+	RemoveReaction(commentID, userID int, reaction string) error
 }
 
 type commentAccess interface {
@@ -1053,6 +1056,11 @@ func applyParameterCorrections(route *Route) {
 			defaultSize = 200
 		}
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", 200, defaultSize))
+		if route.Path == "/items/{item_id}/comments" {
+			upsertParameter(route, booleanQuery("include_reactions", "Attach grouped emoji reactions to each comment. Values true and 1 enable; omitted or other values leave reactions out.", false))
+		}
+	case "GET /comments/{comment_id}", "PATCH /comments/{comment_id}":
+		upsertParameter(route, booleanQuery("include_reactions", "Attach grouped emoji reactions to the returned comment. Values true and 1 enable; omitted or other values leave reactions out.", false))
 	case "POST /items/batch", "POST /assets/summaries", "POST /milestones/test-statistics", "POST /iterations/progress":
 		removeQueryParameter(route, "ids")
 	}
@@ -1236,7 +1244,7 @@ func applyParameterCorrections(route *Route) {
 	case "GET /milestones/{milestone_id}/comments":
 		route.Description = "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only."
 	case "GET /items/{item_id}/comments":
-		route.Description = "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure."
+		route.Description = "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure. Grouped reactions are attached only when include_reactions is true."
 	case "GET /agent-runs/{run_id}/events":
 		route.Description = "Returns up to 200 visible run events after an operation-bound opaque cursor. Events use stable ascending ID order, next_cursor resumes exclusively after the final returned event, and partial pages are never returned on failure."
 	case "GET /workspaces/{workspace_id}/agent-runs", "GET /items/{item_id}/agent-runs":

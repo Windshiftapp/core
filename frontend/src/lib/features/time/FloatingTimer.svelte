@@ -2,9 +2,14 @@
   import { onDestroy } from 'svelte';
   import { useEventListener } from 'runed';
   import { timerStore } from '../../stores/timerStore.svelte.js';
-  import { Clock, Square, Maximize2, Minimize2, ExternalLink } from '@lucide/svelte';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Square from '@lucide/svelte/icons/square';
+  import Maximize2 from '@lucide/svelte/icons/maximize-2';
+  import Minimize2 from '@lucide/svelte/icons/minimize-2';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { customerDisplayName } from '../../utils/customerLabel.js';
 
   let dragging = $state(false);
   let dragOffset = $state({ x: 0, y: 0 });
@@ -169,6 +174,14 @@
 
   // Reactive position style
   const positionStyle = $derived(`left: ${position.x}px; top: ${position.y}px;`);
+
+  const activeCustomerName = $derived(
+    customerDisplayName(
+      timerStore.activeTimer?.customer_name,
+      timerStore.activeTimer?.customer_builtin_key,
+      t
+    )
+  );
 </script>
 
 {#if timerStore.activeTimer}
@@ -252,8 +265,8 @@
             {#if timerStore.activeTimer.project_name}
               <div class="text-white/90">
                 <span class="font-medium">{t('time.timer.project')}:</span> {timerStore.activeTimer.project_name}
-                {#if timerStore.activeTimer.customer_name}
-                  ({timerStore.activeTimer.customer_name})
+                {#if activeCustomerName}
+                  ({activeCustomerName})
                 {/if}
               </div>
             {/if}

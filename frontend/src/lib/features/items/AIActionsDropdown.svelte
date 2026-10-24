@@ -1,5 +1,8 @@
 <script>
-  import { BookOpen, Search, GitBranch, ChevronDown } from '@lucide/svelte';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import Search from '@lucide/svelte/icons/search';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { onClickOutside } from 'runed';
   import WindshiftAiIcon from '../../components/WindshiftAiIcon.svelte';
 

@@ -1,5 +1,5 @@
 <script>
-  import { RefreshCw } from '@lucide/svelte';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

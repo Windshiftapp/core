@@ -1,14 +1,27 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { ssoStore, capabilitiesStore } from '../stores';
-  import { api } from '../api.js';
+  import { ssoStore } from '../stores/sso.svelte.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import {
-    KeyRound, Plus, Edit, Trash2, Save, X, Check, RefreshCw,
-    AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
-    TestTube, CheckCircle, XCircle
-  } from '@lucide/svelte';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Save from '@lucide/svelte/icons/save';
+  import X from '@lucide/svelte/icons/x';
+  import Check from '@lucide/svelte/icons/check';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Power from '@lucide/svelte/icons/power';
+  import PowerOff from '@lucide/svelte/icons/power-off';
+  import Link from '@lucide/svelte/icons/link';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import TestTube from '@lucide/svelte/icons/test-tube';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import XCircle from '@lucide/svelte/icons/x-circle';
   import Button from '../components/Button.svelte';
   import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';

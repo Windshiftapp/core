@@ -1,5 +1,5 @@
 <script>
-  import { IconFolder } from '@tabler/icons-svelte-runes';
+  import IconFolder from '@tabler/icons-svelte-runes/icons/folder';
   import ColorDot from '../../components/ColorDot.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -84,7 +84,7 @@
     {#each Object.entries(asset.custom_field_values) as [fieldId, value]}
       {@const field = fieldDefinitions.find((definition) => String(definition.custom_field_id) === String(fieldId))}
       {#if field && value !== null && value !== ''}
-        <div class="mb-3">
+        <div class="mb-3" data-testid={`asset-detail-field-${fieldId}`}>
           <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{field.field_name}</h4>
           <CustomFieldRenderer
             field={{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -193,10 +194,19 @@ func (s *ScreenProvisioningService) Update(actor AuditActor, id int, screen *mod
 	return screen, warnings, nil
 }
 
-// Delete removes a screen. The default screen (ID 1) is protected.
+// Delete removes a screen. Built-in screens are protected because the default
+// configuration set and fallback resolution depend on them.
 func (s *ScreenProvisioningService) Delete(actor AuditActor, id int) error {
-	if id == 1 {
-		return NewServiceError(400, "Cannot delete default screen")
+	var builtinKey sql.NullString
+	err := s.db.QueryRow("SELECT builtin_key FROM screens WHERE id = ?", id).Scan(&builtinKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NewServiceError(404, "Screen not found")
+	}
+	if err != nil {
+		return fmt.Errorf("load screen %d: %w", id, err)
+	}
+	if strings.TrimSpace(builtinKey.String) != "" {
+		return NewServiceError(400, "Cannot delete builtin screen")
 	}
 
 	if _, err := s.db.ExecWrite("DELETE FROM screens WHERE id = ?", id); err != nil {
@@ -220,6 +230,11 @@ func (s *ScreenProvisioningService) GetScreenFields(screenID int) ([]models.Scre
 // ReplaceScreenFields atomically replaces a screen's field configuration.
 func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screenID int, fields []models.ScreenField) ([]models.ScreenField, error) {
 	fields = ensureAlwaysVisibleScreenFields(screenID, fields)
+	cleanedFields, err := s.clearLinkingRequiredFlags(fields)
+	if err != nil {
+		return nil, err
+	}
+	fields = cleanedFields
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -249,6 +264,35 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 		return nil, fmt.Errorf("update screen fields: %w", err)
 	}
 	return updatedFields, nil
+}
+
+// clearLinkingRequiredFlags forces is_required off for linking custom fields.
+// A linking field stores its value as an item link and needs the owning item
+// to exist, so a create form cannot satisfy a required linking field. The
+// screen editor disables the toggle; this keeps the API from persisting the
+// impossible state too.
+func (s *ScreenProvisioningService) clearLinkingRequiredFlags(fields []models.ScreenField) ([]models.ScreenField, error) {
+	for i := range fields {
+		if fields[i].FieldType != "custom" || !fields[i].IsRequired {
+			continue
+		}
+		fieldID, err := strconv.Atoi(strings.TrimSpace(fields[i].FieldIdentifier))
+		if err != nil {
+			continue
+		}
+		var fieldType string
+		err = s.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load custom field %d: %w", fieldID, err)
+		}
+		if fieldType == "linking" {
+			fields[i].IsRequired = false
+		}
+	}
+	return fields, nil
 }
 
 // ReplaceScreenSystemFields atomically replaces a screen's system-field

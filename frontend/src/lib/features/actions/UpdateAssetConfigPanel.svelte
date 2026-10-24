@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { customFields as customFieldsApi } from '../../api/configuration.js';
+  import { assetTypes as assetTypesApi } from '../../api/assets.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import Select from '../../components/Select.svelte';
@@ -31,7 +32,7 @@
   // Load custom fields on mount
   onMount(async () => {
     try {
-      customFields = await api.customFields.getAll();
+      customFields = await customFieldsApi.getAll();
       // Filter to only asset type fields
       assetFields = customFields.filter(f => f.field_type === 'asset');
     } catch (error) {
@@ -61,7 +62,7 @@
     }
 
     try {
-      const nextAssetTypes = await api.assetTypes.getAll(field.field_config.asset_set_id) || [];
+      const nextAssetTypes = await assetTypesApi.getAll(field.field_config.asset_set_id) || [];
       if (token !== assetTypesLoadToken) return;
       assetTypes = nextAssetTypes;
       // Update the asset_set_id in config

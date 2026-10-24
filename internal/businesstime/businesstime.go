@@ -36,8 +36,8 @@ type ClockInterval struct {
 }
 
 // Holiday is a dated closure. Recurring holidays repeat on the same month and
-// day every year, which is how Jira preserves annual holidays without
-// expanding them into a finite list.
+// day every year, so annual holidays do not need to be expanded into a finite
+// list.
 type Holiday struct {
 	Date      string `json:"date,omitempty"` // YYYY-MM-DD, required unless recurring
 	MonthDay  string `json:"month_day,omitempty"`
@@ -180,7 +180,7 @@ func FromStored(timezone string, weeklyIntervals, holidays json.RawMessage) (Raw
 }
 
 // AlwaysOpenRaw returns a 24/7 schedule in the given zone. It is the default
-// Jira applies when no calendar is selected and the seed for a new workspace.
+// when no calendar is selected and the seed for a new workspace.
 func AlwaysOpenRaw(timezone string) RawCalendar {
 	if strings.TrimSpace(timezone) == "" {
 		timezone = "UTC"
@@ -194,7 +194,7 @@ func AlwaysOpenRaw(timezone string) RawCalendar {
 }
 
 // ParseRaw decodes the stored calendar JSON. A blank value is a 24/7 UTC
-// calendar, matching the default Jira applies when no calendar is selected.
+// calendar, the default when no calendar is selected.
 func ParseRaw(encoded string) (RawCalendar, error) {
 	trimmed := strings.TrimSpace(encoded)
 	if trimmed == "" {

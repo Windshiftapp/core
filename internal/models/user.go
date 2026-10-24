@@ -143,9 +143,11 @@ type UserDashboardWidget struct {
 
 // UserDashboardLayout represents the complete personal dashboard layout
 type UserDashboardLayout struct {
-	GridColumns int                    `json:"grid_columns,omitempty"`
-	Sections    []UserDashboardSection `json:"sections"`
-	Widgets     []UserDashboardWidget  `json:"widgets"`
+	GridColumns        int                    `json:"grid_columns,omitempty"`
+	Gradient           int                    `json:"gradient,omitempty"`             // Selected gradient index (0 = none, 1+ = gradient index)
+	BackgroundImageURL string                 `json:"background_image_url,omitempty"` // Preset background image URL (takes priority over gradient)
+	Sections           []UserDashboardSection `json:"sections"`
+	Widgets            []UserDashboardWidget  `json:"widgets"`
 }
 
 // TeamGroup represents a user group for access control and organization

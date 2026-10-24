@@ -72,6 +72,15 @@ func EnsureEmailRequestType(db database.Database, portalChannelID, preferredWork
 	return int(id), nil
 }
 
+// ResolveEmailIntakeWorkspace returns the workspace an email intake feeding the
+// portal creates items in: the preferred workspace when the portal serves it,
+// otherwise the portal's only served workspace. It is the same resolution the
+// system Email request type uses, exposed so intake writes can validate an item
+// type against the target workspace before persisting it.
+func ResolveEmailIntakeWorkspace(db database.Database, portalChannelID, preferred int) (int, error) {
+	return resolveEmailIntakeWorkspace(db, portalChannelID, preferred)
+}
+
 // resolveEmailIntakeWorkspace picks the workspace the Email request type pins.
 // A preferred workspace is honored only when the portal actually serves it; a
 // portal with several workspaces and no usable preference is ambiguous and

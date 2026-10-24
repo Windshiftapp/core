@@ -438,6 +438,33 @@ func (s *Service) UpsertExternalIssueLink(
 		})
 }
 
+// SubresourceBelongsToItem reports whether a previously imported comment,
+// attachment, or worklog is currently owned by the destination item. A partial
+// fork retry must not reuse a mapping owned by the original workspace's item,
+// because the update would move that resource instead of copying it.
+func (s *Service) SubresourceBelongsToItem(entityType string, windshiftID, itemID int) (bool, error) {
+	var query string
+	switch entityType {
+	case "comment":
+		query = `SELECT item_id FROM comments WHERE id = ?`
+	case "attachment":
+		query = `SELECT item_id FROM attachments WHERE id = ?`
+	case "worklog":
+		query = `SELECT item_id FROM time_worklogs WHERE id = ?`
+	default:
+		return false, nil
+	}
+	var owner sql.NullInt64
+	err := s.db.QueryRow(query, windshiftID).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check %s ownership: %w", entityType, err)
+	}
+	return owner.Valid && int(owner.Int64) == itemID, nil
+}
+
 // ReassignAttachment moves a previously imported attachment onto a new item
 // and refreshes its portal visibility, so a re-import can both relocate and
 // reclassify the file.

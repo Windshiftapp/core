@@ -1,6 +1,6 @@
 <script>
   import { Handle, Position } from '@xyflow/svelte';
-  import { X } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { data, selected = false, dragging = false, ...rest } = $props();
@@ -83,7 +83,7 @@
 
     <!-- Remove button - positioned in top-right corner -->
     <button
-      class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-ds-text-danger hover:opacity-80 p-1 transition-opacity duration-200 z-10"
+      class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 text-ds-text-danger hover:opacity-80 p-1 transition-opacity duration-200 z-10"
       onclick={handleRemove}
       title={t('workflows.removeFromWorkflow')}
     >

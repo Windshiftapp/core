@@ -2,9 +2,14 @@
   import { onMount } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-  import { Plus, Edit, Trash2, Settings, Circle, Layout } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Layout from '@lucide/svelte/icons/layout';
   import { SYSTEM_FIELDS } from '../stores/fieldConfig.js';
-  import { screenEditorStore } from '../stores';
+  import { screenEditorStore } from '../stores/screenEditorStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -218,7 +223,7 @@
   }
 
   async function deleteScreen(screen) {
-    if (screen.id === 1) {
+    if (screen.builtin_key) {
       errorToast(t('dialogs.alerts.cannotDeleteDefaultScreen'));
       return;
     }
@@ -280,8 +285,9 @@
       }
     ];
 
-    // Don't show delete option for default screen (ID 1)
-    if (screen.id !== 1) {
+    // Built-in screens back the default configuration set and cannot be
+    // removed.
+    if (!screen.builtin_key) {
       items.push({
         id: 'delete',
         type: 'regular',

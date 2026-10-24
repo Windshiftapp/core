@@ -1,3 +1,5 @@
+import { convertMermaidToExcalidraw } from '../../editors/mermaidConversion.js';
+
 export class PageDiagramSceneError extends Error {
   constructor(message) {
     super(message);
@@ -50,20 +52,10 @@ export async function preparePageDiagramScene(payload, converters = {}) {
   const decoded = decodePageDiagramPayload(payload);
   if (decoded.kind === 'excalidraw') return decoded.scene;
 
-  let parseMermaid = converters.parseMermaid;
-  let convertElements = converters.convertElements;
-  if (!parseMermaid || !convertElements) {
-    const [{ parseMermaidToExcalidraw }, { convertToExcalidrawElements }] = await Promise.all([
-      import('@excalidraw/mermaid-to-excalidraw'),
-      import('@excalidraw/excalidraw'),
-    ]);
-    parseMermaid = parseMermaidToExcalidraw;
-    convertElements = convertToExcalidrawElements;
-  }
   try {
-    const { elements: skeletons, files } = await parseMermaid(decoded.source);
+    const { elements, files } = await convertMermaidScene(decoded.source, converters);
     return {
-      elements: convertElements(skeletons),
+      elements,
       appState: {},
       files: files || {},
       scrollToContent: true,
@@ -71,6 +63,14 @@ export async function preparePageDiagramScene(payload, converters = {}) {
   } catch (error) {
     throw new PageDiagramSceneError(error?.message || 'Mermaid conversion failed');
   }
+}
+
+async function convertMermaidScene(source, converters) {
+  if (converters.parseMermaid && converters.convertElements) {
+    const { elements: skeletons, files } = await converters.parseMermaid(source);
+    return { elements: converters.convertElements(skeletons), files };
+  }
+  return convertMermaidToExcalidraw(source);
 }
 
 export function pageDiagramSceneFingerprint(scene) {

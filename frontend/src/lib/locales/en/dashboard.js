@@ -19,6 +19,10 @@ export default {
       },
     },
     widgetCatalog: {
+      customWidget: {
+        name: 'Custom Widget',
+        description: 'A widget you build with AI or by writing an OpenUI program',
+      },
       dailyBriefing: {
         name: 'Daily Briefing',
         description: 'AI-generated summary of what matters to you today',
@@ -42,6 +46,10 @@ export default {
       assignedToMe: {
         name: 'Assigned to Me',
         description: 'Open items assigned to you across all workspaces',
+      },
+      createdByMe: {
+        name: 'Created by Me',
+        description: 'Open items you created across all workspaces',
       },
       watchedItems: {
         name: 'Watched Items',
@@ -82,8 +90,50 @@ export default {
         name: 'Navigation',
         description: 'Quick access to workspaces',
       },
+      custom: {
+        name: 'Custom',
+        description: 'Build your own widget from a description',
+      },
+      background: {
+        name: 'Background',
+        description: 'Gradients and preset images for your dashboard',
+      },
       tipLabel: 'Tip',
       tip: 'Drag widgets from here into any section on your dashboard.',
+    },
+    widgetBuilder: {
+      createTitle: "Create a widget",
+      editTitle: "Edit widget",
+      subtitle: "Describe it, or write the OpenUI program yourself",
+      nameLabel: "Name",
+      namePlaceholder: "My open work",
+      promptLabel: "What should it show?",
+      promptPlaceholder: "Items I still owe, with counts and a table",
+      generate: "Generate",
+      generating: "Generating...",
+      itemQueryLabel: "Item query (CQL)",
+      assetQueryLabel: "Asset query (CQL)",
+      assetSetLabel: "Asset set",
+      assetSetNone: "None",
+      previewLabel: "Preview",
+      previewEmpty: "Nothing to preview yet",
+      loading: "Loading...",
+      aiUnavailable: "AI generation is not available, so a new widget cannot be created.",
+      aiUnavailableEditing: "AI generation is not available. You can still change the name and the queries.",
+      generateFailed: "Generation failed",
+      saveFailed: "Saving failed",
+      loadFailed: "Could not load this widget",
+      saving: "Saving...",
+    },
+    customWidgets: {
+      sourceError: "This widget's data could not be loaded",
+      truncated: 'Based on {shown} of {total} rows',
+      renderError: "This widget could not be rendered",
+      unavailable: "This widget is no longer available",
+      notConfigured: "This widget has not been set up yet",
+      noLinks: "No links between these items and assets",
+      canvasUnavailable: "This chart needs a canvas, which is not available here",
+      renderedNodes: "Drawing {shown} of {total} nodes",
     },
     editor: {
       newSection: 'New Section',
@@ -106,6 +156,8 @@ export default {
     states: {
       assignedLoadError: "Couldn't load your assigned items",
       assignedEmpty: 'Nothing assigned to you right now',
+      createdLoadError: "Couldn't load the items you created",
+      createdEmpty: "You haven't created any open items",
       storyPointsLoadError: "Couldn't load the story points summary",
       storyPointsEmpty: 'No open story points assigned yet',
       personalTasksLoadError: "Couldn't load your personal tasks",

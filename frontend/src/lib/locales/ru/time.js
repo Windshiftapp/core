@@ -23,6 +23,7 @@ export default {
     resumeTimer: 'Продолжить таймер',
     timeLogged: 'Время записано',
     timeTrackingProject: 'Проект учёта времени',
+    noCustomer: 'Без заказчика',
     workItemOptional: 'Рабочий элемент (необязательно)',
     whatDidYouWorkOn: 'Над чем вы работали?',
     start: 'Начало',

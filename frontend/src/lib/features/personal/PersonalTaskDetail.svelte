@@ -1,11 +1,16 @@
 <script>
-  import { api } from '../../api.js';
-  import { attachmentStatus } from '../../stores';
+  import { items } from '../../api/items.js';
+  import { attachments as attachmentsApi } from '../../api/misc.js';
+  import { hierarchyLevels as hierarchyLevelsApi } from '../../api/configuration.js';
+  import { attachmentStatus } from '../../stores/attachmentStatus.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
-  import { X, Calendar, MessageSquare, ExternalLink } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
@@ -68,7 +73,7 @@
     commentCount = 0;
     if (!isModal && attachmentStatus.enabled) void loadAttachments(id, generation);
     try {
-      const loaded = await api.items.get(id);
+      const loaded = await items.get(id);
       if (generation !== itemGeneration) return; // a newer load superseded this one
       item = loaded;
       editTitle = item.title || '';
@@ -100,7 +105,7 @@
 
   async function loadAttachments(id = itemId, generation = itemGeneration) {
     try {
-      const response = await api.attachments.getByItem(id);
+      const response = await attachmentsApi.getByItem(id);
       if (id !== itemId || generation !== itemGeneration) return; // superseded by navigation
       attachments = response?.data || [];
     } catch (err) {
@@ -124,8 +129,8 @@
     try {
       const [itemTypesData, hierarchyLevels, ancestors] = await Promise.all([
         Promise.resolve(workspaceDataStore.itemTypes),
-        api.hierarchyLevels.getAll(),
-        item?.parent_id ? api.items.getAncestors(item.id) : Promise.resolve([]),
+        hierarchyLevelsApi.getAll(),
+        item?.parent_id ? items.getAncestors(item.id) : Promise.resolve([]),
       ]);
       itemTypes = itemTypesData || [];
       parentHierarchy = (ancestors || []).map((ancestor) => {
@@ -156,7 +161,7 @@
     try {
       saving = true;
       const targetStatusId = isTaskCompleted() ? STATUS_ID_OPEN : STATUS_ID_DONE;
-      await api.items.transition(item.id, targetStatusId);
+      await items.transition(item.id, targetStatusId);
       item = { ...item, status_id: targetStatusId };
       onupdate?.();
     } catch (err) {
@@ -176,7 +181,7 @@
 
     try {
       saving = true;
-      await api.items.update(item.id, { title: editTitle.trim() });
+      await items.update(item.id, { title: editTitle.trim() });
       item = { ...item, title: editTitle.trim() };
       editingTitle = false;
       onupdate?.();
@@ -191,7 +196,7 @@
   async function saveDescription() {
     try {
       saving = true;
-      await api.items.update(item.id, { description: editDescription });
+      await items.update(item.id, { description: editDescription });
       item = { ...item, description: editDescription };
       editingDescription = false;
       onupdate?.();
@@ -207,7 +212,7 @@
     try {
       saving = true;
       const dueDate = newValue || null;
-      await api.items.update(item.id, { due_date: dueDate });
+      await items.update(item.id, { due_date: dueDate });
       item = { ...item, due_date: dueDate };
       editingDueDate = false;
       onupdate?.();
@@ -258,7 +263,7 @@
     const { files } = data;
     for (const file of files) {
       try {
-        await api.attachments.uploadToItem(item.id, file);
+        await attachmentsApi.uploadToItem(item.id, file);
       } catch (err) {
         console.error('Failed to upload:', err);
       }
@@ -268,7 +273,7 @@
 
   async function handleAttachmentDelete(attachment) {
     try {
-      await api.attachments.delete(attachment.id);
+      await attachmentsApi.delete(attachment.id);
       attachments = attachments.filter(a => a.id !== attachment.id);
     } catch (err) {
       console.error('Failed to delete attachment:', err);
@@ -306,7 +311,7 @@
     const id = item?.id;
     if (id == null) return;
     try {
-      const fresh = await api.items.get(id);
+      const fresh = await items.get(id);
       if (item?.id !== id) return;
       item = { ...item, ...fresh };
       if (!editingTitle) editTitle = fresh.title || '';

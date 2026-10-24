@@ -1,5 +1,8 @@
 <script>
-  import { IconActivity, IconCheck, IconX, IconClock } from '@tabler/icons-svelte-runes';
+  import IconActivity from '@tabler/icons-svelte-runes/icons/activity';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
   import StatCard from '../../components/StatCard.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import {
@@ -17,16 +20,18 @@
   let purging = $state(false);
 
   // Display order — keep stable even when backend returns alphabetical.
-  const SCHEDULER_ORDER = ['briefing', 'email', 'recurrence', 'notification'];
+  const SCHEDULER_ORDER = ['briefing', 'email', 'email_outbox', 'recurrence', 'notification'];
   const SCHEDULER_LABELS = {
     briefing: 'Briefing (6h)',
     email: 'Email IMAP (5m)',
+    email_outbox: 'Outbound email (1m)',
     recurrence: 'Recurrence (5m)',
     notification: 'Notification batch (5m)',
   };
   const ITEM_LABELS = {
     briefing: 'users',
     email: 'channels',
+    email_outbox: 'emails',
     recurrence: 'instances',
     notification: 'batches',
   };

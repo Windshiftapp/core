@@ -3,7 +3,7 @@
   import Select from '../../../components/Select.svelte';
   import Button from '../../../components/Button.svelte';
   import Badge from '../../../components/Badge.svelte';
-  import { IconWand } from '@tabler/icons-svelte-runes';
+  import IconWand from '@tabler/icons-svelte-runes/icons/wand';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);

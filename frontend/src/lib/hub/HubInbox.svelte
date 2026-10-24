@@ -1,5 +1,6 @@
 <script>
-  import { ExternalLink, Inbox as InboxIcon } from '@lucide/svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import InboxIcon from '@lucide/svelte/icons/inbox';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -87,7 +88,7 @@
         >
           <div class="font-medium text-sm" style="color: var(--ds-text);">{item.title}</div>
           <div class="text-xs">
-            <ItemKey item={item} />
+            <ItemKey item={item} clickable={false} />
           </div>
         </a>
       {/snippet}

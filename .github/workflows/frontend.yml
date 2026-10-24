@@ -22,6 +22,12 @@ defaults:
   run:
     working-directory: frontend
 
+# The OpenUI packages ship a telemetry postinstall. frontend/.npmrc sets
+# ignore-scripts=true; these vars keep telemetry off if scripts are re-enabled.
+env:
+  OPENUI_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+
 jobs:
   lint:
     name: Lint

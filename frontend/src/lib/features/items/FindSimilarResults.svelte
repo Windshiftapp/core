@@ -1,5 +1,5 @@
 <script>
-  import { ExternalLink } from '@lucide/svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import Lozenge from '../../components/Lozenge.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import ItemKey from '../../components/ItemKey.svelte';

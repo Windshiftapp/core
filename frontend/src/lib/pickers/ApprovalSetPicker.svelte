@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { Stamp } from '@lucide/svelte';
+  import Stamp from '@lucide/svelte/icons/stamp';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

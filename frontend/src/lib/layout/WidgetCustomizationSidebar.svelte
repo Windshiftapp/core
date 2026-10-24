@@ -1,6 +1,6 @@
 <script>
   import { useEventListener } from 'runed';
-  import { GripVertical } from '@lucide/svelte';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import DescriptionText from '../components/DescriptionText.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
 
@@ -15,6 +15,8 @@
     fallbackTitle = '',
     tipLabel = '',
     tip = '',
+    panelCategory = '',
+    panelContent = null,
   } = $props();
 
   const currentCategory = $derived(categories.find((category) => category.id === activeCategory));
@@ -45,6 +47,7 @@
         onclick={() => activeCategory = category.id}
         title={category.name}
         aria-label={category.name}
+        data-testid={`customization-category-${category.id}`}
       >
         <CategoryIcon class="w-5 h-5" />
       </button>
@@ -59,7 +62,10 @@
     />
 
     <div class="flex-1 overflow-y-auto p-6">
-      <div class="space-y-3">
+      {#if panelContent && panelCategory && activeCategory === panelCategory}
+        {@render panelContent()}
+      {:else}
+        <div class="space-y-3">
         {#each widgets as widget (widget.type)}
           {@const IconComponent = iconMap[widget.icon] || fallbackIcon}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -92,6 +98,7 @@
           <strong>{tipLabel}:</strong> {tip}
         </p>
       </div>
+      {/if}
     </div>
   </div>
 </div>

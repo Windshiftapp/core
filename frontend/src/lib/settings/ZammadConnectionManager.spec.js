@@ -15,16 +15,18 @@ const mocks = vi.hoisted(() => ({
   updateConnection: vi.fn(),
 }));
 
-vi.mock('../api.js', () => ({
-  api: {
-    zammadConnections: {
-      getAll: mocks.getConnections,
-      test: mocks.testConnection,
-      update: mocks.updateConnection,
-    },
-    workspaces: { getAll: mocks.getWorkspaces, getPage: mocks.getWorkspacesPage },
-    statuses: { getAll: mocks.getStatuses },
+vi.mock('../api/integrations.js', () => ({
+  zammadConnections: {
+    getAll: mocks.getConnections,
+    test: mocks.testConnection,
+    update: mocks.updateConnection,
   },
+}));
+vi.mock('../api/workspaces.js', () => ({
+  workspaces: { getAll: mocks.getWorkspaces, getPage: mocks.getWorkspacesPage },
+}));
+vi.mock('../api/workflows.js', () => ({
+  statuses: { getAll: mocks.getStatuses },
 }));
 
 vi.mock('../stores/i18n.svelte.js', () => ({ t: (key) => key }));

@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { api } from '../api.js';
+import { notifications as notificationsApi } from '../api/notifications.js';
 import { navigate } from '../router.js';
 import { toExternal } from '../runtime/contextPath.js';
 import { itemIdFromActionUrl } from '../utils/actionUrl.js';
@@ -38,7 +38,7 @@ async function loadNotificationPages(generation) {
   let offset = 0;
 
   while (true) {
-    const page = await api.notifications.getAll({ limit: NOTIFICATION_PAGE_SIZE, offset });
+    const page = await notificationsApi.getAll({ limit: NOTIFICATION_PAGE_SIZE, offset });
     if (generation !== pollerGeneration) return [];
     if (!page || !Array.isArray(page)) {
       if (offset === 0) return [];
@@ -59,7 +59,7 @@ function loadNotifications() {
   // Keep component tests and optional consumers resilient when they provide a
   // partial API mock. Importing this module never starts authenticated work;
   // startNotificationPoller owns the first load after auth is established.
-  if (typeof api?.notifications?.getAll !== 'function') {
+  if (typeof notificationsApi?.getAll !== 'function') {
     notifications.set([]);
     return Promise.resolve([]);
   }
@@ -97,7 +97,7 @@ export const notificationActions = {
   // Mark notification as read
   markAsRead: async (id) => {
     try {
-      await api.notifications.markAsRead(id);
+      await notificationsApi.markAsRead(id);
       notifications.update((items) =>
         items.map((item) => (item.id === id ? { ...item, read: true } : item))
       );
@@ -114,7 +114,7 @@ export const notificationActions = {
   // Delete every notification from the server-backed inbox.
   clearAll: async () => {
     try {
-      await api.notifications.clearAll();
+      await notificationsApi.clearAll();
       // An older inbox request may have started before the delete. Let it
       // settle first so its response cannot restore deleted notifications.
       if (loadPromise) await loadPromise;
@@ -128,7 +128,7 @@ export const notificationActions = {
   // Mark all as read
   markAllAsRead: async () => {
     try {
-      await api.notifications.markAllAsRead();
+      await notificationsApi.markAllAsRead();
       notifications.update((items) =>
         items.map((item) => (item.read ? item : { ...item, read: true }))
       );
@@ -143,7 +143,7 @@ export const notificationActions = {
   // auto-timer so passive viewing doesn't silently snooze the email digest.
   markAllAsSeen: async () => {
     try {
-      await api.notifications.markAllAsSeen();
+      await notificationsApi.markAllAsSeen();
       const now = new Date().toISOString();
       notifications.update((items) =>
         items.map((item) => (item.seen_at ? item : { ...item, seen_at: now }))
@@ -163,7 +163,7 @@ export const notificationActions = {
 
     const itemIdString = String(itemId);
     try {
-      await api.notifications.markItemAsRead(itemId);
+      await notificationsApi.markItemAsRead(itemId);
       // If the initial inbox request was already in flight, let it settle before
       // applying the local patch so an older response cannot restore unread.
       if (loadPromise) await loadPromise;
@@ -191,7 +191,7 @@ export const notificationActions = {
         ...notification,
       };
 
-      const createdNotification = await api.notifications.create(newNotification);
+      const createdNotification = await notificationsApi.create(newNotification);
       // Convert response to match our format
       const processedNotification = {
         ...createdNotification,

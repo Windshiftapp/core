@@ -1,9 +1,9 @@
 <script>
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
-  import { api } from '../api.js';
+  import { logbook } from '../api/logbook.js';
   import { onDestroy, untrack } from 'svelte';
-  import { FileText } from '@lucide/svelte';
+  import FileText from '@lucide/svelte/icons/file-text';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -25,11 +25,11 @@
   const documents = createAsyncLoader(async () => {
     if (!bucketId) return [];
     if (searchQuery) {
-      const result = await api.logbook.keywordSearch(searchQuery, { bucket_id: bucketId });
+      const result = await logbook.keywordSearch(searchQuery, { bucket_id: bucketId });
       const items = result?.data ?? (Array.isArray(result) ? result : []);
       return items.map(r => ({ ...r, id: r.document_id || r.id }));
     }
-    const result = await api.logbook.listDocuments(bucketId, { limit: 50 });
+    const result = await logbook.listDocuments(bucketId, { limit: 50 });
     return result?.data ?? (Array.isArray(result) ? result : []);
   });
   onDestroy(() => documents.dispose());

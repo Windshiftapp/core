@@ -1,5 +1,8 @@
 <script>
-  import { Pencil, AlertTriangle, Loader2, Trash2 } from '@lucide/svelte';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { t } from '../stores/i18n.svelte.js';
   import { preparePageDiagramScene } from '../features/pages/pageDiagramScene.js';
 
@@ -41,7 +44,6 @@
         exportPadding: 16,
       });
       svg.setAttribute('width', '100%');
-      svg.setAttribute('height', 'auto');
       svg.style.maxWidth = '100%';
       svg.style.height = 'auto';
       if (svgHost) {
@@ -97,6 +99,9 @@
       <div class="excalidraw-block__placeholder error">
         <AlertTriangle size={18} />
         <span>{t('editors.diagramRenderError')}</span>
+        {#if errorMsg}
+          <span class="excalidraw-block__error-msg" title={errorMsg}>{errorMsg}</span>
+        {/if}
       </div>
     {/if}
   </div>
@@ -162,6 +167,14 @@
   }
   .excalidraw-block__placeholder.error {
     color: var(--ds-text-danger);
+  }
+  .excalidraw-block__error-msg {
+    overflow: hidden;
+    max-width: 60ch;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
   }
   .excalidraw-block__caption {
     display: flex;

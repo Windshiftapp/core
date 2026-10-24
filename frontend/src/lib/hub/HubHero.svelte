@@ -1,7 +1,12 @@
 <script>
-  import { Search, Palette, Inbox, FileText, ExternalLink } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import Palette from '@lucide/svelte/icons/palette';
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { hubStore, gradients, iconMap, WINDSHIFT_GRADIENT } from '../stores/hub.svelte.js';
-  import { authStore, permissionStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
+  import { permissionStore } from '../stores/permissions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl, portalRequestTypeUrl } from '../utils/urls.js';
   import GlassButton from '../components/GlassButton.svelte';

@@ -622,9 +622,9 @@ func (s *WorkspaceService) Delete(id int) error {
 			return err
 		}
 
-		// Intakes targeting this workspace would keep polling and failing once
+		// Intakes routing into this workspace would keep polling and failing once
 		// the workspace is gone; remove them with it.
-		if err := repository.NewIntakeRepository(s.db).DeleteByTargetTx(tx, models.IntakeTargetWorkspace, id); err != nil {
+		if err := repository.NewIntakeRepository(s.db).DeleteByWorkspaceTx(tx, id); err != nil {
 			return err
 		}
 

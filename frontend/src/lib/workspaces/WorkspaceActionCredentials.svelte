@@ -12,13 +12,17 @@
 -->
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
-  import { workspacePermissions } from '../stores';
+  import { actionCredentials } from '../api/ai.js';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import { Plus, Edit, Trash2, KeyRound, Shield } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import Shield from '@lucide/svelte/icons/shield';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Input from '../components/Input.svelte';
@@ -92,7 +96,7 @@
   async function loadCredentials() {
     loading = true;
     try {
-      credentials = (await api.actionCredentials.getForWorkspace(workspaceId)) || [];
+      credentials = (await actionCredentials.getForWorkspace(workspaceId)) || [];
     } catch (err) {
       console.error('Failed to load workspace action credentials:', err);
       errorToast(err.message || t('settings.adminOperations.actionCredentials.loadFailed'));
@@ -142,7 +146,7 @@
     try {
       // The server pins the credential to this workspace; scope fields are
       // ignored on this endpoint.
-      const created = await api.actionCredentials.createForWorkspace(workspaceId, {
+      const created = await actionCredentials.createForWorkspace(workspaceId, {
         name: form.name,
         credential_type: form.credential_type,
         secret: form.secret,
@@ -167,7 +171,7 @@
     if (!editing) return;
     saving = true;
     try {
-      await api.actionCredentials.updateForWorkspace(workspaceId, editing.id, {
+      await actionCredentials.updateForWorkspace(workspaceId, editing.id, {
         name: form.name,
         is_enabled: form.is_enabled,
         secret_metadata: form.secret_metadata,
@@ -186,7 +190,7 @@
     if (!rotating || !form.secret) return;
     saving = true;
     try {
-      const updated = await api.actionCredentials.rotateForWorkspace(
+      const updated = await actionCredentials.rotateForWorkspace(
         workspaceId,
         rotating.id,
         form.secret
@@ -214,7 +218,7 @@
     });
     if (!ok) return;
     try {
-      await api.actionCredentials.deleteForWorkspace(workspaceId, cred.id);
+      await actionCredentials.deleteForWorkspace(workspaceId, cred.id);
       successToast(t('settings.adminOperations.actionCredentials.deleted'));
       await loadCredentials();
     } catch (err) {

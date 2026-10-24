@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	milestoneCommentsMigrationVersion = "20261005_milestone_comments"
-	milestoneActivityMigrationVersion = "20261005_milestone_activity"
+	milestoneCommentsMigrationVersion = "20261109_milestone_comments"
+	milestoneActivityMigrationVersion = "20261109_milestone_activity"
 )
 
 func sqliteObjectCount(t *testing.T, db Database, kind, name string) int {

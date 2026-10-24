@@ -1,13 +1,16 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { time } from '../../api/time.js';
   import Button from '../../components/Button.svelte';
   import TimeProjectCategoryModal from '../../dialogs/TimeProjectCategoryModal.svelte';
-  import { Plus, GripVertical, Edit, Trash2 } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { permissionStore, isSystemAdmin } from '../../stores';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -29,7 +32,7 @@
 
   async function loadCategories() {
     try {
-      const result = await api.time.projectCategories.getAll();
+      const result = await time.projectCategories.getAll();
       categories = result || [];
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -68,7 +71,7 @@
   async function saveCategory() {
     try {
       if (editingCategory) {
-        await api.time.projectCategories.update(editingCategory.id, {
+        await time.projectCategories.update(editingCategory.id, {
           ...formData,
           display_order: editingCategory.display_order,
           color: editingCategory.color // Keep existing color on edit
@@ -76,7 +79,7 @@
       } else {
         // Assign random color for new categories
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        await api.time.projectCategories.create({
+        await time.projectCategories.create({
           ...formData,
           color: randomColor
         });
@@ -99,7 +102,7 @@
     });
     if (confirmed) {
       try {
-        await api.time.projectCategories.delete(category.id);
+        await time.projectCategories.delete(category.id);
         await loadCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
@@ -145,7 +148,7 @@
       }));
 
       // Save to backend
-      api.time.projectCategories.reorder(updates).catch(error => {
+      time.projectCategories.reorder(updates).catch(error => {
         console.error('Failed to reorder categories:', error);
         loadCategories(); // Reload on error
       });

@@ -108,7 +108,9 @@ func (s *Service) finalizeCleanup(jobID, resultJSON string) error {
 		return fmt.Errorf("delete Jira import mappings: %w", err)
 	}
 	if _, err := tx.ExecWrite(`
-		UPDATE jira_import_jobs SET status = 'data_deleted', result_json = ? WHERE id = ?
+		UPDATE jira_import_jobs
+		SET status = 'data_deleted', result_json = ?, lease_expires_at = NULL, lease_token = NULL
+		WHERE id = ?
 	`, resultJSON, jobID); err != nil {
 		return fmt.Errorf("mark Jira import data deleted: %w", err)
 	}

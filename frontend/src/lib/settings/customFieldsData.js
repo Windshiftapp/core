@@ -1,3 +1,4 @@
+import { customFields, screens } from '../api/configuration.js';
 import { canonicalCustomFieldType } from '../utils/customFieldTypes.js';
 
 const defaultIndexCounts = {
@@ -18,10 +19,10 @@ export function customFieldFormData(field = null) {
 }
 
 /** Load custom fields and every screen assignment with two bounded requests. */
-export async function loadCustomFieldsOverview(apiClient) {
+export async function loadCustomFieldsOverview() {
   const [fieldsOutcome, screensOutcome] = await Promise.allSettled([
-    apiClient.customFields.getOverview(),
-    apiClient.screens.getAllWithFields(),
+    customFields.getOverview(),
+    screens.getAllWithFields(),
   ]);
   if (fieldsOutcome.status === 'rejected') {
     throw fieldsOutcome.reason;

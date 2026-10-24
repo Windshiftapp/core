@@ -1,5 +1,8 @@
 <script>
-  import { FileText, PlusSquare, Users, HelpCircle } from '@lucide/svelte';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import PlusSquare from '@lucide/svelte/icons/plus-square';
+  import Users from '@lucide/svelte/icons/users';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';

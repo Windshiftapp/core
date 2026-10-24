@@ -37,6 +37,7 @@
       {checked}
       {disabled}
       onchange={handleChange}
+      data-testid={dataTestid ? `${dataTestid}-input` : undefined}
       class="checkbox-input"
     />
     {#if checked}

@@ -30,6 +30,7 @@ const (
 	PromptAgentQATestEngineer      = "agent_qa_test_engineer"
 	PromptAgentReleaseManager      = "agent_release_manager"
 	PromptAgentBlank               = "agent_blank"
+	PromptCustomWidget             = "custom_widget"
 )
 
 var allPromptNames = []string{
@@ -51,6 +52,7 @@ var allPromptNames = []string{
 	PromptAgentQATestEngineer,
 	PromptAgentReleaseManager,
 	PromptAgentBlank,
+	PromptCustomWidget,
 }
 
 // PromptStore holds AI system prompts, loaded from embedded defaults with

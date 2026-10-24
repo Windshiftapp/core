@@ -1,8 +1,14 @@
 <script>
-  import { api } from '../api.js';
+  import { customFields, itemTemplates, itemTypes as itemTypesApi, priorities as prioritiesApi, screens } from '../api/configuration.js';
+  import { labels } from '../api/misc.js';
+  import { getAssignableUsers } from '../api/users.js';
+  import { iterations as iterationsApi, milestones as milestonesApi } from '../api/milestones.js';
+  import { time } from '../api/time.js';
+  import { items } from '../api/items.js';
   import { currentRoute, navigate, setNavigationInterceptor } from '../router.js';
-  import { workspacesStore, workspacePermissions } from '../stores';
-  import { FileText } from '@lucide/svelte';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
+  import FileText from '@lucide/svelte/icons/file-text';
   import NativeSelect from '../components/NativeSelect.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
@@ -19,7 +25,11 @@
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { dateInputToISOString } from '../utils/dateFormatter.js';
   import { parseDuration } from '../utils/timeUtils.js';
-  import { defaultCustomFieldValue, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import {
+    defaultCustomFieldValue,
+    isBooleanCustomFieldType,
+    isCreateRenderableCustomFieldType,
+  } from '../utils/customFieldTypes.js';
   import { t, translateError } from '../stores/i18n.svelte.js';
 
   /**
@@ -200,6 +210,8 @@
         fieldDef: customFieldsById.get(parseInt(screenField.field_identifier, 10)),
       }))
       .filter((entry) => !!entry.fieldDef)
+      // Linking fields need an existing item; a create form cannot satisfy them.
+      .filter((entry) => isCreateRenderableCustomFieldType(entry.fieldDef.field_type))
   );
 
   const configuredSystemFields = $derived.by(() =>
@@ -331,7 +343,7 @@
   async function loadTypes(wsId) {
     typesLoading = true;
     try {
-      const res = await api.itemTypes.getAll({ workspace_id: wsId });
+      const res = await itemTypesApi.getAll({ workspace_id: wsId });
       itemTypes = Array.isArray(res) ? res : (res?.items ?? []);
       // Keep the current type if still valid, else default to the first.
       if (!itemTypes.some((t) => t.id === itemTypeId)) {
@@ -365,7 +377,7 @@
       let list = [];
       const config = await workspaceDataStore.screenConfig(null);
       const configured = config?.priorities || [];
-      list = configured.length > 0 ? configured : await api.priorities.getAll();
+      list = configured.length > 0 ? configured : await prioritiesApi.getAll();
       priorities = [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     } catch (err) {
       console.error('Failed to load priorities:', err);
@@ -375,7 +387,7 @@
 
   async function loadLabels(wsId) {
     try {
-      labelOptions = (await api.labels.getAll(wsId)) || [];
+      labelOptions = (await labels.getAll(wsId)) || [];
     } catch (err) {
       console.error('Failed to load labels:', err);
       labelOptions = [];
@@ -392,7 +404,7 @@
     if (assigneeOptions) return;
     assigneeLoading = true;
     try {
-      assigneeOptions = (await api.getAssignableUsers(workspaceId)) ?? [];
+      assigneeOptions = (await getAssignableUsers(workspaceId)) ?? [];
     } catch (err) {
       console.error('Failed to load assignable users:', err);
       assigneeOptions = [];
@@ -411,7 +423,7 @@
   async function loadCustomFields() {
     if (customFieldsLoaded) return;
     try {
-      allCustomFields = await api.customFields.getAll();
+      allCustomFields = await customFields.getAll();
     } catch (err) {
       console.error('Failed to load custom fields:', err);
       allCustomFields = [];
@@ -444,7 +456,7 @@
     try {
       const config = await workspaceDataStore.screenConfig(typeId);
       const screenId = config?.screens?.create ?? 1;
-      const fields = (await api.screens.getFields(screenId)) || [];
+      const fields = (await screens.getFields(screenId)) || [];
       // Ignore an out-of-order response after a workspace/type change.
       if (`${workspaceId}-${itemTypeId}` !== key) return;
 
@@ -457,7 +469,7 @@
       const previousValues = customFieldValues;
       customFieldValues = {};
       for (const field of allCustomFields) {
-        if (customIds.includes(field.id)) {
+        if (customIds.includes(field.id) && isCreateRenderableCustomFieldType(field.field_type)) {
           const previous = previousValues[field.id];
           customFieldValues[field.id] =
             previous !== undefined && previous !== null && previous !== ''
@@ -481,7 +493,7 @@
 
   async function loadMilestones(wsId) {
     try {
-      milestones = (await api.milestones.getAll({ workspace_id: wsId, include_global: true })) || [];
+      milestones = (await milestonesApi.getAll({ workspace_id: wsId, include_global: true })) || [];
     } catch (err) {
       console.error('Failed to load milestones:', err);
       milestones = [];
@@ -490,7 +502,7 @@
 
   async function loadIterations(wsId) {
     try {
-      iterations = (await api.iterations.getAll({ workspace_id: wsId, include_global: true })) || [];
+      iterations = (await iterationsApi.getAll({ workspace_id: wsId, include_global: true })) || [];
     } catch (err) {
       console.error('Failed to load iterations:', err);
       iterations = [];
@@ -499,7 +511,7 @@
 
   async function loadTimeProjects(wsId) {
     try {
-      timeProjects = (await api.time.projects.getByWorkspace(wsId)) || [];
+      timeProjects = (await time.projects.getByWorkspace(wsId)) || [];
     } catch (err) {
       console.error('Failed to load time projects:', err);
       timeProjects = [];
@@ -529,7 +541,7 @@
     templatesLoading = true;
     try {
       const list =
-        (await api.itemTemplates.getAll(wsId, { item_type_id: typeId })) ?? [];
+        (await itemTemplates.getAll(wsId, { item_type_id: typeId })) ?? [];
       // Guard against an out-of-order response after another type change.
       if (`${workspaceId}:${itemTypeId}` !== key) return;
 
@@ -656,6 +668,9 @@
         const fieldId = parseInt(field.field_identifier, 10);
         const value = customFieldValues[fieldId];
         const fieldDef = customFieldsById.get(fieldId);
+        // Linking fields are not renderable on create; ignore a legacy
+        // required flag rather than blocking submission forever.
+        if (!isCreateRenderableCustomFieldType(fieldDef?.field_type)) continue;
         if (isBooleanCustomFieldType(fieldDef?.field_type)) continue;
         if (isEmptyValue(value)) {
           error = t('mobile.create.requiredField', { field: fieldDef?.name || t('mobile.create.customField') });
@@ -699,7 +714,7 @@
     try {
       if (!isPersonal && !validateConfiguredFields()) return;
 
-      const result = await api.items.create(createPayload());
+      const result = await items.create(createPayload());
       clearDraft();
       if (isPersonal) {
         // Back to the Personal checklist; the tab remounts and loads the new
@@ -965,7 +980,10 @@
     {#snippet row(u)}
       <span class="opt">
         <Avatar src={u.avatar_url} name={userLabel(u)} size="xs" variant="teal" />
-        <span>{userLabel(u)}</span>
+        <span class="assignee-option-label">{userLabel(u)}</span>
+        {#if u.username}
+          <span class="assignee-option-handle">@{u.username}</span>
+        {/if}
       </span>
     {/snippet}
   </MobileOptionSheet>
@@ -1080,7 +1098,6 @@
       onChange={(val) => customFieldValues[entry.fieldDef.id] = val}
       {milestones}
       {iterations}
-      autoOpenPickers={false}
     />
   </div>
 {/snippet}
@@ -1212,6 +1229,8 @@
   .chip-input:focus { outline: none; }
 
   .opt { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+  .assignee-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .assignee-option-handle { color: var(--ds-text-subtle); font-size: 0.8125rem; flex-shrink: 0; }
   .opt-dot { width: 8px; height: 8px; border-radius: var(--radius-full, 9999px); background-color: var(--ds-icon-subtle, var(--ds-text-subtle)); flex-shrink: 0; }
 
   .field-section { border-top: 1px solid var(--ds-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }

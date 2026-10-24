@@ -324,22 +324,25 @@ type TimeProjectCategory struct {
 
 // TimeProject represents a time tracking project
 type TimeProject struct {
-	ID            int            `json:"id"`
-	CustomerID    *int           `json:"customer_id,omitempty"` // Now optional
-	CategoryID    *int           `json:"category_id,omitempty"` // Link to project category
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	Status        string         `json:"status"` // Active, On Hold, Completed, Archived
-	Color         string         `json:"color,omitempty"`
-	HourlyRate    float64        `json:"hourly_rate"`
-	Settings      map[string]any `json:"settings,omitempty"` // Flexible JSON attributes (e.g., max_hours)
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	CustomerName  string         `json:"customer_name,omitempty"`
-	CategoryName  string         `json:"category_name,omitempty"`
-	CategoryColor string         `json:"category_color,omitempty"`
-	TotalHours    *float64       `json:"total_hours,omitempty"` // Computed from worklogs
-	IsManager     bool           `json:"is_manager,omitempty"`  // Whether current user is a manager of this project
+	ID           int            `json:"id"`
+	CustomerID   *int           `json:"customer_id,omitempty"` // Now optional
+	CategoryID   *int           `json:"category_id,omitempty"` // Link to project category
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Status       string         `json:"status"` // Active, On Hold, Completed, Archived
+	Color        string         `json:"color,omitempty"`
+	HourlyRate   float64        `json:"hourly_rate"`
+	Settings     map[string]any `json:"settings,omitempty"` // Flexible JSON attributes (e.g., max_hours)
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	CustomerName string         `json:"customer_name,omitempty"`
+	// CustomerBuiltinKey identifies a system-managed customer (e.g. the
+	// no-customer placeholder) so clients can localize its display name.
+	CustomerBuiltinKey string   `json:"customer_builtin_key,omitempty"`
+	CategoryName       string   `json:"category_name,omitempty"`
+	CategoryColor      string   `json:"category_color,omitempty"`
+	TotalHours         *float64 `json:"total_hours,omitempty"` // Computed from worklogs
+	IsManager          bool     `json:"is_manager,omitempty"`  // Whether current user is a manager of this project
 }
 
 // Worklog represents a time tracking entry
@@ -357,6 +360,7 @@ type Worklog struct {
 	CreatedAt           int64    `json:"created_at"` // Unix timestamp
 	UpdatedAt           int64    `json:"updated_at"` // Unix timestamp
 	CustomerName        string   `json:"customer_name,omitempty"`
+	CustomerBuiltinKey  string   `json:"customer_builtin_key,omitempty"`
 	ProjectName         string   `json:"project_name,omitempty"`
 	UserName            string   `json:"user_name,omitempty"`             // Name of user who created the worklog
 	ItemTitle           string   `json:"item_title,omitempty"`            // Title of linked work item
@@ -379,6 +383,7 @@ type ActiveTimer struct {
 	CreatedAt           int64   `json:"created_at"`     // Unix timestamp
 	ProjectName         *string `json:"project_name,omitempty"`
 	CustomerName        *string `json:"customer_name,omitempty"`
+	CustomerBuiltinKey  *string `json:"customer_builtin_key,omitempty"`
 	ItemTitle           *string `json:"item_title,omitempty"`
 	WorkspaceName       *string `json:"workspace_name,omitempty"`
 	WorkspaceKey        *string `json:"workspace_key,omitempty"`

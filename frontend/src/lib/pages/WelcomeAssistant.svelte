@@ -1,7 +1,11 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { api } from '../api.js';
-  import { User, Blocks, ClipboardList, AlertCircle, Languages } from '@lucide/svelte';
+  import { setup } from '../api/admin.js';
+  import User from '@lucide/svelte/icons/user';
+  import Blocks from '@lucide/svelte/icons/blocks';
+  import ClipboardList from '@lucide/svelte/icons/clipboard-list';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Languages from '@lucide/svelte/icons/languages';
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Seagulls from '../components/Seagulls.svelte';
@@ -131,7 +135,7 @@
         module_settings: moduleSettings
       };
 
-      const result = await api.setup.complete(setupData);
+      const result = await setup.complete(setupData);
 
       try {
         onsetupCompleted?.(result);
@@ -144,7 +148,9 @@
       window.location.reload();
     } catch (err) {
       console.error('Setup error:', err);
-      error = t('setup.setupError');
+      // Show the server's message when it sends one, for example a password over
+      // bcrypt's 72 byte input limit. The generic string stays as the fallback.
+      error = err?.message || t('setup.setupError');
       submitting = false;
     }
   }

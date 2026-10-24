@@ -1,7 +1,13 @@
 <script>
   import PageHeader from '../../../lib/layout/PageHeader.svelte'
   import Button from '../../../lib/components/Button.svelte'
-  import { LayoutDashboard, Users, FileText, Settings, Plus, Download, Filter } from '@lucide/svelte'
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+  import Users from '@lucide/svelte/icons/users';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Download from '@lucide/svelte/icons/download';
+  import Filter from '@lucide/svelte/icons/filter';
 </script>
 
 <div class="p-8 max-w-6xl">

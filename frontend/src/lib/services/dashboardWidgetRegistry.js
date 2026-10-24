@@ -5,7 +5,9 @@
 export const dashboardWidgetCategories = {
   ACTIVITY: 'activity',
   WORK: 'work',
+  SUPPORT: 'support',
   NAVIGATION: 'navigation',
+  CUSTOM: 'custom',
 };
 
 export const DASHBOARD_GRID_COLUMNS = 12;
@@ -69,6 +71,15 @@ export const dashboardWidgetRegistry = [
     minWidth: 3,
   },
   {
+    type: 'created-by-me',
+    nameKey: 'dashboard.widgetCatalog.createdByMe.name',
+    descriptionKey: 'dashboard.widgetCatalog.createdByMe.description',
+    category: dashboardWidgetCategories.WORK,
+    icon: 'PenLine',
+    defaultWidth: 6,
+    minWidth: 3,
+  },
+  {
     type: 'watched-items',
     nameKey: 'dashboard.widgetCatalog.watchedItems.name',
     descriptionKey: 'dashboard.widgetCatalog.watchedItems.description',
@@ -113,6 +124,17 @@ export const dashboardWidgetRegistry = [
     category: dashboardWidgetCategories.SUPPORT,
     icon: 'LifeBuoy',
     defaultWidth: 4,
+    minWidth: 3,
+  },
+
+  // User-authored widgets rendered from an OpenUI program
+  {
+    type: 'custom-widget',
+    nameKey: 'dashboard.widgetCatalog.customWidget.name',
+    descriptionKey: 'dashboard.widgetCatalog.customWidget.description',
+    category: dashboardWidgetCategories.CUSTOM,
+    icon: 'Sparkles',
+    defaultWidth: 6,
     minWidth: 3,
   },
 ];
@@ -200,7 +222,11 @@ export function buildDefaultDashboardLayout() {
       'default-your-activity',
       'default-whats-new',
     ]),
-    section('default-work', 1, ['default-personal-tasks', 'default-assigned-to-me']),
+    section('default-work', 1, [
+      'default-personal-tasks',
+      'default-assigned-to-me',
+      'default-created-by-me',
+    ]),
     section('default-workspaces', 2, ['default-recent-workspaces', 'default-quick-access']),
   ];
 
@@ -219,9 +245,27 @@ export function buildDefaultDashboardLayout() {
     widget('default-whats-new', 'whats-new', 'default-your-day', 2),
     widget('default-personal-tasks', 'personal-tasks', 'default-work', 0, 6),
     widget('default-assigned-to-me', 'assigned-to-me', 'default-work', 1, 6),
+    widget('default-created-by-me', 'created-by-me', 'default-work', 2, 6),
     widget('default-recent-workspaces', 'recent-workspaces', 'default-workspaces', 0),
     widget('default-quick-access', 'quick-access', 'default-workspaces', 1),
   ];
 
   return { grid_columns: DASHBOARD_GRID_COLUMNS, sections, widgets };
+}
+
+/**
+ * Resolve the header title for a dashboard widget. A custom widget is named by
+ * its author, so its cached name wins over the generic catalog label.
+ *
+ * @param {{ type?: string, config?: Record<string, any> }} widget
+ * @param {(key: string) => string} translate
+ * @returns {string}
+ */
+export function getDashboardWidgetTitle(widget, translate) {
+  const type = widget?.type ?? '';
+  if (type === 'custom-widget' && widget?.config?.title) {
+    return widget.config.title;
+  }
+  const metadata = getDashboardWidgetMetadata(type);
+  return metadata ? translate(metadata.nameKey) : type;
 }

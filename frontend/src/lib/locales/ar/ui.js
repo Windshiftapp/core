@@ -243,6 +243,7 @@ export default {
     numberedList: 'قائمة مرقمة',
     insertImage: 'إدراج صورة',
     userNotFound: 'المستخدم غير موجود',
+    multipleUsersMatch: 'يطابق عدة مستخدمين',
   },
   dialogs: {
     cancel: 'إلغاء',

@@ -1,12 +1,16 @@
 <script>
-  import { api } from '../api.js';
+  import { sla } from '../api/sla.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import WorkingCalendarEditor from '../features/sla/WorkingCalendarEditor.svelte';
-  import { Clock, Plus, Trash2, Edit, Eye } from '@lucide/svelte';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Eye from '@lucide/svelte/icons/eye';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
@@ -26,7 +30,7 @@
     try {
       loading = true;
       error = null;
-      calendars = (await api.sla.getTeamCalendars(team.id)) ?? [];
+      calendars = (await sla.getTeamCalendars(team.id)) ?? [];
     } catch (err) {
       error = err?.message || t('teams.serviceHours.loadFailed');
     } finally {
@@ -51,10 +55,10 @@
 
   async function save(payload) {
     if (editing) {
-      await api.sla.updateTeamCalendar(team.id, editing.id, payload);
+      await sla.updateTeamCalendar(team.id, editing.id, payload);
       successToast(t('teams.serviceHours.updated'));
     } else {
-      await api.sla.createTeamCalendar(team.id, payload);
+      await sla.createTeamCalendar(team.id, payload);
       successToast(t('teams.serviceHours.created'));
     }
     await loadCalendars();
@@ -69,7 +73,7 @@
     });
     if (!ok) return;
     try {
-      await api.sla.deleteTeamCalendar(team.id, calendar.id);
+      await sla.deleteTeamCalendar(team.id, calendar.id);
       successToast(t('teams.serviceHours.deleted'));
       await loadCalendars();
     } catch (err) {
@@ -81,7 +85,7 @@
     impact = { calendar, workspaces: [] };
     impactLoading = true;
     try {
-      impact = { calendar, ...(await api.sla.getTeamCalendarImpact(team.id, calendar.id)) };
+      impact = { calendar, ...(await sla.getTeamCalendarImpact(team.id, calendar.id)) };
     } catch (err) {
       errorToast(err?.message || t('teams.serviceHours.impactFailed'));
       impact = null;

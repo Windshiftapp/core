@@ -1,5 +1,6 @@
 <script>
-  import { BarChart3, Package } from '@lucide/svelte';
+  import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
+  import Package from '@lucide/svelte/icons/package';
   import { widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';

@@ -1,5 +1,6 @@
 <script>
-  import { Loader2, AlertCircle } from '@lucide/svelte';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

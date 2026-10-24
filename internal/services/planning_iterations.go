@@ -73,16 +73,20 @@ func scanIterationRow(sc iterationScanner) (IterationResult, error) {
 	return iter, nil
 }
 
-// scanIterations scans all rows from an iteration query into a slice.
-func scanIterations(rows *sql.Rows) ([]IterationResult, error) { //nolint:unparam // error is always nil but kept for consistency with scan pattern
+// scanIterations scans all rows from an iteration query into a slice. A scan or
+// iteration failure is returned rather than silently dropping rows, so callers
+// never mistake an incomplete read for a complete empty result.
+func scanIterations(rows *sql.Rows) ([]IterationResult, error) {
 	var iterations []IterationResult
 	for rows.Next() {
 		iter, err := scanIterationRow(rows)
 		if err != nil {
-			slog.Error("failed to scan iteration row", slog.Any("error", err))
-			continue
+			return nil, fmt.Errorf("failed to scan iteration row: %w", err)
 		}
 		iterations = append(iterations, iter)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate iterations: %w", err)
 	}
 	if iterations == nil {
 		iterations = []IterationResult{}
@@ -153,7 +157,10 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 	defer rows.Close()
 
-	iterations, _ := scanIterations(rows)
+	iterations, err := scanIterations(rows)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	var total int
 	if err := s.db.QueryRow(list.countQuery, list.countArgs...).Scan(&total); err != nil {
@@ -170,9 +177,11 @@ func iterationOrderByClause(sortBy, sortOrder string) string {
 	}
 	switch sortBy {
 	case "start_date", "end_date", "name", "status", "created_at", "updated_at":
-		return " ORDER BY i." + sortBy + " " + direction + ", i.name ASC, i.id ASC"
+		// The id tie-break follows the primary direction and is always the
+		// final key, so equal values never fall back to alphabetical name order.
+		return " ORDER BY i." + sortBy + " " + direction + ", i.id " + direction
 	default:
-		return " ORDER BY i.start_date DESC, i.name ASC, i.id ASC"
+		return " ORDER BY i.start_date DESC, i.id DESC"
 	}
 }
 

@@ -98,6 +98,9 @@ var recurringTasksSchema string
 //go:embed schema/jira_import.sql
 var jiraImportSchema string
 
+//go:embed schema/custom_widgets.sql
+var customWidgetsSchema string
+
 //go:embed schema/actions.sql
 var actionsSchema string
 

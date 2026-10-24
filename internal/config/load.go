@@ -269,10 +269,12 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			Endpoint: os.Getenv("LOGBOOK_ENDPOINT"),
 		},
 		Notification: NotificationConfig{
-			FlushInterval: parseDurationEnv("NOTIFICATION_FLUSH_INTERVAL", 0),
-			BatchSize:     parseIntEnv("NOTIFICATION_BATCH_SIZE", 0),
-			SyncInterval:  parseDurationEnv("NOTIFICATION_SYNC_INTERVAL", 0),
-			BatchInterval: parseDurationEnv("WINDSHIFT_NOTIFICATION_BATCH_INTERVAL", 0),
+			FlushInterval:   parseDurationEnv("NOTIFICATION_FLUSH_INTERVAL", 0),
+			BatchSize:       parseIntEnv("NOTIFICATION_BATCH_SIZE", 0),
+			SyncInterval:    parseDurationEnv("NOTIFICATION_SYNC_INTERVAL", 0),
+			BatchInterval:   parseDurationEnv("WINDSHIFT_NOTIFICATION_BATCH_INTERVAL", 0),
+			OutboxInterval:  parseDurationEnv("WINDSHIFT_EMAIL_OUTBOX_INTERVAL", 0),
+			OutboxBatchSize: parseIntEnv("WINDSHIFT_EMAIL_OUTBOX_BATCH_SIZE", 0),
 		},
 		OutboundTLS: OutboundTLSConfig{
 			SkipVerify: parseBoolEnv("TLS_SKIP_VERIFY"),
@@ -296,6 +298,8 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		RecoverUser:                 os.Getenv("RECOVER_USER"),
 		ActivateDurableActions:      *activateDurableActions || parseBoolEnv("WINDSHIFT_ACTIVATE_DURABLE_ACTIONS"),
 		ActivateDurableAssetActions: *activateDurableAssetActions || parseBoolEnv("WINDSHIFT_ACTIVATE_DURABLE_ASSET_ACTIONS"),
+
+		MetricsToken: os.Getenv("WINDSHIFT_METRICS_TOKEN"),
 
 		FrontendFiles: frontend,
 		ShutdownChan:  shutdownChan,

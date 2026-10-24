@@ -127,8 +127,8 @@ export default { zammad: {
       syncFailed: 'Synchronisierung fehlgeschlagen', creationUncertain: 'Erstellung unklar', unknownStatus: 'Unbekannter Status',
     },
   },
-  returnLinkResolving: 'Der verknüpfte Windshift-Eintrag wird geöffnet...',
-  returnLinkFailed: 'Der verknüpfte Windshift-Eintrag konnte nicht geöffnet werden. Er existiert möglicherweise nicht mehr oder du hast keinen Zugriff.',
+  returnLinkResolving: 'Der verknüpfte Windshift-Vorgang wird geöffnet...',
+  returnLinkFailed: 'Der verknüpfte Windshift-Vorgang konnte nicht geöffnet werden. Er existiert möglicherweise nicht mehr oder du hast keinen Zugriff.',
   syncState: {
     pending: 'Ticketerstellung ausstehend',
     creating: 'Ticket wird erstellt',

@@ -1,6 +1,7 @@
 import { derived, writable } from 'svelte/store';
+import { auth } from '../api/auth.js';
 import { setAPIRequestSessionKey } from '../api/core.js';
-import { api } from '../api.js';
+import { resetSLAState } from '../features/sla/slaState.js';
 import { clearStores, getStoreValue } from './storeUtils.js';
 import { workspacesStore } from './workspaces.svelte.js';
 
@@ -45,14 +46,25 @@ function createAuthStore() {
   // server does not expose the cookie token, so user id + session creation
   // time is the stable public session marker; tests/legacy responses may
   // provide an explicit id instead.
+  let lastSessionKey = null;
   combined.subscribe((state) => {
     if (!state.isAuthenticated || state.user?.id == null) {
+      if (lastSessionKey !== null) {
+        // Protected SLA data must not survive a session change.
+        resetSLAState();
+        lastSessionKey = null;
+      }
       setAPIRequestSessionKey(null);
       return;
     }
     const marker =
       state.session?.id || state.session?.created_at || state.session?.expires_at || 'active';
-    setAPIRequestSessionKey(`auth:${state.user.id}:${marker}`);
+    const nextKey = `auth:${state.user.id}:${marker}`;
+    if (nextKey !== lastSessionKey) {
+      resetSLAState();
+      lastSessionKey = nextKey;
+    }
+    setAPIRequestSessionKey(nextKey);
   });
 
   return {
@@ -81,7 +93,7 @@ function createAuthStore() {
       loading.set(true);
 
       try {
-        const response = await api.auth.getCurrentUser(options);
+        const response = await auth.getCurrentUser(options);
         if (response.session?.auth_pending_type === 'passkey_verification') {
           // A refreshed password+passkey browser session is still only the
           // first factor. Return to login rather than rendering the app as if
@@ -121,7 +133,7 @@ function createAuthStore() {
       error.set(null);
 
       try {
-        const response = await api.auth.login(credentials);
+        const response = await auth.login(credentials);
 
         // Handle policy-related responses
         if (response.sso_required) {
@@ -152,7 +164,7 @@ function createAuthStore() {
         if (response.success) {
           // Get session details before marking the store authenticated so a
           // follow-up failure cannot leave user/isAuthenticated inconsistent.
-          const sessionResponse = await api.auth.getCurrentUser();
+          const sessionResponse = await auth.getCurrentUser();
           user.set(sessionResponse.user || response.user);
           session.set(sessionResponse.session);
           isAuthenticated.set(true);
@@ -212,7 +224,7 @@ function createAuthStore() {
       loading.set(true);
 
       try {
-        await api.auth.logout();
+        await auth.logout();
       } catch (err) {
         console.warn('Logout API call failed:', err);
       }
@@ -227,7 +239,7 @@ function createAuthStore() {
       loading.set(true);
 
       try {
-        await api.auth.logoutAll();
+        await auth.logoutAll();
       } catch (err) {
         console.warn('Logout all API call failed:', err);
       }
@@ -240,10 +252,10 @@ function createAuthStore() {
     // Refresh session
     async refreshSession(rememberMe = false) {
       try {
-        await api.auth.refreshSession({ remember_me: rememberMe });
+        await auth.refreshSession({ remember_me: rememberMe });
 
         // Update session info
-        const response = await api.auth.getCurrentUser();
+        const response = await auth.getCurrentUser();
         session.set(response.session);
 
         return true;
@@ -259,7 +271,7 @@ function createAuthStore() {
       error.set(null);
 
       try {
-        const response = await api.auth.changePassword(passwordData);
+        const response = await auth.changePassword(passwordData);
         loading.set(false);
         error.set(null);
 
@@ -285,7 +297,7 @@ function createAuthStore() {
       loading.set(true);
       error.set(null);
       try {
-        const response = await api.auth.getCurrentUser();
+        const response = await auth.getCurrentUser();
         user.set(response.user || fallbackUser);
         session.set(response.session);
         isAuthenticated.set(true);

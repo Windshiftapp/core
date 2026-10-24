@@ -20,7 +20,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "check": "biome check . && node scripts/check-shortcuts.js && node scripts/check-i18n.js && node scripts/check-hardcoded-i18n.js && node scripts/check-design-tokens.js",
+    "check": "biome check . && node scripts/check-shortcuts.js && node scripts/check-i18n.js && node scripts/check-hardcoded-i18n.js && node scripts/check-design-tokens.js && node scripts/check-hmr-boundaries.js && node scripts/check-openui-components.mjs",
     "check:entry-assets": "node scripts/check-entry-assets.js",
     "check:fix": "biome check --write .",
     "test": "vitest",
@@ -29,21 +29,23 @@
     "licenses:generate": "node scripts/generate-license-manifest.mjs",
     "typecheck": "svelte-check --threshold error",
     "tauri:dev": "cd ../../desktop && ./build.sh && cargo tauri dev",
-    "tauri:build": "cd ../../desktop && ./build.sh --all"
+    "tauri:build": "cd ../../desktop && ./build.sh --all",
+    "check:hmr-boundaries": "node scripts/check-hmr-boundaries.js && node scripts/check-openui-components.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.4",
+    "@biomejs/biome": "2.5.15",
     "@hugeicons/core-free-icons": "4.2.2",
     "@hugeicons/svelte": "1.1.4",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@tailwindcss/vite": "^4.1.11",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.4.2",
     "@types/dompurify": "^3.0.5",
     "@typescript/native-preview": "^7.0.0-dev.20260420.1",
-    "@vitest/coverage-istanbul": "^4.1.11",
+    "@vitest/coverage-istanbul": "^4.1.12",
     "carbon-icons-svelte": "13.13.0",
     "iconoir": "7.11.1",
-    "jscpd": "^4.0.9",
+    "jscpd": "^5.4.0",
     "jsdom": "^27.4.0",
     "phosphor-svelte": "3.1.0",
     "rollup-plugin-visualizer": "^6.0.3",
@@ -51,8 +53,8 @@
     "svelte-check": "^4.4.8",
     "svelte-check-native": "^0.3.7",
     "typescript": "^5.7.0",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.3",
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.6",
@@ -69,8 +71,8 @@
     "@milkdown/kit": "^7.18.0",
     "@milkdown/plugin-listener": "^7.18.0",
     "@milkdown/theme-nord": "^7.18.0",
+    "@openuidev/svelte-lang": "^0.4.2",
     "@tabler/icons-svelte-runes": "^3.40.0",
-    "@tailwindcss/vite": "^4.1.11",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-fs": "^2.2.0",
@@ -85,9 +87,11 @@
     "react-dom": "^18.3.1",
     "runed": "^0.37.0",
     "shiki": "^4.0.2",
-    "tauri-pty": "^0.2.1"
+    "tauri-pty": "^0.2.1",
+    "zod": "^4.6.7"
   },
   "overrides": {
+    "sass": "^1.83.0",
     "@tailwindcss/vite": {
       "vite": "$vite"
     },

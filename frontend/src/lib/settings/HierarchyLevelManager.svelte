@@ -1,8 +1,14 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { hierarchyLevels as hierarchyLevelsApi } from '../api/configuration.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Circle, Network } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Network from '@lucide/svelte/icons/network';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -46,7 +52,7 @@
     try {
       isLoading = true;
       error = null;
-      const data = await api.hierarchyLevels.getAll();
+      const data = await hierarchyLevelsApi.getAll();
       hierarchyLevels = data.sort((a, b) => a.level - b.level);
     } catch (err) {
       error = t('settings.hierarchyLevels.failedToLoad');
@@ -94,10 +100,10 @@
 
       if (editingId) {
         translationEditor?.validate();
-        await api.hierarchyLevels.update(editingId, formData);
+        await hierarchyLevelsApi.update(editingId, formData);
         await translationEditor?.save();
       } else {
-        await api.hierarchyLevels.create(formData);
+        await hierarchyLevelsApi.create(formData);
       }
 
       await loadHierarchyLevels();
@@ -121,7 +127,7 @@
     if (!confirmed) return;
 
     try {
-      await api.hierarchyLevels.delete(id);
+      await hierarchyLevelsApi.delete(id);
       await loadHierarchyLevels();
     } catch (err) {
       errorToast(
@@ -153,7 +159,7 @@
     }
 
     try {
-      await api.hierarchyLevels.update(id, {
+      await hierarchyLevelsApi.update(id, {
         ...currentLevel,
         level: newLevel
       });

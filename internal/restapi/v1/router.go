@@ -41,7 +41,7 @@ func RegisterRoutes(deps restapi.Deps) {
 
 	bearerAuth := v1middleware.NewBearerAuthWithPermissions(tokenManager, permissionService)
 
-	rateLimiter := v1middleware.NewRateLimiter(1000)
+	rateLimiter := v1middleware.NewRateLimiter(1000, deps.IPExtractor)
 
 	// Reuse the fully wired comment service so v1 comments retain side effects.
 

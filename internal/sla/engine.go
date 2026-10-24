@@ -640,6 +640,13 @@ func (e *Engine) advanceCycle(config *compiledConfig, cycle *models.ItemSLACycle
 	if !effective.After(cycle.LastCalculatedAt) {
 		return nil
 	}
+	// A cycle without a matched goal carries the synthetic 24/7 snapshot. It has
+	// no target to measure against, so it must not accrue wall-clock time that a
+	// goal matched later would inherit and immediately breach.
+	if cycle.GoalDurationMs <= 0 {
+		cycle.LastCalculatedAt = effective
+		return nil
+	}
 	calendar, err := calendarForCycle(config, cycle)
 	if err != nil {
 		return err

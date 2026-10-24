@@ -1,8 +1,14 @@
 <script>
   import { onDestroy } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { CalendarDays, Copy, Eye, EyeOff, Link2, RefreshCw, Trash2 } from '@lucide/svelte';
-  import { createCalendarFeedToken, getCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { createCalendarFeedToken, getCalendarFeedToken, revokeCalendarFeedToken } from '../api/misc.js';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';

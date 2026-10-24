@@ -30,6 +30,15 @@ type TransactionalEmailSender interface {
 	SendTransactional(toEmail, templateName string, data any) error
 }
 
+// MentionEmailSender renders and sends the dedicated @mention email. It is a
+// narrower surface than ThreadedEmailSender: mentions are fresh, unthreaded
+// messages to internal users, so the sender only needs a context-aware
+// transactional send of a named template.
+type MentionEmailSender interface {
+	IsSMTPConfigured() bool
+	SendTransactionalContext(ctx context.Context, toEmail, templateName string, data any) error
+}
+
 // ThreadedEmailSender abstracts the SMTP sending capability for the threaded
 // reply flow. RenderEmail resolves a named template (DB row preferred,
 // embedded fallback otherwise) and renders it against the provided data —

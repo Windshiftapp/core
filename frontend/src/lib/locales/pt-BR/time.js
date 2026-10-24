@@ -24,6 +24,7 @@ export default {
     resumeTimer: 'Retomar Cronometro',
     timeLogged: 'Tempo registrado com sucesso',
     timeTrackingProject: 'Projeto de Registro de Horas',
+    noCustomer: 'Sem cliente',
     workItemOptional: 'Item de Trabalho (Opcional)',
     whatDidYouWorkOn: 'No que voce trabalhou?',
     start: 'Inicio',

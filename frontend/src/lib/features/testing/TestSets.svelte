@@ -1,10 +1,14 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { ai } from '../../api/ai.js';
+  import { tests } from '../../api/tests/index.js';
+  import { milestones as milestonesApi } from '../../api/milestones.js';
   import { writable } from 'svelte/store';
   import { confirm } from '../../composables/useConfirm.js';
-  import { IconX, IconPackage, IconFileText, IconPlayerPlay } from '@tabler/icons-svelte-runes';
-  import { escapeHtml } from '../../utils/sanitize.ts';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconPackage from '@tabler/icons-svelte-runes/icons/package';
+  import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import IconPlayerPlay from '@tabler/icons-svelte-runes/icons/player-play';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
@@ -15,12 +19,14 @@
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Panel from '../../components/Panel.svelte';
+  import Badge from '../../components/Badge.svelte';
+  import Lozenge from '../../components/Lozenge.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
-  import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
+  import { getStatusLabel, getTestStatusColor } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { workspacePermissions } from '../../stores/index.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -67,7 +73,7 @@
     if (!(await confirmOverwriteIfNeeded(formData.description))) return;
     generating = true;
     try {
-      const { description } = await api.ai.summarizeTestPlanDescription(editingSet.id);
+      const { description } = await ai.summarizeTestPlanDescription(editingSet.id);
       formData.description = description ?? '';
     } catch (err) {
       errorToast(err?.message || t('testing.generateFailed'));
@@ -82,9 +88,9 @@
     if (!(await confirmOverwriteIfNeeded(set.description))) return;
     generating = true;
     try {
-      const { description } = await api.ai.summarizeTestPlanDescription(set.id);
+      const { description } = await ai.summarizeTestPlanDescription(set.id);
       const next = description ?? '';
-      await api.tests.testPlans.update(workspaceId, set.id, {
+      await tests.testPlans.update(workspaceId, set.id, {
         name: set.name,
         description: next,
         milestone_id: set.milestone_id,
@@ -115,8 +121,8 @@
   async function loadData() {
     try {
       const [sets, milestonesData] = await Promise.all([
-        api.tests.testPlans.getAll(workspaceId, { page_size: 200 }),
-        api.milestones.getAll({ workspace_id: workspaceId })
+        tests.testPlans.getAll(workspaceId, { page_size: 200 }),
+        milestonesApi.getAll({ workspace_id: workspaceId })
       ]);
       testSets.set(sets || []);
       milestones.set(milestonesData || []);
@@ -156,9 +162,9 @@
       const data = { ...formData };
 
       if (editingSet) {
-        await api.tests.testPlans.update(workspaceId, editingSet.id, data);
+        await tests.testPlans.update(workspaceId, editingSet.id, data);
       } else {
-        await api.tests.testPlans.create(workspaceId, data);
+        await tests.testPlans.create(workspaceId, data);
       }
       await loadData();
       showForm = false;
@@ -173,7 +179,7 @@
     try {
       // Create a test run for this plan
       const runName = `${$selectedSet.name} - ${formatDateSimple(new Date())}`;
-      const newRun = await api.tests.testRuns.create(workspaceId, {
+      const newRun = await tests.testRuns.create(workspaceId, {
         plan_id: $selectedSet.id,
         name: runName
       });
@@ -196,7 +202,7 @@
     });
     if (!ok) return;
     try {
-      await api.tests.testPlans.delete(workspaceId, id);
+      await tests.testPlans.delete(workspaceId, id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete test plan:', error);
@@ -211,7 +217,7 @@
 
   async function loadSetTestCases(setId) {
     try {
-      const cases = await api.tests.testPlans.getTestCases(workspaceId, setId);
+      const cases = await tests.testPlans.getTestCases(workspaceId, setId);
       setTestCases = cases || [];
     } catch (error) {
       console.error('Failed to load set test cases:', error);
@@ -222,7 +228,7 @@
     if (!testCase || !testCase.id) return;
 
     try {
-      await api.tests.testPlans.addTestCase(workspaceId, $selectedSet.id, testCase.id);
+      await tests.testPlans.addTestCase(workspaceId, $selectedSet.id, testCase.id);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to add test case to set:', error);
@@ -232,7 +238,7 @@
 
   async function removeTestCaseFromSet(testCaseId) {
     try {
-      await api.tests.testPlans.removeTestCase(workspaceId, $selectedSet.id, testCaseId);
+      await tests.testPlans.removeTestCase(workspaceId, $selectedSet.id, testCaseId);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to remove test case from set:', error);
@@ -247,54 +253,16 @@
   const workspaceTestBase = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
   const testSetColumns = $derived.by(() => [
     { key: 'id', label: t('common.id'), width: 'w-16' },
-    {
-      key: 'name',
-      label: t('common.name'),
-      html: true,
-      render: (set) => {
-        const description = set.description ? `<div class="text-xs mt-1" style="color: var(--ds-text-subtle);">${escapeHtml(set.description)}</div>` : '';
-        return `<div class="font-medium" style="color: var(--ds-text);">${escapeHtml(set.name)}</div>${description}`;
-      }
-    },
-    {
-      key: 'milestone',
-      label: t('milestones.milestone'),
-      html: true,
-      render: (set) => renderMilestoneBadge(set.milestone_name)
-    },
+    { key: 'name', label: t('common.name'), slot: 'nameCell' },
+    { key: 'milestone', label: t('milestones.milestone'), width: 'w-40', slot: 'milestoneCell' },
     {
       key: 'test_case_count',
       label: t('testing.testCases'),
-      html: true,
-      render: (set) => {
-        const count = set.test_case_count || 0;
-        return `<span style="color: var(--ds-text);">${count}</span>`;
-      }
+      width: 'w-24',
+      render: (set) => String(set.test_case_count || 0)
     },
-    {
-      key: 'total_runs',
-      label: t('testing.testRuns'),
-      html: true,
-      render: (set) => {
-        const total = set.total_runs || 0;
-        const success = set.successful_runs || 0;
-        const failed = set.failed_runs || 0;
-        const summary = total > 0
-          ? `<div class="text-xs"><span style="color: var(--ds-text-success);">${success} ✓</span>${failed > 0 ? `<span style="color: var(--ds-text-danger);" class="ml-1">${failed} ✗</span>` : ''}</div>`
-          : '';
-        return `<div class="flex items-center space-x-2"><span class="font-medium" style="color: var(--ds-text);">${total} ${t('common.total').toLowerCase()}</span>${summary}</div>`;
-      }
-    },
-    {
-      key: 'last_run_status',
-      label: t('testing.lastRun'),
-      html: true,
-      render: (set) => {
-        if (!set.last_run_status) return `<span style="color: var(--ds-text-subtle);">${t('testing.neverRun')}</span>`;
-        const datePart = set.last_run_date ? `<span class="text-xs mt-1" style="color: var(--ds-text-subtle);">${formatDateSimple(set.last_run_date)}</span>` : '';
-        return `<div class="flex flex-col">${renderStatusBadge(set.last_run_status)}${datePart}</div>`;
-      }
-    },
+    { key: 'total_runs', label: t('testing.testRuns'), width: 'w-32', slot: 'runsCell' },
+    { key: 'last_run_status', label: t('testing.lastRun'), width: 'w-36', slot: 'lastRunCell' },
     { key: 'actions', label: t('common.actions'), width: 'w-24', align: 'text-right' }
   ]);
 
@@ -510,6 +478,49 @@
       emptyMessage={t('testing.noTestPlansYet')}
       emptyDescription={t('testing.createFirstTestPlan')}
       emptyIcon={IconPackage}
-    />
+    >
+      {#snippet nameCell(set)}
+        <div class="font-medium" style="color: var(--ds-text);">{set.name}</div>
+        {#if set.description}
+          <DescriptionText>{set.description}</DescriptionText>
+        {/if}
+      {/snippet}
+
+      {#snippet milestoneCell(set)}
+        {#if set.milestone_name}
+          <Badge variant="info" class="whitespace-nowrap">{set.milestone_name}</Badge>
+        {:else}
+          <span style="color: var(--ds-text-subtle);">{t('testing.noMilestone')}</span>
+        {/if}
+      {/snippet}
+
+      {#snippet runsCell(set)}
+        {@const total = set.total_runs || 0}
+        <div class="flex flex-col items-start gap-1 whitespace-nowrap">
+          <span class="text-sm font-medium" style="color: var(--ds-text);">{total} {t('common.total').toLowerCase()}</span>
+          {#if total > 0}
+            <div class="flex items-center gap-1">
+              <Badge variant="success" size="xs">{set.successful_runs || 0} ✓</Badge>
+              {#if (set.failed_runs || 0) > 0}
+                <Badge variant="danger" size="xs">{set.failed_runs} ✗</Badge>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/snippet}
+
+      {#snippet lastRunCell(set)}
+        {#if set.last_run_status}
+          <div class="flex flex-col items-start gap-1 whitespace-nowrap">
+            <Lozenge color={getTestStatusColor(set.last_run_status)} text={getStatusLabel(set.last_run_status)} />
+            {#if set.last_run_date}
+              <span class="text-xs" style="color: var(--ds-text-subtle);">{formatDateSimple(set.last_run_date)}</span>
+            {/if}
+          </div>
+        {:else}
+          <span style="color: var(--ds-text-subtle);">{t('testing.neverRun')}</span>
+        {/if}
+      {/snippet}
+    </DataTable>
   </div>
 </div>

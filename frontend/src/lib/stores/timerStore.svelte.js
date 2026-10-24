@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { timer as timerApi } from '../api/time.js';
 
 class TimerStore {
   // === State ===
@@ -116,7 +116,7 @@ class TimerStore {
       this.error = null;
       this.#stateVersion += 1;
 
-      const timer = await api.timer.start(timerData);
+      const timer = await timerApi.start(timerData);
       this.#stateVersion += 1;
       this.activeTimer = timer;
 
@@ -152,7 +152,7 @@ class TimerStore {
       this.error = null;
       this.#stateVersion += 1;
 
-      const result = await api.timer.stop();
+      const result = await timerApi.stop();
 
       // Clear active timer
       this.#stateVersion += 1;
@@ -180,7 +180,7 @@ class TimerStore {
     try {
       this.error = null;
 
-      const timer = await api.timer.getActive();
+      const timer = await timerApi.getActive();
       if (syncVersion !== this.#stateVersion || this.syncing) {
         return;
       }

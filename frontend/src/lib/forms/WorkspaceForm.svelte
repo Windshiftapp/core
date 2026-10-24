@@ -5,7 +5,8 @@
   import Checkbox from '../components/Checkbox.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import Spinner from '../components/Spinner.svelte';
-  import { LayoutTemplate, Package } from '@lucide/svelte';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Package from '@lucide/svelte/icons/package';
 
   let {
     formData = $bindable({

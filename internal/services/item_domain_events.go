@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"windshift/internal/database"
@@ -10,23 +9,6 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
-
-func itemMilestoneIDsInTx(tx database.Tx, itemID int) ([]int, error) {
-	rows, err := tx.Query("SELECT milestone_id FROM item_milestones WHERE item_id = ? ORDER BY milestone_id", itemID)
-	if err != nil {
-		return nil, fmt.Errorf("load item milestones for event: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
-}
 
 func recordRemovedItemLinks(ctx context.Context, db database.Database, tx database.Tx, itemIDs []int, metadata itemevents.Metadata) error {
 	return itemevents.NewRecorder(db).RemovedLinks(ctx, tx, "item", itemIDs, metadata)

@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { GitBranch } from '@lucide/svelte';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

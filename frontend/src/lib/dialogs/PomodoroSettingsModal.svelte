@@ -1,12 +1,15 @@
 <script>
-  import { Clock, FileText, Play, X } from '@lucide/svelte';
+  import Clock from '@lucide/svelte/icons/clock';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Play from '@lucide/svelte/icons/play';
+  import X from '@lucide/svelte/icons/x';
   import Button from '../components/Button.svelte';
   import FormField from '../components/FormField.svelte';
   import Input from '../components/Input.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Select from '../components/Select.svelte';
   import Toggle from '../components/Toggle.svelte';
-  import { api } from '../api.js';
+  import { time } from '../api/time.js';
   import { t } from '../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
 
@@ -120,7 +123,7 @@
   async function loadProjects() {
     projectsLoaded = true;
     try {
-      projects = (await api.time.projects.getAll()) || [];
+      projects = (await time.projects.getAll()) || [];
     } catch (err) {
       console.warn('[pomodoro-settings] failed to load projects:', err);
       projects = [];

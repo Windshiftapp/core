@@ -1,7 +1,7 @@
 <script>
 	import { onMount, tick } from 'svelte';
-	import { api } from '../../api.js';
-	import { authStore } from '../../stores';
+	import { milestones as milestonesApi } from '../../api/milestones.js';
+	import { authStore } from '../../stores/auth.svelte.js';
 	import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
@@ -60,7 +60,7 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await api.milestones.getComments(milestoneId, { limit: COMMENT_PAGE_SIZE });
+			const response = await milestonesApi.getComments(milestoneId, { limit: COMMENT_PAGE_SIZE });
 			comments = response?.comments || [];
 			hasMore = Boolean(response?.has_more);
 			olderCursor = response?.next_cursor || '';
@@ -81,7 +81,7 @@
 		isLoadingMore = true;
 		error = '';
 		try {
-			const response = await api.milestones.getComments(milestoneId, {
+			const response = await milestonesApi.getComments(milestoneId, {
 				limit: COMMENT_PAGE_SIZE,
 				cursor: olderCursor
 			});
@@ -102,7 +102,7 @@
 		isSubmitting = true;
 		error = '';
 		try {
-			const created = await api.milestones.createComment(milestoneId, newCommentContent);
+			const created = await milestonesApi.createComment(milestoneId, newCommentContent);
 			if (!comments.some((comment) => comment.id === created.id)) totalCount += 1;
 			comments = [...comments.filter((comment) => comment.id !== created.id), created];
 			newCommentContent = '';
@@ -132,7 +132,7 @@
 		});
 		if (!confirmed) return;
 		try {
-			await api.milestones.deleteComment(milestoneId, commentId);
+			await milestonesApi.deleteComment(milestoneId, commentId);
 			comments = comments.filter((comment) => comment.id !== commentId);
 			totalCount = Math.max(0, totalCount - 1);
 		} catch (err) {
@@ -158,7 +158,7 @@
 		isSavingEdit = true;
 		error = '';
 		try {
-			const updated = await api.milestones.updateComment(milestoneId, editingCommentId, editingContent);
+			const updated = await milestonesApi.updateComment(milestoneId, editingCommentId, editingContent);
 			comments = comments.map((comment) => (comment.id === updated.id ? updated : comment));
 			cancelEdit();
 		} catch (err) {

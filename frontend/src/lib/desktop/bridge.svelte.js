@@ -1,4 +1,4 @@
-import { toExternal } from '../runtime/contextPath.js';
+import { contextPath, toExternal } from '../runtime/contextPath.js';
 import { isTauri } from '../utils/isTauri.js';
 import { DESKTOP_MODAL_FEATURES, DESKTOP_OPEN_MODAL_EVENT } from './events.js';
 
@@ -42,7 +42,10 @@ class DesktopBridge {
         this.open(modal);
       });
 
-      await invoke('set_webapp_ui_ready', { features: DESKTOP_MODAL_FEATURES });
+      await invoke('set_webapp_ui_ready', {
+        features: DESKTOP_MODAL_FEATURES,
+        basePath: contextPath(),
+      });
     } catch (err) {
       console.warn('[desktop-bridge] init failed:', err);
     }

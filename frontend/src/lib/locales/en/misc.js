@@ -832,6 +832,9 @@ export default {
     // Validation
     fillRequiredFields: 'Please fill in required fields:',
     selectWorkspaceFirst: 'Select a workspace first',
+    // Feedback
+    createdPartialError:
+      'Item created, but finishing it failed: {error}. Press Create again to retry.',
     // Buttons
     create: 'Create',
   },
@@ -971,6 +974,13 @@ export default {
     bulkAssignMe: 'Assign to me',
     bulkAssignTeam: 'Assign to team',
     bulkApplyTeam: 'Apply',
+    bulkTransition: 'Set status',
+    bulkApplyStatus: 'Apply',
+    bulkDelete: 'Delete',
+    bulkDeleteConfirm: 'Delete {n} selected tickets?',
+    bulkDeleteSuccess: 'Deleted {n} tickets',
+    bulkTransitionSuccess: 'Moved {n} tickets',
+    bulkPartial: '{updated} of {requested} tickets updated; {failed} failed',
     bulkClear: 'Clear selection',
     bulkSuccess: 'Updated {n} tickets',
     columnTitle: 'Ticket',

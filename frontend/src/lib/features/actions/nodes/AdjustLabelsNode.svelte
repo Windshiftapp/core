@@ -1,5 +1,5 @@
 <script>
-  import { Tag } from '@lucide/svelte';
+  import Tag from '@lucide/svelte/icons/tag';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

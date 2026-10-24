@@ -1,11 +1,13 @@
+import { items } from '../../api/items.js';
+import { getComments } from '../../api/misc.js';
 /** Load comments whose agent-owner attribution is already permission-filtered server-side. */
-export function loadAttributedComments(apiClient, itemId, params = {}) {
-  return apiClient.getComments(itemId, params);
+export function loadAttributedComments(itemId, params = {}) {
+  return getComments(itemId, params);
 }
 
 /** Load item history whose agent-owner attribution is already permission-filtered server-side. */
-export function loadAttributedItemHistory(apiClient, itemId) {
-  return apiClient.items.getHistory(itemId);
+export function loadAttributedItemHistory(itemId) {
+  return items.getHistory(itemId);
 }
 
 export function agentOwnerName(entry) {

@@ -1,5 +1,10 @@
 <script>
-  import { MoreHorizontal, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -183,7 +188,7 @@
                     {:else if sortKey === column.key && sortDirection === 'desc'}
                       <ArrowDown class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
                     {:else}
-                      <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" style="color: var(--ds-text-subtlest);" />
+                      <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100" style="color: var(--ds-text-subtlest);" />
                     {/if}
                   {/if}
                 </span>

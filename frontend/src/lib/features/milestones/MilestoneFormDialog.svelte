@@ -1,5 +1,6 @@
 <script>
-  import { IconBuilding as Building2, IconWorld as Globe } from '@tabler/icons-svelte-runes';
+  import Building2 from '@tabler/icons-svelte-runes/icons/building';
+  import Globe from '@tabler/icons-svelte-runes/icons/world';
   import { t } from '../../stores/i18n.svelte.js';
   import { categoriesStore } from '../../stores/categories.js';
   import { canChangePlanningScope } from '../../utils/planningScope.js';

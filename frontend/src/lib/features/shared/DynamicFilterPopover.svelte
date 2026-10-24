@@ -1,5 +1,7 @@
 <script>
-  import { Filter, Plus, X } from '@lucide/svelte';
+  import Filter from '@lucide/svelte/icons/filter';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
   import Button from '../../components/Button.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 

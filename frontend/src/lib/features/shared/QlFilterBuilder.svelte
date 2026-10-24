@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, X } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { queryLanguage } from '../../api/queryLanguage.js';
   import { QLBuilder } from '../../utils/ql.js';
   import { completionFieldToFilterField } from '../../utils/qlCompletion.js';
   import Button from '../../components/Button.svelte';
@@ -64,7 +65,7 @@
   async function ensureCatalog() {
     if (catalog) return catalog;
     try {
-      catalog = await api.queryLanguage.getCatalog();
+      catalog = await queryLanguage.getCatalog();
     } catch (error) {
       console.warn('Failed to load QL catalog for builder hydration:', error);
       catalog = null;
@@ -157,7 +158,7 @@
       type="button"
       role="tab"
       aria-selected={mode === 'builder'}
-      class="px-3 py-1.5 rounded-md text-sm border transition-colors"
+      class="px-3 py-1.5 rounded-md text-sm border transition-colors whitespace-nowrap"
       style={mode === 'builder'
         ? 'color: var(--ds-text); background-color: var(--ds-surface-hovered); border-color: var(--ds-border-bold);'
         : 'color: var(--ds-text-subtle); background-color: transparent; border-color: var(--ds-border);'}
@@ -170,7 +171,7 @@
       type="button"
       role="tab"
       aria-selected={mode === 'raw'}
-      class="px-3 py-1.5 rounded-md text-sm border transition-colors"
+      class="px-3 py-1.5 rounded-md text-sm border transition-colors whitespace-nowrap"
       style={mode === 'raw'
         ? 'color: var(--ds-text); background-color: var(--ds-surface-hovered); border-color: var(--ds-border-bold);'
         : 'color: var(--ds-text-subtle); background-color: transparent; border-color: var(--ds-border);'}

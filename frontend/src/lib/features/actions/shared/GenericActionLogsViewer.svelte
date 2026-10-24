@@ -1,7 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { CheckCircle, XCircle, Clock, ArrowLeft, Eye } from '@lucide/svelte';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import XCircle from '@lucide/svelte/icons/x-circle';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Eye from '@lucide/svelte/icons/eye';
   import Button from '../../../components/Button.svelte';
+  import BackButton from '../../../components/BackButton.svelte';
   import DataTable from '../../../components/DataTable.svelte';
   import ExecutionTraceModal from '../ExecutionTraceModal.svelte';
   import { errorToast } from '../../../stores/toasts.svelte.js';
@@ -80,10 +84,7 @@
 
 <div class="action-logs">
   <div class="header">
-    <Button variant="ghost" size="small" onclick={onBack}>
-      <ArrowLeft size={14} />
-      Back
-    </Button>
+    <BackButton onclick={onBack} label="Back" />
     <h3>Logs: {action.name}</h3>
   </div>
 

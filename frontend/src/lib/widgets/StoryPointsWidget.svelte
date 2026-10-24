@@ -1,5 +1,5 @@
 <script>
-  import { api } from '../api.js';
+  import { items } from '../api/items.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let { workspaceId } = $props();
@@ -20,7 +20,7 @@
     loading = true;
     errored = false;
     try {
-      const response = await api.items.getStoryPointsByAssignee({ workspace_id: workspaceId });
+      const response = await items.getStoryPointsByAssignee({ workspace_id: workspaceId });
       if (v !== version) return;
       rows = response || [];
     } catch (err) {

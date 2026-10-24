@@ -98,17 +98,21 @@ ensure_node_runtime() {
         return 0
     fi
 
-    if [ "${WINDSHIFT_RELEASE_NODE_BOOTSTRAPPED:-}" = "$required_version" ]; then
-        die "mise failed to activate Node $required_version (active: ${current_version:-unavailable})"
-    fi
-
     if ! command -v mise >/dev/null 2>&1; then
         die "Node $required_version is required (active: ${current_version:-unavailable}). Install mise or activate the version from .nvmrc."
     fi
 
-    log_info "Active Node is ${current_version:-unavailable}; restarting with Node $required_version via mise..."
-    exec env WINDSHIFT_RELEASE_NODE_BOOTSTRAPPED="$required_version" \
-        mise x "node@$required_version" -- "$SCRIPT_DIR/release.sh" "$@"
+    # Prepend the pinned install ourselves. `mise exec` resolves the direct
+    # command but leaves its node path behind earlier entries such as
+    # Homebrew's, so every later PATH lookup would still pick the wrong node.
+    local node_bin
+    node_bin="$(mise where "node@$required_version" 2>/dev/null)/bin"
+    if [ ! -x "$node_bin/node" ]; then
+        die "mise could not provide Node $required_version (active: ${current_version:-unavailable}). Run 'mise install node@$required_version'."
+    fi
+
+    log_info "Switching Node from ${current_version:-unavailable} to $required_version via mise..."
+    export PATH="$node_bin:$PATH"
 }
 
 # =============================================================================
@@ -429,8 +433,10 @@ run_frontend_supply_chain_checks() {
     log_info "Verifying npm package signatures..."
     npm audit signatures --min-release-age=0
 
-    log_info "Running npm audit (high severity and above)..."
-    npm audit --audit-level=high
+    # Audit production dependencies only. Dev-only tools (vite, vitest, ...)
+    # never ship in the release artifact, so their advisories must not block it.
+    log_info "Running npm audit (high severity and above, production deps only)..."
+    npm audit --audit-level=high --omit=dev
 }
 
 run_go_vulnerability_check() {
@@ -884,7 +890,7 @@ write_release_provenance() {
             echo ""
             echo "Resolved base image digests at build time"
             echo "-----------------------------------------"
-            for image in node:24.18.0-alpine golang:1.27.2-alpine golang:1.27.2-bookworm node:lts-slim; do
+            for image in node:24.18.0-alpine golang:1.27.3-alpine golang:1.27.3-bookworm node:lts-slim; do
                 docker buildx imagetools inspect "$image" 2>/dev/null | grep -E 'Name:|Digest:' || true
             done
         fi
@@ -1365,9 +1371,9 @@ Release Notes:
     - Fixed issue #123
 
 Node Runtime:
-  The script reads .nvmrc and automatically restarts through mise when the
-  active Node version differs. Install mise if the required version is not
-  already active.
+  The script reads .nvmrc and activates that Node version through mise when a
+  different one is active. Install mise if the required version is not already
+  available.
 EOF
 }
 
@@ -1433,7 +1439,7 @@ main() {
     fi
 
     case "$COMMAND" in
-        build|push|release) ensure_node_runtime "$@" ;;
+        build|push|release) ensure_node_runtime ;;
     esac
 
     case "$COMMAND" in

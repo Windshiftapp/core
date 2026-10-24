@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import StateDisplay from '../components/StateDisplay.svelte';
 	import Spinner from '../components/Spinner.svelte';
-	import { api } from '../api.js';
-	import { RefreshCw } from '@lucide/svelte';
+	import { todoistSync } from '../api/integrations.js';
+	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Button from '../components/Button.svelte';
 	import Checkbox from '../components/Checkbox.svelte';
 	import NativeSelect from '../components/NativeSelect.svelte';
@@ -41,7 +41,7 @@
 		loading = true;
 		err = '';
 		try {
-			const s = await api.todoistSync.get();
+			const s = await todoistSync.get();
 			enabled = !!s.enabled;
 			scopeMode = s.scope_mode || 'all';
 			projectId = s.todoist_project_id || '';
@@ -60,7 +60,7 @@
 		if (projectsLoaded || loadingProjects) return;
 		loadingProjects = true;
 		try {
-			projects = (await api.todoistSync.getProjects()) || [];
+			projects = (await todoistSync.getProjects()) || [];
 			projectsLoaded = true;
 		} catch (e) {
 			console.error('Failed to load Todoist projects:', e);
@@ -76,7 +76,7 @@
 		saving = true;
 		err = '';
 		try {
-			const s = await api.todoistSync.update({
+			const s = await todoistSync.update({
 				enabled,
 				scope_mode: scopeMode,
 				todoist_project_id: scopeMode === 'project' ? projectId : '',
@@ -113,7 +113,7 @@
 		syncMsg = '';
 		err = '';
 		try {
-			const r = await api.todoistSync.run();
+			const r = await todoistSync.run();
 			const into = (r.created_in_ws || 0) + (r.updated_in_ws || 0) + (r.deleted_in_ws || 0);
 			const out = (r.created_in_td || 0) + (r.updated_in_td || 0) + (r.deleted_in_td || 0);
 			syncMsg = r.ok

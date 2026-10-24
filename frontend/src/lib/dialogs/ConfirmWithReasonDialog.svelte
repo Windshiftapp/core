@@ -1,5 +1,5 @@
 <script>
-  import { AlertTriangle } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import ConfirmDialog from './ConfirmDialog.svelte';
 
   // ConfirmDialog with a required reason input. The Confirm button stays

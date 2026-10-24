@@ -1,7 +1,7 @@
 <script>
-  import { ChevronRight } from '@lucide/svelte';
-  import { api } from '../api.js';
-  import { authStore } from '../stores';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import { updateUserRegionalSettings } from '../api/users.js';
+  import { authStore } from '../stores/auth.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { i18n, SUPPORTED_LOCALES, t } from '../stores/i18n.svelte.js';
   import { navigate } from '../router.js';
@@ -33,7 +33,7 @@
     saving = true;
     try {
       if (user?.id) {
-        const updated = await api.updateUserRegionalSettings(user.id, {
+        const updated = await updateUserRegionalSettings(user.id, {
           timezone: user.timezone || 'UTC',
           language: locale.value,
         });

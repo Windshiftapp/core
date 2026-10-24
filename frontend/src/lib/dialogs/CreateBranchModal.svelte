@@ -1,9 +1,9 @@
 <script>
-  import { api } from '../api.js';
+  import { itemSCMLinks } from '../api/scm.js';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
   import TextField from '../components/TextField.svelte';
-  import { GitBranch } from '@lucide/svelte';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -61,7 +61,7 @@
         base_branch: baseBranch.trim() || undefined,
       };
 
-      const result = await api.itemSCMLinks.createBranch(itemId, data);
+      const result = await itemSCMLinks.createBranch(itemId, data);
       successToast(t('scm.branchCreatedSuccess'));
       oncreated?.(result);
     } catch (err) {

@@ -103,13 +103,13 @@ export const agentBindings = {
   /**
    * Rewrite the binding's prompt-shaping config: custom instructions (the
    * persona appended to the run's initial prompt) + attached skill ids
-   * (WI-258), plus the optional custom runner image for pool bindings (WI-450).
-   * runner_image is presence-aware: omit it to leave the current image
-   * untouched, or pass "" to clear it back to the default. Everything else on a
-   * binding stays create/delete-only.
+   * (WI-258), plus the optional custom runner image for pool bindings (WI-450)
+   * and the model connection (presence-aware). runner_image and
+   * llm_connection_id are presence-aware: omit to leave the current value
+   * untouched (pass "" for runner_image to clear it).
    * @param {number} workspaceId
    * @param {number} id
-   * @param {{ instructions: string, skill_ids: number[], runner_image?: string }} body
+   * @param {{ instructions: string, skill_ids: number[], runner_image?: string, llm_connection_id?: number }} body
    */
   updateAgentConfig: (workspaceId, id, body) =>
     fetchAPI(`/workspaces/${workspaceId}/agent-bindings/${id}/agent-config`, {

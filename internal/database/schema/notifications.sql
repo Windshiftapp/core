@@ -48,6 +48,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_timestamp ON notifications(timestam
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON notifications(sent_at);
 CREATE INDEX IF NOT EXISTS idx_notifications_email_delivery ON notifications(email_delivery_state, email_claim_expires_at);
+-- Supports the digest recipient scan, which groups by user and orders by the
+-- oldest eligible notification. Partial so suppressed and sent rows drop out
+-- of the index instead of accumulating behind `sent_at IS NULL` (WI-1768).
+CREATE INDEX IF NOT EXISTS idx_notifications_email_digest_pending
+    ON notifications(user_id, timestamp)
+    WHERE sent_at IS NULL AND read = false AND email_delivery_state IN ('pending', 'failed');
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE INDEX IF NOT EXISTS idx_notifications_workspace_id ON notifications(workspace_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_delivery_key ON notifications(delivery_key) WHERE delivery_key IS NOT NULL;

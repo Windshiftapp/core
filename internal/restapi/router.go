@@ -7,6 +7,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // Deps carries the dependencies v1 (and future versions) need so we can add
@@ -92,6 +93,10 @@ type Deps struct {
 	// *middleware.RateLimiter (same import-cycle reasoning as AI). Optional:
 	// nil falls back to the group rate limiter alone.
 	AIRateLimiter Limiter
+	// IPExtractor resolves the client IP for the v1 IP-keyed rate-limit
+	// fallback with trusted-proxy handling. Optional: nil ignores forwarded
+	// headers and uses RemoteAddr.
+	IPExtractor *utils.IPExtractor
 }
 
 // AIHandler is the subset of the AI tier the bearer surface exposes.

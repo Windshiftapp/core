@@ -177,7 +177,7 @@ export default {
       'Cannot delete the default screen. This screen is required for workspaces without a configuration set.',
     confirmDeleteScreen:
       'Are you sure you want to delete screen "{name}"? This will affect all workspaces using this screen.',
-    defaults: { default: { name: 'Default Screen', description: 'Default screen with essential work item fields' } },
+    defaults: { default: { name: 'Default Screen', description: 'Default screen with essential work item fields' }, default_create: { name: 'Default Create Screen', description: 'Focused screen for creating work items' } },
     fieldWidths: {
       full: 'Full Width',
       half: 'Half Width',

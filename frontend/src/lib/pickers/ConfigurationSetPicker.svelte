@@ -1,6 +1,6 @@
 <script>
   import BasePicker from './BasePicker.svelte';
-  import { Settings } from '@lucide/svelte';
+  import Settings from '@lucide/svelte/icons/settings';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

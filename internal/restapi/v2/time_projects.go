@@ -64,21 +64,22 @@ type timerApplication interface {
 }
 
 type timeProjectDTO struct {
-	ID            int            `json:"id"`
-	CustomerID    *int           `json:"customer_id"`
-	CategoryID    *int           `json:"category_id"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	Status        string         `json:"status"`
-	Color         string         `json:"color"`
-	HourlyRate    float64        `json:"hourly_rate"`
-	Settings      map[string]any `json:"settings"`
-	CustomerName  string         `json:"customer_name"`
-	CategoryName  string         `json:"category_name"`
-	CategoryColor string         `json:"category_color"`
-	TotalHours    *float64       `json:"total_hours"`
-	CreatedAt     string         `json:"created_at"`
-	UpdatedAt     string         `json:"updated_at"`
+	ID                 int            `json:"id"`
+	CustomerID         *int           `json:"customer_id"`
+	CategoryID         *int           `json:"category_id"`
+	Name               string         `json:"name"`
+	Description        string         `json:"description"`
+	Status             string         `json:"status"`
+	Color              string         `json:"color"`
+	HourlyRate         float64        `json:"hourly_rate"`
+	Settings           map[string]any `json:"settings"`
+	CustomerName       string         `json:"customer_name"`
+	CustomerBuiltinKey string         `json:"customer_builtin_key,omitempty"`
+	CategoryName       string         `json:"category_name"`
+	CategoryColor      string         `json:"category_color"`
+	TotalHours         *float64       `json:"total_hours"`
+	CreatedAt          string         `json:"created_at"`
+	UpdatedAt          string         `json:"updated_at"`
 }
 
 type timeProjectCategoryDTO struct {
@@ -92,7 +93,7 @@ type timeProjectCategoryDTO struct {
 }
 
 type timeProjectCreateRequest struct {
-	CustomerID  int            `json:"customer_id"`
+	CustomerID  *int           `json:"customer_id"`
 	CategoryID  *int           `json:"category_id"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
@@ -242,7 +243,7 @@ func createTimeProject(projects timeProjectApplication) jsonOperation[timeProjec
 			return timeProjectDTO{}, err
 		}
 		project, err := projects.CreateProject(auditActor(r, user), models.TimeProject{
-			CustomerID: &input.CustomerID, CategoryID: input.CategoryID, Name: input.Name,
+			CustomerID: input.CustomerID, CategoryID: input.CategoryID, Name: input.Name,
 			Description: input.Description, Status: input.Status, Color: input.Color,
 			HourlyRate: input.HourlyRate, Settings: input.Settings,
 		})
@@ -536,7 +537,8 @@ func timeProjectFromRepository(project repository.TimeProjectDetail) timeProject
 		ID: project.ID, CustomerID: project.CustomerID, CategoryID: project.CategoryID,
 		Name: project.Name, Description: project.Description, Status: project.Status,
 		Color: project.Color, HourlyRate: project.HourlyRate, Settings: project.Settings,
-		CustomerName: project.CustomerName, CategoryName: project.CategoryName,
+		CustomerName: project.CustomerName, CustomerBuiltinKey: project.CustomerBuiltinKey,
+		CategoryName:  project.CategoryName,
 		CategoryColor: project.CategoryColor, TotalHours: project.TotalHours,
 		CreatedAt: project.CreatedAt.UTC().Format(time.RFC3339), UpdatedAt: project.UpdatedAt.UTC().Format(time.RFC3339),
 	}

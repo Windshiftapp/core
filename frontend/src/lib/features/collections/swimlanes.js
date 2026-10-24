@@ -1,10 +1,13 @@
-// Swimlane logic for the story map (CollectionMap.svelte). Pure functions so
-// lane derivation and membership stay unit-testable without mounting Svelte.
+// Swimlane logic shared by the story map (CollectionMap.svelte), the board
+// (CollectionBoard.svelte) and the public board. Pure functions so lane
+// derivation, membership, ordering and drop payloads stay unit-testable
+// without mounting Svelte.
 //
-// A swimlane dimension slices every backbone column's child cards into
-// horizontal bands. Membership is single-valued for every dimension except
-// milestone (items carry a set of attached milestones); milestone items render
-// in each matching lane.
+// A swimlane dimension slices cards into horizontal bands. Membership is
+// single-valued for every dimension except milestone: items carry a set of
+// attached milestones, and the map renders an item in each matching lane. The
+// board and public board use a single primary milestone per card so a drag can
+// move a card out of one lane unambiguously.
 
 export const SWIMLANE_DIMENSIONS = [
   'status',
@@ -34,12 +37,31 @@ export function statusCategoryForItem(item, statuses, statusCategories) {
 }
 
 function milestoneIdsOf(item) {
-  return (item.milestones || []).map((m) => m.id);
+  if (Array.isArray(item?.milestones)) {
+    return item.milestones.map((milestone) => milestone.id).filter((id) => id != null);
+  }
+  if (Array.isArray(item?.milestone_ids)) return item.milestone_ids;
+  return [];
+}
+
+export function milestoneIdFromLaneKey(laneKey) {
+  if (laneKey == null || laneKey === SWIMLANE_NONE_KEY) return null;
+  const id = Number(String(laneKey).split('-').pop());
+  return Number.isFinite(id) ? id : null;
+}
+
+// Workspace-local milestones can only be attached to cards in that workspace;
+// global milestones are assignable everywhere.
+export function milestoneAssignableToWorkspace(milestone, workspaceId) {
+  if (!milestone) return false;
+  if (milestone.is_global) return true;
+  if (milestone.workspace_id == null) return false;
+  return Number(milestone.workspace_id) === Number(workspaceId);
 }
 
 // Lane key for an item under a dimension, or SWIMLANE_NONE_KEY when the item
 // has no value for it. For milestones an item may belong to several lanes;
-// callers use itemLanesForItem for membership, this returns the primary key.
+// callers use itemLaneKeys for membership, this returns the primary key.
 export function laneKeyForItem(item, dimension) {
   switch (dimension) {
     case 'status': {
@@ -83,9 +105,92 @@ export function itemLaneKeys(item, dimension, statuses, statusCategories) {
   return [laneKeyForItem(item, dimension)];
 }
 
-// Ordered lane definitions for a dimension. Only lanes with at least one
-// matching item are returned (plus the none-lane when something is unlaned).
-// reference lists arrive in their canonical display order; lanes follow it.
+function isUndated(value) {
+  return value == null || value === '';
+}
+
+function compareMilestoneLanes(a, b) {
+  const aUndated = isUndated(a.target_date);
+  const bUndated = isUndated(b.target_date);
+  if (aUndated !== bUndated) return aUndated ? 1 : -1;
+  if (!aUndated) {
+    const byDate = String(a.target_date).localeCompare(String(b.target_date));
+    if (byDate !== 0) return byDate;
+  }
+  const byName = String(a.name || '').localeCompare(String(b.name || ''));
+  if (byName !== 0) return byName;
+  return Number(a.id) - Number(b.id);
+}
+
+// Canonical milestone lane order: target date ascending, undated last, then
+// name and id as stable tie-breakers.
+export function sortMilestonesForLanes(milestones = []) {
+  return [...milestones].sort(compareMilestoneLanes);
+}
+
+// The board and public board place a card in one milestone lane. Resolve the
+// primary milestone from the attached rows, falling back to a reference list
+// when the card only carries ids. The earliest target date wins; undated rows
+// sort last.
+export function primaryMilestoneForItem(item, milestones = []) {
+  const referenceById = new Map(
+    (milestones || [])
+      .filter((milestone) => milestone?.id != null)
+      .map((milestone) => [Number(milestone.id), milestone])
+  );
+
+  const attached =
+    Array.isArray(item?.milestones) && item.milestones.length > 0
+      ? item.milestones
+      : milestoneIdsOf(item).map((id) => ({ id }));
+
+  const candidates = attached
+    .map((milestone) => {
+      const id = Number(milestone?.id ?? milestone);
+      if (!Number.isFinite(id)) return null;
+      const reference = referenceById.get(id) || {};
+      return {
+        id,
+        name: milestone?.name ?? reference.name ?? '',
+        target_date: milestone?.target_date ?? reference.target_date ?? null,
+      };
+    })
+    .filter(Boolean);
+
+  if (candidates.length === 0) return null;
+  candidates.sort(compareMilestoneLanes);
+  return candidates[0];
+}
+
+// Single-lane membership used by the board and the public board. Other
+// dimensions keep their existing single-valued lane key.
+export function primaryLaneKeyForItem(item, dimension, milestones = []) {
+  if (dimension !== 'milestone') return laneKeyForItem(item, dimension);
+  const primary = primaryMilestoneForItem(item, milestones);
+  return primary ? `milestone-${primary.id}` : SWIMLANE_NONE_KEY;
+}
+
+// Milestones a board lane drop would detach. Returns null when no confirmation
+// is needed: a card with fewer than two milestones, a drop into its current
+// primary lane, or a drop that removes nothing.
+export function milestoneDropRemovals(item, dimension, laneKey, milestones = []) {
+  if (dimension !== 'milestone') return null;
+  const attachedIds = milestoneIdsOf(item);
+  if (attachedIds.length < 2) return null;
+
+  const targetId = laneKey === SWIMLANE_NONE_KEY ? null : milestoneIdFromLaneKey(laneKey);
+  const primary = primaryMilestoneForItem(item, milestones);
+  if (targetId != null && primary?.id === targetId) return null;
+
+  const nextIds = targetId == null ? [] : [targetId];
+  const removed = attachedIds.filter((id) => !nextIds.includes(id));
+  return removed.length > 0 ? removed : null;
+}
+
+// Ordered lane definitions for a dimension. By default only lanes with at
+// least one matching item are returned (plus the none-lane when something is
+// unlaned). Board drop targets pass includeEmpty so active reference lanes
+// stay present even without cards.
 //
 // labelFor(key) resolves a display title for the none lane; data-driven lanes
 // are titled from the reference entity and carry an optional accent color.
@@ -99,6 +204,7 @@ export function buildSwimlanes({
   iterations = [],
   milestones = [],
   noneTitle = 'No value',
+  includeEmpty = false,
 }) {
   if (!dimension) return null;
 
@@ -112,7 +218,7 @@ export function buildSwimlanes({
   const lanes = [];
   const push = (key, title, color = null, sublabel = '') => {
     const count = membership.get(key) || 0;
-    if (count === 0) return;
+    if (count === 0 && !includeEmpty) return;
     lanes.push({ key, title, color, sublabel, count });
   };
 
@@ -145,10 +251,7 @@ export function buildSwimlanes({
       );
     }
   } else if (dimension === 'milestone') {
-    const ordered = [...milestones].sort((a, b) =>
-      (a.target_date || '9999').localeCompare(b.target_date || '9999')
-    );
-    for (const milestone of ordered) {
+    for (const milestone of sortMilestonesForLanes(milestones)) {
       push(`milestone-${milestone.id}`, milestone.name, milestone.category_color);
     }
   }

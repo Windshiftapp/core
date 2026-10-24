@@ -1,22 +1,22 @@
 <script>
   import { onMount } from 'svelte';
-  import {
-    IconArrowLeft as ArrowLeft,
-    IconBolt as Bolt,
-    IconCode as Code,
-    IconFile as BlankIcon,
-    IconGitPullRequest as ReviewIcon,
-    IconListCheck as TriageIcon,
-    IconMap2 as WorkspaceGuideIcon,
-    IconRocket as ReleaseIcon,
-    IconRoute as DeliveryIcon,
-    IconTestPipe as QAIcon,
-    IconUserStar as AgentIcon,
-  } from '@tabler/icons-svelte-runes';
-  import { agentBindings, api } from '../../api.js';
+  import Bolt from '@tabler/icons-svelte-runes/icons/bolt';
+  import Code from '@tabler/icons-svelte-runes/icons/code';
+  import BlankIcon from '@tabler/icons-svelte-runes/icons/file';
+  import ReviewIcon from '@tabler/icons-svelte-runes/icons/git-pull-request';
+  import TriageIcon from '@tabler/icons-svelte-runes/icons/list-check';
+  import WorkspaceGuideIcon from '@tabler/icons-svelte-runes/icons/map-2';
+  import ReleaseIcon from '@tabler/icons-svelte-runes/icons/rocket';
+  import DeliveryIcon from '@tabler/icons-svelte-runes/icons/route';
+  import QAIcon from '@tabler/icons-svelte-runes/icons/test-pipe';
+  import AgentIcon from '@tabler/icons-svelte-runes/icons/user-star';
+  import { actionCapabilities, llmProviders, runnerPools as runnerPoolsApi } from '../../api/ai.js';
+  import { workspaceSCM } from '../../api/scm.js';
+  import { agentBindings } from '../../api/agentBindings.js';
   import { navigate } from '../../router.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
@@ -144,13 +144,13 @@
         pools,
       ] = await Promise.all([
         agentBindings.listTemplates(workspaceId),
-        api.llmProviders.getEnabled(),
+        llmProviders.getEnabled(),
         agentBindings.getCandidates(workspaceId).catch(() => []),
         agentBindings.listToolCapabilities(workspaceId).catch(() => []),
-        api.workspaceSCM
+        workspaceSCM
           .getConnectionsOverview(workspaceId, { includeRepositories: true })
           .catch(() => []),
-        api.actionCapabilities.getForWorkspace(workspaceId, 'runner_pool').catch(() => []),
+        actionCapabilities.getForWorkspace(workspaceId, 'runner_pool').catch(() => []),
       ]);
       templates = templateResult || [];
       llmConnections = connectionResult || [];
@@ -260,7 +260,7 @@
 
   async function cancelPendingRunnerSetup() {
     if (pendingRunnerTokenId && pendingRunnerTokenPoolId) {
-      await api.runnerPools
+      await runnerPoolsApi
         .revokeWorkspaceToken(
           workspaceId,
           pendingRunnerTokenPoolId,
@@ -362,15 +362,7 @@
   data-testid="agent-create"
 >
   <div class="mx-auto max-w-5xl space-y-6">
-    <Button
-      variant="subtle"
-      size="small"
-      icon={ArrowLeft}
-      onclick={leaveCreate}
-      dataTestid="agent-create-back"
-    >
-      Back to agents
-    </Button>
+    <BackButton onclick={leaveCreate} label="Back to agents" testid="agent-create-back" />
 
     <PageHeader
       icon={AgentIcon}
@@ -481,7 +473,7 @@
             id="agent-llm"
             label="LLM connection"
             required
-            helper="The selected model is fixed for this profile."
+            helper="You can change the model later from the profile's Tools and access tab."
           >
             <Select
               id="agent-create-llm"

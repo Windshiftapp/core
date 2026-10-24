@@ -1,15 +1,16 @@
 <script>
   import { navigate } from '../../router.js';
   import { logbookStore } from '../../stores/logbook.svelte.js';
-  import { permissionStore } from '../../stores';
+  import { permissionStore } from '../../stores/permissions.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { logbook } from '../../api/logbook.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
-  import { IconPlus as Plus, IconFolderOpen as FolderOpen } from '@tabler/icons-svelte-runes';
+  import Plus from '@tabler/icons-svelte-runes/icons/plus';
+  import FolderOpen from '@tabler/icons-svelte-runes/icons/folder-open';
   import NavigationSidebar from '../../layout/NavigationSidebar.svelte';
 	import TextareaField from '../../components/TextareaField.svelte';
 	import TextField from '../../components/TextField.svelte';
@@ -25,7 +26,7 @@
 
   async function createBucket() {
     try {
-      await api.logbook.createBucket(formData);
+      await logbook.createBucket(formData);
       successToast(t('logbook.bucketCreated'));
       showCreateForm = false;
       formData = { name: '', description: '' };

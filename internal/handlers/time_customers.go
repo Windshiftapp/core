@@ -135,6 +135,8 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// builtin_key is server-managed; never let a client create a system row.
+	c.BuiltinKey = ""
 
 	warnings := sanitize.ApplyAllWithWarnings(
 		sanitize.Pair{Target: &c.Name, Policy: sanitize.PlainTextField, Label: "Name"},
@@ -177,6 +179,20 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existing, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "customer")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if existing.BuiltinKey != "" {
+		respondValidationError(w, r, "Built-in customers cannot be edited")
+		return
+	}
+
 	warnings := sanitize.ApplyAllWithWarnings(
 		sanitize.Pair{Target: &c.Name, Policy: sanitize.PlainTextField, Label: "Name"},
 		sanitize.Pair{Target: &c.Description, Policy: sanitize.Comment, Label: "Description"},
@@ -213,6 +229,20 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
+		return
+	}
+
+	existing, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "customer")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if existing.BuiltinKey != "" {
+		respondValidationError(w, r, "Built-in customers cannot be deleted")
 		return
 	}
 
@@ -325,6 +355,10 @@ func (h *TimeCustomerHandler) UpdateRequestSharing(w http.ResponseWriter, r *htt
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if c.BuiltinKey != "" {
+		respondValidationError(w, r, "Built-in customers cannot be edited")
 		return
 	}
 

@@ -1,8 +1,19 @@
 <script>
-  import { MoreHorizontal, Calendar, Flag, User, Users, Layers, ChevronDown, FileText, Briefcase, Hash, Clock } from '@lucide/svelte';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Flag from '@lucide/svelte/icons/flag';
+  import User from '@lucide/svelte/icons/user';
+  import Users from '@lucide/svelte/icons/users';
+  import Layers from '@lucide/svelte/icons/layers';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import Hash from '@lucide/svelte/icons/hash';
+  import Clock from '@lucide/svelte/icons/clock';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
-  import { workspacesStore, workspacePermissions } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateOnly, formatDueDate } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
@@ -18,7 +29,7 @@
   import NativeSelect from '../components/NativeSelect.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import { createPopover, melt } from '@melt-ui/svelte'; // used for dueDateTrigger/dueDateContent
-  import { Milestone as MilestoneIcon } from '@lucide/svelte';
+  import MilestoneIcon from '@lucide/svelte/icons/milestone';
 
   let {
     nameInputRef = $bindable(null),
@@ -612,7 +623,6 @@
             milestones={store.milestones}
             iterations={store.iterations}
             isDarkMode={false}
-            autoOpenPickers={false}
           />
         </div>
       {/each}

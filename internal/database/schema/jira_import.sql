@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS jira_import_connections (
     deployment_type TEXT DEFAULT 'cloud',  -- 'cloud' or 'datacenter'
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_used_at DATETIME
+    last_used_at DATETIME,
+    -- Set when the operator removes the connection. The row is retained as
+    -- provenance for import jobs; credentials are cleared at the same time.
+    deleted_at DATETIME
 );
 
 CREATE INDEX IF NOT EXISTS idx_jira_connections_created_by ON jira_import_connections(created_by);
@@ -34,6 +37,9 @@ CREATE TABLE IF NOT EXISTS jira_import_jobs (
     -- worker renews it; startup reconciliation fails queued/running jobs whose
     -- lease expired so a restart cannot block retry or cleanup.
     lease_expires_at BIGINT,
+    -- Per-run ownership token. Job-state writes are fenced on it so a worker
+    -- whose lease was recovered or cleaned up cannot change the job's state.
+    lease_token TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

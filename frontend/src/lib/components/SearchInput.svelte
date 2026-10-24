@@ -1,5 +1,5 @@
 <script>
-  import { Search } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
 

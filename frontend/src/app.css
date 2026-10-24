@@ -6,8 +6,9 @@
 @custom-variant dark (&:where([data-color-mode="dark"], [data-color-mode="dark"] *));
 
 @theme {
-  --font-size-sm: 0.8125rem; /* 13px — matches Linear */
-  --font-size-sm--line-height: 1.25rem;
+  /* text-* font sizes and their line-height companions are pinned unlayered in
+     design-system/tokens/primitives.css — see the note there for why they
+     cannot live in @theme. */
 
   /* Design-system tokens exposed as Tailwind utilities.
      Each --color-ds-* references a runtime --ds-* var, so these utilities

@@ -1,20 +1,19 @@
 <script>
   import { onMount } from 'svelte';
-  import {
-    AlertCircle,
-    CircleCheck,
-    CirclePlus,
-    Clock3,
-    Flag,
-    Gauge,
-    Hash,
-    Info,
-    Layers,
-    Ruler,
-    TrendingUp,
-    UserRoundMinus,
-  } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import CirclePlus from '@lucide/svelte/icons/circle-plus';
+  import Clock3 from '@lucide/svelte/icons/clock-3';
+  import Flag from '@lucide/svelte/icons/flag';
+  import Gauge from '@lucide/svelte/icons/gauge';
+  import Hash from '@lucide/svelte/icons/hash';
+  import Info from '@lucide/svelte/icons/info';
+  import Layers from '@lucide/svelte/icons/layers';
+  import Ruler from '@lucide/svelte/icons/ruler';
+  import TrendingUp from '@lucide/svelte/icons/trending-up';
+  import UserRoundMinus from '@lucide/svelte/icons/user-round-minus';
+  import { collections as collectionsApi } from '../../api/collections.js';
+  import { analytics } from '../../api/analytics.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { currentWorkspace } from '../../stores/workspaces.svelte.js';
@@ -123,7 +122,7 @@
     const version = ++collectionsLoadVersion;
     collectionLoadError = false;
     try {
-      const response = await api.collections.getAll({ workspace_id: targetWorkspace });
+      const response = await collectionsApi.getAll({ workspace_id: targetWorkspace });
       if (version !== collectionsLoadVersion) return;
       collections = response || [];
       if (
@@ -157,7 +156,7 @@
     try {
       const params = { start_date: startDate, end_date: endDate };
       if (selectedCollection) params.collection_id = selectedCollection;
-      const response = await api.analytics.getAnalytics(workspaceId, params);
+      const response = await analytics.getAnalytics(workspaceId, params);
       if (version !== analyticsLoadVersion) return;
       if (response?.schema_version !== 2) {
         throw new Error(t('analytics.unsupportedVersion'));
@@ -587,9 +586,14 @@
 
 {#snippet itemCell(item)}
   <div class="flex min-w-0 items-baseline gap-2">
-    <ItemKey {item} workspace={$currentWorkspace} />
+    <ItemKey
+      {item}
+      workspace={$currentWorkspace}
+      dataTestid={`analytics-attention-key-${item.id}`}
+    />
     <button
       type="button"
+      data-testid={`analytics-attention-title-${item.id}`}
       class="truncate text-left font-medium text-ds-text hover:text-ds-text-link hover:underline"
       onclick={() => openItem(item)}
     >

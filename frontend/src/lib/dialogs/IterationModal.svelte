@@ -1,5 +1,8 @@
 <script>
-  import { Globe, Building2, Calendar, Tag } from '@lucide/svelte';
+  import Globe from '@lucide/svelte/icons/globe';
+  import Building2 from '@lucide/svelte/icons/building-2';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Tag from '@lucide/svelte/icons/tag';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';

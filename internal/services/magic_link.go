@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -122,17 +123,51 @@ func (s *MagicLinkService) generateMagicLink(portalCustomerID int, channelID *in
 // The token is placed in the URL fragment (#) so it is not transmitted in
 // HTTP Referer headers, query-string logs, or any third-party request
 // initiated by the verify page. The token is already URL-safe
-// (base64.URLEncoding), so no further escaping is needed.
-func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug string) error {
+// (base64.URLEncoding), so no further escaping is needed. An optional `next`
+// destination (a same-portal path already validated by the caller) rides
+// alongside the token so the customer resumes the page that sent them to
+// sign in instead of landing on the portal home.
+func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug, next string) error {
 	if name == "" {
 		name = "there"
 	}
-	url := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
+	magicURL := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
+	if next != "" {
+		magicURL += "&next=" + escapeFragmentValue(next)
+	}
 	return s.smtpSender.SendTransactional(email, emailutil.TemplateMagicLink, struct {
 		FirstName    string
 		MagicLinkURL string
 		ExpiresIn    string
-	}{name, url, emailutil.HumanizeDuration(MagicLinkExpiry)})
+	}{name, magicURL, emailutil.HumanizeDuration(MagicLinkExpiry)})
+}
+
+// PortalNextPath validates an optional post-sign-in destination supplied with
+// a magic-link request. Only paths inside the requesting portal are accepted,
+// so a crafted request cannot turn the emailed link into an open redirect.
+// Invalid or over-long values are dropped rather than rejected, keeping the
+// sign-in request response uniform.
+func PortalNextPath(raw, portalSlug string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 2048 {
+		return ""
+	}
+	if !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
+		return ""
+	}
+	prefix := "/portal/" + portalSlug
+	if raw != prefix && !strings.HasPrefix(raw, prefix+"/") && !strings.HasPrefix(raw, prefix+"?") {
+		return ""
+	}
+	return raw
+}
+
+// escapeFragmentValue percent-encodes a value embedded in the verify URL
+// fragment. QueryEscape handles the `&` and `?` separators; its `+` encoding
+// for spaces is rewritten to %20 because the frontend decodes the fragment
+// with decodeURIComponent, which does not treat `+` as a space.
+func escapeFragmentValue(value string) string {
+	return strings.ReplaceAll(url.QueryEscape(value), "+", "%20")
 }
 
 // SendApprovalRequestEmail sends an "approval requested" email to a portal

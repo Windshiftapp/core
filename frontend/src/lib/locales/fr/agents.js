@@ -4,7 +4,7 @@ export default {
   workspaceAgents: {
     availability: {
       ready: 'Prêt',
-      offline: 'Hors ligne · travaux en attente',
+      offline: 'Hors ligne · met le travail en file d’attente',
       needsSetup: 'Configuration requise',
       draft: 'Brouillon',
       paused: 'En pause',

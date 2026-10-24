@@ -1,12 +1,10 @@
-import {
-  IconForms,
-  IconLifebuoy,
-  IconMail,
-  IconSend,
-  IconStack2,
-  IconWebhook,
-  IconWorld,
-} from '@tabler/icons-svelte-runes';
+import IconForms from '@tabler/icons-svelte-runes/icons/forms';
+import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
+import IconMail from '@tabler/icons-svelte-runes/icons/mail';
+import IconSend from '@tabler/icons-svelte-runes/icons/send';
+import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
+import IconWebhook from '@tabler/icons-svelte-runes/icons/webhook';
+import IconWorld from '@tabler/icons-svelte-runes/icons/world';
 
 export const channelTypes = [
   {

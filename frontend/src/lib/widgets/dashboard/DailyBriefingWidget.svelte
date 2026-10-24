@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { Sparkles } from '@lucide/svelte';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { ai } from '../../api/ai.js';
-  import { navigate } from '../../router.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -28,12 +28,18 @@
     }
   });
 
+  function itemHref(key) {
+    const item = itemKeyMap[key];
+    return item ? `/workspaces/${item.workspace_id}/items/${item.item_id}` : null;
+  }
+
   function preprocess(text) {
     if (!text) return '';
     let result = text.replace(/\[([A-Z]{2,10}-\d+)\](?!\()/g, '$1');
-    result = result.replace(/\b([A-Z]{2,10}-\d+)\b/g, (_, key) =>
-      itemKeyMap[key] ? `[${key}](#)` : key,
-    );
+    result = result.replace(/\b([A-Z]{2,10}-\d+)\b/g, (_, key) => {
+      const href = itemHref(key);
+      return href ? `[${key}](${href})` : key;
+    });
     return result;
   }
 
@@ -42,9 +48,11 @@
     if (!link) return;
     const key = link.textContent.trim();
     if (!/^[A-Z]{2,10}-\d+$/.test(key)) return;
+    // Keep modified/middle clicks native so the item can open in a new tab.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
     const item = itemKeyMap[key];
-    if (item) navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}`);
+    if (item) itemModalStore.open(item.item_id, item.workspace_id);
   }
 </script>
 

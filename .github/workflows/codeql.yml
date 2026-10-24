@@ -50,6 +50,9 @@ jobs:
       - name: Build frontend
         if: matrix.language == 'go'
         working-directory: frontend
+        env:
+          OPENUI_TELEMETRY_DISABLED: '1'
+          DO_NOT_TRACK: '1'
         run: |
           npm ci
           npm run build

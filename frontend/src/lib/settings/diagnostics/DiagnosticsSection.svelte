@@ -1,6 +1,8 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
-  import { IconRefresh, IconAlertCircle, IconTrash } from '@tabler/icons-svelte-runes';
+  import IconRefresh from '@tabler/icons-svelte-runes/icons/refresh';
+  import IconAlertCircle from '@tabler/icons-svelte-runes/icons/alert-circle';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
   import Card from '../../components/Card.svelte';
   import Input from '../../components/Input.svelte';
 

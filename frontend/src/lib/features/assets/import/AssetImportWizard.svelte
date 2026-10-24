@@ -6,7 +6,8 @@
   import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { addToast } from '../../../stores/toasts.svelte.js';
-  import { IconFileSpreadsheet, IconChevronLeft } from '@tabler/icons-svelte-runes';
+  import IconFileSpreadsheet from '@tabler/icons-svelte-runes/icons/file-spreadsheet';
+  import IconChevronLeft from '@tabler/icons-svelte-runes/icons/chevron-left';
 
   import UploadStep from './UploadStep.svelte';
   import MappingStep from './MappingStep.svelte';

@@ -1,5 +1,8 @@
 import { derived, get, writable } from 'svelte/store';
-import { api } from '../api.js';
+import { priorities } from '../api/configuration.js';
+import { items } from '../api/items.js';
+import { queryLanguage } from '../api/queryLanguage.js';
+import { statusCategories as statusCategoriesApi, statuses } from '../api/workflows.js';
 import { confirm } from '../composables/useConfirm.js';
 import { QLBuilder } from '../utils/ql.js';
 import { completionFieldToFilterField } from '../utils/qlCompletion.js';
@@ -163,9 +166,9 @@ export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
     try {
       const [wsData, stData, prData, catData] = await Promise.all([
         workspacesStore.load(),
-        api.statuses.getAll(),
-        api.priorities.getAll(),
-        api.statusCategories.getAll(),
+        statuses.getAll(),
+        priorities.getAll(),
+        statusCategoriesApi.getAll(),
       ]);
       workspaces.set(wsData || []);
       allStatuses.set(
@@ -201,7 +204,7 @@ export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
     loadingItems.set(true);
     qlError.set(null);
     try {
-      const response = await api.items.getAll({ ql: finalQl, page, limit });
+      const response = await items.getAll({ ql: finalQl, page, limit });
       if (generation !== searchGeneration) return;
       if (response?.data) {
         workItems.set(response.data);
@@ -254,9 +257,9 @@ export function createWorkItemSearchStore({ allowEmptyQuery = false } = {}) {
     let priorityCatalog = get(allPriorities);
     try {
       const [catalog, st, pr] = await Promise.all([
-        api.queryLanguage.getCatalog(),
-        statusCatalog.length ? null : api.statuses.getAll(),
-        priorityCatalog.length ? null : api.priorities.getAll(),
+        queryLanguage.getCatalog(),
+        statusCatalog.length ? null : statuses.getAll(),
+        priorityCatalog.length ? null : priorities.getAll(),
       ]);
       customFieldsCatalog = (catalog?.fields || [])
         .filter((field) => /^cfid_\d+$/i.test(field.name))

@@ -1,9 +1,9 @@
 <script>
-  import { ChevronRight } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { workspaceMenuItems } from '../navigation/workspaceMenu.js';
   import { currentRoute } from '../router.js';
-  import { workspacesStore } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let { workspace = null, onOpen = () => {} } = $props();

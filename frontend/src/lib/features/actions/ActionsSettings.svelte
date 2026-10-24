@@ -1,10 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { actions as actionsApi } from '../../api/actions.js';
+  import { workspaces } from '../../api/workspaces.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { statusCategoriesStore } from '../../stores/statusCategories.svelte.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { navigate } from '../../router.js';
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
@@ -40,7 +41,7 @@
     }
     if (editingAction?.id === id) return;
     let cancelled = false;
-    api.actions
+    actionsApi
       .get(workspaceId, id)
       .then((full) => {
         if (!cancelled) editingAction = full;
@@ -82,7 +83,7 @@
 
   async function loadActions() {
     try {
-      actions = await api.actions.getAll(workspaceId) || [];
+      actions = await actionsApi.getAll(workspaceId) || [];
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.error('Failed to load actions:', error);
@@ -93,7 +94,7 @@
 
   async function loadStatuses() {
     try {
-      statuses = await api.workspaces.getStatuses(workspaceId) || [];
+      statuses = await workspaces.getStatuses(workspaceId) || [];
     } catch (error) {
       console.error('Failed to load statuses:', error);
       statuses = [];
@@ -113,7 +114,7 @@
     }
 
     try {
-      const newAction = await api.actions.create(workspaceId, {
+      const newAction = await actionsApi.create(workspaceId, {
         name: newActionName.trim(),
         description: newActionDescription.trim(),
         trigger_type: 'status_transition',
@@ -136,7 +137,7 @@
 
   async function handleToggle(action) {
     try {
-      await api.actions.update(workspaceId, action.id, { is_enabled: !action.is_enabled });
+      await actionsApi.update(workspaceId, action.id, { is_enabled: !action.is_enabled });
       await loadActions();
       successToast(action.is_enabled ? t('actions.disabled') : t('actions.enabled'));
     } catch (error) {
@@ -147,7 +148,7 @@
 
   async function handleDelete(action) {
     try {
-      await api.actions.delete(workspaceId, action.id);
+      await actionsApi.delete(workspaceId, action.id);
       await loadActions();
       successToast(t('common.deleted'));
     } catch (error) {
@@ -166,7 +167,7 @@
 
   async function handleSaveAction(updatedAction) {
     try {
-      await api.actions.update(workspaceId, updatedAction.id, updatedAction);
+      await actionsApi.update(workspaceId, updatedAction.id, updatedAction);
       await loadActions();
       successToast(t('common.saved'));
       navigate(`/workspaces/${workspaceId}/actions`);

@@ -5,7 +5,8 @@
   import Label from '../../components/Label.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import { api } from '../../api.js';
+  import { links } from '../../api/configuration.js';
+  import { items } from '../../api/items.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { isOpen = $bindable(false), item = null, preselected = null, onMerged = null } = $props();
@@ -67,7 +68,7 @@
 
     searchLoading = true;
     try {
-      const results = await api.links.search(trimmed, 'item', 20);
+      const results = await links.search(trimmed, 'item', 20);
       if (version !== searchVersion) return;
       const list = (Array.isArray(results) ? results : []).filter(
         (entry) => Number(entry.id) !== Number(item?.id)
@@ -92,6 +93,18 @@
     }
   }
 
+  // Merge folds a different requester's ticket in a degraded way: comments
+  // move but become private, and files, email thread, and participants stay
+  // on the duplicate (WI-1566). Warn before the agent commits.
+  function requesterID(entry) {
+    const value = entry?.creator_portal_customer_id;
+    return value == null ? null : Number(value);
+  }
+
+  let differentRequester = $derived(
+    !!selectedDuplicate && requesterID(item) !== requesterID(selectedDuplicate)
+  );
+
   function close() {
     isOpen = false;
   }
@@ -105,7 +118,7 @@
     try {
       merging = true;
       error = '';
-      const result = await api.items.mergeInto(item.id, [duplicateId]);
+      const result = await items.mergeInto(item.id, [duplicateId]);
       close();
       onMerged?.(result);
     } catch (err) {
@@ -140,6 +153,15 @@
       />
       <DescriptionText>{t('items.mergeHelp')}</DescriptionText>
     </div>
+    {#if differentRequester}
+      <div
+        class="text-sm rounded p-2"
+        style="background: var(--ds-surface-warning, rgba(234, 88, 12, 0.1)); color: var(--ds-text-warning, var(--ds-text));"
+        data-testid="item-merge-requester-warning"
+      >
+        {t('items.mergeDifferentRequester')}
+      </div>
+    {/if}
     {#if error}
       <div class="text-sm rounded p-2" style="background: var(--ds-surface-danger, rgba(239, 68, 68, 0.1)); color: var(--ds-text-danger);" data-testid="item-merge-error">
         {error}

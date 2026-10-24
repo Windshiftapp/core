@@ -47,38 +47,87 @@ export default defineConfig({
       : []),
   ],
   optimizeDeps: {
-    // React + jsx-runtime are force-included so the dev optimizer emits all
-    // exports (Fragment, jsx, jsxs) — needed by Excalidraw's auto-JSX output.
-    // Excalidraw and its mermaid bridge are pre-bundled rather than excluded:
-    // their dep tree contains CJS packages (es6-promise-pool, sanitize-url,
-    // lodash.throttle, …) and Vite's on-demand pre-bundle for an *excluded*
-    // package's CJS dependencies produces interop-broken chunks that fail at
-    // runtime ("does not provide an export named 'default' / 'Fragment'").
-    // The startup cost is bounded since both are only loaded behind a dynamic
-    // import — the optimizer just makes sure the pre-bundle is well-formed.
+    // Vite's default scan crawls every .html in the project, including
+    // design-system.html and the stale dist-design-system build. That pulls the
+    // entire design-system viewer and every icon library it compares into the
+    // dep graph, roughly tripling the pre-bundle and making dev-server startup
+    // crawl. This config owns only the app entry.
+    entries: ['index.html'],
+    // The dev dependency scanner does not walk into route-level lazy-loaded
+    // Svelte components, so anything imported only from those must be listed
+    // here. Otherwise the first visit registers a missing import, re-runs the
+    // whole optimizer (~10 s), and reloads the page.
+    //
+    // `debug` and `extend` are CJS interop for the Milkdown tree. React +
+    // jsx-runtime are force-included so the dev optimizer emits all exports
+    // (Fragment, jsx, jsxs) needed by Excalidraw's auto-JSX output. The editor
+    // stacks stay pre-bundled: excluding them serves a large CJS tree from
+    // source and breaks the editors at runtime.
     include: [
       'react',
       'react-dom',
+      'react-dom/client',
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
+      'debug',
+      'extend',
       '@excalidraw/excalidraw',
       '@excalidraw/mermaid-to-excalidraw',
-    ],
-    // exclude deps that are only loaded via dynamic import() behind a
-    // runtime guard (isTauri, route-level lazy loads). Pre-bundling them
-    // wastes startup time and — worse — when Vite's scanner misses one
-    // (e.g. @tauri-apps/plugin-dialog) the dep gets discovered on the
-    // first hit, triggering a re-bundle and full reload that costs
-    // ~30 s in our codebase. Excluded deps are loaded on demand from
-    // their original location.
-    exclude: [
-      // Milkdown is pure ESM and only loads behind the knowledge-page editor.
-      // It never changes, so pre-bundling it only adds cold-start cost and
-      // re-bundle cost on every optimizer invalidation — serve it from source
-      // and let the browser cache the individual modules instead.
       '@milkdown/kit',
+      '@milkdown/kit/component/image-block',
+      '@milkdown/kit/core',
+      '@milkdown/kit/plugin/clipboard',
+      '@milkdown/kit/plugin/listener',
+      '@milkdown/kit/plugin/upload',
+      '@milkdown/kit/preset/commonmark',
+      '@milkdown/kit/preset/gfm',
+      '@milkdown/kit/prose/state',
+      '@milkdown/kit/prose/view',
+      '@milkdown/kit/utils',
       '@milkdown/utils',
       '@milkdown/theme-nord',
+      '@xyflow/svelte',
+      '@atlaskit/pragmatic-drag-and-drop/element/adapter',
+      '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge',
+      '@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item',
+      '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element',
+      'marked',
+      'mermaid',
+      'shiki/core',
+      'shiki/engine/javascript',
+      'shiki/langs/bash.mjs',
+      'shiki/langs/c.mjs',
+      'shiki/langs/cpp.mjs',
+      'shiki/langs/css.mjs',
+      'shiki/langs/diff.mjs',
+      'shiki/langs/go.mjs',
+      'shiki/langs/html.mjs',
+      'shiki/langs/java.mjs',
+      'shiki/langs/javascript.mjs',
+      'shiki/langs/json.mjs',
+      'shiki/langs/jsx.mjs',
+      'shiki/langs/markdown.mjs',
+      'shiki/langs/php.mjs',
+      'shiki/langs/python.mjs',
+      'shiki/langs/ruby.mjs',
+      'shiki/langs/rust.mjs',
+      'shiki/langs/scss.mjs',
+      'shiki/langs/shellscript.mjs',
+      'shiki/langs/sql.mjs',
+      'shiki/langs/svelte.mjs',
+      'shiki/langs/toml.mjs',
+      'shiki/langs/tsx.mjs',
+      'shiki/langs/typescript.mjs',
+      'shiki/langs/xml.mjs',
+      'shiki/langs/yaml.mjs',
+      'shiki/themes/github-dark.mjs',
+      'shiki/themes/github-light.mjs',
+    ],
+    // Exclude deps that are only loaded via dynamic import() behind a runtime
+    // guard. Pre-bundling them wastes startup time and, when Vite's scanner
+    // misses one, the dep is discovered on the first hit and triggers a
+    // re-bundle plus full reload. Excluded deps load on demand.
+    exclude: [
       '@tauri-apps/api',
       '@tauri-apps/api/path',
       '@tauri-apps/plugin-dialog',
@@ -91,6 +140,23 @@ export default defineConfig({
   },
   server: {
     port: 5555,
+    // Pre-transform the app shell and the heaviest route roots right after
+    // "ready" so the first navigation does not pay the compile cost (WI-1760).
+    // Warmup follows static imports recursively and runs in the background,
+    // so startup itself is not delayed. Without it, the first item-detail
+    // load after a server restart transforms ~400 modules (~1.8 s); once
+    // warm the same walk is ~10 ms.
+    warmup: {
+      clientFiles: [
+        'src/App.svelte',
+        'src/lib/pages/MainApp.svelte',
+        'src/lib/features/items/ItemDetail.svelte',
+        'src/lib/workspaces/WorkspaceDetail.svelte',
+        'src/lib/features/collections/CollectionBoard.svelte',
+        'src/lib/features/collections/CollectionList.svelte',
+        'src/lib/features/assets/AssetBrowser.svelte',
+      ],
+    },
     proxy: {
       ...pluginProxies,
       '/api': {

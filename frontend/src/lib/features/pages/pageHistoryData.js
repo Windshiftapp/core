@@ -1,3 +1,4 @@
+import { pages } from '../../api/pages.js';
 export function normalizePageHistoryResponse(response) {
   if (Array.isArray(response?.revisions)) return response.revisions;
   if (Array.isArray(response?.items)) return response.items;
@@ -5,8 +6,8 @@ export function normalizePageHistoryResponse(response) {
 }
 
 /** Load revisions with their permission-filtered author summaries in one request. */
-export async function loadPageHistory(apiClient, workspaceId, pageId, options = {}) {
-  const response = await apiClient.pages.getHistory(workspaceId, pageId, options);
+export async function loadPageHistory(workspaceId, pageId, options = {}) {
+  const response = await pages.getHistory(workspaceId, pageId, options);
   return normalizePageHistoryResponse(response);
 }
 

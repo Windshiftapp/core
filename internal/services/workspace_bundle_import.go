@@ -370,36 +370,57 @@ func (s *WorkspaceBundleImportService) buildSLAMetricInput(ctx context.Context, 
 	}
 	for i := range metric.Goals {
 		goal := &metric.Goals[i]
-		resolved := models.SLAGoal{
-			Position:     goal.Position,
-			QLQuery:      strings.TrimSpace(goal.QLQuery),
-			ImportStatus: "native",
+		baseQL := strings.TrimSpace(goal.QLQuery)
+		if baseQL == "" {
+			baseQL = "1 = 1"
 		}
-		if resolved.QLQuery == "" {
-			resolved.QLQuery = "1 = 1"
+		newGoal := func(query string) models.SLAGoal {
+			return models.SLAGoal{QLQuery: query, ImportStatus: "native"}
 		}
-		for j := range goal.Targets {
-			target := &goal.Targets[j]
+		resolveTarget := func(target *WorkspaceBundleSLATarget) (models.SLAGoalTarget, error) {
 			calendarID, ok := calendarIDByRef[target.CalendarRef]
 			if !ok {
-				return SLAMetricInput{}, fmt.Errorf("SLA metric %q goal %d target %d: calendar_ref %q is not a bundled calendar", metric.Name, i, j, target.CalendarRef)
+				return models.SLAGoalTarget{}, fmt.Errorf("calendar_ref %q is not a bundled calendar", target.CalendarRef)
 			}
-			resolvedTarget := models.SLAGoalTarget{
-				Position:   j,
-				IsFallback: target.IsFallback,
-				TargetMs:   target.TargetMs,
-				CalendarID: calendarID,
-			}
-			if !target.IsFallback && strings.TrimSpace(target.PriorityName) != "" {
-				priorityID, err := s.priorityIDByName(ctx, target.PriorityName)
-				if err != nil {
-					return SLAMetricInput{}, err
-				}
-				resolvedTarget.PriorityID = &priorityID
-			}
-			resolved.Targets = append(resolved.Targets, resolvedTarget)
+			return models.SLAGoalTarget{TargetMs: target.TargetMs, CalendarID: calendarID}, nil
 		}
-		input.Goals = append(input.Goals, resolved)
+
+		// One goal per target: priority targets get their own goal with the
+		// priority appended to the base query, and the fallback keeps the base
+		// query so first-match-wins preserves priority precedence.
+		var fallback *WorkspaceBundleSLATarget
+		for j := range goal.Targets {
+			target := &goal.Targets[j]
+			priorityName := strings.TrimSpace(target.PriorityName)
+			if target.IsFallback || priorityName == "" {
+				if fallback == nil {
+					fallback = &goal.Targets[j]
+				}
+				continue
+			}
+			if _, err := s.priorityIDByName(ctx, priorityName); err != nil {
+				return SLAMetricInput{}, fmt.Errorf("SLA metric %q goal %d target %d: %w", metric.Name, i, j, err)
+			}
+			resolvedTarget, err := resolveTarget(target)
+			if err != nil {
+				return SLAMetricInput{}, fmt.Errorf("SLA metric %q goal %d target %d: %w", metric.Name, i, j, err)
+			}
+			resolved := newGoal(combineGoalQuery(baseQL, priorityName))
+			resolved.Targets = []models.SLAGoalTarget{resolvedTarget}
+			input.Goals = append(input.Goals, resolved)
+		}
+		if fallback != nil {
+			resolvedTarget, err := resolveTarget(fallback)
+			if err != nil {
+				return SLAMetricInput{}, fmt.Errorf("SLA metric %q goal %d fallback: %w", metric.Name, i, err)
+			}
+			resolved := newGoal(baseQL)
+			resolved.Targets = []models.SLAGoalTarget{resolvedTarget}
+			input.Goals = append(input.Goals, resolved)
+		}
+	}
+	for i := range input.Goals {
+		input.Goals[i].Position = i
 	}
 	return input, nil
 }
@@ -565,9 +586,11 @@ func (s *WorkspaceBundleImportService) validateReferences(ctx context.Context, w
 			continue
 		}
 		seenEmails[strings.ToLower(email)] = true
-		if id, _ := s.lookupUserID(ctx, email); id == 0 {
+		if id, _ := s.lookupWorkspaceUserID(ctx, workspaceID, email); id == 0 {
+			// Report by path only: echoing the email would let an editor probe
+			// which addresses belong to accounts.
 			missing = append(missing, UnresolvedRef{
-				Kind: UnresolvedKindUser, Email: email,
+				Kind: UnresolvedKindUser,
 				Path: fmt.Sprintf("items/%s", item.Ref),
 			})
 		}
@@ -606,13 +629,29 @@ func (s *WorkspaceBundleImportService) lookupLinkTypeID(ctx context.Context, nam
 	return id, err
 }
 
-func (s *WorkspaceBundleImportService) lookupUserID(ctx context.Context, email string) (int, error) {
+// lookupWorkspaceUserID resolves an assignee email to a user who can view the
+// target workspace. Restricting the lookup to workspace members stops an editor
+// from assigning an arbitrary instance user as an imported item's assignee.
+func (s *WorkspaceBundleImportService) lookupWorkspaceUserID(ctx context.Context, workspaceID int, email string) (int, error) {
 	var id int
 	err := s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, email).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
-	return id, err
+	if err != nil {
+		return 0, err
+	}
+	if s.permissions == nil {
+		return 0, nil
+	}
+	actionable, err := NewWorkspaceUserResolver(s.db, s.permissions).CanActInWorkspace(id, workspaceID)
+	if err != nil {
+		return 0, err
+	}
+	if !actionable {
+		return 0, nil
+	}
+	return id, nil
 }
 
 // ---- application ------------------------------------------------------------
@@ -829,8 +868,7 @@ func (s *WorkspaceBundleImportService) importItems(ctx context.Context, imp *wor
 			input.PriorityID = &priorityID
 		}
 		if item.AssigneeEmail != "" {
-			var userID int
-			if err := s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, item.AssigneeEmail).Scan(&userID); err == nil {
+			if userID, err := s.lookupWorkspaceUserID(ctx, imp.workspaceID, item.AssigneeEmail); err == nil && userID != 0 {
 				input.AssigneeID = &userID
 			}
 		}

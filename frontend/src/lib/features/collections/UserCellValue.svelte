@@ -1,5 +1,5 @@
 <script>
-  import { User } from '@lucide/svelte';
+  import User from '@lucide/svelte/icons/user';
   import Avatar from '../../components/Avatar.svelte';
 
   let {

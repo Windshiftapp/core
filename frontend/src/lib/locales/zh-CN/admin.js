@@ -554,6 +554,8 @@ export default {
         invitation: 'New user invitation',
         notification_batch: 'Batched notifications',
         portal_reply: 'Portal customer reply',
+        approval_requested: '门户审批请求',
+        intake_confirmation: '邮件提交回执',
       },
     },
     linkTypes: {

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
-  import { AlertCircle } from '@lucide/svelte';
+  import { priorities as prioritiesApi } from '../api/configuration.js';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { priorityIconMap } from '../utils/icons.js';
   import ItemPicker from './ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -63,7 +63,7 @@
       const configuredPriorities = config?.priorities || [];
       priorities = configuredPriorities.length > 0
         ? configuredPriorities
-        : await api.priorities.getAll();
+        : await prioritiesApi.getAll();
 
       // Sort by sort_order
       priorities = priorities.sort((a, b) => a.sort_order - b.sort_order);

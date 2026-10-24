@@ -1,8 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
-  import { api } from '../../api.js';
-  import { timeEntryStore } from '../../stores';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import X from '@lucide/svelte/icons/x';
+  import { time } from '../../api/time.js';
+  import { timeEntryStore } from '../../stores/timeEntryStore.svelte.js';
   import { BasePicker } from '../../pickers';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
@@ -10,6 +12,7 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { customerDisplayName, customerOrganisationName } from '../../utils/customerLabel.js';
   import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { serverNow } from '../../utils/serverClock.js';
   import { authStore } from '../../stores/auth.svelte.js';
@@ -177,7 +180,7 @@
       .filter(p => !visibleProjectIds.has(p.id))
       .map(p => {
         const customer = customers.find(c => c.id === p.customer_id);
-        return { ...p, subtitle: customer?.name || '' };
+        return { ...p, subtitle: customerOrganisationName(customer, t) };
       })
   );
 
@@ -196,7 +199,7 @@
         projectName: project.name,
         itemId: null,
         itemTitle: null,
-        customerName: customers.find(c => c.id === project.customer_id)?.name || '',
+        customerName: customerOrganisationName(customers.find(c => c.id === project.customer_id), t),
         isPinned: pinnedProjectIds.includes(project.id),
         days: new Map(),
       });
@@ -212,7 +215,7 @@
           projectName: wl.project_name || 'Unknown Project',
           itemId: wl.item_id || null,
           itemTitle: wl.item_title || null,
-          customerName: wl.customer_name || '',
+          customerName: customerDisplayName(wl.customer_name, wl.customer_builtin_key, t),
           isPinned: pinnedProjectIds.includes(wl.project_id),
           days: new Map(),
         });
@@ -295,8 +298,8 @@
       const prevEnd = addDaysToKey(prevWeekStart, 6);
 
       const [current, prev] = await Promise.all([
-        api.time.worklogs.getAll({ date_from: fullWeekDays[0], date_to: fullWeekDays[6], timezone: reportTimezone }),
-        api.time.worklogs.getAll({ date_from: prevWeekStart, date_to: prevEnd, timezone: reportTimezone }),
+        time.worklogs.getAll({ date_from: fullWeekDays[0], date_to: fullWeekDays[6], timezone: reportTimezone }),
+        time.worklogs.getAll({ date_from: prevWeekStart, date_to: prevEnd, timezone: reportTimezone }),
       ]);
       weekWorklogs = current || [];
       prevWeekWorklogs = prev || [];
@@ -331,7 +334,7 @@
   async function handleModalSave(event) {
     try {
       const data = event.detail;
-      await api.time.worklogs.create(data);
+      await time.worklogs.create(data);
       await loadWeekWorklogs();
     } catch (error) {
       console.error('Failed to save worklog:', error);
@@ -473,7 +476,7 @@
                   </div>
                   {#if row.isPinned && !row.itemId}
                     <button
-                      class="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded hover:bg-ds-danger-subtle cursor-pointer"
+                      class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded hover:bg-ds-danger-subtle cursor-pointer"
                       style="color: var(--ds-text-subtle);"
                       onclick={() => removeProject(row.projectId)}
                       title={t('time.timesheet.removeProject')}

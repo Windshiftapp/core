@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrConnectionNotFound   = errors.New("jira import connection not found")
-	ErrConnectionHasHistory = errors.New("jira import connection has import history")
+	ErrConnectionNotFound = errors.New("jira import connection not found")
+	ErrConnectionActive   = errors.New("jira import connection has an active import")
 )
 
 type Connection struct {
@@ -40,6 +40,14 @@ type ConnectionCredentials struct {
 	DeploymentType       string
 }
 
+// ConnectionUpdate carries the mutable fields of an existing connection. The
+// instance URL and deployment type are identity and cannot change.
+type ConnectionUpdate struct {
+	Email                string
+	InstanceName         string
+	EncryptedCredentials string
+}
+
 func (s *Service) CreateConnection(input NewConnection) error {
 	_, err := s.db.ExecWrite(`
 		INSERT INTO jira_import_connections
@@ -52,7 +60,7 @@ func (s *Service) CreateConnection(input NewConnection) error {
 func (s *Service) ListConnections() ([]Connection, error) {
 	rows, err := s.db.Query(`
 		SELECT id, instance_url, email, instance_name, deployment_type, created_at, last_used_at
-		FROM jira_import_connections ORDER BY created_at DESC
+		FROM jira_import_connections WHERE deleted_at IS NULL ORDER BY created_at DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -80,18 +88,44 @@ func (s *Service) ListConnections() ([]Connection, error) {
 	return connections, rows.Err()
 }
 
+// UpdateConnection replaces the credentials and account details of an active
+// connection. It is the supported way to recover from an expired or revoked
+// token without deleting the connection and its import provenance.
+func (s *Service) UpdateConnection(connectionID string, update ConnectionUpdate) error {
+	result, err := s.db.ExecWrite(`
+		UPDATE jira_import_connections
+		SET email = ?, instance_name = ?, encrypted_credentials = ?
+		WHERE id = ? AND deleted_at IS NULL
+	`, update.Email, update.InstanceName, update.EncryptedCredentials, connectionID)
+	if err != nil {
+		return err
+	}
+	return requireActiveConnection(result)
+}
+
+// DeleteConnection removes the stored credentials and hides the connection
+// from every active-connection read, while retaining the row so import jobs
+// and their ID mappings keep valid provenance.
 func (s *Service) DeleteConnection(connectionID string) error {
-	hasHistory, err := s.HasImportHistory(connectionID)
+	active, err := s.HasActiveImport(connectionID)
 	if err != nil {
 		return err
 	}
-	if hasHistory {
-		return ErrConnectionHasHistory
+	if active {
+		return ErrConnectionActive
 	}
-	result, err := s.db.ExecWrite(`DELETE FROM jira_import_connections WHERE id = ?`, connectionID)
+	result, err := s.db.ExecWrite(`
+		UPDATE jira_import_connections
+		SET deleted_at = CURRENT_TIMESTAMP, encrypted_credentials = ''
+		WHERE id = ? AND deleted_at IS NULL
+	`, connectionID)
 	if err != nil {
 		return err
 	}
+	return requireActiveConnection(result)
+}
+
+func requireActiveConnection(result sql.Result) error {
 	affected, err := result.RowsAffected()
 	if err != nil {
 		return err
@@ -102,12 +136,27 @@ func (s *Service) DeleteConnection(connectionID string) error {
 	return nil
 }
 
-func (s *Service) UseConnection(connectionID string) (ConnectionCredentials, error) {
+// HasActiveImport reports whether a queued or running import still depends on
+// the connection's credentials.
+func (s *Service) HasActiveImport(connectionID string) (bool, error) {
+	var count int
+	if err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM jira_import_jobs
+		WHERE connection_id = ? AND status IN ('queued', 'running')
+	`, connectionID).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// LoadConnectionCredentials loads the stored credentials for an active
+// connection without marking it as used.
+func (s *Service) LoadConnectionCredentials(connectionID string) (ConnectionCredentials, error) {
 	var result ConnectionCredentials
 	var deploymentType sql.NullString
 	err := s.db.QueryRow(`
 		SELECT instance_url, email, encrypted_credentials, deployment_type
-		FROM jira_import_connections WHERE id = ?
+		FROM jira_import_connections WHERE id = ? AND deleted_at IS NULL
 	`, connectionID).Scan(&result.InstanceURL, &result.Email, &result.EncryptedCredentials, &deploymentType)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ConnectionCredentials{}, ErrConnectionNotFound
@@ -116,8 +165,17 @@ func (s *Service) UseConnection(connectionID string) (ConnectionCredentials, err
 		return ConnectionCredentials{}, err
 	}
 	result.DeploymentType = deploymentType.String
+	return result, nil
+}
+
+func (s *Service) UseConnection(connectionID string) (ConnectionCredentials, error) {
+	result, err := s.LoadConnectionCredentials(connectionID)
+	if err != nil {
+		return ConnectionCredentials{}, err
+	}
 	if _, err := s.db.ExecWrite(`
-		UPDATE jira_import_connections SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?
+		UPDATE jira_import_connections SET last_used_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND deleted_at IS NULL
 	`, connectionID); err != nil {
 		return ConnectionCredentials{}, err
 	}
@@ -126,7 +184,7 @@ func (s *Service) UseConnection(connectionID string) (ConnectionCredentials, err
 
 func (s *Service) ConnectionDeploymentType(connectionID string) (string, error) {
 	var deploymentType sql.NullString
-	err := s.db.QueryRow(`SELECT deployment_type FROM jira_import_connections WHERE id = ?`, connectionID).Scan(&deploymentType)
+	err := s.db.QueryRow(`SELECT deployment_type FROM jira_import_connections WHERE id = ? AND deleted_at IS NULL`, connectionID).Scan(&deploymentType)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrConnectionNotFound
 	}

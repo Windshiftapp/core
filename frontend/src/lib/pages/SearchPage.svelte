@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { AlertCircle, Search } from '@lucide/svelte';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Search from '@lucide/svelte/icons/search';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';

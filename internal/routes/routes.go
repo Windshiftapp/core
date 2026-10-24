@@ -18,6 +18,7 @@ func RegisterAll(deps *Deps) {
 	RegisterAIRoutes(deps)
 	RegisterAnalyticsRoutes(deps)
 	RegisterMiscRoutes(deps)
+	RegisterCustomWidgetRoutes(deps)
 	RegisterTeamRoutes(deps)
 	RegisterIntegrationRoutes(deps)
 	RegisterOAuthRoutes(deps)

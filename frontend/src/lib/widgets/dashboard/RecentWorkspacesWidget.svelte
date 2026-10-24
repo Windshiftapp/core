@@ -1,6 +1,6 @@
 <script>
-  import { Briefcase } from '@lucide/svelte';
-  import { homepageStore } from '../../stores';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import { homepageStore } from '../../stores/homepageStore.svelte.js';
   import { workspaceIconMap } from '../../utils/icons.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';

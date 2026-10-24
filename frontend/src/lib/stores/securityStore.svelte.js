@@ -3,7 +3,19 @@
  * Uses Svelte 5 class-based reactive state pattern.
  * Centralizes credentials, tokens, SSH keys, and password management.
  */
-import { api } from '../api.js';
+
+import { auth } from '../api/auth.js';
+import {
+  completeFIDORegistration,
+  createApiToken,
+  createSSHKey,
+  getApiTokens,
+  getUser,
+  getUserCredentials,
+  removeUserCredential,
+  revokeApiToken,
+  startFIDORegistration,
+} from '../api/users.js';
 import { capabilitiesStore } from './capabilities.svelte.js';
 import { scopeCatalogStore } from './scopeCatalog.svelte.js';
 
@@ -132,7 +144,7 @@ class SecurityStore {
     if (!this.currentUserId) return;
     try {
       this.loading = true;
-      this.user = await api.getUser(this.currentUserId);
+      this.user = await getUser(this.currentUserId);
     } catch (err) {
       console.warn('Failed to load user profile:', err);
       this.user = null;
@@ -145,7 +157,7 @@ class SecurityStore {
     if (!this.currentUserId) return;
     try {
       this.credentialsLoading = true;
-      this.credentials = (await api.getUserCredentials(this.currentUserId)) || [];
+      this.credentials = (await getUserCredentials(this.currentUserId)) || [];
     } catch (err) {
       console.warn('Failed to load credentials:', err);
       this.credentials = [];
@@ -157,7 +169,7 @@ class SecurityStore {
   async loadApiTokens() {
     try {
       this.tokensLoading = true;
-      this.apiTokens = (await api.getApiTokens()) || [];
+      this.apiTokens = (await getApiTokens()) || [];
     } catch (err) {
       console.warn('Failed to load API tokens:', err);
       this.apiTokens = [];
@@ -188,7 +200,7 @@ class SecurityStore {
       this.enrollingFIDO = true;
 
       // Start registration with server
-      const registrationData = await api.startFIDORegistration(
+      const registrationData = await startFIDORegistration(
         this.currentUserId,
         this.newCredentialName.trim()
       );
@@ -218,7 +230,7 @@ class SecurityStore {
         response: credentialResponse,
       };
 
-      await api.completeFIDORegistration(this.currentUserId, completionData);
+      await completeFIDORegistration(this.currentUserId, completionData);
 
       const wasEnrollmentRequired = this.enrollmentOnly;
       if (wasEnrollmentRequired) {
@@ -252,7 +264,7 @@ class SecurityStore {
 
     try {
       this.loading = true;
-      await api.createSSHKey(
+      await createSSHKey(
         this.currentUserId,
         this.newCredentialName.trim(),
         this.newSSHPublicKey.trim()
@@ -270,7 +282,7 @@ class SecurityStore {
   async removeCredential(credentialId) {
     if (!this.currentUserId) return;
     try {
-      await api.removeUserCredential(this.currentUserId, credentialId);
+      await removeUserCredential(this.currentUserId, credentialId);
       await this.loadCredentials();
     } catch (err) {
       console.error('Failed to remove credential:', err);
@@ -291,7 +303,7 @@ class SecurityStore {
         expires_on: this.newTokenExpiry || null,
       };
 
-      const result = await api.createApiToken(tokenData);
+      const result = await createApiToken(tokenData);
       this.newTokenValue = result.token;
       this.showNewToken = true;
 
@@ -307,7 +319,7 @@ class SecurityStore {
 
   async revokeApiToken(tokenId) {
     try {
-      await api.revokeApiToken(tokenId);
+      await revokeApiToken(tokenId);
       await this.loadApiTokens();
     } catch (err) {
       console.error('Failed to revoke token:', err);
@@ -334,7 +346,7 @@ class SecurityStore {
 
     this.changePasswordLoading = true;
     try {
-      await api.auth.changePassword({
+      await auth.changePassword({
         current_password: this.changePasswordData.current_password,
         new_password: this.changePasswordData.new_password,
         logout_all: this.changePasswordData.logout_all,

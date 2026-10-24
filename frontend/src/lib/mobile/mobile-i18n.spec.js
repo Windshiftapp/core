@@ -21,11 +21,16 @@ import { mobilePalette } from './mobilePalette.svelte.js';
 // network and navigation dependencies are isolated from this UI test.
 const mockAiStore = vi.hoisted(() => ({ chatAvailable: true }));
 
-vi.mock('../stores', async () => {
+vi.mock('../stores/auth.svelte.js', async () => {
   const { writable } = await import('svelte/store');
   return {
     authStore: writable({ currentUser: { id: 1 } }),
-    aiStore: mockAiStore,
+  };
+});
+vi.mock('../stores/aiStore.svelte.js', () => ({ aiStore: mockAiStore }));
+vi.mock('../stores/workspaces.svelte.js', async () => {
+  const { writable } = await import('svelte/store');
+  return {
     workspacesStore: writable({ personalWorkspace: null, regularWorkspaces: [] }),
   };
 });
@@ -43,12 +48,12 @@ vi.mock('../stores/notifications.js', async () => {
 vi.mock('../stores/timerStore.svelte.js', () => ({
   timerStore: { hasActive: false, activeTimer: null },
 }));
-vi.mock('../api.js', () => ({
-  api: {
-    items: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-    homepage: { get: vi.fn().mockResolvedValue({ watched_items: [] }) },
-    search: { items: vi.fn().mockResolvedValue([]) },
-  },
+vi.mock('../api/items.js', () => ({
+  items: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
+}));
+vi.mock('../api/misc.js', () => ({
+  homepage: { get: vi.fn().mockResolvedValue({ watched_items: [] }) },
+  search: { items: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock('../commands/executor.js', () => ({ executeCommand: vi.fn().mockResolvedValue() }));
 vi.mock('../components/UserAvatar.svelte', () => ({ default: () => {} }));
@@ -223,10 +228,13 @@ describe('mobile localization with real catalogs', () => {
     expect(translateError({ message: 'External server detail' })).toBe('External server detail');
     // Every shipped locale must resolve the full mobile surface — no English
     // fallback for missing mobile keys.
+    // Each locale dynamically imports its real catalog; under full-suite
+    // parallelism that load alone has measured ~5s, so give the loop its own
+    // budget instead of relying on the 5s default.
     for (const { code } of SUPPORTED_LOCALES) {
       await switchLocale(code);
       expect(t('mobile.create.item')).not.toBe('mobile.create.item');
       for (const key of Object.values(BUCKET_LABEL_KEYS)) expect(t(key)).not.toBe(key);
     }
-  });
+  }, 30_000);
 });

@@ -762,6 +762,8 @@ export default {
         invitation: 'Приглашение нового пользователя',
         notification_batch: 'Сводные уведомления',
         portal_reply: 'Ответ клиенту на портале',
+        approval_requested: 'Запрос согласования в портале',
+        intake_confirmation: 'Подтверждение получения (email)',
       },
     },
 

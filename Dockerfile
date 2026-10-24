@@ -8,8 +8,11 @@ WORKDIR /build
 # Copy package files first for better layer caching
 COPY frontend/package*.json frontend/.npmrc ./
 
-# Install dependencies (npm ci is faster and more reliable for CI)
-RUN npm ci
+# Install dependencies (npm ci is faster and more reliable for CI).
+# The OpenUI packages ship a telemetry postinstall; frontend/.npmrc already sets
+# ignore-scripts=true, and these env vars keep it disabled if scripts are ever
+# re-enabled.
+RUN OPENUI_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 npm ci
 
 # Build-time version metadata for the static UI. These are passed by
 # release.sh / CI so the About page and footer do not fall back to "dev".
@@ -23,7 +26,7 @@ RUN VITE_APP_VERSION_CODE="${VERSION}" \
     npm run build
 
 # Stage 2: Build Go binary
-FROM golang:1.27.2-alpine@sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673 AS builder
+FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS builder
 
 # Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
 RUN apk add --no-cache git tzdata

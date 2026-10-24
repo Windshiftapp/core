@@ -35,7 +35,14 @@ func (c *dynamicFantasyClient) modelClient(model string) *fantasyClient {
 	if client := c.models[model]; client != nil {
 		return client
 	}
-	client := newFantasyClient(c.endpoint, model, c.apiKey, APIContractChatCompletions, "/v1/chat/completions", "", c.timeout)
+	client := newFantasyClient(fantasyClientOptions{
+		baseURL:  c.endpoint,
+		model:    model,
+		apiKey:   c.apiKey,
+		protocol: APIContractChatCompletions,
+		chatPath: "/v1/chat/completions",
+		timeout:  c.timeout,
+	})
 	c.models[model] = client
 	return client
 }
@@ -78,54 +85,73 @@ type fantasyClient struct {
 	completionTokens completionTokenNegotiator
 }
 
-func newFantasyClient(baseURL, model, apiKey, protocol, chatPath, providerConfig string, timeout time.Duration) *fantasyClient {
-	if timeout <= 0 {
-		timeout = DefaultRequestTimeout
+// fantasyClientOptions is the resolved configuration for one provider/model
+// generation client. It is a struct rather than positional arguments because
+// the header fields are only meaningful for some providers.
+type fantasyClientOptions struct {
+	baseURL        string
+	model          string
+	apiKey         string
+	protocol       string
+	chatPath       string
+	providerConfig string
+	timeout        time.Duration
+	userAgent      string
+	sessionHeader  string
+}
+
+func newFantasyClient(opts fantasyClientOptions) *fantasyClient {
+	if opts.timeout <= 0 {
+		opts.timeout = DefaultRequestTimeout
 	}
 	client := &fantasyClient{
-		modelID:        model,
-		protocol:       protocol,
-		providerConfig: providerConfig,
+		modelID:        opts.model,
+		protocol:       opts.protocol,
+		providerConfig: opts.providerConfig,
 		replay:         &reasoningReplayState{},
 	}
-	httpClient := newAdminConfiguredHTTPClient(timeout)
+	httpClient := newAdminConfiguredHTTPClient(opts.timeout)
 	transport := httpClient.Transport
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	httpClient.Transport = &reasoningReplayTransport{next: transport, state: client.replay}
+	httpClient.Transport = &providerHeaderTransport{
+		next:          &reasoningReplayTransport{next: transport, state: client.replay},
+		userAgent:     opts.userAgent,
+		sessionHeader: opts.sessionHeader,
+	}
 
 	var provider fantasy.Provider
 	var err error
-	switch protocol {
+	switch opts.protocol {
 	case APIContractAnthropic:
 		provider, err = anthropic.New(
-			anthropic.WithBaseURL(strings.TrimRight(baseURL, "/")),
-			anthropic.WithAPIKey(apiKey),
+			anthropic.WithBaseURL(strings.TrimRight(opts.baseURL, "/")),
+			anthropic.WithAPIKey(opts.apiKey),
 			anthropic.WithHTTPClient(httpClient),
 		)
 	case APIContractResponses:
 		provider, err = openai.New(
-			openai.WithBaseURL(fantasyOpenAIBaseURL(baseURL, "/v1/responses")),
-			openai.WithAPIKey(apiKey),
+			openai.WithBaseURL(fantasyOpenAIBaseURL(opts.baseURL, "/v1/responses")),
+			openai.WithAPIKey(opts.apiKey),
 			openai.WithHTTPClient(httpClient),
 			openai.WithUseResponsesAPI(),
 			openai.WithResponsesAPIFunc(func(string) bool { return true }),
-			openai.WithSDKOptions(providerConfigSDKOptions(providerConfig, protocol)...),
+			openai.WithSDKOptions(providerConfigSDKOptions(opts.providerConfig, opts.protocol)...),
 		)
 	default:
 		provider, err = openai.New(
-			openai.WithBaseURL(fantasyOpenAIBaseURL(baseURL, chatPath)),
-			openai.WithAPIKey(apiKey),
+			openai.WithBaseURL(fantasyOpenAIBaseURL(opts.baseURL, opts.chatPath)),
+			openai.WithAPIKey(opts.apiKey),
 			openai.WithHTTPClient(httpClient),
-			openai.WithSDKOptions(providerConfigSDKOptions(providerConfig, protocol)...),
+			openai.WithSDKOptions(providerConfigSDKOptions(opts.providerConfig, opts.protocol)...),
 		)
 	}
 	if err != nil {
 		client.initErr = err
 		return client
 	}
-	client.model, client.initErr = provider.LanguageModel(context.Background(), model)
+	client.model, client.initErr = provider.LanguageModel(context.Background(), opts.model)
 	return client
 }
 
@@ -138,7 +164,7 @@ func providerConfigSDKOptions(raw, protocol string) []sdkoption.RequestOption {
 		"model": true, "messages": true, "input": true, "temperature": true,
 		"top_p": true, "max_tokens": true, "max_completion_tokens": true,
 		"max_output_tokens": true, "tools": true, "tool_choice": true,
-		"response_format": true, "text": true, "reasoning": true,
+		"response_format": true, "text": true,
 		"include": true, "store": true,
 	}
 	if protocol == APIContractResponses {
@@ -146,6 +172,14 @@ func providerConfigSDKOptions(raw, protocol string) []sdkoption.RequestOption {
 		generated["parallel_tool_calls"] = true
 	}
 	var options []sdkoption.RequestOption
+	// The normalized reasoning_level is translated to the Chat Completions
+	// field. A provider-native reasoning field supplied by the operator wins and
+	// is forwarded verbatim by the generic loop below.
+	if protocol == APIContractChatCompletions && !ProviderConfigHasReasoningOverride(raw) {
+		if level := ProviderConfigReasoningLevel(raw); level != "" {
+			options = append(options, sdkoption.WithJSONSet("reasoning_effort", level))
+		}
+	}
 	for key, rawValue := range config {
 		if reservedProviderConfigKeys[key] || generated[key] {
 			continue
@@ -176,6 +210,12 @@ func fantasyOpenAIBaseURL(baseURL, endpointPath string) string {
 func (c *fantasyClient) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 	if c.initErr != nil {
 		return nil, mapFantasyError(c.initErr)
+	}
+	// Guarantee one session per logical call so an internal retry (the
+	// max_tokens negotiation below) stays on the same provider session even when
+	// the caller attached none.
+	if SessionIDFromContext(ctx) == "" {
+		ctx = WithSessionID(ctx, NewSessionID("ws-request"))
 	}
 	prompt, err := toFantasyPrompt(req.Messages, req.EnablePromptCache)
 	if err != nil {
@@ -494,13 +534,10 @@ func (c *fantasyClient) callProviderOptions(req CompletionRequest) fantasy.Provi
 				break
 			}
 		}
-		if reasoning := ProviderConfigResponsesReasoning(c.providerConfig); reasoning != nil {
-			if reasoning.Effort != "" {
-				effort := openai.ReasoningEffort(reasoning.Effort)
+		if !ProviderConfigHasReasoningOverride(c.providerConfig) {
+			if level := ProviderConfigReasoningLevel(c.providerConfig); level != "" {
+				effort := openai.ReasoningEffort(level)
 				options.ReasoningEffort = &effort
-			}
-			if reasoning.Summary != "" {
-				options.ReasoningSummary = &reasoning.Summary
 			}
 		}
 		applyResponsesProviderConfig(options, c.providerConfig)
@@ -508,18 +545,19 @@ func (c *fantasyClient) callProviderOptions(req CompletionRequest) fantasy.Provi
 	}
 	if c.protocol == APIContractAnthropic {
 		options := &anthropic.ProviderOptions{}
-		reasoning := ProviderConfigResponsesReasoning(c.providerConfig)
-		switch {
-		case reasoning != nil && reasoning.BudgetTokens > 0:
-			options.Thinking = &anthropic.ThinkingProviderOption{BudgetTokens: reasoning.BudgetTokens}
-		case reasoning != nil && reasoning.Effort != "":
-			effort := anthropic.Effort(reasoning.Effort)
-			options.Effort = &effort
-		case req.CodingAgent:
-			effort := anthropic.EffortHigh
-			options.Effort = &effort
+		// A provider-native reasoning field supplied by the operator wins over
+		// the normalized reasoning_level and is forwarded verbatim via ExtraBody.
+		options.ExtraBody = providerConfigReasoningOverrideBody(c.providerConfig)
+		if options.ExtraBody == nil {
+			if level := ProviderConfigReasoningLevel(c.providerConfig); level != "" {
+				effort := anthropic.Effort(level)
+				options.Effort = &effort
+			} else if req.CodingAgent {
+				effort := anthropic.EffortHigh
+				options.Effort = &effort
+			}
 		}
-		if options.Effort != nil || options.Thinking != nil {
+		if options.Effort != nil || options.ExtraBody != nil {
 			sendReasoning := true
 			options.SendReasoning = &sendReasoning
 		}

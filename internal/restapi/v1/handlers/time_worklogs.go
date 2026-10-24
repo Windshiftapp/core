@@ -43,6 +43,7 @@ type worklogResponse struct {
 	CreatedAt           int64    `json:"created_at"`
 	UpdatedAt           int64    `json:"updated_at"`
 	CustomerName        string   `json:"customer_name,omitempty"`
+	CustomerBuiltinKey  string   `json:"customer_builtin_key,omitempty"`
 	ProjectName         string   `json:"project_name,omitempty"`
 	ItemTitle           string   `json:"item_title,omitempty"`
 	WorkspaceID         *int     `json:"workspace_id,omitempty"`
@@ -66,6 +67,7 @@ func mapWorklogToResponse(wl models.Worklog) worklogResponse {
 		CreatedAt:           wl.CreatedAt,
 		UpdatedAt:           wl.UpdatedAt,
 		CustomerName:        wl.CustomerName,
+		CustomerBuiltinKey:  wl.CustomerBuiltinKey,
 		ProjectName:         wl.ProjectName,
 		ItemTitle:           wl.ItemTitle,
 		WorkspaceID:         wl.WorkspaceID,

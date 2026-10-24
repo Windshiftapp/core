@@ -1,15 +1,23 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { approvals } from '../../api/approvals.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
-  import { AlertCircle, Check, X, MessageSquare, RotateCcw, ChevronUp, ChevronDown, Clock, ShieldX } from '@lucide/svelte';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Clock from '@lucide/svelte/icons/clock';
+  import ShieldX from '@lucide/svelte/icons/shield-x';
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Badge from '../../components/Badge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../../utils/authenticatedDateFormatter.js';
-  import { authStore } from '../../stores';
+  import { authStore } from '../../stores/auth.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
 
   let {
@@ -51,7 +59,7 @@
     if (!itemId) return;
     try {
       loading = true;
-      applyRequests((await api.approvals.forItem(itemId)) || []);
+      applyRequests((await approvals.forItem(itemId)) || []);
     } catch (err) {
       console.error('load approvals', err);
       errorToast(err.message || JSON.stringify(err));
@@ -111,7 +119,7 @@
     }
     acting = true;
     try {
-      await api.approvals.decide(req.id, decision, commentsByRequest[req.id] ?? '');
+      await approvals.decide(req.id, decision, commentsByRequest[req.id] ?? '');
       commentsByRequest[req.id] = '';
       successToast(t('items.approvals.decisionRecorded', { decision: decisionLabel({ decision }) }));
       await load();
@@ -134,7 +142,7 @@
     if (!ok) return;
     acting = true;
     try {
-      await api.approvals.cancel(req.id, commentsByRequest[req.id] ?? '');
+      await approvals.cancel(req.id, commentsByRequest[req.id] ?? '');
       commentsByRequest[req.id] = '';
       successToast(t('items.approvals.cancelledSuccess'));
       await load();

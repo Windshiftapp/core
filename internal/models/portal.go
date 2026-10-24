@@ -45,6 +45,7 @@ type ChannelConfig struct {
 	SMTPFromName      string `json:"smtp_from_name,omitempty"`
 	SMTPEncryption    string `json:"smtp_encryption,omitempty"` // tls/starttls, ssl, none
 	SMTPSkipTLSVerify bool   `json:"smtp_skip_tls_verify,omitempty"`
+	SMTPAuthMethod    string `json:"smtp_auth_method,omitempty"` // auto (default), plain, login, cram-md5, none
 
 	// Webhook Configuration
 	WebhookURL              string            `json:"webhook_url,omitempty"`
@@ -74,11 +75,18 @@ type ChannelConfig struct {
 	EmailOAuthClientSecret string `json:"email_oauth_client_secret,omitempty"` // Encrypted client secret
 	EmailOAuthTenantID     string `json:"email_oauth_tenant_id,omitempty"`     // Microsoft tenant ID (or 'common')
 
+	// EmailOAuthMailbox is the monitored mailbox the admin enters for the OAuth
+	// flow. IMAP XOAUTH2 authenticates as this address, so it is known before
+	// the flow and cannot be derived from the token. Kept separate from
+	// EmailOAuthEmail so a pending address change survives reconnect: the
+	// verified EmailOAuthEmail marks the connection as live.
+	EmailOAuthMailbox string `json:"email_oauth_mailbox,omitempty"`
+
 	// OAuth Tokens (populated after successful OAuth flow)
 	EmailOAuthAccessToken   string     `json:"email_oauth_access_token,omitempty"`   // Encrypted OAuth access token
 	EmailOAuthRefreshToken  string     `json:"email_oauth_refresh_token,omitempty"`  // Encrypted OAuth refresh token
 	EmailOAuthExpiresAt     *time.Time `json:"email_oauth_expires_at,omitempty"`     // Token expiration time
-	EmailOAuthEmail         string     `json:"email_oauth_email,omitempty"`          // Connected email address
+	EmailOAuthEmail         string     `json:"email_oauth_email,omitempty"`          // Verified connected mailbox address
 	EmailWorkspaceID        int        `json:"email_workspace_id,omitempty"`         // Target workspace for items
 	EmailItemTypeID         *int       `json:"email_item_type_id,omitempty"`         // Item type to create
 	EmailDefaultPriorityID  *int       `json:"email_default_priority_id,omitempty"`  // Default priority for items
@@ -261,7 +269,10 @@ type PortalCustomerRole struct {
 
 // CustomerOrganisation represents a B2B entity for time tracking
 type CustomerOrganisation struct {
-	ID                int            `json:"id"`
+	ID int `json:"id"`
+	// BuiltinKey identifies system-managed rows (see
+	// CustomerOrganisationBuiltinNoCustomer). Empty for ordinary organisations.
+	BuiltinKey        string         `json:"builtin_key,omitempty"`
 	Name              string         `json:"name"`
 	Email             string         `json:"email"`
 	Description       string         `json:"description"`
@@ -274,6 +285,10 @@ type CustomerOrganisation struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 }
+
+// CustomerOrganisationBuiltinNoCustomer is the builtin_key of the placeholder
+// organisation that owns projects and worklogs created without a real customer.
+const CustomerOrganisationBuiltinNoCustomer = "no_customer"
 
 // Portal organisation request-sharing modes stored in
 // CustomerOrganisation.Settings under "request_sharing".

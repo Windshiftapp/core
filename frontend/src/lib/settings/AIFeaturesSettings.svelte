@@ -2,23 +2,21 @@
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import {  } from '@lucide/svelte';
-  import { api } from '../api.js';
+
+  import { aiFeatures } from '../api/ai.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { logbookStore } from '../stores/logbook.svelte.js';
   import Select from '../components/Select.svelte';
-  import {
-    IconMessageChatbot,
-    IconSun,
-    IconCalendarCheck,
-    IconPlayerTrackNext,
-    IconSearch,
-    IconPuzzle,
-    IconFileDescription,
-    IconArrowsShuffle,
-    IconNotebook,
-  } from '@tabler/icons-svelte-runes';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
+  import IconSun from '@tabler/icons-svelte-runes/icons/sun';
+  import IconCalendarCheck from '@tabler/icons-svelte-runes/icons/calendar-check';
+  import IconPlayerTrackNext from '@tabler/icons-svelte-runes/icons/player-track-next';
+  import IconSearch from '@tabler/icons-svelte-runes/icons/search';
+  import IconPuzzle from '@tabler/icons-svelte-runes/icons/puzzle';
+  import IconFileDescription from '@tabler/icons-svelte-runes/icons/file-description';
+  import IconArrowsShuffle from '@tabler/icons-svelte-runes/icons/arrows-shuffle';
+  import IconNotebook from '@tabler/icons-svelte-runes/icons/notebook';
 
   const FEATURE_ICONS = {
     ai_chat: IconMessageChatbot,
@@ -61,7 +59,7 @@
   async function loadConfig() {
     loading = true;
     try {
-      const data = await api.aiFeatures.getConfig();
+      const data = await aiFeatures.getConfig();
       config = data.config ?? {};
       connections = data.connections ?? [];
     } catch (err) {
@@ -125,7 +123,7 @@
   async function save() {
     saving = true;
     try {
-      const result = await api.aiFeatures.updateConfig(config);
+      const result = await aiFeatures.updateConfig(config);
       config = result.config ?? config;
       successToast(t('settings.aiFeatures.saveSuccess'));
     } catch (err) {

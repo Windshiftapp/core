@@ -12,13 +12,24 @@
   import { nord } from '@milkdown/theme-nord';
   import '@milkdown/theme-nord/style.css';
   import { imageBlockComponent } from '@milkdown/kit/component/image-block';
-  import { Bold, Italic, Code, List, ListOrdered, Strikethrough, Image as ImageIcon, Workflow, BookOpen } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Bold from '@lucide/svelte/icons/bold';
+  import Italic from '@lucide/svelte/icons/italic';
+  import Code from '@lucide/svelte/icons/code';
+  import List from '@lucide/svelte/icons/list';
+  import ListOrdered from '@lucide/svelte/icons/list-ordered';
+  import Strikethrough from '@lucide/svelte/icons/strikethrough';
+  import ImageIcon from '@lucide/svelte/icons/image';
+  import Workflow from '@lucide/svelte/icons/workflow';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import { getAssignableUsers, getUsers } from '../api/users.js';
+  import { attachments as attachmentsApi } from '../api/misc.js';
+  import { pages } from '../api/pages.js';
   import { confirm } from '../composables/useConfirm.js';
   import Tooltip from '../components/Tooltip.svelte';
   import FileInput from '../components/FileInput.svelte';
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
+  import { mentionTextFor, resolveMentionUser } from './mentionResolver.js';
   import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
   import { imageBlockerPlugin } from './milkdown-image-blocker.js';
   import { rewriteBreakHTML } from './milkdown-hardbreak.js';
@@ -118,10 +129,14 @@
   let hoverCardVisible = $state(false);
   let hoverCardPosition = $state({ x: 0, y: 0 });
   let hoverCardUser = $state(null);
+  let hoverCardMatches = $state([]);
   let hoverCardLoading = $state(false);
   let hoverCardTimeout = $state(null);
   let hideCardTimeout = $state(null);
-  let userCache = new Map();
+  let hoverCardRequest = 0;
+  // Workspace roster used to resolve mention identifiers, loaded once per editor.
+  let mentionRoster = null;
+  let mentionRosterPromise = null;
 
   // Toolbar actions
   function toggleBold() {
@@ -193,11 +208,9 @@
     if (!editor || !mentionRange) return;
     const range = mentionRange;
 
-    // Format the mention text based on whether display name has spaces
-    const displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-    const mentionText = displayName.includes(' ')
-      ? `@"${displayName}"`
-      : `@${user.username}`;
+    // The picker supplies the identifier from the full roster so a duplicated
+    // display name becomes @username instead of an ambiguous @"Name".
+    const mentionText = user.mentionText || mentionTextFor(user, [user]);
 
     // Get the editor view and replace the mention range with the formatted mention
     editor.action((ctx) => {
@@ -230,30 +243,43 @@
   }
 
   // User hover card functions
+  function ensureMentionRoster() {
+    if (mentionRoster) return Promise.resolve(mentionRoster);
+    if (!mentionRosterPromise) {
+      mentionRosterPromise = (workspaceId
+        ? getAssignableUsers(workspaceId)
+        : getUsers())
+        .then((roster) => {
+          mentionRoster = roster || [];
+          return mentionRoster;
+        })
+        .catch((error) => {
+          mentionRosterPromise = null;
+          throw error;
+        });
+    }
+    return mentionRosterPromise;
+  }
+
+  // Resolve the hovered mention against the same roster the picker offers, so
+  // the card shows the person the mention refers to. A display-name mention
+  // that matches several people shows every candidate instead of guessing.
   async function loadUserForHoverCard(identifier) {
-    if (hoverCardLoading) return;
-
-    // Check cache first
-    if (userCache.has(identifier)) {
-      hoverCardUser = userCache.get(identifier);
-      return;
-    }
-
+    const request = ++hoverCardRequest;
     hoverCardLoading = true;
+    hoverCardUser = null;
+    hoverCardMatches = [];
     try {
-      const users = await api.getUsers();
-      const user = users.find(u =>
-        u.username === identifier ||
-        `${u.first_name || ''} ${u.last_name || ''}`.trim() === identifier
-      );
-      if (user) {
-        userCache.set(identifier, user);
-        hoverCardUser = user;
-      }
+      const roster = await ensureMentionRoster();
+      if (request !== hoverCardRequest) return;
+      const resolved = resolveMentionUser(roster, identifier);
+      hoverCardUser = resolved.user;
+      hoverCardMatches = resolved.user ? [] : resolved.matches;
     } catch (e) {
-      console.error('Failed to load user for hover card:', e);
+      if (request !== hoverCardRequest) return;
+      console.error('Failed to load users for hover card:', e);
     }
-    hoverCardLoading = false;
+    if (request === hoverCardRequest) hoverCardLoading = false;
   }
 
   function showHoverCard(element, identifier) {
@@ -270,6 +296,7 @@
       };
       hoverCardVisible = true;
       hoverCardUser = null;
+      hoverCardMatches = [];
       loadUserForHoverCard(identifier);
     }, 300);
   }
@@ -367,7 +394,7 @@
 
           let result;
           if (!customUploadFn && effectiveEntityType === 'item' && effectiveEntityId) {
-            const attachment = await api.attachments.uploadToItem(effectiveEntityId, image);
+            const attachment = await attachmentsApi.uploadToItem(effectiveEntityId, image);
             result = { success: true, attachment };
           } else {
             const formData = new FormData();
@@ -378,11 +405,11 @@
             }
             result = customUploadFn
               ? await customUploadFn(formData)
-              : await api.attachments.upload(formData);
+              : await attachmentsApi.upload(formData);
           }
           if (result.success && result.attachment) {
             const src = downloadUrlBase === '/api/attachments'
-              ? api.attachments.getDownloadUrl(result.attachment.id)
+              ? attachmentsApi.getContentUrl(result.attachment.id)
               : `${downloadUrlBase}/${result.attachment.id}/download`;
             const node = schema?.nodes?.image?.createAndFill({
               src,
@@ -780,7 +807,7 @@
     const version = ++pageLinkSearchVersion;
     pageLinkTimer = setTimeout(async () => {
       try {
-        const result = await api.pages.searchPages(workspaceId, trimmed, { limit: 8 });
+        const result = await pages.searchPages(workspaceId, trimmed, { limit: 8 });
         if (version !== pageLinkSearchVersion) return;
         pageLinkResults = result?.results ?? (Array.isArray(result) ? result : []);
       } catch (error) {
@@ -862,7 +889,7 @@
   onfocusout={handleEditorFocusOut}
 >
   {#if toolbarVisible}
-    <div class="milkdown-toolbar" tabindex="-1">
+    <div class="milkdown-toolbar" tabindex="-1" data-testid="milkdown-toolbar">
       <Tooltip content={t('editors.bold')} placement="bottom">
         {#snippet children()}
           <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBold} aria-label={t('editors.bold')}>
@@ -1020,10 +1047,35 @@
   onCancel={handleMentionCancel}
 />
 <!-- User Hover Card for mentions -->
+{#snippet hoverUserCard(user, candidate = false)}
+  <div
+    class="hc-user-card"
+    data-testid={candidate ? `mention-hover-card-candidate-${user.id}` : 'mention-hover-card-user'}
+  >
+    <div class="hc-avatar">
+      {#if user.avatar_url}
+        <img src={user.avatar_url} alt="" />
+      {:else}
+        <span class="hc-initials">{getInitials(user)}</span>
+      {/if}
+    </div>
+    <div class="hc-info">
+      <div class="hc-name">{user.first_name || ''} {user.last_name || ''}</div>
+      {#if user.email}
+        <div class="hc-email">{user.email}</div>
+      {/if}
+      {#if user.username}
+        <div class="hc-username">@{user.username}</div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 {#if hoverCardVisible}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="user-hover-card"
+    data-testid="mention-hover-card"
     style="left: {hoverCardPosition.x}px; top: {hoverCardPosition.y}px;"
     onmouseenter={hoverCardMouseEnter}
     onmouseleave={hoverCardMouseLeave}
@@ -1032,23 +1084,13 @@
     {#if hoverCardLoading}
       <div class="hc-loading">{t('common.loading')}</div>
     {:else if hoverCardUser}
-      <div class="hc-user-card">
-        <div class="hc-avatar">
-          {#if hoverCardUser.avatar_url}
-            <img src={hoverCardUser.avatar_url} alt="" />
-          {:else}
-            <span class="hc-initials">{getInitials(hoverCardUser)}</span>
-          {/if}
-        </div>
-        <div class="hc-info">
-          <div class="hc-name">{hoverCardUser.first_name || ''} {hoverCardUser.last_name || ''}</div>
-          {#if hoverCardUser.email}
-            <div class="hc-email">{hoverCardUser.email}</div>
-          {/if}
-          {#if hoverCardUser.username}
-            <div class="hc-username">@{hoverCardUser.username}</div>
-          {/if}
-        </div>
+      {@render hoverUserCard(hoverCardUser)}
+    {:else if hoverCardMatches.length > 1}
+      <div class="hc-candidates" data-testid="mention-hover-card-candidates">
+        <div class="hc-candidates-title">{t('editors.multipleUsersMatch')}</div>
+        {#each hoverCardMatches as candidate (candidate.id)}
+          {@render hoverUserCard(candidate, true)}
+        {/each}
       </div>
     {:else}
       <div class="hc-not-found">{t('editors.userNotFound')}</div>
@@ -1153,8 +1195,11 @@
     outline: none;
   }
 
+  /* Show the placeholder only for a truly empty document. `:only-child` ignores
+     text nodes, so match the empty-paragraph trailing break by class — a hard
+     break (`<br data-type="hardbreak">`) must not re-trigger the placeholder. */
   :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child:empty)::before),
-  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br:only-child)::before) {
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br.ProseMirror-trailingBreak:only-child)::before) {
     content: attr(data-placeholder);
     float: left;
     color: var(--ds-text-subtlest, #9ca3af);
@@ -1707,5 +1752,20 @@
   .hc-username {
     font-size: 12px;
     color: var(--ds-accent-blue, #0052cc);
+  }
+
+  .hc-candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 220px;
+  }
+
+  .hc-candidates-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ds-text-subtle, #6b778c);
   }
 </style>

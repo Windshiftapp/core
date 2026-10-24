@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { items } from '../api/items.js';
 
 /**
  * Load the mobile above-the-fold item graph through the shared summary
@@ -8,5 +8,5 @@ import { api } from '../api.js';
  * @param {RequestInit} [requestOptions]
  */
 export function loadMobileItemDetailSummary(itemId, requestOptions = {}) {
-  return api.items.getDetailSummary(itemId, { ...requestOptions, surface: 'mobile' });
+  return items.getDetailSummary(itemId, { ...requestOptions, surface: 'mobile' });
 }

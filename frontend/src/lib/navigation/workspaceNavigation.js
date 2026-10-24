@@ -1,34 +1,32 @@
-import { GanttChart } from '@lucide/svelte';
-import {
-  IconAdjustments as Adjustments,
-  IconUserStar as AgentIcon,
-  IconChartBar as BarChart3,
-  IconBook as Book,
-  IconCalendar as Calendar,
-  IconClock as Clock,
-  IconFileCheck as FileCheck,
-  IconFileStack as FileStack,
-  IconGitBranch as GitBranch,
-  IconInbox,
-  IconKey as Key,
-  IconList as List,
-  IconListTree as ListTree,
-  IconMapPin as MapPin,
-  IconMessageCircle2 as MessageSquareText,
-  IconFlag as Milestone,
-  IconPackage as Package,
-  IconPlayerPlay as Play,
-  IconRefresh as Refresh,
-  IconRepeat as Repeat,
-  IconLayoutRows as Rows_3,
-  IconSettings as SettingsCog,
-  IconLayoutKanban as SquareKanban,
-  IconTags as Tags,
-  IconTrash as Trash,
-  IconTrendingUp as TrendingUp,
-  IconUsers as Users,
-  IconBolt as Zap,
-} from '@tabler/icons-svelte-runes';
+import GanttChart from '@lucide/svelte/icons/gantt-chart';
+import Adjustments from '@tabler/icons-svelte-runes/icons/adjustments';
+import Zap from '@tabler/icons-svelte-runes/icons/bolt';
+import Book from '@tabler/icons-svelte-runes/icons/book';
+import Calendar from '@tabler/icons-svelte-runes/icons/calendar';
+import BarChart3 from '@tabler/icons-svelte-runes/icons/chart-bar';
+import Clock from '@tabler/icons-svelte-runes/icons/clock';
+import FileCheck from '@tabler/icons-svelte-runes/icons/file-check';
+import FileStack from '@tabler/icons-svelte-runes/icons/file-stack';
+import Milestone from '@tabler/icons-svelte-runes/icons/flag';
+import GitBranch from '@tabler/icons-svelte-runes/icons/git-branch';
+import IconInbox from '@tabler/icons-svelte-runes/icons/inbox';
+import Key from '@tabler/icons-svelte-runes/icons/key';
+import SquareKanban from '@tabler/icons-svelte-runes/icons/layout-kanban';
+import Rows_3 from '@tabler/icons-svelte-runes/icons/layout-rows';
+import List from '@tabler/icons-svelte-runes/icons/list';
+import ListTree from '@tabler/icons-svelte-runes/icons/list-tree';
+import MapPin from '@tabler/icons-svelte-runes/icons/map-pin';
+import MessageSquareText from '@tabler/icons-svelte-runes/icons/message-circle';
+import Package from '@tabler/icons-svelte-runes/icons/package';
+import Play from '@tabler/icons-svelte-runes/icons/player-play';
+import Refresh from '@tabler/icons-svelte-runes/icons/refresh';
+import Repeat from '@tabler/icons-svelte-runes/icons/repeat';
+import SettingsCog from '@tabler/icons-svelte-runes/icons/settings';
+import Tags from '@tabler/icons-svelte-runes/icons/tags';
+import Trash from '@tabler/icons-svelte-runes/icons/trash';
+import TrendingUp from '@tabler/icons-svelte-runes/icons/trending-up';
+import AgentIcon from '@tabler/icons-svelte-runes/icons/user-star';
+import Users from '@tabler/icons-svelte-runes/icons/users';
 
 /**
  * @typedef {Object} WorkspaceView
@@ -279,6 +277,23 @@ export const workspaceSettingsItems = [
     danger: true,
   },
 ];
+
+/** Per-module settings page-header subtitle keys (id → i18n key). */
+export const workspaceSettingsSubtitleKeys = {
+  general: 'workspaceSettings.headers.general',
+  categories: 'workspaceSettings.headers.categories',
+  members: 'workspaceSettings.headers.members',
+  configuration: 'workspaceSettings.headers.configuration',
+  'source-control': 'workspaceSettings.headers.sourceControl',
+  'coding-agents': 'workspaceSettings.headers.codingAgents',
+  'issue-sync': 'workspaceSettings.headers.issueSync',
+  'action-credentials': 'workspaceSettings.headers.actionCredentials',
+  recurrence: 'workspaceSettings.headers.recurrence',
+  templates: 'workspaceSettings.headers.templates',
+  'canned-responses': 'workspaceSettings.headers.cannedResponses',
+  'service-levels': 'workspaceSettings.headers.serviceLevels',
+  danger: 'workspaceSettings.headers.danger',
+};
 
 /** All route view names that belong to the workspace admin area. */
 export const workspaceSettingsViews = [

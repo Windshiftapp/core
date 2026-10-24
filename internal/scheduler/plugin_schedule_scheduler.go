@@ -125,7 +125,7 @@ func (s *PluginScheduleScheduler) processTick() {
 	start := time.Now()
 	itemsProcessed := 0
 	var runErr error
-	defer recordSchedulerRun(s.runRepo, pluginScheduleSchedulerName, start, &itemsProcessed, &runErr)
+	defer recordSchedulerRun(s.runRepo, pluginScheduleSchedulerName, start, &itemsProcessed, &runErr, time.Now)
 
 	due := s.manager.DueSchedules(start)
 	if len(due) == 0 {

@@ -1,11 +1,13 @@
 <script>
-  import { api } from '../../api.js';
+  import { sla } from '../../api/sla.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Input from '../../components/Input.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { BarChart3, Download, RefreshCw } from '@lucide/svelte';
+  import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
+  import Download from '@lucide/svelte/icons/download';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDate } from '../../utils/dateFormatter.js';
 
@@ -36,7 +38,7 @@
     try {
       loading = true;
       error = null;
-      report = await api.sla.getReport(workspaceId, { from, to });
+      report = await sla.getReport(workspaceId, { from, to });
     } catch (err) {
       error = err?.message || t('workspaceSettings.serviceLevels.reportLoadFailed');
     } finally {

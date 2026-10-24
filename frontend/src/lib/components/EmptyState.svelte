@@ -1,5 +1,5 @@
 <script>
-  import { IconInbox as Inbox } from '@tabler/icons-svelte-runes';
+  import Inbox from '@tabler/icons-svelte-runes/icons/inbox';
   import StateDisplay from './StateDisplay.svelte';
 
   /**

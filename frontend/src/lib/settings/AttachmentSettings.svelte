@@ -1,8 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
-  import { AlertCircle, CheckCircle, X, Plus, Paperclip } from '@lucide/svelte';
+  import { attachmentSettings } from '../api/misc.js';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import X from '@lucide/svelte/icons/x';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Paperclip from '@lucide/svelte/icons/paperclip';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import TextField from '../components/TextField.svelte';
@@ -66,7 +70,7 @@
   
   async function loadSettings() {
     try {
-      settings = await api.attachmentSettings.get();
+      settings = await attachmentSettings.get();
       
       // Convert to form values
       maxFileSizeMB = Math.round(settings.max_file_size / 1048576); // bytes to MB
@@ -99,7 +103,7 @@
   
   async function loadStatus() {
     try {
-      status = await api.attachmentSettings.getStatus();
+      status = await attachmentSettings.getStatus();
       attachmentStatus.hydrate(status);
     } catch (err) {
       if (err.status === 404) {
@@ -125,7 +129,7 @@
         enabled: enabled
       };
 
-      await api.attachmentSettings.update(settings.id, requestData);
+      await attachmentSettings.update(settings.id, requestData);
 
       successToast(t('settings.attachments.settingsSavedSuccess'));
 

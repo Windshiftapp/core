@@ -1,6 +1,7 @@
+import { issueSync, workspaceSCM } from '../api/scm.js';
 /** Load every linked repository in a workspace through one enriched list. */
-export async function loadIssueSyncLinkedRepositories(apiClient, workspaceId) {
-  const connections = await apiClient.workspaceSCM.getConnectionsOverview(workspaceId, {
+export async function loadIssueSyncLinkedRepositories(workspaceId) {
+  const connections = await workspaceSCM.getConnectionsOverview(workspaceId, {
     includeRepositories: true,
   });
   return (Array.isArray(connections) ? connections : []).flatMap((connection) =>
@@ -9,14 +10,14 @@ export async function loadIssueSyncLinkedRepositories(apiClient, workspaceId) {
 }
 
 /** Load Issue Sync setup data concurrently while reusing workspace references. */
-export async function loadIssueSyncPageData(apiClient, referenceStore, workspaceId) {
-  const configRequest = apiClient.issueSync.getConfig(workspaceId).catch((error) => {
+export async function loadIssueSyncPageData(referenceStore, workspaceId) {
+  const configRequest = issueSync.getConfig(workspaceId).catch((error) => {
     if (error?.status === 404) return null;
     throw error;
   });
   const [config, linkedRepositories] = await Promise.all([
     configRequest,
-    loadIssueSyncLinkedRepositories(apiClient, workspaceId),
+    loadIssueSyncLinkedRepositories(workspaceId),
     referenceStore.initialize(workspaceId),
   ]);
   return {

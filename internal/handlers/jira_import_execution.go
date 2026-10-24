@@ -18,6 +18,8 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/xray"
+
+	"uuid"
 )
 
 const (
@@ -30,8 +32,16 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
 
-	// Update job status to running
-	h.updateJobStatus(jobID, "running", "initializing", nil, "")
+	// Claim the job with a per-run ownership token. A job another worker already
+	// recovered or cleaned up cannot be claimed, so a stale worker never starts.
+	token := uuid.New().String()
+	if err := h.imports.ClaimJob(jobID, token); err != nil {
+		slog.Warn("Jira import job could not be claimed; skipping run",
+			slog.String("component", "jira"), slog.String("job_id", jobID), slog.Any("error", err))
+		return
+	}
+	h.setJobToken(jobID, token)
+	defer h.clearJobToken(jobID)
 
 	// Look up the user who initiated this job so imported workspaces can grant
 	// them admin access. Without this the importer would create workspaces with
@@ -159,7 +169,7 @@ func sortJiraIssuesByRequestedKeyOrder(issues []jira.JiraIssue, orderedKeys []st
 // stall does not look like a dead worker.
 const jiraImportLeaseRenewInterval = 30 * time.Second
 
-func (h *JiraImportHandler) renewJiraImportLease(ctx context.Context, jobID string) {
+func (h *JiraImportHandler) renewJiraImportLease(ctx context.Context, jobID string, onLost func()) {
 	ticker := time.NewTicker(jiraImportLeaseRenewInterval)
 	defer ticker.Stop()
 	for {
@@ -167,11 +177,20 @@ func (h *JiraImportHandler) renewJiraImportLease(ctx context.Context, jobID stri
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := h.imports.RenewLease(jobID); err != nil {
+			renewed, err := h.imports.RenewLease(jobID, h.jobToken(jobID))
+			if err != nil {
 				slog.Warn("Failed to renew Jira import lease",
 					slog.String("component", "jira"),
 					slog.String("job_id", jobID),
 					slog.Any("error", err))
+				continue
+			}
+			if !renewed {
+				slog.Warn("Jira import lease lost; stopping import",
+					slog.String("component", "jira"),
+					slog.String("job_id", jobID))
+				onLost()
+				return
 			}
 		}
 	}
@@ -258,11 +277,14 @@ func (h *JiraImportHandler) executeImportWithClientContext(ctx context.Context, 
 	h.clearMappingFailure(jobID)
 	defer h.clearMappingFailure(jobID)
 
-	// Renew the job lease on a heartbeat so a peer replica's startup
-	// reconciliation does not treat this live import as interrupted.
+	// Cancel the import if the lease is lost so a recovered or cleaned-up worker
+	// stops making progress.
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
 	leaseCtx, stopLease := context.WithCancel(ctx)
 	defer stopLease()
-	go h.renewJiraImportLease(leaseCtx, jobID)
+	go h.renewJiraImportLease(leaseCtx, jobID, cancelRun)
+	ctx = runCtx
 
 	progress := &ImportProgress{
 		Phase:         "initializing",
@@ -603,6 +625,15 @@ func (h *JiraImportHandler) importJiraIssueBatches(
 
 	batchSize := 100
 	for j := 0; j < len(issueKeys); j += batchSize {
+		// Stop before persisting a batch once the lease is lost: a recovered or
+		// cleaned-up job must not have its data resurrected by a stale worker.
+		if err := h.imports.CheckJobOwnership(im.jobID, h.jobToken(im.jobID)); err != nil {
+			slog.Warn("Jira import lease lost; stopping import",
+				slog.String("component", "jira"),
+				slog.String("job_id", im.jobID),
+				slog.Any("error", err))
+			return false, true
+		}
 		end := j + batchSize
 		if end > len(issueKeys) {
 			end = len(issueKeys)
@@ -904,7 +935,7 @@ func (h *JiraImportHandler) persistJiraImportResult(jobID string, progress *Impo
 			slog.Any("error", err))
 		return
 	}
-	if err := h.imports.UpdateJobResult(jobID, data); err != nil {
+	if err := h.imports.UpdateJobResult(jobID, h.jobToken(jobID), data); err != nil {
 		slog.Warn("Failed to persist Jira import configuration result",
 			slog.String("component", "jira"),
 			slog.String("job_id", jobID),

@@ -1,7 +1,8 @@
 <script>
   import { navigate } from '../router.js';
   import Button from '../components/Button.svelte';
-  import { Telescope, Home } from '@lucide/svelte';
+  import Telescope from '@lucide/svelte/icons/telescope';
+  import Home from '@lucide/svelte/icons/home';
   import { t } from '../stores/i18n.svelte.js';
 
   function goHome() {

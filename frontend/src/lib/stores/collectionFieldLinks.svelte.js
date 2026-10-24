@@ -1,4 +1,5 @@
-import { api } from '../api.js';
+import { links as linksApi } from '../api/configuration.js';
+import { BACKGROUND_READ } from '../api/readScheduler.js';
 
 const BATCH_SIZE = 200;
 const EMPTY_GROUP = Object.freeze({ outgoing: [], incoming: [] });
@@ -72,8 +73,8 @@ export class CollectionFieldLinksStore {
 
   #loadChunk(chunk) {
     const generation = this.#generation;
-    const promise = api.links
-      .getForItems(chunk, { includeCustomFields: true })
+    const promise = linksApi
+      .getForItems(chunk, { includeCustomFields: true, ...BACKGROUND_READ })
       .then((groups) => {
         if (generation !== this.#generation) return;
         const updates = {};

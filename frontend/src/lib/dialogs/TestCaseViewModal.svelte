@@ -1,19 +1,17 @@
 <script>
-  import {
-    ArrowLeft,
-    Edit,
-    Play,
-    CheckCircle,
-    XCircle,
-    AlertCircle,
-    Clock,
-    ListOrdered,
-    ClipboardList,
-    History,
-    Copy
-  } from '@lucide/svelte';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Play from '@lucide/svelte/icons/play';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import XCircle from '@lucide/svelte/icons/x-circle';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Clock from '@lucide/svelte/icons/clock';
+  import ListOrdered from '@lucide/svelte/icons/list-ordered';
+  import ClipboardList from '@lucide/svelte/icons/clipboard-list';
+  import History from '@lucide/svelte/icons/history';
+  import Copy from '@lucide/svelte/icons/copy';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
+  import BackButton from '../components/BackButton.svelte';
   import Card from '../components/Card.svelte';
   import Panel from '../components/Panel.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -21,7 +19,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
-  import { api } from '../api.js';
+  import { tests } from '../api/tests/index.js';
   import BDDScenarioView from '../features/testing/BDDScenarioView.svelte';
   import { parseScenarioSpec } from '../features/testing/bddSpec.js';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../utils/authenticatedDateFormatter.js';
@@ -71,14 +69,14 @@
     error = null;
 
     try {
-      const caseData = await api.tests.testCases.get(workspaceId, numericId);
+      const caseData = await tests.testCases.get(workspaceId, numericId);
       const stepsData = caseData?.format === 'bdd'
         ? []
-        : await api.tests.testCases.steps.getAll(workspaceId, numericId);
+        : await tests.testCases.steps.getAll(workspaceId, numericId);
 
       let connections = null;
       try {
-        connections = await api.tests.testCases.connections(workspaceId, numericId);
+        connections = await tests.testCases.connections(workspaceId, numericId);
       } catch (connErr) {
         if (!(connErr?.status === 404)) {
           throw connErr;
@@ -107,7 +105,7 @@
   async function copyFeatureFile() {
     if (!workspaceId || !testCase?.id) return;
     try {
-      const feature = await api.tests.testCases.feature(workspaceId, testCase.id);
+      const feature = await tests.testCases.feature(workspaceId, testCase.id);
       await navigator.clipboard.writeText(feature);
       copyState = 'copied';
     } catch (err) {
@@ -207,9 +205,11 @@
     >
       {#snippet actions()}
         {#if embedded}
-          <Button variant="ghost" icon={ArrowLeft} onclick={handleClose} dataTestid="test-case-detail-back">
-            {backLabel || t('testCase.backToItem')}
-          </Button>
+          <BackButton
+            onclick={handleClose}
+            testid="test-case-detail-back"
+            label={backLabel || t('testCase.backToItem')}
+          />
         {/if}
       {/snippet}
     </PageHeader>

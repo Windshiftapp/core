@@ -1,4 +1,4 @@
-import { workspacePermissions } from '../../stores';
+import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 

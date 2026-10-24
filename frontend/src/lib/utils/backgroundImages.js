@@ -1,10 +1,11 @@
-/** Unsplash workspace-background presets with optimized thumbnails. */
+/** Unsplash background presets with optimized thumbnails. */
 
 export const backgroundCategories = [
   { id: 'abstract', name: 'Abstract' },
   { id: 'nature', name: 'Nature' },
   { id: 'minimal', name: 'Minimal' },
   { id: 'dark', name: 'Dark' },
+  { id: 'space', name: 'Space' },
 ];
 
 export const backgroundPresets = [
@@ -37,6 +38,20 @@ export const backgroundPresets = [
     url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1920&q=80',
     thumbnail: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=200&q=60',
   },
+  {
+    id: 'abstract-5',
+    name: 'Liquid Colors',
+    category: 'abstract',
+    url: 'https://images.unsplash.com/photo-1550859492-d5da9d8e45f3?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1550859492-d5da9d8e45f3?w=200&q=60',
+  },
+  {
+    id: 'abstract-6',
+    name: '3D Shapes',
+    category: 'abstract',
+    url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&q=60',
+  },
 
   // Nature
   {
@@ -66,6 +81,20 @@ export const backgroundPresets = [
     category: 'nature',
     url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1920&q=80',
     thumbnail: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=200&q=60',
+  },
+  {
+    id: 'nature-5',
+    name: 'Misty Mountains',
+    category: 'nature',
+    url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=200&q=60',
+  },
+  {
+    id: 'nature-6',
+    name: 'Mountain Sunset',
+    category: 'nature',
+    url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=200&q=60',
   },
 
   // Minimal
@@ -97,6 +126,20 @@ export const backgroundPresets = [
     url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=1920&q=80',
     thumbnail: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=200&q=60',
   },
+  {
+    id: 'minimal-5',
+    name: 'Quiet Workspace',
+    category: 'minimal',
+    url: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=200&q=60',
+  },
+  {
+    id: 'minimal-6',
+    name: 'Soft Paint',
+    category: 'minimal',
+    url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200&q=60',
+  },
 
   // Dark
   {
@@ -126,6 +169,43 @@ export const backgroundPresets = [
     category: 'dark',
     url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&q=80',
     thumbnail: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=200&q=60',
+  },
+  {
+    id: 'dark-5',
+    name: 'Night Ridge',
+    category: 'dark',
+    url: 'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=200&q=60',
+  },
+  {
+    id: 'dark-6',
+    name: 'Milky Way',
+    category: 'dark',
+    url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=200&q=60',
+  },
+
+  // Space
+  {
+    id: 'space-1',
+    name: 'Blue Planet',
+    category: 'space',
+    url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=200&q=60',
+  },
+  {
+    id: 'space-2',
+    name: 'Orbit',
+    category: 'space',
+    url: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=200&q=60',
+  },
+  {
+    id: 'space-3',
+    name: 'Starry Night',
+    category: 'space',
+    url: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=200&q=60',
   },
 ];
 

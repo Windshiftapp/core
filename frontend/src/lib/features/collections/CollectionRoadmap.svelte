@@ -2,24 +2,39 @@
   import { onMount } from 'svelte';
   import { untrack } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { items as itemsApi } from '../../api/items.js';
+  import { collections } from '../../api/collections.js';
+  import { customFields as customFieldsApi, linkTypes as linkTypesApi, screens } from '../../api/configuration.js';
+  import { createDependencyLoader } from './dependencyLoader.svelte.js';
   import { navigate } from '../../router.js';
-  import { collectionStore, refreshCollectionDeltas, reloadCollection, refreshCollectionItem } from '../../stores/collectionContext.js';
+  import {
+    collectionStore,
+    reloadCollection,
+    refreshCollectionItem,
+    scheduleCollectionReconciliation,
+  } from '../../stores/collectionContext.js';
   import { findOrphansByMissingParent, indexCollectionHierarchy, mergeAncestorContext } from './collectionHierarchy.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { workspaceDataStore } from '../../stores/index.js';
+  import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import Toggle from '../../components/Toggle.svelte';
-  import ItemDetail from '../items/ItemDetail.svelte';
   import RoadmapItemPreview from './RoadmapItemPreview.svelte';
+  import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { buildHierarchyDatePatches, projectHierarchyDates } from './roadmapHierarchyDates.js';
   import { boardColumnsForSave } from '../../utils/workItemListColumns.js';
-  import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, CalendarClock, RotateCcw } from '@lucide/svelte';
+  import Settings from '@lucide/svelte/icons/settings';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Diamond from '@lucide/svelte/icons/diamond';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import CalendarClock from '@lucide/svelte/icons/calendar-clock';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
@@ -118,7 +133,7 @@
     hierarchyDatesLoaded = false;
     hierarchyDatesError = '';
     try {
-      const result = await api.items.getRoadmapHierarchyDates(rootIds);
+      const result = await itemsApi.getRoadmapHierarchyDates(rootIds);
       if (generation !== hierarchyLoadGeneration) return;
       if (result?.truncated) {
         hierarchyDateItems = [];
@@ -173,13 +188,15 @@
   // Drag state (bar move/resize)
   let dragInfo = $state(null);
 
-  // Item detail modal
-  let showItemModal = $state(false);
-  let selectedItemId = $state(null);
-
-  // Links/dependencies
-  let itemLinks = $state({});
-  const ROADMAP_LINK_CHUNK = 100;
+  // Links/dependencies. The roadmap projects outgoing links only.
+  const roadmapDependencyLoader = createDependencyLoader();
+  let itemLinks = $derived.by(() => {
+    const map = {};
+    for (const [id, entry] of Object.entries(roadmapDependencyLoader.entries)) {
+      if (entry.outgoing?.length) map[id] = entry.outgoing;
+    }
+    return map;
+  });
 
   // Timeline computation
   let containerWidth = $state(1200);
@@ -485,7 +502,7 @@
     }
     ancestorsRequestInFlight = true;
     try {
-      const entries = await api.items.getManyAncestors(orphanIds);
+      const entries = await itemsApi.getManyAncestors(orphanIds);
       for (const { item_id: orphanId, ancestors } of entries) {
         // The gap may have closed while the request was in flight.
         const parentId = parentByOrphanId.get(orphanId);
@@ -533,25 +550,27 @@
   }
 
   function getItemTypeInfo(item) {
-    if (!item.item_type_id || !itemTypes.length) {
-      const fallback = [
-        { iconName: 'GitBranch', color: '#9333ea', label: 'Epic' },
-        { iconName: 'Circle', color: '#2563eb', label: 'Feature' },
-        { iconName: 'Circle', color: '#16a34a', label: 'Story' },
-        { iconName: 'Circle', color: '#ea580c', label: 'Task' },
-        { iconName: 'Circle', color: '#6b7280', label: 'Subtask' }
-      ];
-      return fallback[Math.min(item.level || 0, fallback.length - 1)];
-    }
-    const it = itemTypes.find(type => type.id === item.item_type_id);
-    if (it) {
+    const itemType = item.item_type_id
+      ? itemTypes.find((type) => type.id === item.item_type_id)
+      : null;
+    // Prefer the icon carried on the row: the workspace-scoped itemTypes list
+    // omits types excluded from the effective configuration set.
+    const iconName = item.item_type_icon || itemType?.icon;
+    if (iconName) {
       return {
-        iconName: it.icon,
-        color: it.color,
-        label: it.name
+        iconName,
+        color: item.item_type_color || itemType?.color || '#6b7280',
+        label: item.item_type_name || itemType?.name || 'Unknown'
       };
     }
-    return { iconName: 'Circle', color: '#6b7280', label: 'Unknown' };
+    const fallback = [
+      { iconName: 'GitBranch', color: '#9333ea', label: 'Epic' },
+      { iconName: 'Circle', color: '#2563eb', label: 'Feature' },
+      { iconName: 'Circle', color: '#16a34a', label: 'Story' },
+      { iconName: 'Circle', color: '#ea580c', label: 'Task' },
+      { iconName: 'Circle', color: '#6b7280', label: 'Subtask' }
+    ];
+    return fallback[Math.min(item.level || 0, fallback.length - 1)];
   }
 
   function renderTreeItems(parentId = null, level = 0, result = []) {
@@ -736,40 +755,20 @@
   // Scoped SSE invalidations (WI-1624): any frame runs the existing delta fetch.
   useCollectionEventStream(
     () => (collectionId ? { kind: 'collection', id: collectionId } : { kind: 'workspace', id: workspaceId }),
-    { onInvalidate: () => refreshCollectionDeltas() }
+    { onInvalidate: () => scheduleCollectionReconciliation() }
   );
 
   // Load links for visible items in batched requests instead of one per item.
   async function loadLinksForItems(items) {
     if (!roadmapConfig.dependency_link_type_id) return;
     const ids = items.filter((i) => i?.id != null).map((i) => i.id);
-    const newLinks = {};
-    for (const id of ids) newLinks[id] = [];
-    const chunks = [];
-    for (let i = 0; i < ids.length; i += ROADMAP_LINK_CHUNK) {
-      chunks.push(ids.slice(i, i + ROADMAP_LINK_CHUNK));
-    }
-    const groupsPerChunk = await Promise.all(
-      chunks.map(async (chunk) => {
-        try {
-          return await api.links.getForItems(chunk);
-        } catch {
-          return {};
-        }
-      })
-    );
-    for (const groups of groupsPerChunk) {
-      for (const [id, group] of Object.entries(groups)) {
-        newLinks[id] = group?.outgoing || [];
-      }
-    }
-    itemLinks = newLinks;
+    await roadmapDependencyLoader.ensure(ids);
   }
 
   // Load config data
   async function loadConfig() {
     try {
-      const config = await api.collections.getBoardConfiguration(collectionId, workspaceId);
+      const config = await collections.getBoardConfiguration(collectionId, workspaceId);
       boardConfig = config;
       boardConfigId = config.id;
       if (config.roadmap_config) {
@@ -787,8 +786,8 @@
   async function loadReferenceData() {
     try {
       const [lt, cf] = await Promise.all([
-        api.linkTypes.getAll(),
-        api.customFields.getAll(),
+        linkTypesApi.getAll(),
+        customFieldsApi.getAll(),
       ]);
       linkTypes = lt || [];
       customFields = cf?.data || cf || [];
@@ -798,7 +797,7 @@
       // effective edit screen through the workspace's shared config cache.
       const config = await workspaceDataStore.screenConfig(null);
       const screenId = config?.edit_screen?.id ?? 1;
-      const screen = await api.screens.get(screenId);
+      const screen = await screens.get(screenId);
       screenFields = screen?.fields || [];
     } catch (e) {
       console.error('Failed to load reference data:', e);
@@ -823,9 +822,9 @@
 
     try {
       if (boardConfigId) {
-        await api.collections.updateBoardConfiguration(collectionId, boardConfigId, payload, workspaceId);
+        await collections.updateBoardConfiguration(collectionId, boardConfigId, payload, workspaceId);
       } else {
-        const result = await api.collections.createBoardConfiguration(collectionId, workspaceId, payload);
+        const result = await collections.createBoardConfiguration(collectionId, workspaceId, payload);
         boardConfigId = result.id;
       }
     } catch (e) {
@@ -874,8 +873,7 @@
 
   // Item click
   function openItem(itemId) {
-    selectedItemId = itemId;
-    showItemModal = true;
+    itemModalStore.open(itemId, workspaceId);
   }
 
   // --- Bar drag handlers (existing move/resize) ---
@@ -986,12 +984,12 @@
         fields,
         mode: hierarchyMode,
       });
-      await api.items.bulkPatch(patches);
+      await itemsApi.bulkPatch(patches);
       reloadCollection();
       await loadHierarchyDates(allItemsSorted.map((item) => item.id));
       return;
     }
-    await api.items.update(itemId, updateData);
+    await itemsApi.update(itemId, updateData);
     reloadCollection();
   }
 
@@ -1722,20 +1720,13 @@
           </div>
         </div>
       {/if}
+
+      {#if roadmapConfig.start_field_id}
+        <CollectionHierarchyLoadMore testid="roadmap-load-more" />
+      {/if}
   </StaticViewBackground>
 {/if}
 
-<!-- Item Detail Modal -->
-{#if showItemModal && selectedItemId}
-  <ItemDetail
-    itemId={selectedItemId}
-    isModal={true}
-    onclose={() => {
-      showItemModal = false;
-      selectedItemId = null;
-    }}
-  />
-{/if}
 
 <style>
   /* Custom scrollbar for timeline */

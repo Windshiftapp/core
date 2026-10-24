@@ -1,5 +1,5 @@
 <script>
-  import { api } from '../api.js';
+  import { itemSCMLinks } from '../api/scm.js';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
   import Modal from './Modal.svelte';
@@ -40,7 +40,7 @@
         base_branch: baseBranch.trim() || undefined,
       };
 
-      const result = await api.itemSCMLinks.createPRFromBranch(branchLink.id, data);
+      const result = await itemSCMLinks.createPRFromBranch(branchLink.id, data);
       successToast(t(isGitLab ? 'scm.mrCreatedSuccess' : 'scm.prCreatedSuccess', { prNumber: result.pr_number }));
       oncreated?.(result);
     } catch (err) {

@@ -5,7 +5,7 @@
 // civil days by the server; `totals` carry booked duration and entry counts.
 
 /**
- * @param {Array<{user_id: number, user_name: string, project_id: number, project_name: string, customer_id: number, customer_name: string, duration_minutes: number, entries: number}>} totals
+ * @param {Array<{user_id: number, user_name: string, project_id: number, project_name: string, customer_id: number, customer_name: string, customer_builtin_key?: string, duration_minutes: number, entries: number}>} totals
  * @param {{ dateFrom?: string, dateTo?: string }} [range]
  */
 export function buildSummary(totals, range = {}) {
@@ -33,6 +33,7 @@ export function buildSummary(totals, range = {}) {
   }
   const projectMinutes = new Map();
   const customerMinutes = new Map();
+  const customerBuiltinKeys = new Map();
   for (const t of safeTotals) {
     projectMinutes.set(
       t.project_name,
@@ -42,9 +43,15 @@ export function buildSummary(totals, range = {}) {
       t.customer_name,
       (customerMinutes.get(t.customer_name) || 0) + t.duration_minutes
     );
+    if (t.customer_builtin_key && !customerBuiltinKeys.has(t.customer_name)) {
+      customerBuiltinKeys.set(t.customer_name, t.customer_builtin_key);
+    }
   }
   summary.topProject = topOf(projectMinutes);
   summary.topCustomer = topOf(customerMinutes);
+  if (summary.topCustomer && customerBuiltinKeys.has(summary.topCustomer.name)) {
+    summary.topCustomer.builtinKey = customerBuiltinKeys.get(summary.topCustomer.name);
+  }
   return summary;
 }
 
@@ -64,7 +71,7 @@ function topOf(minutesByName) {
 /**
  * Per-member hours/entries/avgPerDay for the project report.
  * @param {Array<{day: string, user_id: number, user_name: string, minutes: number}>} daily
- * @param {Array<{user_id: number, user_name: string, project_id: number, project_name: string, customer_id: number, customer_name: string, duration_minutes: number, entries: number}>} totals
+ * @param {Array<{user_id: number, user_name: string, project_id: number, project_name: string, customer_id: number, customer_name: string, customer_builtin_key?: string, duration_minutes: number, entries: number}>} totals
  */
 export function buildMemberBreakdown(daily, totals) {
   // daily rows: {day, user_id, user_name, minutes}; totals rows:

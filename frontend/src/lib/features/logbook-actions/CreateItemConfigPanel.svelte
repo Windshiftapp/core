@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { itemTypes as itemTypesApi } from '../../api/configuration.js';
   import { logbookActionFlowStore } from '../../stores/logbookActionFlowStore.svelte.js';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -14,7 +14,7 @@
 
   onMount(async () => {
     try {
-      itemTypes = await api.itemTypes.getAll() || [];
+      itemTypes = await itemTypesApi.getAll() || [];
     } catch (error) {
       console.error('Failed to load item types:', error);
     } finally {

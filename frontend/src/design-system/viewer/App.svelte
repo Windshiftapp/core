@@ -1,5 +1,43 @@
 <script>
-  import { Sun, Moon, Palette, Type, Ruler, Square, TextCursor, AlertCircle, List, AlignLeft, FormInput, Search, Loader, MessageCircle, Tag, CircleDot, Inbox, PanelTop, Columns3, Navigation, Link2, ChevronsLeftRight, Layers, ChevronDown, Hash, MousePointer, Sliders, Building, Users, AtSign, Grid, FileText, BarChart3, BadgeCheck, Disc, MousePointer2, LayoutDashboard, ClipboardPenLine } from '@lucide/svelte'
+  import Sun from '@lucide/svelte/icons/sun';
+  import Moon from '@lucide/svelte/icons/moon';
+  import Palette from '@lucide/svelte/icons/palette';
+  import Type from '@lucide/svelte/icons/type';
+  import Ruler from '@lucide/svelte/icons/ruler';
+  import Square from '@lucide/svelte/icons/square';
+  import TextCursor from '@lucide/svelte/icons/text-cursor';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import List from '@lucide/svelte/icons/list';
+  import AlignLeft from '@lucide/svelte/icons/align-left';
+  import FormInput from '@lucide/svelte/icons/form-input';
+  import Search from '@lucide/svelte/icons/search';
+  import Loader from '@lucide/svelte/icons/loader';
+  import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import Tag from '@lucide/svelte/icons/tag';
+  import CircleDot from '@lucide/svelte/icons/circle-dot';
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import PanelTop from '@lucide/svelte/icons/panel-top';
+  import Columns3 from '@lucide/svelte/icons/columns-3';
+  import Navigation from '@lucide/svelte/icons/navigation';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import ChevronsLeftRight from '@lucide/svelte/icons/chevrons-left-right';
+  import Layers from '@lucide/svelte/icons/layers';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Hash from '@lucide/svelte/icons/hash';
+  import MousePointer from '@lucide/svelte/icons/mouse-pointer';
+  import Sliders from '@lucide/svelte/icons/sliders';
+  import Building from '@lucide/svelte/icons/building';
+  import Users from '@lucide/svelte/icons/users';
+  import AtSign from '@lucide/svelte/icons/at-sign';
+  import Grid from '@lucide/svelte/icons/grid';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
+  import BadgeCheck from '@lucide/svelte/icons/badge-check';
+  import Disc from '@lucide/svelte/icons/disc';
+  import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+  import ClipboardPenLine from '@lucide/svelte/icons/clipboard-pen-line';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
   // Composition Examples
   import BoardExample from './pages/BoardExample.svelte'
@@ -43,6 +81,7 @@
   // Navigation Component Pages
   import TabsPage from './pages/Tabs.svelte'
   import LinkPage from './pages/Link.svelte'
+  import BackButtonPage from './pages/BackButton.svelte'
   import PaginationPage from './pages/Pagination.svelte'
 
   // Modal Component Pages
@@ -140,6 +179,7 @@
       items: [
         { id: 'tabs', label: 'Tabs', icon: Navigation },
         { id: 'link', label: 'Link', icon: Link2 },
+        { id: 'backbutton', label: 'BackButton', icon: ArrowLeft },
         { id: 'pagination', label: 'Pagination', icon: ChevronsLeftRight },
       ]
     },
@@ -297,6 +337,8 @@
       <TabsPage />
     {:else if currentPage === 'link'}
       <LinkPage />
+    {:else if currentPage === 'backbutton'}
+      <BackButtonPage />
     {:else if currentPage === 'pagination'}
       <PaginationPage />
     {:else if currentPage === 'modal'}

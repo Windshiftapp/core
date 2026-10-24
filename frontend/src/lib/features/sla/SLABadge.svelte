@@ -1,9 +1,10 @@
 <script>
   import { useEventListener } from 'runed';
   import Lozenge from '../../components/Lozenge.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatInstant } from '../../utils/dateFormatter.js';
-  import { getItemSLA, getSLAThresholds } from './slaState.js';
+  import { getItemSLA, getSLAThresholds, onSLAThresholdsInvalidated } from './slaState.js';
 
   let { itemId = null, workspaceId = null, refreshToken = 0 } = $props();
 
@@ -37,6 +38,21 @@
   });
 
   useEventListener(() => window, 'refresh-work-items', () => void load(itemId, workspaceId, refreshToken));
+
+  // A threshold mutation in this tab must refresh mounted badges immediately;
+  // failed mutations never emit, and other tabs pick the change up once the
+  // five-minute threshold freshness expires.
+  $effect(() => {
+    return onSLAThresholdsInvalidated((invalidatedWorkspaceId) => {
+      if (
+        invalidatedWorkspaceId != null &&
+        Number(invalidatedWorkspaceId) !== Number(workspaceId)
+      ) {
+        return;
+      }
+      void load(itemId, workspaceId, refreshToken);
+    });
+  });
 
   function formatDuration(ms) {
     if (ms == null) return '';
@@ -82,7 +98,10 @@
       if (!cycle) continue;
       const breached = !!cycle.breached;
       const paused = !!cycle.paused;
-      const outsideHours = !paused && cycle.within_calendar_hours === false;
+      // A cycle without a matched goal reports within_calendar_hours=false,
+      // but that is the synthetic 24/7 placeholder, not a service-hours pause.
+      const outsideHours =
+        !paused && cycle.goal_duration_ms > 0 && cycle.within_calendar_hours === false;
       const percent = warningPercentFor(state.metric_id);
       const warning =
         !breached &&
@@ -114,7 +133,9 @@
   {:else if signal.warning}
     <Lozenge color="yellow" text={t('items.sla.warning')} />
   {:else if signal.outsideHours}
-    <Lozenge color="blue" text={t('items.sla.outsideHours')} />
+    <Tooltip content={t('items.sla.outsideHours')}>
+      <Lozenge color="blue" text={t('items.sla.paused')} dataTestid="sla-badge-paused-outside-hours" />
+    </Tooltip>
   {:else if signal.displayFormat === 'due_date' && signal.cycle.next_deadline_at}
     <span class="text-xs" style="color: var(--ds-text-subtle)">
       {t('items.sla.dueOn', { date: formatDeadline(signal.cycle) })}

@@ -1,6 +1,8 @@
 <script>
-  import { ChevronDown, Languages, Trash2 } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Languages from '@lucide/svelte/icons/languages';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { objectTranslations } from '../api/objectTranslations.js';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -112,7 +114,7 @@
 
     loading = true;
     try {
-      const rows = (await api.objectTranslations.list(objectType, objectId)) || [];
+      const rows = (await objectTranslations.list(objectType, objectId)) || [];
       if (initializedKey !== key) return;
       translations = rows;
       overrides = buildOverrideMap(rows);
@@ -170,7 +172,7 @@
 
   async function resolveFallback(locale, field) {
     const fallback = field === 'name' ? canonicalName : canonicalDescription;
-    const [resolved] = await api.objectTranslations.resolve(locale, [
+    const [resolved] = await objectTranslations.resolve(locale, [
       { object_type: objectType, object_id: objectId, field, fallback },
     ]);
     return resolved?.value ?? fallback;
@@ -179,7 +181,7 @@
   async function removeOverride(locale, field) {
     const existing = originalOverrides[locale]?.[field];
     if (existing !== undefined) {
-      await api.objectTranslations.delete(objectType, objectId, field, locale);
+      await objectTranslations.delete(objectType, objectId, field, locale);
     }
     const nextLocale = { ...(overrides[locale] || {}) };
     delete nextLocale[field];
@@ -220,7 +222,7 @@
 
     if (canonicalDecision === 'remove-instance') {
       for (const translation of instanceTranslations) {
-        await api.objectTranslations.delete(
+        await objectTranslations.delete(
           objectType,
           objectId,
           translation.field,
@@ -238,9 +240,9 @@
           const after = overrides[locale]?.[field]?.trim();
           if (after === before) continue;
           if (after) {
-            await api.objectTranslations.upsert(objectType, objectId, field, locale, after);
+            await objectTranslations.upsert(objectType, objectId, field, locale, after);
           } else if (before !== undefined) {
-            await api.objectTranslations.delete(objectType, objectId, field, locale);
+            await objectTranslations.delete(objectType, objectId, field, locale);
           }
         }
       }

@@ -97,8 +97,6 @@ CREATE TABLE IF NOT EXISTS sla_goal_targets (
 	id SERIAL PRIMARY KEY,
 	goal_id INTEGER NOT NULL,
 	position INTEGER NOT NULL DEFAULT 0,
-	priority_id INTEGER REFERENCES priorities(id) ON DELETE RESTRICT,
-	is_fallback BOOLEAN NOT NULL DEFAULT FALSE,
 	target_ms BIGINT NOT NULL,
 	calendar_id INTEGER NOT NULL,
 	source_id TEXT,

@@ -1,5 +1,6 @@
 <script>
-  import { api } from '../api.js';
+  import { workspaces } from '../api/workspaces.js';
+  import { requestTypes } from '../api/channels.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -64,7 +65,7 @@
       const byId = new Map(cached.map(ws => [ws.id, ws]));
       const configured = channelWorkspaceIds || [];
       const missing = configured.filter(id => !byId.has(id));
-      const fetched = await Promise.allSettled(missing.map(id => api.workspaces.get(id)));
+      const fetched = await Promise.allSettled(missing.map(id => workspaces.get(id)));
       for (const result of fetched) {
         if (result.status === 'fulfilled' && result.value?.id) {
           byId.set(result.value.id, result.value);
@@ -118,7 +119,7 @@
             // the request_type row, so this modal still has to round-trip
             // it through the basic Update payload. Refetch here so we
             // don't silently clobber a value the FieldsModal just saved.
-            api.requestTypes.get(requestType.id)
+            requestTypes.get(requestType.id)
               .then(fresh => { formData.title_template = fresh?.title_template || ''; })
               .catch(err => console.error('Failed to refresh request type:', err));
           } else if (mode === 'create') {
@@ -175,7 +176,7 @@
       error = null;
 
       if (mode === 'create') {
-        await api.requestTypes.create(channelId, {
+        await requestTypes.create(channelId, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           icon: formData.icon,
@@ -188,7 +189,7 @@
       } else {
         // is_active is omitted on edit so saving the form does not reactivate
         // a request type that was deliberately disabled.
-        await api.requestTypes.update(channelId, requestType.id, {
+        await requestTypes.update(channelId, requestType.id, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           icon: formData.icon,

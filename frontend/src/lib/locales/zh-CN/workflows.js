@@ -165,7 +165,7 @@ export default {
     noScreens: '未找到屏幕。创建您的第一个屏幕以开始使用。',
     cannotDeleteDefault: '无法删除默认屏幕。没有配置集的工作区需要此屏幕。',
     confirmDeleteScreen: '确定要删除屏幕「{name}」吗？这将影响所有使用此屏幕的工作区。',
-    defaults: { default: { name: '默认屏幕', description: '包含工作项基本字段的默认屏幕' } },
+    defaults: { default: { name: '默认屏幕', description: '包含工作项基本字段的默认屏幕' }, default_create: { name: '默认创建屏幕', description: '用于创建工作项的简洁屏幕' } },
     fieldWidths: {
       full: '全宽',
       half: '半宽',

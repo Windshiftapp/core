@@ -1,5 +1,6 @@
 <script>
-  import { Check, X } from '@lucide/svelte';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

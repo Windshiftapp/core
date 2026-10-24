@@ -18,7 +18,6 @@
     milestones = [],
     iterations = [],
     projects = [],
-    collectionId = null,
     includeWorkspace = false,
     canEdit = false,
     actionItems = null,
@@ -96,7 +95,6 @@
         {item}
         column={column}
         workspace={getWorkspace(item)}
-        {collectionId}
         canEdit={canEditItem()}
         {statuses}
         {statusCategories}

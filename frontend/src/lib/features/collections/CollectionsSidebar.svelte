@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronLeft, Filter, Search } from '@lucide/svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import Filter from '@lucide/svelte/icons/filter';
+  import Search from '@lucide/svelte/icons/search';
   import { t } from '../../stores/i18n.svelte.js';
   import WorkItemFilterPanel from '../items/WorkItemFilterPanel.svelte';
   import SidebarResizeHandle from '../../layout/SidebarResizeHandle.svelte';

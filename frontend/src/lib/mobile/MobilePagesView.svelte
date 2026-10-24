@@ -1,8 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronRight, Command as CommandIcon, House, Search } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import CommandIcon from '@lucide/svelte/icons/command';
+  import House from '@lucide/svelte/icons/house';
+  import Search from '@lucide/svelte/icons/search';
   import { navigate } from '../router.js';
-  import { workspacesStore } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import MobileHeader from './MobileHeader.svelte';
   import MobileListState from './MobileListState.svelte';

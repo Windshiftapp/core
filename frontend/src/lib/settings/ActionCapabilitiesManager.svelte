@@ -4,7 +4,9 @@
   import ActionCredentialManager from './ActionCredentialManager.svelte';
   import RunnerPoolManager from './RunnerPoolManager.svelte';
   import { currentRoute, updateQueryParams } from '../router.js';
-  import { Bolt, KeyRound, Server } from '@lucide/svelte';
+  import Bolt from '@lucide/svelte/icons/bolt';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import Server from '@lucide/svelte/icons/server';
   import { useEventListener } from 'runed';
   import { t } from '../stores/i18n.svelte.js';
 

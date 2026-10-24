@@ -3,8 +3,10 @@
  * Uses Svelte 5 runes pattern following portal.svelte.js
  */
 
-import { api } from '../api.js';
-import { authStore } from '../stores';
+import { hub } from '../api/hub.js';
+import { attachments } from '../api/misc.js';
+import { createId } from '../utils/uuid.js';
+import { authStore } from './auth.svelte.js';
 import { createFooterLinkHelpers } from './footerLinks.js';
 
 export { WINDSHIFT_GRADIENT } from '../utils/gradients.js';
@@ -72,7 +74,7 @@ async function loadHub() {
     loading = true;
     error = null;
 
-    const data = await api.hub.get();
+    const data = await hub.get();
 
     hubConfig = data.config;
     portals = data.portals || [];
@@ -163,7 +165,7 @@ async function handleLogoUpload(files) {
     uploadFormData.append('file', file);
     uploadFormData.append('category', 'hub_logo');
 
-    const uploadResult = await api.attachments.upload(uploadFormData);
+    const uploadResult = await attachments.upload(uploadFormData);
 
     if (uploadResult?.success && uploadResult.logo_url) {
       logoUrl = uploadResult.logo_url;
@@ -207,7 +209,7 @@ async function saveCustomizations() {
         footer_columns: footerColumns,
       };
 
-      await api.hub.updateConfig(config);
+      await hub.updateConfig(config);
     } catch (err) {
       console.error('Failed to save hub customizations:', err);
     }
@@ -217,7 +219,7 @@ async function saveCustomizations() {
 // Hub Sections Management
 function addSection() {
   const newSection = {
-    id: crypto.randomUUID(),
+    id: createId(),
     title: '',
     subtitle: '',
     display_order: hubSections.length,
@@ -319,7 +321,7 @@ const { addFooterLink, removeFooterLink, updateColumnTitle, updateFooterLink } =
 async function loadInbox() {
   try {
     inboxLoading = true;
-    const data = await api.hub.getInbox({
+    const data = await hub.getInbox({
       page: inboxPage,
       per_page: inboxPerPage,
       portal_id: inboxPortalFilter || undefined,

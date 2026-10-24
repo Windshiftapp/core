@@ -1,7 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import TabStrip from '../../components/TabStrip.svelte';
-  import { api } from '../../api.js';
+  import { assetCategories as assetCategoriesApi, assetRoles as assetRolesApi, assetSets as assetSetsApi, assetTypes as assetTypesApi } from '../../api/assets.js';
+  import { getUsers } from '../../api/users.js';
+  import { customFields as customFieldsApi } from '../../api/configuration.js';
+  import { groups as groupsApi } from '../../api/permissions.js';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -13,7 +16,21 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import { IconPlus, IconPackage, IconEdit, IconTrash, IconSettings, IconListTree, IconUsers, IconUser, IconChevronRight, IconChevronDown, IconFolder, IconFolderOpen, IconDots, IconX, IconBolt } from '@tabler/icons-svelte-runes';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconPackage from '@tabler/icons-svelte-runes/icons/package';
+  import IconEdit from '@tabler/icons-svelte-runes/icons/edit';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
+  import IconListTree from '@tabler/icons-svelte-runes/icons/list-tree';
+  import IconUsers from '@tabler/icons-svelte-runes/icons/users';
+  import IconUser from '@tabler/icons-svelte-runes/icons/user';
+  import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
+  import IconChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
+  import IconFolder from '@tabler/icons-svelte-runes/icons/folder';
+  import IconFolderOpen from '@tabler/icons-svelte-runes/icons/folder-open';
+  import IconDots from '@tabler/icons-svelte-runes/icons/dots';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconBolt from '@tabler/icons-svelte-runes/icons/bolt';
   import AssetActionsSettings from './AssetActionsSettings.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
@@ -26,7 +43,7 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
-  import { permissionStore, isSystemAdmin } from '../../stores';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { fetchAssetCategories, flattenCategories } from './shared/assetSetUtils.js';
 	import TextField from '../../components/TextField.svelte';
 	import SelectField from '../../components/SelectField.svelte';
@@ -88,7 +105,7 @@
 
   async function loadAssetSets() {
     try {
-      const sets = await api.assetSets.getAll();
+      const sets = await assetSetsApi.getAll();
       assetSets = sets || [];
       if (assetSets.length > 0 && !selectedSetId) {
         const defaultSet = assetSets.find(s => s.is_default) || assetSets[0];
@@ -101,7 +118,7 @@
 
   async function loadUsers() {
     try {
-      const users = await api.getUsers();
+      const users = await getUsers();
       availableUsers = users || [];
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -155,7 +172,7 @@
     editingSet = set;
     setFormData = { name: set.name, description: set.description || '', is_default: !!set.is_default, portal_access: !!set.portal_access };
     try {
-      const access = await api.assetSets.getPortalAccess(set.id);
+      const access = await assetSetsApi.getPortalAccess(set.id);
       if (editingSet?.id === set.id) setFormData.portal_access = !!access;
     } catch (error) {
       console.error('Failed to load portal access:', error);
@@ -197,16 +214,16 @@
     await saveConfiguration(
       async () => {
         if (editingSet) {
-          await api.assetSets.update(editingSet.id, {
+          await assetSetsApi.update(editingSet.id, {
             name: setFormData.name,
             description: setFormData.description,
             is_default: setFormData.is_default,
           });
           if (isSetAdmin) {
-            await api.assetSets.setPortalAccess(editingSet.id, setFormData.portal_access);
+            await assetSetsApi.setPortalAccess(editingSet.id, setFormData.portal_access);
           }
         } else {
-          await api.assetSets.create({
+          await assetSetsApi.create({
             name: setFormData.name,
             description: setFormData.description,
             is_default: setFormData.is_default,
@@ -230,7 +247,7 @@
     });
     if (confirmed) {
       try {
-        await api.assetSets.delete(id);
+        await assetSetsApi.delete(id);
         if (selectedSetId === id) {
           selectedSetId = null;
         }
@@ -248,7 +265,7 @@
     const request = ++typeRequest;
     if (!setId) return;
     try {
-      const types = await api.assetTypes.getAll(setId);
+      const types = await assetTypesApi.getAll(setId);
       if (request !== typeRequest || setId !== selectedSetId) return;
       assetTypes = types || [];
     } catch (error) {
@@ -278,8 +295,8 @@
   async function handleTypeSubmit() {
     await saveConfiguration(
       () => editingType
-        ? api.assetTypes.update(editingType.id, typeFormData)
-        : api.assetTypes.create(selectedSetId, typeFormData),
+        ? assetTypesApi.update(editingType.id, typeFormData)
+        : assetTypesApi.create(selectedSetId, typeFormData),
       loadAssetTypes,
       () => showTypeForm = false,
       'save asset type',
@@ -297,7 +314,7 @@
     });
     if (confirmed) {
       try {
-        await api.assetTypes.delete(id);
+        await assetTypesApi.delete(id);
         await loadAssetTypes();
       } catch (error) {
         console.error('Failed to delete asset type:', error);
@@ -314,8 +331,8 @@
 
     try {
       const [result, assignedFields] = await Promise.all([
-        api.customFields.getAll(),
-        api.assetTypes.getFields(type.id),
+        customFieldsApi.getAll(),
+        assetTypesApi.getFields(type.id),
       ]);
       if (request !== fieldsRequest || setId !== selectedSetId) return;
       // Work item system fields do not apply to assets.
@@ -381,7 +398,7 @@
             display_order: index
           }))
       };
-      await api.assetTypes.updateFields(editingTypeForFields.id, fieldsData);
+      await assetTypesApi.updateFields(editingTypeForFields.id, fieldsData);
     }, null, () => {
       showFieldsModal = false;
       editingTypeForFields = null;
@@ -425,18 +442,18 @@
     await saveConfiguration(
       async () => {
         if (!editingCategory) {
-          return api.assetCategories.create(selectedSetId, categoryFormData);
+          return assetCategoriesApi.create(selectedSetId, categoryFormData);
         }
         // The v2 PATCH body only accepts name/description; parent changes go
         // through the dedicated move endpoint.
-        const updated = await api.assetCategories.update(editingCategory.id, {
+        const updated = await assetCategoriesApi.update(editingCategory.id, {
           name: categoryFormData.name,
           description: categoryFormData.description,
         });
         const nextParent = categoryFormData.parent_id ?? null;
         const currentParent = editingCategory.parent_id ?? null;
         if (nextParent !== currentParent) {
-          await api.assetCategories.move(editingCategory.id, { parent_id: nextParent });
+          await assetCategoriesApi.move(editingCategory.id, { parent_id: nextParent });
         }
         return updated;
       },
@@ -457,7 +474,7 @@
     });
     if (confirmed) {
       try {
-        await api.assetCategories.delete(id);
+        await assetCategoriesApi.delete(id);
         await loadAssetCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
@@ -479,7 +496,7 @@
   // Role functions
   async function loadAssetRoles() {
     try {
-      const roles = await api.assetRoles.getAll();
+      const roles = await assetRolesApi.getAll();
       assetRoles = roles || [];
     } catch (error) {
       console.error('Failed to load asset roles:', error);
@@ -488,7 +505,7 @@
 
   async function loadGroups() {
     try {
-      const groups = await api.groups.getAll();
+      const groups = await groupsApi.getAll();
       availableGroups = groups || [];
     } catch (error) {
       console.error('Failed to load groups:', error);
@@ -500,7 +517,7 @@
     const request = ++roleRequest;
     if (!setId) return;
     try {
-      const roles = await api.assetSets.getRoles(setId);
+      const roles = await assetSetsApi.getRoles(setId);
       if (request !== roleRequest || setId !== selectedSetId) return;
       roleAssignments = roles || { user_roles: [], group_roles: [], everyone_role: null };
       everyoneRoleId = roles?.everyone_role?.role_id || null;
@@ -524,7 +541,7 @@
       } else {
         data.group_id = roleFormData.group_id;
       }
-      await api.assetSets.assignRole(selectedSetId, data);
+      await assetSetsApi.assignRole(selectedSetId, data);
     }, loadSetRoles, () => {
       showRoleForm = false;
     }, 'assign role', 'dialogs.alerts.failedToAssignRole');
@@ -540,7 +557,7 @@
     });
     if (confirmed) {
       try {
-        await api.assetSets.revokeRole(selectedSetId, assignmentId, type);
+        await assetSetsApi.revokeRole(selectedSetId, assignmentId, type);
         await loadSetRoles();
       } catch (error) {
         console.error('Failed to revoke role:', error);
@@ -551,7 +568,7 @@
 
   async function handleEveryoneRoleChange() {
     try {
-      await api.assetSets.setEveryoneRole(selectedSetId, {
+      await assetSetsApi.setEveryoneRole(selectedSetId, {
         role_id: everyoneRoleId || null
       });
       await loadSetRoles();

@@ -58,8 +58,8 @@ export const sla = {
     fetchAPI(`${workspaceBase(workspaceId)}/metrics/${metricId}`, { method: 'DELETE' }),
 
   // --- Warning thresholds ---
-  getWarningThresholds: (workspaceId) =>
-    fetchAPI(`${workspaceBase(workspaceId)}/warning-thresholds`),
+  getWarningThresholds: (workspaceId, requestOptions = {}) =>
+    fetchAPI(`${workspaceBase(workspaceId)}/warning-thresholds`, requestOptions),
   createWarningThreshold: (workspaceId, data) =>
     fetchAPI(`${workspaceBase(workspaceId)}/warning-thresholds`, {
       method: 'POST',
@@ -93,11 +93,11 @@ export const sla = {
   },
 
   // --- Item state ---
-  getItemSLA: (itemId) => fetchAPI(`/items/${itemId}/sla`),
+  getItemSLA: (itemId, requestOptions = {}) => fetchAPI(`/items/${itemId}/sla`, requestOptions),
   // Batch read for list/board badges: one request amortizes the workspace
   // metric and reference loads across every visible row.
-  getItemSLABatch: (workspaceId, itemIds) =>
-    fetchAPI(`${workspaceBase(workspaceId)}/items?ids=${itemIds.join(',')}`),
+  getItemSLABatch: (workspaceId, itemIds, requestOptions = {}) =>
+    fetchAPI(`${workspaceBase(workspaceId)}/items?ids=${itemIds.join(',')}`, requestOptions),
 
   // Validate a goal QL by parsing it through the item query endpoint.
   validateGoalQuery: async (workspaceId, ql) => {

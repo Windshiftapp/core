@@ -11,7 +11,7 @@ export default {
       },
       work: {
         title: 'Arbeit',
-        subtitle: 'Ihre persönliche Liste und die Ihnen zugewiesenen Einträge',
+        subtitle: 'Ihre persönliche Liste und die Ihnen zugewiesenen Vorgänge',
       },
       workspaces: {
         title: 'Arbeitsbereiche',
@@ -19,13 +19,17 @@ export default {
       },
     },
     widgetCatalog: {
+      customWidget: {
+        name: 'Eigenes Widget',
+        description: 'Ein Widget, das du mit KI oder einem OpenUI-Programm erstellst',
+      },
       dailyBriefing: {
         name: 'Täglicher Überblick',
         description: 'KI-generierte Zusammenfassung dessen, was heute für Sie wichtig ist',
       },
       yourActivity: {
         name: 'Ihre Aktivität',
-        description: 'Kürzlich angesehene, bearbeitete oder kommentierte Einträge',
+        description: 'Kürzlich angesehene, bearbeitete oder kommentierte Vorgänge',
       },
       whatsNew: {
         name: 'Neuigkeiten',
@@ -33,19 +37,23 @@ export default {
       },
       personalTasks: {
         name: 'Persönliche Aufgaben',
-        description: 'Einträge aus Ihrer persönlichen Aufgabenliste',
+        description: 'Vorgänge aus Ihrer persönlichen Aufgabenliste',
       },
       savedSearch: {
         name: 'Gespeicherte Suche',
-        description: 'Einträge aus einer gespeicherten Sammlung anzeigen',
+        description: 'Vorgänge aus einer gespeicherten Sammlung anzeigen',
       },
       assignedToMe: {
         name: 'Mir zugewiesen',
-        description: 'Ihnen zugewiesene offene Einträge aus allen Arbeitsbereichen',
+        description: 'Ihnen zugewiesene offene Vorgänge aus allen Arbeitsbereichen',
+      },
+      createdByMe: {
+        name: 'Von mir erstellt',
+        description: 'Von Ihnen erstellte offene Einträge aus allen Arbeitsbereichen',
       },
       watchedItems: {
-        name: 'Beobachtete Einträge',
-        description: 'Einträge, denen Sie folgen',
+        name: 'Beobachtete Vorgänge',
+        description: 'Vorgänge, denen Sie folgen',
       },
       upcomingMilestones: {
         name: 'Anstehende Meilensteine',
@@ -72,7 +80,7 @@ export default {
       },
       work: {
         name: 'Arbeit',
-        description: 'Einträge, Meilensteine und Ihnen zugewiesene Aufgaben',
+        description: 'Vorgänge, Meilensteine und Ihnen zugewiesene Aufgaben',
       },
       support: {
         name: 'Support',
@@ -82,8 +90,50 @@ export default {
         name: 'Navigation',
         description: 'Schnellzugriff auf Arbeitsbereiche',
       },
+      custom: {
+        name: 'Eigene',
+        description: 'Erstelle dein eigenes Widget aus einer Beschreibung',
+      },
+      background: {
+        name: 'Hintergrund',
+        description: 'Verläufe und Vorschaubilder für dein Dashboard',
+      },
       tipLabel: 'Tipp',
       tip: 'Ziehen Sie Widgets von hier in einen beliebigen Bereich Ihres Dashboards.',
+    },
+    widgetBuilder: {
+      createTitle: "Widget erstellen",
+      editTitle: "Widget bearbeiten",
+      subtitle: "Beschreibe es oder schreibe das OpenUI-Programm selbst",
+      nameLabel: "Name",
+      namePlaceholder: "Meine offene Arbeit",
+      promptLabel: "Was soll es zeigen?",
+      promptPlaceholder: "Offene Aufgaben mit Zahlen und Tabelle",
+      generate: "Erzeugen",
+      generating: "Wird erzeugt...",
+      itemQueryLabel: "Element-Abfrage (CQL)",
+      assetQueryLabel: "Asset-Abfrage (CQL)",
+      assetSetLabel: "Asset-Set",
+      assetSetNone: "Keins",
+      previewLabel: "Vorschau",
+      previewEmpty: "Noch nichts zum Anzeigen",
+      loading: "Wird geladen...",
+      aiUnavailable: "KI-Erzeugung ist nicht verfuegbar, daher kann kein neues Widget erstellt werden.",
+      aiUnavailableEditing: "KI-Erzeugung ist nicht verfuegbar. Name und Abfragen lassen sich weiterhin aendern.",
+      generateFailed: "Erzeugung fehlgeschlagen",
+      saveFailed: "Speichern fehlgeschlagen",
+      loadFailed: "Widget konnte nicht geladen werden",
+      saving: "Wird gespeichert...",
+    },
+    customWidgets: {
+      sourceError: "Die Daten dieses Widgets konnten nicht geladen werden",
+      truncated: 'Basiert auf {shown} von {total} Zeilen',
+      renderError: "Dieses Widget konnte nicht gerendert werden",
+      unavailable: "Dieses Widget ist nicht mehr verfuegbar",
+      notConfigured: "Dieses Widget wurde noch nicht eingerichtet",
+      noLinks: "Keine Verknuepfungen zwischen diesen Elementen und Assets",
+      canvasUnavailable: "Dieses Diagramm benoetigt ein Canvas, das hier nicht verfuegbar ist",
+      renderedNodes: "Zeichnet {shown} von {total} Knoten",
     },
     editor: {
       newSection: 'Neuer Bereich',
@@ -104,8 +154,10 @@ export default {
       addSectionsHint: 'Wählen Sie Bearbeiten, um Bereiche zum Dashboard hinzuzufügen',
     },
     states: {
-      assignedLoadError: 'Die Ihnen zugewiesenen Einträge konnten nicht geladen werden',
+      assignedLoadError: 'Die Ihnen zugewiesenen Vorgänge konnten nicht geladen werden',
       assignedEmpty: 'Ihnen ist derzeit nichts zugewiesen',
+      createdLoadError: 'Die von Ihnen erstellten Einträge konnten nicht geladen werden',
+      createdEmpty: 'Sie haben keine offenen Einträge erstellt',
       personalTasksLoadError: 'Ihre persönlichen Aufgaben konnten nicht geladen werden',
       personalTasksEmpty: 'Ihre persönliche Aufgabenliste ist leer',
       supportMetricsLoadError: 'Support-Kennzahlen konnten nicht geladen werden',
@@ -133,7 +185,7 @@ export default {
       milestoneProgress: '{done} von {total} erledigt',
       daysOverdue: '{days} Tage überfällig',
       daysLeft: 'Noch {days} Tage',
-      watchedItemsEmpty: 'Sie beobachten derzeit keine Einträge',
+      watchedItemsEmpty: 'Sie beobachten derzeit keine Vorgänge',
       workspaceWithId: 'Arbeitsbereich {id}',
     },
   },

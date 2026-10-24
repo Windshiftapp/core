@@ -1,6 +1,23 @@
 // Centralized reactive state for the work-item create form.
-import { api } from '../api.js';
-import { defaultCustomFieldValue, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+
+import {
+  customFields,
+  hierarchyLevels,
+  itemTemplates,
+  itemTypes,
+  screens,
+} from '../api/configuration.js';
+import { iterations, milestones } from '../api/milestones.js';
+import { FOREGROUND_READ } from '../api/readScheduler.js';
+import { teams } from '../api/teams.js';
+import { time } from '../api/time.js';
+import { getAssignableUsers, getUsers } from '../api/users.js';
+import { workspaces } from '../api/workspaces.js';
+import {
+  defaultCustomFieldValue,
+  isBooleanCustomFieldType,
+  isCreateRenderableCustomFieldType,
+} from '../utils/customFieldTypes.js';
 import { dateInputToISOString } from '../utils/dateFormatter.js';
 import { isGenericSubtaskType, sortItemTypesByHierarchy } from '../utils/hierarchy.js';
 import {
@@ -257,7 +274,7 @@ class WorkItemFormStore {
   async loadTeams() {
     if (this.teamsLoaded) return;
     try {
-      this.teams = (await api.teams.getAll()) || [];
+      this.teams = (await teams.getAll()) || [];
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.error('Failed to load teams:', error);
@@ -270,7 +287,7 @@ class WorkItemFormStore {
   async loadUsers(workspaceId = null) {
     if (this.usersLoaded) return;
     try {
-      const result = workspaceId ? await api.getAssignableUsers(workspaceId) : await api.getUsers();
+      const result = workspaceId ? await getAssignableUsers(workspaceId) : await getUsers();
       this.users = result || [];
       this.usersLoaded = true;
     } catch (error) {
@@ -287,7 +304,7 @@ class WorkItemFormStore {
   async loadCustomFields() {
     if (this.customFieldsLoaded) return;
     try {
-      this.allCustomFields = await api.customFields.getAll();
+      this.allCustomFields = await customFields.getAll();
       this.customFieldsLoaded = true;
     } catch (error) {
       console.error('Failed to load custom fields:', error);
@@ -311,7 +328,7 @@ class WorkItemFormStore {
       const filters = numericWorkspaceId
         ? { workspace_id: numericWorkspaceId, include_global: true }
         : {};
-      const result = await api.milestones.getAll(filters);
+      const result = await milestones.getAll(filters);
       if (token !== this.#milestonesLoadToken) return;
 
       this.allMilestones = result || [];
@@ -346,7 +363,7 @@ class WorkItemFormStore {
       const filters = numericWorkspaceId
         ? { workspace_id: numericWorkspaceId, include_global: true }
         : {};
-      const result = await api.iterations.getAll(filters);
+      const result = await iterations.getAll(filters);
       if (token !== this.#iterationsLoadToken) return;
 
       this.iterations = result || [];
@@ -383,7 +400,7 @@ class WorkItemFormStore {
     const token = ++this.#timeProjectsLoadToken;
     try {
       this.timeProjectsLoading = true;
-      const result = await api.time.projects.getByWorkspace(numericWorkspaceId);
+      const result = await time.projects.getByWorkspace(numericWorkspaceId);
       if (token !== this.#timeProjectsLoadToken) return;
 
       this.timeProjects = result || [];
@@ -429,7 +446,7 @@ class WorkItemFormStore {
       return;
     }
     try {
-      this.workspaceDetails = await api.workspaces.get(workspaceId);
+      this.workspaceDetails = await workspaces.get(workspaceId);
       await Promise.all([
         this.loadMilestones(workspaceId),
         this.loadIterations(workspaceId),
@@ -449,8 +466,8 @@ class WorkItemFormStore {
     if (this.itemTypesLoaded && !forceReload) return;
     try {
       const [itemTypesResult, hierarchyLevelsResult] = await Promise.all([
-        api.itemTypes.getAll(),
-        api.hierarchyLevels.getAll(),
+        itemTypes.getAll(),
+        hierarchyLevels.getAll(),
       ]);
       this.itemTypes = itemTypesResult || [];
       this.hierarchyLevels = hierarchyLevelsResult || [];
@@ -503,6 +520,20 @@ class WorkItemFormStore {
   }
 
   /**
+   * Resolve a workspace's effective configuration without disturbing the
+   * active route scope. The shared cache only holds the route's workspace;
+   * activating it here for another workspace would fight the app shell's
+   * route hydration and can ping-pong forever when the create modal targets
+   * a workspace other than the one behind it.
+   */
+  #effectiveConfig(workspaceId, itemTypeId = null) {
+    if (Number(workspaceDataStore.workspaceId) === Number(workspaceId)) {
+      return workspaceDataStore.screenConfig(itemTypeId);
+    }
+    return workspaces.getEffectiveConfig(workspaceId, itemTypeId, FOREGROUND_READ);
+  }
+
+  /**
    * Load the workspace's effective configuration (resolved once per workspace
    * by the backend: assigned config set, else the global default) and project
    * the parts the create flow needs onto currentConfigSet.
@@ -510,10 +541,7 @@ class WorkItemFormStore {
   async loadConfigSetForWorkspace(workspaceId) {
     if (this.configSetLoadedForWorkspace === workspaceId) return;
     try {
-      if (Number(workspaceDataStore.workspaceId) !== Number(workspaceId)) {
-        await workspaceDataStore.initialize(workspaceId);
-      }
-      const config = await workspaceDataStore.screenConfig(null);
+      const config = await this.#effectiveConfig(workspaceId, null);
       this.currentConfigSet = config
         ? {
             priorities_detailed: config.priorities || [],
@@ -532,11 +560,10 @@ class WorkItemFormStore {
   }
 
   /**
-   * Resolve the create screen ID for an item type through the shared
-   * effective-config cache (resolved server-side per workspace + type).
+   * Resolve the create screen ID for an item type in the given workspace.
    */
-  async #resolveCreateScreenId(itemTypeId) {
-    const config = await workspaceDataStore.screenConfig(itemTypeId);
+  async #resolveCreateScreenId(workspaceId, itemTypeId) {
+    const config = await this.#effectiveConfig(workspaceId, itemTypeId);
     return config?.screens?.create ?? 1;
   }
 
@@ -548,8 +575,8 @@ class WorkItemFormStore {
     if (this.loadingScreenFields || this.screenFieldsLoadedForKey === key) return;
     try {
       this.loadingScreenFields = true;
-      const createScreenId = await this.#resolveCreateScreenId(itemTypeId);
-      const fields = createScreenId ? await api.screens.getFields(createScreenId) : [];
+      const createScreenId = await this.#resolveCreateScreenId(workspaceId, itemTypeId);
+      const fields = createScreenId ? await screens.getFields(createScreenId) : [];
       this.screenFields = fields || [];
 
       this.screenSystemFields = this.screenFields
@@ -560,8 +587,11 @@ class WorkItemFormStore {
         .filter((field) => field.field_type === 'custom')
         .map((field) => parseInt(field.field_identifier, 10));
 
-      const filteredCustomFields = this.allCustomFields.filter((field) =>
-        customFieldIds.includes(field.id)
+      // Linking fields need an existing item and cannot be filled during
+      // create, so keep them out of the rendered fields and the payload.
+      const filteredCustomFields = this.allCustomFields.filter(
+        (field) =>
+          customFieldIds.includes(field.id) && isCreateRenderableCustomFieldType(field.field_type)
       );
 
       // Keep values the user already entered for fields that remain configured
@@ -657,6 +687,11 @@ class WorkItemFormStore {
       this.#templatesInFlightKey = null;
       return;
     }
+    // Wait for the workspace's effective configuration first: the unfiltered
+    // global catalog can hold a type this workspace does not bind, and a
+    // request for its templates 404s before the config set filters it out.
+    if (this.configSetLoadedForWorkspace !== workspaceId) return;
+
     const key = `${workspaceId}:${itemTypeId}`;
     // Never cache resolved keys: templates can change while the modal is open.
     if (this.#templatesInFlightKey === key) return;
@@ -664,8 +699,7 @@ class WorkItemFormStore {
 
     this.templatesLoading = true;
     try {
-      const list =
-        (await api.itemTemplates.getAll(workspaceId, { item_type_id: itemTypeId })) ?? [];
+      const list = (await itemTemplates.getAll(workspaceId, { item_type_id: itemTypeId })) ?? [];
       // Guard against an out-of-order response after another type change.
       if (`${this.formData.workspace_id}:${this.formData.item_type_id}` !== key) return;
 
@@ -918,6 +952,9 @@ class WorkItemFormStore {
           const fieldId = parseInt(field.field_identifier, 10);
           const value = this.customFieldValues[fieldId];
           const fieldDef = this.allCustomFields.find((f) => f.id === fieldId);
+          // Linking fields are not renderable on create; ignore a legacy
+          // required flag rather than blocking submission forever.
+          if (!isCreateRenderableCustomFieldType(fieldDef?.field_type)) continue;
           if (isBooleanCustomFieldType(fieldDef?.field_type)) continue;
           if (this.#isEmptyValue(value)) {
             errors.push(`${fieldDef?.name || 'Custom field'} is required`);

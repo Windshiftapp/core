@@ -1,4 +1,4 @@
-import { api } from '../../api.js';
+import { system } from '../../api/admin.js';
 import { confirm } from '../../composables/useConfirm.js';
 import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
 import { BUCKET } from '../buckets.js';
@@ -23,7 +23,7 @@ export function systemProvider(ctx) {
         });
         if (!ok) return;
         try {
-          await api.system.shutdown();
+          await system.shutdown();
           infoToast(t('dialogs.alerts.applicationShuttingDown'));
         } catch (err) {
           console.error('Failed to shutdown:', err);

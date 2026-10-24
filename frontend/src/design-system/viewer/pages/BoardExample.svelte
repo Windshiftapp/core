@@ -1,5 +1,6 @@
 <script>
-  import { Filter, Plus } from '@lucide/svelte';
+  import Filter from '@lucide/svelte/icons/filter';
+  import Plus from '@lucide/svelte/icons/plus';
   import Button from '../../../lib/components/Button.svelte';
   import SearchInput from '../../../lib/components/SearchInput.svelte';
   import BoardColumn from '../../../lib/features/collections/BoardColumn.svelte';

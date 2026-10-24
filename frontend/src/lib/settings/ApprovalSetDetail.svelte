@@ -3,10 +3,20 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { currentRoute, navigate } from '../router.js';
-  import { api } from '../api.js';
+  import { statuses, workflows as workflowsApi } from '../api/workflows.js';
+  import { groups as groupsApi } from '../api/permissions.js';
+  import { getUsers } from '../api/users.js';
+  import { workspaceRoles } from '../api/workspaces.js';
+  import { customFields } from '../api/configuration.js';
+  import { approvalSets } from '../api/approvalSets.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import Button from '../components/Button.svelte';
+  import BackButton from '../components/BackButton.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Radio from '../components/Radio.svelte';
   import Input from '../components/Input.svelte';
@@ -126,12 +136,12 @@
   async function loadReferenceData() {
     try {
       const [wf, st, gr, us, rs, cf] = await Promise.all([
-        api.workflows.getAll().catch(() => []),
-        api.statuses.getAll().catch(() => []),
-        api.groups.getAll().catch(() => []),
-        api.getUsers().catch(() => []),
-        api.workspaceRoles.getAll().catch(() => []),
-        api.customFields.getAll().catch(() => []),
+        workflowsApi.getAll().catch(() => []),
+        statuses.getAll().catch(() => []),
+        groupsApi.getAll().catch(() => []),
+        getUsers().catch(() => []),
+        workspaceRoles.getAll().catch(() => []),
+        customFields.getAll().catch(() => []),
       ]);
       workflows = wf || [];
       statusesAll = st || [];
@@ -153,7 +163,7 @@
     }
     try {
       loading = true;
-      const data = await api.approvalSets.get(approvalSetId);
+      const data = await approvalSets.get(approvalSetId);
       formData = {
         name: data.name || '',
         description: data.description || '',
@@ -183,7 +193,7 @@
       return;
     }
     try {
-      transitions = (await api.workflows.getTransitions(workflowId)) || [];
+      transitions = (await workflowsApi.getTransitions(workflowId)) || [];
     } catch (error) {
       console.error('Failed to load transitions:', error);
       transitions = [];
@@ -362,11 +372,11 @@
       };
 
       if (isNewMode) {
-        const created = await api.approvalSets.create(payload);
+        const created = await approvalSets.create(payload);
         successToast('Approval set created');
         navigate(`/admin/approval-sets/${created.id}`);
       } else {
-        await api.approvalSets.update(approvalSetId, payload);
+        await approvalSets.update(approvalSetId, payload);
         await loadData();
         successToast('Approval set saved');
       }
@@ -386,9 +396,7 @@
 <div class="flex-1 min-h-0 overflow-y-auto p-6" style="background-color: var(--ds-surface);" data-testid="approval-set-detail-scroll">
   <div class="max-w-5xl mx-auto">
   <div class="mb-4">
-    <Button variant="ghost" icon={ArrowLeft} onclick={back}>
-      {t('approvalSets.backToList')}
-    </Button>
+    <BackButton onclick={back} label={t('approvalSets.backToList')} />
   </div>
 
   {#if loading}

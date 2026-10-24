@@ -1,9 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
-  import { api } from '../../api.js';
-  import { ArrowLeft, Save, X, Plus, Trash2 } from '@lucide/svelte';
-  import Button from '../../components/Button.svelte';
+  import { statusCategories as statusCategoriesApi, statuses as statusesApi, workflows } from '../../api/workflows.js';
+  import Save from '@lucide/svelte/icons/save';
+  import X from '@lucide/svelte/icons/x';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import BackButton from '../../components/BackButton.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
 
@@ -29,9 +32,9 @@
       
       // Load workflow, statuses, and status categories in parallel
       const [workflowData, statusesData, categoriesData] = await Promise.all([
-        api.workflows.get(workflowId),
-        api.statuses.getAll(),
-        api.statusCategories.getAll()
+        workflows.get(workflowId),
+        statusesApi.getAll(),
+        statusCategoriesApi.getAll()
       ]);
       
       workflow = workflowData;
@@ -62,7 +65,7 @@
 
   async function handleSave(allTransitions) {
     try {
-      await api.workflows.updateTransitions(workflow.id, allTransitions);
+      await workflows.updateTransitions(workflow.id, allTransitions);
       navigate('/admin/workflows');
     } catch (error) {
       throw error;
@@ -81,13 +84,10 @@
     <div class="max-w-full px-6 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <Button
-            variant="default"
-            icon={ArrowLeft}
+          <BackButton
             onclick={() => navigate('/admin/workflows')}
-          >
-            {t('workflows.backToWorkflows')}
-          </Button>
+            label={t('workflows.backToWorkflows')}
+          />
           <div>
             <h1 class="text-xl font-medium" style="color: var(--ds-text);">
               {workflow?.name || t('nav.loading')} - {t('workflows.workflowDesigner')}

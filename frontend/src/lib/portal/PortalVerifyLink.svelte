@@ -1,5 +1,7 @@
 <script>
-  import { Loader2, CheckCircle, XCircle } from '@lucide/svelte';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import XCircle from '@lucide/svelte/icons/x-circle';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 

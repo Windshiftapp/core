@@ -222,9 +222,8 @@ func (s *SyncService) applyTransitionSlug(
 }
 
 // resolveActingUser maps a committer email to an internal user ID, but only
-// when that user has item-edit permission in the workspace. This mirrors
-// Jira's smart-commit rule that the committer email must match a user with
-// the permission to perform the action.
+// when that user has item-edit permission in the workspace. The committer
+// email must match a user who can perform the action.
 func (s *SyncService) resolveActingUser(workspaceID int, email string) (int, bool) {
 	if email == "" {
 		return 0, false

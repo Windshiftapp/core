@@ -1,6 +1,6 @@
 <script>
   import { currentRoute } from '../router.js';
-  import { workspacePermissions } from '../stores';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import {
     visibleWorkspaceSettingsItems,
     workspaceSettingsRoute,

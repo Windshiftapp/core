@@ -7,7 +7,9 @@
 	import IntegrationProviderManager from './IntegrationProviderManager.svelte';
 	import OAuthClientManager from './OAuthClientManager.svelte';
 	import ZammadConnectionManager from './ZammadConnectionManager.svelte';
-	import { ArrowUpRight, ArrowDownLeft, TicketCheck } from '@lucide/svelte';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+	import ArrowDownLeft from '@lucide/svelte/icons/arrow-down-left';
+	import TicketCheck from '@lucide/svelte/icons/ticket-check';
 	import { t } from '../stores/i18n.svelte.js';
 
 	let activeTab = $state('outbound');

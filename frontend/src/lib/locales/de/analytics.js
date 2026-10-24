@@ -11,16 +11,16 @@ export default {
     unsupportedVersion:
       'Der Server hat ein nicht unterstütztes Analyseformat zurückgegeben. Aktualisieren Sie die Seite nach Abschluss der Bereitstellung.',
     collectionLoadError:
-      'Sammlungen konnten nicht geladen werden. Die Analyse zeigt alle Workspace-Elemente.',
+      'Sammlungen konnten nicht geladen werden. Die Analyse zeigt alle Workspace-Vorgänge.',
     retry: 'Erneut versuchen',
     dateRange: 'Zeitraum',
     collection: 'Sammlung',
-    allItems: 'Alle Workspace-Elemente',
+    allItems: 'Alle Workspace-Vorgänge',
     from: 'Von',
     to: 'Bis',
     daysValue: '{value} T.',
-    items_one: '{count} Element',
-    items_other: '{count} Elemente',
+    items_one: '{count} Vorgang',
+    items_other: '{count} Vorgänge',
     range: {
       last30Days: 'Letzte 30 Tage',
       last12Weeks: 'Letzte 12 Wochen',
@@ -34,13 +34,13 @@ export default {
       too_long: 'Wählen Sie einen Zeitraum von höchstens 366 Tagen.',
     },
     scope: {
-      summary: '{items} aktuelle Elemente · {from}–{to}',
+      summary: '{items} aktuelle Vorgänge · {from}–{to}',
       currentWorkspace: 'Aktuelle Workspace-Kohorte',
       currentWorkspaceNote:
-        'Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Elemente, die heute in diesem Workspace liegen. Verschobene oder gelöschte Elemente sind nicht enthalten.',
+        'Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Vorgänge, die heute in diesem Workspace liegen. Verschobene oder gelöschte Vorgänge sind nicht enthalten.',
       currentCollection: 'Aktuelle Sammlungskohorte',
       currentCollectionNote:
-        'Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Elemente, die heute zur Sammlung passen. Änderungen an der Sammlung können die Kohorte verändern.',
+        'Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Vorgänge, die heute zur Sammlung passen. Änderungen an der Sammlung können die Kohorte verändern.',
     },
     health: {
       title: 'Handlungsbedarf',
@@ -52,8 +52,8 @@ export default {
       unassigned: 'Nicht zugewiesen',
       withoutPriority: 'Keine Priorität',
       withoutEstimate: 'Keine Schätzung',
-      attentionItems: 'Zu prüfende Elemente',
-      item: 'Element',
+      attentionItems: 'Zu prüfende Vorgänge',
+      item: 'Vorgang',
       status: 'Status',
       age: 'Alter',
       signals: 'Signale',
@@ -64,7 +64,7 @@ export default {
         without_priority: 'Keine Priorität',
         without_estimate: 'Keine Schätzung',
       },
-      allClear: 'Keine unerledigten Elemente entsprechen derzeit einem Warnsignal.',
+      allClear: 'Keine unerledigten Vorgänge entsprechen derzeit einem Warnsignal.',
     },
     throughput: {
       title: 'Erstellt vs. abgeschlossen',
@@ -79,14 +79,14 @@ export default {
     },
     aging: {
       title: 'Alter der laufenden Arbeit',
-      description: 'Wie lange aktuell unerledigte Elemente bereits offen sind.',
-      total: 'Aktive Elemente',
+      description: 'Wie lange aktuell unerledigte Vorgänge bereits offen sind.',
+      total: 'Aktive Vorgänge',
       median: 'Medianalter',
       p85: '85. Perzentil',
       ageBand: 'Altersgruppe',
-      itemCount: 'Elemente',
+      itemCount: 'Vorgänge',
       byStatus: 'Alter nach Status',
-      oldest: 'Älteste unerledigte Elemente',
+      oldest: 'Älteste unerledigte Vorgänge',
       status: 'Status',
       noActive: 'In diesem Bereich gibt es keine unerledigte Arbeit.',
       buckets: {
@@ -100,7 +100,7 @@ export default {
     deliveryTime: {
       title: 'Lieferzeit',
       description: 'Von der Erstellung bis zum ersten Abschluss, gruppiert nach Abschlusswoche.',
-      analyzed: 'Abgeschlossene Elemente',
+      analyzed: 'Abgeschlossene Vorgänge',
       average: 'Durchschnitt',
       median: 'Median',
       p85: '85. Perzentil',
@@ -110,9 +110,9 @@ export default {
       completedDate: 'Erstmals abgeschlossen',
       duration: 'Lieferzeit',
       missingHistory_one:
-        '1 aktuell abgeschlossenes Element wurde wegen fehlender Abschlusshistorie ausgeschlossen.',
+        '1 aktuell abgeschlossener Vorgang wurde wegen fehlender Abschlusshistorie ausgeschlossen.',
       missingHistory_other:
-        '{count} aktuell abgeschlossene Elemente wurden wegen fehlender Abschlusshistorie ausgeschlossen.',
+        '{count} aktuell abgeschlossene Vorgänge wurden wegen fehlender Abschlusshistorie ausgeschlossen.',
       definition:
         'Gemessen von der Erstellung bis zum ersten Wechsel in einen abgeschlossenen Status. Spätere Wiedereröffnungen ändern den Wert nicht.',
     },
@@ -120,11 +120,11 @@ export default {
       show: 'Datentabelle anzeigen',
     },
     insufficientData: {
-      no_items: 'Dieser Bereich enthält noch keine Elemente.',
+      no_items: 'Dieser Bereich enthält noch keine Vorgänge.',
       no_active_items: 'In diesem Bereich gibt es keine unerledigte Arbeit.',
       no_completed_items: 'Im ausgewählten Zeitraum wurden keine ersten Abschlüsse erfasst.',
       few_completed_items:
-        'In diesem Zeitraum wurden nur wenige Elemente abgeschlossen. Perzentile sind daher nur als Tendenz zu verstehen.',
+        'In diesem Zeitraum wurden nur wenige Vorgänge abgeschlossen. Perzentile sind daher nur als Tendenz zu verstehen.',
     },
   },
 };

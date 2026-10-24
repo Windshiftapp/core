@@ -1,5 +1,6 @@
 import { derived, writable } from 'svelte/store';
-import { api } from '../api.js';
+import { auth } from '../api/auth.js';
+import { sso } from '../api/sso.js';
 import { desktopStartSso } from '../desktop/bridge.svelte.js';
 import { toExternal } from '../runtime/contextPath.js';
 import { isTauri } from '../utils/isTauri.js';
@@ -78,7 +79,7 @@ function createSSOStore() {
       statusError.set(null);
 
       try {
-        const data = await api.sso.getStatus();
+        const data = await sso.getStatus();
         const providers = data.providers || [];
         const defaultProvider = providers[0] || null;
         status.set({
@@ -130,7 +131,7 @@ function createSSOStore() {
       // instead of dropping them at the dashboard root (WI-519).
       const redirectURI = `${window.location.pathname || ''}${window.location.search || ''}`;
 
-      const url = api.sso.startLogin(slug, type || 'oidc', remember || false, redirectURI);
+      const url = sso.startLogin(slug, type || 'oidc', remember || false, redirectURI);
 
       // Inside the desktop app, the IdP login (esp. passkey/WebAuthn) can't run
       // in the embedded webview — hand it to the system browser and return via
@@ -151,7 +152,7 @@ function createSSOStore() {
       providersError.set(null);
 
       try {
-        const data = await api.sso.listProviders();
+        const data = await sso.listProviders();
         providers.set(data || []);
         providersLoading.set(false);
       } catch (err) {
@@ -164,7 +165,7 @@ function createSSOStore() {
     // Admin: Get a single provider
     async getProvider(id) {
       try {
-        return await api.sso.getProvider(id);
+        return await sso.getProvider(id);
       } catch (err) {
         console.error('Failed to get SSO provider:', err);
         throw err;
@@ -174,7 +175,7 @@ function createSSOStore() {
     // Admin: Create a new provider
     async createProvider(data) {
       try {
-        const provider = await api.sso.createProvider(data);
+        const provider = await sso.createProvider(data);
         // Refresh providers list
         await this.loadProviders();
         // Refresh status
@@ -189,7 +190,7 @@ function createSSOStore() {
     // Admin: Update a provider
     async updateProvider(id, data) {
       try {
-        const provider = await api.sso.updateProvider(id, data);
+        const provider = await sso.updateProvider(id, data);
         // Refresh providers list
         await this.loadProviders();
         // Refresh status
@@ -204,7 +205,7 @@ function createSSOStore() {
     // Admin: Delete a provider
     async deleteProvider(id) {
       try {
-        await api.sso.deleteProvider(id);
+        await sso.deleteProvider(id);
         // Refresh providers list
         await this.loadProviders();
         // Refresh status
@@ -218,7 +219,7 @@ function createSSOStore() {
     // Admin: Test provider connection
     async testProvider(id) {
       try {
-        return await api.sso.testProvider(id);
+        return await sso.testProvider(id);
       } catch (err) {
         console.error('Failed to test SSO provider:', err);
         throw err;
@@ -230,7 +231,7 @@ function createSSOStore() {
       externalAccountsLoading.set(true);
 
       try {
-        const data = await api.sso.getExternalAccounts();
+        const data = await sso.getExternalAccounts();
         externalAccounts.set(data || []);
         externalAccountsLoading.set(false);
       } catch (err) {
@@ -242,7 +243,7 @@ function createSSOStore() {
     // User: Unlink an external account
     async unlinkExternalAccount(id) {
       try {
-        await api.sso.unlinkExternalAccount(id);
+        await sso.unlinkExternalAccount(id);
         // Refresh external accounts
         await this.loadExternalAccounts();
       } catch (err) {
@@ -284,7 +285,7 @@ function createSSOStore() {
       }
 
       try {
-        const result = await api.auth.getVerificationStatus();
+        const result = await auth.getVerificationStatus();
         verificationStatusCache = result;
         return result;
       } catch (err) {
@@ -303,7 +304,7 @@ function createSSOStore() {
     // Resend verification email
     async resendVerificationEmail() {
       try {
-        return await api.auth.resendVerification();
+        return await auth.resendVerification();
       } catch (err) {
         console.error('Failed to resend verification email:', err);
         throw err;

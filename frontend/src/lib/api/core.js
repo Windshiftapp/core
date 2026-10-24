@@ -5,6 +5,14 @@ import {
   isClockDriftSignificant,
   updateOffset,
 } from '../utils/serverClock.js';
+import { READ_PRIORITY, scheduleRead } from './readScheduler.js';
+
+// Bounded recovery for transient per-user concurrency rejections. Only safe,
+// finite reads are eligible; mutations are never automatically replayed.
+const RETRY_MAX_ATTEMPTS = 3;
+const RETRY_MAX_ELAPSED_MS = 30000;
+const RETRY_DEFAULT_DELAYS_MS = [1000, 2000];
+const RETRY_JITTER_MS = 250;
 
 // Use relative path for API calls - Vite proxy will handle dev, production uses same origin
 export const API_BASE = '/api';
@@ -13,6 +21,31 @@ export const ADMIN_UI_MUTATION_EVENT = 'windshift:admin-ui-mutation';
 
 // Ensure the clock-drift warning toast fires at most once per session
 let driftWarningShown = false;
+
+// The API layer must not import stores or the router: those imports would put
+// every API module back behind entry-level importers and turn store edits into
+// full page reloads in dev. The app shell registers the side effects instead.
+const apiEventHandlers = {
+  /** @type {null | (() => void)} */
+  onAuthExpired: null,
+  /** @type {null | ((event: { offsetMs: number }) => void)} */
+  onClockDrift: null,
+};
+
+/**
+ * Register app-shell side effects for API responses. Handlers left out of
+ * `handlers` keep their current value; pass `null` to unregister one.
+ * @param {{ onAuthExpired?: (() => void) | null, onClockDrift?: ((event: { offsetMs: number }) => void) | null }} [handlers]
+ */
+export function configureAPIEventHandlers(handlers = {}) {
+  if ('onAuthExpired' in handlers) apiEventHandlers.onAuthExpired = handlers.onAuthExpired ?? null;
+  if ('onClockDrift' in handlers) apiEventHandlers.onClockDrift = handlers.onClockDrift ?? null;
+}
+
+// The per-user concurrency limiter (internal/middleware/user_concurrency.go)
+// answers bursts with 429 + Retry-After. Safe, finite reads recover from that
+// within the shared budget; writes are never automatically replayed.
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 // Chromium does not consistently report fetches cancelled by a document
 // navigation as AbortError. Track the page lifecycle explicitly so callers do
@@ -62,8 +95,9 @@ function inFlightGETKey(base, endpoint, options) {
 
   // Caller-specific request controls cannot safely share one underlying
   // fetch: aborting or timing out one consumer must not cancel another.
+  // Scheduler metadata is not caller-specific and must not break sharing.
   const optionKeys = Object.keys(options || {});
-  if (optionKeys.some((key) => key !== 'method')) return null;
+  if (optionKeys.some((key) => key !== 'method' && key !== 'readPolicy')) return null;
 
   return `${apiRequestSessionKey}|${requestLocale()}|${base}|${normalizeGETEndpoint(endpoint)}`;
 }
@@ -134,6 +168,10 @@ function createApiError(response, responseText) {
   // Add HTTP status info
   /** @type {any} */ (error).status = response.status;
   /** @type {any} */ (error).statusText = response.statusText;
+  // Retry-After recovery needs the raw header plus the server clock so a
+  // relative HTTP-date delay is measured against the server's now, not ours.
+  /** @type {any} */ (error).retryAfter = response.headers?.get?.('Retry-After') ?? null;
+  /** @type {any} */ (error).serverDate = response.headers?.get?.('Date') ?? null;
 
   return error;
 }
@@ -234,34 +272,10 @@ async function performFetchAPI(base, endpoint, options = {}) {
     // Track server-vs-client clock offset from the Date header
     updateOffset(response.headers.get('Date'));
 
-    // After enough samples, warn admins once if drift is significant
+    // After enough samples, report drift once so the shell can warn admins.
     if (!driftWarningShown && getSampleCount() >= 3 && isClockDriftSignificant()) {
       driftWarningShown = true;
-      // Dynamic import avoids circular deps (stores → api → stores)
-      Promise.all([
-        import('../stores'),
-        import('../stores/toasts.svelte.js'),
-        import('../stores/i18n.svelte.js'),
-        import('../router.js'),
-      ]).then(([{ authStore }, { addToast }, { t }, { navigate }]) => {
-        let user;
-        authStore.subscribe((s) => (user = s.currentUser))();
-        if (/** @type {any} */ (user)?.is_system_admin) {
-          const offsetSec = Math.round(getClockOffset() / 1000);
-          const absMin = Math.floor(Math.abs(offsetSec) / 60);
-          const absSec = Math.abs(offsetSec) % 60;
-          const direction = offsetSec > 0 ? 'ahead' : 'behind';
-          const amount =
-            absMin > 0 ? `${absMin}m ${absSec}s ${direction}` : `${absSec}s ${direction}`;
-          addToast({
-            message: `Server clock appears to be ${amount}. Click for details.`,
-            title: t('toast.warning'),
-            variant: 'warning',
-            clickable: true,
-            onClick: () => navigate('/admin/diagnostics?subtab=clock'),
-          });
-        }
-      });
+      apiEventHandlers.onClockDrift?.({ offsetMs: getClockOffset() });
     }
 
     if (!response.ok) {
@@ -279,9 +293,7 @@ async function performFetchAPI(base, endpoint, options = {}) {
         response.status === 401 &&
         /** @type {any} */ (apiError).code !== 'AUTHENTICATION_PENDING'
       ) {
-        // Import auth store dynamically to avoid circular dependencies
-        const { authStore } = await import('../stores');
-        authStore.clearAuth();
+        apiEventHandlers.onAuthExpired?.();
       }
       throw apiError;
     }
@@ -297,7 +309,7 @@ async function performFetchAPI(base, endpoint, options = {}) {
     }
 
     const method = String(fetchOptions.method || 'GET').toUpperCase();
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    if (!SAFE_METHODS.includes(method)) {
       notifyAdminUIMutation(endpoint, method);
     }
 
@@ -316,6 +328,118 @@ export function fetchAPI(endpoint, options = {}) {
 
 export function fetchAPIV2(endpoint, options = {}) {
   return fetchFromAPI(API_V2_BASE, endpoint, options);
+}
+
+function isSafeReadMethod(options) {
+  return SAFE_METHODS.includes(String(options?.method || 'GET').toUpperCase());
+}
+
+/**
+ * Delay before retrying a 429: Retry-After (seconds or HTTP-date) when present,
+ * otherwise 1s then 2s. Jitter is added on top so parallel retries spread out;
+ * it never shortens the server-requested delay.
+ * @param {any} error
+ * @param {number} attempt
+ * @param {() => number} [random]
+ */
+export function concurrencyRetryDelayMs(error, attempt, random = Math.random) {
+  return parseRetryAfterMs(error, attempt) + random() * RETRY_JITTER_MS;
+}
+
+function parseRetryAfterMs(error, attemptIndex) {
+  const fallback = RETRY_DEFAULT_DELAYS_MS[attemptIndex] ?? RETRY_DEFAULT_DELAYS_MS.at(-1);
+  const header = error?.retryAfter;
+  if (header == null || String(header).trim() === '') return fallback;
+
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+
+  const dateMs = Date.parse(header);
+  if (Number.isNaN(dateMs)) return fallback;
+
+  // A relative HTTP-date is resolved against the server's Date header when
+  // present so client clock drift does not lengthen or shorten the wait.
+  const serverNow = Date.parse(error?.serverDate);
+  const now = Number.isNaN(serverNow) ? Date.now() : serverNow;
+  return Math.max(0, dateMs - now);
+}
+
+function abortError() {
+  return new DOMException('The read was aborted', 'AbortError');
+}
+
+function sleepWithAbort(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    let timer;
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(abortError());
+    };
+    timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/**
+ * Perform one physical attempt, entering the shared read budget when the
+ * caller opted in with `readPolicy`.
+ */
+function performFetchAttempt(base, endpoint, options) {
+  const { readPolicy, ...rest } = options;
+  const priority = readPolicy?.priority;
+  if (priority !== READ_PRIORITY.FOREGROUND && priority !== READ_PRIORITY.BACKGROUND) {
+    return performFetchAPI(base, endpoint, rest);
+  }
+  // The scheduler owns the attempt signal so queued/active cancellation can
+  // abort the underlying fetch while caller signals keep transport sharing off.
+  return scheduleRead(priority, rest.signal, (signal) =>
+    performFetchAPI(base, endpoint, { ...rest, signal })
+  );
+}
+
+async function performFetchWithRetry(base, endpoint, options) {
+  if (!isSafeReadMethod(options)) {
+    return performFetchAttempt(base, endpoint, options);
+  }
+
+  const startedAt = Date.now();
+  const sessionKey = apiRequestSessionKey;
+  let lastError;
+
+  for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await performFetchAttempt(base, endpoint, options);
+    } catch (error) {
+      lastError = error;
+      if (/** @type {any} */ (error)?.status !== 429) throw error;
+      const isLastAttempt = attempt >= RETRY_MAX_ATTEMPTS - 1;
+      // A session replacement must not continue an old session's retry
+      // sequence. A read that started before auth settled (null key) may still
+      // retry once the authenticated session is established.
+      const sessionReplaced = sessionKey !== null && apiRequestSessionKey !== sessionKey;
+      if (isLastAttempt || sessionReplaced) throw error;
+
+      const delayMs = parseRetryAfterMs(error, attempt);
+      const remainingMs = RETRY_MAX_ELAPSED_MS - (Date.now() - startedAt);
+      if (delayMs > remainingMs) throw error;
+
+      // The slot is free during this sleep because the failed attempt already
+      // released it.
+      await sleepWithAbort(concurrencyRetryDelayMs(error, attempt), options?.signal);
+
+      if (sessionKey !== null && apiRequestSessionKey !== sessionKey) throw lastError;
+    }
+  }
+
+  throw lastError;
 }
 
 export async function fetchV2Data(endpoint, options = {}) {
@@ -360,13 +484,15 @@ export async function fetchAllV2Pages(endpoint, options = {}) {
 
 function fetchFromAPI(base, endpoint, options) {
   const key = inFlightGETKey(base, endpoint, options);
-  if (!key) return performFetchAPI(base, endpoint, options);
+  // Retry lives inside the shared promise so duplicate callers observe one
+  // sequence and never multiply the physical attempts.
+  if (!key) return performFetchWithRetry(base, endpoint, options);
 
   const existing = inFlightGetRequests.get(key);
   if (existing) return existing;
 
   let trackedRequest;
-  trackedRequest = performFetchAPI(base, endpoint, options).finally(() => {
+  trackedRequest = performFetchWithRetry(base, endpoint, options).finally(() => {
     if (inFlightGetRequests.get(key) === trackedRequest) {
       inFlightGetRequests.delete(key);
     }

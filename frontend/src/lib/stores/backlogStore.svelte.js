@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { items } from '../api/items.js';
 
 /**
  * Store for managing backlog count across workspace views.
@@ -20,7 +20,7 @@ class BacklogStore {
     this.workspaceId = workspaceId;
     this.loading = true;
     try {
-      const response = await api.items.getBacklog(workspaceId);
+      const response = await items.getBacklog(workspaceId);
       if (generation !== this.#loadGeneration || this.workspaceId !== workspaceId) return;
       const count = response?.pagination?.total_items ?? response?.data?.length ?? 0;
       this.count = count;

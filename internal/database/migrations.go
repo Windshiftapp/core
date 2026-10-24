@@ -2159,6 +2159,9 @@ var Catalog = []Migration{
 					AND child.relname = 'incident_notification_state'
 					AND parent.relname = 'on_call_escalation_rules'
 			) THEN 1 ELSE 0 END`,
+		// Databases stamped before the constraint was renamed to match the
+		// fresh-schema default are restamped rather than rejected.
+		Superseded: []string{"f5adf8c7e589157ad5b7b2a254875f05d0d78382ce4997c43696d7f88293e8f2"},
 		SQLite: `
 			ALTER TABLE incidents DROP COLUMN dedup_key;
 			DELETE FROM incident_notification_state WHERE escalation_rule_id NOT IN (SELECT id FROM on_call_escalation_rules);
@@ -2187,8 +2190,8 @@ var Catalog = []Migration{
 		Postgres: `
 			ALTER TABLE incidents DROP COLUMN IF EXISTS dedup_key;
 			DELETE FROM incident_notification_state WHERE escalation_rule_id NOT IN (SELECT id FROM on_call_escalation_rules);
-			ALTER TABLE incident_notification_state DROP CONSTRAINT IF EXISTS incident_notification_state_escalation_rule_fkey;
-			ALTER TABLE incident_notification_state ADD CONSTRAINT incident_notification_state_escalation_rule_fkey
+			ALTER TABLE incident_notification_state DROP CONSTRAINT IF EXISTS incident_notification_state_escalation_rule_id_fkey;
+			ALTER TABLE incident_notification_state ADD CONSTRAINT incident_notification_state_escalation_rule_id_fkey
 				FOREIGN KEY (escalation_rule_id) REFERENCES on_call_escalation_rules(id) ON DELETE CASCADE;
 		`,
 	},
@@ -2554,6 +2557,24 @@ var Catalog = []Migration{
 		ApplyPostgres:   applyIntakeSplitMigration,
 	},
 	{
+		Version:         "20261026_intake_workspace_portal",
+		Name:            "Route email intakes by workspace with an optional portal link (WI-1644)",
+		CheckSQLiteFn:   checkIntakeWorkspacePortalMigration,
+		CheckPostgresFn: checkIntakeWorkspacePortalMigration,
+		SQLite:          "applyIntakeWorkspacePortalMigration:v1",
+		Postgres:        "applyIntakeWorkspacePortalMigration:v1",
+		ApplySQLite:     applyIntakeWorkspacePortalMigration,
+		ApplyPostgres:   applyIntakeWorkspacePortalMigration,
+	},
+	{
+		Version:       "20261027_intake_send_confirmation",
+		Name:          "Send an optional submission receipt for an email intake (WI-1712)",
+		CheckSQLite:   sqliteColumnCheck("intakes", "send_confirmation"),
+		CheckPostgres: pgColumnCheck("intakes", "send_confirmation"),
+		SQLite:        `ALTER TABLE intakes ADD COLUMN send_confirmation BOOLEAN NOT NULL DEFAULT false`,
+		Postgres:      `ALTER TABLE intakes ADD COLUMN IF NOT EXISTS send_confirmation BOOLEAN NOT NULL DEFAULT false`,
+	},
+	{
 		Version:       "20261019_email_tracking_completed_at",
 		Name:          "Keep email dedup after an intake-created item is deleted (WI-1658)",
 		CheckSQLite:   sqliteColumnCheck("email_message_tracking", "completed_at"),
@@ -2623,7 +2644,328 @@ var Catalog = []Migration{
 		ApplyPostgres: applyAssetReportsWorkspacePinned,
 	},
 	{
-		Version:       "20261005_milestone_comments",
+		Version:       "20261024_attachments_internal_visibility",
+		Name:          "Hide internal attachments from portal customers (WI-1700)",
+		CheckSQLite:   sqliteColumnCheck("attachments", "is_internal"),
+		CheckPostgres: pgColumnCheck("attachments", "is_internal"),
+		SQLite:        `ALTER TABLE attachments ADD COLUMN is_internal BOOLEAN NOT NULL DEFAULT false;`,
+		Postgres:      `ALTER TABLE attachments ADD COLUMN IF NOT EXISTS is_internal BOOLEAN NOT NULL DEFAULT false;`,
+	},
+	{
+		Version:       "20261025_jira_import_job_leases",
+		Name:          "Lease Jira import jobs so restarts recover interrupted runs (WI-1703)",
+		CheckSQLite:   sqliteColumnCheck("jira_import_jobs", "lease_expires_at"),
+		CheckPostgres: pgColumnCheck("jira_import_jobs", "lease_expires_at"),
+		SQLite:        `ALTER TABLE jira_import_jobs ADD COLUMN lease_expires_at BIGINT;`,
+		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS lease_expires_at BIGINT;`,
+	},
+	{
+		Version:       "20261028_jira_import_job_lease_token",
+		Name:          "Fence Jira import workers with an ownership token (WI-1718)",
+		CheckSQLite:   sqliteColumnCheck("jira_import_jobs", "lease_token"),
+		CheckPostgres: pgColumnCheck("jira_import_jobs", "lease_token"),
+		SQLite:        `ALTER TABLE jira_import_jobs ADD COLUMN lease_token TEXT;`,
+		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS lease_token TEXT;`,
+	},
+	{
+		Version:       "20261029_mention_email_outbox",
+		Name:          "Queue dedicated @mention emails that carry the message body (WI-1726)",
+		CheckSQLite:   sqliteTableCheck("mention_email_outbox"),
+		CheckPostgres: pgTableCheck("mention_email_outbox"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS mention_email_outbox (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				mention_id INTEGER NOT NULL,
+				notification_id INTEGER,
+				user_id INTEGER NOT NULL,
+				workspace_id INTEGER NOT NULL,
+				item_id INTEGER NOT NULL,
+				to_email TEXT NOT NULL,
+				to_name TEXT NOT NULL DEFAULT '',
+				actor_name TEXT NOT NULL DEFAULT '',
+				item_key TEXT NOT NULL DEFAULT '',
+				item_title TEXT NOT NULL DEFAULT '',
+				source_type TEXT NOT NULL DEFAULT '',
+				content TEXT NOT NULL DEFAULT '',
+				action_url TEXT NOT NULL DEFAULT '',
+				attempt_count INTEGER NOT NULL DEFAULT 0,
+				next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				lease_owner TEXT,
+				last_error TEXT,
+				delivered_at DATETIME,
+				discarded_at DATETIME,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (mention_id) REFERENCES mentions(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_mention_email_outbox_pending
+				ON mention_email_outbox(delivered_at, discarded_at, next_attempt_at);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_mention_email_outbox_mention
+				ON mention_email_outbox(mention_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS mention_email_outbox (
+				id SERIAL PRIMARY KEY,
+				mention_id INTEGER NOT NULL,
+				notification_id INTEGER,
+				user_id INTEGER NOT NULL,
+				workspace_id INTEGER NOT NULL,
+				item_id INTEGER NOT NULL,
+				to_email TEXT NOT NULL,
+				to_name TEXT NOT NULL DEFAULT '',
+				actor_name TEXT NOT NULL DEFAULT '',
+				item_key TEXT NOT NULL DEFAULT '',
+				item_title TEXT NOT NULL DEFAULT '',
+				source_type TEXT NOT NULL DEFAULT '',
+				content TEXT NOT NULL DEFAULT '',
+				action_url TEXT NOT NULL DEFAULT '',
+				attempt_count INTEGER NOT NULL DEFAULT 0,
+				next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				lease_owner TEXT,
+				last_error TEXT,
+				delivered_at TIMESTAMPTZ,
+				discarded_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (mention_id) REFERENCES mentions(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_mention_email_outbox_pending
+				ON mention_email_outbox(delivered_at, discarded_at, next_attempt_at);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_mention_email_outbox_mention
+				ON mention_email_outbox(mention_id);
+		`,
+	},
+	{
+		Version:       "20261030_customer_organisations_builtin_key",
+		Name:          "Add stable builtin_key to customer organisations (no-customer placeholder)",
+		CheckSQLite:   sqliteColumnCheck("customer_organisations", "builtin_key"),
+		CheckPostgres: pgColumnCheck("customer_organisations", "builtin_key"),
+		// Existing installs keep working without a customer: the placeholder row
+		// absorbs projects and worklogs that would otherwise need a real one.
+		// Fresh installs get the row from the default-data seed instead.
+		SQLite: `
+			ALTER TABLE customer_organisations ADD COLUMN builtin_key TEXT;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_organisations_builtin_key ON customer_organisations(builtin_key) WHERE builtin_key IS NOT NULL;
+			INSERT INTO customer_organisations (builtin_key, name, description, active)
+			SELECT 'no_customer', 'No customer', 'Placeholder for projects and worklogs without a customer', true
+			WHERE NOT EXISTS (SELECT 1 FROM customer_organisations WHERE builtin_key = 'no_customer');
+		`,
+		Postgres: `
+			ALTER TABLE customer_organisations ADD COLUMN IF NOT EXISTS builtin_key TEXT;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_organisations_builtin_key ON customer_organisations(builtin_key) WHERE builtin_key IS NOT NULL;
+			INSERT INTO customer_organisations (builtin_key, name, description, active)
+			SELECT 'no_customer', 'No customer', 'Placeholder for projects and worklogs without a customer', true
+			WHERE NOT EXISTS (SELECT 1 FROM customer_organisations WHERE builtin_key = 'no_customer');
+		`,
+	},
+	{
+		Version:       "20261031_email_tracking_skipped_reason",
+		Name:          "Record machine-generated inbound mail that was not turned into a ticket",
+		CheckSQLite:   sqliteColumnCheck("email_message_tracking", "skipped_reason"),
+		CheckPostgres: pgColumnCheck("email_message_tracking", "skipped_reason"),
+		SQLite:        `ALTER TABLE email_message_tracking ADD COLUMN skipped_reason TEXT`,
+		Postgres:      `ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS skipped_reason TEXT`,
+	},
+	{
+		// Per-email lookups keyed on normalized addresses or item id scanned
+		// whole tables at the target intake volume (WI-1767). Expression and
+		// composite indexes keep intake, rate limiting, and reply threading on
+		// an index search; the queries keep their LOWER(...) form so the
+		// expression indexes apply.
+		Version:       "20261101_email_lookup_indexes",
+		Name:          "Index email intake and reply threading lookups (WI-1767)",
+		CheckSQLite:   sqliteIndexCheck("idx_email_message_tracking_intake_sender_time"),
+		CheckPostgres: pgIndexCheck("idx_email_message_tracking_intake_sender_time"),
+		SQLite: `
+			CREATE INDEX IF NOT EXISTS idx_portal_customers_email_lower ON portal_customers(LOWER(email));
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_intake_sender_time ON email_message_tracking(intake_id, LOWER(from_email), processed_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_item_time ON email_message_tracking(item_id, processed_at);
+		`,
+		Postgres: `
+			CREATE INDEX IF NOT EXISTS idx_portal_customers_email_lower ON portal_customers(LOWER(email));
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_intake_sender_time ON email_message_tracking(intake_id, LOWER(from_email), processed_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_item_time ON email_message_tracking(item_id, processed_at);
+		`,
+	},
+	{
+		// The digest recipient scan groups by user and orders by the oldest
+		// eligible notification. A partial index keeps suppressed and sent rows
+		// out of the access path so it stays small as notifications accumulate
+		// (WI-1768).
+		Version:       "20261102_notification_digest_recipient_index",
+		Name:          "Index the notification digest recipient scan (WI-1768)",
+		CheckSQLite:   sqliteIndexCheck("idx_notifications_email_digest_pending"),
+		CheckPostgres: pgIndexCheck("idx_notifications_email_digest_pending"),
+		SQLite: `
+			CREATE INDEX IF NOT EXISTS idx_notifications_email_digest_pending
+				ON notifications(user_id, timestamp)
+				WHERE sent_at IS NULL AND read = false AND email_delivery_state IN ('pending', 'failed');
+		`,
+		Postgres: `
+			CREATE INDEX IF NOT EXISTS idx_notifications_email_digest_pending
+				ON notifications(user_id, timestamp)
+				WHERE sent_at IS NULL AND read = false AND email_delivery_state IN ('pending', 'failed');
+		`,
+	},
+	{
+		// Intake receipts move from an inline SMTP send to the durable reply
+		// outbox (WI-1769). Receipts have no comment, so comment_id becomes
+		// nullable and a kind discriminator plus a partial unique index keeps
+		// one receipt per item. SQLite cannot drop NOT NULL in place.
+		Version:       "20261103_email_confirmation_outbox",
+		Name:          "Queue intake confirmation receipts in the durable reply outbox (WI-1769)",
+		CheckSQLite:   sqliteColumnCheck("email_reply_outbox", "kind"),
+		CheckPostgres: pgColumnCheck("email_reply_outbox", "kind"),
+		Postgres: `
+			ALTER TABLE email_reply_outbox ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'reply';
+			ALTER TABLE email_reply_outbox ALTER COLUMN comment_id DROP NOT NULL;
+			DROP INDEX IF EXISTS uq_email_reply_outbox_comment_recipient;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_email_reply_outbox_comment_recipient
+				ON email_reply_outbox(comment_id, to_email) WHERE comment_id IS NOT NULL;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_email_reply_outbox_confirmation
+				ON email_reply_outbox(item_id) WHERE kind = 'intake_confirmation';
+		`,
+		// The SQL field stays non-empty so the runner reaches ApplySQLite.
+		SQLite:      "applySQLiteEmailReplyOutboxConfirmation:v1",
+		ApplySQLite: applySQLiteEmailReplyOutboxConfirmation,
+	},
+	{
+		// Priority-scoped targets are replaced by one goal per target, with
+		// priority-specific durations expressed through the goal's QL query.
+		// Collapse any multi-target goal to a single target (the fallback when
+		// present, otherwise the lowest position) and drop the now-unused
+		// columns.
+		Version:       "20261104_sla_single_goal_target",
+		Name:          "Collapse SLA goals to one target and drop priority/fallback columns",
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('sla_goal_targets') WHERE name IN ('priority_id', 'is_fallback')) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='sla_goal_targets' AND column_name IN ('priority_id', 'is_fallback')) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			DELETE FROM sla_goal_targets
+			WHERE id IN (
+				SELECT id FROM (
+					SELECT id, ROW_NUMBER() OVER (PARTITION BY goal_id ORDER BY is_fallback DESC, position ASC, id ASC) AS rn
+					FROM sla_goal_targets
+				) ranked
+				WHERE rn > 1
+			);
+			ALTER TABLE sla_goal_targets DROP COLUMN is_fallback;
+			ALTER TABLE sla_goal_targets DROP COLUMN priority_id;
+		`,
+		Postgres: `
+			DELETE FROM sla_goal_targets
+			WHERE id IN (
+				SELECT id FROM (
+					SELECT id, ROW_NUMBER() OVER (PARTITION BY goal_id ORDER BY is_fallback DESC, position ASC, id ASC) AS rn
+					FROM sla_goal_targets
+				) ranked
+				WHERE rn > 1
+			);
+			ALTER TABLE sla_goal_targets DROP COLUMN IF EXISTS is_fallback;
+			ALTER TABLE sla_goal_targets DROP COLUMN IF EXISTS priority_id;
+		`,
+	},
+	{
+		Version:       "20261105_comment_reactions",
+		Name:          "React to comments with a fixed set of emoji (core#298)",
+		CheckSQLite:   sqliteTableCheck("comment_reactions"),
+		CheckPostgres: pgTableCheck("comment_reactions"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS comment_reactions (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				comment_id INTEGER NOT NULL,
+				user_id INTEGER NOT NULL,
+				reaction TEXT NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE(comment_id, user_id, reaction)
+			);
+			CREATE INDEX IF NOT EXISTS idx_comment_reactions_user_id ON comment_reactions(user_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS comment_reactions (
+				id SERIAL PRIMARY KEY,
+				comment_id INTEGER NOT NULL,
+				user_id INTEGER NOT NULL,
+				reaction TEXT NOT NULL,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE(comment_id, user_id, reaction)
+			);
+			CREATE INDEX IF NOT EXISTS idx_comment_reactions_user_id ON comment_reactions(user_id);
+		`,
+	},
+	{
+		Version:       "20261106_collections_public_milestone_swimlanes",
+		Name:          "Preconfigure milestone swimlanes on public collection boards",
+		CheckSQLite:   sqliteColumnCheck("collections", "public_milestone_swimlanes"),
+		CheckPostgres: pgColumnCheck("collections", "public_milestone_swimlanes"),
+		SQLite:        "ALTER TABLE collections ADD COLUMN public_milestone_swimlanes BOOLEAN NOT NULL DEFAULT false",
+		Postgres:      "ALTER TABLE collections ADD COLUMN IF NOT EXISTS public_milestone_swimlanes BOOLEAN NOT NULL DEFAULT false",
+	},
+	{
+		Version:       "20261107_custom_widgets",
+		Name:          "Store user-authored OpenUI dashboard widgets",
+		CheckSQLite:   sqliteTableCheck("custom_widgets"),
+		CheckPostgres: pgTableCheck("custom_widgets"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS custom_widgets (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				workspace_id INTEGER,
+				owner_user_id INTEGER,
+				name TEXT NOT NULL,
+				description TEXT NOT NULL DEFAULT '',
+				program TEXT NOT NULL,
+				lang_version TEXT NOT NULL DEFAULT '',
+				library_version TEXT NOT NULL DEFAULT '',
+				queries TEXT NOT NULL DEFAULT '{}',
+				visibility TEXT NOT NULL DEFAULT 'private',
+				created_by INTEGER NOT NULL,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+				FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_custom_widgets_owner ON custom_widgets(owner_user_id);
+			CREATE INDEX IF NOT EXISTS idx_custom_widgets_workspace ON custom_widgets(workspace_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS custom_widgets (
+				id SERIAL PRIMARY KEY,
+				workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE,
+				owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+				name TEXT NOT NULL,
+				description TEXT NOT NULL DEFAULT '',
+				program TEXT NOT NULL,
+				lang_version TEXT NOT NULL DEFAULT '',
+				library_version TEXT NOT NULL DEFAULT '',
+				queries TEXT NOT NULL DEFAULT '{}',
+				visibility TEXT NOT NULL DEFAULT 'private',
+				created_by INTEGER NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_custom_widgets_owner ON custom_widgets(owner_user_id);
+			CREATE INDEX IF NOT EXISTS idx_custom_widgets_workspace ON custom_widgets(workspace_id);
+		`,
+	},
+	{
+		Version:       "20261108_jira_connection_soft_delete",
+		Name:          "Retain Jira import connections referenced by history when removed",
+		CheckSQLite:   sqliteColumnCheck("jira_import_connections", "deleted_at"),
+		CheckPostgres: pgColumnCheck("jira_import_connections", "deleted_at"),
+		SQLite:        `ALTER TABLE jira_import_connections ADD COLUMN deleted_at DATETIME;`,
+		Postgres:      `ALTER TABLE jira_import_connections ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
+	},
+	{
+		Version:       "20261109_milestone_comments",
 		Name:          "Markdown comments on milestones",
 		CheckSQLite:   sqliteTableCheck("milestone_comments"),
 		CheckPostgres: pgTableCheck("milestone_comments"),
@@ -2657,7 +2999,7 @@ var Catalog = []Migration{
 		`,
 	},
 	{
-		Version:       "20261005_milestone_activity",
+		Version:       "20261109_milestone_activity",
 		Name:          "Milestone history and item milestone-change index for the milestone Activity tab",
 		CheckSQLite:   sqliteTableCheck("milestone_history"),
 		CheckPostgres: pgTableCheck("milestone_history"),
@@ -2697,22 +3039,6 @@ var Catalog = []Migration{
 				ON item_history(changed_at DESC, id DESC)
 				WHERE field_name = 'milestones';
 		`,
-	},
-	{
-		Version:       "20261024_attachments_internal_visibility",
-		Name:          "Hide internal attachments from portal customers (WI-1700)",
-		CheckSQLite:   sqliteColumnCheck("attachments", "is_internal"),
-		CheckPostgres: pgColumnCheck("attachments", "is_internal"),
-		SQLite:        `ALTER TABLE attachments ADD COLUMN is_internal BOOLEAN NOT NULL DEFAULT false;`,
-		Postgres:      `ALTER TABLE attachments ADD COLUMN IF NOT EXISTS is_internal BOOLEAN NOT NULL DEFAULT false;`,
-	},
-	{
-		Version:       "20261025_jira_import_job_leases",
-		Name:          "Lease Jira import jobs so restarts recover interrupted runs (WI-1703)",
-		CheckSQLite:   sqliteColumnCheck("jira_import_jobs", "lease_expires_at"),
-		CheckPostgres: pgColumnCheck("jira_import_jobs", "lease_expires_at"),
-		SQLite:        `ALTER TABLE jira_import_jobs ADD COLUMN lease_expires_at BIGINT;`,
-		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS lease_expires_at BIGINT;`,
 	},
 }
 
@@ -3450,6 +3776,103 @@ func applySQLiteEmailReplyOutboxPerRecipient(db Database) (retErr error) {
 	return nil
 }
 
+// applySQLiteEmailReplyOutboxConfirmation rebuilds email_reply_outbox with a
+// nullable comment_id, a kind discriminator, and the partial unique indexes
+// that keep replies and intake receipts idempotent (WI-1769). SQLite cannot
+// drop a NOT NULL constraint in place, so the rows are copied into a fresh
+// table and swapped. Existing rows are comment replies.
+func applySQLiteEmailReplyOutboxConfirmation(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin email_reply_outbox confirmation rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE email_reply_outbox_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			kind TEXT NOT NULL DEFAULT 'reply',
+			comment_id INTEGER,
+			channel_id INTEGER NOT NULL,
+			item_id INTEGER NOT NULL,
+			to_email TEXT NOT NULL,
+			to_name TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL,
+			html_body TEXT NOT NULL,
+			text_body TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			in_reply_to TEXT NOT NULL DEFAULT '',
+			references_json TEXT NOT NULL DEFAULT '[]',
+			from_email TEXT NOT NULL,
+			from_name TEXT NOT NULL DEFAULT '',
+			reply_to_email TEXT NOT NULL DEFAULT '',
+			reply_to_name TEXT NOT NULL DEFAULT '',
+			attempt_count INTEGER NOT NULL DEFAULT 0,
+			next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			lease_owner TEXT,
+			last_error TEXT,
+			delivered_at DATETIME,
+			discarded_at DATETIME,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+			FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+		)`,
+		`INSERT INTO email_reply_outbox_migration (
+			id, kind, comment_id, channel_id, item_id, to_email, to_name, subject, html_body, text_body,
+			message_id, in_reply_to, references_json, from_email, from_name, reply_to_email, reply_to_name,
+			attempt_count, next_attempt_at, lease_owner, last_error, delivered_at, discarded_at, created_at, updated_at
+		)
+		SELECT id, 'reply', comment_id, channel_id, item_id, to_email, to_name, subject, html_body, text_body,
+			message_id, in_reply_to, references_json, from_email, from_name, reply_to_email, reply_to_name,
+			attempt_count, next_attempt_at, lease_owner, last_error, delivered_at, discarded_at, created_at, updated_at
+		FROM email_reply_outbox`,
+		`DROP TABLE email_reply_outbox`,
+		`ALTER TABLE email_reply_outbox_migration RENAME TO email_reply_outbox`,
+		`CREATE INDEX idx_email_reply_outbox_pending ON email_reply_outbox(delivered_at, next_attempt_at)`,
+		`CREATE UNIQUE INDEX uq_email_reply_outbox_comment_recipient ON email_reply_outbox(comment_id, to_email) WHERE comment_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX uq_email_reply_outbox_confirmation ON email_reply_outbox(item_id) WHERE kind = 'intake_confirmation'`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild email_reply_outbox for confirmations: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit email_reply_outbox confirmation rebuild: %w", err)
+	}
+	return nil
+}
+
 // applySQLiteItemHistoryPortalActors rebuilds item_history with a nullable
 // user_id plus the actor_kind / actor_portal_customer_id columns. SQLite
 // cannot drop a NOT NULL constraint in place, so the rows are copied into a
@@ -3751,6 +4174,231 @@ func applyIntakeSplitMigration(db Database) error {
 		}
 	}
 	return backfillIntakesFromChannels(db)
+}
+
+// applyIntakeWorkspacePortalMigration reshapes intakes from the
+// portal-XOR-workspace target into explicit workspace routing plus an optional
+// portal link. Existing rows are preserved: workspace intakes keep their target
+// workspace, and portal intakes keep the portal while gaining the workspace and
+// item type their system Email request type already resolved. The apply is
+// idempotent so a partial run can be retried without a transaction.
+func applyIntakeWorkspacePortalMigration(db Database) error {
+	pg := db.GetDriverName() == driverPostgres
+	addColumn := func(column, typ string) error {
+		if pg {
+			if _, err := db.Exec(fmt.Sprintf("ALTER TABLE intakes ADD COLUMN IF NOT EXISTS %s %s", column, typ)); err != nil {
+				return fmt.Errorf("add intakes.%s: %w", column, err)
+			}
+			return nil
+		}
+		exists, err := intakeColumnExists(db, column)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
+		if _, err := db.Exec(fmt.Sprintf("ALTER TABLE intakes ADD COLUMN %s %s", column, typ)); err != nil {
+			return fmt.Errorf("add intakes.%s: %w", column, err)
+		}
+		return nil
+	}
+
+	for _, col := range []struct{ name, typ string }{
+		{"workspace_id", "INTEGER"},
+		{"portal_channel_id", "INTEGER"},
+		{"status_reason", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := addColumn(col.name, col.typ); err != nil {
+			return err
+		}
+	}
+
+	if err := backfillIntakeWorkspacePortal(db); err != nil {
+		return err
+	}
+
+	if _, err := db.Exec(`DROP INDEX IF EXISTS idx_intakes_target`); err != nil {
+		return fmt.Errorf("drop idx_intakes_target: %w", err)
+	}
+	for _, column := range []string{"target_type", "target_id"} {
+		exists, err := intakeColumnExists(db, column)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+		if _, err := db.Exec("ALTER TABLE intakes DROP COLUMN " + column); err != nil {
+			return fmt.Errorf("drop intakes.%s: %w", column, err)
+		}
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_intakes_portal ON intakes(portal_channel_id)`); err != nil {
+		return fmt.Errorf("create idx_intakes_portal: %w", err)
+	}
+	return nil
+}
+
+// checkIntakeWorkspacePortalMigration reports whether the reshape is complete:
+// the new columns exist and the legacy target columns are gone. A partial run
+// leaves it false so the apply is retried instead of stamped.
+func checkIntakeWorkspacePortalMigration(db Database) (bool, error) {
+	workspace, err := intakeColumnExists(db, "workspace_id")
+	if err != nil {
+		return false, err
+	}
+	portal, err := intakeColumnExists(db, "portal_channel_id")
+	if err != nil {
+		return false, err
+	}
+	targetType, err := intakeColumnExists(db, "target_type")
+	if err != nil {
+		return false, err
+	}
+	targetID, err := intakeColumnExists(db, "target_id")
+	if err != nil {
+		return false, err
+	}
+	return workspace && portal && !targetType && !targetID, nil
+}
+
+func intakeColumnExists(db Database, column string) (bool, error) {
+	var count int
+	query := sqliteColumnCheck("intakes", column)
+	if db.GetDriverName() == driverPostgres {
+		query = pgColumnCheck("intakes", column)
+	}
+	if err := db.QueryRow(query).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// backfillIntakeWorkspacePortal copies the legacy target into the new columns.
+// Workspace intakes keep their workspace; portal intakes keep the portal and
+// inherit the workspace and item type of the portal's system Email request
+// type. Rows that cannot be resolved are parked as needs_attention rather than
+// silently dropped or routed somewhere wrong.
+func backfillIntakeWorkspacePortal(db Database) error {
+	rows, err := db.Query(`SELECT id, target_type, target_id FROM intakes`)
+	if err != nil {
+		return fmt.Errorf("list intakes for workspace/portal backfill: %w", err)
+	}
+	type legacyIntake struct {
+		id         int
+		targetType string
+		targetID   int
+	}
+	var legacy []legacyIntake
+	for rows.Next() {
+		var in legacyIntake
+		if err := rows.Scan(&in.id, &in.targetType, &in.targetID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan intake for workspace/portal backfill: %w", err)
+		}
+		legacy = append(legacy, in)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate intakes for workspace/portal backfill: %w", err)
+	}
+	_ = rows.Close()
+
+	for _, in := range legacy {
+		switch in.targetType {
+		case "workspace":
+			if _, err := db.ExecWrite(`UPDATE intakes SET workspace_id = ? WHERE id = ?`, in.targetID, in.id); err != nil {
+				return fmt.Errorf("backfill workspace intake %d: %w", in.id, err)
+			}
+		case "portal":
+			workspaceID, itemTypeID, ok := migrationLegacyPortalRouting(db, in.targetID)
+			if !ok {
+				if _, err := db.ExecWrite(`
+					UPDATE intakes
+					SET portal_channel_id = ?, status = 'needs_attention',
+					    status_reason = 'Portal no longer resolves a workspace; re-point this intake'
+					WHERE id = ?
+				`, in.targetID, in.id); err != nil {
+					return fmt.Errorf("flag portal intake %d: %w", in.id, err)
+				}
+				continue
+			}
+			if _, err := db.ExecWrite(`
+				UPDATE intakes
+				SET portal_channel_id = ?, workspace_id = ?, item_type_id = COALESCE(item_type_id, ?)
+				WHERE id = ?
+			`, in.targetID, workspaceID, itemTypeID, in.id); err != nil {
+				return fmt.Errorf("backfill portal intake %d: %w", in.id, err)
+			}
+		default:
+			if _, err := db.ExecWrite(`
+				UPDATE intakes SET status = 'needs_attention',
+					status_reason = 'Unknown legacy intake target; re-point this intake'
+				WHERE id = ?
+			`, in.id); err != nil {
+				return fmt.Errorf("flag legacy intake %d: %w", in.id, err)
+			}
+		}
+	}
+	return nil
+}
+
+// migrationLegacyPortalRouting resolves the workspace and item type a legacy
+// portal intake was routing to, preferring the portal's system Email request
+// type and falling back to the portal's single served workspace default.
+func migrationLegacyPortalRouting(db Database, portalID int) (workspaceID, itemTypeID int, ok bool) {
+	var rtWorkspace, rtItemType sql.NullInt64
+	err := db.QueryRow(`
+		SELECT workspace_id, item_type_id FROM request_types
+		WHERE channel_id = ? AND kind = 'email'
+		ORDER BY id
+		LIMIT 1
+	`, portalID).Scan(&rtWorkspace, &rtItemType)
+	if err == nil && rtWorkspace.Valid && rtItemType.Valid {
+		return int(rtWorkspace.Int64), int(rtItemType.Int64), true
+	}
+
+	var configJSON string
+	if err := db.QueryRow(`SELECT COALESCE(config, '{}') FROM channels WHERE id = ?`, portalID).Scan(&configJSON); err != nil {
+		return 0, 0, false
+	}
+	var cfg struct {
+		PortalWorkspaceIDs []int `json:"portal_workspace_ids"`
+	}
+	if json.Unmarshal([]byte(configJSON), &cfg) != nil || len(cfg.PortalWorkspaceIDs) != 1 {
+		return 0, 0, false
+	}
+	itemType, err := migrationDefaultItemTypeForWorkspace(db, cfg.PortalWorkspaceIDs[0])
+	if err != nil {
+		return 0, 0, false
+	}
+	return cfg.PortalWorkspaceIDs[0], itemType, true
+}
+
+func migrationDefaultItemTypeForWorkspace(db Database, workspaceID int) (int, error) {
+	var itemTypeID int
+	err := db.QueryRow(`
+		SELECT cs.default_item_type_id FROM configuration_sets cs
+		INNER JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
+		INNER JOIN configuration_set_item_types csit
+			ON csit.configuration_set_id = cs.id AND csit.item_type_id = cs.default_item_type_id
+		WHERE wcs.workspace_id = ? AND cs.default_item_type_id IS NOT NULL
+		ORDER BY cs.is_default DESC
+		LIMIT 1
+	`, workspaceID).Scan(&itemTypeID)
+	if err != nil {
+		err = db.QueryRow(`
+			SELECT csit.item_type_id FROM configuration_set_item_types csit
+			INNER JOIN workspace_configuration_sets wcs ON wcs.configuration_set_id = csit.configuration_set_id
+			WHERE wcs.workspace_id = ?
+			ORDER BY csit.item_type_id
+			LIMIT 1
+		`, workspaceID).Scan(&itemTypeID)
+	}
+	if err != nil {
+		err = db.QueryRow(`SELECT id FROM item_types WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&itemTypeID)
+	}
+	return itemTypeID, err
 }
 
 // backfillIntakesFromChannels creates one intake per inbound email channel and

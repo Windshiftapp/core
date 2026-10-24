@@ -1,6 +1,16 @@
 <script>
   import DropdownMenu from '../../../lib/layout/DropdownMenu.svelte'
-  import { Settings, User, LogOut, Edit, Trash2, Copy, Archive, Star, MoreHorizontal, ChevronDown, Filter } from '@lucide/svelte'
+  import Settings from '@lucide/svelte/icons/settings';
+  import User from '@lucide/svelte/icons/user';
+  import LogOut from '@lucide/svelte/icons/log-out';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Archive from '@lucide/svelte/icons/archive';
+  import Star from '@lucide/svelte/icons/star';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Filter from '@lucide/svelte/icons/filter';
 
   let searchValue = ''
 </script>

@@ -1,5 +1,8 @@
 <script>
-  import { IconAlertTriangle, IconDatabase, IconGauge, IconStack2 } from '@tabler/icons-svelte-runes';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconDatabase from '@tabler/icons-svelte-runes/icons/database';
+  import IconGauge from '@tabler/icons-svelte-runes/icons/gauge';
+  import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
   import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Lozenge from '../../components/Lozenge.svelte';

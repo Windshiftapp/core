@@ -1,6 +1,6 @@
 <script>
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { logbook } from '../../api/logbook.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import FileInput from '../../components/FileInput.svelte';
@@ -8,7 +8,9 @@
   import FormField from '../../components/FormField.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import Modal from '../../dialogs/Modal.svelte';
-  import { IconUpload as Upload, IconX as X, IconFileText as FileText } from '@tabler/icons-svelte-runes';
+  import Upload from '@tabler/icons-svelte-runes/icons/upload';
+  import X from '@tabler/icons-svelte-runes/icons/x';
+  import FileText from '@tabler/icons-svelte-runes/icons/file-text';
 
   let { bucketId, onclose = () => {}, onupload = () => {} } = $props();
 
@@ -59,7 +61,7 @@
       if (title.trim()) {
         formData.append('title', title.trim());
       }
-      await api.logbook.uploadDocument(bucketId, formData);
+      await logbook.uploadDocument(bucketId, formData);
       successToast(t('logbook.uploadSuccess'));
       onupload();
     } catch (error) {

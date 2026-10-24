@@ -1,6 +1,8 @@
 <script>
-  import { Loader2, CheckCircle2, XCircle } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import CheckCircle2 from '@lucide/svelte/icons/check-circle-2';
+  import XCircle from '@lucide/svelte/icons/x-circle';
+  import { tests } from '../../api/tests/index.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
 
@@ -32,7 +34,7 @@
     validating = true;
     validationError = null;
     try {
-      result = await api.tests.testCases.validateFeature(workspaceId, value);
+      result = await tests.testCases.validateFeature(workspaceId, value);
       validatedContent = value;
     } catch (err) {
       result = null;

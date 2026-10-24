@@ -1,11 +1,9 @@
 <script>
   import { onDestroy } from 'svelte';
-  import {
-    IconRefresh as Refresh,
-    IconServer as Server,
-    IconX as X,
-  } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import Refresh from '@tabler/icons-svelte-runes/icons/refresh';
+  import Server from '@tabler/icons-svelte-runes/icons/server';
+  import X from '@tabler/icons-svelte-runes/icons/x';
+  import { runnerPools } from '../../api/ai.js';
   import AlertBox from '../../components/AlertBox.svelte';
   import CopyButton from '../../components/CopyButton.svelte';
   import Badge from '../../components/Badge.svelte';
@@ -95,8 +93,8 @@
     error = '';
     try {
       const [tokens, instances] = await Promise.all([
-        api.runnerPools.listWorkspaceTokens(workspaceId, pendingTokenPoolId),
-        api.runnerPools.listWorkspaceInstances(workspaceId, pendingTokenPoolId),
+        runnerPools.listWorkspaceTokens(workspaceId, pendingTokenPoolId),
+        runnerPools.listWorkspaceInstances(workspaceId, pendingTokenPoolId),
       ]);
       const baseline = new Set((knownInstanceIds || []).map(Number));
       const connected = (instances || []).find(
@@ -155,7 +153,7 @@
     const tokenId = Number(pendingTokenId);
     const poolId = Number(pendingTokenPoolId);
     if (tokenId > 0 && poolId > 0) {
-      await api.runnerPools
+      await runnerPools
         .revokeWorkspaceToken(workspaceId, poolId, tokenId)
         .catch(() => {});
     }
@@ -186,12 +184,12 @@
     error = '';
     try {
       if (pendingTokenId) await revokePending();
-      const instances = await api.runnerPools.listWorkspaceInstances(
+      const instances = await runnerPools.listWorkspaceInstances(
         workspaceId,
         selectedPoolId
       );
       knownInstanceIds = (instances || []).map((instance) => Number(instance.id));
-      const response = await api.runnerPools.mintWorkspaceToken(
+      const response = await runnerPools.mintWorkspaceToken(
         workspaceId,
         selectedPoolId,
         {

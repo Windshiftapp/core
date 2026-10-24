@@ -948,7 +948,7 @@ func (r *SLARepository) hydrateMetric(ctx context.Context, metric *models.SLAMet
 }
 
 func (r *SLARepository) listTargets(ctx context.Context, goalID int) ([]models.SLAGoalTarget, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, goal_id, position, priority_id, is_fallback, target_ms, calendar_id, source_id, source_payload
+	rows, err := r.db.QueryContext(ctx, `SELECT id, goal_id, position, target_ms, calendar_id, source_id, source_payload
 		FROM sla_goal_targets WHERE goal_id = ? ORDER BY position, id`, goalID)
 	if err != nil {
 		return nil, fmt.Errorf("load goal targets: %w", err)
@@ -957,14 +957,9 @@ func (r *SLARepository) listTargets(ctx context.Context, goalID int) ([]models.S
 	var targets []models.SLAGoalTarget
 	for rows.Next() {
 		var target models.SLAGoalTarget
-		var priorityID sql.NullInt64
 		var sourceID, sourcePayload sql.NullString
-		if err := rows.Scan(&target.ID, &target.GoalID, &target.Position, &priorityID, &target.IsFallback, &target.TargetMs, &target.CalendarID, &sourceID, &sourcePayload); err != nil {
+		if err := rows.Scan(&target.ID, &target.GoalID, &target.Position, &target.TargetMs, &target.CalendarID, &sourceID, &sourcePayload); err != nil {
 			return nil, fmt.Errorf("scan goal target: %w", err)
-		}
-		if priorityID.Valid {
-			value := int(priorityID.Int64)
-			target.PriorityID = &value
 		}
 		if sourceID.Valid {
 			target.SourceID = &sourceID.String
@@ -1136,9 +1131,9 @@ func (r *SLARepository) syncMetricGoals(ctx context.Context, tx database.Tx, met
 
 func (r *SLARepository) insertGoalTargets(ctx context.Context, tx database.Tx, goalID int, targets []models.SLAGoalTarget) error {
 	for _, target := range targets {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO sla_goal_targets (goal_id, position, priority_id, is_fallback, target_ms, calendar_id, source_id, source_payload)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			goalID, target.Position, nullableInt(target.PriorityID), target.IsFallback, target.TargetMs, target.CalendarID, target.SourceID, target.SourcePayload); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO sla_goal_targets (goal_id, position, target_ms, calendar_id, source_id, source_payload)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			goalID, target.Position, target.TargetMs, target.CalendarID, target.SourceID, target.SourcePayload); err != nil {
 			return fmt.Errorf("insert goal target: %w", err)
 		}
 	}
@@ -1519,6 +1514,12 @@ func (r *SLARepository) UpdateCycle(ctx context.Context, tx database.Tx, cycle *
 const jobColumns = `id, kind, threshold_key, cycle_id, item_id, metric_id, due_at, deadline_at,
 	cursor, attempts, lease_owner, last_error, state, created_at`
 
+// jobColumnsPrefixed qualifies jobColumns for the "sla_jobs j" alias. Declared
+// explicitly (not derived from jobColumns) so joined queries stay in scanJob's
+// column order when the base constant's formatting changes.
+const jobColumnsPrefixed = `j.id, j.kind, j.threshold_key, j.cycle_id, j.item_id, j.metric_id, j.due_at,
+	j.deadline_at, j.cursor, j.attempts, j.lease_owner, j.last_error, j.state, j.created_at`
+
 func scanJob(scanner interface{ Scan(...any) error }) (models.SLAJob, error) {
 	var job models.SLAJob
 	var cycleID, itemID, metricID sql.NullInt64
@@ -1887,10 +1888,10 @@ func floatToMs(value sql.NullFloat64) *int64 {
 
 // ListRecalculationJobs returns pending recalculation work for a workspace.
 func (r *SLARepository) ListRecalculationJobs(ctx context.Context, workspaceID int) ([]models.SLAJob, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+jobColumns+` FROM sla_jobs j
+	rows, err := r.db.QueryContext(ctx, `SELECT `+jobColumnsPrefixed+` FROM sla_jobs j
 		LEFT JOIN sla_metrics m ON m.id = j.metric_id
 		LEFT JOIN items i ON i.id = j.item_id
-		WHERE j.kind IN ('recalc_item', 'recalc_metric')
+		WHERE j.kind IN ('recalc_item', 'recalc_metric', 'recalc_calendar')
 		  AND (m.workspace_id = ? OR i.workspace_id = ?)
 		ORDER BY j.due_at`, workspaceID, workspaceID)
 	if err != nil {
@@ -2072,7 +2073,7 @@ func (r *SLARepository) CalendarImpact(ctx context.Context, calendarID int) ([]m
 	}
 
 	targetRows, err := r.db.QueryContext(ctx, `
-		SELECT m.workspace_id, t.id, t.goal_id, g.metric_id, m.name, t.is_fallback, t.priority_id, t.target_ms
+		SELECT m.workspace_id, t.id, t.goal_id, g.metric_id, m.name, t.target_ms
 		FROM sla_goal_targets t
 		JOIN sla_goals g ON g.id = t.goal_id
 		JOIN sla_metrics m ON m.id = g.metric_id
@@ -2084,14 +2085,9 @@ func (r *SLARepository) CalendarImpact(ctx context.Context, calendarID int) ([]m
 	for targetRows.Next() {
 		var workspaceID int
 		var target models.SLACalendarImpactTarget
-		var priority sql.NullInt64
-		if err := targetRows.Scan(&workspaceID, &target.TargetID, &target.GoalID, &target.MetricID, &target.MetricName, &target.IsFallback, &priority, &target.TargetMs); err != nil {
+		if err := targetRows.Scan(&workspaceID, &target.TargetID, &target.GoalID, &target.MetricID, &target.MetricName, &target.TargetMs); err != nil {
 			_ = targetRows.Close()
 			return nil, fmt.Errorf("scan impact target: %w", err)
-		}
-		if priority.Valid {
-			value := int(priority.Int64)
-			target.PriorityID = &value
 		}
 		if idx, ok := index[workspaceID]; ok {
 			workspaces[idx].GoalTargets = append(workspaces[idx].GoalTargets, target)

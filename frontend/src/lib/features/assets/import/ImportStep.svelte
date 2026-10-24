@@ -2,7 +2,9 @@
   import { assetImportStore } from './AssetImportStore.svelte.js';
   import Progress from '../../../components/Progress.svelte';
   import AlertBox from '../../../components/AlertBox.svelte';
-  import { IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-svelte-runes';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
   import DescriptionText from '../../../components/DescriptionText.svelte';
 
   let importData = $derived(assetImportStore.import);

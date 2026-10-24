@@ -1,5 +1,10 @@
 <script>
-  import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from '@lucide/svelte';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Paperclip from '@lucide/svelte/icons/paperclip';
+  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import Zap from '@lucide/svelte/icons/zap';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
   import Button from '../../components/Button.svelte';
   import FileInput from '../../components/FileInput.svelte';
@@ -8,7 +13,8 @@
   import AIActionsDropdown from './AIActionsDropdown.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { attachmentStatus, aiStore } from '../../stores';
+  import { attachmentStatus } from '../../stores/attachmentStatus.svelte.js';
+  import { aiStore } from '../../stores/aiStore.svelte.js';
   import { onClickOutside } from 'runed';
 
   // Get shortcut configurations
@@ -201,7 +207,7 @@
         title={t('items.clickToEditDescription')}
         data-testid="item-description-display"
       >
-        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} />
+        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} workspaceId={item.workspace_id} />
       </div>
     {:else}
       <div
@@ -209,14 +215,14 @@
         style="color: var(--ds-text);"
         data-testid="item-description-display"
       >
-        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} />
+        <MilkdownEditor content={item.description} readonly={true} showToolbar={false} workspaceId={item.workspace_id} />
       </div>
     {/if}
   {:else if canEdit}
     <button
       data-testid="item-description-empty"
       onclick={startEditingDescription}
-      class="description-empty text-left w-full py-2 text-sm transition-colors cursor-pointer"
+      class="description-empty text-left text-[0.875rem] transition-colors cursor-pointer"
       title={t('items.clickToAddDescription')}
     >
       {t('items.noDescriptionProvided')}
@@ -224,15 +230,18 @@
   {:else}
     <p
       data-testid="item-description-empty"
-      class="text-left w-full py-2 text-sm"
+      class="text-left w-full py-2 text-[0.875rem]"
       style="color: var(--ds-text-subtle);"
     >
       {t('items.noDescriptionProvided')}
     </p>
   {/if}
   
-  <!-- Action buttons - icon only, label slides in on hover -->
-  <div class="mt-5 flex gap-1">
+  <!-- Action buttons - icon only, label slides in on hover. The row's -mx-2
+       compensates the buttons' px-2: icons sit on the text column edge and
+       the leftmost button's hover chip lines up with the title/description
+       hover pills (8px outset). Each button keeps its own hover chip. -->
+  <div class="mt-5 flex gap-1 -mx-2">
     {#if showLinkButton && canEdit}
       <button
         data-testid="add-link-button"
@@ -348,16 +357,26 @@
     width: calc(100% + 1rem);
     padding: 0.5rem;
     margin: -0.5rem;
+    border-radius: 0.25rem;
   }
-  .description-hover:hover {
-    background-color: var(--ds-background-input-hovered);
+  /* Same pill as the title hover: 8px outset in the neutral hover token. */
+  .description-hover:hover,
+  .description-empty:hover {
+    background-color: var(--ds-background-neutral-hovered);
   }
   .action-btn {
     overflow: hidden;
     color: var(--ds-text-subtle);
   }
+  /* Lucide glyphs draw ~0.7px inside their box at 16px (24-unit viewBox with
+     round caps), which reads as a right-shift against the text column at
+     high zoom. Compensate so the icon ink sits on the column edge. */
+  .action-btn > :global(svg) {
+    margin-left: -0.5px;
+  }
   .action-btn:hover {
     color: var(--ds-text-subtle);
+    background-color: var(--ds-background-neutral-hovered);
   }
   .action-label {
     max-width: 0;
@@ -373,6 +392,11 @@
     transform: translateX(0);
   }
   .description-empty {
+    /* Same 8px-outset pill geometry as .description-hover above. */
+    width: calc(100% + 1rem);
+    margin: 0 -0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
     color: var(--ds-text-subtle);
   }
 

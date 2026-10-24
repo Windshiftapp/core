@@ -1,5 +1,5 @@
 <script>
-  import { X } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
   import Spinner from './Spinner.svelte';
   import ModalBackdrop from './ModalBackdrop.svelte';
 

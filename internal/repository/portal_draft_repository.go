@@ -71,8 +71,8 @@ func NewPortalDraftRepository(db database.Database) *PortalDraftRepository {
 const portalDraftColumns = "id, channel_id, request_type_id, portal_customer_id, user_id, title, description, custom_field_values, current_step, created_at, updated_at"
 
 // Upsert inserts or updates the single draft row for (identity, request_type).
-// Implemented as SELECT-then-UPDATE-or-INSERT rather than ON CONFLICT to keep
-// the partial-index targeting portable across SQLite and Postgres.
+// When concurrent saves contain different content, the save that reaches the
+// conflict update last wins, just as it does for the ordinary update path.
 func (r *PortalDraftRepository) Upsert(
 	ctx context.Context,
 	channelID, requestTypeID int,
@@ -95,41 +95,43 @@ func (r *PortalDraftRepository) Upsert(
 		return nil, err
 	}
 
-	if existingID > 0 {
+	if existingID == 0 {
+		// The partial unique indexes differ by identity type, so use an
+		// untargeted conflict handler. A concurrent insert is ignored and the
+		// winning row is re-read below; the update then makes this save's
+		// content the last writer, rather than returning a unique-constraint
+		// error to the caller.
 		if _, err := r.db.ExecWriteContext(ctx, `
-			UPDATE portal_request_drafts
-			SET channel_id = ?, title = ?, description = ?, custom_field_values = ?,
-			    current_step = ?, updated_at = ?
-			WHERE id = ?
-		`, channelID, payload.Title, payload.Description, customJSON, payload.CurrentStep, now, existingID); err != nil {
-			return nil, fmt.Errorf("update draft %d: %w", existingID, err)
+			INSERT INTO portal_request_drafts
+			    (channel_id, request_type_id, portal_customer_id, user_id, title, description, custom_field_values, current_step, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT DO NOTHING
+		`,
+			channelID, requestTypeID,
+			draftNullableInt(identity.PortalCustomerID), draftNullableInt(identity.UserID),
+			payload.Title, payload.Description, customJSON, payload.CurrentStep,
+			now, now,
+		); err != nil {
+			return nil, fmt.Errorf("insert draft: %w", err)
 		}
-		return r.getByID(ctx, existingID)
+		existingID, err = r.lookupID(ctx, requestTypeID, identity)
+		if err != nil {
+			return nil, err
+		}
+		if existingID == 0 {
+			return nil, fmt.Errorf("insert draft: row was not found after insert")
+		}
 	}
 
-	res, err := r.db.ExecWriteContext(ctx, `
-		INSERT INTO portal_request_drafts
-		    (channel_id, request_type_id, portal_customer_id, user_id, title, description, custom_field_values, current_step, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		channelID, requestTypeID,
-		draftNullableInt(identity.PortalCustomerID), draftNullableInt(identity.UserID),
-		payload.Title, payload.Description, customJSON, payload.CurrentStep,
-		now, now,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("insert draft: %w", err)
+	if _, err := r.db.ExecWriteContext(ctx, `
+		UPDATE portal_request_drafts
+		SET channel_id = ?, title = ?, description = ?, custom_field_values = ?,
+		    current_step = ?, updated_at = ?
+		WHERE id = ?
+	`, channelID, payload.Title, payload.Description, customJSON, payload.CurrentStep, now, existingID); err != nil {
+		return nil, fmt.Errorf("update draft %d: %w", existingID, err)
 	}
-	newID, err := res.LastInsertId()
-	if err != nil || newID == 0 {
-		// Postgres lib/pq doesn't support LastInsertId; fall back to a lookup.
-		id, lerr := r.lookupID(ctx, requestTypeID, identity)
-		if lerr != nil {
-			return nil, lerr
-		}
-		newID = int64(id)
-	}
-	return r.getByID(ctx, int(newID))
+	return r.getByID(ctx, existingID)
 }
 
 // GetByIdentity returns the draft for the given identity + request type, or

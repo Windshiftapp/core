@@ -103,8 +103,8 @@ export default {
         description: 'Gérer les configurations de notification',
       },
       emailTemplates: {
-        title: 'Modèles de courriel',
-        description: 'Personnaliser l\'objet et le corps des courriels transactionnels',
+        title: 'Modèles d’e-mail',
+        description: 'Personnaliser l\'objet et le corps des e-mails transactionnels',
       },
       channels: {
         title: 'Canaux',
@@ -282,7 +282,7 @@ export default {
       noConfigSets: 'Aucun ensemble de configuration pour le moment',
       previewUnavailable: 'Aucun ensemble de configuration disponible',
       previewUnavailableDescription: 'Créez un ensemble de configuration par défaut pour configurer cet espace de travail.',
-      assignerDescription: 'Sélectionnez l\'ensemble de configuration qui définit le flux de travail et les écrans pour cet espace de travail. Un seul ensemble peut être attribué.',
+      assignerDescription: 'Sélectionnez l\'ensemble de configuration qui définit le flux de travail et les écrans pour créer, modifier et consulter les éléments dans cet espace de travail. Un seul ensemble peut être attribué.',
       migrationRequiresSystemAdmin: 'Passer à cet ensemble de configuration nécessite une migration de données qu\'un administrateur système seul peut exécuter.',
       select: 'Sélectionner un ensemble de configuration',
       updating: 'Mise à jour de la configuration…',
@@ -558,13 +558,13 @@ export default {
       autoProvisionUsers: 'Création automatique de comptes',
       autoProvisionUsersDesc: 'Créer automatiquement les comptes lors de la première connexion SSO',
       manualUserCreationOnly: 'Création manuelle d\'utilisateurs uniquement',
-      trustIdpEmailVerification: 'Faire confiance aux courriels vérifiés du fournisseur',
+      trustIdpEmailVerification: 'Faire confiance aux e-mails vérifiés du fournisseur',
       trustIdpEmailVerificationDesc:
-        'Ignorer la vérification de courriel Windshift si le fournisseur omet le statut. Les adresses explicitement non vérifiées nécessiteront toujours une confirmation.',
-      idpVerificationNotEnforced: 'Windshift vérifie les courriels non confirmés',
-      unsafeProvisioningWarningTitle: 'Confiance aux courriels du fournisseur activée',
+        'Ignorer la vérification d’e-mail Windshift si le fournisseur omet le statut. Les adresses explicitement non vérifiées nécessiteront toujours une confirmation.',
+      idpVerificationNotEnforced: 'Windshift vérifie les e-mails non confirmés',
+      unsafeProvisioningWarningTitle: 'Confiance aux e-mails du fournisseur activée',
       unsafeProvisioningWarningBody:
-        "Les utilisateurs dont le fournisseur omet la vérification de courriel peuvent être liés à des comptes existants par leur courriel. N'activez ceci que si le fournisseur gère strictement ces adresses.",
+        "Les utilisateurs dont le fournisseur omet la vérification d’e-mail peuvent être liés à des comptes existants par leur e-mail. N'activez ceci que si le fournisseur gère strictement ces adresses.",
       testConnection: 'Tester la connexion',
       testing: 'Test en cours...',
       connectionSuccessful: 'Connexion réussie',
@@ -623,10 +623,10 @@ export default {
 
     // Email Templates
     emailTemplates: {
-      title: 'Modèles de courriels',
-      subtitle: 'Personnaliser l\'objet et le corps des courriels transactionnels envoyés par Windshift.',
+      title: 'Modèles d’e-mails',
+      subtitle: 'Personnaliser l\'objet et le corps des e-mails transactionnels envoyés par Windshift.',
       loading: 'Chargement…',
-      empty: 'Aucun modèle de courriel trouvé.',
+      empty: 'Aucun modèle d’e-mail trouvé.',
       template: 'Modèle',
       description: 'Description',
       status: 'Statut',
@@ -651,16 +651,18 @@ export default {
       plainTextVersion: 'Version texte brut',
       save: 'Enregistrer',
       cancel: 'Annuler',
-      saved: 'Modèle de courriel enregistré',
-      loadFailed: 'Échec du chargement des modèles de courriels : {error}',
+      saved: 'Modèle d’e-mail enregistré',
+      loadFailed: 'Échec du chargement des modèles d’e-mails : {error}',
       saveFailed: 'Échec de l\'enregistrement : {error}',
       previewFailed: 'Échec de l\'aperçu : {error}',
       labels: {
         magic_link: 'Connexion portail par lien magique',
-        email_verification: 'Vérification de l\'adresse courriel',
+        email_verification: 'Vérification de l\'adresse e-mail',
         invitation: 'Invitation de nouvel utilisateur',
         notification_batch: 'Notifications regroupées',
         portal_reply: 'Réponse client du portail',
+        approval_requested: 'Demande d’approbation du portail',
+        intake_confirmation: 'Accusé de réception e-mail',
       },
     },
 
@@ -789,7 +791,7 @@ export default {
         },
         epic: {
           name: 'Épopée',
-          description: 'Ensemble de travaux pouvant être décomposé en récits utilisateur',
+          description: 'Grand élément de travail pouvant être décomposé en récits utilisateur',
         },
         story: {
           name: 'Récit utilisateur',

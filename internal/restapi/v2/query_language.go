@@ -261,7 +261,11 @@ func (l queryLanguageValueLoader) loadUserCompletionValues(ctx context.Context, 
 			if label == "" {
 				label = row.Username
 			}
-			values = append(values, qlCompletionValue(row.ID, row.Username, "", valueField, label, row.Username))
+			value := qlCompletionValue(row.ID, row.Username, "", valueField, label, row.Username)
+			// The label is the display name, which is not unique. Carry the
+			// username so value pickers can disambiguate identical names.
+			value.Description = row.Username
+			values = append(values, value)
 		}
 	}
 	slices.SortStableFunc(values, func(a, b qlCompletionValueDTO) int {
@@ -473,7 +477,7 @@ func customCompletionFieldDTO(id int, name, description, fieldType, rawOptions s
 		for i, option := range options.Items {
 			result.Values[i] = qlCompletionValueDTO{Value: option.ID, Label: option.Label}
 		}
-	case "milestone":
+	case "milestone", "multi_milestone":
 		result.ValueType = "number"
 		result.ValueHelp = completionValueHelp(cql.CompletionValuesMilestones, "number", "")
 	case "iteration":

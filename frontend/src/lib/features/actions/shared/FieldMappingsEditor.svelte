@@ -1,5 +1,7 @@
 <script>
-  import { Plus, Trash2, HelpCircle } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
   import { t } from '../../../stores/i18n.svelte.js';
   import Select from '../../../components/Select.svelte';
   import FieldSelector from '../../../pickers/FieldSelector.svelte';

@@ -1,5 +1,11 @@
 <script>
-  import { Users, Shield, Briefcase, Folder, Tag, Calendar, Flag } from '@lucide/svelte'
+  import Users from '@lucide/svelte/icons/users';
+  import Shield from '@lucide/svelte/icons/shield';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import Folder from '@lucide/svelte/icons/folder';
+  import Tag from '@lucide/svelte/icons/tag';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Flag from '@lucide/svelte/icons/flag';
 </script>
 
 <div class="p-8 max-w-6xl">

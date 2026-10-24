@@ -1,8 +1,10 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { IconPlus, IconCheck, IconX } from '@tabler/icons-svelte-runes';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
   import { tick } from 'svelte';
-  import { api } from '../../api.js';
+  import { pageLabels } from '../../api/pages.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import Input from '../../components/Input.svelte';
@@ -68,7 +70,7 @@
   async function load() {
     loading = true;
     try {
-      const resp = await api.pageLabels.list(workspaceId);
+      const resp = await pageLabels.list(workspaceId);
       labels = resp || [];
       loadedOnce = true;
     } catch (err) {
@@ -99,7 +101,7 @@
     if (!name) return;
     creating = true;
     try {
-      const created = await api.pageLabels.create(workspaceId, { name, color: createColor });
+      const created = await pageLabels.create(workspaceId, { name, color: createColor });
       labels = [...labels, created].sort((a, b) => a.name.localeCompare(b.name));
       search = '';
       createColor = '#3B82F6';

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -302,27 +303,74 @@ func (r *WorkspaceTemplateRepository) ListSeedItemsTx(ctx context.Context, tx da
 }
 
 // InsertClonedItemTx writes one cloned item with cleared operational fields,
-// a fresh dense item number, and a fresh fractional index. Hierarchy and
-// internal references are restored in a second pass.
-func (r *WorkspaceTemplateRepository) InsertClonedItemTx(ctx context.Context, tx database.Tx, insert ClonedItemInsert) (int64, error) {
-	var id int64
-	err := tx.QueryRowContext(ctx, `
-		INSERT INTO items (workspace_id, workspace_item_number, item_type_id, title, description, is_task,
-			status_id, priority_id, start_date, due_date, end_date, story_points, estimate_minutes,
-			frac_index, custom_field_values, creator_id, path, created_at, updated_at, last_active_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '/', ?, ?, ?)
-		RETURNING id
-	`, insert.WorkspaceID, insert.ItemNumber, insert.ItemTypeID, insert.Title, insert.Description, insert.IsTask,
-		insert.StatusID, insert.PriorityID, insert.StartDate, insert.DueDate, insert.EndDate,
-		insert.StoryPoints, insert.EstimateMinutes, insert.FracIndex, insert.CustomFieldValues,
-		insert.CreatorID, insert.CreatedAt, insert.CreatedAt, insert.CreatedAt).Scan(&id)
+// a fresh dense item number, and a fresh fractional index. It goes through
+// ItemRepository.Create so a cloned row has the same shape as any other
+// created item. Hierarchy and internal references are restored in a second
+// pass.
+func (r *WorkspaceTemplateRepository) InsertClonedItemTx(_ context.Context, tx database.Tx, insert ClonedItemInsert) (int64, error) {
+	customFields, err := unmarshalCustomFieldsJSON(insert.CustomFieldValues)
+	if err != nil {
+		return 0, fmt.Errorf("decode cloned custom fields: %w", err)
+	}
+	item := &models.Item{
+		WorkspaceID:         insert.WorkspaceID,
+		WorkspaceItemNumber: insert.ItemNumber,
+		ItemTypeID:          nullInt64Ptr(insert.ItemTypeID),
+		Title:               insert.Title,
+		Description:         insert.Description.String,
+		IsTask:              insert.IsTask,
+		StatusID:            nullInt64Ptr(insert.StatusID),
+		PriorityID:          nullInt64Ptr(insert.PriorityID),
+		StartDate:           nullTimePtr(insert.StartDate),
+		DueDate:             nullTimePtr(insert.DueDate),
+		EndDate:             nullTimePtr(insert.EndDate),
+		StoryPoints:         nullFloat64Ptr(insert.StoryPoints),
+		EstimateMinutes:     nullInt64Ptr(insert.EstimateMinutes),
+		FracIndex:           &insert.FracIndex,
+		CustomFieldValues:   customFields,
+		CreatedAt:           insert.CreatedAt,
+		UpdatedAt:           insert.CreatedAt,
+		LastActiveAt:        insert.CreatedAt,
+	}
+	if insert.CreatorID > 0 {
+		creatorID := insert.CreatorID
+		item.CreatorID = &creatorID
+	}
+	id, err := NewItemRepository(r.db).Create(tx, item)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return 0, fmt.Errorf("%w: %w", ErrDuplicateEntry, err)
 		}
 		return 0, fmt.Errorf("insert cloned item: %w", err)
 	}
-	return id, nil
+	return int64(id), nil
+}
+
+func unmarshalCustomFieldsJSON(value sql.NullString) (map[string]any, error) {
+	if !value.Valid || strings.TrimSpace(value.String) == "" {
+		return nil, nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(value.String), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func nullInt64Ptr(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+	n := int(value.Int64)
+	return &n
+}
+
+func nullFloat64Ptr(value sql.NullFloat64) *float64 {
+	if !value.Valid {
+		return nil
+	}
+	f := value.Float64
+	return &f
 }
 
 // ClonedItemInsert is the write-side shape of one cloned seed item.

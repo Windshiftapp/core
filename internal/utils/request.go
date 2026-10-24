@@ -29,50 +29,95 @@ func NewIPExtractor(useProxy bool, additionalProxies []string) *IPExtractor {
 	}
 }
 
-// GetClientIP extracts the client IP with proxy validation
-// Only trusts X-Forwarded-For/X-Real-IP headers if the request comes from a trusted proxy
+// GetClientIP extracts the client IP with proxy validation. Only trusts
+// X-Forwarded-For/X-Real-IP headers if the request comes from a trusted proxy.
 func (e *IPExtractor) GetClientIP(r *http.Request) string {
-	// SplitHostPort handles both "1.2.3.4:5678" and "[::1]:5678"; the bare-host
-	// fallback covers the rare case where RemoteAddr has no port at all. Must
-	// match middleware/auth.go so the IP stored at login matches the IP the
-	// session validator compares against (LastIndex(":") would keep IPv6
-	// brackets and produce "[::1]" vs SplitHostPort's "::1").
-	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteAddr = r.RemoteAddr
-	}
+	return ExtractClientIP(r, e.useProxy, e.additionalProxies)
+}
 
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
+// ExtractClientIP returns the client IP for r, trusting X-Forwarded-For and
+// X-Real-IP only when the request's immediate peer (RemoteAddr) is a trusted
+// proxy. This is the canonical extractor; every surface must use it so the IP
+// stored at login, the IP compared by session validation, the IP used for rate
+// limiting, and the IP written to audit logs all agree.
+//
+// Forwarded chains are walked right-to-left: each proxy appends the address it
+// saw, so entries written by the proxies closest to us are the most
+// trustworthy and the leftmost entries are the most likely to be
+// client-supplied. Hops that are themselves trusted proxies are skipped, and
+// the first untrusted hop is the real client. When every hop is a trusted proxy
+// there is no attributable client, so the socket peer is used instead of a
+// client-supplied value. A client therefore cannot rotate its own identity by
+// injecting trusted-range addresses into the forwarded headers.
+func ExtractClientIP(r *http.Request, useProxy bool, additionalProxies []net.IP) string {
+	remoteAddr := remoteHost(r.RemoteAddr)
+	peer := net.ParseIP(remoteAddr)
+	if peer == nil {
 		return remoteAddr // Return as-is if parsing fails
 	}
 
-	// Only trust proxy headers if the request comes from a trusted proxy
-	if e.isTrustedProxy(clientIP) {
-		// Check X-Forwarded-For header (for proxies)
-		forwarded := r.Header.Get("X-Forwarded-For")
-		if forwarded != "" {
-			// Validate and extract the first (original client) IP
-			ips := strings.Split(forwarded, ",")
-			for _, ipStr := range ips {
-				ipStr = strings.TrimSpace(ipStr)
-				if ip := net.ParseIP(ipStr); ip != nil && e.isValidClientIP(ip) {
-					return ipStr
-				}
-			}
-		}
+	if !IsTrustedProxy(peer, useProxy, additionalProxies) {
+		return remoteAddr
+	}
 
-		// Check X-Real-IP header
-		realIP := r.Header.Get("X-Real-IP")
-		if realIP != "" {
-			if ip := net.ParseIP(realIP); ip != nil && e.isValidClientIP(ip) {
-				return realIP
-			}
+	isTrusted := func(ip net.IP) bool {
+		return IsTrustedProxy(ip, useProxy, additionalProxies)
+	}
+	if clientIP := ForwardedClientIP(r.Header.Get("X-Forwarded-For"), isTrusted); clientIP != "" {
+		return clientIP
+	}
+
+	// X-Real-IP is a single hop. Trust it only when it is not itself a trusted
+	// proxy, mirroring the X-Forwarded-For rule; otherwise fall back to the peer.
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		if ip := net.ParseIP(realIP); isValidForwardedIP(ip) && !isTrusted(ip) {
+			return realIP
 		}
 	}
 
 	// Fall back to direct connection IP
 	return remoteAddr
+}
+
+// ForwardedClientIP returns the client IP encoded in an X-Forwarded-For header.
+// It walks the chain right-to-left, skipping hops for which isTrusted reports a
+// trusted proxy, and returns the first untrusted hop. Malformed, unspecified,
+// and multicast entries are ignored. Returns "" when the header holds no usable
+// address or when every hop is a trusted proxy, in which case the header cannot
+// attribute a client and the caller should fall back to the socket peer.
+func ForwardedClientIP(forwarded string, isTrusted func(net.IP) bool) string {
+	if strings.TrimSpace(forwarded) == "" {
+		return ""
+	}
+
+	parts := strings.Split(forwarded, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		ipStr := strings.TrimSpace(parts[i])
+		ip := net.ParseIP(ipStr)
+		if !isValidForwardedIP(ip) {
+			continue
+		}
+		if !isTrusted(ip) {
+			return ipStr
+		}
+	}
+	return ""
+}
+
+// remoteHost strips the port from a RemoteAddr, handling IPv6 brackets. The
+// bare-host fallback covers the rare case where RemoteAddr has no port at all.
+func remoteHost(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
+}
+
+// isValidForwardedIP reports whether a forwarded address is usable as a client
+// IP: parseable, specified, and not multicast.
+func isValidForwardedIP(ip net.IP) bool {
+	return ip != nil && !ip.IsUnspecified() && !ip.IsMulticast()
 }
 
 // IsPrivateIP checks if an IP is a private/internal address.
@@ -162,16 +207,6 @@ func IsTrustedProxy(ip net.IP, useProxy bool, additionalProxies []net.IP) bool {
 	return false
 }
 
-// isTrustedProxy checks if an IP is a trusted proxy (method wrapper for IPExtractor)
-func (e *IPExtractor) isTrustedProxy(ip net.IP) bool {
-	return IsTrustedProxy(ip, e.useProxy, e.additionalProxies)
-}
-
-// isValidClientIP validates that an IP is valid for a client
-func (e *IPExtractor) isValidClientIP(ip net.IP) bool {
-	return ip != nil && !ip.IsUnspecified()
-}
-
 // GetClientIP extracts the client IP address from request context.
 //
 // Prefer the proxy-validated client IP stored by auth middleware. When called
@@ -188,11 +223,7 @@ func GetClientIP(r *http.Request) string {
 
 	// Fall back to RemoteAddr. SplitHostPort handles "[::1]:5678" correctly;
 	// LastIndex(":") would leave the IPv6 brackets in place.
-	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		remoteAddr = r.RemoteAddr
-	}
-	return remoteAddr
+	return remoteHost(r.RemoteAddr)
 }
 
 // GetCurrentUser retrieves the authenticated user from request context

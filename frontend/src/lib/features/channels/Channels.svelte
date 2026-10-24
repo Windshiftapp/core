@@ -3,8 +3,16 @@
   import StateDisplay from '../../components/StateDisplay.svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
-  import { IconLifebuoy, IconPlus, IconTrash, IconSettings, IconSearch, IconTag, IconPower, IconFileText, IconMail } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
+  import IconSearch from '@tabler/icons-svelte-runes/icons/search';
+  import IconTag from '@tabler/icons-svelte-runes/icons/tag';
+  import IconPower from '@tabler/icons-svelte-runes/icons/power';
+  import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import IconMail from '@tabler/icons-svelte-runes/icons/mail';
+  import { channels as channelsApi } from '../../api/channels.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -18,6 +26,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import ChannelNavigation from './ChannelNavigation.svelte';
+  import TabStrip from '../../components/TabStrip.svelte';
   import { channelTypes as channelTypeDefs, allTypesEntry, getChannelTypeIcon } from './channelTypes.js';
   import { channelAdminRoute } from './channelRoutes.js';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
@@ -34,11 +43,11 @@
   // Props
   let { embedded = false } = $props();
 
-  // Channel type definitions for embedded tab navigation
-  const channelTypes = [
-    { ...allTypesEntry, label: t('channels.allTypes', 'All') },
-    ...channelTypeDefs.map(ct => ({ ...ct, label: t(`channels.${ct.id}`, ct.id) }))
-  ];
+  // Channel type definitions for embedded tab navigation.
+  let channelTabs = $derived([
+    { id: 'all', label: t('channels.allTypes', 'All'), icon: allTypesEntry.icon },
+    ...channelTypeDefs.map(ct => ({ id: ct.id, label: t(`channels.${ct.id}`, ct.id), icon: ct.icon }))
+  ]);
 
   let channels = $state([]);
   let loading = $state(true);
@@ -123,7 +132,7 @@
 
   async function toggleChannelEnabled(channel) {
     try {
-      await api.channels.toggle(channel.id);
+      await channelsApi.toggle(channel.id);
       await loadChannels();
       successToast(`Channel ${channel.status === 'enabled' ? 'disabled' : 'enabled'} successfully`);
     } catch (err) {
@@ -224,7 +233,7 @@
         'invalid_config': 'Invalid channel configuration',
         'unsupported_provider': 'Unsupported OAuth provider',
         'decrypt_failed': 'Could not decrypt the OAuth client secret',
-        'identity_failed': 'Could not read the connected mailbox identity',
+        'identity_failed': 'The mailbox address is missing or invalid. Enter it and connect again.',
         'authorization_failed': 'You no longer have permission to connect this channel',
         'config_changed': 'The channel changed while OAuth was open. Review the latest settings and reconnect.'
       };
@@ -257,7 +266,7 @@
     try {
       loading = true;
       error = null;
-      channels = await api.channels.getAll({ include_disabled: true });
+      channels = await channelsApi.getAll({ include_disabled: true });
     } catch (err) {
       console.error('Failed to load channels:', err);
       error = 'Failed to load channels';
@@ -337,7 +346,7 @@
         category_id: channelFormData.category_id || null
       };
 
-      const newChannel = await api.channels.create(channelData);
+      const newChannel = await channelsApi.create(channelData);
 
       await loadChannels();
       cancelChannelForm();
@@ -386,7 +395,7 @@
     }
     let impact;
     try {
-      impact = await api.channels.getDeleteImpact(channel.id);
+      impact = await channelsApi.getDeleteImpact(channel.id);
     } catch (error) {
       console.error('Failed to load channel delete impact:', error);
       errorToast('Could not verify what this deletion would remove. Please try again.');
@@ -420,7 +429,7 @@
     });
     if (!ok) return;
     try {
-      await api.channels.delete(channel.id);
+      await channelsApi.delete(channel.id);
       await loadChannels();
 
       if (selectedChannel?.id === channel.id) {
@@ -455,54 +464,44 @@
   <div class="flex-1 min-h-0 overflow-y-auto {embedded ? '' : 'p-6'}">
     <!-- Embedded Tab Navigation -->
     {#if embedded}
-      <div class="border-b mb-6" style="border-color: var(--ds-border);">
-        <!-- Type Tabs with Category filter and Manage button on right -->
-        <div class="flex items-center justify-between">
-          <div class="flex gap-1">
-            {#each channelTypes as type (type.id)}
-              {@const isActive = activeTypeFilter === type.id}
-              <button
-                onclick={() => handleTypeClick(type.id)}
-                class="channel-tab px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2"
-                class:active={isActive}
-              >
-                <type.icon class="w-4 h-4" />
-                {type.label}
-              </button>
-            {/each}
-          </div>
-          <div class="flex items-center gap-3 flex-shrink-0">
-            <span class="text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
-            <ItemPicker
-              value={activeCategoryId ? parseInt(activeCategoryId) : null}
-              items={$channelCategoriesStore}
-              placeholder={t('channels.allCategories', 'All Categories')}
-              showUnassigned={true}
-              unassignedLabel={t('channels.allCategories', 'All Categories')}
-              allowClear={false}
-              class="w-48"
-              onSelect={(item) => {
-                if (!item) {
-                  navigate('/admin/channels');
-                } else {
-                  navigate(`/admin/channels/category/${item.id}`);
-                }
-              }}
-            />
-            {#if $isSystemAdmin}
-              <Button
-                onclick={() => showCategoryModal = true}
-                variant="ghost"
-                size="small"
-                icon={IconTag}
-                class="whitespace-nowrap flex-shrink-0"
-              >
-                {t('channels.manageCategories', 'Manage')}
-              </Button>
-            {/if}
-          </div>
-        </div>
-      </div>
+      <!-- Type Tabs with Category filter and Manage button on right -->
+      <TabStrip
+        tabs={channelTabs}
+        activeTab={activeTypeFilter ?? 'all'}
+        onTabChange={(id) => handleTypeClick(id === 'all' ? null : id)}
+        class="mb-6"
+      >
+        {#snippet trailing()}
+          <span class="text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
+          <ItemPicker
+            value={activeCategoryId ? parseInt(activeCategoryId) : null}
+            items={$channelCategoriesStore}
+            placeholder={t('channels.allCategories', 'All Categories')}
+            showUnassigned={true}
+            unassignedLabel={t('channels.allCategories', 'All Categories')}
+            allowClear={false}
+            class="w-48"
+            onSelect={(item) => {
+              if (!item) {
+                navigate('/admin/channels');
+              } else {
+                navigate(`/admin/channels/category/${item.id}`);
+              }
+            }}
+          />
+          {#if $isSystemAdmin}
+            <Button
+              onclick={() => showCategoryModal = true}
+              variant="ghost"
+              size="small"
+              icon={IconTag}
+              class="whitespace-nowrap flex-shrink-0"
+            >
+              {t('channels.manageCategories', 'Manage')}
+            </Button>
+          {/if}
+        {/snippet}
+      </TabStrip>
     {/if}
 
     <!-- Header -->
@@ -765,18 +764,3 @@
   onClose={() => { showEmailLog = false; emailLogChannel = null; }}
 />
 
-<style>
-  .channel-tab {
-    border-color: transparent;
-    color: var(--ds-text-subtle);
-  }
-
-  .channel-tab:hover:not(.active) {
-    color: var(--ds-text);
-  }
-
-  .channel-tab.active {
-    border-color: var(--ds-border-focused);
-    color: var(--ds-text);
-  }
-</style>

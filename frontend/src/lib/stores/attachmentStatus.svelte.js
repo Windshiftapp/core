@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { attachmentSettings } from '../api/misc.js';
 
 // Create reactive attachment status state
 let enabled = $state(true); // Default to true, will be updated on load
@@ -21,7 +21,7 @@ async function load() {
   loading = true;
 
   try {
-    const status = await api.attachmentSettings.getStatus();
+    const status = await attachmentSettings.getStatus();
     applyStatus(status);
     loaded = true;
   } catch (error) {

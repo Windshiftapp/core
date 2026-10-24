@@ -1,7 +1,9 @@
 <script>
   import { tick } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
-  import { ChevronDown, Check, X } from '@lucide/svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
   import Select from '../components/Select.svelte';
 

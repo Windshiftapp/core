@@ -1,7 +1,7 @@
 <script>
-  import { Menu } from '@lucide/svelte';
+  import Menu from '@lucide/svelte/icons/menu';
   import { useEventListener } from 'runed';
-  import { api } from '../api.js';
+  import { auth } from '../api/auth.js';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
@@ -12,16 +12,15 @@
     GLOBAL_COLLECTION_VIEWS,
     currentRoute,
     isWorkspaceRoute,
+    matchRoute,
     navigate,
   } from '../router.js';
+  import { toLogical } from '../runtime/contextPath.js';
   import { hydrateCurrentWorkspaceFromSharedData } from '../services/authenticatedShellUI.js';
-  import {
-    authStore,
-    currentWorkspace,
-    uiStore,
-    workspaceDataStore,
-    workspacesStore,
-  } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
+  import { currentWorkspace, workspacesStore } from '../stores/workspaces.svelte.js';
+  import { uiStore } from '../stores/ui.svelte.js';
+  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { terminalStore } from '../stores/terminalStore.svelte.js';
   import { clearWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
@@ -37,6 +36,8 @@
     CREATE_MODAL_WORKSPACE_VIEWS,
     MAIN_APP_COMPONENT_LOADERS,
     MAIN_APP_TEST_VIEWS,
+    prefetchIdleMainAppComponents,
+    prefetchMainAppForView,
     resolveEffectiveMainAppView,
   } from './mainAppRoutes.js';
   import {
@@ -72,6 +73,23 @@
       void recoverFromLazyLoadFailure();
     },
   });
+
+  // Warm the likely next routes once the browser is idle (WI-1761).
+  prefetchIdleMainAppComponents();
+
+  /** Hover/focus prefetch: load the route chunk behind a link before the
+   * click, so warm navigations resolve without ever showing a spinner. */
+  function prefetchRouteChunkFromLink(target) {
+    const anchor = target?.closest?.('a[href]');
+    if (!anchor) return;
+    try {
+      const url = new URL(anchor.href, window.location.href);
+      const { view } = matchRoute(toLogical(url.pathname)) ?? {};
+      if (view) prefetchMainAppForView(view);
+    } catch {
+      // Unparseable href — navigation itself will surface the problem.
+    }
+  }
 
   async function loadTerminalPanel() {
     if (TerminalPanelComponent || terminalLoading) return;
@@ -127,7 +145,7 @@
   async function recoverFromLazyLoadFailure() {
     if (!authStore.isAuthenticated) return;
 
-    sessionRevalidationPromise ??= hasSessionExpired(api.auth.getCurrentUser);
+    sessionRevalidationPromise ??= hasSessionExpired(auth.getCurrentUser);
     const sessionExpired = await sessionRevalidationPromise;
     sessionRevalidationPromise = null;
 
@@ -309,7 +327,13 @@
   });
 </script>
 
-<div class="desktop-app-shell h-dvh min-h-0 overflow-hidden flex flex-col" style="background-color: var(--ds-surface);">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="desktop-app-shell h-dvh min-h-0 overflow-hidden flex flex-col"
+  style="background-color: var(--ds-surface);"
+  onpointerover={(event) => prefetchRouteChunkFromLink(event.target)}
+  onfocusin={(event) => prefetchRouteChunkFromLink(event.target)}
+>
   <EmailVerificationBanner
     show={showEmailVerificationBanner}
     ondismiss={() => showEmailVerificationBanner = false}

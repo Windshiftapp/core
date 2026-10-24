@@ -1,5 +1,5 @@
 <script>
-  import { ExternalLink } from '@lucide/svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import Tooltip from './Tooltip.svelte';
 
   let {

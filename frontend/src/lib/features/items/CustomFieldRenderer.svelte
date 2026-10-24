@@ -7,17 +7,28 @@
   import PortalCustomerPicker from '../../pickers/PortalCustomerPicker.svelte';
   import CustomerOrganisationPicker from '../../pickers/CustomerOrganisationPicker.svelte';
   import LinkingFieldPicker from '../../pickers/LinkingFieldPicker.svelte';
-  import { Box, Globe, Building2, Calendar, User, Target, Link2, Mail, ExternalLink, CheckSquare } from '@lucide/svelte';
+  import Box from '@lucide/svelte/icons/box';
+  import Globe from '@lucide/svelte/icons/globe';
+  import Building2 from '@lucide/svelte/icons/building-2';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import User from '@lucide/svelte/icons/user';
+  import Target from '@lucide/svelte/icons/target';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import Mail from '@lucide/svelte/icons/mail';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import CheckSquare from '@lucide/svelte/icons/check-square';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import TruncatedFieldValue from '../../components/TruncatedFieldValue.svelte';
   import { onDestroy } from 'svelte';
   import { referenceDisplayCache } from '../../stores/referenceDisplayCache.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatCustomFieldDate } from '../../utils/dateFormatter.js';
   import { fieldOptionsObject, parseFieldOptions, resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
   import { safeHref } from '../../utils/sanitize';
+  import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
   import {
     milestonePickerConfig as milestoneConfig,
@@ -39,17 +50,22 @@
   let {
     field, value = $bindable(''), onChange = () => {}, onCommit = null, milestones = [], iterations = [],
     isDarkMode = false, required = false, readonly = true, disabled = false,
-    onStartEdit = null, onCancel = null, showSelectedInTrigger = true, autoOpenPickers = true,
+    onStartEdit = null, onCancel = null, showSelectedInTrigger = true,
     noPadding = false, itemId = null, users: providedUsers = null, fieldLinks = null,
     onFieldLinksChanged = null,
     optionData = {}, optionLoading = {}, onRequestOptions = null, loadAssetOptions = null,
     displayAlignment = 'start', truncateDisplay = false, displayTestId = undefined,
+    // Row mode: the caller passes the field label and the component renders the
+    // label/value row used by the item detail sidebar, swapping it for a
+    // full-width editor. rowTestIdPrefix builds the row's stable test ids:
+    // `<prefix>-<field id>` for the row, `<prefix>-<part>-<field id>` for its
+    // label, value, edit and display hooks.
+    label = null, rowTestIdPrefix = undefined,
     // Bare display hands layout to the caller: no padding, hover, or rounding.
-    // Used by sidebar rows that own the row chrome.
     bare = false,
-    // Self-editing mode: the component owns the display→editor toggle, the
-    // way list cells need it. Callers that drive editing externally (item
-    // detail sidebar) keep using onStartEdit + readonly and leave this off.
+    // Self-editing mode: the component owns the display→editor toggle, the way
+    // list cells need it. Callers that drive editing externally (item detail
+    // sidebar) keep using onStartEdit + readonly and leave this off.
     selfEditing = false
   } = $props();
 
@@ -156,6 +172,8 @@
           return milestone ? milestone.name : v;
         }
         return v;
+      case 'multi_milestone':
+        return normalizedMilestoneIDs().map((id) => milestoneName(id) ?? id).join(', ');
       case 'asset':
         if (Array.isArray(v)) {
           return v.map(assetDisplayName).join(', ');
@@ -200,8 +218,68 @@
 
 	function hasDisplayValue() {
 	  if (value === null || value === undefined || value === '') return false;
-	  return !(field.field_type === 'multiselect' && Array.isArray(value) && value.length === 0);
+	  return !((field.field_type === 'multiselect' || field.field_type === 'multi_milestone') && Array.isArray(value) && value.length === 0);
 	}
+
+  const rowMode = $derived(label !== null);
+  // The row right-aligns and truncates its value; standalone displays keep the
+  // caller's layout choices.
+  const valueAlignment = $derived(rowMode ? 'end' : displayAlignment);
+  const valueTruncate = $derived(rowMode ? true : truncateDisplay);
+  // References keep the rich display (avatar, asset tag) inside the row.
+  const rowRichDisplay = $derived(['user', 'multi_user', 'asset'].includes(field.field_type));
+  const rowValueHref = $derived(rowRichDisplay ? null : customFieldLinkHref(field.field_type, value));
+
+  // Row values are plain text: the per-type icons of the rich display do not
+  // fit the sidebar's label/value row.
+  function rowDisplayValue() {
+    if (!hasDisplayValue()) return t('common.none');
+    const v = /** @type {any} */ (value);
+    switch (field.field_type) {
+      case 'date':
+        return formatDateDisplay(v);
+      case 'milestone':
+      case 'multi_milestone': {
+        const entries = field.field_type === 'multi_milestone'
+          ? (Array.isArray(v) ? v : [])
+          : [v];
+        return entries.map((entry) => {
+          const id = entry && typeof entry === 'object' ? entry.id : entry;
+          return milestoneName(id) ?? id;
+        }).join(', ');
+      }
+      case 'iteration': {
+        const iteration = iterations?.find((i) => i.id === parseInt(v, 10));
+        return iteration ? iteration.name : v;
+      }
+      case 'select':
+        return field.options ? resolveOptionLabel(field.options, v) : v;
+      case 'multiselect': {
+        if (!field.options) return v;
+        const values = Array.isArray(v)
+          ? v
+          : typeof v === 'string' && v.includes(',')
+            ? v.split(',').map((entry) => entry.trim()).filter(Boolean)
+            : [v];
+        return resolveOptionLabels(field.options, values).join(', ');
+      }
+      case 'boolean':
+      case 'checkbox':
+        return booleanCustomFieldChecked(v) ? t('common.yes') : t('common.no');
+      default:
+        if (Array.isArray(v)) {
+          return v
+            .map((entry) => (entry && typeof entry === 'object'
+              ? entry.title || entry.name || entry.label || entry.value
+              : entry))
+            .join(', ');
+        }
+        if (v && typeof v === 'object') {
+          return v.title || v.name || v.label || v.value || JSON.stringify(v);
+        }
+        return v;
+    }
+  }
 
   // Handle keydown for text/number inputs
   function handleKeydown(event) {
@@ -308,6 +386,21 @@
     return milestone || null;
   })());
 
+  function normalizedMilestoneIDs() {
+    const raw = /** @type {any} */ (value);
+    if (!raw) return [];
+    const entries = Array.isArray(raw) ? raw : [raw];
+    return entries.map((entry) => {
+      if (entry && typeof entry === 'object') return parseInt(entry.id, 10);
+      return parseInt(entry, 10);
+    }).filter((id) => Number.isFinite(id) && id > 0);
+  }
+
+  function milestoneName(id) {
+    const milestone = milestones?.find((m) => m.id === parseInt(id, 10));
+    return milestone ? milestone.name : null;
+  }
+
   // --- Self-editing plumbing ------------------------------------------------
   // In self-editing mode the component starts in display form and swaps to
   // the editor on click, commit-on-change for single-value types and commit
@@ -322,9 +415,10 @@
   // Booleans edit in place — render the checkbox directly instead of routing
   // through a display→editor swap.
   const renderLiveEditor = $derived(isSelfEditing && isBooleanCustomFieldType(field.field_type));
-  // Opening the editor means the user already clicked the cell, so menus open
-  // immediately instead of needing a second click on the picker trigger.
-  const pickerAutoOpen = $derived(autoOpenPickers || editorOpen);
+  // An editor only exists after the user activated the field, either through
+  // self-editing or an external onStartEdit/readonly swap, so its picker opens
+  // right away. Forms mount every field in editor mode up front and stay closed.
+  const pickerAutoOpen = $derived(editorOpen || (onStartEdit !== null && !readonly));
   const editorValue = $derived(draftValue !== null ? draftValue : value);
 
   function enterEdit() {
@@ -355,7 +449,7 @@
     onChange(newValue);
     // Multi-value editors stay open so several entries can be picked in a
     // row; everything else returns to display right after the commit.
-    const multiValue = ['multi_user', 'multiselect', 'combobox'].includes(field.field_type)
+    const multiValue = ['multi_user', 'multiselect', 'multi_milestone', 'combobox'].includes(field.field_type)
       || (field.field_type === 'asset' && isMultiAssetField);
     if (!multiValue) exitEditing();
   }
@@ -437,6 +531,8 @@
       }
       case 'milestone':
         return milestoneData?.name || '';
+      case 'multi_milestone':
+        return milestoneName(missingValue) || '';
       case 'iteration': {
         const iteration = iterations?.find((i) => i.id === parseInt(missingValue));
         return iteration ? iteration.name : '';
@@ -467,11 +563,11 @@
   {#if hasDisplayValue()}
     {#if field.field_type === 'user'}
       {#if userData}
-        <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+        <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
           <div class="w-4 h-4 rounded-full bg-ds-accent-blue flex items-center justify-center text-ds-text-inverse text-[9px] font-medium flex-shrink-0">
             {userData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
           </div>
-          <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
+          <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{userData.name}</span>
         </div>
       {:else if usersLoading}
         <span style="color: var(--ds-text-subtle);">{t('common.loading')}</span>
@@ -490,8 +586,13 @@
           <span style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
         {/if}
       </div>
+    {:else if field.field_type === 'multi_milestone'}
+      <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
+        <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      </div>
     {:else if field.field_type === 'iteration'}
-      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         {#if iterationData}
           {#if iterationData.is_global}
             <Globe class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
@@ -501,25 +602,25 @@
         {:else}
           <Calendar class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         {/if}
-        <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+        <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
       </div>
     {:else if field.field_type === 'asset'}
-      <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+        <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
       </div>
     {:else if field.field_type === 'portalcustomer'}
-      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
       </div>
     {:else if field.field_type === 'customerorganisation'}
-      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
       </div>
     {:else if field.field_type === 'linking'}
-      <div class="flex items-center gap-1 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-1 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Link2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <span style="color: var(--ds-text);">
           {#if Array.isArray(value) && value.length > 0}
@@ -532,7 +633,7 @@
         </span>
       </div>
     {:else if field.field_type === 'combobox'}
-      <div class="flex items-center gap-1 flex-wrap {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-1 flex-wrap {valueAlignment === 'end' ? 'justify-end' : ''}">
         {#each getComboboxLabels(value) as labelName}
           <span class="inline-flex items-center px-2 py-0.5 bg-ds-accent-blue-subtle text-ds-text-accent-blue text-xs rounded-full">
             {labelName}
@@ -540,12 +641,12 @@
         {/each}
       </div>
     {:else if isBooleanCustomFieldType(field.field_type)}
-      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <span style="color: var(--ds-text);">{booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no')}</span>
       </div>
     {:else if field.field_type === 'email'}
-      <div class="flex items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         {#if interactive}
           <span style="color: var(--ds-text);">{value}</span>
@@ -554,7 +655,7 @@
         {/if}
       </div>
     {:else if field.field_type === 'url'}
-      <div class="flex min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end' : ''}">
+      <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         {#if interactive}
           <span style="color: var(--ds-text);" class="truncate">{value}</span>
@@ -565,7 +666,7 @@
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {:else}
-      <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      <span class={valueTruncate ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {/if}
   {:else if interactive}
     {#if field.field_type === 'user'}
@@ -585,34 +686,13 @@
     {:else if field.field_type === 'url'}
       <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
     {/if}
-    <span class={truncateDisplay ? 'min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
+    <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
   {:else}
-    <span class={truncateDisplay ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
+    <span class={valueTruncate ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
   {/if}
 {/snippet}
 
-{#if readonly && !editorOpen && !renderLiveEditor}
-  <div>
-    {#if (onStartEdit || isSelfEditing) && !disabled}
-      <button
-        type="button"
-        class="flex w-full min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {bare ? '' : 'hover:bg-ds-background-neutral-hovered transition-colors rounded'}"
-        onclick={handleActivate}
-        data-testid={displayTestId}
-      >
-        {@render readOnlyContent(true)}
-      </button>
-    {:else}
-      <div
-        class="min-w-0 {displayAlignment === 'end' ? 'text-right' : ''} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {disabled ? 'opacity-50' : ''}"
-        data-testid={displayTestId}
-      >
-        {@render readOnlyContent(false)}
-      </div>
-    {/if}
-  </div>
-{:else}
-  <!-- Edit mode -->
+{#snippet editorContent()}
   <div class="{disabled ? 'opacity-50 pointer-events-none' : ''}">
     {#if field.field_type === 'milestone'}
       <ItemPicker
@@ -627,6 +707,26 @@
         {disabled}
         {resolveMissingLabel}
         onSelect={(item) => handleEditorChange(item?.id || null)}
+        onCancel={handleEditorCancel}
+      />
+    {:else if field.field_type === 'multi_milestone'}
+      <ItemPicker
+        value={normalizedMilestoneIDs()}
+        values={normalizedMilestoneIDs()}
+        items={milestones}
+        config={milestoneConfig}
+        placeholder={t('pickers.selectMilestones')}
+        showUnassigned={false}
+        multiSelect={true}
+        autoOpen={pickerAutoOpen}
+        class="w-full"
+        {disabled}
+        {resolveMissingLabel}
+        onSelect={(selected) => handleEditorChange(
+          Array.isArray(selected)
+            ? selected.map((entry) => (entry && typeof entry === 'object' ? entry.id : entry)).filter((entry) => entry != null)
+            : []
+        )}
         onCancel={handleEditorCancel}
       />
     {:else if field.field_type === 'user'}
@@ -942,4 +1042,83 @@
       </div>
     {/if}
   </div>
+{/snippet}
+
+{#snippet rowValue()}
+  {#if rowRichDisplay}
+    <button
+      type="button"
+      class="flex w-full min-w-0 items-center justify-end gap-2 text-right whitespace-nowrap overflow-hidden"
+      onclick={handleActivate}
+      data-testid={`${rowTestIdPrefix}-display-${field.id}`}
+      {disabled}
+    >
+      {@render readOnlyContent(true)}
+    </button>
+  {:else}
+    <TruncatedFieldValue
+      value={rowDisplayValue()}
+      href={rowValueHref}
+      onactivate={rowValueHref ? null : handleActivate}
+      {disabled}
+      subtle={!hasDisplayValue()}
+      testId={rowValueHref
+        ? `${rowTestIdPrefix}-value-${field.id}`
+        : `${rowTestIdPrefix}-edit-${field.id}`}
+    />
+  {/if}
+{/snippet}
+
+{#if readonly && !editorOpen && !renderLiveEditor}
+  {#if rowMode}
+    <!-- Row mode: label on the left, value on the right; the row owns its
+         padding and hover chrome. -->
+    <div
+      class="hover-bg group flex w-full min-w-0 items-center justify-between gap-2 rounded px-2 py-1.5 text-sm transition-colors"
+      data-testid={`${rowTestIdPrefix}-${field.id}`}
+    >
+      <button
+        type="button"
+        onclick={handleActivate}
+        data-testid={rowValueHref
+          ? `${rowTestIdPrefix}-edit-${field.id}`
+          : `${rowTestIdPrefix}-label-${field.id}`}
+        class="max-w-[45%] shrink-0 truncate rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
+        style="outline-color: var(--ds-border-focused);"
+        {disabled}
+      >
+        {@render label(field.name)}
+      </button>
+      <div class="min-w-0 flex-1 text-right">
+        {@render rowValue()}
+      </div>
+    </div>
+  {:else}
+    <div>
+      {#if (onStartEdit || isSelfEditing) && !disabled}
+        <button
+          type="button"
+          class="flex w-full min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {bare ? '' : 'hover:bg-ds-background-neutral-hovered transition-colors rounded'}"
+          onclick={handleActivate}
+          data-testid={displayTestId}
+        >
+          {@render readOnlyContent(true)}
+        </button>
+      {:else}
+        <div
+          class="min-w-0 {displayAlignment === 'end' ? 'text-right' : ''} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {disabled ? 'opacity-50' : ''}"
+          data-testid={displayTestId}
+        >
+          {@render readOnlyContent(false)}
+        </div>
+      {/if}
+    </div>
+  {/if}
+{:else if rowMode}
+  <div class="w-full" data-testid={`${rowTestIdPrefix}-${field.id}`}>
+    {@render editorContent()}
+  </div>
+{:else}
+  <!-- Edit mode -->
+  {@render editorContent()}
 {/if}

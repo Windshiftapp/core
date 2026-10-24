@@ -43,10 +43,13 @@ func Derive(cycle *models.ItemSLACycle, now time.Time) (models.DerivedSLACycle, 
 		if err != nil {
 			return models.DerivedSLACycle{}, fmt.Errorf("compile cycle %d calendar: %w", cycle.ID, err)
 		}
-		if cycle.PauseStartedAt == nil {
+		if cycle.PauseStartedAt == nil && cycle.GoalDurationMs > 0 {
 			elapsed += calendar.ElapsedCalendarTime(cycle.LastCalculatedAt, now)
 		}
-		derived.WithinCalendarHours = calendar.WithinCalendarHours(now)
+		// A cycle with no matched target carries the synthetic 24/7 snapshot and
+		// has nothing to measure against; reporting it as service hours would
+		// claim a schedule it never had.
+		derived.WithinCalendarHours = cycle.GoalDurationMs > 0 && calendar.WithinCalendarHours(now)
 	} else {
 		derived.WithinCalendarHours = cycle.WithinCalendarHours
 	}

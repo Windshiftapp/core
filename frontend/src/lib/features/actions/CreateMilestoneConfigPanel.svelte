@@ -1,5 +1,5 @@
 <script>
-  import { HelpCircle } from '@lucide/svelte';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import Select from '../../components/Select.svelte';
   import Checkbox from '../../components/Checkbox.svelte';

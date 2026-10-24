@@ -3,7 +3,7 @@
   import StateDisplay from '../components/StateDisplay.svelte';
   import { useDebounce } from 'runed';
   import { t } from '../stores/i18n.svelte.js';
-  import { api } from '../api.js';
+  import { channels } from '../api/channels.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
@@ -11,8 +11,14 @@
   import EmptyState from '../components/EmptyState.svelte';
   import DataTable from '../components/DataTable.svelte';
   import SelectField from '../components/SelectField.svelte';
-  import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Mail from '@lucide/svelte/icons/mail';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import FileText from '@lucide/svelte/icons/file-text';
   import SearchInput from '../components/SearchInput.svelte';
+  import TabStrip from '../components/TabStrip.svelte';
 
   let { isOpen = false, channel = null, initialTab = 'inbound', onClose = () => {} } = $props();
 
@@ -55,7 +61,7 @@
     try {
       loading = true;
       error = null;
-      data = await api.channels.getEmailLog(channel.id, page, pageSize, search);
+      data = await channels.getEmailLog(channel.id, page, pageSize, search);
     } catch (err) {
       console.error('Failed to load email log:', err);
       error = err.message || 'Failed to load email log';
@@ -69,7 +75,7 @@
     try {
       outboxLoading = true;
       outboxError = null;
-      outboxData = await api.channels.getEmailReplies(channel.id, outboxStatus, outboxPage, pageSize);
+      outboxData = await channels.getEmailReplies(channel.id, outboxStatus, outboxPage, pageSize);
     } catch (err) {
       console.error('Failed to load customer reply queue:', err);
       outboxError = err.message || 'Failed to load customer reply queue';
@@ -84,9 +90,8 @@
     debouncedSearch();
   }
 
-  function onTabChange(event) {
-    activeTab = event.tab;
-    if (activeTab === 'outbox' && !outboxData) {
+  function handleTabChange(id) {
+    if (id === 'outbox' && !outboxData) {
       untrack(() => loadOutbox());
     }
   }
@@ -197,7 +202,7 @@
     if (actingCommentID !== null) return;
     try {
       actingCommentID = reply.comment_id;
-      await api.channels.retryEmailReply(channel.id, reply.comment_id);
+      await channels.retryEmailReply(channel.id, reply.comment_id);
       await loadOutbox();
     } catch (err) {
       console.error('Failed to retry customer reply:', err);
@@ -211,7 +216,7 @@
     if (actingCommentID !== null) return;
     try {
       actingCommentID = reply.comment_id;
-      await api.channels.discardEmailReply(channel.id, reply.comment_id);
+      await channels.discardEmailReply(channel.id, reply.comment_id);
       await loadOutbox();
     } catch (err) {
       console.error('Failed to discard customer reply:', err);
@@ -225,7 +230,7 @@
     if (requeueing || !channel) return;
     try {
       requeueing = true;
-      await api.channels.requeueRateLimitedEmail(channel.id);
+      await channels.requeueRateLimitedEmail(channel.id);
       await loadLog();
     } catch (err) {
       console.error('Failed to requeue rate-limited emails:', err);
@@ -283,23 +288,13 @@
 
   <!-- Content -->
   <div class="p-6">
-    <div class="border-b mb-4" style="border-color: var(--ds-border);">
-      <nav class="-mb-px flex space-x-6" aria-label="Sections">
-        {#each modalTabs as tab (tab.id)}
-          <button
-            type="button"
-            data-testid={tab.testid}
-            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors"
-            style={activeTab === tab.id
-              ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);'
-              : 'border-color: transparent; color: var(--ds-text-subtle);'}
-            onclick={() => onTabChange(tab.id)}
-          >
-            {tab.label}
-          </button>
-        {/each}
-      </nav>
-    </div>
+    <TabStrip
+      tabs={modalTabs}
+      bind:activeTab
+      onTabChange={handleTabChange}
+      ariaLabel="Sections"
+      class="mb-4"
+    />
 
     {#if activeTab === 'inbound'}
     <div class="pt-4">
@@ -493,7 +488,7 @@
             title={t('channel.emailLog.outboxEmpty')}
           />
         {:else}
-          <DataTable columns={outboxColumns} data={outboxData.replies} keyField="comment_id">
+          <DataTable columns={outboxColumns} data={outboxData.replies} keyField="id">
             {#snippet to(reply)}
               <div class="font-medium truncate max-w-44" style="color: var(--ds-text);">{reply.to_name || reply.to_email}</div>
               {#if reply.to_name}
@@ -514,7 +509,7 @@
               style={replyStatus(reply) === 'failed'
                 ? 'background: var(--ds-surface-warning, rgba(234, 88, 12, 0.12)); color: var(--ds-text-warning, var(--ds-text));'
                 : 'background: var(--ds-background-neutral, rgba(0,0,0,0.05)); color: var(--ds-text-subtle);'}
-              data-testid="email-outbox-status-{reply.comment_id}"
+              data-testid="email-outbox-status-{reply.id}"
             >
               {replyStatusText(reply)}
             </span>
@@ -531,14 +526,16 @@
               {/if}
             {/snippet}
             {#snippet outboxActions(reply)}
-              {#if isReplyPending(reply)}
+              {#if isReplyPending(reply) && reply.comment_id}
+                <!-- Intake receipts have no comment_id; the retry/discard
+                     endpoints are comment-keyed, so they are not actionable. -->
                 <div class="flex items-center gap-1.5">
                   <Button
                     onclick={() => retryReply(reply)}
                     variant="ghost"
                     size="small"
                     disabled={actingCommentID !== null}
-                    dataTestid="email-outbox-retry-{reply.comment_id}"
+                    dataTestid="email-outbox-retry-{reply.id}"
                   >
                     {actingCommentID === reply.comment_id ? t('channel.emailLog.outboxRetrying') : t('channel.emailLog.outboxRetry')}
                   </Button>
@@ -547,7 +544,7 @@
                     variant="ghost"
                     size="small"
                     disabled={actingCommentID !== null}
-                    dataTestid="email-outbox-discard-{reply.comment_id}"
+                    dataTestid="email-outbox-discard-{reply.id}"
                   >
                     {actingCommentID === reply.comment_id ? t('channel.emailLog.outboxDiscarding') : t('channel.emailLog.outboxDiscard')}
                   </Button>

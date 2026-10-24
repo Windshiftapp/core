@@ -443,7 +443,8 @@ export default {
   },
   "widgets": {
     "chart": {
-      "noDataAvailable": "No hay datos disponibles"
+      "noDataAvailable": "No hay datos disponibles",
+      "otherSlices": "Otros ({count} más)",
     },
     "completionChart": {
       "title": "Gráfico completo"

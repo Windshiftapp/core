@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { zammadTickets } from '../../api/integrations.js';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import { navigate } from '../../router.js';
@@ -22,7 +22,7 @@
         // Keep the original value so the API returns the same unavailable
         // result as it does for any other malformed or unknown key.
       }
-      const destination = await api.zammadTickets.resolve(decodedCorrelationKey);
+      const destination = await zammadTickets.resolve(decodedCorrelationKey);
       const workspaceId = Number(destination?.workspace_id);
       const itemId = Number(destination?.item_id);
       if (!Number.isInteger(workspaceId) || workspaceId <= 0 || !Number.isInteger(itemId) || itemId <= 0) {

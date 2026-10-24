@@ -78,7 +78,7 @@ export default {
       definition: 'La finalisation correspond au premier passage à un statut terminé.',
     },
     aging: {
-      title: 'Ancienneté des travaux en cours',
+      title: 'Ancienneté des éléments en cours',
       description: 'Durée depuis laquelle les éléments actuellement non terminés sont ouverts.',
       total: 'Éléments actifs',
       median: 'Âge médian',

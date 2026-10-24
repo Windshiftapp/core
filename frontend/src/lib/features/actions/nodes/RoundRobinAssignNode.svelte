@@ -1,5 +1,5 @@
 <script>
-  import { UsersRound } from '@lucide/svelte';
+  import UsersRound from '@lucide/svelte/icons/users-round';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

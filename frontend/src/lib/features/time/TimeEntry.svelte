@@ -1,9 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Plus, Edit, Trash2 } from '@lucide/svelte';
+  import Filter from '@lucide/svelte/icons/filter';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import AlertBox from '../../components/AlertBox.svelte';
   import { navigate } from '../../router.js';
-  import { timeEntryStore, permissionStore, isSystemAdmin } from '../../stores';
+  import { timeEntryStore } from '../../stores/timeEntryStore.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
@@ -13,6 +17,7 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { customerOrganisationName, realCustomers } from '../../utils/customerLabel.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -167,7 +172,7 @@
     <p class="font-medium" style="color: var(--ds-text-warning);">{t('time.entry.needProjects')}</p>
     <p class="mt-1" style="color: var(--ds-text-subtle);">
       <a href="/time/projects" class="font-medium underline hover:opacity-80 transition-opacity" style="color: var(--ds-link);">{t('time.entry.goToProjects')}</a>
-      {#if customers.length === 0 && canManageProjects}
+      {#if realCustomers(customers).length === 0 && canManageProjects}
         {t('common.or')} <button onclick={() => timeEntryStore.openOnboarding()} class="font-medium underline hover:opacity-80 transition-opacity" style="color: var(--ds-link);">{t('time.entry.startSetupWizard')}</button>
       {/if}
     </p>
@@ -188,7 +193,7 @@
         showUnassigned={true}
         unassignedLabel={t('time.reports.allCustomers')}
         getValue={(item) => item.id}
-        getLabel={(item) => item.name}
+        getLabel={(item) => customerOrganisationName(item, t)}
         onSelect={(item) => setFilter('customer_id', item ? item.id : '')}
       />
     </div>

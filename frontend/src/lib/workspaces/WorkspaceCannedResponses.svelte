@@ -1,10 +1,13 @@
 <script>
   // Workspace canned responses (WI-1138): reusable agent reply snippets.
-  // Private snippets are internal notes and never reach portal customers.
+  // Private snippets are internal notes; automations never send them to customers.
 
   import { onMount } from 'svelte';
-  import { MessageSquareText, Pencil, Plus, Trash2 } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import MessageSquareText from '@lucide/svelte/icons/message-square-text';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { cannedResponses } from '../api/configuration.js';
   import Panel from '../components/Panel.svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
@@ -41,7 +44,7 @@
   async function load() {
     loading = true;
     try {
-      responses = (await api.cannedResponses.getAll(workspaceId, true)) ?? [];
+      responses = (await cannedResponses.getAll(workspaceId, true)) ?? [];
     } catch (err) {
       console.error('Failed to load canned responses:', err);
       errorToast(err?.message || t('cannedResponses.loadFailed'));
@@ -81,10 +84,10 @@
     saving = true;
     try {
       if (editingId === null) {
-        await api.cannedResponses.create(workspaceId, { name: formName.trim(), body: formBody, is_private: formIsPrivate });
+        await cannedResponses.create(workspaceId, { name: formName.trim(), body: formBody, is_private: formIsPrivate });
         successToast(t('cannedResponses.created'));
       } else {
-        await api.cannedResponses.update(workspaceId, editingId, {
+        await cannedResponses.update(workspaceId, editingId, {
           name: formName.trim(),
           body: formBody,
           is_private: formIsPrivate,
@@ -113,7 +116,7 @@
     pendingDelete = null;
     if (!target) return;
     try {
-      await api.cannedResponses.delete(workspaceId, target.id);
+      await cannedResponses.delete(workspaceId, target.id);
       successToast(t('cannedResponses.deleted'));
       await load();
     } catch (err) {
@@ -129,10 +132,7 @@
 </script>
 
 <Panel padding="spacious">
-  <SectionHeader
-    title={t('cannedResponses.title')}
-    subtitle={t('cannedResponses.subtitle')}
-  >
+  <SectionHeader>
     {#snippet actions()}
       <Button
         size="sm"

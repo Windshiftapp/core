@@ -45,6 +45,7 @@ import (
 	"windshift/internal/objecttranslation"
 	"windshift/internal/plugins"
 	"windshift/internal/portalwebauthn"
+	"windshift/internal/reporting"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	v1 "windshift/internal/restapi/v1"
@@ -140,6 +141,7 @@ type Server struct {
 	notificationManager          *handlers.NotificationManager
 	notificationService          *services.NotificationService
 	notificationScheduler        *scheduler.NotificationScheduler
+	outboundEmailScheduler       *scheduler.OutboundEmailScheduler
 	recurrenceScheduler          *scheduler.RecurrenceScheduler
 	cfvCleanupScheduler          *scheduler.CFVCleanupScheduler
 	todoistSyncScheduler         *scheduler.TodoistSyncScheduler
@@ -482,7 +484,7 @@ func (s *Server) initialize() error {
 	healthHandler := health.NewHandler(s.db.GetDB())
 	mux.HandleFunc("GET /healthz", healthHandler.Liveness)
 	mux.HandleFunc("GET /readyz", healthHandler.Readiness)
-	s.metrics = appmetrics.New(s.db)
+	s.metrics = appmetrics.New(s.db, s.config.MetricsToken)
 	mux.Handle("GET /metrics", s.metrics.Handler())
 
 	nmCfg := handlers.DefaultNotificationManagerConfig()
@@ -516,8 +518,17 @@ func (s *Server) initialize() error {
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
+	if cfg.Notification.OutboxBatchSize > 0 {
+		s.notificationScheduler.SetOutboxBatchSize(cfg.Notification.OutboxBatchSize)
+	}
 	s.notificationScheduler.Start()
 	slog.Info("notification scheduler started")
+
+	// The outbound email pool drains the threaded-reply and @mention outboxes
+	// on a fast, bounded cadence, separate from the 5-minute digest batching.
+	s.outboundEmailScheduler = scheduler.NewOutboundEmailScheduler(s.db, smtpSender, cfg.Notification.OutboxInterval, cfg.Notification.OutboxBatchSize)
+	s.outboundEmailScheduler.Start()
+	slog.Info("outbound email scheduler started")
 
 	// WorkflowService is constructed here (moved up from later in bootstrap) so the
 	// recurrence scheduler can resolve a workspace+item-type's initial status the
@@ -824,6 +835,7 @@ func (s *Server) initialize() error {
 	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService)
 	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db), permService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
+	customWidgetHandler := handlers.NewCustomWidgetHandler(repository.NewCustomWidgetRepository(s.db), permService)
 	homepageHandler := handlers.NewHomepageHandler(
 		repository.NewWorkspaceRepository(s.db),
 		repository.NewItemRepository(s.db),
@@ -851,7 +863,7 @@ func (s *Server) initialize() error {
 
 	permissionMiddleware := middleware.NewPermissionMiddleware(s.db, permService)
 
-	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware)
+	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware, ipExtractor)
 
 	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
@@ -899,6 +911,9 @@ func (s *Server) initialize() error {
 		slog.Info("LLM fallback service not configured")
 	}
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
+	// Widget generation uses the shared prompt store and connection manager, so
+	// it follows the same per-feature AI configuration as the other features.
+	customWidgetGenerateHandler := handlers.NewCustomWidgetGenerateHandler(llmManager, promptStore)
 	llmModelCache := llm.NewModelCache(s.db)
 	llmManager.SetModelCache(llmModelCache) // freshest vision-capability resolution
 	llmModelRefresher := llm.NewModelRefresher(llmModelCache)
@@ -1115,11 +1130,27 @@ func (s *Server) initialize() error {
 
 	// Wire email reply service for bidirectional email threading
 	emailReplyService := services.NewEmailReplyService(s.db, smtpSender)
+	emailReplyService.SetBaseURL(baseURL)
 	if err := services.PrepareDurableEmailReplyEngine(context.Background(), s.eventEngine, emailReplyService); err != nil {
 		return fmt.Errorf("prepare durable email reply consumer: %w", err)
 	}
 	commentService.SetEmailReplyService(emailReplyService)
 	s.notificationScheduler.SetEmailReplyOutbox(emailReplyService)
+	s.outboundEmailScheduler.SetEmailReplyOutbox(emailReplyService)
+
+	// Dedicated @mention emails (WI-1726): carry the message body and
+	// re-authorize the recipient before SMTP delivery. mentionService was
+	// constructed above, before this notifier existed.
+	mentionEmailService := services.NewMentionEmailService(
+		s.db,
+		smtpSender,
+		s.notificationService,
+		services.NewNotificationAuthorizer(s.db, permService, nil),
+	)
+	mentionEmailService.SetBaseURL(baseURL)
+	mentionService.SetMentionEmailNotifier(mentionEmailService)
+	s.notificationScheduler.SetMentionEmailOutbox(mentionEmailService)
+	s.outboundEmailScheduler.SetMentionEmailOutbox(mentionEmailService)
 
 	// External request participants (WI-1136): the reply service sends the
 	// customer-facing "you were added" notice.
@@ -1136,6 +1167,10 @@ func (s *Server) initialize() error {
 	// Wire EventCoordinator into email processor so inbound-email-created items
 	// emit the same notifications/webhooks/action events as REST-created ones.
 	s.emailScheduler.SetEventCoordinator(eventCoordinator)
+
+	// Optional intake receipts reuse the reply service's SMTP + portal-link
+	// plumbing (WI-1712).
+	s.emailScheduler.SetConfirmationSender(emailReplyService)
 
 	slog.Info("comment service initialized")
 
@@ -1703,6 +1738,7 @@ func (s *Server) initialize() error {
 				s.memoryBudget,
 				s.eventEngine.Store(),
 				repository.NewSCMHealthRepository(s.db),
+				repository.NewChannelRepository(s.db),
 			),
 			AgentSecurity: handlers.NewAgentSecurityHandler(
 				agentSecurityRepo,
@@ -1749,6 +1785,10 @@ func (s *Server) initialize() error {
 			AI:                aiHandler,
 			LLMConnection:     llmConnHandler,
 			WorkItemStaleness: workItemStalenessHandler,
+		},
+		Widgets: routes.WidgetHandlers{
+			Custom:   customWidgetHandler,
+			Generate: customWidgetGenerateHandler,
 		},
 		Misc: routes.MiscHandlers{
 			Homepage:      homepageHandler,
@@ -1848,6 +1888,7 @@ func (s *Server) initialize() error {
 		PackProvisioner:                packApplyService,
 		AI:                             aiHandler,
 		AIRateLimiter:                  s.aiRateLimiter,
+		IPExtractor:                    ipExtractor,
 	}, v1.RegisterRoutes)
 	v2CSRF := middleware.NewDisabledCSRFValidator()
 	if !cfg.DisableCSRF {
@@ -1916,6 +1957,17 @@ func (s *Server) initialize() error {
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
+	// Custom widget data resolution needs the item application service, which is
+	// built after RegisterAll, so this one route is registered here instead.
+	customWidgetDataHandler := handlers.NewCustomWidgetDataHandler(
+		repository.NewCustomWidgetRepository(s.db),
+		permService,
+		reporting.NewService(itemApplication, assetApplication).
+			WithLinks(repository.NewItemLinkRepository(s.db)).
+			WithEdges(repository.NewItemLinkRepository(s.db), repository.NewItemRepository(s.db)),
+	)
+	routeDeps.API.HandleH("POST /custom-widgets/data",
+		routeDeps.AuthMiddleware.RequireAuth(http.HandlerFunc(customWidgetDataHandler.ResolveCustomWidgetData)))
 	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
 	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
 	if err := v2.RegisterRoutes(v2.Deps{
@@ -2301,6 +2353,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")
 		s.notificationScheduler.Stop()
+	}
+
+	if s.outboundEmailScheduler != nil {
+		slog.Info("stopping outbound email scheduler")
+		s.outboundEmailScheduler.Stop()
 	}
 
 	if s.recurrenceScheduler != nil {

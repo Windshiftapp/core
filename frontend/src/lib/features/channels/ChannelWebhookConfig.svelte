@@ -1,7 +1,7 @@
 <script>
-  import { IconX } from '@tabler/icons-svelte-runes';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { channels } from '../../api/channels.js';
   import AlertBox from '../../components/AlertBox.svelte';
   import Input from '../../components/Input.svelte';
   import Button from '../../components/Button.svelte';
@@ -93,7 +93,7 @@
 
     try {
       const configData = getConfig();
-      const result = await api.channels.testConfig(channelId, configData);
+      const result = await channels.testConfig(channelId, configData);
       if (result.success) {
         webhookTestResult = {
           success: true,

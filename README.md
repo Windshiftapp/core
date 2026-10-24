@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/assets/readme-splash.svg">
-    <img src=".github/assets/readme-splash-dark.svg" alt="Windshift — a self-hosted work management platform for teams" width="100%">
+    <img src=".github/assets/readme-splash-dark.svg" alt="Windshift, a self-hosted work management platform for teams" width="100%">
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
   <a href="https://matrix.to/#/%23windshift:matrix.org"><img src="https://img.shields.io/badge/matrix-%23windshift-2e7dbd?style=flat-square" alt="Matrix chat"></a>
 </p>
 
-<p align="center"> <strong>Work management that fits the way your team works.</strong><br> Jira-class planning, workflows, and automation, self-hosted and open source. </p>
+<p align="center">Windshift is an open-source, self-hosted work management platform and a Jira alternative, licensed under AGPL v3. It runs as a single Go binary with the Svelte frontend built in, using embedded SQLite by default or PostgreSQL, and ships as an official Docker image and a desktop app. See <a href="https://windshift.sh">windshift.sh</a> and the <a href="https://windshift.sh/docs">documentation</a>.</p>
 
 <p align="center">
   <picture>

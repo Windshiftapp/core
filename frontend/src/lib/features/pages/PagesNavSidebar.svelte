@@ -3,23 +3,21 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachInstruction, extractInstruction } from '@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item';
   import { isSelfOrDescendant, orderPagesDepthFirst } from './pageHierarchy.js';
-  import { api } from '../../api.js';
+  import { pages as pagesApi } from '../../api/pages.js';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import {
-    IconPlus as Plus,
-    IconDots as Dots,
-    IconBook as Book,
-    IconX as X,
-    IconSearch as Search,
-    IconChevronRight as ChevronRight,
-    IconChevronDown as ChevronDown,
-    IconChevronsDown as ChevronsDown,
-    IconChevronsUp as ChevronsUp,
-    IconArchive as Archive
-  } from '@tabler/icons-svelte-runes';
+  import Plus from '@tabler/icons-svelte-runes/icons/plus';
+  import Dots from '@tabler/icons-svelte-runes/icons/dots';
+  import Book from '@tabler/icons-svelte-runes/icons/book';
+  import X from '@tabler/icons-svelte-runes/icons/x';
+  import Search from '@tabler/icons-svelte-runes/icons/search';
+  import ChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
+  import ChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
+  import ChevronsDown from '@tabler/icons-svelte-runes/icons/chevrons-down';
+  import ChevronsUp from '@tabler/icons-svelte-runes/icons/chevrons-up';
+  import Archive from '@tabler/icons-svelte-runes/icons/archive';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ScrollableSidebar from '../../layout/ScrollableSidebar.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -368,8 +366,8 @@
     loading = true;
     try {
       const [tree, levels] = await Promise.all([
-        api.pages.getAll(workspaceId),
-        api.pages.getEffectiveLevels(workspaceId).catch(() => null),
+        pagesApi.getAll(workspaceId),
+        pagesApi.getEffectiveLevels(workspaceId).catch(() => null),
       ]);
       pages = orderPagesDepthFirst(tree || []);
       // A failed levels lookup degrades to hiding management actions for
@@ -415,7 +413,7 @@
     if (creating) return;
     creating = true;
     try {
-      const page = await api.pages.createPage(workspaceId, {
+      const page = await pagesApi.createPage(workspaceId, {
         title: t('pages.untitled'),
         content: '',
         parentId: parentId ?? null,
@@ -448,7 +446,7 @@
     });
     if (!ok) return;
     try {
-      await api.pages.archivePage(workspaceId, page.id);
+      await pagesApi.archivePage(workspaceId, page.id);
       if (activePageId === page.id) {
         navigate(`/workspaces/${workspaceId}/pages`);
       }
@@ -650,7 +648,7 @@
     }
 
     try {
-      await api.pages.movePage(workspaceId, draggedId, newParentId, {
+      await pagesApi.movePage(workspaceId, draggedId, newParentId, {
         prevSiblingId,
         nextSiblingId,
       });

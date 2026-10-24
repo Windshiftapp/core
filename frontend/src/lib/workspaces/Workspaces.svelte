@@ -1,18 +1,22 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { workspaces } from '../api/workspaces.js';
   import { navigate } from '../router.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { Edit, Plus, Circle, Grip } from '@lucide/svelte';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Grip from '@lucide/svelte/icons/grip';
   import { workspaceIconMap } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
-  import { workspacesStore, permissionStore, isSystemAdmin } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
 
   // Props
@@ -30,7 +34,7 @@
 
   async function loadWorkspaceRows() {
     try {
-      const all = await api.workspaces.getAll({}, { pageSize: 1000 });
+      const all = await workspaces.getAll({}, { pageSize: 1000 });
       workspaceRows = (all || []).filter((ws) => !ws.is_personal);
     } catch (error) {
       console.error('Failed to load workspaces:', error);
@@ -59,7 +63,7 @@
     });
     if (confirmed) {
       try {
-        await api.workspaces.delete(workspace.id);
+        await workspaces.delete(workspace.id);
         workspacesStore.remove(workspace.id);
         await loadWorkspaceRows();
       } catch (error) {

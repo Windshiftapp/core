@@ -1,5 +1,5 @@
 <script>
-  import { permissionStore } from '../stores';
+  import { permissionStore } from '../stores/permissions.svelte.js';
   import UnauthorizedAccess from '../pages/UnauthorizedAccess.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

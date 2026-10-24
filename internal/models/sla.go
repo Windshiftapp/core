@@ -109,13 +109,12 @@ type SLAGoal struct {
 	Targets       []SLAGoalTarget `json:"targets,omitempty"`
 }
 
-// SLAGoalTarget is a priority-scoped or fallback duration target.
+// SLAGoalTarget is the duration target for a goal. A goal has exactly one
+// target; priority-specific durations are expressed as separate goals.
 type SLAGoalTarget struct {
 	ID               int     `json:"id"`
 	GoalID           int     `json:"goal_id"`
 	Position         int     `json:"position"`
-	PriorityID       *int    `json:"priority_id,omitempty"`
-	IsFallback       bool    `json:"is_fallback"`
 	TargetMs         int64   `json:"target_ms"`
 	CalendarID       int     `json:"calendar_id"`
 	SourceID         *string `json:"source_id,omitempty"`
@@ -318,7 +317,5 @@ type SLACalendarImpactTarget struct {
 	GoalID     int    `json:"goal_id"`
 	MetricID   int    `json:"metric_id"`
 	MetricName string `json:"metric_name"`
-	IsFallback bool   `json:"is_fallback"`
-	PriorityID *int   `json:"priority_id,omitempty"`
 	TargetMs   int64  `json:"target_ms"`
 }

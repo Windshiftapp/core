@@ -4,7 +4,9 @@
 // likely looking at right now. Browser users get a no-op; they already have
 // F5 and tend to keep tabs fresh through normal navigation.
 
-import { collectionStore, itemDetailStore, workspaceDataStore } from '../stores';
+import { collectionStore } from '../stores/collectionContext.js';
+import { itemDetailStore } from '../stores/itemDetailStore.svelte.js';
+import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 import { isTauri } from './isTauri.js';
 
 let installed = false;

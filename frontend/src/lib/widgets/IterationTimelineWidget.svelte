@@ -1,6 +1,7 @@
 <script>
-  import { CalendarDays, RefreshCw } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { iterations as iterationsApi } from '../api/milestones.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -41,7 +42,7 @@
     error = null;
 
     try {
-      const allIterations = await api.iterations.getAll({ workspace_id: workspaceId });
+      const allIterations = await iterationsApi.getAll({ workspace_id: workspaceId });
       const iterationList = allIterations || [];
 
       const relevant = iterationList
@@ -61,7 +62,7 @@
       // one GET /iterations/{id}/progress per iteration.
       let progressById = {};
       try {
-        progressById = (await api.iterations.getProgressMany(relevant.map((i) => i.id))) || {};
+        progressById = (await iterationsApi.getProgressMany(relevant.map((i) => i.id))) || {};
       } catch {
         progressById = {};
       }

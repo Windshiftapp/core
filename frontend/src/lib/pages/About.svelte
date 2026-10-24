@@ -1,6 +1,6 @@
 <script>
-  import { Scale } from '@lucide/svelte';
-  import { IconBrandGithub as Github } from '@tabler/icons-svelte-runes';
+  import Scale from '@lucide/svelte/icons/scale';
+  import Github from '@tabler/icons-svelte-runes/icons/brand-github';
   import Button from '../components/Button.svelte';
   import { navigate } from '../router.js';
   import { versionLabel } from '../version.js';

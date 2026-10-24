@@ -112,6 +112,7 @@ type CommentService struct {
 	emailReplyService   EmailReplyHandler
 	agentMentionTrigger AgentMentionTrigger
 	issueSync           CommentIssueSync
+	reactionCache       commentReactionCache
 }
 
 type CaptureComment struct {
@@ -1251,6 +1252,9 @@ func (s *CommentService) Delete(commentID int) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit comment deletion: %w", err)
 	}
+
+	// The comment and its reactions are gone; drop any memoized groups.
+	s.reactionCache.invalidate(commentID)
 
 	// Live-update publish (WI-483): the delete committed.
 	PublishItemChange(itemID)

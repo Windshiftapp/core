@@ -1,10 +1,14 @@
 <script>
   import { untrack } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
-  import { ExternalLink, FileText, LogIn, Paperclip, RotateCcw } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import LogIn from '@lucide/svelte/icons/log-in';
+  import Paperclip from '@lucide/svelte/icons/paperclip';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import { forms } from '../../api/forms.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { authStore } from '../../stores';
+  import { authStore } from '../../stores/auth.svelte.js';
   import Label from '../../components/Label.svelte';
   import FileInput from '../../components/FileInput.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
@@ -308,7 +312,7 @@
 
       const result = submitForm
         ? await submitForm(submissionData, attachments)
-        : await api.forms.submit(formSlug, submissionData, attachments);
+        : await forms.submit(formSlug, submissionData, attachments);
 
       draftReady = false;
       const { storage: draftStorage, userId: draftUserId } = resolveDraftStore();

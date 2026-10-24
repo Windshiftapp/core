@@ -6,7 +6,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import PagePicker from '../pickers/PagePicker.svelte';
   import Input from '../components/Input.svelte';
-  import { api } from '../api.js';
+  import { links } from '../api/configuration.js';
   import { t } from '../stores/i18n.svelte.js';
   import { useEventListener } from 'runed';
   import { onDestroy } from 'svelte';
@@ -115,7 +115,7 @@
 
   async function searchItems(query, searchType, version) {
     try {
-      const results = await api.links.search(query, searchType, 10);
+      const results = await links.search(query, searchType, 10);
       if (version !== searchVersion) return;
       const items = Array.isArray(results) ? results : [];
       searchResults = searchType === 'item'

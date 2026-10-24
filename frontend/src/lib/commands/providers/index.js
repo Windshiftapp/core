@@ -1,5 +1,6 @@
 export { adminProvider } from './adminProvider.js';
 export { createProvider } from './createProvider.js';
+export { delegatedAdminProvider } from './delegatedAdminProvider.js';
 export { makeExternalProvider } from './externalProvider.js';
 export { globalNavigationProvider } from './globalNavigationProvider.js';
 export { recentlyViewedProvider } from './recentlyViewedProvider.js';

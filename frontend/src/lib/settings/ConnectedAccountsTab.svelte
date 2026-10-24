@@ -2,9 +2,14 @@
 	import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { setOAuthReturnURL } from '../utils/oauthReturn.js';
-	import { api } from '../api.js';
- import { GitBranch, CheckCircle, XCircle, LogOut, ExternalLink } from '@lucide/svelte';
-	import { IconBrandGithub as Github } from '@tabler/icons-svelte-runes';
+	import { scmProviders, userSCM } from '../api/scm.js';
+	import { userIntegrations } from '../api/integrations.js';
+ import GitBranch from '@lucide/svelte/icons/git-branch';
+ import CheckCircle from '@lucide/svelte/icons/check-circle';
+ import XCircle from '@lucide/svelte/icons/x-circle';
+ import LogOut from '@lucide/svelte/icons/log-out';
+ import ExternalLink from '@lucide/svelte/icons/external-link';
+	import Github from '@tabler/icons-svelte-runes/icons/brand-github';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
@@ -44,7 +49,7 @@
 		loading = true;
 		error = '';
 		try {
-			providers = await api.userSCM.getAvailableProviders() || [];
+			providers = await userSCM.getAvailableProviders() || [];
 		} catch (err) {
 			console.error('Failed to load SCM providers:', err);
 			error = t('settings.connectedAccounts.failedToLoad');
@@ -58,7 +63,7 @@
 		disconnecting = providerId;
 		error = '';
 		try {
-			await api.userSCM.disconnect(providerId);
+			await userSCM.disconnect(providerId);
 			// Refresh providers list
 			await loadProviders();
 		} catch (err) {
@@ -71,7 +76,7 @@
 
 	function connect(provider) {
 		// Start OAuth flow
-		api.scmProviders.startOAuth(provider.slug).then(result => {
+		scmProviders.startOAuth(provider.slug).then(result => {
 			if (result?.auth_url) {
 				// Store return URL so we come back here
 				setOAuthReturnURL();
@@ -97,8 +102,8 @@
 		intError = '';
 		try {
 			const [connections, available] = await Promise.all([
-				api.userIntegrations.getConnections(),
-				api.userIntegrations.getAvailableProviders(),
+				userIntegrations.getConnections(),
+				userIntegrations.getAvailableProviders(),
 			]);
 			intConnections = connections || [];
 			intAvailable = available || [];
@@ -113,7 +118,7 @@
 	async function disconnectIntegration(providerId) {
 		intDisconnecting = providerId;
 		try {
-			await api.userIntegrations.disconnect(providerId);
+			await userIntegrations.disconnect(providerId);
 			await loadIntegrations();
 		} catch (err) {
 			console.error('Failed to disconnect integration:', err);
@@ -124,7 +129,7 @@
 	}
 
 	function connectIntegration(provider) {
-		api.userIntegrations.startOAuth(provider.slug).then(result => {
+		userIntegrations.startOAuth(provider.slug).then(result => {
 			if (result?.auth_url) {
 				sessionStorage.setItem('integration_oauth_return', window.location.href);
 				window.location.href = result.auth_url;

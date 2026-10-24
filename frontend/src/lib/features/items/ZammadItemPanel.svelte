@@ -1,19 +1,17 @@
 <script>
   import { useEventListener } from 'runed';
   import Spinner from '../../components/Spinner.svelte';
-  import {
-    TicketCheck,
-    Plus,
-    RefreshCw,
-    Loader2,
-    ExternalLink,
-    AlertTriangle,
-    Edit2,
-    Trash2,
-    ChevronDown,
-    ChevronUp,
-  } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import TicketCheck from '@lucide/svelte/icons/ticket-check';
+  import Plus from '@lucide/svelte/icons/plus';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Edit2 from '@lucide/svelte/icons/edit-2';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import { zammadConnections, zammadTickets } from '../../api/integrations.js';
   import { isExpectedBackgroundSyncError } from '../../utils/backgroundSync.js';
   import Button from '../../components/Button.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -24,7 +22,7 @@
   import FormField from '../../components/FormField.svelte';
   import Input from '../../components/Input.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { authStore } from '../../stores';
+  import { authStore } from '../../stores/auth.svelte.js';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { safeHref } from '../../utils/sanitize';
@@ -272,7 +270,7 @@
     timelineLoading = true;
     timelineError = '';
     try {
-      const response = await api.zammadTickets.history(currentItemId, { limit: 6 });
+      const response = await zammadTickets.history(currentItemId, { limit: 6 });
       if (!isCurrentTimelineRequest()) return;
       timelineEvents = Array.isArray(response?.events)
         ? response.events.filter((event) => observedTimelineFields.has(event?.field)).slice(0, 6)
@@ -356,8 +354,8 @@
     error = '';
     try {
       const [loadedConnections, loadedLinks] = await Promise.all([
-        api.zammadConnections.forWorkspace(currentWorkspaceId),
-        api.zammadTickets.forItem(currentItemId),
+        zammadConnections.forWorkspace(currentWorkspaceId),
+        zammadTickets.forItem(currentItemId),
       ]);
       if (currentVersion !== loadVersion || !isCurrentContext(version, currentItemId, currentWorkspaceId)) {
         return loadOutcomes.superseded;
@@ -431,7 +429,7 @@
       );
     loadingMetadata = true;
     try {
-      const loadedMetadata = await api.zammadConnections.metadata(workspaceId, connection.id);
+      const loadedMetadata = await zammadConnections.metadata(workspaceId, connection.id);
       if (!isCurrentRequest()) return;
       const groups = usableGroups(connection, loadedMetadata);
       metadata = { ...loadedMetadata, groups };
@@ -460,7 +458,7 @@
     creating = true;
     formError = '';
     try {
-      const link = await api.zammadTickets.create(currentItemId, {
+      const link = await zammadTickets.create(currentItemId, {
         connection_id: selectedConnectionId,
         group_id: group.id,
       });
@@ -492,7 +490,7 @@
     linking = true;
     formError = '';
     try {
-      const link = await api.zammadTickets.link(currentItemId, {
+      const link = await zammadTickets.link(currentItemId, {
         connection_id: selectedConnectionId,
         ticket_number: trimmedTicketNumber,
       });
@@ -518,7 +516,7 @@
     const currentItemId = itemId;
     refreshingId = link.id;
     try {
-      await api.zammadTickets.refresh(link.id);
+      await zammadTickets.refresh(link.id);
       if (!isCurrentContext(version, currentItemId)) return;
       const reloaded = await load(currentItemId, workspaceId, version, { preserveExisting: true });
       if (!isCurrentContext(version, currentItemId)) return;
@@ -553,7 +551,7 @@
     showEdit = true;
     loadingEditMetadata = true;
     try {
-      const loadedMetadata = await api.zammadConnections.metadata(currentWorkspaceId, connection.id);
+      const loadedMetadata = await zammadConnections.metadata(currentWorkspaceId, connection.id);
       if (version !== editVersion || !isCurrentContext(contextVersion, currentItemId, currentWorkspaceId) || !showEdit || editingLink?.id !== link.id) return;
       editMetadata = { ...loadedMetadata, groups: usableGroups(connection, loadedMetadata) };
       if (!editGroups.some((group) => String(group.id) === selectedEditGroupId)) {
@@ -591,7 +589,7 @@
     if (!connection || !selectedEditGroupId) return;
     loadingEditOwners = true;
     try {
-      const loadedOwners = await api.zammadConnections.owners(
+      const loadedOwners = await zammadConnections.owners(
         currentWorkspaceId,
         connection.id,
         Number(selectedEditGroupId),
@@ -641,7 +639,7 @@
     savingEdit = true;
     editError = '';
     try {
-      await api.zammadTickets.update(editingLink.id, payload);
+      await zammadTickets.update(editingLink.id, payload);
       if (version !== editVersion || !isCurrentContext(context, currentItemId)) return;
       showEdit = false;
       const reloaded = await load(currentItemId, workspaceId, context, { preserveExisting: true });
@@ -673,7 +671,7 @@
 
     removingId = link.id;
     try {
-      await api.zammadTickets.delete(link.id);
+      await zammadTickets.delete(link.id);
       if (!isCurrentContext(version, currentItemId, currentWorkspaceId)) return;
       links = links.filter((entry) => entry.id !== link.id);
       invalidateTimeline();

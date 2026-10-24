@@ -1,5 +1,8 @@
 <script>
-  import { CheckSquare, Square, ChevronDown, X } from '@lucide/svelte';
+  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import Square from '@lucide/svelte/icons/square';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import X from '@lucide/svelte/icons/x';
   import { BasePicker } from '.';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { formatDateShort } from '../utils/dateFormatter.js';

@@ -11,7 +11,7 @@
 		IconCircleMinus,
 		IconHistory
 	} from '@tabler/icons-svelte-runes';
-	import { api } from '../../api.js';
+	import { milestones as milestonesApi } from '../../api/milestones.js';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import Button from '../../components/Button.svelte';
 	import StateDisplay from '../../components/StateDisplay.svelte';
@@ -63,7 +63,7 @@
 		loadingMore = false;
 		error = '';
 		try {
-			const result = await api.milestones.getActivity(milestoneId, { page: 1, pageSize: PAGE_SIZE });
+			const result = await milestonesApi.getActivity(milestoneId, { page: 1, pageSize: PAGE_SIZE });
 			if (version !== feedVersion) return;
 			entries = result.entries;
 			page = 1;
@@ -84,7 +84,7 @@
 		loadingMore = true;
 		error = '';
 		try {
-			const result = await api.milestones.getActivity(milestoneId, { page: page + 1, pageSize: PAGE_SIZE });
+			const result = await milestonesApi.getActivity(milestoneId, { page: page + 1, pageSize: PAGE_SIZE });
 			if (version !== feedVersion) return;
 			const seen = new Set(entries.map((entry) => entry.id));
 			entries = [...entries, ...result.entries.filter((entry) => !seen.has(entry.id))];

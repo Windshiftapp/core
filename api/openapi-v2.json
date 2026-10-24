@@ -1374,6 +1374,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -1381,9 +1385,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "DeleteItemsItemIdWatchersUserIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -5638,6 +5704,10 @@
         "format": "binary",
         "type": "string"
       },
+      "GetAttachmentsAttachmentIdDownloadResult": {
+        "format": "binary",
+        "type": "string"
+      },
       "GetAttachmentsAttachmentIdResult": {
         "additionalProperties": false,
         "properties": {
@@ -5664,6 +5734,10 @@
               "id": {
                 "description": "The id value.",
                 "type": "integer"
+              },
+              "is_internal": {
+                "description": "The is internal value.",
+                "type": "boolean"
               },
               "item_id": {
                 "description": "The item id value.",
@@ -5707,6 +5781,7 @@
               "filename",
               "has_thumbnail",
               "id",
+              "is_internal",
               "mime_type",
               "original_filename"
             ],
@@ -6035,6 +6110,33 @@
                         },
                         "nullable": true,
                         "type": "array"
+                      },
+                      "milestone_swimlanes": {
+                        "additionalProperties": false,
+                        "description": "The milestone swimlanes value.",
+                        "nullable": true,
+                        "properties": {
+                          "global_milestone_ids": {
+                            "description": "The global milestone ids value.",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          },
+                          "show_completed": {
+                            "description": "The show completed value.",
+                            "type": "boolean"
+                          },
+                          "show_open_from_completed": {
+                            "description": "The show open from completed value.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "show_completed",
+                          "show_open_from_completed"
+                        ],
+                        "type": "object"
                       }
                     },
                     "type": "object"
@@ -6416,6 +6518,33 @@
                     },
                     "nullable": true,
                     "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -6568,6 +6697,10 @@
                 "description": "The name value.",
                 "type": "string"
               },
+              "public_milestone_swimlanes": {
+                "description": "The public milestone swimlanes value.",
+                "type": "boolean"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -6594,6 +6727,7 @@
               "is_private",
               "is_public",
               "name",
+              "public_milestone_swimlanes",
               "ql_query",
               "updated_at"
             ],
@@ -6879,6 +7013,10 @@
                   "description": "The name value.",
                   "type": "string"
                 },
+                "public_milestone_swimlanes": {
+                  "description": "The public milestone swimlanes value.",
+                  "type": "boolean"
+                },
                 "public_slug": {
                   "description": "The public slug value.",
                   "nullable": true,
@@ -6905,6 +7043,7 @@
                 "is_private",
                 "is_public",
                 "name",
+                "public_milestone_swimlanes",
                 "ql_query",
                 "updated_at"
               ],
@@ -6982,6 +7121,44 @@
                 "description": "The portal customer id value.",
                 "nullable": true,
                 "type": "integer"
+              },
+              "reactions": {
+                "description": "The reactions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "count": {
+                      "description": "The count value.",
+                      "type": "integer"
+                    },
+                    "reaction": {
+                      "description": "The reaction value.",
+                      "type": "string"
+                    },
+                    "user_ids": {
+                      "description": "The user ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "user_names": {
+                      "description": "The user names value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "reaction",
+                    "user_ids",
+                    "user_names"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "source": {
                 "description": "The source value.",
@@ -9881,12 +10058,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -10389,6 +10579,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -10570,6 +10764,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -11210,12 +11405,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -11718,6 +11926,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -11899,6 +12111,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -12205,6 +12418,10 @@
                   "description": "The id value.",
                   "type": "integer"
                 },
+                "is_internal": {
+                  "description": "The is internal value.",
+                  "type": "boolean"
+                },
                 "item_id": {
                   "description": "The item id value.",
                   "nullable": true,
@@ -12247,6 +12464,7 @@
                 "filename",
                 "has_thumbnail",
                 "id",
+                "is_internal",
                 "mime_type",
                 "original_filename"
               ],
@@ -12667,12 +12885,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -13175,6 +13406,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -13356,6 +13591,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -13436,6 +13672,44 @@
                       "description": "The portal customer id value.",
                       "nullable": true,
                       "type": "integer"
+                    },
+                    "reactions": {
+                      "description": "The reactions value.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "count": {
+                            "description": "The count value.",
+                            "type": "integer"
+                          },
+                          "reaction": {
+                            "description": "The reaction value.",
+                            "type": "string"
+                          },
+                          "user_ids": {
+                            "description": "The user ids value.",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          },
+                          "user_names": {
+                            "description": "The user names value.",
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "count",
+                          "reaction",
+                          "user_ids",
+                          "user_names"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
                     },
                     "source": {
                       "description": "The source value.",
@@ -13861,12 +14135,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -14369,6 +14656,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -14550,6 +14841,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -14888,12 +15180,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -15396,6 +15701,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -15577,6 +15886,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -15959,12 +16269,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -16467,6 +16790,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -16648,6 +16975,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -17087,12 +17415,25 @@
                     "description": "The inherit project value.",
                     "type": "boolean"
                   },
+                  "intake_id": {
+                    "description": "The intake id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "is_task": {
                     "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                     "type": "boolean"
                   },
                   "item_type_builtin_key": {
                     "description": "The item type builtin key value.",
+                    "type": "string"
+                  },
+                  "item_type_color": {
+                    "description": "The item type color value.",
+                    "type": "string"
+                  },
+                  "item_type_icon": {
+                    "description": "The item type icon value.",
                     "type": "string"
                   },
                   "item_type_id": {
@@ -17595,6 +17936,10 @@
                     },
                     "type": "array"
                   },
+                  "portal_org_shared": {
+                    "description": "The portal org shared value.",
+                    "type": "boolean"
+                  },
                   "priority_builtin_key": {
                     "description": "The priority builtin key value.",
                     "type": "string"
@@ -17776,6 +18121,7 @@
                   "inherit_project",
                   "is_task",
                   "last_active_at",
+                  "portal_org_shared",
                   "title",
                   "updated_at",
                   "workspace_id",
@@ -18928,6 +19274,10 @@
                 ],
                 "type": "object"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -18948,6 +19298,7 @@
               "screen_context",
               "section_errors",
               "transitions",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
@@ -20230,12 +20581,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -20738,6 +21102,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -20919,6 +21287,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -21469,12 +21838,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -21977,6 +22359,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -22158,6 +22544,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -22728,6 +23115,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -22735,9 +23126,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetItemsItemIdWatchersResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -22755,6 +23208,10 @@
                 "created_at": {
                   "description": "The created at value.",
                   "type": "integer"
+                },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
                 },
                 "customer_id": {
                   "description": "The customer id value.",
@@ -23200,12 +23657,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -23708,6 +24178,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -23889,6 +24363,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -24252,12 +24727,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -24760,6 +25248,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -24941,6 +25433,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -26042,6 +26535,11 @@
                 "asset_type_name": {
                   "description": "The asset type name value.",
                   "type": "string"
+                },
+                "creator_portal_customer_id": {
+                  "description": "The creator portal customer id value.",
+                  "nullable": true,
+                  "type": "integer"
                 },
                 "description": {
                   "description": "The description value.",
@@ -29717,6 +30215,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
               "customer_id": {
                 "description": "The customer id value.",
                 "nullable": true,
@@ -29795,6 +30297,10 @@
                 "created_at": {
                   "description": "The created at value.",
                   "type": "integer"
+                },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
                 },
                 "customer_id": {
                   "description": "The customer id value.",
@@ -29949,6 +30455,10 @@
                   "description": "The created at value.",
                   "type": "string"
                 },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
+                },
                 "customer_id": {
                   "description": "The customer id value.",
                   "nullable": true,
@@ -30029,6 +30539,11 @@
               "created_at": {
                 "description": "The created at value.",
                 "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "nullable": true,
+                "type": "string"
               },
               "customer_name": {
                 "description": "The customer name value.",
@@ -30115,6 +30630,10 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
+                },
                 "customer_id": {
                   "description": "The customer id value.",
                   "type": "integer"
@@ -30167,6 +30686,10 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
+                },
                 "customer_id": {
                   "description": "The customer id value.",
                   "type": "integer"
@@ -30231,6 +30754,10 @@
                 "created_at": {
                   "description": "The created at value.",
                   "type": "integer"
+                },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
                 },
                 "customer_id": {
                   "description": "The customer id value.",
@@ -30366,6 +30893,10 @@
               "created_at": {
                 "description": "The created at value.",
                 "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
               },
               "customer_id": {
                 "description": "The customer id value.",
@@ -33459,6 +33990,33 @@
                         },
                         "nullable": true,
                         "type": "array"
+                      },
+                      "milestone_swimlanes": {
+                        "additionalProperties": false,
+                        "description": "The milestone swimlanes value.",
+                        "nullable": true,
+                        "properties": {
+                          "global_milestone_ids": {
+                            "description": "The global milestone ids value.",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          },
+                          "show_completed": {
+                            "description": "The show completed value.",
+                            "type": "boolean"
+                          },
+                          "show_open_from_completed": {
+                            "description": "The show open from completed value.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "show_completed",
+                          "show_open_from_completed"
+                        ],
+                        "type": "object"
                       }
                     },
                     "type": "object"
@@ -33840,6 +34398,33 @@
                     },
                     "nullable": true,
                     "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -38849,10 +39434,6 @@
                             "description": "The goal id value.",
                             "type": "integer"
                           },
-                          "is_fallback": {
-                            "description": "The is fallback value.",
-                            "type": "boolean"
-                          },
                           "metric_id": {
                             "description": "The metric id value.",
                             "type": "integer"
@@ -38860,11 +39441,6 @@
                           "metric_name": {
                             "description": "The metric name value.",
                             "type": "string"
-                          },
-                          "priority_id": {
-                            "description": "The priority id value.",
-                            "nullable": true,
-                            "type": "integer"
                           },
                           "target_id": {
                             "description": "The target id value.",
@@ -38877,7 +39453,6 @@
                         },
                         "required": [
                           "goal_id",
-                          "is_fallback",
                           "metric_id",
                           "metric_name",
                           "target_id",
@@ -39206,17 +39781,8 @@
                             "description": "The id value.",
                             "type": "integer"
                           },
-                          "is_fallback": {
-                            "description": "The is fallback value.",
-                            "type": "boolean"
-                          },
                           "position": {
                             "description": "The position value.",
-                            "type": "integer"
-                          },
-                          "priority_id": {
-                            "description": "The priority id value.",
-                            "nullable": true,
                             "type": "integer"
                           },
                           "source_id": {
@@ -39238,7 +39804,6 @@
                           "calendar_id",
                           "goal_id",
                           "id",
-                          "is_fallback",
                           "position",
                           "target_ms"
                         ],
@@ -39455,17 +40020,8 @@
                               "description": "The id value.",
                               "type": "integer"
                             },
-                            "is_fallback": {
-                              "description": "The is fallback value.",
-                              "type": "boolean"
-                            },
                             "position": {
                               "description": "The position value.",
-                              "type": "integer"
-                            },
-                            "priority_id": {
-                              "description": "The priority id value.",
-                              "nullable": true,
                               "type": "integer"
                             },
                             "source_id": {
@@ -39487,7 +40043,6 @@
                             "calendar_id",
                             "goal_id",
                             "id",
-                            "is_fallback",
                             "position",
                             "target_ms"
                           ],
@@ -42163,12 +42718,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -42671,6 +43239,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -42852,6 +43424,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -44237,6 +44810,10 @@
                   "description": "The created at value.",
                   "type": "string"
                 },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
+                },
                 "customer_id": {
                   "description": "The customer id value.",
                   "nullable": true,
@@ -44752,12 +45329,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -45260,6 +45850,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -45441,6 +46035,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -45823,12 +46418,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -46331,6 +46939,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -46512,6 +47124,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -46951,12 +47564,25 @@
                     "description": "The inherit project value.",
                     "type": "boolean"
                   },
+                  "intake_id": {
+                    "description": "The intake id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "is_task": {
                     "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                     "type": "boolean"
                   },
                   "item_type_builtin_key": {
                     "description": "The item type builtin key value.",
+                    "type": "string"
+                  },
+                  "item_type_color": {
+                    "description": "The item type color value.",
+                    "type": "string"
+                  },
+                  "item_type_icon": {
+                    "description": "The item type icon value.",
                     "type": "string"
                   },
                   "item_type_id": {
@@ -47459,6 +48085,10 @@
                     },
                     "type": "array"
                   },
+                  "portal_org_shared": {
+                    "description": "The portal org shared value.",
+                    "type": "boolean"
+                  },
                   "priority_builtin_key": {
                     "description": "The priority builtin key value.",
                     "type": "string"
@@ -47640,6 +48270,7 @@
                   "inherit_project",
                   "is_task",
                   "last_active_at",
+                  "portal_org_shared",
                   "title",
                   "updated_at",
                   "workspace_id",
@@ -48792,6 +49423,10 @@
                 ],
                 "type": "object"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -48812,6 +49447,7 @@
               "screen_context",
               "section_errors",
               "transitions",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
@@ -49141,12 +49777,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -49649,6 +50298,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -49830,6 +50483,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -53002,6 +53656,11 @@
             "nullable": true,
             "type": "string"
           },
+          "public_milestone_swimlanes": {
+            "description": "The public milestone swimlanes value.",
+            "nullable": true,
+            "type": "boolean"
+          },
           "public_slug": {
             "description": "The public slug value.",
             "nullable": true,
@@ -53081,6 +53740,10 @@
                 "description": "The name value.",
                 "type": "string"
               },
+              "public_milestone_swimlanes": {
+                "description": "The public milestone swimlanes value.",
+                "type": "boolean"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -53107,6 +53770,7 @@
               "is_private",
               "is_public",
               "name",
+              "public_milestone_swimlanes",
               "ql_query",
               "updated_at"
             ],
@@ -53123,6 +53787,11 @@
         "properties": {
           "is_public": {
             "description": "The is public value.",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "public_milestone_swimlanes": {
+            "description": "The public milestone swimlanes value.",
             "nullable": true,
             "type": "boolean"
           },
@@ -53195,6 +53864,10 @@
                 "description": "The name value.",
                 "type": "string"
               },
+              "public_milestone_swimlanes": {
+                "description": "The public milestone swimlanes value.",
+                "type": "boolean"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -53221,6 +53894,7 @@
               "is_private",
               "is_public",
               "name",
+              "public_milestone_swimlanes",
               "ql_query",
               "updated_at"
             ],
@@ -53372,6 +54046,44 @@
                 "description": "The portal customer id value.",
                 "nullable": true,
                 "type": "integer"
+              },
+              "reactions": {
+                "description": "The reactions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "count": {
+                      "description": "The count value.",
+                      "type": "integer"
+                    },
+                    "reaction": {
+                      "description": "The reaction value.",
+                      "type": "string"
+                    },
+                    "user_ids": {
+                      "description": "The user ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "user_names": {
+                      "description": "The user names value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "reaction",
+                    "user_ids",
+                    "user_names"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "source": {
                 "description": "The source value.",
@@ -54510,12 +55222,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -55018,6 +55743,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -55199,6 +55928,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -55741,12 +56471,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -56249,6 +56992,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -56430,6 +57177,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -57938,6 +58686,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
               "customer_id": {
                 "description": "The customer id value.",
                 "nullable": true,
@@ -58066,6 +58818,10 @@
               "created_at": {
                 "description": "The created at value.",
                 "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
               },
               "customer_id": {
                 "description": "The customer id value.",
@@ -65254,6 +66010,10 @@
             "description": "The name value.",
             "type": "string"
           },
+          "public_milestone_swimlanes": {
+            "description": "The public milestone swimlanes value.",
+            "type": "boolean"
+          },
           "public_slug": {
             "description": "The public slug value.",
             "nullable": true,
@@ -65280,6 +66040,7 @@
           "is_private",
           "is_public",
           "name",
+          "public_milestone_swimlanes",
           "ql_query",
           "updated_at"
         ],
@@ -65346,6 +66107,10 @@
                 "description": "The name value.",
                 "type": "string"
               },
+              "public_milestone_swimlanes": {
+                "description": "The public milestone swimlanes value.",
+                "type": "boolean"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -65372,6 +66137,7 @@
               "is_private",
               "is_public",
               "name",
+              "public_milestone_swimlanes",
               "ql_query",
               "updated_at"
             ],
@@ -65386,6 +66152,10 @@
       "PostCommentsBatchPayload": {
         "additionalProperties": false,
         "properties": {
+          "include_reactions": {
+            "description": "The include reactions value.",
+            "type": "boolean"
+          },
           "item_ids": {
             "description": "The item ids value.",
             "items": {
@@ -65471,6 +66241,44 @@
                         "nullable": true,
                         "type": "integer"
                       },
+                      "reactions": {
+                        "description": "The reactions value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "count": {
+                              "description": "The count value.",
+                              "type": "integer"
+                            },
+                            "reaction": {
+                              "description": "The reaction value.",
+                              "type": "string"
+                            },
+                            "user_ids": {
+                              "description": "The user ids value.",
+                              "items": {
+                                "type": "integer"
+                              },
+                              "type": "array"
+                            },
+                            "user_names": {
+                              "description": "The user names value.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "reaction",
+                            "user_ids",
+                            "user_names"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
                       "source": {
                         "description": "The source value.",
                         "type": "string"
@@ -65507,6 +66315,65 @@
                 "comments",
                 "has_more",
                 "item_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostCommentsCommentIdReactionsPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reaction": {
+            "description": "The reaction value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reaction"
+        ],
+        "type": "object"
+      },
+      "PostCommentsCommentIdReactionsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "count": {
+                  "description": "The count value.",
+                  "type": "integer"
+                },
+                "reaction": {
+                  "description": "The reaction value.",
+                  "type": "string"
+                },
+                "user_ids": {
+                  "description": "The user ids value.",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "user_names": {
+                  "description": "The user names value.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "count",
+                "reaction",
+                "user_ids",
+                "user_names"
               ],
               "type": "object"
             },
@@ -70474,12 +71341,25 @@
                         "description": "The inherit project value.",
                         "type": "boolean"
                       },
+                      "intake_id": {
+                        "description": "The intake id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
                       "is_task": {
                         "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                         "type": "boolean"
                       },
                       "item_type_builtin_key": {
                         "description": "The item type builtin key value.",
+                        "type": "string"
+                      },
+                      "item_type_color": {
+                        "description": "The item type color value.",
+                        "type": "string"
+                      },
+                      "item_type_icon": {
+                        "description": "The item type icon value.",
                         "type": "string"
                       },
                       "item_type_id": {
@@ -70982,6 +71862,10 @@
                         },
                         "type": "array"
                       },
+                      "portal_org_shared": {
+                        "description": "The portal org shared value.",
+                        "type": "boolean"
+                      },
                       "priority_builtin_key": {
                         "description": "The priority builtin key value.",
                         "type": "string"
@@ -71163,6 +72047,7 @@
                       "inherit_project",
                       "is_task",
                       "last_active_at",
+                      "portal_org_shared",
                       "title",
                       "updated_at",
                       "workspace_id",
@@ -71526,12 +72411,25 @@
                   "description": "The inherit project value.",
                   "type": "boolean"
                 },
+                "intake_id": {
+                  "description": "The intake id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "is_task": {
                   "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                   "type": "boolean"
                 },
                 "item_type_builtin_key": {
                   "description": "The item type builtin key value.",
+                  "type": "string"
+                },
+                "item_type_color": {
+                  "description": "The item type color value.",
+                  "type": "string"
+                },
+                "item_type_icon": {
+                  "description": "The item type icon value.",
                   "type": "string"
                 },
                 "item_type_id": {
@@ -72034,6 +72932,10 @@
                   },
                   "type": "array"
                 },
+                "portal_org_shared": {
+                  "description": "The portal org shared value.",
+                  "type": "boolean"
+                },
                 "priority_builtin_key": {
                   "description": "The priority builtin key value.",
                   "type": "string"
@@ -72215,6 +73117,7 @@
                 "inherit_project",
                 "is_task",
                 "last_active_at",
+                "portal_org_shared",
                 "title",
                 "updated_at",
                 "workspace_id",
@@ -72223,6 +73126,82 @@
               "type": "object"
             },
             "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostItemsBulkDeletePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "item_ids": {
+            "description": "The item ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "type": "object"
+      },
+      "PostItemsBulkDeleteResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "deleted_count": {
+                "description": "The deleted count value.",
+                "type": "integer"
+              },
+              "failed_count": {
+                "description": "The failed count value.",
+                "type": "integer"
+              },
+              "failures": {
+                "description": "The failures value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "description": "The code value.",
+                      "type": "string"
+                    },
+                    "item_id": {
+                      "description": "The item id value.",
+                      "type": "integer"
+                    },
+                    "message": {
+                      "description": "The message value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "item_id",
+                    "message"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "requested_count": {
+                "description": "The requested count value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "deleted_count",
+              "failed_count",
+              "failures",
+              "requested_count"
+            ],
+            "type": "object"
           }
         },
         "required": [
@@ -72592,12 +73571,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -73100,6 +74092,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -73281,6 +74277,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -73309,6 +74306,92 @@
               "requested_count",
               "unchanged_count",
               "updated_count"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostItemsBulkTransitionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "item_ids": {
+            "description": "The item ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "to_status_id": {
+            "description": "The to status id value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_ids",
+          "to_status_id"
+        ],
+        "type": "object"
+      },
+      "PostItemsBulkTransitionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "failed_count": {
+                "description": "The failed count value.",
+                "type": "integer"
+              },
+              "failures": {
+                "description": "The failures value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "description": "The code value.",
+                      "type": "string"
+                    },
+                    "item_id": {
+                      "description": "The item id value.",
+                      "type": "integer"
+                    },
+                    "message": {
+                      "description": "The message value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "item_id",
+                    "message"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "requested_count": {
+                "description": "The requested count value.",
+                "type": "integer"
+              },
+              "transitioned_count": {
+                "description": "The transitioned count value.",
+                "type": "integer"
+              },
+              "unchanged_count": {
+                "description": "The unchanged count value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "failed_count",
+              "failures",
+              "requested_count",
+              "transitioned_count",
+              "unchanged_count"
             ],
             "type": "object"
           }
@@ -73670,12 +74753,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -74178,6 +75274,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -74359,6 +75459,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -74459,6 +75560,10 @@
                 "description": "The id value.",
                 "type": "integer"
               },
+              "is_internal": {
+                "description": "The is internal value.",
+                "type": "boolean"
+              },
               "item_id": {
                 "description": "The item id value.",
                 "nullable": true,
@@ -74501,6 +75606,7 @@
               "filename",
               "has_thumbnail",
               "id",
+              "is_internal",
               "mime_type",
               "original_filename"
             ],
@@ -74849,12 +75955,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -75357,6 +76476,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -75538,6 +76661,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -75629,6 +76753,44 @@
                 "description": "The portal customer id value.",
                 "nullable": true,
                 "type": "integer"
+              },
+              "reactions": {
+                "description": "The reactions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "count": {
+                      "description": "The count value.",
+                      "type": "integer"
+                    },
+                    "reaction": {
+                      "description": "The reaction value.",
+                      "type": "string"
+                    },
+                    "user_ids": {
+                      "description": "The user ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "user_names": {
+                      "description": "The user names value.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "reaction",
+                    "user_ids",
+                    "user_names"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "source": {
                 "description": "The source value.",
@@ -75976,12 +77138,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -76484,6 +77659,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -76665,6 +77844,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -77531,12 +78711,25 @@
                     "description": "The inherit project value.",
                     "type": "boolean"
                   },
+                  "intake_id": {
+                    "description": "The intake id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "is_task": {
                     "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                     "type": "boolean"
                   },
                   "item_type_builtin_key": {
                     "description": "The item type builtin key value.",
+                    "type": "string"
+                  },
+                  "item_type_color": {
+                    "description": "The item type color value.",
+                    "type": "string"
+                  },
+                  "item_type_icon": {
+                    "description": "The item type icon value.",
                     "type": "string"
                   },
                   "item_type_id": {
@@ -78039,6 +79232,10 @@
                     },
                     "type": "array"
                   },
+                  "portal_org_shared": {
+                    "description": "The portal org shared value.",
+                    "type": "boolean"
+                  },
                   "priority_builtin_key": {
                     "description": "The priority builtin key value.",
                     "type": "string"
@@ -78220,6 +79417,7 @@
                   "inherit_project",
                   "is_task",
                   "last_active_at",
+                  "portal_org_shared",
                   "title",
                   "updated_at",
                   "workspace_id",
@@ -79242,12 +80440,25 @@
                     "description": "The inherit project value.",
                     "type": "boolean"
                   },
+                  "intake_id": {
+                    "description": "The intake id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "is_task": {
                     "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                     "type": "boolean"
                   },
                   "item_type_builtin_key": {
                     "description": "The item type builtin key value.",
+                    "type": "string"
+                  },
+                  "item_type_color": {
+                    "description": "The item type color value.",
+                    "type": "string"
+                  },
+                  "item_type_icon": {
+                    "description": "The item type icon value.",
                     "type": "string"
                   },
                   "item_type_id": {
@@ -79750,6 +80961,10 @@
                     },
                     "type": "array"
                   },
+                  "portal_org_shared": {
+                    "description": "The portal org shared value.",
+                    "type": "boolean"
+                  },
                   "priority_builtin_key": {
                     "description": "The priority builtin key value.",
                     "type": "string"
@@ -79931,6 +81146,7 @@
                   "inherit_project",
                   "is_task",
                   "last_active_at",
+                  "portal_org_shared",
                   "title",
                   "updated_at",
                   "workspace_id",
@@ -80418,12 +81634,25 @@
                 "description": "The inherit project value.",
                 "type": "boolean"
               },
+              "intake_id": {
+                "description": "The intake id value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "is_task": {
                 "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                 "type": "boolean"
               },
               "item_type_builtin_key": {
                 "description": "The item type builtin key value.",
+                "type": "string"
+              },
+              "item_type_color": {
+                "description": "The item type color value.",
+                "type": "string"
+              },
+              "item_type_icon": {
+                "description": "The item type icon value.",
                 "type": "string"
               },
               "item_type_id": {
@@ -80926,6 +82155,10 @@
                 },
                 "type": "array"
               },
+              "portal_org_shared": {
+                "description": "The portal org shared value.",
+                "type": "boolean"
+              },
               "priority_builtin_key": {
                 "description": "The priority builtin key value.",
                 "type": "string"
@@ -81107,6 +82340,7 @@
               "inherit_project",
               "is_task",
               "last_active_at",
+              "portal_org_shared",
               "title",
               "updated_at",
               "workspace_id",
@@ -81538,12 +82772,25 @@
                       "description": "The inherit project value.",
                       "type": "boolean"
                     },
+                    "intake_id": {
+                      "description": "The intake id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "is_task": {
                       "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
                       "type": "boolean"
                     },
                     "item_type_builtin_key": {
                       "description": "The item type builtin key value.",
+                      "type": "string"
+                    },
+                    "item_type_color": {
+                      "description": "The item type color value.",
+                      "type": "string"
+                    },
+                    "item_type_icon": {
+                      "description": "The item type icon value.",
                       "type": "string"
                     },
                     "item_type_id": {
@@ -82046,6 +83293,10 @@
                       },
                       "type": "array"
                     },
+                    "portal_org_shared": {
+                      "description": "The portal org shared value.",
+                      "type": "boolean"
+                    },
                     "priority_builtin_key": {
                       "description": "The priority builtin key value.",
                       "type": "string"
@@ -82227,6 +83478,7 @@
                     "inherit_project",
                     "is_task",
                     "last_active_at",
+                    "portal_org_shared",
                     "title",
                     "updated_at",
                     "workspace_id",
@@ -85824,6 +87076,7 @@
           },
           "customer_id": {
             "description": "The customer id value.",
+            "nullable": true,
             "type": "integer"
           },
           "description": {
@@ -85852,7 +87105,6 @@
         },
         "required": [
           "color",
-          "customer_id",
           "description",
           "hourly_rate",
           "name",
@@ -86036,6 +87288,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
               "customer_id": {
                 "description": "The customer id value.",
                 "nullable": true,
@@ -86190,6 +87446,11 @@
                 "description": "The created at value.",
                 "type": "integer"
               },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "nullable": true,
+                "type": "string"
+              },
               "customer_name": {
                 "description": "The customer name value.",
                 "nullable": true,
@@ -86329,6 +87590,10 @@
               "created_at": {
                 "description": "The created at value.",
                 "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
               },
               "customer_id": {
                 "description": "The customer id value.",
@@ -90030,6 +91295,10 @@
                 "description": "The id value.",
                 "type": "integer"
               },
+              "is_internal": {
+                "description": "The is internal value.",
+                "type": "boolean"
+              },
               "item_id": {
                 "description": "The item id value.",
                 "nullable": true,
@@ -90072,6 +91341,7 @@
               "filename",
               "has_thumbnail",
               "id",
+              "is_internal",
               "mime_type",
               "original_filename"
             ],
@@ -91350,17 +92620,8 @@
                         "description": "The id value.",
                         "type": "integer"
                       },
-                      "is_fallback": {
-                        "description": "The is fallback value.",
-                        "type": "boolean"
-                      },
                       "position": {
                         "description": "The position value.",
-                        "type": "integer"
-                      },
-                      "priority_id": {
-                        "description": "The priority id value.",
-                        "nullable": true,
                         "type": "integer"
                       },
                       "source_id": {
@@ -91382,7 +92643,6 @@
                       "calendar_id",
                       "goal_id",
                       "id",
-                      "is_fallback",
                       "position",
                       "target_ms"
                     ],
@@ -91563,17 +92823,8 @@
                             "description": "The id value.",
                             "type": "integer"
                           },
-                          "is_fallback": {
-                            "description": "The is fallback value.",
-                            "type": "boolean"
-                          },
                           "position": {
                             "description": "The position value.",
-                            "type": "integer"
-                          },
-                          "priority_id": {
-                            "description": "The priority id value.",
-                            "nullable": true,
                             "type": "integer"
                           },
                           "source_id": {
@@ -91595,7 +92846,6 @@
                           "calendar_id",
                           "goal_id",
                           "id",
-                          "is_fallback",
                           "position",
                           "target_ms"
                         ],
@@ -94143,6 +95393,33 @@
                 },
                 "nullable": true,
                 "type": "array"
+              },
+              "milestone_swimlanes": {
+                "additionalProperties": false,
+                "description": "The milestone swimlanes value.",
+                "nullable": true,
+                "properties": {
+                  "global_milestone_ids": {
+                    "description": "The global milestone ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "show_completed": {
+                    "description": "The show completed value.",
+                    "type": "boolean"
+                  },
+                  "show_open_from_completed": {
+                    "description": "The show open from completed value.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "show_completed",
+                  "show_open_from_completed"
+                ],
+                "type": "object"
               }
             },
             "type": "object"
@@ -94357,6 +95634,33 @@
                     },
                     "nullable": true,
                     "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -94744,6 +96048,10 @@
                 "description": "The item id value.",
                 "type": "integer"
               },
+              "watcher_count": {
+                "description": "The watcher count value.",
+                "type": "integer"
+              },
               "watching": {
                 "description": "The watching value.",
                 "type": "boolean"
@@ -94751,9 +96059,71 @@
             },
             "required": [
               "item_id",
+              "watcher_count",
               "watching"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PutItemsItemIdWatchersUserIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "avatar_url": {
+                  "description": "The avatar url value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The email value.",
+                  "type": "string"
+                },
+                "first_name": {
+                  "description": "The first name value.",
+                  "type": "string"
+                },
+                "last_name": {
+                  "description": "The last name value.",
+                  "type": "string"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "username": {
+                  "description": "The username value.",
+                  "type": "string"
+                },
+                "watch_reason": {
+                  "description": "The watch reason value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "watched_at": {
+                  "description": "The watched at value.",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "username",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -95507,6 +96877,33 @@
                 },
                 "nullable": true,
                 "type": "array"
+              },
+              "milestone_swimlanes": {
+                "additionalProperties": false,
+                "description": "The milestone swimlanes value.",
+                "nullable": true,
+                "properties": {
+                  "global_milestone_ids": {
+                    "description": "The global milestone ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "show_completed": {
+                    "description": "The show completed value.",
+                    "type": "boolean"
+                  },
+                  "show_open_from_completed": {
+                    "description": "The show open from completed value.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "show_completed",
+                  "show_open_from_completed"
+                ],
+                "type": "object"
               }
             },
             "type": "object"
@@ -95721,6 +97118,33 @@
                     },
                     "nullable": true,
                     "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -96112,17 +97536,8 @@
                         "description": "The id value.",
                         "type": "integer"
                       },
-                      "is_fallback": {
-                        "description": "The is fallback value.",
-                        "type": "boolean"
-                      },
                       "position": {
                         "description": "The position value.",
-                        "type": "integer"
-                      },
-                      "priority_id": {
-                        "description": "The priority id value.",
-                        "nullable": true,
                         "type": "integer"
                       },
                       "source_id": {
@@ -96144,7 +97559,6 @@
                       "calendar_id",
                       "goal_id",
                       "id",
-                      "is_fallback",
                       "position",
                       "target_ms"
                     ],
@@ -96325,17 +97739,8 @@
                             "description": "The id value.",
                             "type": "integer"
                           },
-                          "is_fallback": {
-                            "description": "The is fallback value.",
-                            "type": "boolean"
-                          },
                           "position": {
                             "description": "The position value.",
-                            "type": "integer"
-                          },
-                          "priority_id": {
-                            "description": "The priority id value.",
-                            "nullable": true,
                             "type": "integer"
                           },
                           "source_id": {
@@ -96357,7 +97762,6 @@
                           "calendar_id",
                           "goal_id",
                           "id",
-                          "is_fallback",
                           "position",
                           "target_ms"
                         ],
@@ -101242,6 +102646,63 @@
         ]
       }
     },
+    "/attachments/{attachment_id}/download": {
+      "get": {
+        "description": "Download item attachment. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getAttachmentsAttachmentIdDownload",
+        "parameters": [
+          {
+            "description": "The attachment identifier.",
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAttachmentsAttachmentIdDownloadResult"
+                }
+              }
+            },
+            "description": "Download item attachment response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Download item attachment",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
     "/attachments/{attachment_id}/thumbnail": {
       "get": {
         "description": "Get item attachment thumbnail. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -103128,6 +104589,16 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "Attach grouped emoji reactions to the returned comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "in": "query",
+            "name": "include_reactions",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -103183,6 +104654,16 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "Attach grouped emoji reactions to the returned comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "in": "query",
+            "name": "include_reactions",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -103237,6 +104718,152 @@
           }
         ],
         "summary": "Update comment",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/comments/{comment_id}/reactions": {
+      "post": {
+        "description": "Add comment reaction. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postCommentsCommentIdReactions",
+        "parameters": [
+          {
+            "description": "The comment identifier.",
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCommentsCommentIdReactionsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostCommentsCommentIdReactionsResult"
+                }
+              }
+            },
+            "description": "Add comment reaction response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Add comment reaction",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/comments/{comment_id}/reactions/{reaction}": {
+      "delete": {
+        "description": "Remove comment reaction. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteCommentsCommentIdReactionsReaction",
+        "parameters": [
+          {
+            "description": "The comment identifier.",
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The reaction key: thumbs_up, check, eyes, heart, laugh, or hooray.",
+            "in": "path",
+            "name": "reaction",
+            "required": true,
+            "schema": {
+              "enum": [
+                "thumbs_up",
+                "check",
+                "eyes",
+                "heart",
+                "laugh",
+                "hooray"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove comment reaction",
         "tags": [
           "Work items"
         ],
@@ -105830,6 +107457,68 @@
         ]
       }
     },
+    "/items/bulk-delete": {
+      "post": {
+        "description": "Bulk delete items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postItemsBulkDelete",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostItemsBulkDeletePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostItemsBulkDeleteResult"
+                }
+              }
+            },
+            "description": "Bulk delete items response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Bulk delete items",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:delete"
+        ]
+      }
+    },
     "/items/bulk-patch": {
       "post": {
         "description": "Bulk patch items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -105884,6 +107573,68 @@
           }
         ],
         "summary": "Bulk patch items",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/items/bulk-transition": {
+      "post": {
+        "description": "Bulk transition items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postItemsBulkTransition",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostItemsBulkTransitionPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostItemsBulkTransitionResult"
+                }
+              }
+            },
+            "description": "Bulk transition items response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Bulk transition items",
         "tags": [
           "Work items"
         ],
@@ -107177,7 +108928,7 @@
     },
     "/items/{item_id}/comments": {
       "get": {
-        "description": "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure.",
+        "description": "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure. Grouped reactions are attached only when include_reactions is true.",
         "operationId": "getItemsItemIdComments",
         "parameters": [
           {
@@ -107210,6 +108961,16 @@
             "schema": {
               "minLength": 1,
               "type": "string"
+            }
+          },
+          {
+            "description": "Attach grouped emoji reactions to each comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "in": "query",
+            "name": "include_reactions",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -109952,6 +111713,195 @@
           }
         ],
         "summary": "Watch item",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers": {
+      "get": {
+        "description": "List item watchers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getItemsItemIdWatchers",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetItemsItemIdWatchersResult"
+                }
+              }
+            },
+            "description": "List item watchers response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List item watchers",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers/{user_id}": {
+      "delete": {
+        "description": "Remove item watcher. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteItemsItemIdWatchersUserId",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The user identifier.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteItemsItemIdWatchersUserIdResult"
+                }
+              }
+            },
+            "description": "Remove item watcher response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remove item watcher",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
+      },
+      "put": {
+        "description": "Add item watcher. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "putItemsItemIdWatchersUserId",
+        "parameters": [
+          {
+            "description": "The item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The user identifier.",
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutItemsItemIdWatchersUserIdResult"
+                }
+              }
+            },
+            "description": "Add item watcher response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Add item watcher",
         "tags": [
           "Work items"
         ],

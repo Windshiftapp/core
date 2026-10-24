@@ -151,10 +151,12 @@ export const links = {
   // ({ "<id>": { outgoing, incoming } }) for many items in one request. Used by
   // board/roadmap dependency badges so a board render is one request instead of
   // one per card. Callers chunk to the 200-item cap; the server accepts up to 500.
-  getForItems: async (ids, { includeCustomFields = false } = {}) => {
+  getForItems: async (ids, options = {}) => {
+    const { includeCustomFields = false, ...requestOptions } = options;
     const customFields = includeCustomFields ? '&include_custom_fields=true' : '';
     const document = await fetchAPIV2(
-      `/links/batch?ids=${ids.join(',')}&page_size=100${customFields}`
+      `/links/batch?ids=${ids.join(',')}&page_size=100${customFields}`,
+      requestOptions
     );
     return Object.fromEntries((document?.data ?? []).map((group) => [group.item_id, group]));
   },

@@ -1,10 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { del, get, post } from '../api/core.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { navigate } from '../router.js';
-  import { Plus, Edit, Trash2, Shield } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Shield from '@lucide/svelte/icons/shield';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -31,7 +34,7 @@
   async function loadPermissionSets() {
     try {
       loading = true;
-      const data = await api.get('/permission-sets') || [];
+      const data = await get('/permission-sets') || [];
       permissionSets = data;
     } catch (error) {
       console.error('Failed to load permission sets:', error);
@@ -68,7 +71,7 @@
         return;
       }
 
-      const created = await api.post('/permission-sets', {
+      const created = await post('/permission-sets', {
         name: formData.name,
         description: formData.description,
         permission_ids: []
@@ -94,7 +97,7 @@
     if (!confirmed) return;
 
     try {
-      await api.delete(`/permission-sets/${permSet.id}`);
+      await del(`/permission-sets/${permSet.id}`);
       permissionSets = permissionSets.filter(ps => ps.id !== permSet.id);
     } catch (error) {
       console.error('Failed to delete permission set:', error);

@@ -22,15 +22,20 @@ type Handler interface {
 
 // Config controls bounded worker behavior.
 type Config struct {
-	WorkerCount                int
-	PollInterval               time.Duration
-	LeaseDuration              time.Duration
-	HandlerTimeout             time.Duration
-	ReconcileBatch             int
+	WorkerCount    int
+	PollInterval   time.Duration
+	LeaseDuration  time.Duration
+	HandlerTimeout time.Duration
+	ReconcileBatch int
+	// ReconcileLookback bounds the periodic safety rescan: it re-checks events
+	// recorded within this window so a late-committing transaction cannot be
+	// missed, without rescanning the full retained history (WI-1770).
+	ReconcileLookback time.Duration
+	// SafetyReconcileInterval is how often the bounded safety rescan runs.
+	SafetyReconcileInterval    time.Duration
 	MaxAttempts                int
 	BaseRetryDelay             time.Duration
 	MaxRetryDelay              time.Duration
-	FullReconcileInterval      time.Duration
 	RetentionInterval          time.Duration
 	CompletedDeliveryRetention time.Duration
 	EventRetention             time.Duration
@@ -45,10 +50,11 @@ func DefaultConfig() Config {
 		LeaseDuration:              45 * time.Second,
 		HandlerTimeout:             30 * time.Second,
 		ReconcileBatch:             250,
+		ReconcileLookback:          5 * time.Minute,
+		SafetyReconcileInterval:    time.Minute,
 		MaxAttempts:                8,
 		BaseRetryDelay:             time.Second,
 		MaxRetryDelay:              5 * time.Minute,
-		FullReconcileInterval:      time.Minute,
 		RetentionInterval:          6 * time.Hour,
 		CompletedDeliveryRetention: 30 * 24 * time.Hour,
 		EventRetention:             90 * 24 * time.Hour,
@@ -72,8 +78,8 @@ func (c Config) validate() error {
 	if c.ReconcileBatch <= 0 || c.MaxAttempts <= 0 {
 		return errors.New("reconcile batch and max attempts must be positive")
 	}
-	if c.FullReconcileInterval <= 0 {
-		return errors.New("full reconcile interval must be positive")
+	if c.SafetyReconcileInterval <= 0 || c.ReconcileLookback <= 0 {
+		return errors.New("safety reconcile interval and lookback must be positive")
 	}
 	if c.BaseRetryDelay <= 0 || c.MaxRetryDelay < c.BaseRetryDelay {
 		return errors.New("retry delays are invalid")
@@ -106,8 +112,14 @@ type Engine struct {
 
 	// reconcileCursors tracks, per consumer, the highest event id a short
 	// (exhaustive) scan has covered. Only the reconcile goroutine touches it.
-	reconcileCursors  map[string]int64
-	lastFullReconcile time.Time
+	reconcileCursors    map[string]int64
+	lastSafetyReconcile time.Time
+
+	// workKeys is the consumer set the last gate reported as having eligible
+	// deliveries, plus any consumer the same tick created deliveries for. It is
+	// guarded by mu and read by workers, so an idle engine claims nothing at all
+	// instead of probing every consumer once per tick.
+	workKeys []string
 
 	now    func() time.Time
 	jitter func(time.Duration) time.Duration
@@ -275,7 +287,7 @@ func (e *Engine) reconcileLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.config.PollInterval)
 	defer ticker.Stop()
 	for {
-		if _, err := e.reconcile(ctx); err != nil && ctx.Err() == nil {
+		if _, err := e.tick(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("domain event reconciliation failed", "error", err)
 		}
 		select {
@@ -287,38 +299,57 @@ func (e *Engine) reconcileLoop(ctx context.Context) {
 	}
 }
 
-// reconcile creates missing deliveries. Per consumer it normally scans only
-// events past the in-memory cursor; a full history scan runs periodically to
-// bound the delay of events whose inserting transaction was still in flight
-// when a cursor advanced past their (lower) id.
-func (e *Engine) reconcile(ctx context.Context) (int64, error) {
-	keys, err := e.store.ActiveConsumerKeys(ctx)
+// tick pays one gate statement per tick, then only does the work the gate proved
+// exists: it creates deliveries for consumers whose cursor does not yet cover the
+// highest visible event id, and records the consumers with eligible deliveries so
+// workers claim for those only. An idle engine costs one statement per tick
+// instead of one statement per consumer plus a transaction per claim.
+//
+// Cursors advance only after an exhaustive scan, as before: a batch-sized scan has
+// not covered every event, so its cursor must not jump to the gate's highest id.
+func (e *Engine) tick(ctx context.Context) (int64, error) {
+	since, safety := e.safetyReconcileWindow()
+	gate, err := e.store.Gate(ctx, e.lowestCursor(), e.now())
 	if err != nil {
 		return 0, err
 	}
-	for key := range e.reconcileCursors {
-		if !slices.Contains(keys, key) {
-			delete(e.reconcileCursors, key)
-		}
+
+	// Scanning still covers every active consumer, as before, not only consumers
+	// with a handler in this process: deliveries for a handler registered later
+	// must still exist. The gate names the active set whenever any event is past
+	// the lowest cursor, so the only case the gate cannot name is a late-committed
+	// event whose id is below every cursor — which is what the safety scan is for.
+	// On a safety tick scan the consumers the engine already knows as well.
+	targets := gate.ScanKeys
+	if safety {
+		targets = unionKeys(targets, e.knownKeys())
 	}
-	full := e.fullReconcileDue()
+	// Cursors are kept only for consumers that still admit events, so an idle
+	// tick prunes a consumer that went inactive instead of holding its cursor
+	// until the next scan.
+	e.pruneCursors(gate.ActiveKeys)
+	e.setWorkKeys(gate.ScanKeys, gate.ClaimKeys)
+
 	var total int64
-	for _, key := range keys {
+	for _, key := range targets {
 		afterID := e.reconcileCursors[key]
-		if full {
+		if safety {
 			afterID = 0
+		} else if afterID >= gate.MaxEventID {
+			continue
 		}
 		for {
-			created, maxSeen, err := e.store.reconcileConsumer(ctx, key, afterID, int64(e.config.ReconcileBatch))
+			created, err := e.store.reconcileConsumer(ctx, key, afterID, since, int64(e.config.ReconcileBatch))
 			if err != nil {
 				return total, err
 			}
 			total += created
 			if created > 0 {
+				e.addWorkKey(key)
 				e.signalWorkers()
 			}
 			if created < int64(e.config.ReconcileBatch) {
-				e.reconcileCursors[key] = maxSeen
+				e.reconcileCursors[key] = gate.MaxEventID
 				break
 			}
 		}
@@ -326,13 +357,67 @@ func (e *Engine) reconcile(ctx context.Context) (int64, error) {
 	return total, nil
 }
 
-func (e *Engine) fullReconcileDue() bool {
-	now := e.now()
-	if e.lastFullReconcile.IsZero() || now.Sub(e.lastFullReconcile) >= e.config.FullReconcileInterval {
-		e.lastFullReconcile = now
-		return true
+// lowestCursor is the oldest uncovered point across the consumers the engine
+// knows. If no event is past it, no consumer can have new work, and nothing is
+// scanned.
+func (e *Engine) lowestCursor() int64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	lowest := int64(0)
+	for _, cursor := range e.reconcileCursors {
+		if cursor < lowest {
+			lowest = cursor
+		}
 	}
-	return false
+	return lowest
+}
+
+func (e *Engine) knownKeys() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	keys := make([]string, 0, len(e.reconcileCursors))
+	for key := range e.reconcileCursors {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+func (e *Engine) pruneCursors(active []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for key := range e.reconcileCursors {
+		if !slices.Contains(active, key) {
+			delete(e.reconcileCursors, key)
+		}
+	}
+}
+
+func unionKeys(a, b []string) []string {
+	out := slices.Clone(a)
+	for _, key := range b {
+		if !slices.Contains(out, key) {
+			out = append(out, key)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// safetyReconcileWindow reports the lower recorded_at bound for the periodic
+// safety rescan. The first pass after startup scans from the (empty) cursor,
+// which is a full history backstop; the safety clock starts then.
+func (e *Engine) safetyReconcileWindow() (time.Time, bool) {
+	now := e.now()
+	if e.lastSafetyReconcile.IsZero() {
+		e.lastSafetyReconcile = now
+		return time.Time{}, false
+	}
+	if now.Sub(e.lastSafetyReconcile) >= e.config.SafetyReconcileInterval {
+		e.lastSafetyReconcile = now
+		return now.Add(-e.config.ReconcileLookback), true
+	}
+	return time.Time{}, false
 }
 
 func (e *Engine) workerLoop(ctx context.Context) {
@@ -356,7 +441,7 @@ func (e *Engine) workerLoop(ctx context.Context) {
 }
 
 func (e *Engine) processOne(ctx context.Context) (bool, error) {
-	keys := e.handlerKeys()
+	keys := e.eligibleHandlerKeys()
 	for _, consumerKey := range keys {
 		delivery, err := e.store.Claim(ctx, consumerKey, e.owner, e.now(), e.config.LeaseDuration)
 		if err != nil {
@@ -450,19 +535,49 @@ func (e *Engine) retryDelay(attempt int) time.Duration {
 	return delay + jitter
 }
 
-func (e *Engine) handlerKeys() []string {
+// eligibleHandlerKeys returns the consumers the last gate reported as having an
+// eligible delivery, limited to consumers with a registered handler, in rotated
+// order so a busy consumer cannot starve the others. Rotation is unchanged.
+func (e *Engine) eligibleHandlerKeys() []string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	keys := make([]string, 0, len(e.handlers))
-	for key := range e.handlers {
-		keys = append(keys, key)
+	keys := make([]string, 0, len(e.workKeys))
+	for _, key := range e.workKeys {
+		if _, exists := e.handlers[key]; exists {
+			keys = append(keys, key)
+		}
 	}
 	slices.Sort(keys)
+	return rotateKeys(keys, &e.nextHandler)
+}
+
+func (e *Engine) setWorkKeys(scan, claim []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	keys := slices.Clone(scan)
+	for _, key := range claim {
+		if !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys)
+	e.workKeys = keys
+}
+
+func (e *Engine) addWorkKey(key string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !slices.Contains(e.workKeys, key) {
+		e.workKeys = append(e.workKeys, key)
+	}
+}
+
+func rotateKeys(keys []string, counter *int) []string {
 	if len(keys) == 0 {
 		return keys
 	}
-	start := e.nextHandler % len(keys)
-	e.nextHandler = (start + 1) % len(keys)
+	start := *counter % len(keys)
+	*counter = (*counter + 1) % len(keys)
 	if start == 0 {
 		return keys
 	}

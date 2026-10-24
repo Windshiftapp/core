@@ -2,6 +2,9 @@
 -- Customer organisations (B2B entities for time tracking)
 CREATE TABLE IF NOT EXISTS customer_organisations (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	-- Stable identity for system-managed rows (e.g. the "no customer"
+	-- placeholder). NULL for ordinary organisations.
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	email TEXT,
 	description TEXT,
@@ -79,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_time_worklogs_customer_id ON time_worklogs(custom
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_organisations_builtin_key ON customer_organisations(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Project managers: can edit project, manage members, view all worklogs
 CREATE TABLE IF NOT EXISTS time_project_managers (

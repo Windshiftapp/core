@@ -42,7 +42,7 @@ export function createStatusPickerConfig(statusCategories) {
       type: 'color-dot',
       source: (status) => {
         const category = statusCategories.find((sc) => sc.id === status.category_id);
-        return category?.color || '#6b7280';
+        return category?.color || status.category_color || '#6b7280';
       },
       size: 'w-2 h-2',
     },

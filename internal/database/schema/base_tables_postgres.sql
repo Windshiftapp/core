@@ -139,6 +139,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_channels_public_slug
 -- From time_tracking_postgres.sql
 CREATE TABLE IF NOT EXISTS customer_organisations (
 	id SERIAL PRIMARY KEY,
+	-- Stable identity for system-managed rows (e.g. the "no customer"
+	-- placeholder). NULL for ordinary organisations.
+	builtin_key TEXT,
 	name TEXT NOT NULL,
 	email TEXT,
 	description TEXT,
@@ -151,6 +154,8 @@ CREATE TABLE IF NOT EXISTS customer_organisations (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_organisations_builtin_key ON customer_organisations(builtin_key) WHERE builtin_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS time_project_categories (
 	id SERIAL PRIMARY KEY,

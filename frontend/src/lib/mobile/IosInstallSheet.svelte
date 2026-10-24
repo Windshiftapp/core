@@ -1,5 +1,6 @@
 <script>
-  import { Share, SquarePlus } from '@lucide/svelte';
+  import Share from '@lucide/svelte/icons/share';
+  import SquarePlus from '@lucide/svelte/icons/square-plus';
   import Modal from '../dialogs/Modal.svelte';
   import { iosInstallOpen } from './installClient.js';
   import { t } from '../stores/i18n.svelte.js';

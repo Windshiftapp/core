@@ -161,6 +161,7 @@ type PortalRequestSummary struct {
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 	ChannelID           *int    `json:"channel_id"`
+	IntakeID            *int    `json:"intake_id,omitempty"`
 	RequestTypeID       *int    `json:"request_type_id"`
 	RequestTypeName     *string `json:"request_type_name"`
 	RequestTypeIcon     *string `json:"request_type_icon"`
@@ -215,6 +216,7 @@ func portalRequestSummaryFromRow(row repository.PortalRequestRow) PortalRequestS
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,
 		ChannelID:           row.ChannelID,
+		IntakeID:            row.IntakeID,
 		RequestTypeID:       row.RequestTypeID,
 		RequestTypeName:     row.RequestTypeName,
 		RequestTypeIcon:     row.RequestTypeIcon,
@@ -234,14 +236,14 @@ func portalRequestSummariesFromRows(rows []repository.PortalRequestRow) []Portal
 	return requests
 }
 
-// PortalRequestVisibility resolves the WI-1547 visibility rules for one
-// portal: enabled intake email channels whose email_connected_portal_id
-// points at it (so email-originated tickets surface in "My Requests" and
-// pass ownership checks), plus the workspaces the portal serves
-// (defense-in-depth against an intake channel routed at an unrelated
-// workspace). Configs are parsed in Go — no JSON-in-SQL dialect concerns.
-// A missing portal channel yields an empty visibility: nothing extra is
-// exposed and the caller's own-channel query degrades to the portal itself.
+// portalRequestVisibility resolves the WI-1547 visibility rules for one portal:
+// the enabled intakes linked to it (so their email-originated tickets surface
+// in "My Requests" and pass ownership checks), plus the workspaces the portal
+// serves (defense-in-depth against an intake routed at an unrelated workspace).
+// Intake-scoped linking keeps a sibling internal intake on the same mailbox out
+// of the portal. A missing portal channel yields an empty visibility: nothing
+// extra is exposed and the caller's own-channel query degrades to the portal
+// itself.
 func (s *PortalService) portalRequestVisibility(ctx context.Context, portalChannelID int) (repository.PortalRequestVisibility, error) {
 	vis := repository.PortalRequestVisibility{PortalChannelID: portalChannelID}
 
@@ -258,53 +260,21 @@ func (s *PortalService) portalRequestVisibility(ctx context.Context, portalChann
 		vis.ServedWorkspaceIDs = portalCfg.PortalWorkspaceIDs
 	}
 
-	// Intakes targeting this portal own the mailbox links since WI-1644.
-	linked := map[int]struct{}{}
-	intakes, err := repository.NewIntakeRepository(s.db).ListByTarget(ctx, models.IntakeTargetPortal, portalChannelID)
+	// Intakes linked to this portal own the visibility since WI-1644: an item is
+	// visible when it came from one of those intakes, so a sibling internal
+	// intake on the same mailbox stays private.
+	intakes, err := repository.NewIntakeRepository(s.db).ListByPortal(ctx, portalChannelID)
 	if err != nil {
 		return vis, fmt.Errorf("list portal intakes: %w", err)
 	}
 	for _, intake := range intakes {
-		if intake.Status != "enabled" {
+		if intake.Status != models.IntakeStatusEnabled {
 			continue
 		}
-		if _, seen := linked[intake.MailboxID]; seen {
-			continue
-		}
-		linked[intake.MailboxID] = struct{}{}
-		vis.LinkedEmailChannelIDs = append(vis.LinkedEmailChannelIDs, intake.MailboxID)
+		vis.LinkedIntakeIDs = append(vis.LinkedIntakeIDs, intake.ID)
 	}
 
-	// Legacy fallback: enabled email channels that still carry
-	// email_connected_portal_id but have not been migrated to an intake.
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, COALESCE(config, '{}') FROM channels
-		WHERE type = 'email' AND direction = 'inbound' AND status = 'enabled'
-	`)
-	if err != nil {
-		return vis, fmt.Errorf("list intake email channels: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var id int
-		var configJSON string
-		if err := rows.Scan(&id, &configJSON); err != nil {
-			continue
-		}
-		var cfg models.ChannelConfig
-		if json.Unmarshal([]byte(configJSON), &cfg) != nil {
-			continue
-		}
-		if cfg.EmailConnectedPortalID == nil || *cfg.EmailConnectedPortalID != portalChannelID {
-			continue
-		}
-		if _, seen := linked[id]; seen {
-			continue
-		}
-		linked[id] = struct{}{}
-		vis.LinkedEmailChannelIDs = append(vis.LinkedEmailChannelIDs, id)
-	}
-	return vis, rows.Err()
+	return vis, nil
 }
 
 // portalServesWorkspace reports whether the visibility's served-workspace
@@ -536,11 +506,10 @@ func (s *PortalService) PortalServesWorkspace(ctx context.Context, portalChannel
 
 // VerifyRequestOwnership verifies that a user owns a request
 // Returns true if the user owns the request within the specified channel.
-// Since WI-1547 the check also admits items created through enabled intake
-// email channels linked to this portal (email_connected_portal_id), so a
-// customer who opened a ticket by email can read and continue it in the
-// connected portal. Since WI-1136 it also admits external request
-// participants. Since WI-1139 it also admits organisation-shared requests
+// Since WI-1547 the check also admits items created through enabled intakes
+// linked to this portal, so a customer who opened a ticket by email can read
+// and continue it in the connected portal. Since WI-1136 it also admits
+// external request participants. Since WI-1139 it also admits organisation-shared requests
 // (automatic mode, or requester_choice with the item flag set) when the
 // viewer qualifies for the configured audience. Items outside the portal's
 // served workspaces never pass, regardless of channel linkage or participation.
@@ -563,10 +532,12 @@ func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID, chan
 	}
 	if *detail.ChannelID != channelID {
 		linked := false
-		for _, id := range vis.LinkedEmailChannelIDs {
-			if id == *detail.ChannelID {
-				linked = true
-				break
+		if detail.IntakeID != nil {
+			for _, id := range vis.LinkedIntakeIDs {
+				if id == *detail.IntakeID {
+					linked = true
+					break
+				}
 			}
 		}
 		if !linked {

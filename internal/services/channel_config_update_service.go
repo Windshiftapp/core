@@ -66,6 +66,16 @@ type ChannelConfigUpdateService struct {
 
 var channelSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`)
 
+// channelSecretFields are stored encrypted and scrubbed from read responses.
+// A partial update treats an omitted or blank value as "keep the stored
+// ciphertext" so a form that echoes back an unedited secret cannot delete it.
+// JSON null is the explicit way to clear one.
+var channelSecretFields = []string{"smtp_password", "imap_password", "webhook_secret", "email_oauth_client_secret"}
+
+func isChannelSecretField(key string) bool {
+	return slices.Contains(channelSecretFields, key)
+}
+
 func NewChannelConfigUpdateService(channels *ChannelService, permission *PermissionService) *ChannelConfigUpdateService {
 	return &ChannelConfigUpdateService{channels: channels, permission: permission}
 }
@@ -164,8 +174,38 @@ func (s *ChannelConfigUpdateService) Update(ctx context.Context, actorUserID, ch
 			slog.Warn("failed to provision portal email request type",
 				"channel_id", channelID, "error", err)
 		}
+		s.markOrphanedPortalIntakes(ctx, channelID, final.PortalWorkspaceIDs)
 	}
 	return true, nil
+}
+
+// markOrphanedPortalIntakes parks intakes whose linked portal no longer serves
+// their routing workspace, so the admin sees a needs_attention warning instead
+// of a mailbox that keeps polling a target the customer cannot see.
+func (s *ChannelConfigUpdateService) markOrphanedPortalIntakes(ctx context.Context, portalChannelID int, servedWorkspaceIDs []int) {
+	repo := repository.NewIntakeRepository(s.channels.db)
+	intakes, err := repo.ListByPortal(ctx, portalChannelID)
+	if err != nil {
+		slog.Warn("failed to list portal intakes for workspace check", "channel_id", portalChannelID, "error", err)
+		return
+	}
+	served := make(map[int]struct{}, len(servedWorkspaceIDs))
+	for _, id := range servedWorkspaceIDs {
+		served[id] = struct{}{}
+	}
+	reasons := map[int]string{}
+	for _, intake := range intakes {
+		if intake.Status != models.IntakeStatusEnabled {
+			continue
+		}
+		if _, ok := served[intake.WorkspaceID]; ok {
+			continue
+		}
+		reasons[intake.ID] = fmt.Sprintf("Portal no longer serves workspace %d; re-point this intake and re-enable it", intake.WorkspaceID)
+	}
+	if err := repo.MarkNeedsAttention(ctx, reasons); err != nil {
+		slog.Warn("failed to mark orphaned portal intakes", "channel_id", portalChannelID, "error", err)
+	}
 }
 
 // PrepareEnable validates that a channel may transition to "enabled" and
@@ -296,39 +336,35 @@ func (s *ChannelConfigUpdateService) prepareEmailEnable(ctx context.Context, act
 
 // validateEmailIntakeEnable checks one enabled intake before the mailbox is
 // activated: its workspace item type must still be valid and, for non-admins,
-// the actor must manage the intake target.
+// the actor must manage the routing workspace and any linked portal.
 func (s *ChannelConfigUpdateService) validateEmailIntakeEnable(ctx context.Context, actorUserID int, intake models.Intake, admin bool) error {
-	if intake.TargetType == models.IntakeTargetWorkspace {
-		if intake.ItemTypeID == nil || *intake.ItemTypeID <= 0 {
-			return channelConfigInvalid(fmt.Sprintf("Email intake %d has no item type", intake.ID))
-		}
-		allowed, err := s.channels.ItemTypeAllowedInWorkspace(intake.TargetID, *intake.ItemTypeID)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return channelConfigInvalid(fmt.Sprintf("Item type %d is not allowed in workspace %d", *intake.ItemTypeID, intake.TargetID))
-		}
+	if intake.ItemTypeID == nil || *intake.ItemTypeID <= 0 {
+		return channelConfigInvalid(fmt.Sprintf("Email intake %d has no item type", intake.ID))
+	}
+	allowed, err := s.channels.ItemTypeAllowedInWorkspace(intake.WorkspaceID, *intake.ItemTypeID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return channelConfigInvalid(fmt.Sprintf("Item type %d is not allowed in workspace %d", *intake.ItemTypeID, intake.WorkspaceID))
 	}
 	if admin {
 		return nil
 	}
-	switch intake.TargetType {
-	case models.IntakeTargetWorkspace:
-		allowed, err := s.permission.HasWorkspacePermission(actorUserID, intake.TargetID, models.PermissionWorkspaceAdmin)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return channelConfigForbidden("workspace administration permission is required to connect the email intake target workspace")
-		}
-	case models.IntakeTargetPortal:
-		canManage, err := s.channels.UserCanManage(ctx, actorUserID, intake.TargetID)
+	canAdmin, err := s.permission.HasWorkspacePermission(actorUserID, intake.WorkspaceID, models.PermissionWorkspaceAdmin)
+	if err != nil {
+		return err
+	}
+	if !canAdmin {
+		return channelConfigForbidden("workspace administration permission is required to connect the email intake target workspace")
+	}
+	if intake.PortalChannelID != nil {
+		canManage, err := s.channels.UserCanManage(ctx, actorUserID, *intake.PortalChannelID)
 		if err != nil {
 			return err
 		}
 		if !canManage {
-			return channelConfigForbidden("permission to manage the email intake target portal is required")
+			return channelConfigForbidden("permission to manage the email intake portal is required")
 		}
 	}
 	return nil
@@ -437,18 +473,35 @@ func mergeChannelConfig(existingJSON string, incoming map[string]any) (map[strin
 	previousProvider, _ := merged["email_oauth_provider_type"].(string)
 	previousClientID, _ := merged["email_oauth_client_id"].(string)
 	previousTenantID, _ := merged["email_oauth_tenant_id"].(string)
+	previousMailbox := effectiveOAuthMailbox(merged)
 	for key, value := range incoming {
+		if isChannelSecretField(key) {
+			if value == nil {
+				delete(merged, key)
+				continue
+			}
+			if secret, ok := value.(string); ok && secret == "" {
+				continue
+			}
+		}
 		merged[key] = value
 	}
 	currentProvider, _ := merged["email_oauth_provider_type"].(string)
 	currentClientID, _ := merged["email_oauth_client_id"].(string)
 	currentTenantID, _ := merged["email_oauth_tenant_id"].(string)
-	if previousProvider != currentProvider || previousClientID != currentClientID || previousTenantID != currentTenantID {
+	currentMailbox := effectiveOAuthMailbox(merged)
+	// Changing any part of the OAuth identity — including the monitored mailbox
+	// — invalidates the stored credentials: a token for the old mailbox cannot
+	// authenticate the new one. The typed mailbox itself is kept so the admin
+	// does not retype it; the verified email is what marks the connection live.
+	if previousProvider != currentProvider || previousClientID != currentClientID || previousTenantID != currentTenantID || previousMailbox != currentMailbox {
 		for _, key := range []string{"email_oauth_access_token", "email_oauth_refresh_token", "email_oauth_expires_at", "email_oauth_email"} {
 			delete(merged, key)
 		}
 		if previousProvider != currentProvider || previousClientID != currentClientID {
-			if _, supplied := incoming["email_oauth_client_secret"]; !supplied {
+			// A blank secret is not a new credential, so an identity change
+			// still discards the secret that belonged to the old client.
+			if secret, _ := incoming["email_oauth_client_secret"].(string); secret == "" {
 				delete(merged, "email_oauth_client_secret")
 			}
 		}
@@ -456,8 +509,20 @@ func mergeChannelConfig(existingJSON string, incoming map[string]any) (map[strin
 	return merged, stored, nil
 }
 
+// effectiveOAuthMailbox is the monitored address a config currently represents:
+// the admin-entered mailbox, or the verified address on channels connected
+// before email_oauth_mailbox existed. Comparing the effective value keeps a
+// legacy reconnect from looking like an identity change.
+func effectiveOAuthMailbox(config map[string]any) string {
+	if mailbox, _ := config["email_oauth_mailbox"].(string); mailbox != "" {
+		return mailbox
+	}
+	email, _ := config["email_oauth_email"].(string)
+	return email
+}
+
 func (s *ChannelConfigUpdateService) encryptSecrets(config map[string]any) error {
-	for _, key := range []string{"smtp_password", "imap_password", "webhook_secret", "email_oauth_client_secret"} {
+	for _, key := range channelSecretFields {
 		value, ok := config[key]
 		if !ok {
 			continue
@@ -896,7 +961,7 @@ func normalizeEmailAuthConfig(config map[string]any) {
 	method, _ := config["email_auth_method"].(string)
 	switch strings.ToLower(method) {
 	case "basic":
-		for _, key := range []string{"email_oauth_provider_type", "email_oauth_client_id", "email_oauth_client_secret", "email_oauth_tenant_id", "email_oauth_access_token", "email_oauth_refresh_token", "email_oauth_expires_at", "email_oauth_email"} {
+		for _, key := range []string{"email_oauth_provider_type", "email_oauth_client_id", "email_oauth_client_secret", "email_oauth_tenant_id", "email_oauth_mailbox", "email_oauth_access_token", "email_oauth_refresh_token", "email_oauth_expires_at", "email_oauth_email"} {
 			delete(config, key)
 		}
 	case "oauth":

@@ -10,10 +10,21 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import {
-    Cloud, Plus, Trash2, ExternalLink, Link, Clock,
-    CheckCircle, XCircle, Loader, PlayCircle, AlertTriangle
-  } from '@lucide/svelte';
+  import Cloud from '@lucide/svelte/icons/cloud';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import FormField from '../components/FormField.svelte';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import Link from '@lucide/svelte/icons/link';
+  import Clock from '@lucide/svelte/icons/clock';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import XCircle from '@lucide/svelte/icons/x-circle';
+  import Loader from '@lucide/svelte/icons/loader';
+  import PlayCircle from '@lucide/svelte/icons/play-circle';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import PageHeader from '../layout/PageHeader.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -27,11 +38,22 @@
   let deleteJob = $state(null);
   let deleteConfirmation = $state('');
   let isDeletingImportedData = $state(false);
+  let editConnection = $state(null);
+  let editEmail = $state('');
+  let editToken = $state('');
+  let editShowToken = $state(false);
+  let isSavingConnection = $state(false);
 
   // Derived state from store
   let savedConnections = $derived(jiraImport.savedConnections);
   let importJobs = $derived(jiraImport.importJobs);
   let canConfirmDeleteImportData = $derived(deleteJob && deleteConfirmation.trim() === deleteJob.id);
+  let isEditDataCenter = $derived(editConnection?.deployment_type === 'datacenter');
+  let canSaveConnection = $derived(
+    Boolean(editConnection) &&
+      editToken.trim() !== '' &&
+      (isEditDataCenter || editEmail.trim() !== '')
+  );
 
   onMount(() => {
     jiraImport.loadSavedConnections();
@@ -60,9 +82,9 @@
 
   async function deleteConnection(connectionId) {
     const confirmed = await confirm({
-      title: t('common.delete'),
+      title: t('systemImport.deleteConnection'),
       message: t('systemImport.deleteConnectionMessage'),
-      confirmText: t('common.delete'),
+      confirmText: t('systemImport.deleteConnection'),
       cancelText: t('common.cancel'),
       variant: 'danger'
     });
@@ -78,6 +100,35 @@
   function formatDate(dateString) {
     if (!dateString) return '-';
     return formatDateTimeLocale(dateString);
+  }
+
+  function openEditConnection(connection) {
+    editConnection = connection;
+    editEmail = connection.email || '';
+    editToken = '';
+    editShowToken = false;
+  }
+
+  function closeEditConnection() {
+    if (isSavingConnection) return;
+    editConnection = null;
+    editToken = '';
+  }
+
+  async function saveConnectionToken() {
+    if (!editConnection || !canSaveConnection) return;
+    isSavingConnection = true;
+    const result = await jiraImport.updateSavedConnection(editConnection.id, {
+      email: isEditDataCenter ? '' : editEmail.trim(),
+      api_token: editToken,
+    });
+    isSavingConnection = false;
+    if (result.success) {
+      addToast({ message: t('systemImport.connectionUpdated'), variant: 'success' });
+      closeEditConnection();
+    } else {
+      addToast({ message: result.error, variant: 'error' });
+    }
   }
 
   function getStatusColor(status) {
@@ -226,7 +277,8 @@
                   <PlayCircle size={14} class="mr-1" />
                   {t('jiraImport.buttons.startImport')}
                 </Button>
-                <Button variant="danger-ghost" size="small" icon={Trash2} title={t('systemImport.deleteConnection')} onclick={() => deleteConnection(connection.id)}></Button>
+                <Button dataTestid={`jira-import-connection-edit-${connection.id}`} variant="ghost" size="small" icon={KeyRound} title={t('systemImport.updateToken')} onclick={() => openEditConnection(connection)}></Button>
+                <Button dataTestid={`jira-import-connection-delete-${connection.id}`} variant="danger-ghost" size="small" icon={Trash2} title={t('systemImport.deleteConnection')} onclick={() => deleteConnection(connection.id)}></Button>
               </div>
             </div>
           {/each}
@@ -429,6 +481,77 @@
       variant="danger"
       loading={isDeletingImportedData}
       confirmDisabled={!canConfirmDeleteImportData}
+      showKeyboardHint={true}
+    />
+  </Modal>
+{/if}
+
+<!-- Edit connection modal -->
+{#if editConnection}
+  <Modal
+    isOpen={!!editConnection}
+    preventClose={isSavingConnection}
+    onclose={closeEditConnection}
+    onSubmit={saveConnectionToken}
+    submitDisabled={!canSaveConnection || isSavingConnection}
+  >
+    <ModalHeader title={t('systemImport.updateTokenTitle')} showCloseButton={!isSavingConnection} />
+    <div class="px-6 py-5 space-y-4">
+      <p class="text-sm" style="color: var(--ds-text-subtle);">
+        {t('systemImport.updateTokenDescription')}
+      </p>
+
+      <div class="rounded-lg border p-4 space-y-1" style="border-color: var(--ds-border); background: var(--ds-surface);">
+        <p class="font-medium" style="color: var(--ds-text);">
+          {editConnection.instance_name || 'Jira'}
+        </p>
+        <p class="text-sm break-all" style="color: var(--ds-text-subtle);">
+          {editConnection.instance_url}
+        </p>
+      </div>
+
+      {#if !isEditDataCenter}
+        <FormField label={t('jiraImport.form.email')} required>
+          <Input
+            bind:value={editEmail}
+            dataTestid="jira-import-edit-email"
+            type="email"
+            placeholder="your.email@company.com"
+            disabled={isSavingConnection}
+          />
+        </FormField>
+      {/if}
+
+      <FormField label={isEditDataCenter ? t('jiraImport.form.personalAccessToken') : t('jiraImport.form.apiToken')} required>
+        <div class="relative">
+          <Input
+            bind:value={editToken}
+            dataTestid="jira-import-edit-token"
+            type={editShowToken ? 'text' : 'password'}
+            placeholder={isEditDataCenter ? 'Your Jira personal access token' : 'Your Jira API token'}
+            disabled={isSavingConnection}
+          />
+          <button
+            type="button"
+            data-testid="jira-import-edit-token-toggle"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover-bg"
+            onclick={() => editShowToken = !editShowToken}
+          >
+            {#if editShowToken}
+              <EyeOff size={16} style="color: var(--ds-text-subtle);" />
+            {:else}
+              <Eye size={16} style="color: var(--ds-text-subtle);" />
+            {/if}
+          </button>
+        </div>
+      </FormField>
+    </div>
+    <DialogFooter
+      onCancel={closeEditConnection}
+      onConfirm={saveConnectionToken}
+      confirmLabel={t('systemImport.updateToken')}
+      loading={isSavingConnection}
+      confirmDisabled={!canSaveConnection}
       showKeyboardHint={true}
     />
   </Modal>

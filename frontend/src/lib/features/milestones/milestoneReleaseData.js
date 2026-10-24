@@ -1,7 +1,8 @@
+import { workspaceSCM } from '../../api/scm.js';
 /** Load release-target SCM connections with one request for either scope. */
-export async function loadMilestoneReleaseConnections(apiClient, workspaceId) {
+export async function loadMilestoneReleaseConnections(workspaceId) {
   if (workspaceId) {
-    const connections = (await apiClient.workspaceSCM.getConnections(workspaceId)) ?? [];
+    const connections = (await workspaceSCM.getConnections(workspaceId)) ?? [];
     return connections.map((connection) => ({
       ...connection,
       _workspaceName: null,
@@ -9,7 +10,7 @@ export async function loadMilestoneReleaseConnections(apiClient, workspaceId) {
     }));
   }
 
-  const connections = (await apiClient.workspaceSCM.getAccessibleConnections()) ?? [];
+  const connections = (await workspaceSCM.getAccessibleConnections()) ?? [];
   return connections.map((connection) => ({
     ...connection,
     _workspaceName: connection.workspace_name ?? null,

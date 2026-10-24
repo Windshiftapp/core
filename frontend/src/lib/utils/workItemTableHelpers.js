@@ -1,5 +1,6 @@
-import { Eye, Trash2 } from '@lucide/svelte';
-import { api } from '../api.js';
+import Eye from '@lucide/svelte/icons/eye';
+import Trash2 from '@lucide/svelte/icons/trash-2';
+import { items } from '../api/items.js';
 import { confirm } from '../composables/useConfirm.js';
 import { t } from '../stores/i18n.svelte.js';
 import { errorToast } from '../stores/toasts.svelte.js';
@@ -40,7 +41,7 @@ export function createDeleteItemHandler({ confirmMessage, onDeleted }) {
     if (!confirmed) return;
 
     try {
-      await api.items.delete(item.id);
+      await items.delete(item.id);
       await onDeleted(item);
     } catch (error) {
       console.error('Failed to delete item:', error);

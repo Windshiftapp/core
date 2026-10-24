@@ -1,5 +1,8 @@
 <script>
-  import { ArrowDownToLine, ArrowUpToLine, CalendarDays, MoreHorizontal } from '@lucide/svelte';
+  import ArrowDownToLine from '@lucide/svelte/icons/arrow-down-to-line';
+  import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 

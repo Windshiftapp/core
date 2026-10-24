@@ -1,9 +1,15 @@
+import {
+  statusCategories as statusCategoriesApi,
+  statuses as statusesApi,
+  workflows as workflowsApi,
+} from '../api/workflows.js';
+
 /** Load status catalogs and every workflow's transitions from the v2 catalog API. */
-export async function loadStatusManagerData(apiClient) {
+export async function loadStatusManagerData() {
   const [statusCategories, statuses, workflows] = await Promise.all([
-    apiClient.statusCategories.getAll(),
-    apiClient.statuses.getAll(),
-    apiClient.workflows.getAllWithTransitions(),
+    statusCategoriesApi.getAll(),
+    statusesApi.getAll(),
+    workflowsApi.getAllWithTransitions(),
   ]);
   const normalizedCategories = Array.isArray(statusCategories) ? statusCategories : [];
   const normalizedWorkflows = Array.isArray(workflows) ? workflows : [];

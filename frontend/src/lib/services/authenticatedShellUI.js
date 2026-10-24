@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { api } from '../api.js';
+import { shellBootstrap, themes } from '../api/admin.js';
 import { aiStore } from '../stores/aiStore.svelte.js';
 import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
@@ -59,7 +59,7 @@ export function loadAuthenticatedShellUI(userId, { force = false, timeout = 0 } 
   const generation = ++shellUILoadGeneration;
   shellUILoadAudience = audience;
 
-  const request = api.shellBootstrap
+  const request = shellBootstrap
     .get({ timeout })
     .then((bootstrap) => {
       if (generation !== shellUILoadGeneration) return false;
@@ -128,8 +128,8 @@ export async function hydrateCurrentWorkspaceFromSharedData(workspaceId) {
 export async function refreshAuthenticatedShellUI() {
   const generation = ++refreshGeneration;
   const [shellResult, themeResult] = await Promise.allSettled([
-    api.shellBootstrap.get(),
-    api.themes.getActive(),
+    shellBootstrap.get(),
+    themes.getActive(),
     workspacesStore.reload(),
     workspaceDataStore.refresh(),
   ]);

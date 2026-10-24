@@ -3,9 +3,22 @@
   import { useEventListener } from 'runed';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
-  import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore, permissionStore, isSystemAdmin, workspacePermissions } from '../stores';
-  import { api } from '../api.js';
-  import { X, Target, Building, FolderOpen, ChevronRight, FileText } from '@lucide/svelte';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import { shouldNavigateAfterCreate } from '../stores/navigationConfig.svelte.js';
+  import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
+  import { packs as packsApi } from '../api/packs.js';
+  import { workspaces } from '../api/workspaces.js';
+  import { attachments } from '../api/misc.js';
+  import { items } from '../api/items.js';
+  import { collections } from '../api/collections.js';
+  import X from '@lucide/svelte/icons/x';
+  import Target from '@lucide/svelte/icons/target';
+  import Building from '@lucide/svelte/icons/building';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import FileText from '@lucide/svelte/icons/file-text';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
@@ -71,6 +84,10 @@
 
   // svelte-ignore state_referenced_locally
   let selectedType = $state(initialType);
+
+  // Set once item creation commits so a failed post-create step can be retried
+  // without creating a duplicate.
+  let recoverableItemId = $state(null);
 
   // Form references
   let milestoneFormRef = $state(null);
@@ -156,6 +173,7 @@
   function close() {
     isOpen = false;
     selectedType = initialType;
+    recoverableItemId = null;
 
     // Reset work item form store
     workItemFormStore.resetForm();
@@ -199,7 +217,7 @@
     workspacePacksLoading = true;
     workspacePacksError = null;
     try {
-      const packs = await api.packs.list();
+      const packs = await packsApi.list();
       workspacePackOptions = Array.isArray(packs) ? packs : [];
       workspacePacksLoaded = true;
     } catch (error) {
@@ -216,7 +234,7 @@
     workspaceTemplatesLoading = true;
     workspaceTemplatesError = null;
     try {
-      const templates = await api.workspaces.getTemplates();
+      const templates = await workspaces.getTemplates();
       workspaceTemplateOptions = Array.isArray(templates) ? templates : [];
       workspaceTemplatesLoaded = true;
     } catch (error) {
@@ -237,13 +255,13 @@
     for (const image of workItemFormStore.pendingDescriptionImages) {
       if (!updatedDescription.includes(image.url)) continue;
 
-      const attachment = await api.attachments.uploadToItem(itemId, image.file);
+      const attachment = await attachments.uploadToItem(itemId, image.file);
       const attachmentId = attachment?.id;
       if (!attachmentId) {
         throw new Error('Image upload failed');
       }
 
-      const downloadUrl = api.attachments.getDownloadUrl(attachmentId);
+      const downloadUrl = attachments.getContentUrl(attachmentId);
       updatedDescription = updatedDescription.split(image.url).join(downloadUrl);
     }
 
@@ -267,11 +285,18 @@
           return;
         }
 
-        let result = await api.items.create(formData);
+        // Creation may have committed on an earlier attempt whose post-create
+        // work failed. Reuse that item instead of posting a duplicate.
+        const reusingItem = recoverableItemId != null;
+        let result = reusingItem ? { id: recoverableItemId } : await items.create(formData);
+        recoverableItemId = result.id;
+
         const originalDescription = formData.description || '';
         const updatedDescription = await uploadPendingDescriptionImages(result.id, originalDescription);
-        if (updatedDescription !== originalDescription) {
-          result = await api.items.update(result.id, { description: updatedDescription });
+        // Always reconcile the description when retrying a committed item: the
+        // first attempt stored the pre-upload text and may hold a temporary URL.
+        if (updatedDescription !== originalDescription || reusingItem) {
+          result = await items.update(result.id, { description: updatedDescription });
           formData.description = updatedDescription;
         }
 
@@ -288,14 +313,28 @@
         } else {
           showCreatedItemToast(result);
         }
+        recoverableItemId = null;
         close();
       } else if (selectedType === 'milestone') {
+        // Scope the milestone to the opening context when the user may write
+        // there; otherwise fall back to a global milestone, which the
+        // milestone.create permission gating this option already authorizes.
+        const workspaceId = initialWorkspaceId
+          ? Number.parseInt(String(initialWorkspaceId), 10)
+          : null;
+        const canWriteWorkspace =
+          workspaceId != null &&
+          Number.isFinite(workspaceId) &&
+          (workspacePermissions.canAdminWorkspace(workspaceId) ||
+            workspacePermissions.hasPermission(workspaceId, 'item.edit'));
         await milestonesStore.add({
           name: milestoneFormData.name,
           description: milestoneFormData.description,
           target_date: milestoneFormData.target_date || null,
           status: milestoneFormData.status,
-          category_id: null
+          category_id: null,
+          is_global: !canWriteWorkspace,
+          workspace_id: canWriteWorkspace ? workspaceId : null
         });
 
         navigate('/milestones');
@@ -316,7 +355,7 @@
         if (workspaceFormData.template_pack) {
           payload.template_pack = workspaceFormData.template_pack;
         }
-        const result = await api.workspaces.create(payload);
+        const result = await workspaces.create(payload);
 
         // The creator becomes the workspace administrator server-side; refresh
         // the permission profile so the workspace nav immediately shows the
@@ -332,7 +371,7 @@
         }
         close();
       } else if (selectedType === 'collection') {
-        const result = await api.collections.create({
+        const result = await collections.create({
           name: collectionFormData.name,
           description: collectionFormData.description || '',
           ql_query: '',
@@ -347,7 +386,9 @@
     } catch (error) {
       console.error('Failed to create item:', error);
       const errorMsg = error.message || String(error);
-      if (errorMsg.includes('UNIQUE constraint failed: workspaces.key')) {
+      if (recoverableItemId != null && selectedType === 'work-item') {
+        errorToast(t('createModal.createdPartialError', { error: errorMsg }));
+      } else if (errorMsg.includes('UNIQUE constraint failed: workspaces.key')) {
         errorToast('A workspace with this key already exists. Please choose a different key.');
       } else {
         errorToast(`Failed to create ${currentTypeName.toLowerCase()}: ${errorMsg}`);

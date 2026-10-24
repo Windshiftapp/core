@@ -1,6 +1,6 @@
 <script>
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { channels } from '../../api/channels.js';
   import AlertBox from '../../components/AlertBox.svelte';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -21,6 +21,7 @@
       from_name: '',
       encryption: 'tls',
       skip_tls_verify: false,
+      auth_method: 'auto',
       enabled: false
     }),
     onSave = () => {}
@@ -48,10 +49,10 @@
     try {
       // Save config first
       const configData = getConfig();
-      await api.channels.updateConfig(channelId, configData);
+      await channels.updateConfig(channelId, configData);
 
       // Test the channel with test email
-      const result = await api.channels.testWithEmail(channelId, testEmail);
+      const result = await channels.testWithEmail(channelId, testEmail);
       if (result.success) {
         testResult = {
           success: true,
@@ -94,11 +95,14 @@
       smtp_host: formData.host,
       smtp_port: formData.port || 587,
       smtp_username: plaintext ? '' : formData.username || '',
-      smtp_password: plaintext ? '' : formData.password || undefined,
+      // Plaintext relays reject stored credentials, so signal an explicit
+      // clear. Blank passwords otherwise mean "keep the saved secret".
+      smtp_password: plaintext ? null : formData.password || undefined,
       smtp_from_email: formData.from_email,
       smtp_from_name: formData.from_name || '',
       smtp_encryption: formData.encryption || 'tls',
-      smtp_skip_tls_verify: plaintext ? false : formData.skip_tls_verify || false
+      smtp_skip_tls_verify: plaintext ? false : formData.skip_tls_verify || false,
+      smtp_auth_method: plaintext ? 'none' : formData.auth_method || 'auto'
     };
   }
 
@@ -175,6 +179,24 @@
         <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">{t('channel.authentication')}</h5>
         <div class="space-y-4">
           <div>
+            <SelectField
+              label={t('channel.smtpAuthMethod')}
+              id="smtp-auth-method"
+              labelColor="default"
+              ariaLabel={t('channel.smtpAuthMethod')}
+              options={[
+              { value: 'auto', label: t('channel.smtpAuthAuto') },
+              { value: 'plain', label: 'PLAIN' },
+              { value: 'login', label: 'LOGIN' },
+              { value: 'cram-md5', label: 'CRAM-MD5' },
+              { value: 'none', label: t('channel.smtpAuthNone') }
+              ]}
+              bind:value={formData.auth_method}
+            />
+            <DescriptionText>{t('channel.smtpAuthMethodDescription')}</DescriptionText>
+          </div>
+          {#if formData.auth_method !== 'none'}
+          <div>
             <TextField
               label={t('channel.smtpUsername')}
               labelColor="default"
@@ -197,6 +219,7 @@
               {t('channel.leaveBlankPassword')}
             </DescriptionText>
           </div>
+          {/if}
         </div>
       </div>
     {/if}

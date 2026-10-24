@@ -3,9 +3,10 @@
 	// error=access_denied.
 
 	import { onMount } from 'svelte';
-	import { Lock, AlertTriangle } from '@lucide/svelte';
-	import { api } from '../api.js';
-	import { authStore } from '../stores';
+	import Lock from '@lucide/svelte/icons/lock';
+	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+	import { oauth } from '../api/oauth.js';
+	import { authStore } from '../stores/auth.svelte.js';
 	import { currentRoute } from '../router.js';
 	import ConsentCard from '../components/ConsentCard.svelte';
 	import Spinner from '../components/Spinner.svelte';
@@ -40,7 +41,7 @@
 	onMount(async () => {
 		scopeCatalogStore.load();
 		try {
-			info = await api.oauth.authorizeInfo({
+			info = await oauth.authorizeInfo({
 				client_id: params.client_id || '',
 				redirect_uri: params.redirect_uri || '',
 				response_type: params.response_type || 'code',
@@ -76,7 +77,7 @@
 		working = true;
 		actionError = '';
 		try {
-			const resp = await api.oauth.authorizeApprove(approveBody());
+			const resp = await oauth.authorizeApprove(approveBody());
 			if (resp?.redirect_to) {
 				window.location.replace(resp.redirect_to);
 				return;
@@ -95,7 +96,7 @@
 		working = true;
 		actionError = '';
 		try {
-			const resp = await api.oauth.authorizeDeny(approveBody());
+			const resp = await oauth.authorizeDeny(approveBody());
 			if (resp?.redirect_to) {
 				window.location.replace(resp.redirect_to);
 				return;

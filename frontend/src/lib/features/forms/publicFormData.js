@@ -1,9 +1,9 @@
-import { api } from '../../api.js';
+import { forms } from '../../api/forms.js';
 
 export function loadPublicFormBootstrap(slug) {
-  return api.forms.getBootstrap(slug);
+  return forms.getBootstrap(slug);
 }
 
 export function loadPublicFormDetail(slug, formId) {
-  return api.forms.getFormDetail(slug, formId);
+  return forms.getFormDetail(slug, formId);
 }

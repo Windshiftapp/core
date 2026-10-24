@@ -266,30 +266,12 @@ func (c *itemCreation) insert() (int, error) {
 }
 
 func (c *itemCreation) insertRow(tx database.Tx, itemNumber int, fracIndex string) (int, error) {
-	p := c.params
-	query := `
-		INSERT INTO items (
-			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
-			iteration_id, project_id, inherit_project, time_project_id, assignee_id, team_id, reporter_id, creator_id, creator_portal_customer_id,
-			channel_id, request_type_id, intake_id, portal_org_shared, due_date, start_date, end_date, related_work_item_id,
-			story_points, estimate_minutes, custom_field_values, virtual_field_data, parent_id,
-			frac_index, created_at, updated_at, last_active_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`
-
-	var itemID int
-	err := tx.QueryRow(query,
-		p.WorkspaceID, itemNumber, p.ItemTypeID, p.Title, p.Description, c.statusID, c.priorityID, p.IsTask,
-		p.IterationID, p.ProjectID, p.InheritProject, p.TimeProjectID, p.AssigneeID, p.TeamID, p.ReporterID, p.CreatorID,
-		p.CreatorPortalCustomerID, p.ChannelID, p.RequestTypeID, p.IntakeID, p.PortalOrgShared, p.DueDate, p.StartDate, p.EndDate,
-		p.RelatedWorkItemID, p.StoryPoints, p.EstimateMinutes, nullString(p.CustomFieldValuesJSON),
-		nullString(p.VirtualFieldDataJSON), p.ParentID, fracIndex, c.createdAt, c.updatedAt, c.updatedAt,
-	).Scan(&itemID)
+	item, err := c.eventItem(0, itemNumber)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert item: %w", err)
+		return 0, err
 	}
-	return itemID, nil
+	item.FracIndex = &fracIndex
+	return repository.NewItemRepository(c.db).Create(tx, item)
 }
 
 func (c *itemCreation) extendTransaction(tx database.Tx, itemID int) error {
@@ -320,15 +302,15 @@ func (c *itemCreation) recordCreation(tx database.Tx, itemID, itemNumber int) er
 		return err
 	}
 	metadata := itemCreateEventMetadata(c.params, c.createdAt)
+	creatorUserID := 0
 	if c.params.CreatorID != nil {
-		history := append(
-			creationHistoryEntries(*item, *c.params.CreatorID, metadata.OccurredAt),
-			creationMilestonesHistory(itemID, *c.params.CreatorID, c.params.MilestoneIDs, metadata.OccurredAt)...,
-		)
-		history = stampHistorySource(history, metadata)
-		if err := repository.NewItemRepository(c.db).RecordHistoryBatch(tx, history); err != nil {
-			return fmt.Errorf("record item creation history: %w", err)
-		}
+		creatorUserID = *c.params.CreatorID
+	}
+	if err := RecordItemCreationHistory(c.db, tx, item, creatorUserID, c.params.CreatorPortalCustomerID, metadata); err != nil {
+		return fmt.Errorf("record item creation history: %w", err)
+	}
+	if err := RecordItemCreationMilestonesHistory(c.db, tx, itemID, c.params.MilestoneIDs, creatorUserID, c.params.CreatorPortalCustomerID, metadata); err != nil {
+		return fmt.Errorf("record item creation milestones history: %w", err)
 	}
 	_, err = itemevents.NewRecorder(c.db).Created(c.ctx, tx, item, c.params.MilestoneIDs, metadata)
 	return err
@@ -350,7 +332,8 @@ func (c *itemCreation) eventItem(itemID, itemNumber int) (*models.Item, error) {
 		StatusID: c.statusID, PriorityID: c.priorityID, IsTask: p.IsTask,
 		AssigneeID: p.AssigneeID, TeamID: p.TeamID, ReporterID: p.ReporterID, CreatorID: p.CreatorID,
 		CreatorPortalCustomerID: p.CreatorPortalCustomerID, ChannelID: p.ChannelID,
-		RequestTypeID: p.RequestTypeID, ParentID: p.ParentID, IterationID: p.IterationID,
+		RequestTypeID: p.RequestTypeID, IntakeID: p.IntakeID, PortalOrgShared: p.PortalOrgShared,
+		ParentID: p.ParentID, IterationID: p.IterationID,
 		ProjectID: p.ProjectID, InheritProject: p.InheritProject, TimeProjectID: p.TimeProjectID,
 		RelatedWorkItemID: p.RelatedWorkItemID, DueDate: p.DueDate, StartDate: p.StartDate,
 		EndDate: p.EndDate, StoryPoints: p.StoryPoints, EstimateMinutes: p.EstimateMinutes,

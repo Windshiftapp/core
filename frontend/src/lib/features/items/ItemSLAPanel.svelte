@@ -1,8 +1,10 @@
 <script>
   import { useEventListener } from 'runed';
-  import { api } from '../../api.js';
+  import { sla } from '../../api/sla.js';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { Gauge, AlertTriangle, PauseCircle, Clock, CalendarClock } from '@lucide/svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
+  import Gauge from '@lucide/svelte/icons/gauge';
+  import Clock from '@lucide/svelte/icons/clock';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatInstant } from '../../utils/dateFormatter.js';
 
@@ -23,7 +25,7 @@
     const requestedItemId = itemId;
     loading = true;
     try {
-      const result = (await api.sla.getItemSLA(requestedItemId)) ?? [];
+      const result = (await sla.getItemSLA(requestedItemId)) ?? [];
       // A newer request or an item switch supersedes this response.
       if (token !== requestToken) return;
       states = result;
@@ -110,37 +112,47 @@
 
           {#if state.ongoing}
             {@const cycle = { ...state.ongoing, display_format: state.display_format }}
-            <div class="flex items-center gap-2 flex-wrap mt-1 text-sm">
-              <Clock class="w-3.5 h-3.5" style="color: var(--ds-text-subtle)" />
-              <span data-testid="item-sla-remaining-{state.metric_id}">{cycleRemaining(cycle)}</span>
-              {#if cycle.breached}
-                <Lozenge color="red" text={t('items.sla.breached')} />
+            {#if cycle.goal_duration_ms > 0}
+              <div class="flex items-center gap-2 flex-wrap mt-1 text-sm">
+                <Clock class="w-3.5 h-3.5" style="color: var(--ds-text-subtle)" />
+                <span data-testid="item-sla-remaining-{state.metric_id}">{cycleRemaining(cycle)}</span>
+                {#if cycle.breached}
+                  <Lozenge color="red" text={t('items.sla.breached')} />
+                {/if}
+                {#if cycle.paused}
+                  <Lozenge color="yellow" text={t('items.sla.paused')} />
+                {/if}
+                {#if !cycle.within_calendar_hours && !cycle.paused}
+                  <Tooltip content={t('items.sla.outsideHours')}>
+                    <Lozenge color="blue" text={t('items.sla.paused')} dataTestid="item-sla-paused-outside-hours-{state.metric_id}" />
+                  </Tooltip>
+                {/if}
+              </div>
+              <div class="text-xs mt-1" style="color: var(--ds-text-subtle)">
+                {t('items.sla.elapsedOfGoal', {
+                  elapsed: formatDuration(cycle.elapsed_ms),
+                  goal: formatDuration(cycle.goal_duration_ms),
+                })}
+              </div>
+              {#if cycle.coverage?.reference === 'team_service_hours' && cycle.coverage.discrepancy && cycle.coverage.discrepancy !== 'aligned'}
+                <div
+                  class="text-xs mt-1"
+                  style="color: var(--ds-text-subtle)"
+                  data-testid="item-sla-coverage-{state.metric_id}"
+                >
+                  {t(`items.sla.coverageDiscrepancies.${cycle.coverage.discrepancy}`)}
+                  {#if cycle.coverage.note}
+                    · {t(`items.sla.coverageNotes.${cycle.coverage.note}`)}
+                  {/if}
+                </div>
               {/if}
-              {#if cycle.paused}
-                <Lozenge color="yellow" text={t('items.sla.paused')} />
-              {/if}
-              {#if cycle.within_calendar_hours}
-                <Lozenge color="green" text={t('items.sla.withinHours')} />
-              {:else if !cycle.paused}
-                <Lozenge color="blue" text={t('items.sla.outsideHours')} />
-              {/if}
-            </div>
-            <div class="text-xs mt-1" style="color: var(--ds-text-subtle)">
-              {t('items.sla.elapsedOfGoal', {
-                elapsed: formatDuration(cycle.elapsed_ms),
-                goal: formatDuration(cycle.goal_duration_ms),
-              })}
-            </div>
-            {#if cycle.coverage?.reference === 'team_service_hours' && cycle.coverage.discrepancy && cycle.coverage.discrepancy !== 'aligned'}
+            {:else}
               <div
                 class="text-xs mt-1"
                 style="color: var(--ds-text-subtle)"
-                data-testid="item-sla-coverage-{state.metric_id}"
+                data-testid="item-sla-no-goal-{state.metric_id}"
               >
-                {t(`items.sla.coverageDiscrepancies.${cycle.coverage.discrepancy}`)}
-                {#if cycle.coverage.note}
-                  · {t(`items.sla.coverageNotes.${cycle.coverage.note}`)}
-                {/if}
+                {t('items.sla.noGoal')}
               </div>
             {/if}
           {:else}

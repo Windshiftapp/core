@@ -1,7 +1,11 @@
 <script>
-  import { Clock, Edit, MessageSquare, Eye } from '@lucide/svelte';
-  import { homepageStore } from '../../stores';
-  import { navigate } from '../../router.js';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Edit from '@lucide/svelte/icons/edit';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Eye from '@lucide/svelte/icons/eye';
+  import { homepageStore } from '../../stores/homepageStore.svelte.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
+  import DashboardItemRow from './DashboardItemRow.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   let activeTab = $derived(homepageStore.activeTab);
@@ -20,7 +24,12 @@
   ];
 
   function open(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}`);
+    itemModalStore.open(item.item_id, item.workspace_id);
+  }
+
+  function itemKey(item) {
+    if (item.workspace_key == null || item.workspace_item_number == null) return null;
+    return `${item.workspace_key}-${item.workspace_item_number}`;
   }
 </script>
 
@@ -54,31 +63,27 @@
       <p class="text-sm">{t('dashboard.noRecentActivity')}</p>
     </div>
   {:else}
-    <ul class="flex flex-col">
+    <ul class="flex flex-col gap-1.5">
       {#each items.slice(0, 6) as item (item.item_id)}
         <li>
-          <button
-            class="dashboard-activity-row w-full text-left px-2 py-1.5 rounded flex items-start gap-2 transition-colors"
+          <DashboardItemRow
+            title={item.title}
+            itemKey={itemKey(item)}
+            href={`/workspaces/${item.workspace_id}/items/${item.item_id}`}
+            statusName={item.status}
+            statusBuiltinKey={item.status_builtin_key}
+            statusColor={item.status_color}
+            priorityName={item.priority_name}
+            priorityBuiltinKey={item.priority_builtin_key}
+            priorityColor={item.priority_color}
+            timestamp={item.last_activity
+              ? homepageStore.formatRelativeTime(item.last_activity)
+              : null}
+            dataTestid="your-activity-entry"
             onclick={() => open(item)}
-          >
-            <div class="min-w-0 flex-1">
-              <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
-              <p class="text-[0.7rem] mt-0.5" style="color: var(--ds-text-subtle);">
-                {item.workspace_key}-{item.workspace_item_number}
-                {#if item.last_activity}
-                  · {homepageStore.formatRelativeTime(item.last_activity)}
-                {/if}
-              </p>
-            </div>
-          </button>
+          />
         </li>
       {/each}
     </ul>
   {/if}
 </div>
-
-<style>
-  .dashboard-activity-row:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-</style>

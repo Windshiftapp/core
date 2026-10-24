@@ -439,7 +439,8 @@ export default {
   },
   "widgets": {
     "chart": {
-      "noDataAvailable": "لا توجد بيانات متاحة"
+      "noDataAvailable": "لا توجد بيانات متاحة",
+      "otherSlices": "أخرى ({count} إضافية)",
     },
     "completionChart": {
       "title": "مخطط الإكمال"

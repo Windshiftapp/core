@@ -10,18 +10,16 @@ import {
   loadAuthenticatedShellUI,
   refreshAuthenticatedShellUI,
 } from '../services/authenticatedShellUI.js';
-import {
-  activityStore,
-  authStore,
-  homepageStore,
-  permissionStore,
-  ssoStore,
-  workspaceDataStore,
-  workspacePermissions,
-  workspacesStore,
-} from '../stores';
+import { activityStore } from '../stores/activityStore.svelte.js';
+import { authStore } from '../stores/auth.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+import { homepageStore } from '../stores/homepageStore.svelte.js';
 import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
+import { permissionStore } from '../stores/permissions.svelte.js';
+import { ssoStore } from '../stores/sso.svelte.js';
+import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
+import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
+import { workspacesStore } from '../stores/workspaces.svelte.js';
 import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
 
 const DOUBLE_SPACE_THRESHOLD_MS = 300;

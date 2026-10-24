@@ -54,6 +54,12 @@ func ValidateConfigForEnable(channel *models.Channel, config *models.ChannelConf
 		if config.EmailOAuthRefreshToken == "" {
 			return fmt.Errorf("%w: OAuth flow not completed (no refresh token)", ErrConfigNotReady)
 		}
+		// A mailbox change clears the tokens, but guard the invariant directly
+		// too: a connection verified for one address must not be enabled for a
+		// different one without reconnecting.
+		if config.EmailOAuthMailbox != "" && !strings.EqualFold(strings.TrimSpace(config.EmailOAuthMailbox), strings.TrimSpace(config.EmailOAuthEmail)) {
+			return fmt.Errorf("%w: the connected mailbox does not match the configured mailbox; reconnect OAuth", ErrConfigNotReady)
+		}
 	case "basic", "":
 		// Empty defaults to basic for back-compat with channels saved before
 		// EmailAuthMethod was introduced.

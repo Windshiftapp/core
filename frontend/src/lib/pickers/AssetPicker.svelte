@@ -1,9 +1,9 @@
 <script>
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
-  import { api } from '../api.js';
+  import { assets as assetsApi } from '../api/assets.js';
   import { onDestroy, untrack } from 'svelte';
-  import { Box } from '@lucide/svelte';
+  import Box from '@lucide/svelte/icons/box';
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 
@@ -48,7 +48,7 @@
     if (!assetSetId) return [];
     const filters = { cql: cqlQuery || undefined };
     if (searchQuery) filters.search = searchQuery;
-    const result = await api.assets.getAll(assetSetId, filters);
+    const result = await assetsApi.getAll(assetSetId, filters);
 	totalCount = result?.pagination?.total_items ?? 0;
 	return result?.data || [];
   });

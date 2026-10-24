@@ -1,11 +1,9 @@
 <script>
-  import {
-    IconActivity,
-    IconAlertTriangle,
-    IconCalendarRepeat,
-    IconClock,
-    IconStack2,
-  } from '@tabler/icons-svelte-runes';
+  import IconActivity from '@tabler/icons-svelte-runes/icons/activity';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconCalendarRepeat from '@tabler/icons-svelte-runes/icons/calendar-repeat';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
   import { getRecurrenceVolume, updateRecurrenceVolumeSettings } from '../../api/diagnostics.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';

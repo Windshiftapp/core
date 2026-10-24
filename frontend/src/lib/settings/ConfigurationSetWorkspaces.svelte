@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { api } from '../api.js';
+  import { configurationSets } from '../api/configuration.js';
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
 
   let {
@@ -18,7 +18,7 @@
 
   async function loadWorkspaceAssignments() {
     try {
-      const response = await api.configurationSets.getAll({ limit: 1000 });
+      const response = await configurationSets.getAll({ limit: 1000 });
       const configSets = response.configuration_sets || [];
 
       workspaceAssignments = {};

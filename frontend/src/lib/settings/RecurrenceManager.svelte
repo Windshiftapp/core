@@ -3,8 +3,9 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { api } from '../api.js';
-  import { Trash2, Repeat } from '@lucide/svelte';
+  import { recurrence } from '../api/recurrence.js';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Repeat from '@lucide/svelte/icons/repeat';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -44,7 +45,7 @@
   async function loadData() {
     try {
       loading = true;
-      const wsRules = await api.recurrence.listByWorkspace(workspaceId);
+      const wsRules = await recurrence.listByWorkspace(workspaceId);
       rules = wsRules || [];
     } catch (error) {
       console.error('Failed to load recurrence rules:', error);
@@ -75,7 +76,7 @@
 
     try {
       // Delete via the template item endpoint
-      await api.recurrence.delete(rule.template_item_id);
+      await recurrence.delete(rule.template_item_id);
       rules = rules.filter(r => r.id !== rule.id);
     } catch (error) {
       console.error('Failed to delete recurrence rule:', error);

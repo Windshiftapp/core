@@ -95,8 +95,14 @@ const GRID_MIN_FIXED_SCALE = 0.75;
 const GRID_MIN_TITLE_WIDTH = 16;
 const GRID_MIN_FLEXIBLE_WIDTH = 10;
 
+// The header and every row each build their own grid from the same template,
+// so any content-sized track (`max-content`/`auto`) resolves differently per
+// grid and shifts every later column. Key and actions must therefore be fixed.
+const GRID_KEY_WIDTH = 5;
+const GRID_ACTIONS_WIDTH = 4;
+
 function gridColumnTrack(col) {
-  if (col.field_identifier === 'key') return 'max-content';
+  if (col.field_identifier === 'key') return `${GRID_KEY_WIDTH}rem`;
 
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
   if (base !== undefined) {
@@ -113,7 +119,7 @@ function gridColumnTrack(col) {
 // Floor for the whole row. When it exceeds the viewport the list scrolls
 // horizontally instead of letting columns collapse into each other.
 function gridColumnMinWidth(col) {
-  if (col.field_identifier === 'key') return 5;
+  if (col.field_identifier === 'key') return GRID_KEY_WIDTH;
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
   if (base !== undefined) return base * GRID_MIN_FIXED_SCALE;
   return col.field_identifier === 'title' ? GRID_MIN_TITLE_WIDTH : GRID_MIN_FLEXIBLE_WIDTH;
@@ -121,12 +127,12 @@ function gridColumnMinWidth(col) {
 
 /** CSS grid-template-columns for a list-shaped row of columns. */
 export function listGridTemplateColumns(columns) {
-  return `${columns.map(gridColumnTrack).join(' ')} auto`;
+  return `${columns.map(gridColumnTrack).join(' ')} ${GRID_ACTIONS_WIDTH}rem`;
 }
 
-/** Row min-width matching listGridTemplateColumns; 2.5rem covers the actions
- * track plus the gap between every track. */
+/** Row min-width matching listGridTemplateColumns; the actions track is fixed
+ * and `columns.length` covers the gap between every track. */
 export function listGridMinWidth(columns) {
   const total = columns.reduce((sum, col) => sum + gridColumnMinWidth(col), 0);
-  return `${total + 2.5 + columns.length}rem`;
+  return `${total + GRID_ACTIONS_WIDTH + columns.length}rem`;
 }

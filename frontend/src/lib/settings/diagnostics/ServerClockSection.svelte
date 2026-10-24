@@ -1,5 +1,8 @@
 <script>
-  import { IconClock, IconActivity, IconAlertTriangle, IconRulerMeasure } from '@tabler/icons-svelte-runes';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconActivity from '@tabler/icons-svelte-runes/icons/activity';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconRulerMeasure from '@tabler/icons-svelte-runes/icons/ruler-measure';
   import StatCard from '../../components/StatCard.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import DiagnosticsSection from './DiagnosticsSection.svelte';

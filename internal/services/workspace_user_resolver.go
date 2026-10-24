@@ -46,7 +46,7 @@ func (r *WorkspaceUserResolver) List(ctx context.Context, workspaceID int) ([]mo
 	}
 	presence, err := r.presence.ForWorkspace(ctx, workspaceID)
 	if err != nil {
-		return nil, fmt.Errorf("workspace user resolver: resolve agent presence: %w", err)
+		return nil, fmt.Errorf("workspace user resolver: %w", err)
 	}
 
 	resolved := make([]models.User, 0, len(users))
@@ -97,7 +97,7 @@ func (r *WorkspaceUserResolver) CanAct(ctx context.Context, userID, workspaceID 
 	if user.IsAgent {
 		presence, err := r.presence.ForWorkspace(ctx, workspaceID)
 		if err != nil {
-			return false, fmt.Errorf("workspace user resolver: resolve agent presence: %w", err)
+			return false, fmt.Errorf("workspace user resolver: %w", err)
 		}
 		if _, ready := presence[userID]; !ready {
 			return false, nil

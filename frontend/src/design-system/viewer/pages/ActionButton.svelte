@@ -1,6 +1,17 @@
 <script>
   import ActionButton from '../../../lib/layout/ActionButton.svelte';
-  import { Edit, Trash2, Copy, Download, Upload, RefreshCw, Settings, Plus, Eye, EyeOff, Star, Heart } from '@lucide/svelte';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Download from '@lucide/svelte/icons/download';
+  import Upload from '@lucide/svelte/icons/upload';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Star from '@lucide/svelte/icons/star';
+  import Heart from '@lucide/svelte/icons/heart';
 </script>
 
 <div class="space-y-8">

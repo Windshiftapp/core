@@ -1,5 +1,9 @@
 <script>
-  import { Plus, X, Package, ChevronDown, LoaderCircle } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
+  import Package from '@lucide/svelte/icons/package';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import { useEventListener } from 'runed';
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
@@ -165,8 +169,9 @@
 
   <!-- Actions Footer -->
   <div
-    class="flex items-center {compact ? 'p-3 pt-2 gap-2' : 'mt-2.5 pt-2 gap-1.5'}"
+    class="flex items-center {compact ? 'p-3 pt-2 gap-2' : 'mt-2.5 pt-2 gap-1'}"
     class:flex-wrap={compact}
+    data-testid="quick-add-footer"
   >
     <!-- Workspace Selector -->
     <div class="relative" bind:this={workspaceAnchor} data-quick-add-menu-anchor>
@@ -283,7 +288,7 @@
             variant="default"
             size="small"
             onclick={toggleItemTypeDropdown}
-            class="!h-6 !px-1 !gap-0.5 !rounded-[3px]"
+            class="!h-6 !px-0.5 !gap-0.5 !rounded-[3px]"
             dataTestid="quick-add-type"
             title={selectedItemType?.name || t('collections.selectType')}
           >
@@ -346,7 +351,7 @@
         variant="ghost"
         size="small"
         onclick={() => onCancel(parentId)}
-        class="!h-6 !px-2 !text-xs"
+        class="!h-6 !px-1 !text-xs"
         style="color: var(--ds-text);"
         dataTestid="quick-add-cancel"
         title="{t('common.cancel')} ({getDisplayString(cancelShortcut)})"
@@ -374,7 +379,7 @@
         size="small"
         keyboardHint={getDisplayString(createShortcut)}
         onclick={() => onCreate(parentId)}
-        class="!h-6 !px-2 !text-xs !gap-1.5"
+        class="!h-6 !px-1 !text-xs !gap-1"
         dataTestid="quick-add-create"
         disabled={formState.loadingTypes || !formState.itemTypeId}
       >

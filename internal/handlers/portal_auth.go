@@ -92,11 +92,16 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	// Parse request body
 	var request struct {
 		Email string `json:"email" validate:"required,email,max=255"`
+		Next  string `json:"next"`
 	}
 	if !decodeChannelRequest(w, r, &request, false) {
 		return
 	}
 	sanitize.Apply(&request.Email, sanitize.ShortIdentifier)
+
+	// A deep link the customer followed into the portal; echoed back through
+	// the emailed verify URL so sign-in resumes the same page.
+	next := services.PortalNextPath(request.Next, slug)
 
 	email := strings.TrimSpace(strings.ToLower(request.Email))
 	if email == "" {
@@ -187,7 +192,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Send magic link email
-	err = h.magicLinkService.SendMagicLinkEmail(email, customerName, token, slug)
+	err = h.magicLinkService.SendMagicLinkEmail(email, customerName, token, slug, next)
 	if err != nil {
 		slog.Error("failed to send magic link email", slog.String("component", "portal_auth"), slog.Any("error", err))
 		// Still return success to prevent enumeration

@@ -1,9 +1,13 @@
 <script>
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
-  import { api } from '../../api.js';
-  import { IconArrowLeft, IconPlayerPlay, IconAlertTriangle, IconFileText, IconTrash } from '@tabler/icons-svelte-runes';
+  import { tests } from '../../api/tests/index.js';
+  import IconPlayerPlay from '@tabler/icons-svelte-runes/icons/player-play';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconFileText from '@tabler/icons-svelte-runes/icons/file-text';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
   import Button from '../../components/Button.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import { confirm } from '../../composables/useConfirm.js';
   import Lozenge from '../../components/Lozenge.svelte';
   import Card from '../../components/Card.svelte';
@@ -13,9 +17,9 @@
   import StateDisplay from '../../components/StateDisplay.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
-  import { getStatusLabel } from '../../utils/statusColors.js';
+  import { getStatusLabel, getTestStatusColor } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { workspacePermissions } from '../../stores/index.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import { loadTestRunDetail } from './testRunDetailData.js';
   import { formatExampleRow } from './bddSpec.js';
@@ -44,7 +48,7 @@
   async function loadTestRun(runId) {
     try {
       loading = true;
-      const detail = await loadTestRunDetail(api, workspaceId, runId);
+      const detail = await loadTestRunDetail(workspaceId, runId);
       testRun = detail.run;
       bddSnapshots = detail.bddSnapshots;
       const groupedExampleResults = {};
@@ -115,7 +119,7 @@
   async function executeRun() {
     try {
       // Get existing runs for this test plan to generate sequential numbering
-      const setRuns = await api.tests.testPlans.getRuns(workspaceId, testRun.plan_id);
+      const setRuns = await tests.testPlans.getRuns(workspaceId, testRun.plan_id);
       const executionCount = setRuns.length;
       
       const newRunName = prompt(
@@ -128,7 +132,7 @@
       }
       
       // Create a new test run instance for this execution
-      const newRun = await api.tests.testRuns.create(workspaceId, {
+      const newRun = await tests.testRuns.create(workspaceId, {
         plan_id: testRun.plan_id,
         name: newRunName
       });
@@ -140,20 +144,8 @@
     }
   }
 
-  // Status colors now handled by imported utility (getStatusBadgeCSS, getStatusLabel)
-
   const isBddResult = (result) => result.format === 'bdd';
   const exampleRowLabel = (row) => formatExampleRow(row.row_values);
-
-  function getStatusColor(status) {
-    return {
-      passed: 'green',
-      failed: 'red',
-      blocked: 'amber',
-      skipped: 'gray',
-      not_run: 'gray'
-    }[status] || 'gray';
-  }
 
   function getStepStatusStyle(status) {
     const styles = {
@@ -214,7 +206,7 @@
     if (!ok) return;
 
     try {
-      await api.tests.testRuns.delete(workspaceId, testRun.id);
+      await tests.testRuns.delete(workspaceId, testRun.id);
       if (fromPage === 'reports') {
         navigate(testPath('/reports'));
       } else {
@@ -233,16 +225,12 @@
       <StateDisplay type="loading" message={t('common.loading')} size="lg" />
     {:else if testRun}
       <!-- Header -->
-      <Button
+      <BackButton
         onclick={goBack}
-        dataTestid="test-run-detail-back"
-        variant="ghost"
-        size="small"
-        icon={IconArrowLeft}
+        testid="test-run-detail-back"
+        label={fromPage === 'reports' ? t('testing.testRunReport') : t('testing.testRuns')}
         class="mb-4"
-      >
-        {fromPage === 'reports' ? t('testing.testRunReport') : t('testing.testRuns')}
-      </Button>
+      />
       <PageHeader
         title={testRun.name}
         subtitle={`${t('testing.started')}: ${formatAuthenticatedDateTime(testRun.started_at)}${testRun.ended_at ? ` • ${t('testing.ended')}: ${formatAuthenticatedDateTime(testRun.ended_at)}` : ''}`}
@@ -311,7 +299,7 @@
                       <h3 class="font-medium" style="color: var(--ds-text);">
                         {result.test_case_title}
                       </h3>
-                      <Lozenge color={getStatusColor(result.status)} text={getStatusLabel(result.status)} size="md" />
+                      <Lozenge color={getTestStatusColor(result.status)} text={getStatusLabel(result.status)} size="md" />
                     </div>
 
 

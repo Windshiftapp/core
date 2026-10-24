@@ -1,5 +1,6 @@
 <script>
-  import { AlertTriangle, Clock } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Clock from '@lucide/svelte/icons/clock';
   import Badge from '../../components/Badge.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import {

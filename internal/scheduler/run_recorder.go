@@ -13,6 +13,9 @@ import (
 // Called from each scheduler's tick function as a deferred call so the result
 // is recorded on every code path including early returns.
 //
+// now supplies the completion time; pass the scheduler's clock so an injected
+// clock produces a consistent duration instead of mixing it with wall time.
+//
 // Best-effort: a DB failure here is logged but never propagated, so a hiccup
 // in scheduler_runs cannot break an actual scheduler tick.
 //
@@ -20,11 +23,14 @@ import (
 // before this defer fires; same for runErr.
 //
 //nolint:gocritic // ptrToRefParam: pointer is intentional — caller mutates after defer is registered
-func recordSchedulerRun(repo *repository.SchedulerRunRepository, name string, start time.Time, items *int, runErr *error) {
+func recordSchedulerRun(repo *repository.SchedulerRunRepository, name string, start time.Time, items *int, runErr *error, now func() time.Time) {
 	if repo == nil {
 		return
 	}
-	completed := time.Now()
+	if now == nil {
+		now = time.Now
+	}
+	completed := now()
 	dur := int(completed.Sub(start).Milliseconds())
 	msg := ""
 	success := true

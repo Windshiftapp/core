@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconSettings, IconUsers } from '@tabler/icons-svelte-runes';
+  import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
+  import IconUsers from '@tabler/icons-svelte-runes/icons/users';
   import { currentRoute } from '../../router.js';
-  import { api } from '../../api.js';
+  import { channels } from '../../api/channels.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { isSystemAdmin } from '../../stores/permissions.svelte.js';
@@ -42,7 +43,7 @@
     allowed_domains: '',
   });
 
-  // Email channels whose email_connected_portal_id points at this portal.
+  // Email channels with an intake linked to this portal.
   let connectedMailboxes = $state([]);
 
   let channelId = $derived(parseInt($currentRoute.path.match(/\/admin\/channels\/(\d+)\/portal/)?.[1]));
@@ -60,7 +61,7 @@
     const requestSequence = ++loadSequence;
     try {
       loading = true;
-      const loadedChannel = await api.channels.get(id);
+      const loadedChannel = await channels.get(id);
       if (loadedChannel.type !== 'portal' || loadedChannel.direction !== 'inbound') {
         throw new Error('This route requires an inbound portal channel');
       }

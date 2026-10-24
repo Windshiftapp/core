@@ -1,23 +1,22 @@
 import { resolveAdminGroups } from '../../admin/adminNavigation.js';
+import { extensions, getExtensionsForPoint } from '../../stores/extensions.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 
 /**
- * Admin tab commands, gated by canAccessAdmin (not isSystemAdmin).
+ * Admin tab commands, gated by canAccessAdmin. Mirrors the admin sidebar:
+ * the static registry plus plugin-provided `admin.tab` extensions, which
+ * Admin.svelte merges from the same extension point.
  *
- * Phase 0 audit fix: previous admin commands in CommandPalette.svelte were
- * gated by isSystemAdmin only. A user who has admin permission but isn't a
- * system-admin could see /admin in the sidebar but couldn't see admin
- * commands in the palette — inconsistent. Using canAccessAdmin matches the
- * sidebar behavior.
+ * The extension store is hydrated by CommandPalette.loadData before the
+ * provider first runs for a system admin.
  */
 export function adminProvider(ctx) {
   const { t, permissions } = ctx;
   if (!permissions?.canAccessAdmin) return [];
 
   const out = [];
-  const groups = resolveAdminGroups(t);
-  for (const group of groups) {
+  for (const group of resolveAdminGroups(t)) {
     for (const item of group.items) {
       out.push(
         createCommand({
@@ -31,5 +30,20 @@ export function adminProvider(ctx) {
       );
     }
   }
+
+  for (const ext of getExtensionsForPoint(extensions.value, 'admin.tab')) {
+    if (!ext?.id || !ext?.label) continue;
+    out.push(
+      createCommand({
+        id: `admin-plugin-${ext.id}`,
+        label: ext.label,
+        description: ext.description || '',
+        bucket: BUCKET.ADMIN,
+        keywords: ['admin', 'plugin', ext.id.replace(/-/g, ' '), ext.group].filter(Boolean),
+        url: `/admin/${ext.id}`,
+      })
+    );
+  }
+
   return out;
 }

@@ -1,7 +1,7 @@
 <script>
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { tests } from '../api/tests/index.js';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -35,7 +35,7 @@
     loading = true;
     error = null;
     try {
-      const response = await api.tests.testLabels.getAll(workspaceId);
+      const response = await tests.testLabels.getAll(workspaceId);
       labels = response || [];
     } catch (err) {
       console.error('Failed to load test labels:', err);

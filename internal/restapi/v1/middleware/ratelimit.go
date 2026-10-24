@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"windshift/internal/restapi"
+	"windshift/internal/utils"
 )
 
 // idleEvictAfter is how long a per-token bucket can sit unused before the
@@ -23,6 +24,10 @@ type RateLimiter struct {
 	rate     int      // requests per window
 	window   time.Duration
 
+	// ipExtractor resolves the client IP for unauthenticated requests with
+	// trusted-proxy handling. When nil, forwarded headers are ignored.
+	ipExtractor *utils.IPExtractor
+
 	sweepTicker *time.Ticker
 	stopChan    chan struct{}
 }
@@ -38,10 +43,13 @@ type tokenBucket struct {
 
 // NewRateLimiter creates a new rate limiter
 // requestsPerMinute specifies the maximum requests allowed per minute per token
-func NewRateLimiter(requestsPerMinute int) *RateLimiter {
+// ipExtractor resolves the client IP for the unauthenticated IP-keyed fallback;
+// nil ignores forwarded headers and uses RemoteAddr.
+func NewRateLimiter(requestsPerMinute int, ipExtractor *utils.IPExtractor) *RateLimiter {
 	rl := &RateLimiter{
 		rate:        requestsPerMinute,
 		window:      time.Minute,
+		ipExtractor: ipExtractor,
 		sweepTicker: time.NewTicker(sweepInterval),
 		stopChan:    make(chan struct{}),
 	}
@@ -87,7 +95,7 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 		tokenID := rl.getTokenID(r)
 		if tokenID == "" {
 			// No token ID means unauthenticated - use IP address
-			tokenID = "ip:" + getClientIP(r)
+			tokenID = "ip:" + rl.getClientIP(r)
 		}
 
 		bucket := rl.getBucket(tokenID)
@@ -154,15 +162,9 @@ func (tb *tokenBucket) allow(rate int, window time.Duration) (allowed bool, rema
 	return false, 0, resetTime
 }
 
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first (for proxies)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return xff
+func (rl *RateLimiter) getClientIP(r *http.Request) string {
+	if rl.ipExtractor != nil {
+		return rl.ipExtractor.GetClientIP(r)
 	}
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	// Fall back to remote address
-	return r.RemoteAddr
+	return utils.ExtractClientIP(r, false, nil)
 }

@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown } from '@lucide/svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { getVisibleColor } from '../utils/colorUtils.js';
 
   let {

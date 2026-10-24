@@ -1,9 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
+  import { zammadConnections } from '../api/integrations.js';
+  import { statuses as statusesApi } from '../api/workflows.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
-  import { Plus, Edit2, Trash2, PlugZap, RefreshCw } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit2 from '@lucide/svelte/icons/edit-2';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import PlugZap from '@lucide/svelte/icons/plug-zap';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
@@ -82,9 +87,9 @@
     error = '';
     try {
       [connections, workspaces, statuses] = await Promise.all([
-        api.zammadConnections.getAll(),
+        zammadConnections.getAll(),
         workspacesStore.load(),
-        api.statuses.getAll(),
+        statusesApi.getAll(),
       ]);
     } catch (err) {
       console.error('Failed to load Zammad settings:', err);
@@ -151,10 +156,10 @@
         if (editing) data.clear_completion_status = true;
       }
       if (editing) {
-        await api.zammadConnections.update(editing.id, data);
+        await zammadConnections.update(editing.id, data);
         successToast(t('zammad.connectionUpdated'));
       } else {
-        await api.zammadConnections.create(data);
+        await zammadConnections.create(data);
         successToast(t('zammad.connectionCreated'));
       }
       showModal = false;
@@ -170,7 +175,7 @@
   async function testConnection(connection) {
     testingId = connection.id;
     try {
-      const result = await api.zammadConnections.test(connection.id);
+      const result = await zammadConnections.test(connection.id);
       metadataByConnection = { ...metadataByConnection, [connection.id]: result.metadata };
       successToast(t('zammad.connectionTestSucceeded'));
       if (result.metadata?.group_catalog_verified === false) {
@@ -190,7 +195,7 @@
   async function refreshAllTickets() {
     refreshingAll = true;
     try {
-      const result = await api.zammadConnections.refreshAllTickets();
+      const result = await zammadConnections.refreshAllTickets();
       if (result.started) successToast(t('zammad.refreshAllTicketsStarted'));
       else warningToast(t('zammad.refreshAllTicketsAlreadyRunning'));
     } catch (err) {
@@ -211,7 +216,7 @@
     });
     if (!accepted) return;
     try {
-      await api.zammadConnections.delete(connection.id);
+      await zammadConnections.delete(connection.id);
       successToast(t('zammad.connectionDeleted'));
       await load();
     } catch (err) {
@@ -223,7 +228,7 @@
   async function startOAuth(connection) {
     authorizingId = connection.id;
     try {
-      const result = await api.zammadConnections.startOAuth(connection.id);
+      const result = await zammadConnections.startOAuth(connection.id);
       window.location.href = result.auth_url;
     } catch (err) {
       console.error('Failed to start Zammad OAuth authorization:', err);

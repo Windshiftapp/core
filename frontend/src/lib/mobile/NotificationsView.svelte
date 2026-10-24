@@ -1,6 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { Bell, Check, BellRing, BellOff, Command as CommandIcon } from '@lucide/svelte';
+  import Bell from '@lucide/svelte/icons/bell';
+  import Check from '@lucide/svelte/icons/check';
+  import BellRing from '@lucide/svelte/icons/bell-ring';
+  import BellOff from '@lucide/svelte/icons/bell-off';
+  import CommandIcon from '@lucide/svelte/icons/command';
   import { notifications, notificationActions } from '../stores/notifications.js';
   import { navigate } from '../router.js';
   import { getPushState, enablePush, disablePush } from './pushClient.js';

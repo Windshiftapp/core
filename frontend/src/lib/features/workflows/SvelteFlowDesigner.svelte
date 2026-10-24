@@ -29,8 +29,9 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
-  import { api } from '../../api.js';
-  import { HelpCircle, Plus } from '@lucide/svelte';
+  import { statuses as statusesApi } from '../../api/workflows.js';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import Plus from '@lucide/svelte/icons/plus';
   import SearchInput from '../../components/SearchInput.svelte';
   import StatusModal from '../../dialogs/StatusModal.svelte';
 
@@ -455,7 +456,7 @@
     if (creatingStatus || !statusFormData.name.trim() || statusFormData.category_id == null) return;
     creatingStatus = true;
     try {
-      const created = await api.statuses.create(statusFormData);
+      const created = await statusesApi.create(statusFormData);
       createdStatuses = [...createdStatuses, created];
       lastCreatedStatusId = created.id;
       showStatusModal = false;

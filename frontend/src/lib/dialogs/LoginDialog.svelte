@@ -1,10 +1,17 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from '../router.js';
-  import { authStore, ssoStore } from '../stores';
-  import { api } from '../api.js';
+  import { authStore } from '../stores/auth.svelte.js';
+  import { ssoStore } from '../stores/sso.svelte.js';
+
   import { authPolicy } from '../api/admin.js';
-  import { Eye, EyeOff, Lock, User, AlertCircle, LogIn, Key } from '@lucide/svelte';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Lock from '@lucide/svelte/icons/lock';
+  import User from '@lucide/svelte/icons/user';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import LogIn from '@lucide/svelte/icons/log-in';
+  import Key from '@lucide/svelte/icons/key';
   import { APP_NAME } from '../constants.js';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
@@ -121,7 +128,7 @@
 
   // Check if FIDO authentication is available when user enters email
   async function checkFidoAvailability() {
-    const { available, showOption } = await evaluateFidoAvailability(api, emailOrUsername);
+    const { available, showOption } = await evaluateFidoAvailability(emailOrUsername);
     fidoAvailable = available;
     showFidoOption = showOption;
   }
@@ -144,7 +151,7 @@
       validationError = '';
       authStore.clearError();
 
-      const loginResult = await performFidoLogin(api, emailOrUsername);
+      const loginResult = await performFidoLogin(emailOrUsername);
 
       if (loginResult.success || loginResult.status === 'success') {
         // Verify the browser session was issued/elevated and load canonical

@@ -1,8 +1,8 @@
 <script>
-  import { CheckSquare } from '@lucide/svelte';
-  import { authStore } from '../../stores';
+  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import { authStore } from '../../stores/auth.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { items } from '../../api/items.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
   import {
     assignedToMeQuery,
@@ -45,7 +45,7 @@
     loading = true;
     errored = false;
     try {
-      const response = await api.items.getAll(assignedToMeQuery(currentUserId, fetchLimit));
+      const response = await items.getAll(assignedToMeQuery(currentUserId, fetchLimit));
       if (v !== version) return;
       tasks = normalizeTaskResponse(response, rowCount);
     } catch (err) {

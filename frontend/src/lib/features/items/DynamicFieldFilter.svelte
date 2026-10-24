@@ -1,11 +1,13 @@
 <script>
-  import { X, Calendar, Pencil } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
-  import { api } from '../../api.js';
+  import { queryLanguage } from '../../api/queryLanguage.js';
   import { findQlCompletionField } from '../../utils/qlCompletion.js';
   import { parseFieldOptions } from '../../utils/optionUtils.js';
   import { booleanOptions, operatorsByType, isMultiValueOperator, isNullOperator } from '../shared/filterOperators.js';
@@ -52,7 +54,7 @@
 
   function fieldCanHaveValueHelp(field) {
     return Boolean(field?.completion?.value_help || field?.completion?.values?.length) ||
-      ['enum', 'select', 'multiselect', 'user', 'reference', 'milestone', 'iteration'].includes(field?.type);
+      ['enum', 'select', 'multiselect', 'multi_milestone', 'user', 'reference', 'milestone', 'iteration'].includes(field?.type);
   }
 
   $effect(() => {
@@ -104,7 +106,7 @@
     try {
       let completion = findQlCompletionField(null, field);
       if (!completion) {
-        const catalog = await api.queryLanguage.getCatalog();
+        const catalog = await queryLanguage.getCatalog();
         completion = findQlCompletionField(catalog, field);
       }
       if (token !== valueLoadToken) return;
@@ -112,12 +114,12 @@
       if (completion?.value_help) {
         serverValueHelp = completion.value_help;
         hasValuePicker = true;
-        const rows = await api.queryLanguage.getValues(completion.value_help, query);
+        const rows = await queryLanguage.getValues(completion.value_help, query);
         if (token !== valueLoadToken) return;
-        valueOptions = (rows || []).map((row) => ({ value: row.value, label: row.label }));
+        valueOptions = (rows || []).map((row) => ({ value: row.value, label: row.label, description: row.description }));
       } else if (completion?.values?.length) {
         hasValuePicker = true;
-        valueOptions = completion.values.map((row) => ({ value: row.value, label: row.label }));
+        valueOptions = completion.values.map((row) => ({ value: row.value, label: row.label, description: row.description }));
       } else if (field.options) {
         valueOptions = parseFieldOptions(field.options).items.map((option) => ({
           value: option.id,
@@ -210,6 +212,15 @@
   }
 </script>
 
+{#snippet valueOptionSnippet({ item })}
+  <div class="flex flex-col min-w-0">
+    <span class="truncate">{item.label}</span>
+    {#if item.description}
+      <span class="truncate" style="color: var(--ds-text-subtle); font-size: 0.75rem;">{item.description}</span>
+    {/if}
+  </div>
+{/snippet}
+
 <div
   data-testid={testIdPrefix || undefined}
   class={compact ? "flex flex-col gap-2" : "flex items-start gap-2 p-2.5 rounded border"}
@@ -222,6 +233,7 @@
         selectedField={filter.field}
         placeholder="Choose field..."
         {fieldGroups}
+        fieldSource={fieldGroups ? 'standard' : 'catalog'}
         {customFieldItems}
         onSelect={handleFieldSelect}
         onClear={handleFieldClear}
@@ -275,6 +287,7 @@
             onSearchChange={searchValueOptions}
             getValue={(item) => item.value}
             getLabel={(item) => item.label}
+            itemSnippet={valueOptionSnippet}
             optionTestid={(option) => testIdPrefix ? `${testIdPrefix}-value-option-${option.value}` : undefined}
             onChange={(values) => onchange?.({ ...filter, values, value: '' })}
           />
@@ -320,6 +333,7 @@
           onSearchChange={searchValueOptions}
           getValue={(item) => item.value}
           getLabel={(item) => item.label}
+          itemSnippet={valueOptionSnippet}
           optionTestid={(option) => testIdPrefix ? `${testIdPrefix}-value-option-${option.value}` : undefined}
           onSelect={(item) => onchange?.({ ...filter, value: item ? item.value : '' })}
         />

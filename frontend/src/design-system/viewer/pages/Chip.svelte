@@ -1,6 +1,12 @@
 <script>
   import Chip from '../../../lib/components/Chip.svelte';
-  import { CalendarDays, Tag, User, Folder, Star, Flag, Circle } from '@lucide/svelte';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import Tag from '@lucide/svelte/icons/tag';
+  import User from '@lucide/svelte/icons/user';
+  import Folder from '@lucide/svelte/icons/folder';
+  import Star from '@lucide/svelte/icons/star';
+  import Flag from '@lucide/svelte/icons/flag';
+  import Circle from '@lucide/svelte/icons/circle';
 
   let chips = $state(['Frontend', 'Backend', 'Design']);
 

@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { ArrowLeft, BookOpen } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import { portal } from '../api/portal.js';
   import { navigate } from '../router.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import StateDisplay from '../components/StateDisplay.svelte';
@@ -31,7 +32,7 @@
       // ?source=search, ticket-conversation links ?source=ticket); anything
       // else is a plain browse view.
       const source = new URLSearchParams(window.location.search).get('source') || '';
-      const result = await api.portal.getKnowledgeBasePage(slug, pageId, source);
+      const result = await portal.getKnowledgeBasePage(slug, pageId, source);
       if (seq !== requestSeq) return;
       page = result;
     } catch (err) {

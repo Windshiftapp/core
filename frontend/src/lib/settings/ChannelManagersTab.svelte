@@ -1,11 +1,15 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { User, Users, X, Plus, Shield } from '@lucide/svelte';
+  import User from '@lucide/svelte/icons/user';
+  import Users from '@lucide/svelte/icons/users';
+  import X from '@lucide/svelte/icons/x';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Shield from '@lucide/svelte/icons/shield';
   import Button from '../components/Button.svelte';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
   import { confirm } from '../composables/useConfirm.js';
-  import { api } from '../api.js';
+  import { channels } from '../api/channels.js';
   import { formatAuthenticatedDateTime as formatDateTimeLocale } from '../utils/authenticatedDateFormatter.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -29,7 +33,7 @@
   async function loadManagers() {
     try {
       loading = true;
-      managers = await api.channels.getManagers(channelId) || [];
+      managers = await channels.getManagers(channelId) || [];
     } catch (err) {
       console.error('Failed to load managers:', err);
       managers = [];
@@ -51,7 +55,7 @@
     try {
       saving = true;
       const managerId = addManagerType === 'user' ? selectedUserId : selectedGroupId;
-      await api.channels.addManagers(channelId, addManagerType, [managerId]);
+      await channels.addManagers(channelId, addManagerType, [managerId]);
       await loadManagers();
       toggleAddManager();
     } catch (err) {
@@ -71,7 +75,7 @@
     });
     if (!ok) return;
     try {
-      await api.channels.removeManager(channelId, manager.id);
+      await channels.removeManager(channelId, manager.id);
       await loadManagers();
     } catch (err) {
       console.error('Failed to remove manager:', err);

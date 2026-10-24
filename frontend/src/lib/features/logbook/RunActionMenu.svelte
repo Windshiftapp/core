@@ -3,7 +3,7 @@
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
-  import { IconPlayerPlay as Play } from '@tabler/icons-svelte-runes';
+  import Play from '@tabler/icons-svelte-runes/icons/player-play';
 
   let {
     bucketId,

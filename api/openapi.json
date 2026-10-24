@@ -12967,7 +12967,7 @@
     },
     "/metrics": {
       "get": {
-        "description": "Returns Go runtime, process, database, HTTP, agent, webhook, and SCM metrics. Public; no authentication required. Restrict access at the reverse proxy or network boundary when metrics should not be publicly reachable.",
+        "description": "Returns Go runtime, process, database, HTTP, agent, webhook, and SCM metrics. Public when WINDSHIFT_METRICS_TOKEN is unset; when set, requires an \"Authorization: Bearer \u003ctoken\u003e\" header. Restrict access at the reverse proxy or network boundary when metrics should not be publicly reachable.",
         "responses": {
           "200": {
             "content": {
@@ -12983,6 +12983,21 @@
               }
             },
             "description": "Prometheus or OpenMetrics text exposition"
+          },
+          "401": {
+            "content": {
+              "application/openmetrics-text": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Missing or invalid bearer token"
           }
         },
         "summary": "Read Prometheus metrics",

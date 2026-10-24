@@ -1,5 +1,5 @@
 <script>
-  import { Check } from '@lucide/svelte';
+  import Check from '@lucide/svelte/icons/check';
 
   let {
     steps = [],           // Array of step objects or labels

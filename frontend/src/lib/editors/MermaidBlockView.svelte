@@ -36,7 +36,8 @@
 </script>
 
 <script>
-  import { AlertTriangle, Loader2 } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 

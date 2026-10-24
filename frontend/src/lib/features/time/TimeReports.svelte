@@ -1,16 +1,26 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { customerOrganisations } from '../../api/portal.js';
+  import { time } from '../../api/time.js';
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
-  import { Filter, Download, FileText, Clock, Hash, TrendingUp, Briefcase, Users, PieChart } from '@lucide/svelte';
+  import Filter from '@lucide/svelte/icons/filter';
+  import Download from '@lucide/svelte/icons/download';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Hash from '@lucide/svelte/icons/hash';
+  import TrendingUp from '@lucide/svelte/icons/trending-up';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import Users from '@lucide/svelte/icons/users';
+  import PieChart from '@lucide/svelte/icons/pie-chart';
   import StatCard from '../../components/StatCard.svelte';
   import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { customerDisplayName, customerOrganisationName } from '../../utils/customerLabel.js';
   import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
   import { authStore } from '../../stores/auth.svelte.js';
@@ -124,7 +134,7 @@
 
   const reportColumns = $derived([
     { key: 'date', label: t('common.date'), render: (w) => formatDateOnly(dateKeyInZone(w.start_time, reportTimezone)) },
-    { key: 'customer_name', label: t('time.reports.customer') },
+    { key: 'customer_name', label: t('time.reports.customer'), render: (w) => customerDisplayName(w.customer_name, w.customer_builtin_key, t) },
     { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
     { key: 'description', label: t('common.description') },
     { key: 'time', label: t('common.time'), slot: 'time' },
@@ -147,7 +157,7 @@
 
   async function loadCustomers() {
     try {
-      customers = (await api.customerOrganisations.getAll()) || [];
+      customers = (await customerOrganisations.getAll()) || [];
     } catch (error) {
       console.error('Failed to load customers:', error);
       customers = [];
@@ -156,7 +166,7 @@
 
   async function loadProjects() {
     try {
-      projects = (await api.time.projects.getAll()) || [];
+      projects = (await time.projects.getAll()) || [];
     } catch (error) {
       console.error('Failed to load projects:', error);
       projects = [];
@@ -171,8 +181,8 @@
     try {
       const query = { ...filters, timezone: reportTimezone };
       const [aggregate, page] = await Promise.all([
-        api.time.worklogs.aggregate(query),
-        api.time.worklogs.getPage({ ...query, page_size: ENTRY_PAGE_SIZE, page: 1 }),
+        time.worklogs.aggregate(query),
+        time.worklogs.getPage({ ...query, page_size: ENTRY_PAGE_SIZE, page: 1 }),
       ]);
       summary = buildSummary(aggregate?.totals, { dateFrom: filters.date_from, dateTo: filters.date_to });
       worklogs = page?.data || [];
@@ -189,7 +199,7 @@
     const nextPage = Math.floor(worklogs.length / ENTRY_PAGE_SIZE) + 1;
     loadingMoreEntries = true;
     try {
-      const page = await api.time.worklogs.getPage(
+      const page = await time.worklogs.getPage(
         { ...filters, timezone: reportTimezone, page_size: ENTRY_PAGE_SIZE, page: nextPage }
       );
       worklogs = [...worklogs, ...(page?.data || [])];
@@ -209,7 +219,7 @@
     let page = 1;
     let totalPages = 1;
     while (page <= totalPages) {
-      const document = await api.time.worklogs.getPage(
+      const document = await time.worklogs.getPage(
         { ...filters, timezone: reportTimezone, page_size: EXPORT_PAGE_SIZE, page }
       );
       for (const row of document?.data || []) {
@@ -240,7 +250,7 @@
         date_from: projectDateFrom,
         date_to: projectDateTo,
       };
-      const aggregate = await api.time.worklogs.aggregate(dateFilters);
+      const aggregate = await time.worklogs.aggregate(dateFilters);
       projectAggregate = aggregate || { daily: [], totals: [] };
     } catch (error) {
       console.error('Failed to load project worklogs:', error);
@@ -257,7 +267,7 @@
       const dateFilters = { timezone: reportTimezone, project_id: selectedProjectId };
       if (projectDateFrom) dateFilters.date_from = projectDateFrom;
       if (projectDateTo) dateFilters.date_to = projectDateTo;
-      const document = await api.time.projects.getWorklogsPage(selectedProjectId, {
+      const document = await time.projects.getWorklogsPage(selectedProjectId, {
         ...dateFilters, page_size: EXPORT_PAGE_SIZE, page,
       });
       rows.push(...(document?.data || []));
@@ -295,6 +305,16 @@
     return formatAuthenticatedInstant(unixTimestamp * 1000, { hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
+  function worklogCustomerName(worklog) {
+    return customerDisplayName(worklog.customer_name, worklog.customer_builtin_key, t);
+  }
+
+  function topCustomerName() {
+    return summary.topCustomer
+      ? customerDisplayName(summary.topCustomer.name, summary.topCustomer.builtinKey, t)
+      : '';
+  }
+
   // Export functions
   function exportToCSV() {
     exportLoading = true;
@@ -317,7 +337,7 @@
     allEntries.forEach(worklog => {
       csvData.push([
         dateKeyInZone(worklog.start_time, reportTimezone),
-        worklog.customer_name,
+        worklogCustomerName(worklog),
         worklog.project_name,
         worklog.description,
         formatTime(worklog.start_time),
@@ -334,7 +354,7 @@
       csvData.push(['Top Project', '', summary.topProject.name, '', '', '', summary.topProject.hours]);
     }
     if (summary.topCustomer) {
-      csvData.push(['Top Customer', summary.topCustomer.name, '', '', '', '', summary.topCustomer.hours]);
+      csvData.push(['Top Customer', topCustomerName(), '', '', '', '', summary.topCustomer.hours]);
     }
 
     downloadCSV(csvData, `time-report-${filters.date_from}-to-${filters.date_to}.csv`);
@@ -350,7 +370,7 @@
       csvData.push([
         dateKeyInZone(worklog.start_time, reportTimezone),
         worklog.user_name || 'Unknown',
-        worklog.customer_name,
+        worklogCustomerName(worklog),
         worklog.project_name,
         worklog.description,
         formatTime(worklog.start_time),
@@ -419,12 +439,12 @@
         { label: 'Total Entries', value: summary.totalEntries },
         { label: 'Average Hours per Day', value: `${summary.averageHoursPerDay}h` },
         { label: 'Top Project', value: `${summary.topProject?.name || 'N/A'} (${summary.topProject?.hours || 0}h)` },
-        { label: 'Top Customer', value: `${summary.topCustomer?.name || 'N/A'} (${summary.topCustomer?.hours || 0}h)` },
+        { label: 'Top Customer', value: `${topCustomerName() || 'N/A'} (${summary.topCustomer?.hours || 0}h)` },
       ],
       entries: allEntries.map((worklog) => ({
         heading: `${formatDateOnly(dateKeyInZone(worklog.start_time, reportTimezone))} — ${worklog.project_name}`,
         fields: [
-          { label: 'Customer', value: worklog.customer_name },
+          { label: 'Customer', value: worklogCustomerName(worklog) },
           { label: 'Duration', value: formatDuration(worklog.duration_minutes) },
           { label: 'Description', value: worklog.description },
           { label: 'Time', value: `${formatTime(worklog.start_time)} – ${formatTime(worklog.end_time)}` },
@@ -571,7 +591,7 @@
           showUnassigned={true}
           unassignedLabel={t('time.reports.allCustomers')}
           getValue={(item) => item.id}
-          getLabel={(item) => item.name}
+          getLabel={(item) => customerOrganisationName(item, t)}
         />
       </div>
       <div>

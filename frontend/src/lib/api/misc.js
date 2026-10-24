@@ -65,6 +65,8 @@ export const getComments = (itemId, params = {}) => {
   const searchParams = new URLSearchParams();
   if (params.limit) searchParams.set('page_size', params.limit);
   if (params.cursor) searchParams.set('cursor', params.cursor);
+  // Reactions are opt-in so feeds that do not render chips skip the extra read.
+  if (params.include_reactions) searchParams.set('include_reactions', 'true');
   const query = searchParams.toString();
   return fetchV2Data(`/items/${itemId}/comments${query ? `?${query}` : ''}`);
 };
@@ -81,6 +83,16 @@ export const updateComment = (commentId, data) =>
   });
 export const deleteComment = (commentId) =>
   fetchV2Data(`/comments/${commentId}`, {
+    method: 'DELETE',
+  });
+// Comment reactions (core#298): add returns the comment's grouped reactions.
+export const addCommentReaction = (commentId, reaction) =>
+  fetchV2Data(`/comments/${commentId}/reactions`, {
+    method: 'POST',
+    body: JSON.stringify({ reaction }),
+  });
+export const removeCommentReaction = (commentId, reaction) =>
+  fetchV2Data(`/comments/${commentId}/reactions/${encodeURIComponent(reaction)}`, {
     method: 'DELETE',
   });
 
@@ -121,7 +133,12 @@ export const attachments = {
     return response.json();
   },
 
-  getDownloadUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/content`,
+  // URL for rendering an attachment inline (images, PDFs). Renderable media
+  // is served inline; other types fall back to a forced download.
+  getContentUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/content`,
+
+  // URL that always forces a download.
+  getDownloadUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/download`,
 
   // Get thumbnail URL for image attachments
   getThumbnailUrl: (attachmentId) => `/api/v2/attachments/${attachmentId}/thumbnail`,
@@ -301,6 +318,12 @@ export const jiraImport = {
   deleteConnection: (connectionId) =>
     fetchAPI(`/admin/jira-import/connections/${connectionId}`, {
       method: 'DELETE',
+    }),
+  // Replace the stored credentials of an existing connection
+  updateConnection: (connectionId, data) =>
+    fetchAPI(`/admin/jira-import/connections/${connectionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
   // Start import
   startImport: (data) =>

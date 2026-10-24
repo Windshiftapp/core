@@ -1,20 +1,26 @@
 <script>
-  import { Bell, Eye, Inbox } from '@lucide/svelte';
-  import { homepageStore, workspacesStore } from '../../stores';
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import { homepageStore } from '../../stores/homepageStore.svelte.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { notifications, notificationActions } from '../../stores/notifications.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
+  import { itemIdFromActionUrl } from '../../utils/actionUrl.js';
   import { navigate } from '../../router.js';
+  import DashboardItemRow from './DashboardItemRow.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   const MAX_ENTRIES_PER_WORKSPACE = 5;
   const MAX_WORKSPACES = 5;
+  // What's New is a feed of recent issue updates, so only surface entries
+  // from the last two weeks regardless of read state.
+  const RECENT_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
-  let recentNotifications = $derived.by(() => {
-    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    return $notifications.filter((notification) => {
-      if (!notification.read) return true;
-      return new Date(notification.timestamp).getTime() >= dayAgo;
-    });
-  });
+  function isRecent(timestamp) {
+    const ts = new Date(timestamp).getTime();
+    return Number.isFinite(ts) && ts >= Date.now() - RECENT_WINDOW_MS;
+  }
+
+  let recentNotifications = $derived($notifications.filter((n) => isRecent(n.timestamp)));
   let watchedItems = $derived(homepageStore.watchedItems);
   let loading = $derived(homepageStore.loading);
 
@@ -31,28 +37,27 @@
       if (!m) continue;
       entries.push({
         id: `n-${n.id}`,
+        kind: 'notification',
         notificationId: n.id,
+        itemId: itemIdFromActionUrl(actionUrl),
         workspaceId: parseInt(m[1], 10),
         timestamp: n.timestamp,
-        source: 'notification',
         title: n.message || n.title || t('notifications.notification'),
-        subtitle: null,
-        link: actionUrl,
         read: n.read,
+        link: actionUrl,
       });
     }
 
     for (const w of watchedItems) {
-      if (!w.last_activity) continue;
+      if (!w.last_active_at || !isRecent(w.last_active_at)) continue;
       entries.push({
         id: `w-${w.item_id}`,
+        kind: 'item',
+        itemId: w.item_id,
         workspaceId: w.workspace_id,
-        timestamp: w.last_activity,
-        source: 'watched',
-        title: w.title,
-        subtitle: w.status,
+        timestamp: w.last_active_at,
+        item: w,
         link: `/workspaces/${w.workspace_id}/items/${w.item_id}`,
-        read: true,
       });
     }
 
@@ -82,10 +87,19 @@
   });
 
   function open(entry) {
-    if (entry?.source === 'notification' && !entry.read) {
+    if (entry?.kind === 'notification' && !entry.read) {
       notificationActions.markAsRead(entry.notificationId);
     }
+    if (entry?.itemId != null) {
+      itemModalStore.open(Number(entry.itemId), entry.workspaceId);
+      return;
+    }
     if (entry?.link) navigate(entry.link);
+  }
+
+  function itemKey(item) {
+    if (item.workspace_key == null || item.workspace_item_number == null) return null;
+    return `${item.workspace_key}-${item.workspace_item_number}`;
   }
 </script>
 
@@ -113,43 +127,31 @@
         <ul class="flex flex-col gap-1.5">
           {#each g.entries as e (e.id)}
             <li>
-              <button
-                data-testid="whats-new-entry"
-                data-entry-id={e.id}
-                data-read={e.read}
-                class="whats-new-entry w-full text-left p-2 flex items-start gap-2 rounded border transition-colors"
-                style="border-color: var(--ds-border); color: var(--ds-text);"
-                onclick={() => open(e)}
-              >
-                {#if e.source === 'watched'}
-                  <Eye
-                    class="w-4 h-4 mt-0.5 flex-shrink-0"
-                    style="color: var(--ds-text-subtlest);"
-                  />
-                {:else}
-                  <Bell
-                    class="w-4 h-4 mt-0.5 flex-shrink-0"
-                    style={e.read
-                      ? 'color: var(--ds-text-subtlest);'
-                      : 'color: var(--ds-icon-accent-blue);'}
-                  />
-                {/if}
-                <div class="min-w-0 flex-1">
-                  <p
-                    class="text-sm truncate"
-                    style={e.read ? 'color: var(--ds-text-subtle);' : 'color: var(--ds-text); font-weight: 500;'}
-                  >
-                    {e.title}
-                  </p>
-                  <p
-                    class="text-[0.7rem] mt-0.5 flex items-center gap-1.5"
-                    style="color: var(--ds-text-subtle);"
-                  >
-                    {#if e.subtitle}<span class="truncate">{e.subtitle}</span><span>·</span>{/if}
-                    <span>{homepageStore.formatRelativeTime(e.timestamp)}</span>
-                  </p>
-                </div>
-              </button>
+              {#if e.kind === 'item'}
+                <DashboardItemRow
+                  title={e.item.title}
+                  itemKey={itemKey(e.item)}
+                  href={`/workspaces/${e.item.workspace_id}/items/${e.item.item_id}`}
+                  statusName={e.item.status}
+                  statusBuiltinKey={e.item.status_builtin_key}
+                  statusColor={e.item.status_color}
+                  priorityName={e.item.priority_name}
+                  priorityBuiltinKey={e.item.priority_builtin_key}
+                  priorityColor={e.item.priority_color}
+                  timestamp={homepageStore.formatRelativeTime(e.timestamp)}
+                  dataTestid="whats-new-entry"
+                  onclick={() => open(e)}
+                />
+              {:else}
+                <DashboardItemRow
+                  title={e.title}
+                  href={e.link}
+                  timestamp={homepageStore.formatRelativeTime(e.timestamp)}
+                  unread={!e.read}
+                  dataTestid="whats-new-entry"
+                  onclick={() => open(e)}
+                />
+              {/if}
             </li>
           {/each}
         </ul>
@@ -157,13 +159,3 @@
     {/each}
   </div>
 {/if}
-
-<style>
-  .whats-new-entry {
-    background-color: var(--ds-surface);
-  }
-
-  .whats-new-entry:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-</style>

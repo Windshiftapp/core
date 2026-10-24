@@ -1,8 +1,18 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { api } from '../../api.js';
-  import { authStore, uiStore } from '../../stores';
-  import { ChevronLeft, ChevronRight, Calendar, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from '@lucide/svelte';
+  import { reviews as reviewsApi } from '../../api/misc.js';
+  import { itemTypes as itemTypesApi } from '../../api/configuration.js';
+  import { authStore } from '../../stores/auth.svelte.js';
+  import { uiStore } from '../../stores/ui.svelte.js';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Lightbulb from '@lucide/svelte/icons/lightbulb';
+  import Maximize from '@lucide/svelte/icons/maximize';
+  import Minimize from '@lucide/svelte/icons/minimize';
+  import BookOpenCheck from '@lucide/svelte/icons/book-open-check';
+  import FileEdit from '@lucide/svelte/icons/file-edit';
   import EmptyState from '../../components/EmptyState.svelte';
   import Card from '../../components/Card.svelte';
   import WorkItemRow from '../items/WorkItemRow.svelte';
@@ -111,8 +121,8 @@ ${t('personal.placeholderImprovements')}`;
       }
 
       const [items, types] = await Promise.all([
-        api.reviews.getCompletedItems(startDate, endDate),
-        api.itemTypes.getAll()
+        reviewsApi.getCompletedItems(startDate, endDate),
+        itemTypesApi.getAll()
       ]);
       if (generation !== reviewGeneration) return;
       completedItems = items || [];
@@ -136,7 +146,7 @@ ${t('personal.placeholderImprovements')}`;
       await loadCompletedItems(generation);
       if (generation !== reviewGeneration) return;
 
-      const reviews = await api.reviews.getAll({
+      const reviews = await reviewsApi.getAll({
         type: reviewType,
         start_date: currentDate,
         end_date: currentDate,
@@ -179,7 +189,7 @@ ${t('personal.placeholderImprovements')}`;
   // Load recent review history
   async function loadReviewHistory() {
     try {
-      const history = await api.reviews.getAll({
+      const history = await reviewsApi.getAll({
         type: reviewType,
         limit: 10
       });
@@ -218,12 +228,12 @@ ${t('personal.placeholderImprovements')}`;
       };
 
       if (existingReview) {
-        const updated = await api.reviews.update(existingReview.id, {
+        const updated = await reviewsApi.update(existingReview.id, {
           review_data: payload.review_data
         });
         existingReview = updated;
       } else {
-        existingReview = await api.reviews.create(payload);
+        existingReview = await reviewsApi.create(payload);
       }
     } catch (error) {
       console.error('Failed to save review:', error);

@@ -19,15 +19,14 @@ const (
 const (
 	microsoftAuthURLTemplate  = "https://login.microsoftonline.com/%s/oauth2/v2.0/authorize"
 	microsoftTokenURLTemplate = "https://login.microsoftonline.com/%s/oauth2/v2.0/token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
-	microsoftUserInfoURL      = "https://graph.microsoft.com/v1.0/me"
 )
 
 // MicrosoftDefaultScopes defines the default scopes for Microsoft 365 IMAP access.
+// The mailbox address is entered by the admin, so no OIDC identity scopes are
+// requested and no Graph resource token is needed.
 var MicrosoftDefaultScopes = []string{
 	"https://outlook.office365.com/IMAP.AccessAsUser.All",
 	"offline_access", // Required for refresh tokens
-	"openid",
-	"email",
 }
 
 // MicrosoftProvider implements OAuth email provider for Microsoft 365
@@ -64,7 +63,10 @@ func (p *MicrosoftProvider) GetIMAPServer(config *models.ChannelConfig) (host st
 	return MicrosoftIMAPHost, MicrosoftIMAPPort
 }
 
-// GetOAuthURL returns the Microsoft authorization URL
+// GetOAuthURL returns the Microsoft authorization URL. prompt=select_account
+// forces the account picker: without it Entra silently reuses the browser's
+// existing session, so an admin already signed in as themselves cannot
+// authorize a different mailbox without logging out or using a private window.
 func (p *MicrosoftProvider) GetOAuthURL(state, redirectURI string) string {
 	authURL := fmt.Sprintf(microsoftAuthURLTemplate, p.TenantID)
 	params := url.Values{
@@ -74,6 +76,7 @@ func (p *MicrosoftProvider) GetOAuthURL(state, redirectURI string) string {
 		"response_mode": {"query"},
 		"scope":         {strings.Join(p.Scopes, " ")},
 		"state":         {state},
+		"prompt":        {"select_account"},
 	}
 	return authURL + "?" + params.Encode()
 }
@@ -117,27 +120,6 @@ func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken strin
 	}
 
 	return tokens, nil
-}
-
-// GetUserEmail retrieves the email address of the authenticated user
-func (p *MicrosoftProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	var userInfo struct {
-		Mail              string `json:"mail"`
-		UserPrincipalName string `json:"userPrincipalName"`
-		PreferredLanguage string `json:"preferredLanguage"`
-	}
-
-	if err := fetchOAuthJSON(ctx, microsoftUserInfoURL, accessToken, &userInfo); err != nil {
-		return "", err
-	}
-
-	// Prefer mail, fall back to userPrincipalName
-	email := userInfo.Mail
-	if email == "" {
-		email = userInfo.UserPrincipalName
-	}
-
-	return email, nil
 }
 
 // Connect establishes an IMAP connection using OAuth

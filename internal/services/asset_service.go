@@ -462,7 +462,7 @@ func coerceAssetFieldValue(f models.AssetTypeField, v any) any {
 			}
 		}
 		return v
-	case "multiselect":
+	case "multiselect", "multi_milestone":
 		if arr, ok := toInterfaceSlice(v); ok {
 			return arr
 		}
@@ -611,10 +611,10 @@ func validateAssetFieldValue(f models.AssetTypeField, v any) error {
 
 // assetFieldOptionAllowed reports whether the given value matches any
 // option in the field's declared option whitelist. It accepts either
-// an option ID (as a JSON number or numeric string) or an option label
-// (legacy string values). Returns true when no options are declared
-// (the field accepts any value) or when the stored options JSON is
-// malformed (fail-open — better to accept than to block legitimate
+// an option ID (as an integral JSON number or numeric string) or an
+// option label (legacy string values). Returns true when no options are
+// declared (the field accepts any value) or when the stored options JSON
+// is malformed (fail-open — better to accept than to block legitimate
 // writes against a misconfigured field).
 func assetFieldOptionAllowed(f models.AssetTypeField, value any) bool {
 	if value == nil || f.Options == "" {
@@ -630,29 +630,17 @@ func assetFieldOptionAllowed(f models.AssetTypeField, value any) bool {
 		allowedIDs[item.ID] = struct{}{}
 		allowedLabels[item.Label] = struct{}{}
 	}
-	switch v := value.(type) {
-	case int:
-		_, ok := allowedIDs[v]
-		return ok
-	case int64:
-		_, ok := allowedIDs[int(v)]
-		return ok
-	case float64:
-		_, ok := allowedIDs[int(v)]
-		return ok
-	case string:
-		if _, ok := allowedLabels[v]; ok {
+	if label, ok := value.(string); ok {
+		if _, ok := allowedLabels[label]; ok {
 			return true
 		}
-		// Also accept numeric strings that match an option ID.
-		if id, err := strconv.Atoi(v); err == nil {
-			_, ok := allowedIDs[id]
-			return ok
-		}
-		return false
-	default:
+	}
+	id, ok := validation.CoerceOptionID(value)
+	if !ok {
 		return false
 	}
+	_, ok = allowedIDs[id]
+	return ok
 }
 
 // customFieldValuePresent reports whether the values map carries a
@@ -691,7 +679,10 @@ func isEmptyCustomFieldValue(v any) bool {
 // action service is wired. Returns the freshly-loaded row.
 //
 // All required fields declared on the asset type must be present in
-// customFieldValues (EnforceRequired is on for creates).
+// customFieldValues (EnforceRequired is on for creates). String values are
+// coerced to the field's declared type first, matching updates and imports,
+// so automation literals and API clients can send "7" for a user or "true"
+// for a boolean.
 func (s *AssetService) CreateAsset(actor AuditActor, in repository.CreateAssetInput, customFieldValues map[string]any) (*models.Asset, error) {
 	return s.CreateAssetWithContext(actor, in, customFieldValues, AssetAutomationContext{})
 }
@@ -702,9 +693,11 @@ func (s *AssetService) CreateAssetWithContext(actor AuditActor, in repository.Cr
 	if err := s.validateAssetTaxonomy(in.SetID, in.AssetTypeID, in.CategoryID, in.StatusID); err != nil {
 		return nil, err
 	}
-	if err := s.ValidateCustomFieldsSchema(in.AssetTypeID, customFieldValues, CustomFieldsValidationOpts{EnforceRequired: true}); err != nil {
+	coerced, err := s.CoerceAndValidateCustomFieldValues(in.AssetTypeID, customFieldValues)
+	if err != nil {
 		return nil, err
 	}
+	customFieldValues = coerced
 	if err := reencodeCustomFieldValues(customFieldValues, &in.CustomFieldValuesJSON); err != nil {
 		return nil, err
 	}
@@ -720,7 +713,7 @@ func (s *AssetService) CreateAssetWithContext(actor AuditActor, in repository.Cr
 		return nil, &AssetValidationError{Msg: "title is required"}
 	}
 	var assetID int
-	err := database.WithTx(s.db, func(tx database.Tx) error {
+	err = database.WithTx(s.db, func(tx database.Tx) error {
 		var err error
 		assetID, err = s.repo.CreateAssetInTx(tx, in)
 		if err != nil {

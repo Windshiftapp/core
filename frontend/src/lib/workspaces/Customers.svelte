@@ -2,8 +2,12 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { IconEdit as Edit2, IconTrash as Trash2, IconLock as Lock, IconLockOpen2 as Unlock } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import Edit2 from '@tabler/icons-svelte-runes/icons/edit';
+  import Trash2 from '@tabler/icons-svelte-runes/icons/trash';
+  import Lock from '@tabler/icons-svelte-runes/icons/lock';
+  import Unlock from '@tabler/icons-svelte-runes/icons/lock-open-2';
+  import { customFields as customFieldsApi } from '../api/configuration.js';
+  import { customerOrganisations as customerOrganisationsApi, portalCustomers as portalCustomersApi } from '../api/portal.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import Spinner from '../components/Spinner.svelte';
@@ -18,7 +22,8 @@
   import TextField from '../components/TextField.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { permissionStore, isSystemAdmin } from '../stores';
+  import { realCustomers } from '../utils/customerLabel.js';
+  import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import AlertBox from '../components/AlertBox.svelte';
 
   // Route-derived state
@@ -139,7 +144,7 @@
 
   async function loadCustomFields() {
     try {
-      customFields = await api.customFields.getAll();
+      customFields = await customFieldsApi.getAll();
       portalCustomerFields = customFields.filter(f => f.applies_to_portal_customers);
     } catch (err) {
       console.error('Failed to load custom fields:', err);
@@ -148,8 +153,8 @@
 
   async function loadOrganisations() {
     try {
-      const result = await api.customerOrganisations.getAll();
-      customerOrganisations = result || [];
+      const result = await customerOrganisationsApi.getAll();
+      customerOrganisations = realCustomers(result);
     } catch (err) {
       console.error('Failed to load customer organisations:', err);
       error = t('workspaces.customers.failedToLoadOrganisations');
@@ -166,7 +171,7 @@
 
   async function loadPortalCustomers() {
     try {
-      portalCustomers = await api.portalCustomers.getAll();
+      portalCustomers = await portalCustomersApi.getAll();
     } catch (err) {
       console.error('Failed to load portal customers:', err);
       error = t('workspaces.customers.failedToLoadCustomers');
@@ -185,7 +190,7 @@
 
   async function handleCustomerDrop(customerId, targetOrgId) {
     try {
-      await api.portalCustomers.updateOrganisation(customerId, targetOrgId);
+      await portalCustomersApi.updateOrganisation(customerId, targetOrgId);
       await loadPortalCustomers();
     } catch (err) {
       console.error('Failed to update customer organisation:', err);
@@ -293,7 +298,7 @@
 
   async function handleCreateCustomer() {
     try {
-      await api.portalCustomers.create(formData);
+      await portalCustomersApi.create(formData);
       await loadPortalCustomers();
       closeModal();
     } catch (err) {
@@ -317,7 +322,7 @@
     }
 
     try {
-      await api.portalCustomers.delete(customer.id);
+      await portalCustomersApi.delete(customer.id);
       await loadPortalCustomers();
     } catch (err) {
       console.error('Failed to delete portal customer:', err);
@@ -345,9 +350,9 @@
 
     try {
       if (deactivating) {
-        await api.portalCustomers.deactivate(customer.id);
+        await portalCustomersApi.deactivate(customer.id);
       } else {
-        await api.portalCustomers.activate(customer.id);
+        await portalCustomersApi.activate(customer.id);
       }
       await loadPortalCustomers();
     } catch (err) {

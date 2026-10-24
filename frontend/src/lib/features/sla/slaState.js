@@ -1,27 +1,64 @@
-import { api } from '../../api.js';
+import { BACKGROUND_READ } from '../../api/readScheduler.js';
+import { sla } from '../../api/sla.js';
 
 // Item SLA reads are pure and cheap on the server, but a list/board page shows
 // many rows. Cache each item's state briefly and dedupe concurrent reads so a
 // page issues at most one request per item, and none at all on a re-render.
-const TTL_MS = 30_000;
+const STATE_TTL_MS = 30_000;
+// Warning thresholds change rarely. Keep them much longer than item state so a
+// board's wall-clock tick only re-evaluates states, not configuration.
+const THRESHOLD_TTL_MS = 5 * 60 * 1000;
+// After a transient threshold failure, do not hammer the endpoint on every
+// badge mount; retry after a short cooldown.
+const THRESHOLD_FAILURE_COOLDOWN_MS = 5_000;
 // Cap the caches so a long-lived page that renders thousands of distinct rows
 // cannot retain every entry until an explicit invalidation.
 const MAX_CACHE_ENTRIES = 2000;
+
 const stateCache = new Map();
 const inFlight = new Map();
 const thresholdsCache = new Map();
-let cacheGeneration = 0;
+const thresholdsPending = new Map();
+/** @type {Set<(workspaceId: number|string|null) => void>} */
+const thresholdListeners = new Set();
+let stateGeneration = 0;
+// Threshold invalidation is per workspace: bumping one workspace must not
+// discard a successful in-flight fetch for another.
+let thresholdEpoch = 0;
+const thresholdGenerations = new Map();
 
 function pruneCache(cache, now = Date.now()) {
   if (cache.size <= MAX_CACHE_ENTRIES) return;
   for (const [key, entry] of cache) {
-    if (now - entry.at >= TTL_MS) cache.delete(key);
+    if (now - entry.at >= STATE_TTL_MS) cache.delete(key);
   }
   // Still over the cap: drop oldest-first (Map preserves insertion order).
   while (cache.size > MAX_CACHE_ENTRIES) {
     const oldest = cache.keys().next().value;
     cache.delete(oldest);
   }
+}
+
+function pruneThresholdCache(now = Date.now()) {
+  if (thresholdsCache.size <= MAX_CACHE_ENTRIES) return;
+  for (const [key, entry] of thresholdsCache) {
+    if (entry.value === undefined || now - entry.fetchedAt >= THRESHOLD_TTL_MS) {
+      thresholdsCache.delete(key);
+    }
+  }
+  while (thresholdsCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = thresholdsCache.keys().next().value;
+    thresholdsCache.delete(oldest);
+  }
+}
+
+function normalizeWorkspaceKey(workspaceId) {
+  const id = Number(workspaceId);
+  return Number.isInteger(id) && id > 0 ? id : String(workspaceId);
+}
+
+function thresholdGenerationFor(key) {
+  return `${thresholdEpoch}:${thresholdGenerations.get(key) ?? 0}`;
 }
 
 // Batch coalescing: badges mounted in the same tick share one workspace
@@ -37,14 +74,14 @@ export async function getItemSLA(itemId, workspaceId = null) {
   if (!itemId) return [];
   const cached = stateCache.get(itemId);
   const now = Date.now();
-  if (cached && now - cached.at < TTL_MS) return cached.value;
+  if (cached && now - cached.at < STATE_TTL_MS) return cached.value;
   if (cached) stateCache.delete(itemId);
   if (inFlight.has(itemId)) return inFlight.get(itemId);
 
-  if (workspaceId && api.sla?.getItemSLABatch) {
+  if (workspaceId && sla?.getItemSLABatch) {
     return enqueueBatchItemSLA(itemId, workspaceId);
   }
-  if (!api.sla?.getItemSLA) return [];
+  if (!sla?.getItemSLA) return [];
   return fetchItemSLA(itemId);
 }
 
@@ -81,7 +118,7 @@ function enqueueBatchItemSLA(itemId, workspaceId) {
 async function flushBatchItemSLA(workspaceId, queue) {
   pendingByWorkspace.delete(workspaceId);
   const ids = [...queue.ids];
-  const generation = cacheGeneration;
+  const generation = stateGeneration;
   const results = new Map();
   const chunks = [];
   for (let i = 0; i < ids.length; i += BATCH_ID_LIMIT) {
@@ -91,7 +128,7 @@ async function flushBatchItemSLA(workspaceId, queue) {
     chunks.map(async (chunkIds) => {
       let batch;
       try {
-        batch = (await api.sla.getItemSLABatch(workspaceId, chunkIds)) ?? {};
+        batch = (await sla.getItemSLABatch(workspaceId, chunkIds, BACKGROUND_READ)) ?? {};
       } catch {
         // A failed chunk resolves unset rather than issuing one request per
         // item, which would amplify load under rate limiting or outages.
@@ -111,7 +148,7 @@ async function flushBatchItemSLA(workspaceId, queue) {
       continue;
     }
     const value = results.get(itemId);
-    if (generation === cacheGeneration) {
+    if (generation === stateGeneration) {
       stateCache.set(itemId, { value, at: Date.now() });
       pruneCache(stateCache);
     }
@@ -121,12 +158,12 @@ async function flushBatchItemSLA(workspaceId, queue) {
 
 // fetchItemSLA issues the per-item read and caches the result.
 function fetchItemSLA(itemId) {
-  const generation = cacheGeneration;
+  const generation = stateGeneration;
   let request;
-  request = api.sla
-    .getItemSLA(itemId)
+  request = sla
+    .getItemSLA(itemId, BACKGROUND_READ)
     .then((value) => {
-      if (generation === cacheGeneration) {
+      if (generation === stateGeneration) {
         stateCache.set(itemId, { value: value ?? [], at: Date.now() });
         pruneCache(stateCache);
       }
@@ -141,28 +178,109 @@ function fetchItemSLA(itemId) {
   return request;
 }
 
+/**
+ * Warning thresholds for a workspace. Returns a cached successful list while
+ * it is fresh, a retained stale list after a transient failure, or null when
+ * no prior value exists (threshold-unavailable). Never caches a failure as an
+ * empty list.
+ */
 export async function getSLAThresholds(workspaceId) {
-  if (!workspaceId || !api.sla?.getWarningThresholds) return [];
-  const cached = thresholdsCache.get(workspaceId);
-  if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
-  if (cached) thresholdsCache.delete(workspaceId);
-  const generation = cacheGeneration;
-  const value = (await api.sla.getWarningThresholds(workspaceId).catch(() => [])) ?? [];
-  if (generation === cacheGeneration) {
-    thresholdsCache.set(workspaceId, { value, at: Date.now() });
-    pruneCache(thresholdsCache);
+  if (!sla?.getWarningThresholds) return [];
+  // A missing workspace is unknown, not a configured-empty threshold list.
+  if (!workspaceId) return null;
+  const key = normalizeWorkspaceKey(workspaceId);
+  const now = Date.now();
+  const cached = thresholdsCache.get(key);
+
+  if (cached) {
+    if (cached.value !== undefined && now - cached.fetchedAt <= THRESHOLD_TTL_MS) {
+      return cached.value;
+    }
+    if (cached.failedAt && now - cached.failedAt < THRESHOLD_FAILURE_COOLDOWN_MS) {
+      return cached.value ?? null;
+    }
   }
-  return value;
+
+  const pending = thresholdsPending.get(key);
+  if (pending) return pending;
+
+  const generation = thresholdGenerationFor(key);
+  const promise = sla
+    .getWarningThresholds(workspaceId, BACKGROUND_READ)
+    .then((result) => {
+      const value = Array.isArray(result) ? result : [];
+      if (generation === thresholdGenerationFor(key)) {
+        thresholdsCache.set(key, { value, fetchedAt: Date.now(), failedAt: 0 });
+        pruneThresholdCache();
+      }
+      return value;
+    })
+    .catch((error) => {
+      if (generation !== thresholdGenerationFor(key)) return null;
+      const status = error?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        // Protected data must not survive an authorization denial.
+        thresholdsCache.delete(key);
+        return null;
+      }
+      const previous = thresholdsCache.get(key);
+      thresholdsCache.set(key, {
+        value: previous?.value,
+        fetchedAt: previous?.value !== undefined ? previous.fetchedAt : 0,
+        failedAt: Date.now(),
+      });
+      return previous?.value ?? null;
+    })
+    .finally(() => {
+      if (thresholdsPending.get(key) === promise) thresholdsPending.delete(key);
+    });
+
+  thresholdsPending.set(key, promise);
+  return promise;
 }
 
-// Drop cached state when an item changes so the next render re-derives it.
+/**
+ * Invalidate cached item states only. The board's wall-clock tick and
+ * refresh-work-items use this so threshold configuration stays cached.
+ */
 export function invalidateSLAState() {
-  cacheGeneration++;
+  stateGeneration++;
   inFlight.clear();
   stateCache.clear();
-  thresholdsCache.clear();
   // Waiters of an in-flight batch still resolve with the values they fetched.
   pendingByWorkspace.clear();
+}
+
+/**
+ * Invalidate one workspace's threshold cache (or every workspace when called
+ * with no id) and notify mounted badges in this tab. A failed mutation must
+ * not call this.
+ */
+export function invalidateSLAThresholds(workspaceId) {
+  if (workspaceId == null) {
+    thresholdEpoch++;
+    thresholdsCache.clear();
+    thresholdsPending.clear();
+    for (const listener of thresholdListeners) listener(null);
+    return;
+  }
+  const key = normalizeWorkspaceKey(workspaceId);
+  thresholdGenerations.set(key, (thresholdGenerations.get(key) ?? 0) + 1);
+  thresholdsCache.delete(key);
+  thresholdsPending.delete(key);
+  for (const listener of thresholdListeners) listener(workspaceId);
+}
+
+/** Subscribe to in-tab threshold invalidations. Returns an unsubscribe. */
+export function onSLAThresholdsInvalidated(listener) {
+  thresholdListeners.add(listener);
+  return () => thresholdListeners.delete(listener);
+}
+
+/** Clear all state and threshold caches, e.g. on session reset. */
+export function resetSLAState() {
+  invalidateSLAState();
+  invalidateSLAThresholds(null);
 }
 
 if (typeof window !== 'undefined') {

@@ -37,6 +37,24 @@ func SampleData(name string) any {
 			InvitationURL: "https://app.example.com/set-password/preview-token",
 			ExpiresIn:     "7 days",
 		}
+	case TemplateMention:
+		return struct {
+			RecipientName string
+			ActorName     string
+			ItemKey       string
+			ItemTitle     string
+			SourceLabel   string
+			Content       string
+			ActionURL     string
+		}{
+			RecipientName: "Alex",
+			ActorName:     "Sam Patel",
+			ItemKey:       "ACME-42",
+			ItemTitle:     "Cannot reset password",
+			SourceLabel:   "a comment",
+			Content:       "@Alex could you take a look at the token refresh path? I think the expiry check runs before the clock is injected.",
+			ActionURL:     "https://app.example.com/workspaces/1/items/42",
+		}
 	case TemplatePortalReply:
 		return struct {
 			AuthorName      string
@@ -44,12 +62,26 @@ func SampleData(name string) any {
 			ItemTitle       string
 			Content         string
 			OriginalSubject string
+			PortalURL       string
 		}{
 			AuthorName:      "Sam Patel",
 			ItemKey:         "ACME-42",
 			ItemTitle:       "Cannot reset password",
 			Content:         "Thanks for the report — I've reproduced the issue locally and pushed a fix. Could you confirm it works on your end after refreshing?",
 			OriginalSubject: "Cannot reset password",
+			PortalURL:       "https://app.example.com/portal/acme?view=requests&id=42",
+		}
+	case TemplateIntakeConfirmation:
+		return struct {
+			FirstName string
+			ItemKey   string
+			ItemTitle string
+			PortalURL string
+		}{
+			FirstName: "Alex",
+			ItemKey:   "ACME-42",
+			ItemTitle: "Cannot reset password",
+			PortalURL: "https://app.example.com/portal/acme?view=requests&id=42",
 		}
 	case TemplateApprovalRequested:
 		return struct {

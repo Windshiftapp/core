@@ -1,5 +1,7 @@
 <script>
-  import { FileText, Package, Trash2 } from '@lucide/svelte';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Package from '@lucide/svelte/icons/package';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import StateDisplay from '../components/StateDisplay.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { portalCatalogStore as portalStore } from '../stores/portal.svelte.js';

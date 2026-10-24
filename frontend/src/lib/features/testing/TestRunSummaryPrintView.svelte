@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { tests } from '../../api/tests/index.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import MarkdownPrintView from '../print/MarkdownPrintView.svelte';
@@ -13,7 +13,7 @@
 
   onMount(async () => {
     try {
-      const summary = await api.tests.testRuns.getSummary(workspaceId, runId);
+      const summary = await tests.testRuns.getSummary(workspaceId, runId);
       content = summary.markdown;
     } catch (err) {
       console.error('Failed to load test run summary:', err);

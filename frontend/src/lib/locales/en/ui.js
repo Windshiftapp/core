@@ -240,6 +240,7 @@ export default {
     numberedList: 'Numbered List',
     insertImage: 'Insert Image',
     userNotFound: 'User not found',
+    multipleUsersMatch: 'Multiple users match',
     insertDiagram: 'Insert diagram',
     insertPageLink: 'Insert knowledge page link',
     searchPagesToLink: 'Search pages…',
@@ -455,6 +456,7 @@ export default {
     chart: {
       items: 'items',
       noDataAvailable: 'No data available',
+      otherSlices: 'Other ({count} more)',
     },
     completionChart: {
       title: 'Completion Chart',

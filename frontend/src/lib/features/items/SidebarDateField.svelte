@@ -1,5 +1,5 @@
 <script>
-  import { Calendar } from '@lucide/svelte';
+  import Calendar from '@lucide/svelte/icons/calendar';
   import Text from '../../components/Text.svelte';
   import { clickOutside } from '../../actions/clickOutside.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -30,7 +30,7 @@
   let testId = $derived(`sidebar-date-${fieldKey.replaceAll('_', '-')}`);
 </script>
 
-<div class="mb-3">
+<div class="mb-1">
   {#if editing}
     <div class="w-full py-1.5" use:clickOutside onclickOutside={onCancel}>
       <input

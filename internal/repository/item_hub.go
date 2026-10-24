@@ -5,9 +5,24 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"windshift/internal/models"
 )
+
+// decodeHubPortalSlug reads the portal slug from a channel config. The config
+// is decoded in Go instead of with SQLite's json_extract (which does not exist
+// on PostgreSQL) and a malformed legacy config degrades to an empty slug
+// rather than failing the whole inbox read.
+func decodeHubPortalSlug(raw string, itemID int) string {
+	slug, _, err := configSlugValues(raw)
+	if err != nil {
+		slog.Warn("ignoring malformed channel config while reading hub inbox item",
+			"item_id", itemID, "error", err)
+		return ""
+	}
+	return slug
+}
 
 // HubInboxFilter captures the user-scoped filters the hub inbox endpoint
 // supports: an optional portal_id, an optional status name, and pagination.
@@ -59,7 +74,7 @@ func (r *ItemRepository) ListHubInboxItems(ctx context.Context, f HubInboxFilter
 			i.id, i.title, COALESCE(i.description, ''), i.created_at,
 			s.name, COALESCE(sc.color, '#6b7280'),
 			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
+			COALESCE(c.name, ''), COALESCE(c.config, '{}'),
 			pc.name, pc.email
 	`+baseQuery+`
 		ORDER BY i.created_at DESC
@@ -74,15 +89,17 @@ func (r *ItemRepository) ListHubInboxItems(ctx context.Context, f HubInboxFilter
 	for rows.Next() {
 		var item models.HubInboxItem
 		var submitterName, submitterEmail sql.NullString
+		var portalConfigRaw string
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Description, &item.CreatedAt,
 			&item.StatusName, &item.StatusColor,
 			&item.WorkspaceKey, &item.WorkspaceItemNumber,
-			&item.PortalName, &item.PortalSlug,
+			&item.PortalName, &portalConfigRaw,
 			&submitterName, &submitterEmail,
 		); err != nil {
 			return nil, 0, nil, fmt.Errorf("scan hub inbox row: %w", err)
 		}
+		item.PortalSlug = decodeHubPortalSlug(portalConfigRaw, item.ID)
 		if submitterName.Valid {
 			item.SubmitterName = &submitterName.String
 		}
@@ -138,12 +155,13 @@ func (r *ItemRepository) CountHubOpenRequests(ctx context.Context, userID int) (
 func (r *ItemRepository) FindHubInboxItem(ctx context.Context, userID, itemID int) (*models.HubInboxItem, error) {
 	var item models.HubInboxItem
 	var submitterName, submitterEmail sql.NullString
+	var portalConfigRaw string
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
 			i.id, i.title, COALESCE(i.description, ''), i.created_at,
 			s.name, COALESCE(sc.color, '#6b7280'),
 			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
+			COALESCE(c.name, ''), COALESCE(c.config, '{}'),
 			pc.name, pc.email
 		FROM items i
 		JOIN statuses s ON i.status_id = s.id
@@ -156,7 +174,7 @@ func (r *ItemRepository) FindHubInboxItem(ctx context.Context, userID, itemID in
 		&item.ID, &item.Title, &item.Description, &item.CreatedAt,
 		&item.StatusName, &item.StatusColor,
 		&item.WorkspaceKey, &item.WorkspaceItemNumber,
-		&item.PortalName, &item.PortalSlug,
+		&item.PortalName, &portalConfigRaw,
 		&submitterName, &submitterEmail,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -165,6 +183,7 @@ func (r *ItemRepository) FindHubInboxItem(ctx context.Context, userID, itemID in
 	if err != nil {
 		return nil, fmt.Errorf("find hub inbox item: %w", err)
 	}
+	item.PortalSlug = decodeHubPortalSlug(portalConfigRaw, item.ID)
 	if submitterName.Valid {
 		item.SubmitterName = &submitterName.String
 	}

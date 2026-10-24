@@ -304,7 +304,7 @@ func (h *AIHandler) StatusSnapshot() AIStatusResponse {
 
 	// Load per-feature config
 	cfg, _ := llm.LoadAIFeaturesConfig(h.db)
-	featureKeys := []string{"ai_chat", "daily_briefing", "plan_my_day", "catch_me_up", "find_similar", "decompose", "release_notes", "dependency_analysis"}
+	featureKeys := []string{"ai_chat", "daily_briefing", "plan_my_day", "catch_me_up", "find_similar", "decompose", "release_notes", "dependency_analysis", "custom_widget"}
 	features := make(map[string]AIFeatureStatus, len(featureKeys))
 	for _, key := range featureKeys {
 		fc, ok := cfg[key]

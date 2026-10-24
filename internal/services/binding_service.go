@@ -687,9 +687,11 @@ func (s *BindingService) UpdateBinding(ctx context.Context, req UpdateBindingReq
 	return updated, nil
 }
 
-// UpdateAgentConfig updates workspace-scoped prompt settings. A nil runner image
-// preserves the current value; an empty non-nil value clears the override.
-func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bindingID int, instructions string, runnerImage *string, skillIDs []int) error {
+// UpdateAgentConfig updates workspace-scoped prompt settings and, when
+// llmConnectionID is non-nil, the model connection. A nil runner image or
+// connection preserves the current value; an empty non-nil runner image clears
+// the override.
+func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bindingID int, instructions string, runnerImage *string, skillIDs []int, llmConnectionID *int) error {
 	if len(instructions) > maxBindingInstructionsLen {
 		return ErrBindingInstructionsTooLong
 	}
@@ -716,8 +718,18 @@ func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bin
 			return ErrBindingRunnerImageRequiresPool
 		}
 	}
+	if llmConnectionID != nil && s.llmRuntime != nil {
+		if _, err := s.llmRuntime.ConnectionRuntime(ctx, *llmConnectionID); err != nil {
+			return ErrLLMConnectionInvalid
+		}
+	}
 	if err := s.repo.UpdateInstructions(ctx, bindingID, workspaceID, instructions); err != nil {
 		return err
+	}
+	if llmConnectionID != nil {
+		if err := s.repo.UpdateLLMConnection(ctx, bindingID, workspaceID, *llmConnectionID); err != nil {
+			return err
+		}
 	}
 	if runnerImage != nil {
 		if err := s.repo.UpdateRunnerImage(ctx, bindingID, workspaceID, newRunnerImage); err != nil {

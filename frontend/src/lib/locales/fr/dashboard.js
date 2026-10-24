@@ -19,6 +19,10 @@ export default {
       },
     },
     widgetCatalog: {
+      customWidget: {
+        name: 'Widget personnalise',
+        description: 'Un widget que vous creez avec l IA ou en ecrivant un programme OpenUI',
+      },
       dailyBriefing: {
         name: 'Briefing quotidien',
         description: 'Résumé généré par IA de ce qui importe pour vous aujourd’hui',
@@ -42,6 +46,10 @@ export default {
       assignedToMe: {
         name: 'Mes éléments attribués',
         description: 'Éléments ouverts qui vous sont attribués dans tous les espaces de travail',
+      },
+      createdByMe: {
+        name: 'Créés par moi',
+        description: 'Éléments ouverts que vous avez créés dans tous les espaces de travail',
       },
       watchedItems: {
         name: 'Éléments suivis',
@@ -82,8 +90,50 @@ export default {
         name: 'Navigation',
         description: 'Accès rapide aux espaces de travail',
       },
+      custom: {
+        name: 'Personnalise',
+        description: 'Creez votre propre widget a partir d une description',
+      },
+      background: {
+        name: 'Arrière-plan',
+        description: 'Dégradés et images prédéfinies pour votre tableau de bord',
+      },
       tipLabel: 'Conseil',
       tip: 'Faites glisser des widgets d’ici vers n’importe quelle section de votre tableau de bord.',
+    },
+    widgetBuilder: {
+      createTitle: "Creer un widget",
+      editTitle: "Modifier le widget",
+      subtitle: "Decrivez-le ou ecrivez le programme OpenUI vous-meme",
+      nameLabel: "Nom",
+      namePlaceholder: "Mon travail en cours",
+      promptLabel: "Que doit-il afficher ?",
+      promptPlaceholder: "Mes taches en cours, avec chiffres et tableau",
+      generate: "Generer",
+      generating: "Generation...",
+      itemQueryLabel: "Requete elements (CQL)",
+      assetQueryLabel: "Requete actifs (CQL)",
+      assetSetLabel: "Jeu d actifs",
+      assetSetNone: "Aucun",
+      previewLabel: "Apercu",
+      previewEmpty: "Rien a previsualiser",
+      loading: "Chargement...",
+      aiUnavailable: "La generation par IA n'est pas disponible, un nouveau widget ne peut donc pas etre cree.",
+      aiUnavailableEditing: "La generation par IA n'est pas disponible. Le nom et les requetes restent modifiables.",
+      generateFailed: "Echec de la generation",
+      saveFailed: "Echec de l'enregistrement",
+      loadFailed: "Impossible de charger ce widget",
+      saving: "Enregistrement...",
+    },
+    customWidgets: {
+      sourceError: "Les donnees de ce widget n ont pas pu etre chargees",
+      truncated: 'Base sur {shown} sur {total} lignes',
+      renderError: "Ce widget n a pas pu etre rendu",
+      unavailable: "Ce widget n'est plus disponible",
+      notConfigured: "Ce widget n'a pas encore ete configure",
+      noLinks: "Aucun lien entre ces elements et ces actifs",
+      canvasUnavailable: "Ce graphique necessite un canvas, indisponible ici",
+      renderedNodes: "Dessine {shown} sur {total} noeuds",
     },
     editor: {
       newSection: 'Nouvelle section',
@@ -106,6 +156,8 @@ export default {
     states: {
       assignedLoadError: 'Impossible de charger les éléments qui vous sont attribués',
       assignedEmpty: 'Rien ne vous est attribué pour le moment',
+      createdLoadError: 'Impossible de charger les éléments que vous avez créés',
+      createdEmpty: "Vous n'avez créé aucun élément ouvert",
       personalTasksLoadError: 'Impossible de charger vos tâches personnelles',
       personalTasksEmpty: 'Votre liste de tâches personnelles est vide',
       supportMetricsLoadError: 'Impossible de charger les métriques d’assistance',

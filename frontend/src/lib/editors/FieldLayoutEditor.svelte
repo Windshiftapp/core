@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-  import { Settings } from '@lucide/svelte';
+  import Settings from '@lucide/svelte/icons/settings';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Modal from '../dialogs/Modal.svelte';

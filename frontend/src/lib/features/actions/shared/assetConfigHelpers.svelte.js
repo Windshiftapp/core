@@ -1,4 +1,4 @@
-import { api } from '../../../api.js';
+import { assetTypes } from '../../../api/assets.js';
 import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
 
 /** Fetch reactive asset-type fields from the supplied ID getter. Late requests
@@ -14,7 +14,7 @@ export function useAssetTypeFields(getAssetTypeId) {
       assetTypeFields = [];
       return;
     }
-    api.assetTypes
+    assetTypes
       .getFields(assetTypeId)
       .then((result) => {
         if (token === requestToken) assetTypeFields = result || [];

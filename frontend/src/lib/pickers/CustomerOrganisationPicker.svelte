@@ -1,8 +1,9 @@
 <script>
   import BasePicker from './BasePicker.svelte';
-  import { Building2 } from '@lucide/svelte';
+  import Building2 from '@lucide/svelte/icons/building-2';
   import { createAsyncLoader } from '../composables';
-  import { api } from '../api.js';
+  import { customerOrganisations } from '../api/portal.js';
+  import { isNoCustomer } from '../utils/customerLabel.js';
   import { onDestroy, onMount } from 'svelte';
 
   let {
@@ -23,10 +24,12 @@
     onCancel = () => {}
   } = $props();
 
-  const organisations = createAsyncLoader(() => api.customerOrganisations.getAll());
+  const organisations = createAsyncLoader(() => customerOrganisations.getAll());
   onMount(() => { if (providedOrganisations === null) organisations.load(); });
   onDestroy(() => organisations.dispose());
-  const organisationOptions = $derived(providedOrganisations ?? organisations.data ?? []);
+  const organisationOptions = $derived(
+    (providedOrganisations ?? organisations.data ?? []).filter((org) => !isNoCustomer(org))
+  );
 </script>
 
 {#snippet organisationRow({ item })}

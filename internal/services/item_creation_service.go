@@ -75,6 +75,23 @@ func NewItemCreationService(db database.Database, perm *PermissionService) *Item
 	return &ItemCreationService{db: db, perm: perm}
 }
 
+// EncodeCustomFieldValuesJSON validates and normalizes the supplied custom
+// field values, then encodes them for ItemCreationParams.CustomFieldValuesJSON.
+// Returns "" for a nil map so callers can skip the field entirely.
+func EncodeCustomFieldValuesJSON(db database.Database, cfv map[string]any) (string, error) {
+	if cfv == nil {
+		return "", nil
+	}
+	if err := validation.ValidateAndNormalizeCustomFieldValues(db, cfv); err != nil {
+		return "", err
+	}
+	encoded, err := json.Marshal(cfv)
+	if err != nil {
+		return "", &ItemCreationValidationError{Message: "Invalid custom field values"}
+	}
+	return string(encoded), nil
+}
+
 func (s *ItemCreationService) SetEmitter(emitter ItemCreatedEmitter) {
 	s.emitter = emitter
 }
@@ -133,16 +150,9 @@ func (s *ItemCreationService) create(
 		input.InheritProject = true
 	}
 
-	var customFieldValuesJSON string
-	if input.CustomFieldValues != nil {
-		if err := validation.ValidateAndNormalizeCustomFieldValues(s.db, input.CustomFieldValues); err != nil {
-			return nil, err
-		}
-		encoded, err := json.Marshal(input.CustomFieldValues)
-		if err != nil {
-			return nil, &ItemCreationValidationError{Message: "Invalid custom field values"}
-		}
-		customFieldValuesJSON = string(encoded)
+	customFieldValuesJSON, err := EncodeCustomFieldValuesJSON(s.db, input.CustomFieldValues)
+	if err != nil {
+		return nil, err
 	}
 
 	var mandatoryTemplate MandatoryTemplateInfo

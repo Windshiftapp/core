@@ -1,5 +1,5 @@
 <script>
-  import { Calendar } from '@lucide/svelte';
+  import Calendar from '@lucide/svelte/icons/calendar';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { iterationPickerConfig } from '../../pickers/pickerConfigs.js';
   import IterationCellValue from './IterationCellValue.svelte';

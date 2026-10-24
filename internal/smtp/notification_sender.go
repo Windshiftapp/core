@@ -3,17 +3,24 @@
 package smtp
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -49,6 +56,9 @@ func ValidateTransport(config *models.ChannelConfig) error {
 	}
 	if mode == "none" && (strings.TrimSpace(config.SMTPUsername) != "" || config.SMTPPassword != "") {
 		return ErrSMTPAuthenticationRequiresTLS
+	}
+	if !AuthMethodAllowed(config.SMTPAuthMethod) {
+		return fmt.Errorf("SMTP auth method %q not allowed; use \"auto\", \"plain\", \"login\", \"cram-md5\", or \"none\"", config.SMTPAuthMethod)
 	}
 	return nil
 }
@@ -143,12 +153,23 @@ func encodeHeaderWord(s string) string {
 
 // encodeMailbox formats a "Name <addr>" mailbox header value safely. The
 // address is sanitized but not QEncoded (it has to stay RFC 5322 addr-spec).
+//
+// The display name goes through net/mail, which quotes the RFC 5322 phrase or
+// emits an encoded-word as needed. An unquoted name containing specials (",",
+// ";", "<", "@", ...) turns the header into an address list, so a portal
+// customer named "Lastname, Firstname" made receivers split the To header into
+// a broken "Lastname" mailbox and the real address.
 func encodeMailbox(name, addr string) string {
 	addr = sanitizeHeader(addr)
+	name = sanitizeHeader(name)
 	if name == "" {
 		return addr
 	}
-	return fmt.Sprintf("%s <%s>", encodeHeaderWord(name), addr)
+	address := &mail.Address{Name: name, Address: addr}
+	if address.Address == "" {
+		return addr
+	}
+	return address.String()
 }
 
 // normalizeEnvelopeAddress accepts only a bare addr-spec for SMTP MAIL/RCPT
@@ -259,6 +280,13 @@ func defaultTemplate(name string) (emailutil.DefaultTemplate, bool) {
 // is the shared one-call surface used by the magic-link / verification /
 // invitation services so each one stays a thin URL-builder + caller.
 func (s *NotificationSMTPSender) SendTransactional(toEmail, templateName string, data any) error {
+	return s.SendTransactionalContext(context.Background(), toEmail, templateName, data)
+}
+
+// SendTransactionalContext is SendTransactional with cancellation propagated
+// through SMTP dialing, handshake, commands, and DATA completion. The
+// mention-email outbox uses it so a scheduler shutdown cannot wedge a send.
+func (s *NotificationSMTPSender) SendTransactionalContext(ctx context.Context, toEmail, templateName string, data any) error {
 	if !s.IsSMTPConfigured() {
 		return ErrSMTPNotConfigured
 	}
@@ -266,7 +294,18 @@ func (s *NotificationSMTPSender) SendTransactional(toEmail, templateName string,
 	if err != nil {
 		return fmt.Errorf("render %s: %w", templateName, err)
 	}
-	return s.SendCustomEmail(toEmail, subject, htmlBody, textBody)
+	config, err := s.getSMTPConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get SMTP config: %w", err)
+	}
+	return s.sendEmailContext(ctx, config, toEmail, subject, htmlBody, textBody)
+}
+
+// AbsoluteActionURL turns a stored relative notification action path into a
+// clickable absolute URL. Exported so out-of-band email builders share the
+// exact normalization the notification digest uses.
+func AbsoluteActionURL(baseURL, actionURL string) string {
+	return absoluteActionURL(baseURL, actionURL)
 }
 
 // resolveTemplate returns the template sources and whether they came from the
@@ -318,7 +357,7 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 	}
 
 	// SMTPPassword stays encrypted in the returned config — dispatch decrypts
-	// it just before AUTH PLAIN. Keeping the encrypted value in the struct
+	// it just before SMTP AUTH. Keeping the encrypted value in the struct
 	// avoids handing plaintext to any code paths that don't strictly need it.
 	return &config, nil
 }
@@ -446,33 +485,57 @@ type mimeOptions struct {
 	References           []string
 }
 
-// buildMime renders a multipart/alternative message. All header values that
-// originate from inbound parsing or admin-configured display names go through
-// sanitizeHeader/encodeHeaderWord/encodeMailbox so a stray `\r\n` cannot
-// inject Bcc/Cc/Reply-To downstream.
-func buildMime(opts mimeOptions) string {
-	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
+// buildMime renders a multipart/alternative message. The MIME structure comes
+// from mime/multipart, so the boundary in Content-Type and the delimiters in
+// the body are written by the same writer and cannot disagree. Every header
+// value that originates from inbound parsing or admin-configured display names
+// goes through sanitizeHeader/encodeHeaderWord/encodeMailbox so a stray `\r\n`
+// cannot inject Bcc/Cc/Reply-To downstream.
+func buildMime(opts mimeOptions) ([]byte, error) {
+	boundary, err := newMimeBoundary()
+	if err != nil {
+		return nil, err
+	}
 
-	from := encodeMailbox(opts.FromName, opts.FromEmail)
+	var body bytes.Buffer
+	parts := multipart.NewWriter(&body)
+	// mime.FormatMediaType quotes the boundary when it needs to; the body
+	// delimiters use the raw value, so they always match.
+	if err := parts.SetBoundary(boundary); err != nil {
+		return nil, fmt.Errorf("set MIME boundary: %w", err)
+	}
+	if err := writeMimePart(parts, "text/plain", opts.TextBody); err != nil {
+		return nil, err
+	}
+	if err := writeMimePart(parts, "text/html", opts.HTMLBody); err != nil {
+		return nil, err
+	}
+	if err := parts.Close(); err != nil {
+		return nil, fmt.Errorf("close MIME multipart: %w", err)
+	}
+
+	var message bytes.Buffer
+	writeMimeHeader(&message, "From", encodeMailbox(opts.FromName, opts.FromEmail))
 	to := sanitizeHeader(opts.ToEmail)
 	if opts.ToName != "" {
 		to = encodeMailbox(opts.ToName, opts.ToEmail)
 	}
-
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n",
-		from, to, encodeHeaderWord(opts.Subject), boundary)
+	writeMimeHeader(&message, "To", to)
+	writeMimeHeader(&message, "Subject", encodeHeaderWord(opts.Subject))
+	writeMimeHeader(&message, "MIME-Version", "1.0")
+	writeMimeHeader(&message, "Content-Type", mime.FormatMediaType("multipart/alternative", map[string]string{"boundary": boundary}))
 
 	// Route customer replies to the monitored inbox rather than the SMTP
 	// sender. Omit the header when there is no distinct monitored address, so
 	// the transport falls back to From exactly as before.
 	if replyTo := strings.TrimSpace(opts.ReplyToEmail); replyTo != "" && !strings.EqualFold(replyTo, opts.FromEmail) {
-		headers += fmt.Sprintf("Reply-To: %s\r\n", encodeMailbox(opts.ReplyToName, replyTo))
+		writeMimeHeader(&message, "Reply-To", encodeMailbox(opts.ReplyToName, replyTo))
 	}
 	if messageID := formatMessageIDHeader(opts.MessageID); messageID != "" {
-		headers += fmt.Sprintf("Message-ID: %s\r\n", messageID)
+		writeMimeHeader(&message, "Message-ID", messageID)
 	}
 	if inReplyTo := formatMessageIDHeader(opts.InReplyTo); inReplyTo != "" {
-		headers += fmt.Sprintf("In-Reply-To: %s\r\n", inReplyTo)
+		writeMimeHeader(&message, "In-Reply-To", inReplyTo)
 	}
 	if len(opts.References) > 0 {
 		clean := make([]string, 0, len(opts.References))
@@ -482,19 +545,58 @@ func buildMime(opts mimeOptions) string {
 			}
 		}
 		if len(clean) > 0 {
-			headers += foldHeaderValue("References", strings.Join(clean, " "))
+			message.WriteString(foldHeaderValue("References", strings.Join(clean, " ")))
 		}
 	}
 
-	headers += "\r\n"
+	message.WriteString("\r\n")
+	message.Write(body.Bytes())
+	return message.Bytes(), nil
+}
 
-	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, opts.TextBody)
-	htmlPart := fmt.Sprintf("--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, opts.HTMLBody)
-	ending := fmt.Sprintf("--%s--\r\n", boundary)
+// newMimeBoundary returns a random hex boundary. A hex string is a valid RFC
+// 2046 b-char token and has no leading hyphen run, which strict parsers (SES)
+// mis-attributed to the Content-Type parameter when the boundary started with
+// "----=".
+func newMimeBoundary() (string, error) {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", fmt.Errorf("generate MIME boundary: %w", err)
+	}
+	return hex.EncodeToString(raw[:]), nil
+}
 
-	return headers + textPart + htmlPart + ending
+// writeMimeHeader emits one header line. Values are already sanitized or
+// encoded by the caller, so nothing here can introduce a CRLF.
+func writeMimeHeader(b *bytes.Buffer, name, value string) {
+	b.WriteString(name)
+	b.WriteString(": ")
+	b.WriteString(value)
+	b.WriteString("\r\n")
+}
+
+// writeMimePart appends one quoted-printable text part. The encoding keeps
+// every line inside the 998-octet SMTP limit and carries non-ASCII bodies
+// byte-for-byte, which the previous unconditional 8bit declaration did not.
+func writeMimePart(parts *multipart.Writer, mediaType, content string) error {
+	// The headers are written through CreatePart rather than by hand: a part
+	// whose first header is preceded by an empty line loses its whole header
+	// block in the receiving parser.
+	header := textproto.MIMEHeader{}
+	header["Content-Type"] = []string{mediaType + "; charset=UTF-8"}
+	header["Content-Transfer-Encoding"] = []string{"quoted-printable"}
+	writer, err := parts.CreatePart(header)
+	if err != nil {
+		return fmt.Errorf("create %s MIME part: %w", mediaType, err)
+	}
+	quoted := quotedprintable.NewWriter(writer)
+	if _, err := io.WriteString(quoted, content); err != nil {
+		return fmt.Errorf("write %s MIME part: %w", mediaType, err)
+	}
+	if err := quoted.Close(); err != nil {
+		return fmt.Errorf("encode %s MIME part: %w", mediaType, err)
+	}
+	return nil
 }
 
 // foldHeaderValue folds a space-separated header value at 78 columns per RFC
@@ -541,10 +643,10 @@ func formatMessageIDHeader(value string) string {
 // authentication; empty or unknown modes are errors rather than downgrades.
 //
 // It is a method (rather than a free function) so it can decrypt the at-rest
-// SMTPPassword before passing it to AUTH PLAIN — every caller goes through the
+// SMTPPassword before passing it to SMTP AUTH — every caller goes through the
 // encryption-aware sender, even the channel-test path that loads raw config
 // from the DB on its own.
-func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *models.ChannelConfig, toEmail, message string) error {
+func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *models.ChannelConfig, toEmail string, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -570,9 +672,9 @@ func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *mo
 		return err
 	}
 
-	var auth smtp.Auth
-	if config.SMTPUsername != "" && password != "" {
-		auth = smtp.PlainAuth("", config.SMTPUsername, password, config.SMTPHost)
+	auth, err := newSMTPAuth(config.SMTPAuthMethod, config.SMTPUsername, password, config.SMTPHost)
+	if err != nil {
+		return err
 	}
 
 	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
@@ -595,20 +697,24 @@ func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail
 }
 
 func (s *NotificationSMTPSender) sendEmailContext(ctx context.Context, config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
-	return s.dispatchContext(ctx, config, toEmail, buildMime(mimeOptions{
+	message, err := buildMime(mimeOptions{
 		FromEmail: config.SMTPFromEmail,
 		FromName:  config.SMTPFromName,
 		ToEmail:   toEmail,
 		Subject:   subject,
 		HTMLBody:  htmlBody,
 		TextBody:  textBody,
-	}))
+	})
+	if err != nil {
+		return err
+	}
+	return s.dispatchContext(ctx, config, toEmail, message)
 }
 
 // sendWithStartTLS sends email using STARTTLS encryption. The dial goes
 // through utils.SafeNetDialer so a maliciously-configured SMTPHost cannot
 // reach loopback / private-IP / link-local / CGNAT targets.
-func sendWithStartTLSContext(ctx context.Context, addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
+func sendWithStartTLSContext(ctx context.Context, addr string, auth smtp.Auth, from, to string, message []byte, skipTLSVerify bool) error {
 	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
@@ -637,7 +743,7 @@ func sendWithStartTLSContext(ctx context.Context, addr string, auth smtp.Auth, f
 
 // sendWithSSL sends email using SSL/TLS encryption. SafeNetDialer enforces
 // the SSRF reject list before the TLS handshake.
-func sendWithSSLContext(ctx context.Context, addr string, auth smtp.Auth, from, to, message string, skipTLSVerify bool) error {
+func sendWithSSLContext(ctx context.Context, addr string, auth smtp.Auth, from, to string, message []byte, skipTLSVerify bool) error {
 	tlsConfig := smtpTLSConfig(addr, skipTLSVerify)
 	rawConn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -674,7 +780,7 @@ func smtpTLSConfig(addr string, skipTLSVerify bool) *tls.Config {
 // sendPlaintext sends unauthenticated email over an unencrypted connection.
 // SafeNetDialer keeps the process-wide local-connection policy effective for
 // this transport just as it is for TLS SMTP.
-func sendPlaintextContext(ctx context.Context, addr, from, to, message string) error {
+func sendPlaintextContext(ctx context.Context, addr, from, to string, message []byte) error {
 	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
@@ -696,7 +802,7 @@ func sendPlaintextContext(ctx context.Context, addr, from, to, message string) e
 }
 
 // sendWithClient performs authentication, addressing, and message delivery on an established SMTP client.
-func sendWithClientContext(ctx context.Context, client *smtp.Client, auth smtp.Auth, from, to, message string) error {
+func sendWithClientContext(ctx context.Context, client *smtp.Client, auth smtp.Auth, from, to string, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -727,7 +833,7 @@ func sendWithClientContext(ctx context.Context, client *smtp.Client, auth smtp.A
 	if err != nil {
 		return err
 	}
-	if _, err = writer.Write([]byte(message)); err != nil {
+	if _, err = writer.Write(message); err != nil {
 		_ = writer.Close()
 		return err
 	}
@@ -792,7 +898,7 @@ func (s *NotificationSMTPSender) SendThreadedEmailContext(ctx context.Context, p
 	if err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
-	return s.dispatchContext(ctx, config, params.ToEmail, buildMime(mimeOptions{
+	message, err := buildMime(mimeOptions{
 		FromEmail:    config.SMTPFromEmail,
 		FromName:     config.SMTPFromName,
 		ToEmail:      params.ToEmail,
@@ -805,5 +911,9 @@ func (s *NotificationSMTPSender) SendThreadedEmailContext(ctx context.Context, p
 		MessageID:    params.MessageID,
 		InReplyTo:    params.InReplyTo,
 		References:   params.References,
-	}))
+	})
+	if err != nil {
+		return err
+	}
+	return s.dispatchContext(ctx, config, params.ToEmail, message)
 }

@@ -1,7 +1,10 @@
 <script>
   import { untrack } from 'svelte';
   import { createCombobox, melt } from '@melt-ui/svelte';
-  import { Check, ChevronDown, X, Search } from '@lucide/svelte';
+  import Check from '@lucide/svelte/icons/check';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import X from '@lucide/svelte/icons/x';
+  import Search from '@lucide/svelte/icons/search';
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';

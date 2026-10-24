@@ -306,8 +306,6 @@ func scanAncestorItem(rows *sql.Rows, item *models.Item, leading ...any) error {
 		return err
 	}
 	_ = level
-	_ = itemTypeColor
-	_ = itemTypeIcon
 	assignNullableInt(&item.ItemTypeID, itemTypeID)
 	assignNullableInt(&item.AssigneeID, assigneeID)
 	assignNullableInt(&item.CreatorID, creatorID)
@@ -315,6 +313,8 @@ func scanAncestorItem(rows *sql.Rows, item *models.Item, leading ...any) error {
 	assignNullableString(&item.WorkspaceName, workspaceName)
 	assignNullableString(&item.WorkspaceKey, workspaceKey)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
+	assignNullableString(&item.ItemTypeColor, itemTypeColor)
+	assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
 	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
 	return nil
 }
@@ -408,8 +408,6 @@ func scanBatchAncestorItem(rows *sql.Rows, item *models.Item, leading ...any) er
 		return err
 	}
 	_ = level
-	_ = itemTypeColor
-	_ = itemTypeIcon
 	assignNullableInt(&item.ItemTypeID, itemTypeID)
 	assignNullableInt(&item.AssigneeID, assigneeID)
 	assignNullableInt(&item.CreatorID, creatorID)
@@ -419,6 +417,8 @@ func scanBatchAncestorItem(rows *sql.Rows, item *models.Item, leading ...any) er
 	assignNullableString(&item.WorkspaceName, workspaceName)
 	assignNullableString(&item.WorkspaceKey, workspaceKey)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
+	assignNullableString(&item.ItemTypeColor, itemTypeColor)
+	assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
 	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
 	return nil
 }
@@ -458,32 +458,46 @@ func (r *ItemRepository) GetRootItems(workspaceID int) ([]*models.Item, error) {
 // descendant set hits maxItems the result's Truncated flag is set and only
 // the first maxItems contribute to the sums.
 //
-// The root item's view permission is checked by the handler; per-descendant
-// permission filtering is intentionally skipped here — we only expose
-// aggregate counts, not per-item data.
-func (r *ItemRepository) GetTimeRollup(itemID, maxDepth, maxItems int) (*models.TimeRollup, error) {
+// Only items in workspaceIDs contribute: the root item's view permission is
+// checked by the handler, but descendants can live in other workspaces and
+// their aggregate volume must not leak to callers who cannot view them. The
+// traversal still walks the full subtree so an accessible descendant beneath
+// an inaccessible intermediate item is counted. An empty workspaceIDs returns
+// a zero rollup.
+func (r *ItemRepository) GetTimeRollup(itemID, maxDepth, maxItems int, workspaceIDs []int) (*models.TimeRollup, error) {
 	if maxDepth <= 0 || maxDepth > maxItemHierarchyDepth {
 		maxDepth = maxItemHierarchyDepth
 	}
 	if maxItems <= 0 {
 		maxItems = defaultTimeRollupMaxItems
 	}
+	if len(workspaceIDs) == 0 {
+		return &models.TimeRollup{}, nil
+	}
 
 	// Step 1: collect ids + estimate_minutes for the root + descendants.
 	// Fetch maxItems+1 so we can detect whether the result was truncated
-	// without a second COUNT query.
+	// without a second COUNT query. The workspace filter applies before the
+	// LIMIT so inaccessible items do not consume the max-items budget.
+	placeholders := make([]string, len(workspaceIDs))
+	args := []any{itemID, maxDepth}
+	for i, id := range workspaceIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	args = append(args, maxItems+1)
 	rows, err := r.db.Query(`
-		WITH RECURSIVE tree(id, est, level) AS (
-			SELECT id, COALESCE(estimate_minutes, 0), 0
+		WITH RECURSIVE tree(id, est, workspace_id, level) AS (
+			SELECT id, COALESCE(estimate_minutes, 0), workspace_id, 0
 			FROM items WHERE id = ?
 			UNION ALL
-			SELECT i.id, COALESCE(i.estimate_minutes, 0), t.level + 1
+			SELECT i.id, COALESCE(i.estimate_minutes, 0), i.workspace_id, t.level + 1
 			FROM items i
 			INNER JOIN tree t ON i.parent_id = t.id
 			WHERE t.level < ?
 		)
-		SELECT id, est FROM tree LIMIT ?
-	`, itemID, maxDepth, maxItems+1)
+		SELECT id, est FROM tree WHERE workspace_id IN (`+strings.Join(placeholders, ",")+`) LIMIT ?
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query time rollup tree: %w", err)
 	}
@@ -533,13 +547,16 @@ func (r *ItemRepository) GetTimeRollup(itemID, maxDepth, maxItems int) (*models.
 	// Step 2: sum logged minutes across the included items. The IN-list is
 	// bounded by maxItems (default 500) which is well within SQL parameter
 	// limits on both SQLite and Postgres.
-	placeholders := strings.Repeat("?,", len(ids))
-	placeholders = placeholders[:len(placeholders)-1]
+	worklogPlaceholders := strings.Repeat("?,", len(ids))
+	worklogPlaceholders = worklogPlaceholders[:len(worklogPlaceholders)-1]
 	query := fmt.Sprintf(
 		"SELECT COALESCE(SUM(duration_minutes), 0) FROM time_worklogs WHERE item_id IN (%s)",
-		placeholders,
+		worklogPlaceholders,
 	)
-	args := make([]any, len(ids))
+	args = args[:0]
+	for _, id := range ids {
+		args = append(args, id)
+	}
 	for i, id := range ids {
 		args[i] = id
 	}
@@ -548,6 +565,50 @@ func (r *ItemRepository) GetTimeRollup(itemID, maxDepth, maxItems int) (*models.
 	}
 
 	return rollup, nil
+}
+
+// GetDescendantIDsInWorkspaces returns the IDs of all descendants that live in
+// one of workspaceIDs. The traversal still walks the full subtree so an
+// accessible descendant beneath an inaccessible intermediate item is counted.
+// An empty or nil workspaceIDs returns no IDs.
+func (r *ItemRepository) GetDescendantIDsInWorkspaces(parentID int, workspaceIDs []int) ([]int, error) {
+	if len(workspaceIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(workspaceIDs))
+	args := []any{parentID, maxItemHierarchyDepth}
+	for i, id := range workspaceIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	rows, err := r.db.Query(`
+		WITH RECURSIVE descendants AS (
+			SELECT id, workspace_id, 1 as level FROM items WHERE parent_id = ?
+			UNION ALL
+			SELECT i.id, i.workspace_id, d.level + 1 FROM items i
+			INNER JOIN descendants d ON i.parent_id = d.id
+			WHERE d.level < ?
+		)
+		SELECT id FROM descendants WHERE workspace_id IN (`+strings.Join(placeholders, ",")+`)
+	`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get descendant ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan descendant id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate descendant ids: %w", err)
+	}
+
+	return ids, nil
 }
 
 // GetDescendantIDs returns just the IDs of all descendants (for bulk operations like delete)

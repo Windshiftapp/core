@@ -3,7 +3,8 @@
   // (heartbeat-live runners) versus what is waiting (queued/running runs).
   // The unhealthy signature is queued work with zero live runners — the
   // "assigned a ticket but nothing happens" case.
-  import { IconAlertTriangle, IconCircleCheck } from '@tabler/icons-svelte-runes';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
+  import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
   import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Lozenge from '../../components/Lozenge.svelte';

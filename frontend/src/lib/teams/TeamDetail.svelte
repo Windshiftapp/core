@@ -1,12 +1,18 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconPhoneCheck, IconUsersGroup, IconUsers, IconStack2, IconBellRinging, IconClock, IconArrowLeft } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import IconPhoneCheck from '@tabler/icons-svelte-runes/icons/phone-check';
+  import IconUsersGroup from '@tabler/icons-svelte-runes/icons/users-group';
+  import IconUsers from '@tabler/icons-svelte-runes/icons/users';
+  import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
+  import IconBellRinging from '@tabler/icons-svelte-runes/icons/bell-ringing';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import { teams } from '../api/teams.js';
   import { navigate } from '../router.js';
-  import { authStore, isSystemAdmin, permissionStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
+  import { isSystemAdmin, permissionStore } from '../stores/permissions.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
-  import Button from '../components/Button.svelte';
+  import BackButton from '../components/BackButton.svelte';
   import Tabs from '../components/Tabs.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import OverviewTab from './OverviewTab.svelte';
@@ -30,7 +36,7 @@
   async function loadTeam() {
     loading = true;
     try {
-      team = await api.teams.get(Number(teamId));
+      team = await teams.get(Number(teamId));
       error = '';
     } catch (err) {
       error = err.message || t('teams.failedToLoad');
@@ -44,7 +50,7 @@
     const userId = $authStore.currentUser?.id;
     if (!userId) return;
     try {
-      const myTeams = await api.teams.getTeamsForUser(userId);
+      const myTeams = await teams.getTeamsForUser(userId);
       const match = (myTeams || []).find((t) => t.id === Number(teamId));
       myRole = match?.role || null;
     } catch (err) {
@@ -81,14 +87,7 @@
 </script>
 
 <div class="space-y-4" data-testid="team-detail">
-  <Button
-    variant="ghost"
-    size="sm"
-    icon={IconArrowLeft}
-    onclick={() => navigate('/teams')}
-  >
-    {t('teams.backToTeams')}
-  </Button>
+  <BackButton onclick={() => navigate('/teams')} label={t('teams.backToTeams')} />
 
   {#if loading}
     <div class="text-center py-8" style="color: var(--ds-text-subtle)">

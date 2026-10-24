@@ -1,14 +1,23 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { Bot, CheckSquare, Puzzle, Upload, RefreshCw, Trash2, ToggleLeft, ToggleRight, Package } from '@lucide/svelte';
+  import Bot from '@lucide/svelte/icons/bot';
+  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import Puzzle from '@lucide/svelte/icons/puzzle';
+  import Upload from '@lucide/svelte/icons/upload';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ToggleLeft from '@lucide/svelte/icons/toggle-left';
+  import ToggleRight from '@lucide/svelte/icons/toggle-right';
+  import Package from '@lucide/svelte/icons/package';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import Toggle from '../components/Toggle.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Panel from '../components/Panel.svelte';
-  import { api, getSecuritySettings, fetchAPI } from '../api.js';
+  import { getSecuritySettings } from '../api/admin.js';
+  import { fetchAPI } from '../api/core.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';

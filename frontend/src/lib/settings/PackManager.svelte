@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
-  import { api } from '../api.js';
-  import { workspacesStore } from '../stores';
-  import { IconPackage } from '@tabler/icons-svelte-runes';
+  import { packs as packsApi } from '../api/packs.js';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import IconPackage from '@tabler/icons-svelte-runes/icons/package';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Panel from '../components/Panel.svelte';
@@ -28,7 +28,7 @@
     try {
       loading = true;
       loadError = null;
-      packs = (await api.packs.list()) || [];
+      packs = (await packsApi.list()) || [];
     } catch (error) {
       console.error('Failed to load built-in packs:', error);
       loadError = t('settings.featurePacks.loadFailed');
@@ -67,8 +67,8 @@
     try {
       const result =
         action === 'verify'
-          ? await api.packs.verify(activePack, target)
-          : await api.packs.apply(activePack, target);
+          ? await packsApi.verify(activePack, target)
+          : await packsApi.apply(activePack, target);
       report = result;
       reportAction = action;
       if (result?.status === 'failed') {

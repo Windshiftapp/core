@@ -1,5 +1,5 @@
 <script>
-  import { ChevronLeft } from '@lucide/svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import { t } from '../stores/i18n.svelte.js';
 
   /**

@@ -1,25 +1,27 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconPlus, IconTrash, IconPencil } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconPencil from '@tabler/icons-svelte-runes/icons/pencil';
+  import { workspaces as workspacesApi } from '../../api/workspaces.js';
+  import { channelIntakes } from '../../api/channels.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import TextField from '../../components/TextField.svelte';
   import SelectField from '../../components/SelectField.svelte';
-  import Label from '../../components/Label.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
-  import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
 
   let { channelId, workspaces = [], portals = [] } = $props();
 
   let intakes = $state([]);
   let loading = $state(false);
   let editing = $state(null);
-  // Item types belong to the intake's chosen workspace, which may differ from
-  // the mailbox's legacy email_workspace_id, so this component owns the load.
+  // Item types belong to the intake's workspace, so this component owns the
+  // load rather than relying on the mailbox's legacy email_workspace_id.
   let itemTypes = $state([]);
   let itemTypeLoadSequence = 0;
 
@@ -30,7 +32,7 @@
       return;
     }
     try {
-      const loaded = await api.workspaces.getItemTypes(workspaceId);
+      const loaded = await workspacesApi.getItemTypes(workspaceId);
       if (requestSequence === itemTypeLoadSequence) {
         itemTypes = loaded;
       }
@@ -40,15 +42,30 @@
     }
   }
 
+  // A portal scopes the routing choices: its served workspaces are the only
+  // valid workspace targets, which keeps intake and portal visibility
+  // consistent by construction.
+  function portalServedWorkspaceIds(portalId) {
+    const portal = portals.find((p) => p.id === portalId);
+    if (!portal?.config) return [];
+    try {
+      const config = typeof portal.config === 'string' ? JSON.parse(portal.config) : portal.config;
+      return Array.isArray(config.portal_workspace_ids) ? config.portal_workspace_ids : [];
+    } catch {
+      return [];
+    }
+  }
+
   function blankIntake() {
     return {
       id: 0,
       folder: 'INBOX',
-      target_type: 'workspace',
-      target_id: null,
+      portal_channel_id: null,
+      workspace_id: null,
       item_type_id: null,
       rate_limit_per_hour: '',
       processing_disposition: '',
+      send_confirmation: false,
       status: 'enabled'
     };
   }
@@ -57,7 +74,7 @@
     if (!channelId) return;
     loading = true;
     try {
-      intakes = (await api.channelIntakes.list(channelId)) ?? [];
+      intakes = (await channelIntakes.list(channelId)) ?? [];
     } catch (err) {
       console.error('Failed to load intakes:', err);
       errorToast(t('channel.intakeLoadFailed'));
@@ -70,19 +87,37 @@
 
   function startCreate() {
     editing = blankIntake();
+    loadItemTypesForWorkspace(null);
   }
 
   function startEdit(intake) {
-    // The API omits empty optionals (rate_limit_per_hour, item_type_id,
-    // processing_disposition) via `omitempty`. Binding an absent key directly
-    // hands `undefined` to a component prop that has a fallback value, which
-    // Svelte 5 rejects with props_invalid_value. Start from the blank defaults
-    // so every bound field is defined.
+    // The API omits empty optionals via `omitempty`; start from the blank
+    // defaults so every bound field is defined (Svelte 5 rejects binding
+    // undefined into a prop with a fallback value). needs_attention is
+    // system-set, so the form maps it to disabled until the admin re-enables.
     editing = { ...blankIntake(), ...intake };
-    // Refresh the item-type list for the workspace being edited.
-    if (editing.target_type === 'workspace' && editing.target_id) {
-      loadItemTypesForWorkspace(editing.target_id);
+    if (editing.status === 'needs_attention') {
+      editing.status = 'disabled';
     }
+    loadItemTypesForWorkspace(editing.workspace_id);
+  }
+
+  function onPortalChange() {
+    if (!editing) return;
+    if (editing.portal_channel_id) {
+      const served = portalServedWorkspaceIds(editing.portal_channel_id);
+      if (!served.includes(editing.workspace_id)) {
+        editing.workspace_id = null;
+        editing.item_type_id = null;
+        loadItemTypesForWorkspace(null);
+      }
+    }
+  }
+
+  function onWorkspaceChange() {
+    if (!editing) return;
+    editing.item_type_id = null;
+    loadItemTypesForWorkspace(editing.workspace_id);
   }
 
   async function save() {
@@ -90,31 +125,32 @@
       errorToast(t('channel.intakeFolderRequired'));
       return;
     }
-    if (!editing.target_id) {
-      errorToast(t('channel.intakeTargetRequired'));
+    if (!editing.workspace_id) {
+      errorToast(t('channel.intakeWorkspaceRequired'));
       return;
     }
-    if (editing.target_type === 'workspace' && !editing.item_type_id) {
+    if (!editing.item_type_id) {
       errorToast(t('channel.itemTypeRequired'));
       return;
     }
     const payload = {
       folder: editing.folder.trim(),
-      target_type: editing.target_type,
-      target_id: Number(editing.target_id),
-      item_type_id: editing.target_type === 'workspace' ? editing.item_type_id : null,
+      portal_channel_id: editing.portal_channel_id || null,
+      workspace_id: Number(editing.workspace_id),
+      item_type_id: editing.item_type_id,
       rate_limit_per_hour:
         editing.rate_limit_per_hour === '' || editing.rate_limit_per_hour === null
           ? null
           : Number(editing.rate_limit_per_hour),
       processing_disposition: editing.processing_disposition || '',
+      send_confirmation: !!editing.send_confirmation,
       status: editing.status || 'enabled'
     };
     try {
       if (editing.id) {
-        await api.channelIntakes.update(channelId, editing.id, payload);
+        await channelIntakes.update(channelId, editing.id, payload);
       } else {
-        await api.channelIntakes.create(channelId, payload);
+        await channelIntakes.create(channelId, payload);
       }
       editing = null;
       await load();
@@ -126,7 +162,7 @@
 
   async function remove(intake) {
     try {
-      await api.channelIntakes.delete(channelId, intake.id);
+      await channelIntakes.delete(channelId, intake.id);
       await load();
       successToast(t('channel.intakeDeleted'));
     } catch (err) {
@@ -134,19 +170,30 @@
     }
   }
 
-  function targetLabel(intake) {
-    if (intake.target_type === 'portal') {
-      const portal = portals.find((p) => p.id === intake.target_id);
-      return portal ? portal.name : `Portal #${intake.target_id}`;
-    }
-    const workspace = workspaces.find((w) => w.id === intake.target_id);
-    return workspace ? workspace.name : `Workspace #${intake.target_id}`;
+  function portalLabel(portalId) {
+    const portal = portals.find((p) => p.id === portalId);
+    return portal ? portal.name : `Portal #${portalId}`;
   }
 
-  const targetOptions = [
-    { value: 'workspace', label: t('channel.intakeTargetWorkspace') },
-    { value: 'portal', label: t('channel.intakeTargetPortal') }
-  ];
+  function workspaceLabel(workspaceId) {
+    const workspace = workspaces.find((w) => w.id === workspaceId);
+    return workspace ? workspace.name : `Workspace #${workspaceId}`;
+  }
+
+  const portalOptions = $derived([
+    { value: null, label: t('channel.intakeNoPortal') },
+    ...portals.map((portal) => ({ value: portal.id, label: portal.name }))
+  ]);
+
+  const workspaceOptions = $derived.by(() => {
+    if (!editing) return [];
+    let list = workspaces;
+    if (editing.portal_channel_id) {
+      const served = portalServedWorkspaceIds(editing.portal_channel_id);
+      list = workspaces.filter((workspace) => served.includes(workspace.id));
+    }
+    return list.map((workspace) => ({ value: workspace.id, label: workspace.name }));
+  });
 
   const dispositionOptions = [
     { value: '', label: t('channel.dispositionInherit') },
@@ -190,17 +237,34 @@
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <span class="font-medium text-sm" style="color: var(--ds-text);">{intake.folder}</span>
-              <Lozenge color={intake.status === 'enabled' ? 'green' : 'gray'}>
+              <Lozenge
+                color={intake.status === 'enabled'
+                  ? 'green'
+                  : intake.status === 'needs_attention'
+                    ? 'orange'
+                    : 'gray'}
+              >
                 {intake.status === 'enabled'
                   ? t('channel.intakeStatusEnabled')
-                  : t('channel.intakeStatusDisabled')}
+                  : intake.status === 'needs_attention'
+                    ? t('channel.intakeStatusNeedsAttention')
+                    : t('channel.intakeStatusDisabled')}
               </Lozenge>
             </div>
             <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
-              {intake.target_type === 'portal'
-                ? t('channel.intakeFeedsPortal')
-                : t('channel.intakeFeedsWorkspace')}: {targetLabel(intake)}
+              {intake.portal_channel_id
+                ? `${t('channel.intakeFeedsPortal')}: ${portalLabel(intake.portal_channel_id)}`
+                : `${t('channel.intakeFeedsWorkspace')}: ${workspaceLabel(intake.workspace_id)}`}
             </div>
+            {#if intake.status === 'needs_attention' && intake.status_reason}
+              <div
+                class="text-xs mt-1"
+                style="color: var(--ds-text-warning);"
+                data-testid="channel-intake-attention-{intake.id}"
+              >
+                {intake.status_reason}
+              </div>
+            {/if}
             <div class="text-xs mt-1 flex items-center gap-2" style="color: var(--ds-text-subtle);">
               <span data-testid="channel-intake-watermark-{intake.id}">
                 {t('channel.intakeLastUID', { uid: intake.last_uid ?? 0 })}
@@ -208,6 +272,11 @@
               {#if intake.rate_limited_count > 0}
                 <Lozenge color="orange" dataTestid="channel-intake-rate-limited-{intake.id}">
                   {t('channel.intakeRateLimited', { count: intake.rate_limited_count })}
+                </Lozenge>
+              {/if}
+              {#if intake.send_confirmation}
+                <Lozenge color="blue" dataTestid="channel-intake-confirmation-{intake.id}">
+                  {t('channel.intakeConfirmationOn')}
                 </Lozenge>
               {/if}
             </div>
@@ -250,54 +319,36 @@
             bind:value={editing.folder}
           />
           <SelectField
-            label={t('channel.intakeTargetType')}
+            label={t('channel.intakeTargetPortal')}
             labelColor="default"
-            id="intake-target-type"
-            options={targetOptions}
-            bind:value={editing.target_type}
+            id="intake-portal"
+            options={portalOptions}
+            bind:value={editing.portal_channel_id}
+            onchange={onPortalChange}
           />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          {#if editing.target_type === 'workspace'}
-            <div>
-              <Label color="default" class="mb-2">{t('channel.intakeTargetWorkspace')}</Label>
-              <WorkspaceSelector
-                bind:value={editing.target_id}
-                {workspaces}
-                placeholder={t('channel.selectWorkspace')}
-                onSelect={() => {
-                  editing.item_type_id = null;
-                  loadItemTypesForWorkspace(editing.target_id);
-                }}
-              />
-            </div>
-            <SelectField
-              label={t('channel.itemType')}
-              labelColor="default"
-              id="intake-item-type"
-              disabled={!editing.target_id}
-              options={[
-                { value: null, label: t('channel.selectItemType') },
-                ...itemTypes.map((type) => ({ value: type.id, label: type.name }))
-              ]}
-              bind:value={editing.item_type_id}
-            />
-          {:else}
-            <SelectField
-              label={t('channel.intakeTargetPortal')}
-              labelColor="default"
-              id="intake-target-portal"
-              options={[
-                { value: null, label: t('channel.selectPortal') },
-                ...portals.map((portal) => ({ value: portal.id, label: portal.name }))
-              ]}
-              bind:value={editing.target_id}
-            />
-            <div>
-              <DescriptionText>{t('channel.intakePortalRequestTypeHelp')}</DescriptionText>
-            </div>
-          {/if}
+          <SelectField
+            label={t('channel.intakeTargetWorkspace')}
+            labelColor="default"
+            id="intake-workspace"
+            options={workspaceOptions}
+            placeholder={t('channel.selectWorkspace')}
+            bind:value={editing.workspace_id}
+            onchange={onWorkspaceChange}
+          />
+          <SelectField
+            label={t('channel.itemType')}
+            labelColor="default"
+            id="intake-item-type"
+            disabled={!editing.workspace_id}
+            options={[
+              { value: null, label: t('channel.selectItemType') },
+              ...itemTypes.map((type) => ({ value: type.id, label: type.name }))
+            ]}
+            bind:value={editing.item_type_id}
+          />
         </div>
 
         <div class="grid grid-cols-3 gap-4">
@@ -325,6 +376,13 @@
             bind:value={editing.status}
           />
         </div>
+
+        <Checkbox
+          label={t('channel.intakeSendConfirmation')}
+          hint={t('channel.intakeSendConfirmationHint')}
+          dataTestid="channel-intake-send-confirmation"
+          bind:checked={editing.send_confirmation}
+        />
 
         <div class="flex justify-end gap-2">
           <Button variant="ghost" onclick={() => (editing = null)}>{t('common.cancel')}</Button>

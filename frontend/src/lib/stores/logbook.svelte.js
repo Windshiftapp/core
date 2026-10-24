@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { logbook } from '../api/logbook.js';
 
 function parseDocumentResult(result) {
   if (Array.isArray(result)) {
@@ -32,7 +32,7 @@ async function checkAvailability() {
   if (loaded || loading) return;
   loading = true;
   try {
-    await api.logbook.health();
+    await logbook.health();
     available = true;
     loaded = true;
   } catch {
@@ -53,7 +53,7 @@ async function loadBuckets() {
   if (bucketsLoading) return;
   bucketsLoading = true;
   try {
-    const result = await api.logbook.getBuckets();
+    const result = await logbook.getBuckets();
     buckets = result || [];
     bucketsLoaded = true;
   } catch (error) {
@@ -69,7 +69,7 @@ async function loadDocuments(bucketId, params = {}, { silent = false } = {}) {
   activeBucketId = bucketId;
   if (!silent) documentsLoading = true;
   try {
-    const result = await api.logbook.listDocuments(bucketId, params);
+    const result = await logbook.listDocuments(bucketId, params);
     if (loadId !== documentsLoadId) return;
     const parsed = parseDocumentResult(result);
     documents = parsed.docs;
@@ -89,7 +89,7 @@ async function loadAllDocuments(params = {}, { silent = false } = {}) {
   activeBucketId = null;
   if (!silent) documentsLoading = true;
   try {
-    const result = await api.logbook.listAllDocuments(params);
+    const result = await logbook.listAllDocuments(params);
     if (loadId !== documentsLoadId) return;
     const parsed = parseDocumentResult(result);
     documents = parsed.docs;
@@ -116,7 +116,7 @@ function resetDocuments() {
 async function loadDocument(documentId, { silent = false } = {}) {
   if (!silent) activeDocumentLoading = true;
   try {
-    activeDocument = await api.logbook.getDocument(documentId);
+    activeDocument = await logbook.getDocument(documentId);
   } catch (error) {
     console.error('Failed to load document:', error);
     activeDocument = null;

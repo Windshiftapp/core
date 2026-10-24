@@ -129,6 +129,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// bcrypt truncates input at 72 bytes, so an over-long password would match a
+	// stored 72-byte password on its first 72 bytes. Reject it as invalid
+	// credentials, with the same rate-limit and audit accounting as a mismatch,
+	// instead of comparing against the stored hash.
+	if err := auth.ValidatePasswordLength(req.Password); err != nil {
+		h.rejectPasswordLogin(w, r, req.EmailOrUsername, req.Password, "")
+		return
+	}
+
 	user, err := h.findUserByEmailOrUsername(req.EmailOrUsername)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -489,9 +498,21 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := auth.ValidatePasswordLength(req.NewPassword); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
 	user, err := h.findUserByEmailOrUsername(session.User.Email)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// The current-password comparison truncates at 72 bytes too; treat over-long
+	// input as an incorrect password rather than matching a truncated prefix.
+	if err := auth.ValidatePasswordLength(req.CurrentPassword); err != nil {
+		respondUnauthorized(w, r)
 		return
 	}
 

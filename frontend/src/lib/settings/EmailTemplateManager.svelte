@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
-  import { api } from '../api.js';
+  import { emailTemplates } from '../api/email-templates.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import Button from '../components/Button.svelte';
@@ -14,7 +14,9 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import { Mail, Edit, Eye } from '@lucide/svelte';
+  import Mail from '@lucide/svelte/icons/mail';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Eye from '@lucide/svelte/icons/eye';
 	import TextField from '../components/TextField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
 
@@ -50,6 +52,13 @@
       { name: '{{.ItemTitle}}', description: 'Item title.' },
       { name: '{{.Content}}', description: 'The reply text. Auto-escaped for HTML safety.' },
       { name: '{{.OriginalSubject}}', description: 'Used as the email subject (with "Re:" prefix added by the threading flow).' },
+      { name: '{{.PortalURL}}', description: 'Link to the request in the portal. Empty when the request is not exposed to a portal.' },
+    ],
+    intake_confirmation: [
+      { name: '{{.FirstName}}', description: 'Name of the person who emailed the intake.' },
+      { name: '{{.ItemKey}}', description: 'Item key of the created request (e.g. ACME-42).' },
+      { name: '{{.ItemTitle}}', description: 'Title of the created request.' },
+      { name: '{{.PortalURL}}', description: 'Link to the request in the portal. Empty when the intake is not linked to a portal.' },
     ],
   };
 
@@ -71,7 +80,7 @@
   async function loadTemplates() {
     loading = true;
     try {
-      const list = await api.emailTemplates.getAll();
+      const list = await emailTemplates.getAll();
       templates.set(list || []);
     } catch (err) {
       errorToast(t('settings.emailTemplates.loadFailed', { error: err.message }));
@@ -95,7 +104,7 @@
   async function save() {
     if (!editing) return;
     try {
-      await api.emailTemplates.update(editing.id, formData);
+      await emailTemplates.update(editing.id, formData);
       successToast(t('settings.emailTemplates.saved'));
       showEditor = false;
       editing = null;
@@ -109,7 +118,7 @@
     if (!editing) return;
     previewLoading = true;
     try {
-      const result = await api.emailTemplates.preview({
+      const result = await emailTemplates.preview({
         name: editing.name,
         subject: formData.subject,
         html_body: formData.html_body,

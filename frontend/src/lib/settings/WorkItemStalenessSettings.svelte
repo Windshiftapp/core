@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { IconClockPause } from '@tabler/icons-svelte-runes';
-  import { api } from '../api.js';
+  import IconClockPause from '@tabler/icons-svelte-runes/icons/clock-pause';
+  import { workItemStaleness } from '../api/ai.js';
   import Button from '../components/Button.svelte';
   import FormField from '../components/FormField.svelte';
   import Input from '../components/Input.svelte';
@@ -22,7 +22,7 @@
   async function load() {
     loading = true;
     try {
-      const settings = await api.workItemStaleness.get();
+      const settings = await workItemStaleness.get();
       staleAfterDays = settings.stale_after_days;
       savedStaleAfterDays = settings.stale_after_days;
       workItemStalenessSettings.hydrate(settings);
@@ -44,7 +44,7 @@
     validationError = '';
     saving = true;
     try {
-      const settings = await api.workItemStaleness.update({ stale_after_days: days });
+      const settings = await workItemStaleness.update({ stale_after_days: days });
       staleAfterDays = settings.stale_after_days;
       savedStaleAfterDays = settings.stale_after_days;
       workItemStalenessSettings.hydrate(settings);

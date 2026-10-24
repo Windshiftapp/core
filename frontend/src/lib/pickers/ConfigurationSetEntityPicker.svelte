@@ -1,5 +1,8 @@
 <script>
-  import { Search, Plus, X, AlertCircle } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { priorityIconMap } from '../utils/icons.js';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
   import { t } from '../stores/i18n.svelte.js';

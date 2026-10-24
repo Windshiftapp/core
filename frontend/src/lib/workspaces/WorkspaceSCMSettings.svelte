@@ -3,9 +3,21 @@
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { SvelteSet } from 'svelte/reactivity';
-  import { api } from '../api.js';
+  import { workspaceSCM } from '../api/scm.js';
   import Button from '../components/Button.svelte';
-  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Check, X, KeyRound, AlertTriangle, Settings, Webhook, RotateCw } from '@lucide/svelte';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
+  import KeyRound from '@lucide/svelte/icons/key-round';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Webhook from '@lucide/svelte/icons/webhook';
+  import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { setOAuthReturnURL } from '../utils/oauthReturn.js';
@@ -52,7 +64,7 @@
   async function saveRepoSettings(connId) {
     if (!editingRepoSettings) return;
     try {
-      const updated = await api.workspaceSCM.updateRepo(editingRepoSettings.id, {
+      const updated = await workspaceSCM.updateRepo(editingRepoSettings.id, {
         milestone_tag_pattern: editingRepoSettings.milestone_tag_pattern,
         milestone_branch_pattern: editingRepoSettings.milestone_branch_pattern
       });
@@ -91,7 +103,7 @@
   async function loadData() {
     loading = true;
     try {
-      const overview = await loadWorkspaceSCMOverview(api, workspaceId);
+      const overview = await loadWorkspaceSCMOverview(workspaceId);
       availableProviders = overview.availableProviders;
       connections = overview.connections;
       authStatuses = overview.authStatuses;
@@ -106,7 +118,7 @@
   async function reconnectOAuth(conn) {
     try {
       setOAuthReturnURL();
-      const result = await api.workspaceSCM.startOAuth(workspaceId, conn.id);
+      const result = await workspaceSCM.startOAuth(workspaceId, conn.id);
       if (result?.auth_url) {
         window.location.href = result.auth_url;
       }
@@ -118,7 +130,7 @@
 
   async function connectProvider(provider) {
     try {
-      const newConn = await api.workspaceSCM.createConnection(workspaceId, {
+      const newConn = await workspaceSCM.createConnection(workspaceId, {
         scm_provider_id: provider.id
       });
       connections = [...connections, newConn];
@@ -143,7 +155,7 @@
     });
     if (!confirmed) return;
     try {
-      await api.workspaceSCM.deleteConnection(workspaceId, conn.id);
+      await workspaceSCM.deleteConnection(workspaceId, conn.id);
       connections = connections.filter(c => c.id !== conn.id);
       // Update provider status
       availableProviders = availableProviders.map(p =>
@@ -176,7 +188,7 @@
   async function loadLinkedRepos(connId) {
     loadingRepos.add(connId);
     try {
-      const repos = await api.workspaceSCM.getLinkedRepos(workspaceId, connId);
+      const repos = await workspaceSCM.getLinkedRepos(workspaceId, connId);
       linkedRepos = { ...linkedRepos, [connId]: repos || [] };
     } catch (error) {
       if (error?.name === 'AbortError') return;
@@ -215,7 +227,7 @@
       c.id === conn.id ? { ...c, smart_commits_enabled: next } : c
     );
     try {
-      const updated = await api.workspaceSCM.updateConnection(workspaceId, conn.id, {
+      const updated = await workspaceSCM.updateConnection(workspaceId, conn.id, {
         smart_commits_enabled: next,
       });
       connections = connections.map(c => (c.id === conn.id ? { ...c, ...updated } : c));
@@ -239,7 +251,7 @@
     });
     if (!confirmed) return;
     try {
-      await api.workspaceSCM.unlinkRepo(repo.id);
+      await workspaceSCM.unlinkRepo(repo.id);
       linkedRepos = {
         ...linkedRepos,
         [connId]: linkedRepos[connId].filter(r => r.id !== repo.id)
@@ -264,7 +276,7 @@
     }
     loadingWebhooks.add(repoId);
     try {
-      const config = await api.workspaceSCM.getWebhookConfig(repoId);
+      const config = await workspaceSCM.getWebhookConfig(repoId);
       webhookConfigs = { ...webhookConfigs, [repoId]: config };
     } catch (error) {
       console.error('Failed to load GitLab webhook config:', error);
@@ -277,7 +289,7 @@
   async function rotateWebhookSecret(repoId) {
     loadingWebhooks.add(repoId);
     try {
-      const config = await api.workspaceSCM.rotateWebhookSecret(repoId);
+      const config = await workspaceSCM.rotateWebhookSecret(repoId);
       webhookConfigs = { ...webhookConfigs, [repoId]: config };
       successToast(t('scmSettings.webhookSecretRotated'));
     } catch (error) {
@@ -308,17 +320,6 @@
 </script>
 
 <div class="space-y-6" data-testid="workspace-scm-settings">
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <GitMerge class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-      <div>
-        <h3 class="text-lg font-medium" style="color: var(--ds-text);">{t('scmSettings.title')}</h3>
-        <p class="text-sm" style="color: var(--ds-text-subtle);">{t('scmSettings.subtitle')}</p>
-      </div>
-    </div>
-  </div>
-
   {#if loading}
     <StateDisplay type="loading" />
   {:else}

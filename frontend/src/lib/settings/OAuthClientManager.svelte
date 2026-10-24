@@ -1,8 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-	import { api } from '../api.js';
- import { Plus, Edit2, Trash2, RefreshCw, X } from '@lucide/svelte';
+	import { oauthClients } from '../api/admin.js';
+ import Plus from '@lucide/svelte/icons/plus';
+ import Edit2 from '@lucide/svelte/icons/edit-2';
+ import Trash2 from '@lucide/svelte/icons/trash-2';
+ import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+ import X from '@lucide/svelte/icons/x';
 	import Button from '../components/Button.svelte';
 	import CopyButton from '../components/CopyButton.svelte';
 	import Modal from '../dialogs/Modal.svelte';
@@ -61,7 +65,7 @@
 		loading = true;
 		error = '';
 		try {
-			clients = (await api.oauthClients.getAll()) || [];
+			clients = (await oauthClients.getAll()) || [];
 		} catch (err) {
 			console.error('Failed to load OAuth clients:', err);
 			error = t('integrations.oauthClients.loadFailed');
@@ -144,7 +148,7 @@
 			if (editingClient) {
 				// Update — only mutable fields. slug, client_id, client_type
 				// are immutable post-creation.
-				await api.oauthClients.update(editingClient.id, {
+				await oauthClients.update(editingClient.id, {
 					display_name: formData.display_name,
 					redirect_uris,
 					allowed_scopes: formData.allowed_scopes,
@@ -156,7 +160,7 @@
 			} else {
 				// Create — server returns the plaintext client_secret exactly
 				// once. Stash it in secretModal so the admin can copy it.
-				const created = await api.oauthClients.create({
+				const created = await oauthClients.create({
 					slug: formData.slug,
 					display_name: formData.display_name,
 					client_type: formData.client_type,
@@ -189,7 +193,7 @@
 		if (!ok) return;
 
 		try {
-			const result = await api.oauthClients.rotateSecret(client.id);
+			const result = await oauthClients.rotateSecret(client.id);
 			if (result?.client_secret) {
 				secretModal = { client: result, secret: result.client_secret };
 			}
@@ -208,7 +212,7 @@
 		if (!ok) return;
 
 		try {
-			await api.oauthClients.delete(client.id);
+			await oauthClients.delete(client.id);
 			successToast(t('integrations.oauthClients.deleted'));
 			await loadClients();
 		} catch (err) {

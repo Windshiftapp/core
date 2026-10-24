@@ -144,6 +144,18 @@ export function getBriefingFailures(opts = {}) {
 }
 
 /**
+ * Daily-briefing generation state: feature resolution, the last scheduler tick,
+ * per-user coverage, and the latest briefing row per user. Complements
+ * getBriefingFailures, which only sees rows that recorded an error.
+ * @param {Object} opts
+ * @param {string} [opts.since='24h']
+ * @param {number} [opts.limit=100]
+ */
+export function getBriefingHealth(opts = {}) {
+  return fetchAPI(diagnosticsQuery('briefing-health', opts));
+}
+
+/**
  * Per-pool runner health: live/stale/revoked runners vs queued/running runs.
  * healthy=false means queued work with no live runner to claim it.
  *
@@ -175,6 +187,20 @@ export function getCacheMemory() {
 /** Durable health for scheduled repository sync and pull-request refresh operations. */
 export function getSCMConnectionHealth() {
   return fetchAPI('/admin/diagnostics/scm-connections');
+}
+
+/**
+ * Machine-generated inbound mail (bounces and auto-replies) that intake
+ * deliberately did not turn into work items, plus per-category counts.
+ *
+ * @param {Object} opts
+ * @param {string} [opts.since='24h']
+ * @param {number} [opts.limit=25]
+ * @returns {Promise<{since: string, counts: Array<{category: string, count: number}>,
+ *   messages: Array<object>}>}
+ */
+export function getEmailIntakeDiagnostics(opts = {}) {
+  return fetchAPI(diagnosticsQuery('email-intake', opts));
 }
 
 /**

@@ -85,6 +85,42 @@ func relWithinRoot(root, storedPath string) (string, error) {
 	return "", ErrOutsideRoot
 }
 
+// inlineSafeMimeTypes is the allowlist of Content-Types a browser may render
+// inline. Every entry is a non-executable media type; HTML/XHTML/SVG/MathML and
+// any unknown type are absent and therefore forced to download.
+var inlineSafeMimeTypes = map[string]struct{}{
+	"image/png":                {},
+	"image/jpeg":               {},
+	"image/gif":                {},
+	"image/webp":               {},
+	"image/bmp":                {},
+	"image/x-icon":             {},
+	"image/vnd.microsoft.icon": {},
+	"application/pdf":          {},
+	"text/plain":               {},
+	"audio/mpeg":               {},
+	"audio/ogg":                {},
+	"audio/wav":                {},
+	"audio/x-wav":              {},
+	"audio/webm":               {},
+	"video/mp4":                {},
+	"video/webm":               {},
+	"video/ogg":                {},
+}
+
+// IsInlineSafeMimeType reports whether a stored Content-Type may be served with
+// an inline Content-Disposition. The declared type (before any parameters such
+// as "; charset=") is matched case-insensitively; SVG is deliberately absent
+// because it can carry script.
+func IsInlineSafeMimeType(mimeType string) bool {
+	base := strings.ToLower(strings.TrimSpace(mimeType))
+	if i := strings.IndexByte(base, ';'); i >= 0 {
+		base = strings.TrimSpace(base[:i])
+	}
+	_, ok := inlineSafeMimeTypes[base]
+	return ok
+}
+
 // ContentDisposition builds a safe Content-Disposition header value for the
 // given disposition ("inline" or "attachment") and filename.
 //

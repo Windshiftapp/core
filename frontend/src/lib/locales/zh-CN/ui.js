@@ -172,6 +172,7 @@ export default {
     numberedList: '有序列表',
     insertImage: '插入图片',
     userNotFound: '未找到用户',
+    multipleUsersMatch: '多个用户匹配',
   },
 
   dialogs: {

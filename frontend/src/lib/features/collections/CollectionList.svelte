@@ -3,22 +3,30 @@
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { api } from '../../api.js';
-  import { navigate } from '../../router.js';
-  import { applyCollectionItem, collectionStore, reloadCollection } from '../../stores/collectionContext.js';
+  import {
+    applyCollectionItem,
+    collectionStore,
+    reloadCollection,
+    scheduleCollectionReconciliation,
+  } from '../../stores/collectionContext.js';
+  import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
+  import { useCollectionSearch } from '../../composables/useCollectionSearch.svelte.js';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
   import {
-    buildListColumnConfiguration,
-    DEFAULT_LIST_COLUMNS,
     getListColumnLabel,
-    listColumnsFromConfig,
     listGridMinWidth,
     listGridTemplateColumns,
   } from '../../utils/workItemListColumns.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { collectionEditorOptions, collectionFieldLinks, workspaceDataStore, authStore } from '../../stores/index.js';
-  import { MoreHorizontal, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
+  import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
+  import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
+  import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -31,7 +39,7 @@
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
-  import { canConfigureListColumns, checkItemVisibility } from './collectionService.js';
+  import { useListColumnConfig } from './listColumnConfig.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -51,15 +59,14 @@
   let workItems = $derived(collectionStore.items);
   let itemsPagination = $derived(collectionStore.itemsPagination);
 
-  // Board configuration for list columns
-  let boardConfig = $state(null);
-  let listColumns = $state([]);
+  // List columns from the board configuration (shared with the tree view)
+  const columnConfig = useListColumnConfig(() => ({ workspaceId, collectionId }));
+  let listColumns = $derived(columnConfig.columns);
 
   let loading = $state(true);
   let loadingItems = $state(false);
   let currentCollectionName = $state('Default');
   let currentView = $state('list');
-  let searchQuery = $state('');
   let currentPage = $state(1);
   let itemsPerPage = $state(50);
   let sortKey = $state(null);
@@ -81,17 +88,6 @@
   // Centralized gradient styling
   const styles = useGradientStyles();
 
-  // Collection columns follow collection ownership; workspace defaults follow
-  // workspace administration. Mirrors the backend board-write authorization.
-  let canConfigureColumns = $derived(
-    canConfigureListColumns({
-      collectionId,
-      collectionOwnerId: collectionStore.boardCollection?.created_by ?? null,
-      currentUserId: authStore.currentUser?.id ?? null,
-      canAdminWorkspace: workspacePermissions.canAdminWorkspace(workspaceId),
-    }),
-  );
-
   // A workspace-scoped list already has these option sets in the shared
   // workspace store. Prime the row-editor cache so opening a cell does not
   // repeat those requests. Global collections deliberately skip this: their
@@ -107,13 +103,19 @@
       return;
     }
 
-    collectionEditorOptions.prime(id, {
-      statuses,
-      users,
-      milestones,
-      iterations,
-      projects,
-    });
+    untrack(() =>
+      collectionEditorOptions.prime(
+        id,
+        {
+          statuses,
+          users,
+          milestones,
+          iterations,
+          projects,
+        },
+        workspaceDataStore.planningCompleteness
+      )
+    );
   });
 
   // Computed: Generate grid-template-columns CSS via the shared list grid
@@ -122,28 +124,24 @@
 
   let gridMinWidth = $derived(listGridMinWidth(listColumns));
 
-  useEventListener(() => window, 'refresh-work-items', async (/** @type {CustomEvent} */ event) => {
+  useEventListener(() => window, 'refresh-work-items', (/** @type {CustomEvent} */ event) => {
     const item = event.detail?.item;
-    if (!item) {
-      reloadCollection();
-      return;
+    // Workspace-scoped views can apply the item immediately as a display
+    // optimization. Collection membership is verified by the store's
+    // coalesced reconciliation instead of one query per event.
+    if (item && !collectionId && Number(item.workspace_id) === Number(workspaceId)) {
+      applyCollectionItem(item);
     }
-    const belongsToView = collectionId
-      ? await checkItemVisibility(item.id, { collection_id: collectionId })
-      : Number(item.workspace_id) === Number(workspaceId);
-    if (belongsToView) applyCollectionItem(item);
+    scheduleCollectionReconciliation();
   });
 
-  // Board config depends only on the viewed collection/workspace, not on the
-  // item set or load state — fetch it when the view changes, not every time
-  // the collection reloads (which toggles collectionStore.loading).
-  let viewSignature = $derived(`${collectionId ?? ''}|${workspaceId ?? ''}`);
-  $effect(() => {
-    viewSignature;
-    if (collectionId || workspaceId) {
-      untrack(() => loadBoardConfiguration());
-    }
-  });
+  // Scoped SSE invalidations (WI-1624): any frame runs the existing delta fetch,
+  // and a reconnect reconciles. Without this the list kept showing items that
+  // were deleted from the item detail modal, unlike the board views.
+  useCollectionEventStream(
+    () => (collectionId ? { kind: 'collection', id: collectionId } : { kind: 'workspace', id: workspaceId }),
+    { onInvalidate: () => scheduleCollectionReconciliation() }
+  );
 
   // Sync collection name + clear local loading from the central store.
   $effect(() => {
@@ -152,52 +150,6 @@
       loading = false;
     }
   });
-
-  async function loadBoardConfiguration() {
-    try {
-      const config = await collectionStore.getBoardConfiguration(workspaceId, collectionId);
-      boardConfig = config;
-      listColumns = listColumnsFromConfig(config);
-    } catch (error) {
-      boardConfig = null;
-      listColumns = [...DEFAULT_LIST_COLUMNS];
-    }
-  }
-
-  async function saveBoardConfiguration(newColumns) {
-    try {
-      const configData = buildListColumnConfiguration(boardConfig, newColumns);
-
-      if (boardConfig?.id) {
-        // Update existing config
-        const updated = await api.collections.updateBoardConfiguration(
-          collectionId,
-          boardConfig.id,
-          configData,
-          workspaceId
-        );
-        boardConfig = updated;
-        listColumns = listColumnsFromConfig(updated);
-      } else {
-        // Create new config - pass raw collectionId so API can detect workspace-level config
-        const created = await api.collections.createBoardConfiguration(
-          collectionId,
-          workspaceId,
-          configData
-        );
-        boardConfig = created;
-        listColumns = listColumnsFromConfig(created);
-      }
-    } catch (error) {
-      console.error('Failed to save board configuration:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
-    }
-  }
-
-  function handleColumnChange(data) {
-    const { columns: newColumns } = data;
-    saveBoardConfiguration(newColumns);
-  }
 
   async function loadWorkItems(page = 1, limit = itemsPerPage) {
     currentPage = page;
@@ -214,18 +166,12 @@
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
 
-  // Client-side search filtering on current page of items
-  let filteredItems = $derived.by(() => {
-    if (!searchQuery.trim()) return workItems;
-    const query = searchQuery.toLowerCase();
-    return workItems.filter(item => {
-      if (item.title.toLowerCase().includes(query)) return true;
-      if (item.description && item.description.toLowerCase().includes(query)) return true;
-      const itemKey = `${item.workspace_key || ''}-${item.workspace_item_number}`.toLowerCase();
-      if (itemKey.includes(query)) return true;
-      return false;
-    });
-  });
+  // Server-side search shared with the board: a query spans every page of the
+  // collection instead of filtering the loaded page (GH #328).
+  const search = useCollectionSearch(
+    () => `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`
+  );
+  let filteredItems = $derived(search.items);
   let filteredItemsById = $derived(new Map(filteredItems.map((item) => [item.id, item])));
 
   // Resolve only the assignees the visible rows reference instead of waiting
@@ -276,11 +222,7 @@
   });
 
   function viewItem(item) {
-    const wsId = workspaceId || item.workspace_id;
-    const url = collectionId && workspaceId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${wsId}/items/${item.id}`;
-    navigate(url);
+    itemModalStore.open(item.id, item.workspace_id ?? workspaceId);
   }
 
   const deleteItem = createDeleteItemHandler({
@@ -329,8 +271,9 @@
         <div class="flex items-center gap-4">
           <!-- Search -->
           <SearchInput
-            bind:value={searchQuery}
+            bind:value={search.query}
             placeholder={t('common.search')}
+            dataTestid="list-search-input"
           />
           <SubFilterBar {workspaceId} />
         </div>
@@ -340,11 +283,21 @@
           <ColumnSelector
             columns={listColumns}
             {customFieldDefinitions}
-            canConfigure={canConfigureColumns}
-            onchange={handleColumnChange}
+            canConfigure={columnConfig.canConfigure}
+            onchange={({ columns }) => columnConfig.save(columns)}
           />
         </div>
       </div>
+
+      {#if search.active && (search.debouncing || collectionStore.searchLoading)}
+        <p class="-mt-2 mb-4 text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));" data-testid="list-search-status">
+          {t('common.searching')}
+        </p>
+      {:else if search.active && collectionStore.searchError}
+        <p class="-mt-2 mb-4 text-sm" style="color: var(--ds-text-danger);" data-testid="list-search-error">
+          {t('common.error')}
+        </p>
+      {/if}
 
       <!-- Work Items Table -->
       {#if loadingItems}
@@ -384,7 +337,7 @@
                   {:else if sortKey === column.field_identifier && sortDirection === 'desc'}
                     <ArrowDown class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
                   {:else}
-                    <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--ds-text-subtlest);" />
+                    <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity" style="color: var(--ds-text-subtlest);" />
                   {/if}
                 </button>
               {:else}
@@ -410,7 +363,6 @@
                             {item}
                             {column}
                             {workspace}
-                            {collectionId}
                             canEdit={workspacePermissions.canEdit(item.workspace_id)}
                             {statuses}
                             {statusCategories}
@@ -444,8 +396,30 @@
           </div>
         </div>
 
-        <!-- Pagination -->
-        {#if itemsPagination && itemsPagination.total_items > 0 && workItems.length > 0}
+        <!-- Search results page on the server, so they use load-more instead of
+             the page control that drives the unfiltered list. -->
+        {#if search.active}
+          {#if search.hasMore}
+            <div class="mt-6 text-center">
+              <button
+                data-testid="list-search-load-more"
+                onclick={() => search.loadMore()}
+                disabled={search.loadingMore}
+                class="px-4 py-2 text-sm rounded-lg border transition-colors"
+                style="border-color: var(--ctx-border, var(--ds-border)); color: var(--ds-text);"
+              >
+                {search.loadingMore ? t('common.loading') : t('common.loadMore')}
+                {#if search.remainingCount > 0}
+                  ({search.remainingCount} {t('common.remaining')})
+                {/if}
+              </button>
+            </div>
+          {:else}
+            <div class="mt-4 text-sm text-center" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));" data-testid="list-search-summary">
+              {t('collections.showingWorkItems', { count: filteredItems.length })}
+            </div>
+          {/if}
+        {:else if itemsPagination && itemsPagination.total_items > 0 && workItems.length > 0}
           <div class="mt-6">
             <Pagination
               currentPage={itemsPagination.page}

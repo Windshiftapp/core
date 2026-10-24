@@ -4,13 +4,16 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
-  import Select from '../../components/Select.svelte';
+  import Label from '../../components/Label.svelte';
+  import Text from '../../components/Text.svelte';
+  import TextField from '../../components/TextField.svelte';
+  import TextareaField from '../../components/TextareaField.svelte';
   import Toggle from '../../components/Toggle.svelte';
-  import Textarea from '../../components/Textarea.svelte';
-  import { Plus, Trash2 } from '@lucide/svelte';
+  import TimezonePicker from '../../pickers/TimezonePicker.svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { t } from '../../stores/i18n.svelte.js';
-  import { listIanaTimezones } from '../../utils/timeUtils.js';
-  import { api } from '../../api.js';
+  import { sla } from '../../api/sla.js';
 
   let {
     isOpen = $bindable(false),
@@ -22,8 +25,6 @@
 
   const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-  const baseTimezoneIds = listIanaTimezones();
-
   function blankIntervals() {
     return Object.fromEntries(weekdays.map((day) => [day, []]));
   }
@@ -34,7 +35,6 @@
       description: '',
       timezone: 'UTC',
       is_default: false,
-      apply_to_ongoing: false,
       weekly_intervals: blankIntervals(),
       holidays: [],
     };
@@ -45,13 +45,7 @@
   let error = $state(null);
   let coverage = $state(null);
   let coverageLoading = $state(false);
-
-  const timezoneOptions = $derived.by(() => {
-    const zones = formData.timezone && !baseTimezoneIds.includes(formData.timezone)
-      ? [formData.timezone, ...baseTimezoneIds]
-      : baseTimezoneIds;
-    return zones;
-  });
+  let ongoingImpact = $state(null);
 
   $effect(() => {
     if (!isOpen) return;
@@ -64,13 +58,13 @@
   $effect(() => {
     const id = calendar?.id;
     const ownedByWorkspace = !!calendar?.workspace_id;
-    if (!isOpen || !id || !workspaceId || !ownedByWorkspace || !api.sla?.getCoveragePreview) {
+    if (!isOpen || !id || !workspaceId || !ownedByWorkspace || !sla?.getCoveragePreview) {
       coverage = null;
       return;
     }
     let active = true;
     coverageLoading = true;
-    api.sla
+    sla
       .getCoveragePreview(workspaceId, id)
       .then((value) => {
         if (active) coverage = value;
@@ -85,6 +79,44 @@
       active = false;
     };
   });
+
+  // Show the recalculation scope before the admin applies an edit to ongoing
+  // cycles: a workspace calendar is scoped to this workspace, a team calendar
+  // to every workspace bound to the team.
+  $effect(() => {
+    const id = calendar?.id;
+    if (!isOpen || !id) {
+      ongoingImpact = null;
+      return;
+    }
+    const teamId = calendar?.team_id;
+    let request;
+    if (teamId) {
+      request = sla?.getTeamCalendarImpact?.(teamId, id);
+    } else if (workspaceId) {
+      request = sla?.getCalendarImpact?.(workspaceId, id);
+    }
+    if (!request) {
+      ongoingImpact = null;
+      return;
+    }
+    let active = true;
+    request
+      .then((value) => {
+        if (active) ongoingImpact = value;
+      })
+      .catch(() => {
+        if (active) ongoingImpact = null;
+      });
+    return () => {
+      active = false;
+    };
+  });
+
+  const impactWorkspaces = $derived(ongoingImpact?.workspaces?.length ?? 0);
+  const impactCycles = $derived(
+    (ongoingImpact?.workspaces ?? []).reduce((sum, workspace) => sum + (workspace.ongoing_cycles ?? 0), 0)
+  );
 
   function formatWeekly(ms) {
     if (ms == null || ms === 0) return '0m';
@@ -110,7 +142,6 @@
       description: source.description || '',
       timezone: source.timezone || 'UTC',
       is_default: !!source.is_default,
-      apply_to_ongoing: false,
       weekly_intervals: weekly,
       holidays: Array.isArray(source.holidays)
         ? source.holidays.map((holiday) => ({
@@ -144,7 +175,7 @@
     formData.holidays = formData.holidays.filter((_, i) => i !== index);
   }
 
-  function buildPayload() {
+  function buildPayload(applyToOngoing = false) {
     const weekly = {};
     for (const day of weekdays) {
       const intervals = formData.weekly_intervals[day].filter(
@@ -157,7 +188,7 @@
       description: formData.description,
       timezone: formData.timezone,
       is_default: formData.is_default,
-      apply_to_ongoing: formData.apply_to_ongoing,
+      apply_to_ongoing: applyToOngoing,
       weekly_intervals: weekly,
       holidays: formData.holidays
         .filter((holiday) => holiday.recurring ? holiday.month_day : holiday.date)
@@ -169,17 +200,25 @@
     };
   }
 
-  async function submit() {
+  async function persist(applyToOngoing) {
     saving = true;
     error = null;
     try {
-      await onSave(buildPayload());
+      await onSave(buildPayload(applyToOngoing));
       isOpen = false;
     } catch (err) {
       error = err?.message || t('workspaceSettings.serviceLevels.saveFailed');
     } finally {
       saving = false;
     }
+  }
+
+  function submit() {
+    return persist(false);
+  }
+
+  function submitAndRecalculate() {
+    return persist(true);
   }
 </script>
 
@@ -201,112 +240,143 @@
 
     <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
       {#if error}
-        <div class="mb-3 text-sm" style="color: var(--ds-text-danger)" data-testid="sla-calendar-error">
+        <div class="mb-4 text-sm" style="color: var(--ds-text-danger)" data-testid="sla-calendar-error">
           {error}
         </div>
       {/if}
 
-      <div class="form-group">
-        <label for="sla-calendar-name">{t('common.name')}</label>
-        <Input
-          id="sla-calendar-name"
-          type="text"
-          bind:value={formData.name}
-          placeholder={t('workspaceSettings.serviceLevels.namePlaceholder')}
-          dataTestid="sla-calendar-name"
+      <TextField
+        class="mb-4"
+        label={t('common.name')}
+        labelColor="default"
+        id="sla-calendar-name"
+        type="text"
+        bind:value={formData.name}
+        placeholder={t('workspaceSettings.serviceLevels.namePlaceholder')}
+        dataTestid="sla-calendar-name"
+      />
+
+      <TextareaField
+        class="mb-4"
+        label={t('common.description')}
+        labelColor="default"
+        id="sla-calendar-description"
+        bind:value={formData.description}
+        rows={2}
+        placeholder={t('placeholders.optionalDescription')}
+        dataTestid="sla-calendar-description"
+      />
+
+      <div class="mb-6">
+        <Label for="sla-calendar-timezone" color="default" class="mb-2">
+          {t('workspaceSettings.serviceLevels.timezone')}
+        </Label>
+        <TimezonePicker
+          id="sla-calendar-timezone"
+          bind:value={formData.timezone}
+          inputTestid="sla-calendar-timezone"
+          menuTestid="sla-calendar-timezone-listbox"
+          optionTestid={() => 'sla-calendar-timezone-option'}
         />
       </div>
 
-      <div class="form-group">
-        <label for="sla-calendar-description">{t('common.description')}</label>
-        <Textarea
-          id="sla-calendar-description"
-          bind:value={formData.description}
-          rows={2}
-          placeholder={t('placeholders.optionalDescription')}
-          dataTestid="sla-calendar-description"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="sla-calendar-timezone">{t('workspaceSettings.serviceLevels.timezone')}</label>
-        <Select id="sla-calendar-timezone" bind:value={formData.timezone} options={timezoneOptions} />
-      </div>
-
-      <fieldset class="form-group">
-        <legend>{t('workspaceSettings.serviceLevels.weeklyHours')}</legend>
-        {#each weekdays as day (day)}
-          <div class="flex items-start gap-2 py-1" data-testid="sla-calendar-day-{day}">
-            <span class="w-24 pt-2 text-sm" style="color: var(--ds-text-subtle)">
-              {t(`workspaceSettings.serviceLevels.days.${day}`)}
-            </span>
-            <div class="flex-1">
-              {#each formData.weekly_intervals[day] as interval, index}
-                <div class="flex items-center gap-2 py-0.5">
-                  <Input
-                    type="time"
-                    bind:value={interval.start}
-                    ariaLabel={t('workspaceSettings.serviceLevels.startTime')}
-                    dataTestid="sla-calendar-{day}-start-{index}"
-                  />
-                  <span>–</span>
-                  <Input
-                    type="time"
-                    bind:value={interval.end}
-                    ariaLabel={t('workspaceSettings.serviceLevels.endTime')}
-                    dataTestid="sla-calendar-{day}-end-{index}"
-                  />
-                  <Button
-                    variant="default"
-                    size="small"
-                    icon={Trash2}
-                    onclick={() => removeInterval(day, index)}
-                    title={t('common.remove')}
-                    dataTestid="sla-calendar-{day}-remove-{index}"
-                  />
-                </div>
-              {/each}
-              <Button
-                variant="default"
-                size="small"
-                icon={Plus}
-                onclick={() => addInterval(day)}
-                dataTestid="sla-calendar-{day}-add"
-              >
-                {t('workspaceSettings.serviceLevels.addInterval')}
-              </Button>
+      <fieldset class="mb-6" data-testid="sla-calendar-weekly">
+        <legend class="mb-3">
+          <Text as="span" weight="semibold">{t('workspaceSettings.serviceLevels.weeklyHours')}</Text>
+        </legend>
+        <div class="space-y-3">
+          {#each weekdays as day (day)}
+            <div class="flex items-start gap-3" data-testid="sla-calendar-day-{day}">
+              <div class="w-24 shrink-0 pt-2">
+                <Label
+                  color="subtle"
+                  for={formData.weekly_intervals[day].length ? `sla-calendar-${day}-start-0` : null}
+                >
+                  {t(`workspaceSettings.serviceLevels.days.${day}`)}
+                </Label>
+              </div>
+              <div class="flex-1 space-y-2">
+                {#each formData.weekly_intervals[day] as interval, index}
+                  <div class="flex items-center gap-2">
+                    <div class="w-32">
+                      <Input
+                        type="time"
+                        id="sla-calendar-{day}-start-{index}"
+                        bind:value={interval.start}
+                        ariaLabel={t('workspaceSettings.serviceLevels.startTime')}
+                        dataTestid="sla-calendar-{day}-start-{index}"
+                      />
+                    </div>
+                    <span style="color: var(--ds-text-subtle)">–</span>
+                    <div class="w-32">
+                      <Input
+                        type="time"
+                        id="sla-calendar-{day}-end-{index}"
+                        bind:value={interval.end}
+                        ariaLabel={t('workspaceSettings.serviceLevels.endTime')}
+                        dataTestid="sla-calendar-{day}-end-{index}"
+                      />
+                    </div>
+                    <Button
+                      variant="default"
+                      size="small"
+                      icon={Trash2}
+                      onclick={() => removeInterval(day, index)}
+                      title={t('common.remove')}
+                      dataTestid="sla-calendar-{day}-remove-{index}"
+                    />
+                  </div>
+                {/each}
+                <Button
+                  variant="default"
+                  size="small"
+                  icon={Plus}
+                  onclick={() => addInterval(day)}
+                  dataTestid="sla-calendar-{day}-add"
+                >
+                  {t('workspaceSettings.serviceLevels.addInterval')}
+                </Button>
+              </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        </div>
       </fieldset>
 
-      <fieldset class="form-group">
-        <legend>{t('workspaceSettings.serviceLevels.holidays')}</legend>
+      <fieldset class="mb-6" data-testid="sla-calendar-holidays">
+        <legend class="mb-3">
+          <Text as="span" weight="semibold">{t('workspaceSettings.serviceLevels.holidays')}</Text>
+        </legend>
         {#each formData.holidays as holiday, index}
-          <div class="flex items-center gap-2 py-1">
+          <div class="flex flex-wrap items-center gap-2 py-1">
             {#if holiday.recurring}
+              <div class="w-28">
+                <Input
+                  type="text"
+                  bind:value={holiday.month_day}
+                  placeholder="MM-DD"
+                  ariaLabel={t('workspaceSettings.serviceLevels.monthDay')}
+                  dataTestid="sla-calendar-holiday-monthday-{index}"
+                />
+              </div>
+            {:else}
+              <div class="w-44">
+                <Input
+                  type="date"
+                  bind:value={holiday.date}
+                  ariaLabel={t('workspaceSettings.serviceLevels.date')}
+                  dataTestid="sla-calendar-holiday-date-{index}"
+                />
+              </div>
+            {/if}
+            <div class="min-w-40 flex-1">
               <Input
                 type="text"
-                bind:value={holiday.month_day}
-                placeholder="MM-DD"
-                ariaLabel={t('workspaceSettings.serviceLevels.monthDay')}
-                dataTestid="sla-calendar-holiday-monthday-{index}"
+                bind:value={holiday.name}
+                placeholder={t('workspaceSettings.serviceLevels.holidayName')}
+                ariaLabel={t('workspaceSettings.serviceLevels.holidayName')}
+                dataTestid="sla-calendar-holiday-name-{index}"
               />
-            {:else}
-              <Input
-                type="date"
-                bind:value={holiday.date}
-                ariaLabel={t('workspaceSettings.serviceLevels.date')}
-                dataTestid="sla-calendar-holiday-date-{index}"
-              />
-            {/if}
-            <Input
-              type="text"
-              bind:value={holiday.name}
-              placeholder={t('workspaceSettings.serviceLevels.holidayName')}
-              ariaLabel={t('workspaceSettings.serviceLevels.holidayName')}
-              dataTestid="sla-calendar-holiday-name-{index}"
-            />
+            </div>
             <Toggle
               bind:checked={holiday.recurring}
               label={t('workspaceSettings.serviceLevels.recurring')}
@@ -322,41 +392,69 @@
             />
           </div>
         {/each}
-        <Button variant="default" size="small" icon={Plus} onclick={addHoliday} dataTestid="sla-calendar-holiday-add">
+        <Button
+          variant="default"
+          size="small"
+          icon={Plus}
+          onclick={addHoliday}
+          dataTestid="sla-calendar-holiday-add"
+        >
           {t('workspaceSettings.serviceLevels.addHoliday')}
         </Button>
       </fieldset>
 
-      <div class="form-group flex items-center gap-2">
-        <Toggle bind:checked={formData.is_default} dataTestid="sla-calendar-default" />
-        <span>{t('workspaceSettings.serviceLevels.setDefault')}</span>
-      </div>
+      <Toggle
+        bind:checked={formData.is_default}
+        label={t('workspaceSettings.serviceLevels.setDefault')}
+        dataTestid="sla-calendar-default"
+      />
 
       {#if calendar}
-        <div class="form-group flex items-center gap-2">
-          <Toggle bind:checked={formData.apply_to_ongoing} dataTestid="sla-calendar-apply-ongoing" />
-          <span>{t('workspaceSettings.serviceLevels.applyToOngoing')}</span>
+        <div
+          class="mt-4 rounded border p-3"
+          style="border-color: var(--ds-border)"
+          data-testid="sla-calendar-ongoing"
+        >
+          <Text as="p" variant="subtle" size="xs">
+            {calendar.team_id
+              ? t('workspaceSettings.serviceLevels.applyToOngoingTeamHint')
+              : t('workspaceSettings.serviceLevels.applyToOngoingHint')}
+          </Text>
+          {#if ongoingImpact}
+            <div class="mt-1" data-testid="sla-calendar-ongoing-impact">
+              <Text as="p" variant="subtle" size="xs">
+                {impactWorkspaces > 0
+                  ? t('workspaceSettings.serviceLevels.applyToOngoingImpact', {
+                      cycles: impactCycles,
+                      workspaces: impactWorkspaces,
+                    })
+                  : t('workspaceSettings.serviceLevels.applyToOngoingNoImpact')}
+              </Text>
+            </div>
+          {/if}
         </div>
       {/if}
 
       {#if coverage && coverage.reference === 'team_service_hours'}
         <div
-          class="mb-3 rounded border p-3 text-xs"
+          class="mt-4 rounded border p-3"
           style="border-color: var(--ds-border)"
           data-testid="sla-calendar-coverage"
         >
-          <div class="font-medium mb-1">{t('workspaceSettings.serviceLevels.coveragePreview')}</div>
-          <div style="color: var(--ds-text-subtle)">
+          <Text as="p" size="sm" weight="medium" class="mb-1">
+            {t('workspaceSettings.serviceLevels.coveragePreview')}
+          </Text>
+          <Text as="p" variant="subtle" size="xs">
             {t('workspaceSettings.serviceLevels.coverageWeekly', {
               sla: formatWeekly(coverage.sla_weekly_ms),
               team: formatWeekly(coverage.team_weekly_ms),
               overlap: formatWeekly(coverage.overlap_weekly_ms),
             })}
-          </div>
+          </Text>
           {#if coverage.discrepancy && coverage.discrepancy !== 'aligned'}
-            <div style="color: var(--ds-text-subtle)">
+            <Text as="p" variant="subtle" size="xs" class="mt-1">
               {t(`workspaceSettings.serviceLevels.coverageDiscrepancies.${coverage.discrepancy}`)}
-            </div>
+            </Text>
           {/if}
         </div>
       {/if}
@@ -369,6 +467,19 @@
       loading={saving}
       showKeyboardHint
       confirmTestid="sla-calendar-submit"
-    />
+    >
+      {#snippet secondaryAction()}
+        {#if calendar}
+          <Button
+            variant="default"
+            onclick={submitAndRecalculate}
+            disabled={saving}
+            dataTestid="sla-calendar-submit-recalculate"
+          >
+            {t('workspaceSettings.serviceLevels.saveAndRecalculate')}
+          </Button>
+        {/if}
+      {/snippet}
+    </DialogFooter>
   {/snippet}
 </Modal>

@@ -155,7 +155,11 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use service to update comment
-	updatedComment, err := h.commentService.Update(commentID, req.Content, user.ID)
+	updatedComment, err := h.commentService.UpdateWithEffects(services.UpdateCommentParams{
+		CommentID: commentID,
+		Content:   req.Content,
+		Actor:     h.AuditActor(r, user),
+	})
 	if err != nil {
 		var validationErr *validation.ValidationError
 		if errors.As(err, &validationErr) {
@@ -184,13 +188,16 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /comments/{id} [delete]
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	commentID, _, ok := h.requireEditableComment(w, r)
+	commentID, user, ok := h.requireEditableComment(w, r)
 	if !ok {
 		return
 	}
 
-	// Use service to delete comment
-	err := h.commentService.Delete(commentID)
+	// Use service to delete comment and emit its mention/notification/webhook effects
+	err := h.commentService.DeleteWithEffects(services.DeleteCommentParams{
+		CommentID: commentID,
+		Actor:     h.AuditActor(r, user),
+	})
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return

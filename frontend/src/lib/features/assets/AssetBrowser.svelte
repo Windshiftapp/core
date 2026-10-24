@@ -3,9 +3,10 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { api } from '../../api.js';
+  import { assetSets as assetSetsApi, assetTypes as assetTypesApi, assets as assetsApi } from '../../api/assets.js';
   import { navigate, currentRoute, updateQueryParams } from '../../router.js';
   import Button from '../../components/Button.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import Input from '../../components/Input.svelte';
   import Label from '../../components/Label.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -16,7 +17,20 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { IconPlus, IconPackage, IconEdit, IconTrash, IconBox, IconChevronRight, IconChevronDown, IconFolder, IconFolderOpen, IconSearch, IconCode, IconUpload, IconShare, IconArrowLeft, IconSettings } from '@tabler/icons-svelte-runes';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconPackage from '@tabler/icons-svelte-runes/icons/package';
+  import IconEdit from '@tabler/icons-svelte-runes/icons/edit';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconBox from '@tabler/icons-svelte-runes/icons/box';
+  import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
+  import IconChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
+  import IconFolder from '@tabler/icons-svelte-runes/icons/folder';
+  import IconFolderOpen from '@tabler/icons-svelte-runes/icons/folder-open';
+  import IconSearch from '@tabler/icons-svelte-runes/icons/search';
+  import IconCode from '@tabler/icons-svelte-runes/icons/code';
+  import IconUpload from '@tabler/icons-svelte-runes/icons/upload';
+  import IconShare from '@tabler/icons-svelte-runes/icons/share';
+  import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
   import { permissionStore } from '../../stores/permissions.svelte.js';
   import AssetRelationshipGraph from './AssetRelationshipGraph.svelte';
   import AssetImportWizard from './import/AssetImportWizard.svelte';
@@ -115,7 +129,7 @@
     if (assetId) {
       directAssetLoading = true;
       untrack(() => {
-        api.assets.get(Number(assetId)).then(async (asset) => {
+        assetsApi.get(Number(assetId)).then(async (asset) => {
           directAsset = asset;
           if (asset?.asset_set_id && !selectedSetId) {
             selectedSetId = asset.asset_set_id;
@@ -135,7 +149,7 @@
 
   async function loadAssetSets() {
     try {
-      const sets = await api.assetSets.getAll();
+      const sets = await assetSetsApi.getAll();
       assetSets = sets || [];
       if (assetSets.length > 0 && !selectedSetId) {
         const defaultSet = assetSets.find(s => s.is_default) || assetSets[0];
@@ -160,7 +174,7 @@
     const setId = selectedSetId;
     const requestSeq = ++assetTypesRequestSeq;
     try {
-      const types = await api.assetTypes.getAll(setId);
+      const types = await assetTypesApi.getAll(setId);
       if (requestSeq !== assetTypesRequestSeq || selectedSetId !== setId) return;
       assetTypes = (types || []).filter(t => t.is_active);
       void loadAllCustomFields(setId, assetTypes);
@@ -178,7 +192,7 @@
     }
     const isStale = () => requestSeq !== allCustomFieldsRequestSeq || selectedSetId !== setId;
     try {
-      const fields = await loadAssetTypeFields(types, (typeId) => api.assetTypes.getFields(typeId), {
+      const fields = await loadAssetTypeFields(types, (typeId) => assetTypesApi.getFields(typeId), {
         isStale,
       });
       if (isStale()) return;
@@ -235,7 +249,7 @@
       if (qlParts.length > 0) {
         filters.ql = qlParts.join(' AND ');
       }
-      const result = await api.assets.getAll(setId, filters);
+      const result = await assetsApi.getAll(setId, filters);
       if (requestSeq !== assetsRequestSeq || selectedSetId !== setId) return;
 		assets = result?.data || [];
 		totalAssets = result?.pagination?.total_items || 0;
@@ -320,7 +334,7 @@
   async function loadTypeFields(typeId) {
     const requestSeq = ++selectedTypeFieldsRequestSeq;
     try {
-      const fields = await api.assetTypes.getFields(typeId);
+      const fields = await assetTypesApi.getFields(typeId);
       if (
         requestSeq !== selectedTypeFieldsRequestSeq ||
         Number(assetFormData.asset_type_id) !== Number(typeId)
@@ -353,7 +367,7 @@
 
   async function loadTypeFieldsForDisplay(typeId) {
     try {
-      const fields = await api.assetTypes.getFields(typeId);
+      const fields = await assetTypesApi.getFields(typeId);
       displayTypeFields = fields || [];
     } catch (error) {
       console.error('Failed to load type fields for display:', error);
@@ -412,11 +426,11 @@
       }
 
       if (editingAsset) {
-        await api.assets.update(editingAsset.id, assetFormData);
+        await assetsApi.update(editingAsset.id, assetFormData);
         showAssetForm = false;
         if (assetId) {
           // Refresh direct asset view
-          const refreshed = await api.assets.get(Number(assetId));
+          const refreshed = await assetsApi.get(Number(assetId));
           directAsset = refreshed;
         } else {
           await loadAssets();
@@ -427,7 +441,7 @@
           }
         }
       } else {
-        const created = await api.assets.create(selectedSetId, assetFormData);
+        const created = await assetsApi.create(selectedSetId, assetFormData);
         showAssetForm = false;
         if (created?.id) {
           await loadAssets();
@@ -456,7 +470,7 @@
     });
     if (confirmed) {
       try {
-        await api.assets.delete(id);
+        await assetsApi.delete(id);
         if (assetId) {
           navigate('/assets');
           return;
@@ -557,14 +571,11 @@
         </div>
       {:else if directAsset}
         <!-- Back button -->
-        <button
-          class="hover-bg inline-flex items-center gap-1.5 mb-6 text-sm font-medium rounded-lg px-3 py-1.5 transition-colors"
-          style="color: var(--ds-text-subtle);"
+        <BackButton
           onclick={() => navigate('/assets')}
-        >
-          <IconArrowLeft class="w-4 h-4" />
-          {t('common.back')}
-        </button>
+          label={t('common.back')}
+          class="mb-6"
+        />
 
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
@@ -904,7 +915,7 @@
           </button>
         </div>
       </div>
-      <div class="flex-1 overflow-auto p-4">
+      <div class="flex-1 overflow-auto p-4" data-testid="asset-detail-scroll">
         <AssetDetailContent asset={selectedAsset} fieldDefinitions={displayTypeFields} />
       </div>
     </div>
@@ -915,6 +926,7 @@
 <!-- Asset Form Modal -->
 <Modal
   isOpen={showAssetForm}
+  dataTestid="asset-form-modal"
   preventClose={savingAsset}
   submitDisabled={savingAsset || (!editingAsset && !assetFormData.asset_type_id)}
   onclose={() => showAssetForm = false}

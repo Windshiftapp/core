@@ -1,10 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../api.js';
+  import { agentTemplates } from '../api/admin.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { Plus, Edit, Trash2 } from '@lucide/svelte';
-  import { IconUserStar as AgentIcon } from '@tabler/icons-svelte-runes';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import AgentIcon from '@tabler/icons-svelte-runes/icons/user-star';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -55,7 +57,7 @@
     try {
       isLoading = true;
       error = null;
-      entries = await api.agentTemplates.getAll();
+      entries = await agentTemplates.getAll();
     } catch (err) {
       error = t('settings.adminOperations.agentTemplates.loadFailed', { error: err.message });
     } finally {
@@ -65,7 +67,7 @@
 
   async function loadDefaults() {
     try {
-      defaults = await api.agentTemplates.defaults();
+      defaults = await agentTemplates.defaults();
     } catch {
       // Non-fatal: admins can still create overrides by typing a key.
     }
@@ -138,14 +140,14 @@
       }
 
       if (editingId) {
-        await api.agentTemplates.update(editingId, {
+        await agentTemplates.update(editingId, {
           name: formData.name,
           default_type: formData.default_type,
           instructions: formData.instructions,
           enabled: formData.enabled,
         });
       } else {
-        await api.agentTemplates.create({
+        await agentTemplates.create({
           template_key: formData.template_key,
           name: formData.name,
           default_type: formData.default_type,
@@ -173,7 +175,7 @@
     if (!confirmed) return;
 
     try {
-      await api.agentTemplates.delete(id);
+      await agentTemplates.delete(id);
       await loadEntries();
       error = null;
     } catch (err) {

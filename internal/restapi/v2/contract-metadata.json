@@ -2838,6 +2838,34 @@
         ]
       }
     },
+    "/attachments/{attachment_id}/download": {
+      "get": {
+        "description": "Download item attachment. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "attachment_id",
+            "In": "path",
+            "Description": "The attachment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Download item attachment",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/attachments/{attachment_id}/thumbnail": {
       "get": {
         "description": "Get item attachment thumbnail. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -3760,6 +3788,16 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "Name": "include_reactions",
+            "In": "query",
+            "Description": "Attach grouped emoji reactions to the returned comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -3786,6 +3824,16 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "Name": "include_reactions",
+            "In": "query",
+            "Description": "Attach grouped emoji reactions to the returned comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -3799,6 +3847,83 @@
           "500": {}
         },
         "summary": "Update comment",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/comments/{comment_id}/reactions": {
+      "post": {
+        "description": "Add comment reaction. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "comment_id",
+            "In": "path",
+            "Description": "The comment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Add comment reaction",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/comments/{comment_id}/reactions/{reaction}": {
+      "delete": {
+        "description": "Remove comment reaction. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "comment_id",
+            "In": "path",
+            "Description": "The comment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "reaction",
+            "In": "path",
+            "Description": "The reaction key: thumbs_up, check, eyes, heart, laugh, or hooray.",
+            "Required": true,
+            "Schema": {
+              "enum": [
+                "thumbs_up",
+                "check",
+                "eyes",
+                "heart",
+                "laugh",
+                "hooray"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Remove comment reaction",
         "tags": [
           "Work items"
         ]
@@ -5096,6 +5221,25 @@
         ]
       }
     },
+    "/items/bulk-delete": {
+      "post": {
+        "description": "Bulk delete items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Bulk delete items",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/items/bulk-patch": {
       "post": {
         "description": "Bulk patch items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -5110,6 +5254,25 @@
           "500": {}
         },
         "summary": "Bulk patch items",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/bulk-transition": {
+      "post": {
+        "description": "Bulk transition items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Bulk transition items",
         "tags": [
           "Work items"
         ]
@@ -5824,7 +5987,7 @@
     },
     "/items/{item_id}/comments": {
       "get": {
-        "description": "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure.",
+        "description": "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure. Grouped reactions are attached only when include_reactions is true.",
         "parameters": [
           {
             "Name": "item_id",
@@ -5856,6 +6019,16 @@
             "Schema": {
               "minLength": 1,
               "type": "string"
+            }
+          },
+          {
+            "Name": "include_reactions",
+            "In": "query",
+            "Description": "Attach grouped emoji reactions to each comment. Values true and 1 enable; omitted or other values leave reactions out.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -7156,6 +7329,108 @@
           "500": {}
         },
         "summary": "Watch item",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers": {
+      "get": {
+        "description": "List item watchers. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List item watchers",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/{item_id}/watchers/{user_id}": {
+      "delete": {
+        "description": "Remove item watcher. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Remove item watcher",
+        "tags": [
+          "Work items"
+        ]
+      },
+      "put": {
+        "description": "Add item watcher. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "item_id",
+            "In": "path",
+            "Description": "The item identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "user_id",
+            "In": "path",
+            "Description": "The user identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Add item watcher",
         "tags": [
           "Work items"
         ]

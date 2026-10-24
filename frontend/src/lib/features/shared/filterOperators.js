@@ -52,6 +52,12 @@ export const operatorsByType = {
     { value: 'IN', label: 'is one of' },
     { value: 'NOT IN', label: 'is not one of' },
   ]),
+  multi_milestone: withNullOperators([
+    { value: '=', label: 'is' },
+    { value: '!=', label: 'is not' },
+    { value: 'IN', label: 'is one of' },
+    { value: 'NOT IN', label: 'is not one of' },
+  ]),
   boolean: withNullOperators([{ value: '=', label: 'is' }]),
   user: withNullOperators([
     { value: '=', label: 'is' },

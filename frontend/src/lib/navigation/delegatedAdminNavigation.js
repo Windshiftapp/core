@@ -1,4 +1,5 @@
-import { IconLifebuoy, IconPackage } from '@tabler/icons-svelte-runes';
+import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
+import IconPackage from '@tabler/icons-svelte-runes/icons/package';
 import { derived } from 'svelte/store';
 import { permissionStore } from '../stores/permissions.svelte.js';
 

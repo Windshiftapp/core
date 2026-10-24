@@ -46,7 +46,7 @@ func NewAgentPresenceService(bindings *repository.WorkspaceAgentBindingRepositor
 func (s *AgentPresenceService) ForWorkspace(ctx context.Context, workspaceID int) (map[int]string, error) {
 	bindings, err := s.bindings.ListForWorkspace(ctx, workspaceID)
 	if err != nil {
-		return nil, fmt.Errorf("agent presence: list bindings: %w", err)
+		return nil, fmt.Errorf("agent presence: %w", err)
 	}
 	freshSince := s.now().Add(-models.RunnerLivenessWindow)
 	liveByPool := map[int]int{}

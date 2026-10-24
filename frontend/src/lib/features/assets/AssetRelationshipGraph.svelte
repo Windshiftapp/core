@@ -10,10 +10,11 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import RelationshipNode from './RelationshipNode.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
-  import { api } from '../../api.js';
+  import { assets } from '../../api/assets.js';
+  import { items } from '../../api/items.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { IconAlertTriangle } from '@tabler/icons-svelte-runes';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
 
   let { isOpen = $bindable(false), assetId } = $props();
 
@@ -70,7 +71,7 @@
     loading = true;
     error = null;
     try {
-      const data = await api.assets.getRelationshipGraph(assetId);
+      const data = await assets.getRelationshipGraph(assetId);
       truncated = data.truncated;
 
       const flowEdges = (data.edges || []).map(e => ({
@@ -123,7 +124,7 @@
       let wsId = metadata.workspace_id;
       if (!wsId) {
         try {
-          const item = await api.items.get(entity_id);
+          const item = await items.get(entity_id);
           wsId = item.workspace_id;
         } catch { return; }
       }

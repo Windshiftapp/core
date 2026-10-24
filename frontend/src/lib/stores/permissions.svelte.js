@@ -1,5 +1,5 @@
 import { derived, get, writable } from 'svelte/store';
-import { api } from '../api.js';
+import { permissions as permissionsApi } from '../api/permissions.js';
 import { authStore } from './auth.svelte.js';
 import { clearPermissionProfiles, loadPermissionProfile } from './permissionProfile.js';
 
@@ -281,7 +281,7 @@ function createPermissionStore() {
 
       const generation = ++allPermissionsLoadGeneration;
       loading.set(true);
-      const request = api.permissions
+      const request = permissionsApi
         .getAll()
         .then((allPermissions) => {
           if (generation !== allPermissionsLoadGeneration) return [];

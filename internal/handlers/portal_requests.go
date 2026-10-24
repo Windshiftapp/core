@@ -360,7 +360,7 @@ func (h *PortalHandler) DownloadRequestAttachment(w http.ResponseWriter, r *http
 	w.Header().Set("Content-Length", strconv.FormatInt(binary.FileSize, 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
-	if isInlineSafeMimeType(binary.MimeType) {
+	if fileserve.IsInlineSafeMimeType(binary.MimeType) {
 		w.Header().Set("Content-Disposition", fileserve.ContentDisposition("inline", binary.OriginalFilename))
 	} else {
 		w.Header().Set("Content-Disposition", fileserve.ContentDisposition("attachment", binary.OriginalFilename))

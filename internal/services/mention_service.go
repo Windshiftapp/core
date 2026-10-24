@@ -31,16 +31,33 @@ type ProcessMentionsParams struct {
 
 // MentionService handles mention extraction, storage, and notification
 type MentionService struct {
-	db                  database.Database
-	notificationService *NotificationService
-	permissionService   *PermissionService
-	workspaceUsers      *WorkspaceUserResolver
+	db                   database.Database
+	notificationService  *NotificationService
+	permissionService    *PermissionService
+	workspaceUsers       *WorkspaceUserResolver
+	mentionEmailNotifier MentionEmailNotifier
+}
+
+// MentionEmailNotifier queues the dedicated @mention email that carries the
+// message body. Kept as an interface so MentionService stays independent of
+// the SMTP transport and test doubles stay trivial.
+type MentionEmailNotifier interface {
+	EnqueueMentionEmail(params MentionEmailParams) error
+	// RefreshPendingMentionContent rewrites the body of still-pending mention
+	// emails for a source after an edit, so a recipient never receives a stale
+	// pre-edit body.
+	RefreshPendingMentionContent(sourceType string, sourceID int, content string) error
 }
 
 // SetWorkspaceUserResolver aligns stored mentions and agent triggers with the
 // same actionable-user roster used by mention and assignment pickers.
 func (s *MentionService) SetWorkspaceUserResolver(resolver *WorkspaceUserResolver) {
 	s.workspaceUsers = resolver
+}
+
+// SetMentionEmailNotifier wires the durable dedicated mention email path.
+func (s *MentionService) SetMentionEmailNotifier(notifier MentionEmailNotifier) {
+	s.mentionEmailNotifier = notifier
 }
 
 // NewMentionService creates a new mention service
@@ -229,6 +246,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 	}
 
 	newMentions := make([]struct {
+		mentionID   int
 		userID      int
 		displayName string
 	}, 0)
@@ -237,7 +255,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 		if !existingIDs[userID] {
 			slog.Debug("Creating new mention", slog.String("component", "mentions"), slog.Int("user_id", userID), slog.String("source_type", params.SourceType), slog.Int("source_id", params.SourceID))
 
-			err = s.createMention(&models.Mention{
+			mentionID, err := s.createMention(&models.Mention{
 				SourceType:               params.SourceType,
 				SourceID:                 params.SourceID,
 				MentionedUserID:          userID,
@@ -252,9 +270,10 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 			}
 
 			newMentions = append(newMentions, struct {
+				mentionID   int
 				userID      int
 				displayName string
-			}{userID, displayName})
+			}{mentionID, userID, displayName})
 		}
 	}
 
@@ -269,6 +288,18 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 		}
 	}
 
+	// A source edit keeps its existing mentions, so rewrite any pending email
+	// body; new mentions are enqueued below with the current content.
+	if s.mentionEmailNotifier != nil && len(currentMentions) > 0 {
+		if err := s.mentionEmailNotifier.RefreshPendingMentionContent(params.SourceType, params.SourceID, params.Content); err != nil {
+			slog.Error("failed to refresh pending mention email content",
+				slog.String("component", "mentions"),
+				slog.String("source_type", params.SourceType),
+				slog.Int("source_id", params.SourceID),
+				slog.Any("error", err))
+		}
+	}
+
 	isPersonal, err := s.isPersonalWorkspace(params.WorkspaceID)
 	if err != nil {
 		slog.Error("Error checking if workspace is personal", slog.String("component", "mentions"), slog.Any("error", err))
@@ -276,7 +307,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 
 	if !isPersonal {
 		for _, mention := range newMentions {
-			s.emitMentionNotification(params, mention.userID, mention.displayName)
+			s.emitMentionNotification(params, mention.mentionID, mention.userID, mention.displayName)
 		}
 	} else {
 		slog.Debug("Skipping notifications for personal workspace", slog.String("component", "mentions"), slog.Int("workspace_id", params.WorkspaceID))
@@ -353,21 +384,23 @@ func (s *MentionService) getExistingMentions(sourceType string, sourceID int) ([
 	return mentions, rows.Err()
 }
 
-// createMention inserts a new mention record
-func (s *MentionService) createMention(m *models.Mention) error {
-	_, err := s.db.ExecWrite(`
+// createMention inserts a new mention record and returns its id.
+func (s *MentionService) createMention(m *models.Mention) (int, error) {
+	var id int
+	err := s.db.QueryRow(`
 		INSERT INTO mentions (
 			source_type, source_id, mentioned_user_id, item_id, workspace_id,
 			created_by, mentioned_user_display_name, notification_sent, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, false, ?)
+		RETURNING id
 	`, m.SourceType, m.SourceID, m.MentionedUserID, m.ItemID, m.WorkspaceID,
-		m.CreatedBy, m.MentionedUserDisplayName, time.Now())
+		m.CreatedBy, m.MentionedUserDisplayName, time.Now()).Scan(&id)
 
-	return err
+	return id, err
 }
 
 // emitMentionNotification sends a notification for a new mention
-func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, mentionedUserID int, _ string) {
+func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, mentionID, mentionedUserID int, _ string) {
 	if s.notificationService == nil {
 		return
 	}
@@ -405,7 +438,7 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 	title := "You were mentioned"
 	message := fmt.Sprintf("%s mentioned you in %s on %s (%s)",
 		actorName, sourceTypeDesc, item.Title, itemKey)
-	if err := s.notificationService.NotifyUsers(
+	notifications, err := s.notificationService.NotifyUsersWithRecords(
 		[]int{mentionedUserID},
 		params.WorkspaceID,
 		params.ItemID,
@@ -413,7 +446,8 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 		"mention", // notifType — short form used by the UI; matches getNotificationType(EventMention)
 		title,
 		message,
-	); err != nil {
+	)
+	if err != nil {
 		slog.Error("failed to add mention notification",
 			slog.String("component", "mentions"),
 			slog.Int("recipient_user_id", mentionedUserID),
@@ -428,6 +462,33 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 	`, params.SourceType, params.SourceID, mentionedUserID)
 	if err != nil {
 		slog.Error("Error marking notification as sent", slog.String("component", "mentions"), slog.Any("error", err))
+	}
+
+	// Only queue the dedicated email when the in-app notification was actually
+	// created: NotifyUsersWithRecords drops agents, inactive users, and
+	// recipients without workspace view permission, and those must not be
+	// emailed either.
+	if s.mentionEmailNotifier == nil || len(notifications) == 0 {
+		return
+	}
+	if err := s.mentionEmailNotifier.EnqueueMentionEmail(MentionEmailParams{
+		MentionID:      mentionID,
+		NotificationID: notifications[0].ID,
+		UserID:         mentionedUserID,
+		WorkspaceID:    params.WorkspaceID,
+		ItemID:         params.ItemID,
+		SourceType:     params.SourceType,
+		Content:        params.Content,
+		ActorName:      actorName,
+		ItemKey:        itemKey,
+		ItemTitle:      item.Title,
+		ActionURL:      itemActionURL(params.WorkspaceID, params.ItemID),
+	}); err != nil {
+		slog.Error("failed to enqueue mention email",
+			slog.String("component", "mentions"),
+			slog.Int("mention_id", mentionID),
+			slog.Int("recipient_user_id", mentionedUserID),
+			slog.Any("error", err))
 	}
 }
 

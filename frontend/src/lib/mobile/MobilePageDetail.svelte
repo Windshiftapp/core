@@ -1,9 +1,13 @@
 <script>
-  import { ChevronRight, House, Loader, Pencil, X } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import House from '@lucide/svelte/icons/house';
+  import Loader from '@lucide/svelte/icons/loader';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import X from '@lucide/svelte/icons/x';
+  import { pages } from '../api/pages.js';
   import { navigate } from '../router.js';
   import { errorToast, infoToast } from '../stores/toasts.svelte.js';
-  import { workspacesStore } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import MobileHeader from './MobileHeader.svelte';
@@ -62,7 +66,7 @@
     if (saving) return;
     saving = true;
     try {
-      const updated = await api.pages.updatePage(workspaceId, pageId, {
+      const updated = await pages.updatePage(workspaceId, pageId, {
         title: draftTitle.trim() || page.title,
         content: draftContent,
         expectedContentHash: page.content_hash,
@@ -90,9 +94,9 @@
       // Fetch the page and the workspace tree in parallel; the tree powers
       // breadcrumbs + sub-page rows and may be permission-denied on its own.
       const [pageRes, listRes, permsRes] = await Promise.allSettled([
-        api.pages.getPage(workspaceId, pageId),
-        api.pages.getAll(workspaceId),
-        api.pages.getPermissions(workspaceId, pageId),
+        pages.getPage(workspaceId, pageId),
+        pages.getAll(workspaceId),
+        pages.getPermissions(workspaceId, pageId),
       ]);
       if (token !== loadToken) return;
       if (pageRes.status === 'rejected') throw pageRes.reason;

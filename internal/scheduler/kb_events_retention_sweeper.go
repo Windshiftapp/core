@@ -103,7 +103,7 @@ func (s *KBEventsRetentionSweeper) tick() {
 	start := time.Now()
 	var runErr error
 	items := 0
-	defer recordSchedulerRun(s.runRepo, "kb_events_retention", start, &items, &runErr)
+	defer recordSchedulerRun(s.runRepo, "kb_events_retention", start, &items, &runErr, time.Now)
 
 	defaultDays := s.defaultRetentionDays
 	if configured := readRetentionDaysSetting(ctx, s.db, systemSettingKBEventsRetentionDays, defaultDays); configured != DefaultKBEventsRetentionDays {

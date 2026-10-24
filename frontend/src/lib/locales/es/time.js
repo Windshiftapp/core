@@ -25,6 +25,7 @@ export default {
     resumeTimer: 'Reanudar temporizador',
     timeLogged: 'Tiempo registrado correctamente',
     timeTrackingProject: 'Proyecto de seguimiento de tiempo',
+    noCustomer: 'Sin cliente',
     workItemOptional: 'Elemento de trabajo (Opcional)',
     whatDidYouWorkOn: '¿En qué trabajaste?',
     start: 'Inicio',

@@ -1,5 +1,5 @@
 <script>
-  import { X } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

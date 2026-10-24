@@ -1,10 +1,15 @@
 <script>
-  import { IconArrowLeft, IconPlus, IconEdit, IconTrash, IconClipboardList, IconX } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconEdit from '@tabler/icons-svelte-runes/icons/edit';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconClipboardList from '@tabler/icons-svelte-runes/icons/clipboard-list';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import { tests } from '../../api/tests/index.js';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { navigate, currentRoute } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import Label from '../../components/Label.svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
@@ -73,7 +78,7 @@
 
   async function loadTestCase(id) {
     try {
-      testCase = await api.tests.testCases.get(workspaceId, id);
+      testCase = await tests.testCases.get(workspaceId, id);
     } catch (err) {
       console.error('Failed to load test case:', err);
       throw err;
@@ -82,7 +87,7 @@
 
   async function loadTestSteps(id = testCaseId) {
     try {
-      testSteps = await api.tests.testCases.steps.getAll(workspaceId, id) || [];
+      testSteps = await tests.testCases.steps.getAll(workspaceId, id) || [];
     } catch (err) {
       console.error('Failed to load test steps:', err);
       throw err;
@@ -134,9 +139,9 @@
     
     try {
       if (editingStep) {
-        await api.tests.testCases.steps.update(workspaceId, testCaseId, editingStep.id, stepFormData);
+        await tests.testCases.steps.update(workspaceId, testCaseId, editingStep.id, stepFormData);
       } else {
-        await api.tests.testCases.steps.create(workspaceId, testCaseId, stepFormData);
+        await tests.testCases.steps.create(workspaceId, testCaseId, stepFormData);
       }
       
       await loadTestSteps();
@@ -156,7 +161,7 @@
     });
     if (!ok) return;
     try {
-      await api.tests.testCases.steps.delete(workspaceId, testCaseId, stepId);
+      await tests.testCases.steps.delete(workspaceId, testCaseId, stepId);
       await loadTestSteps();
     } catch (error) {
       console.error('Failed to delete test step:', error);
@@ -219,9 +224,7 @@
     <PageHeader title={t('testing.testStepsFor', { title: testCase.title })} marginClass="mb-4">
       {#snippet actions()}
         <div class="flex items-center gap-3">
-          <Button onclick={goBack} variant="ghost" icon={IconArrowLeft} dataTestid="test-steps-back">
-            {t('testing.backToTestCases')}
-          </Button>
+          <BackButton onclick={goBack} testid="test-steps-back" label={t('testing.backToTestCases')} />
           {#if !showStepForm}
             <Button
               variant="primary"

@@ -64,6 +64,7 @@ type Deps struct {
 	Assets       AssetHandlers
 	AI           AIHandlers
 	Misc         MiscHandlers
+	Widgets      WidgetHandlers
 	Teams        TeamHandlers
 	Integrations IntegrationHandlers
 	Pages        PageHandlers
@@ -215,6 +216,12 @@ type TeamHandlers struct {
 // PageHandlers groups workspace knowledge-page handlers.
 type PageHandlers struct {
 	KnowledgeSearch *handlers.KnowledgeSearchHandler
+}
+
+// WidgetHandlers groups custom dashboard widget handlers.
+type WidgetHandlers struct {
+	Custom   *handlers.CustomWidgetHandler
+	Generate *handlers.CustomWidgetGenerateHandler
 }
 
 // MiscHandlers groups miscellaneous handlers.

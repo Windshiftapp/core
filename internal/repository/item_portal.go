@@ -195,6 +195,7 @@ type PortalRequestRow struct {
 	CreatedAt               string
 	UpdatedAt               string
 	ChannelID               *int
+	IntakeID                *int
 	RequestTypeID           *int
 	CreatorID               *int
 	CreatorPortalCustomerID *int
@@ -217,7 +218,7 @@ const portalRequestSelect = `
 		i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
 		COALESCE(s.name, 'Unknown') AS status, COALESCE(p.name, '') AS priority,
 		i.created_at, i.updated_at,
-		i.channel_id, i.request_type_id, i.creator_id, i.creator_portal_customer_id,
+		i.channel_id, i.intake_id, i.request_type_id, i.creator_id, i.creator_portal_customer_id,
 		w.name AS workspace_name,
 		w.key AS workspace_key,
 		rt.name AS request_type_name,
@@ -240,12 +241,12 @@ func scanPortalRequestRow(scanner interface {
 	Scan(dest ...any) error
 }) (PortalRequestRow, error) {
 	var row PortalRequestRow
-	var channelID, requestTypeID, creatorID, creatorPortalCustomerID, mergedIntoItemID sql.NullInt64
+	var channelID, intakeID, requestTypeID, creatorID, creatorPortalCustomerID, mergedIntoItemID sql.NullInt64
 	var requestTypeName, requestTypeIcon, requestTypeColor, statusCategoryColor sql.NullString
 	err := scanner.Scan(
 		&row.ID, &row.WorkspaceID, &row.WorkspaceItemNumber, &row.Title, &row.Description,
 		&row.StatusName, &row.PriorityName, &row.CreatedAt, &row.UpdatedAt,
-		&channelID, &requestTypeID, &creatorID, &creatorPortalCustomerID,
+		&channelID, &intakeID, &requestTypeID, &creatorID, &creatorPortalCustomerID,
 		&row.WorkspaceName, &row.WorkspaceKey,
 		&requestTypeName, &requestTypeIcon, &requestTypeColor,
 		&row.CommentCount,
@@ -256,6 +257,7 @@ func scanPortalRequestRow(scanner interface {
 		return row, err
 	}
 	assignNullableInt(&row.ChannelID, channelID)
+	assignNullableInt(&row.IntakeID, intakeID)
 	assignNullableInt(&row.RequestTypeID, requestTypeID)
 	assignNullableInt(&row.CreatorID, creatorID)
 	assignNullableInt(&row.CreatorPortalCustomerID, creatorPortalCustomerID)
@@ -281,14 +283,16 @@ const portalMergedDuplicateVisible = `(i.merged_into_item_id IS NULL OR EXISTS (
 	))`
 
 // PortalRequestVisibility describes which items a portal exposes to its
-// requesters: the portal's own channel, any enabled intake email channel
-// linked to it via email_connected_portal_id, and — as defense-in-depth —
-// only items in workspaces the portal serves (empty = no restriction, for
-// legacy portals).
+// requesters: the portal's own channel, any enabled intake linked to it, and —
+// as defense-in-depth — only items in workspaces the portal serves (empty = no
+// restriction, for legacy portals).
 type PortalRequestVisibility struct {
-	PortalChannelID       int
-	LinkedEmailChannelIDs []int
-	ServedWorkspaceIDs    []int
+	PortalChannelID int
+	// LinkedIntakeIDs are the enabled intakes linked to the portal. Their items
+	// are visible even though their channel_id is the mailbox, so linking one
+	// intake never exposes a sibling internal intake on the same mailbox.
+	LinkedIntakeIDs    []int
+	ServedWorkspaceIDs []int
 }
 
 // PortalOrgShare describes the organisation-sharing that applies to one portal
@@ -363,9 +367,13 @@ func (r *ItemRepository) listChannelRequests(ownerClause string, ownerArgs []any
 	args := append([]any{}, ownerArgs...)
 	channelFilter := "i.channel_id = ?"
 	args = append(args, visibility.PortalChannelID)
-	for _, id := range visibility.LinkedEmailChannelIDs {
-		channelFilter += " OR i.channel_id = ?"
-		args = append(args, id)
+	if len(visibility.LinkedIntakeIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(visibility.LinkedIntakeIDs))
+		placeholders = placeholders[:len(placeholders)-1]
+		channelFilter += " OR i.intake_id IN (" + placeholders + ")"
+		for _, id := range visibility.LinkedIntakeIDs {
+			args = append(args, id)
+		}
 	}
 	where := ownerClause + " AND " + portalMergedDuplicateVisible + " AND (" + channelFilter + ")"
 	if len(visibility.ServedWorkspaceIDs) > 0 {
@@ -451,10 +459,25 @@ type PortalCustomerSubmission struct {
 	CreatedAt           string
 }
 
-// ListPortalCustomerSubmissions returns all items created by the given portal
+// ListPortalCustomerSubmissions returns items created by the given portal
 // customer, newest-first, hydrated with workspace name/key and status
 // name/color (falling back to empty string / neutral color for NULLs).
-func (r *ItemRepository) ListPortalCustomerSubmissions(customerID int) ([]PortalCustomerSubmission, error) {
+//
+// When workspaceIDs is non-nil the result is limited to those workspaces so a
+// caller never sees a submission filed in a workspace it cannot view. A
+// non-nil empty slice matches nothing.
+func (r *ItemRepository) ListPortalCustomerSubmissions(customerID int, workspaceIDs []int) ([]PortalCustomerSubmission, error) {
+	args := []any{customerID}
+	workspaceClause := ""
+	if workspaceIDs != nil {
+		if len(workspaceIDs) == 0 {
+			return []PortalCustomerSubmission{}, nil
+		}
+		placeholders, wsArgs := inPlaceholders(workspaceIDs)
+		workspaceClause = " AND i.workspace_id IN (" + placeholders + ")"
+		args = append(args, wsArgs...)
+	}
+
 	rows, err := r.db.Query(`
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
@@ -466,9 +489,9 @@ func (r *ItemRepository) ListPortalCustomerSubmissions(customerID int) ([]Portal
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.creator_portal_customer_id = ? AND `+portalMergedDuplicateVisible+`
+		WHERE i.creator_portal_customer_id = ? AND `+portalMergedDuplicateVisible+workspaceClause+`
 		ORDER BY i.created_at DESC
-	`, customerID)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list portal customer submissions: %w", err)
 	}

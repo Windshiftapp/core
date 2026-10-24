@@ -1,5 +1,5 @@
 <script>
-  import { Plus } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
   import { t } from '../stores/i18n.svelte.js';
 
   // The "no results" block of a label picker, offering inline creation.

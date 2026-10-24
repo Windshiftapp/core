@@ -1,9 +1,10 @@
 <script>
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
-  import { IconArchive, IconArrowLeft } from '@tabler/icons-svelte-runes';
-  import { api } from '../../api.js';
+  import IconArchive from '@tabler/icons-svelte-runes/icons/archive';
+  import { pages } from '../../api/pages.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
@@ -28,7 +29,7 @@
   async function load() {
     loading = true;
     try {
-      const data = await api.pages.listArchived(workspaceId);
+      const data = await pages.listArchived(workspaceId);
       rows = Array.isArray(data) ? data : [];
     } catch (err) {
       errorToast(err?.message || t('pages.archivedLoadError'));
@@ -48,7 +49,7 @@
     if (!ok) return;
     pendingId = row.id;
     try {
-      await api.pages.unarchive(workspaceId, row.id);
+      await pages.unarchive(workspaceId, row.id);
       successToast(t('pages.archivedUnarchiveOK', { title: row.title }));
       rows = rows.filter((r) => r.id !== row.id);
       // Restore the page to the sidebar tree.
@@ -90,10 +91,7 @@
     subtitle={t('pages.archivedSubtitle')}
   >
     {#snippet actions()}
-      <Button variant="ghost" size="small" onclick={goBack} dataTestid="archived-pages-back">
-        <IconArrowLeft size={14} />
-        {t('pages.archivedBack')}
-      </Button>
+      <BackButton onclick={goBack} testid="archived-pages-back" label={t('pages.archivedBack')} />
     {/snippet}
   </PageHeader>
 

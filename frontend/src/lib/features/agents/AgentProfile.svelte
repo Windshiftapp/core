@@ -1,35 +1,37 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
-  import {
-    IconArrowLeft as ArrowLeft,
-    IconBolt as Bolt,
-    IconCheck as Check,
-    IconCode as Code,
-    IconFlask as Flask,
-    IconHistory as History,
-    IconLock as Lock,
-    IconMessage as Message,
-    IconNotebook as Notebook,
-    IconRefresh as Refresh,
-    IconUserStar as AgentIcon,
-    IconDeviceFloppy as Save,
-    IconShieldCheck as ShieldCheck,
-    IconArchive as Archive,
-    IconDots as MoreHorizontal,
-  } from '@tabler/icons-svelte-runes';
-  import { agentBindings, agentRuns, agentSkills, api } from '../../api.js';
+  import Bolt from '@tabler/icons-svelte-runes/icons/bolt';
+  import Check from '@tabler/icons-svelte-runes/icons/check';
+  import Code from '@tabler/icons-svelte-runes/icons/code';
+  import Flask from '@tabler/icons-svelte-runes/icons/flask';
+  import History from '@tabler/icons-svelte-runes/icons/history';
+  import Lock from '@tabler/icons-svelte-runes/icons/lock';
+  import Message from '@tabler/icons-svelte-runes/icons/message';
+  import Notebook from '@tabler/icons-svelte-runes/icons/notebook';
+  import Refresh from '@tabler/icons-svelte-runes/icons/refresh';
+  import AgentIcon from '@tabler/icons-svelte-runes/icons/user-star';
+  import Save from '@tabler/icons-svelte-runes/icons/device-floppy';
+  import ShieldCheck from '@tabler/icons-svelte-runes/icons/shield-check';
+  import Archive from '@tabler/icons-svelte-runes/icons/archive';
+  import MoreHorizontal from '@tabler/icons-svelte-runes/icons/dots';
+  import { actionCapabilities, llmProviders } from '../../api/ai.js';
+  import { agentBindings } from '../../api/agentBindings.js';
+  import { agentRuns } from '../../api/agentRuns.js';
+  import { agentSkills } from '../../api/agentSkills.js';
   import { updateQueryParams } from '../../router.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
   import Avatar from '../../components/Avatar.svelte';
+  import BackButton from '../../components/BackButton.svelte';
   import Badge from '../../components/Badge.svelte';
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import FormField from '../../components/FormField.svelte';
   import Input from '../../components/Input.svelte';
+  import Select from '../../components/Select.svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
   import Tabs from '../../components/Tabs.svelte';
   import Textarea from '../../components/Textarea.svelte';
@@ -75,6 +77,10 @@
   let savingOverview = $state(false);
   let overviewSaved = $state(false);
   let runnerPools = $state([]);
+  let llmConnections = $state([]);
+  let modelConnectionId = $state(null);
+  let savingModel = $state(false);
+  let modelSaved = $state(false);
   let selectedRunnerPoolId = $state(null);
   let runnerSetupMode = $state('existing');
   let pendingRunnerTokenId = $state(null);
@@ -119,6 +125,16 @@
       || overviewAvatarURL !== (agent?.avatar_url || '')
       || overviewPurpose !== (agent?.purpose || '')
   );
+  const modelChanged = $derived(
+    Number(modelConnectionId || 0) !== Number(adminProfile?.llm_connection_id || 0)
+  );
+  const modelOptions = $derived([
+    { value: null, label: 'Select an LLM connection', disabled: true },
+    ...llmConnections.map((connection) => ({
+      value: connection.id,
+      label: [connection.name, connection.model].filter(Boolean).join(' · '),
+    })),
+  ]);
   const runnerStorageKey = $derived(`agent-studio-runner:${workspaceId}:${agentId}`);
   const runnerAssignmentLocked = $derived(Number(adminProfile?.target_pool_id) > 0);
 
@@ -184,22 +200,25 @@
       overviewAvatarURL = agent.avatar_url || '';
       overviewPurpose = agent.purpose || '';
       if (canAdmin) {
-        const [profiles, skills, capabilities, pools] = await Promise.all([
+        const [profiles, skills, capabilities, pools, connections] = await Promise.all([
           agentBindings.listForWorkspace(workspaceId),
           agentSkills.listForWorkspace(workspaceId).catch(() => []),
           agentBindings.listToolCapabilities(workspaceId).catch(() => []),
-          api.actionCapabilities
+          actionCapabilities
             .getForWorkspace(workspaceId, 'runner_pool')
             .catch(() => []),
+          llmProviders.getEnabled().catch(() => []),
         ]);
         workspaceSkills = skills || [];
         capabilityCatalog = capabilities || [];
         runnerPools = pools || [];
+        llmConnections = connections || [];
         adminProfile =
           (profiles || []).find((entry) => String(entry.id) === String(agentId)) || null;
         instructionsDraft = adminProfile?.instructions || '';
         selectedSkillIds = [...(adminProfile?.skill_ids || [])];
         selectedCapabilityGroups = [...(adminProfile?.capability_groups || [])];
+        modelConnectionId = adminProfile?.llm_connection_id ?? null;
         selectedRunnerPoolId = adminProfile?.target_pool_id || null;
         restoreRunnerSetup();
         await checkReadiness();
@@ -430,6 +449,39 @@
     }
   }
 
+  async function saveModel() {
+    if (!canAdmin || !adminProfile || !modelChanged || savingModel) return;
+    savingModel = true;
+    modelSaved = false;
+    actionError = '';
+    try {
+      await agentBindings.updateAgentConfig(workspaceId, agentId, {
+        instructions: adminProfile.instructions || '',
+        skill_ids: adminProfile.skill_ids || [],
+        llm_connection_id: Number(modelConnectionId),
+      });
+      const nextVersion = markNewDraftVersion();
+      const connection = llmConnections.find(
+        (candidate) => Number(candidate.id) === Number(modelConnectionId)
+      );
+      adminProfile = {
+        ...adminProfile,
+        llm_connection_id: Number(modelConnectionId),
+        profile_version: nextVersion,
+      };
+      agent = {
+        ...agent,
+        model_summary: connection?.model || agent.model_summary,
+      };
+      modelSaved = true;
+      await checkReadiness();
+    } catch (err) {
+      actionError = err.message || 'The model could not be changed.';
+    } finally {
+      savingModel = false;
+    }
+  }
+
   async function saveOverview() {
     if (!canAdmin || !adminProfile || !overviewChanged || savingOverview) return;
     savingOverview = true;
@@ -619,15 +671,11 @@
   data-testid="agent-profile"
 >
   <div class="mx-auto max-w-5xl space-y-6">
-    <Button
+    <BackButton
       href={`/workspaces/${workspaceId}/agents`}
-      variant="subtle"
-      size="small"
-      icon={ArrowLeft}
-      dataTestid="agent-profile-back"
-    >
-      Back to agents
-    </Button>
+      label="Back to agents"
+      testid="agent-profile-back"
+    />
 
     {#if loading}
       <StateDisplay type="loading" message="Loading agent profile…" class="py-20" />
@@ -1034,6 +1082,54 @@
             <h2 class="text-lg font-semibold" style="color: var(--ds-text);">
               Tools and access
             </h2>
+            <!-- Model connection: editable for every profile type. The runtime
+                 keeps the selected model until an admin retargets it here. -->
+            <div
+              class="mt-4 rounded-lg border p-4"
+              style="border-color: var(--ds-border);"
+              data-testid="agent-model"
+            >
+              <h3 class="text-base font-medium" style="color: var(--ds-text);">Model</h3>
+              <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
+                The LLM connection and model this agent runs on. Changing it returns the profile to
+                Draft so the new model is validated before it accepts work.
+              </p>
+              {#if llmConnections.length === 0}
+                <AlertBox
+                  variant="warning"
+                  message="No enabled LLM connection is available. Ask a system administrator to configure one under Admin → AI Connections."
+                  class="mt-3"
+                />
+              {:else}
+                <div class="mt-3 max-w-md">
+                  <Select
+                    id="agent-model-connection"
+                    ariaLabel="Model"
+                    bind:value={modelConnectionId}
+                    options={modelOptions}
+                  />
+                </div>
+              {/if}
+              <div class="mt-3 flex justify-end">
+                <Button
+                  variant="primary"
+                  icon={Save}
+                  loading={savingModel}
+                  disabled={!modelChanged || llmConnections.length === 0}
+                  onclick={saveModel}
+                  dataTestid="agent-model-save"
+                >
+                  Save model
+                </Button>
+              </div>
+              {#if modelSaved}
+                <AlertBox
+                  variant="success"
+                  message="Model changed. The profile is now a Draft and must be made Ready again."
+                  class="mt-3"
+                />
+              {/if}
+            </div>
             {#if agent.profile_type === 'standard'}
               <AlertBox
                 variant="info"
@@ -1270,6 +1366,15 @@
                       {run.item_id ? `Work item #${run.item_id}` : label(run.job_kind)}
                       · Profile version {run.profile_version || agent.profile_version}
                     </p>
+                    {#if run.error}
+                      <p
+                        class="mt-1 text-xs"
+                        style="color: var(--ds-text-danger);"
+                        data-testid={`agent-run-error-${run.id}`}
+                      >
+                        {run.error}
+                      </p>
+                    {/if}
                   </div>
                   <Badge variant={run.status === 'succeeded' ? 'success' : run.status === 'failed' ? 'danger' : 'neutral'}>
                     {label(run.status)}

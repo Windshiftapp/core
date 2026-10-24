@@ -1,5 +1,5 @@
 <script>
-  import { Flag } from '@lucide/svelte';
+  import Flag from '@lucide/svelte/icons/flag';
   import EmptyState from '../components/EmptyState.svelte';
   import PieChartSegments from '../components/PieChartSegments.svelte';
   import { t } from '../stores/i18n.svelte.js';

@@ -9,11 +9,26 @@
   import AlertBox from '../components/AlertBox.svelte';
   import Input from '../components/Input.svelte';
   import FormField from '../components/FormField.svelte';
-  import {
-    Cloud, Server, ChevronRight, ChevronLeft, ArrowRight,
-    Briefcase, FileText, Activity, Hash, Box, AlertCircle,
-    ExternalLink, Eye, EyeOff, Plus, Users, Paperclip, Flag, Check, X
-  } from '@lucide/svelte';
+  import Cloud from '@lucide/svelte/icons/cloud';
+  import Server from '@lucide/svelte/icons/server';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Activity from '@lucide/svelte/icons/activity';
+  import Hash from '@lucide/svelte/icons/hash';
+  import Box from '@lucide/svelte/icons/box';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Users from '@lucide/svelte/icons/users';
+  import Paperclip from '@lucide/svelte/icons/paperclip';
+  import Flag from '@lucide/svelte/icons/flag';
+  import Check from '@lucide/svelte/icons/check';
+  import X from '@lucide/svelte/icons/x';
   import Stepper from '../components/Stepper.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';

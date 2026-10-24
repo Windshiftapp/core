@@ -1,16 +1,30 @@
 <script>
-  import {
-    Palette, Navigation, X, TextCursorInput, Check,
-    Plus, Trash2, GripVertical, Settings, ExternalLink
-  } from '@lucide/svelte';
+  import Palette from '@lucide/svelte/icons/palette';
+  import Navigation from '@lucide/svelte/icons/navigation';
+  import X from '@lucide/svelte/icons/x';
+  import TextCursorInput from '@lucide/svelte/icons/text-cursor-input';
+  import Check from '@lucide/svelte/icons/check';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import GripVertical from '@lucide/svelte/icons/grip-vertical';
+  import Settings from '@lucide/svelte/icons/settings';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import LogoUploader from '../components/LogoUploader.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
+  import TabStrip from '../components/TabStrip.svelte';
 
   let showCustomizePanelHover = $state(false);
+
+  function handleSectionChange(section) {
+    hubStore.activeSection = section;
+    if (section === 'sections') {
+      hubStore.isEditing = true;
+    }
+  }
 </script>
 
 <!-- Customization Panel Overlay (hide when editing sections so sections are visible) -->
@@ -43,24 +57,15 @@
     </div>
 
     <!-- Section Navigation -->
-    <div class="border-b flex" style="border-color: var(--ds-border);">
-      <button
-        onclick={() => hubStore.activeSection = 'hero-gradient'}
-        class="flex-1 p-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors"
-        style="border-color: {hubStore.activeSection === 'hero-gradient' ? 'var(--ds-border-focused)' : 'transparent'}; color: {hubStore.activeSection === 'hero-gradient' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-      >
-        <Palette class="w-4 h-4" />
-        <span>{t('portal.theme', 'Theme')}</span>
-      </button>
-      <button
-        onclick={() => { hubStore.activeSection = 'sections'; hubStore.isEditing = true; }}
-        class="flex-1 p-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors"
-        style="border-color: {hubStore.activeSection === 'sections' ? 'var(--ds-border-focused)' : 'transparent'}; color: {hubStore.activeSection === 'sections' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-      >
-        <Navigation class="w-4 h-4" />
-        <span>{t('hub.sections', 'Sections')}</span>
-      </button>
-    </div>
+    <TabStrip
+      tabs={[
+        { id: 'hero-gradient', label: t('portal.theme', 'Theme'), icon: Palette },
+        { id: 'sections', label: t('hub.sections', 'Sections'), icon: Navigation }
+      ]}
+      activeTab={hubStore.activeSection}
+      onTabChange={handleSectionChange}
+      fill
+    />
 
     <!-- Panel Content -->
     <div class="flex-1 overflow-y-auto p-4">

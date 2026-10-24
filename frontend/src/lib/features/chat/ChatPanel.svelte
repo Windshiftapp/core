@@ -1,10 +1,16 @@
 <script>
-  import { IconArchive, IconMessage, IconX, IconLoader2, IconSend, IconPlus, IconRefresh } from '@tabler/icons-svelte-runes';
+  import IconArchive from '@tabler/icons-svelte-runes/icons/archive';
+  import IconMessage from '@tabler/icons-svelte-runes/icons/message';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconLoader2 from '@tabler/icons-svelte-runes/icons/loader-2';
+  import IconSend from '@tabler/icons-svelte-runes/icons/send';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconRefresh from '@tabler/icons-svelte-runes/icons/refresh';
   import { useEventListener } from 'runed';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import ChatToolTrace from './ChatToolTrace.svelte';
   import { chatStore, preprocessItemKeys } from '../../stores/chatStore.svelte.js';
-  import { workspacePermissions } from '../../stores';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { currentRoute } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';

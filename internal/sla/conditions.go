@@ -39,9 +39,9 @@ func (c *compiledCondition) matches(fact itemevents.RecordedFact, config *compil
 		}
 		return false
 	case conditionCommentByCustomer:
-		return fact.Type == itemevents.CommentCreated && c.commentKind == "customer" && fact.CommentAuthorKind == "portal_customer"
+		return fact.Type == itemevents.CommentCreated && c.commentKind == "customer" && fact.CommentAuthorKind == "portal_customer" && !fact.CommentIsPrivate
 	case conditionCommentByAgent:
-		return fact.Type == itemevents.CommentCreated && c.commentKind == "agent" && fact.CommentAuthorKind != "" && fact.CommentAuthorKind != "portal_customer"
+		return fact.Type == itemevents.CommentCreated && c.commentKind == "agent" && fact.CommentAuthorKind != "" && fact.CommentAuthorKind != "portal_customer" && !fact.CommentIsPrivate
 	default:
 		return false
 	}

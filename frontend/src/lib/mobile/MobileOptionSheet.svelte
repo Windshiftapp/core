@@ -1,5 +1,7 @@
 <script>
-  import { Search, Check, Loader } from '@lucide/svelte';
+  import Search from '@lucide/svelte/icons/search';
+  import Check from '@lucide/svelte/icons/check';
+  import Loader from '@lucide/svelte/icons/loader';
   import MobileSheet from './MobileSheet.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

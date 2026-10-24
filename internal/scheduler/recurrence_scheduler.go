@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -112,7 +113,7 @@ func (rs *RecurrenceScheduler) processRecurrenceRules() {
 	start := time.Now()
 	var generatedCount int
 	var runErr error
-	defer recordSchedulerRun(rs.runRepo, "recurrence", start, &generatedCount, &runErr)
+	defer recordSchedulerRun(rs.runRepo, "recurrence", start, &generatedCount, &runErr, time.Now)
 
 	slog.Debug("Processing recurrence rules...")
 
@@ -288,77 +289,77 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 		statusID = *resolved
 	}
 
-	// Build the new item, copying template fields per the rule's flags. Insert
-	// goes through ItemRepository so the items-table write lives in the
-	// repository layer (same path scm/issue_sync.go uses), not in the scheduler.
-	item := &models.Item{
-		WorkspaceID: template.WorkspaceID,
-		ItemTypeID:  template.ItemTypeID,
-		Title:       template.Title,
-		StatusID:    &statusID,
-		DueDate:     &scheduledDate,
-		IsTask:      template.IsTask,
-		ParentID:    template.ParentID,
-		CreatorID:   rule.CreatedBy,
-	}
-	if rule.CopyDescription {
-		item.Description = template.Description
-	}
-	if rule.CopyAssignee {
-		item.AssigneeID = template.AssigneeID
-	}
-	if rule.CopyPriority {
-		item.PriorityID = template.PriorityID
-	}
-	if rule.CopyCustomFields {
-		item.CustomFieldValues = template.CustomFieldValues
-	}
 	actorUserID := 0
 	if rule.CreatedBy != nil {
 		actorUserID = *rule.CreatedBy
 	}
-	if err := validation.ValidateTaskState(rs.db, item.WorkspaceID, actorUserID, item.IsTask, item.StatusID); err != nil {
+
+	// Build the instance through the shared creation API, copying template
+	// fields per the rule's flags. The recurrence instance row is written by the
+	// AfterCreate hook so it commits with the item.
+	params := services.ItemCreationParams{
+		WorkspaceID:           template.WorkspaceID,
+		ItemTypeID:            template.ItemTypeID,
+		ValidatingUserID:      actorUserID,
+		Title:                 template.Title,
+		StatusID:              &statusID,
+		DueDate:               &scheduledDate,
+		IsTask:                template.IsTask,
+		ParentID:              template.ParentID,
+		CreatorID:             rule.CreatedBy,
+		SkipMandatoryTemplate: true,
+		SkipAssigneeTrigger:   true,
+		SkipPublish:           true,
+	}
+	if rule.CopyDescription {
+		params.Description = template.Description
+	}
+	if rule.CopyAssignee {
+		params.AssigneeID = template.AssigneeID
+	}
+	if rule.CopyPriority {
+		params.PriorityID = template.PriorityID
+	}
+	if rule.CopyCustomFields && len(template.CustomFieldValues) > 0 {
+		encoded, err := json.Marshal(template.CustomFieldValues)
+		if err != nil {
+			return fmt.Errorf("encode recurring custom fields: %w", err)
+		}
+		params.CustomFieldValuesJSON = string(encoded)
+	}
+	if err := validation.ValidateTaskState(rs.db, params.WorkspaceID, actorUserID, params.IsTask, params.StatusID); err != nil {
 		return fmt.Errorf("validate recurring item: %w", err)
 	}
-
-	ctx := context.Background()
-	itemID, err := rs.itemRepo.CreateWithRetry(ctx, item, func(tx database.Tx, itemID int) error {
+	metadata := itemevents.System("recurrence")
+	if rule.CreatedBy != nil {
+		metadata = itemevents.User(*rule.CreatedBy, "recurrence")
+	}
+	params.EventMetadata = metadata
+	params.AfterCreate = func(_ context.Context, tx database.Tx, itemID int) error {
 		seqNum, err := rs.recurrenceRepo.GetNextSequenceNumber(tx, rule.ID)
 		if err != nil {
 			return fmt.Errorf("get next recurrence sequence number: %w", err)
 		}
-		if err := rs.recurrenceRepo.CreateInstance(tx, &models.RecurrenceInstance{
+		return rs.recurrenceRepo.CreateInstance(tx, &models.RecurrenceInstance{
 			RecurrenceRuleID: rule.ID,
 			InstanceItemID:   itemID,
 			ScheduledDate:    scheduledDate,
 			SequenceNumber:   seqNum,
-		}); err != nil {
-			return fmt.Errorf("create recurrence instance: %w", err)
-		}
-		created, err := rs.itemRepo.FindByIDForUpdate(tx, itemID)
-		if err != nil {
-			return fmt.Errorf("load recurring item for event: %w", err)
-		}
-		metadata := itemevents.System("recurrence")
-		if rule.CreatedBy != nil {
-			metadata = itemevents.User(*rule.CreatedBy, "recurrence")
-		}
-		metadata.OccurredAt = time.Now().UTC()
-		if _, err := itemevents.NewRecorder(rs.db).Created(ctx, tx, created, nil, metadata); err != nil {
-			return fmt.Errorf("record recurring item creation: %w", err)
-		}
-		return nil
-	})
+		})
+	}
+
+	itemID64, err := services.CreateItem(rs.db, params)
 	if err != nil {
 		return fmt.Errorf("create recurring item: %w", err)
 	}
+	itemID := int(itemID64)
 
 	// Live-update publish (WI-483): the recurrence instance committed. Announce
 	// the new item and refresh the template parent's child list if any.
 	services.PublishItemChange(itemID)
-	services.PublishWorkspaceChange(item.WorkspaceID)
-	if item.ParentID != nil {
-		services.PublishItemChange(*item.ParentID)
+	services.PublishWorkspaceChange(params.WorkspaceID)
+	if params.ParentID != nil {
+		services.PublishItemChange(*params.ParentID)
 	}
 	return nil
 }

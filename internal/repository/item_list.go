@@ -83,7 +83,11 @@ type ItemFilters struct {
 	ItemIDs                []int  // Multi-value item ID filter
 	TextQuery              string // LIKE search on title/description
 	ItemKeyQuery           string // Workspace key pattern match (e.g. "OK-40")
-	ItemID                 *int   // Filter by specific item ID
+	// SearchQuery is the smart-search form used by the `search` list filter: it
+	// matches title/description text OR a full KEY-NUMBER item key, so a query
+	// like "OK-40" finds the item whether it appears in prose or as a key.
+	SearchQuery string
+	ItemID      *int // Filter by specific item ID
 }
 
 func (f ItemFilters) hasScalarFilters() bool {
@@ -99,7 +103,7 @@ func (f ItemFilters) hasListFilters() bool {
 }
 
 func (f ItemFilters) hasTextFilters() bool {
-	return f.TextQuery != "" || f.ItemKeyQuery != ""
+	return f.TextQuery != "" || f.ItemKeyQuery != "" || f.SearchQuery != ""
 }
 
 func (f ItemFilters) isUnfiltered() bool {
@@ -200,9 +204,10 @@ var systemFieldSortColumns = map[string]string{
 
 // unsortableCustomFieldTypes lists custom field types that cannot be meaningfully sorted.
 var unsortableCustomFieldTypes = map[string]bool{
-	"multiselect": true,
-	"multi_user":  true,
-	"linking":     true,
+	"multiselect":     true,
+	"multi_milestone": true,
+	"multi_user":      true,
+	"linking":         true,
 }
 
 // numericCustomFieldSortTypes store scalar numbers or entity/option IDs.
@@ -266,7 +271,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
 		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
-		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key,
+		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
 		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
 		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
@@ -610,14 +615,26 @@ func (r *ItemRepository) SearchContext(ctx context.Context, query string, worksp
 
 func itemSearchFilters(query string) ItemFilters {
 	query = strings.TrimSpace(query)
-	// Right-anchor: legacy personal-workspace keys may contain dashes, so the
-	// number is everything after the last one.
-	if lastDash := strings.LastIndex(query, "-"); lastDash > 0 {
-		if num, err := strconv.Atoi(query[lastDash+1:]); err == nil && num > 0 {
-			return ItemFilters{ItemKeyQuery: query}
-		}
+	if _, _, ok := splitItemKeyQuery(query); ok {
+		return ItemFilters{ItemKeyQuery: query}
 	}
 	return ItemFilters{TextQuery: query}
+}
+
+// splitItemKeyQuery parses a KEY-NUMBER reference. The split is right-anchored
+// because legacy personal-workspace keys may contain dashes, so the number is
+// everything after the last one.
+func splitItemKeyQuery(query string) (keyPart string, itemNumber int, ok bool) {
+	query = strings.TrimSpace(query)
+	lastDash := strings.LastIndex(query, "-")
+	if lastDash <= 0 {
+		return "", 0, false
+	}
+	num, err := strconv.Atoi(query[lastDash+1:])
+	if err != nil || num <= 0 {
+		return "", 0, false
+	}
+	return query[:lastDash], num, true
 }
 
 // buildWhereClause constructs the WHERE clause and arguments for item queries
@@ -778,26 +795,32 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	}
 
 	if params.Filters.ItemKeyQuery != "" {
-		// Right-anchored KEY-NUMBER split: workspace keys may contain dashes
-		// (legacy personal-workspace keys), so only the number after the last
-		// dash is the item number.
-		query := strings.ToUpper(params.Filters.ItemKeyQuery)
-		if lastDash := strings.LastIndex(query, "-"); lastDash > 0 {
-			if num, err := strconv.Atoi(query[lastDash+1:]); err == nil && num > 0 {
-				keyPart := query[:lastDash]
-				if strings.Contains(keyPart, "-") {
-					// A multi-segment prefix is ambiguous with prose: queries like
-					// "release-2026-09-18" end in digits but are usually text
-					// (WI-1417). Match the key OR the full query as text.
-					whereClause += " AND ((LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?) OR (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?)))"
-					pattern := "%" + params.Filters.ItemKeyQuery + "%"
-					args = append(args, keyPart, num, pattern, pattern)
-				} else {
-					whereClause += " AND (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?)"
-					args = append(args, keyPart, num)
-				}
+		if keyPart, num, ok := splitItemKeyQuery(params.Filters.ItemKeyQuery); ok {
+			if strings.Contains(keyPart, "-") {
+				// A multi-segment prefix is ambiguous with prose: queries like
+				// "release-2026-09-18" end in digits but are usually text
+				// (WI-1417). Match the key OR the full query as text.
+				whereClause += " AND ((LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?) OR (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?)))"
+				pattern := "%" + params.Filters.ItemKeyQuery + "%"
+				args = append(args, keyPart, num, pattern, pattern)
+			} else {
+				whereClause += " AND (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?)"
+				args = append(args, keyPart, num)
 			}
 		}
+	}
+
+	// Smart search is additive: text matches keep working, and a query that
+	// resolves to a full item key also matches that item wherever it sits.
+	if params.Filters.SearchQuery != "" {
+		pattern := "%" + params.Filters.SearchQuery + "%"
+		clause := "(LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))"
+		args = append(args, pattern, pattern)
+		if keyPart, num, ok := splitItemKeyQuery(params.Filters.SearchQuery); ok {
+			clause = "(LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?) OR (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?))"
+			args = append(args, keyPart, num)
+		}
+		whereClause += " AND " + clause
 	}
 
 	if params.Filters.ItemID != nil {
@@ -933,7 +956,7 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		var dueDate, startDate, endDate sql.NullTime
 		var statusSince sql.NullString
 		var teamID, incidentID sql.NullInt64
-		var itemTypeName, itemTypeBuiltinKey, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
+		var itemTypeName, itemTypeBuiltinKey, itemTypeIcon, itemTypeColor, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
 		var teamName, teamColor, teamAvatar sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName, statusColor sql.NullString
 		var statusBuiltinKey, priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
@@ -948,7 +971,7 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
+			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &itemTypeIcon, &itemTypeColor, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
 			&statusSince,
 			&teamID, &incidentID, &teamName, &teamColor, &teamAvatar,
@@ -998,6 +1021,8 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		item.InheritProject = inheritProject
 		assignNullableString(&item.ItemTypeName, itemTypeName)
 		assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
+		assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
+		assignNullableString(&item.ItemTypeColor, itemTypeColor)
 		assignNullableString(&item.ParentTitle, parentTitle)
 		assignNullableString(&item.IterationName, iterationName)
 		assignNullableString(&item.IterationEndDate, iterationEndDate)

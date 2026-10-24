@@ -8,8 +8,14 @@
 
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-import { AlertTriangle, BookOpen, FileText, Pencil, Plus, Trash2, X } from '@lucide/svelte';
-  import { agentSkills } from '../api.js';
+import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+import BookOpen from '@lucide/svelte/icons/book-open';
+import FileText from '@lucide/svelte/icons/file-text';
+import Pencil from '@lucide/svelte/icons/pencil';
+import Plus from '@lucide/svelte/icons/plus';
+import Trash2 from '@lucide/svelte/icons/trash-2';
+import X from '@lucide/svelte/icons/x';
+  import { agentSkills } from '../api/agentSkills.js';
   import Panel from '../components/Panel.svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';

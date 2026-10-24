@@ -1,7 +1,8 @@
 <script>
   import { assetImportStore } from './AssetImportStore.svelte.js';
   import AlertBox from '../../../components/AlertBox.svelte';
-  import { IconCheck, IconAlertTriangle } from '@tabler/icons-svelte-runes';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);

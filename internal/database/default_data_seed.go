@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"windshift/internal/models"
 )
 
 // Both engines run one shared fresh-install seed sequence so their default
@@ -79,6 +81,19 @@ func seedFreshInstall(db *sql.DB, newSeedWriter func(*sql.Tx) seedWriter) error 
 	return nil
 }
 
+// insertScreenFields writes one screen's field rows in display order.
+func insertScreenFields(w seedWriter, screenID int64, fields []defaultScreenField) error {
+	for _, field := range fields {
+		if _, err := w.Exec(
+			"INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (?, ?, ?, ?, ?, ?)",
+			screenID, field.fieldType, field.fieldIdentifier, field.displayOrder, field.isRequired, field.fieldWidth,
+		); err != nil {
+			return fmt.Errorf("failed to add field %s: %w", field.fieldIdentifier, err)
+		}
+	}
+	return nil
+}
+
 // seedDefaultData inserts the built-in defaults in dependency order: status
 // system, workflow, screen, configuration set, link types, system settings,
 // item types, notification channel, themes, priorities, and notification
@@ -134,26 +149,32 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 5. Default screen.
-	screenID, err := w.insertReturningID(
+	// 5. Default screens. The full screen is inserted first so it keeps the
+	// lowest id and stays the fallback layout (FallbackScreenID); the create
+	// screen is a leaner subset used only by the create form.
+	editScreenID, err := w.insertReturningID(
 		"INSERT INTO screens (builtin_key, name, description) VALUES (?, ?, ?)",
 		"default", "Default Screen", "Default screen with essential work item fields",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create default screen: %w", err)
 	}
-
-	// 6. Screen fields.
-	for _, field := range defaultScreenFields {
-		if _, err := w.Exec(
-			"INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (?, ?, ?, ?, ?, ?)",
-			screenID, field.fieldType, field.fieldIdentifier, field.displayOrder, field.isRequired, field.fieldWidth,
-		); err != nil {
-			return fmt.Errorf("failed to add field %s to default screen: %w", field.fieldIdentifier, err)
-		}
+	if err := insertScreenFields(w, editScreenID, defaultScreenFields); err != nil {
+		return fmt.Errorf("failed to configure default screen: %w", err)
 	}
 
-	// 7. Default configuration set.
+	createScreenID, err := w.insertReturningID(
+		"INSERT INTO screens (builtin_key, name, description) VALUES (?, ?, ?)",
+		"default_create", "Default Create Screen", "Focused screen for creating work items",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create default create screen: %w", err)
+	}
+	if err := insertScreenFields(w, createScreenID, defaultCreateScreenFields); err != nil {
+		return fmt.Errorf("failed to configure default create screen: %w", err)
+	}
+
+	// 6. Default configuration set.
 	configSetID, err := w.insertReturningID(
 		"INSERT INTO configuration_sets (builtin_key, name, description, workflow_id, is_default) VALUES (?, ?, ?, ?, ?)",
 		"default", "Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
@@ -162,17 +183,26 @@ func seedDefaultData(w seedWriter) error {
 		return fmt.Errorf("failed to create default configuration set: %w", err)
 	}
 
-	// 8. Default screen for every context.
-	for _, context := range defaultScreenContexts {
+	// 7. Screen assignments: the lean screen for create, the full screen for
+	// edit and view (which share a layout).
+	screenAssignments := []struct {
+		context  string
+		screenID int64
+	}{
+		{"create", createScreenID},
+		{"edit", editScreenID},
+		{"view", editScreenID},
+	}
+	for _, assignment := range screenAssignments {
 		if _, err := w.Exec(
 			"INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context) VALUES (?, ?, ?)",
-			configSetID, screenID, context,
+			configSetID, assignment.screenID, assignment.context,
 		); err != nil {
-			return fmt.Errorf("failed to assign screen to configuration set for %s context: %w", context, err)
+			return fmt.Errorf("failed to assign %s screen to default configuration set: %w", assignment.context, err)
 		}
 	}
 
-	// 9. Default link types.
+	// 8. Default link types.
 	for _, linkType := range defaultLinkTypes {
 		if _, err := w.Exec(
 			"INSERT INTO link_types (builtin_key, name, description, forward_label, reverse_label, color, is_system, allowed_entity_types) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -182,7 +212,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 10. System settings.
+	// 9. System settings.
 	for _, setting := range defaultSystemSettings {
 		if _, err := w.Exec(
 			"INSERT INTO system_settings (key, value, value_type, description, category) VALUES (?, ?, ?, ?, ?)",
@@ -192,7 +222,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 11. Hierarchy levels.
+	// 10. Hierarchy levels.
 	for _, hl := range defaultHierarchyLevels {
 		if _, err := w.Exec(
 			"INSERT INTO hierarchy_levels (builtin_key, level, name, description) VALUES (?, ?, ?, ?)",
@@ -202,7 +232,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 12. Item types.
+	// 11. Item types.
 	for _, itemType := range defaultItemTypes {
 		if _, err := w.Exec(
 			"INSERT INTO item_types (builtin_key, configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -212,7 +242,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 13. Bind the selected item types to the default configuration set
+	// 12. Bind the selected item types to the default configuration set
 	// (excluding Initiative for the simplified setup).
 	for _, typeName := range defaultItemTypeBindings {
 		var itemTypeID int64
@@ -227,7 +257,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 14. Default notification mail channel. (Built-in email templates are
+	// 13. Default notification mail channel. (Built-in email templates are
 	// seeded separately by emailutil.SeedTemplates during server bootstrap —
 	// keeps the database layer free of email-domain imports.)
 	if _, err := w.Exec(
@@ -237,7 +267,7 @@ func seedDefaultData(w seedWriter) error {
 		return fmt.Errorf("failed to create default notification mail channel: %w", err)
 	}
 
-	// 15. Default themes with dual light/dark nav colors.
+	// 14. Default themes with dual light/dark nav colors.
 	for _, theme := range defaultThemes {
 		if _, err := w.Exec(
 			"INSERT INTO themes (builtin_key, name, description, is_default, is_active, nav_background_color_light, nav_text_color_light, nav_background_color_dark, nav_text_color_dark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -247,7 +277,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 16. Default priorities, if the schema shipped none.
+	// 15. Default priorities, if the schema shipped none.
 	var priorityCount int
 	if err := w.QueryRow("SELECT COUNT(*) FROM priorities").Scan(&priorityCount); err != nil {
 		return fmt.Errorf("failed to check existing priorities: %w", err)
@@ -258,7 +288,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 17. Link every priority to the default configuration set. Priority ids
+	// 16. Link every priority to the default configuration set. Priority ids
 	// are collected first: a transaction cannot run a new statement while
 	// rows from the same transaction are still open (PostgreSQL).
 	priorityRows, err := w.Query("SELECT id FROM priorities")
@@ -291,7 +321,7 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 18. Default notification setting and event rules.
+	// 17. Default notification setting and event rules.
 	// mention.created has no rule by design: mentions always notify the
 	// mentioned user (subject to workspace visibility), enforced in
 	// mention_service.go outside the configurable rules system.
@@ -316,12 +346,22 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 19. Link the notification setting to the default configuration set.
+	// 18. Link the notification setting to the default configuration set.
 	if _, err := w.Exec(
 		"INSERT INTO configuration_set_notification_settings (configuration_set_id, notification_setting_id) VALUES (?, ?)",
 		configSetID, notificationSettingID,
 	); err != nil {
 		return fmt.Errorf("failed to link notification setting to configuration set: %w", err)
+	}
+
+	// 19. Placeholder organisation that absorbs projects and worklogs created
+	// without a real customer, keeping the required-customer invariant.
+	if _, err := w.Exec(
+		"INSERT INTO customer_organisations (builtin_key, name, description, active) VALUES (?, ?, ?, ?)",
+		models.CustomerOrganisationBuiltinNoCustomer, "No customer",
+		"Placeholder for projects and worklogs without a customer", true,
+	); err != nil {
+		return fmt.Errorf("failed to create no-customer organisation: %w", err)
 	}
 
 	return nil

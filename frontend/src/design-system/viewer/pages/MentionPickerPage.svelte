@@ -1,5 +1,6 @@
 <script>
-  import { AtSign, User } from '@lucide/svelte'
+  import AtSign from '@lucide/svelte/icons/at-sign';
+  import User from '@lucide/svelte/icons/user';
 </script>
 
 <div class="p-8 max-w-6xl">

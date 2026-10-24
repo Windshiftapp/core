@@ -155,6 +155,7 @@ const activeTimerJoinedQuery = `
 		at.start_time_utc, at.created_at,
 		tp.name as project_name,
 		tc.name as customer_name,
+		COALESCE(tc.builtin_key, '') as customer_builtin_key,
 		i.title as item_title,
 		ws.name as workspace_name,
 		ws.key as workspace_key,
@@ -180,12 +181,12 @@ func (r *ActiveTimerRepository) GetTimerForUser(userID int) (*models.ActiveTimer
 
 func scanJoinedActiveTimer(row *sql.Row) (*models.ActiveTimer, error) {
 	timer := &models.ActiveTimer{}
-	var projectName, customerName, itemTitle, workspaceName, workspaceKey sql.NullString
+	var projectName, customerName, customerBuiltinKey, itemTitle, workspaceName, workspaceKey sql.NullString
 	var workspaceItemNumber sql.NullInt64
 	err := row.Scan(
 		&timer.ID, &timer.WorkspaceID, &timer.ItemID, &timer.ProjectID, &timer.UserID, &timer.Description,
 		&timer.StartTimeUTC, &timer.CreatedAt,
-		&projectName, &customerName, &itemTitle, &workspaceName, &workspaceKey, &workspaceItemNumber,
+		&projectName, &customerName, &customerBuiltinKey, &itemTitle, &workspaceName, &workspaceKey, &workspaceItemNumber,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -198,6 +199,9 @@ func scanJoinedActiveTimer(row *sql.Row) (*models.ActiveTimer, error) {
 	}
 	if customerName.Valid {
 		timer.CustomerName = &customerName.String
+	}
+	if customerBuiltinKey.Valid && customerBuiltinKey.String != "" {
+		timer.CustomerBuiltinKey = &customerBuiltinKey.String
 	}
 	if itemTitle.Valid {
 		timer.ItemTitle = &itemTitle.String

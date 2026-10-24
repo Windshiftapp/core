@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { api } from '../../api.js';
+  import { pages } from '../../api/pages.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
@@ -39,7 +39,7 @@
     window.addEventListener('afterprint', restoreColorMode);
 
     try {
-      page = await api.pages.getPage(workspaceId, pageId);
+      page = await pages.getPage(workspaceId, pageId);
       // Default the Save-as-PDF filename to the page title.
       savedTitle = document.title;
       if (page?.title) document.title = page.title;

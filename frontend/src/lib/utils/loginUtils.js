@@ -1,5 +1,5 @@
+import { auth } from '../api/auth.js';
 import { authenticateWithCredential, getWebAuthnErrorMessage } from './webauthn-utils.js';
-
 export function getBaseLoginState() {
   return {
     emailOrUsername: '',
@@ -13,13 +13,13 @@ export function getBaseLoginState() {
   };
 }
 
-export async function evaluateFidoAvailability(api, emailOrUsername) {
+export async function evaluateFidoAvailability(emailOrUsername) {
   if (!emailOrUsername?.trim()) {
     return { available: false, showOption: false };
   }
 
   try {
-    await api.auth.startFIDOLogin(emailOrUsername.trim());
+    await auth.startFIDOLogin(emailOrUsername.trim());
     return { available: true, showOption: true };
   } catch (error) {
     // Expected errors: 401 (not authenticated), 404 (no FIDO credentials) - don't spam console
@@ -31,12 +31,12 @@ export async function evaluateFidoAvailability(api, emailOrUsername) {
   }
 }
 
-export async function performFidoLogin(api, emailOrUsername) {
+export async function performFidoLogin(emailOrUsername) {
   if (!emailOrUsername?.trim()) {
     throw new Error('Email or username is required');
   }
 
-  const challengeResponse = await api.auth.startFIDOLogin(emailOrUsername.trim());
+  const challengeResponse = await auth.startFIDOLogin(emailOrUsername.trim());
 
   const sessionId = challengeResponse.sessionId;
   const publicKeyOptions =
@@ -50,7 +50,7 @@ export async function performFidoLogin(api, emailOrUsername) {
 
   const loginData = sessionId ? { sessionId, response: credentialResponse } : credentialResponse;
 
-  return api.auth.completeFIDOLogin(loginData);
+  return auth.completeFIDOLogin(loginData);
 }
 
 export function deriveFidoError(error) {

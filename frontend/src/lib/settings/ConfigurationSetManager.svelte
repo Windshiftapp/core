@@ -3,14 +3,25 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { api } from '../api.js';
+  import { get } from '../api/core.js';
+  import { workflows as workflowsApi } from '../api/workflows.js';
+  import { notificationSettings as notificationSettingsApi } from '../api/notifications.js';
+  import { configurationSets as configurationSetsApi } from '../api/configuration.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { navigate } from '../router.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
-  import {
-    Plus, Edit, Trash2, Settings, Workflow,
-    FileText, Search, AlertCircle, Upload, Layers, Copy, Download
-  } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Edit from '@lucide/svelte/icons/edit';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Workflow from '@lucide/svelte/icons/workflow';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Search from '@lucide/svelte/icons/search';
+  import AlertCircle from '@lucide/svelte/icons/alert-circle';
+  import Upload from '@lucide/svelte/icons/upload';
+  import Layers from '@lucide/svelte/icons/layers';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Download from '@lucide/svelte/icons/download';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -82,11 +93,11 @@
       }
 
       const [configSetsResponse, workspacesData, workflowsData, screensData, notificationSettingsData] = await Promise.all([
-        api.get(`/configuration-sets?${params.toString()}`),
+        get(`/configuration-sets?${params.toString()}`),
         workspacesStore.load(),
-        api.workflows.getAll(),
-        api.get('/screens'),
-        api.notificationSettings.getAll()
+        workflowsApi.getAll(),
+        get('/screens'),
+        notificationSettingsApi.getAll()
       ]);
 
       // Extract pagination data from response
@@ -146,7 +157,7 @@
     if (!confirmed) return;
 
     try {
-      await api.configurationSets.delete(configSet.id);
+      await configurationSetsApi.delete(configSet.id);
       configurationSets = configurationSets.filter(cs => cs.id !== configSet.id);
     } catch (error) {
       console.error('Failed to delete configuration set:', error);
@@ -192,7 +203,7 @@
     // Browser-native download: hits the GET endpoint with the session cookie
     // and streams the JSON to a file. No JS-side parsing required.
     const a = document.createElement('a');
-    a.href = api.configurationSets.exportUrl(configSet.id);
+    a.href = configurationSetsApi.exportUrl(configSet.id);
     a.download = '';
     document.body.appendChild(a);
     a.click();
@@ -211,7 +222,7 @@
     if (!file) return;
     importing = true;
     try {
-      const result = await api.configurationSets.import(file);
+      const result = await configurationSetsApi.import(file);
       // Backend may return either the bare configuration set, or
       // { data, warnings } when warnings were emitted.
       const created = result && result.data ? result.data : result;

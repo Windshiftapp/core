@@ -1,5 +1,11 @@
 <script>
-  import { IconSearch, IconPlus, IconTextSize, IconForms, IconCheckbox, IconSelect, IconAlignBoxLeftTop } from '@tabler/icons-svelte-runes';
+  import IconSearch from '@tabler/icons-svelte-runes/icons/search';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconTextSize from '@tabler/icons-svelte-runes/icons/text-size';
+  import IconForms from '@tabler/icons-svelte-runes/icons/forms';
+  import IconCheckbox from '@tabler/icons-svelte-runes/icons/checkbox';
+  import IconSelect from '@tabler/icons-svelte-runes/icons/select';
+  import IconAlignBoxLeftTop from '@tabler/icons-svelte-runes/icons/align-box-left-top';
   import { t } from '../../stores/i18n.svelte.js';
   import { formBuilderStore } from '../../stores/formBuilderStore.svelte.js';
   import Input from '../../components/Input.svelte';

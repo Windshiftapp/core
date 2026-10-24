@@ -1,9 +1,26 @@
-import { addToast } from '../stores/toasts.svelte.js';
-
 let registrationPromise = null;
 let updateReloadRequested = false;
 const UPDATE_APPLIED_KEY = 'pwa-just-updated';
 const UPDATE_SUPPRESSION_MS = 30_000;
+
+// Injected by the app shell so this module never imports the toast store (and
+// through it i18n) while main.js still owns the registration.
+let notifyUpdateAvailable = null;
+let pendingOffer = null;
+
+/**
+ * @param {{ notifyUpdateAvailable?: null | ((update: { onApply: () => void }) => void) }} [handlers]
+ */
+export function configureServiceWorkerNotifications(handlers = {}) {
+  if (!('notifyUpdateAvailable' in handlers)) return;
+  notifyUpdateAvailable =
+    typeof handlers.notifyUpdateAvailable === 'function' ? handlers.notifyUpdateAvailable : null;
+  if (notifyUpdateAvailable && pendingOffer) {
+    const offer = pendingOffer;
+    pendingOffer = null;
+    offer();
+  }
+}
 
 function recentlyAppliedUpdate() {
   try {
@@ -51,16 +68,14 @@ function monitorRegistration(registration) {
     ) {
       return;
     }
+    if (!notifyUpdateAvailable) {
+      // Hold the offer until the shell registers a notifier. A waiting worker
+      // keeps waiting, so deferring the toast loses nothing.
+      pendingOffer = offerUpdate;
+      return;
+    }
     updateOffered = true;
-    addToast({
-      title: 'Update available',
-      message: 'A new version of Windshift is ready.',
-      variant: 'info',
-      actionLabel: 'Reload',
-      duration: 0,
-      clickable: true,
-      onClick: () => applyWaitingUpdate(registration),
-    });
+    notifyUpdateAvailable({ onApply: () => applyWaitingUpdate(registration) });
   };
 
   const watchInstalling = () => {
@@ -78,6 +93,44 @@ function monitorRegistration(registration) {
   registration.addEventListener?.('updatefound', watchInstalling);
   watchInstalling();
   if (registration.waiting) queueMicrotask(offerUpdate);
+}
+
+/**
+ * Drop service workers and their caches on a dev origin. A worker installed by
+ * an earlier production build on the same origin serves stale modules and
+ * defeats HMR, so the app shell clears it before the first import.
+ * @returns {Promise<number>} number of unregistered workers
+ */
+export async function clearDevelopmentServiceWorkerState() {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker?.getRegistrations) {
+    return 0;
+  }
+
+  /** @type {readonly ServiceWorkerRegistration[]} */
+  let registrations = [];
+  try {
+    registrations = await navigator.serviceWorker.getRegistrations();
+  } catch (error) {
+    console.warn('[mobile] could not list service workers:', error);
+    return 0;
+  }
+
+  await Promise.all(
+    registrations.map((registration) =>
+      Promise.resolve(registration.unregister()).catch(() => false)
+    )
+  );
+
+  if (typeof caches !== 'undefined') {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    } catch (error) {
+      console.warn('[mobile] could not clear dev caches:', error);
+    }
+  }
+
+  return registrations.length;
 }
 
 /**
@@ -115,4 +168,6 @@ export function registerMobileServiceWorker() {
 export function resetServiceWorkerRegistrationForTests() {
   registrationPromise = null;
   updateReloadRequested = false;
+  notifyUpdateAvailable = null;
+  pendingOffer = null;
 }

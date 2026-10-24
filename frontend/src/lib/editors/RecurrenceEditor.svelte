@@ -1,6 +1,6 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
-  import { api } from '../api.js';
+  import { recurrence } from '../api/recurrence.js';
   import { parseRRule, buildRRule, rruleToText, DAY_NAMES, DAY_LABELS, FREQ_LABELS } from './rruleUtils.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import Button from '../components/Button.svelte';
@@ -10,7 +10,10 @@
   import Radio from '../components/Radio.svelte';
   import Select from '../components/Select.svelte';
   import Toggle from '../components/Toggle.svelte';
-  import { Save, Trash2, X, Eye } from '@lucide/svelte';
+  import Save from '@lucide/svelte/icons/save';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import X from '@lucide/svelte/icons/x';
+  import Eye from '@lucide/svelte/icons/eye';
 
   let {
     itemId,
@@ -121,7 +124,7 @@
     previewLoading = true;
     previewError = '';
     try {
-      const result = await api.recurrence.preview({
+      const result = await recurrence.preview({
         rrule: currentRRule,
         dtstart: dtStart,
         count: 5,
@@ -153,9 +156,9 @@
 
       let result;
       if (existingRule) {
-        result = await api.recurrence.update(itemId, data);
+        result = await recurrence.update(itemId, data);
       } else {
-        result = await api.recurrence.create(itemId, data);
+        result = await recurrence.create(itemId, data);
       }
       onsave?.(result);
     } catch (err) {

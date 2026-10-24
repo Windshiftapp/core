@@ -10,8 +10,8 @@ export default {
     clearSelection: 'Auswahl aufheben',
     noResultsFor: 'Keine Ergebnisse für "{query}"',
     createItem: '"{value}" erstellen',
-    noItemsFound: 'Keine Einträge gefunden',
-    noItemsAvailable: 'Keine Einträge verfügbar',
+    noItemsFound: 'Keine Vorgänge gefunden',
+    noItemsAvailable: 'Keine Vorgänge verfügbar',
     selectAsset: 'Asset auswählen',
     noTag: 'Kein Tag',
     selectUser: 'Benutzer auswählen',
@@ -43,9 +43,9 @@ export default {
     defaultConfigurationDescription: 'Verwendet die Standard-Arbeitsbereichseinstellungen',
     noConfigurationSetsFound: 'Keine Konfigurationssätze gefunden',
     entityAlreadyAssigned: '{label} ist bereits zugewiesen',
-    itemType: 'Eintragstyp',
+    itemType: 'Vorgangstyp',
     priorities: 'Prioritäten',
-    itemTypes: 'Eintragstypen',
+    itemTypes: 'Vorgangstypen',
     level: 'Ebene {level}',
     assigned: 'Zugewiesen',
     noEntitiesAssigned: 'Keine {entities} zugewiesen',
@@ -88,11 +88,11 @@ export default {
     fields: {
       title: {
         name: 'Titel',
-        description: 'Eintragstitel',
+        description: 'Vorgangstitel',
       },
       description: {
         name: 'Beschreibung',
-        description: 'Eintragsbeschreibung',
+        description: 'Vorgangsbeschreibung',
       },
       status: {
         name: 'Status',
@@ -104,7 +104,7 @@ export default {
       },
       type: {
         name: 'Typ',
-        description: 'Eintragstyp',
+        description: 'Vorgangstyp',
       },
       assignee: {
         name: 'Bearbeiter',
@@ -112,19 +112,19 @@ export default {
       },
       reporter: {
         name: 'Ersteller',
-        description: 'Wer den Eintrag erstellt hat',
+        description: 'Wer den Vorgang erstellt hat',
       },
       createdAt: {
         name: 'Erstellt am',
-        description: 'Wann der Eintrag erstellt wurde',
+        description: 'Wann der Vorgang erstellt wurde',
       },
       updatedAt: {
         name: 'Aktualisiert am',
-        description: 'Wann der Eintrag zuletzt aktualisiert wurde',
+        description: 'Wann der Vorgang zuletzt aktualisiert wurde',
       },
       dueDate: {
         name: 'Fälligkeitsdatum',
-        description: 'Wann der Eintrag fällig ist',
+        description: 'Wann der Vorgang fällig ist',
       },
       startDate: {
         name: 'Startdatum',
@@ -136,7 +136,7 @@ export default {
       },
       labels: {
         name: 'Labels',
-        description: 'Eintragslabels',
+        description: 'Vorgangslabels',
       },
       sprint: {
         name: 'Sprint',
@@ -148,15 +148,15 @@ export default {
       },
       parent: {
         name: 'Übergeordnet',
-        description: 'Übergeordneter Eintrag',
+        description: 'Übergeordneter Vorgang',
       },
       children: {
         name: 'Untergeordnet',
-        description: 'Untergeordnete Einträge',
+        description: 'Untergeordnete Vorgänge',
       },
       links: {
         name: 'Verknüpfungen',
-        description: 'Verwandte Einträge',
+        description: 'Verwandte Vorgänge',
       },
       attachments: {
         name: 'Anhänge',
@@ -168,7 +168,7 @@ export default {
       },
       watchers: {
         name: 'Beobachter',
-        description: 'Benutzer, die diesen Eintrag beobachten',
+        description: 'Benutzer, die diesen Vorgang beobachten',
       },
       iteration: {
         name: 'Iteration',
@@ -241,6 +241,7 @@ export default {
     numberedList: 'Nummerierte Liste',
     insertImage: 'Bild einfügen',
     userNotFound: 'Benutzer nicht gefunden',
+    multipleUsersMatch: 'Mehrere Benutzer stimmen überein',
   },
   dialogs: {
     cancel: 'Abbrechen',
@@ -276,11 +277,11 @@ export default {
       timerAlreadyRunning: 'Ein Timer läuft bereits. Bitte stoppen Sie ihn, bevor Sie einen neuen starten.',
       noTimerRunning: 'Kein Timer läuft derzeit.',
       timerSyncing: 'Timer wird synchronisiert. Bitte warten Sie und versuchen Sie es erneut.',
-      startTimerFromItem: 'Bitte starten Sie einen Timer innerhalb eines Arbeitselements, um Kontext zu liefern.',
+      startTimerFromItem: 'Bitte starten Sie einen Timer innerhalb eines Vorgangs, um Kontext zu liefern.',
       cannotDeleteDefaultScreen: 'Der Standardbildschirm kann nicht gelöscht werden. Dieser Bildschirm ist für Arbeitsbereiche ohne Konfigurationssatz erforderlich.',
       applicationShuttingDown: 'Anwendung wird heruntergefahren...',
       pdfExportComingSoon: 'PDF-Export für Zeitblock-Ansicht kommt bald',
-      configUpdatedSuccess: 'Konfigurationssatz erfolgreich aktualisiert. Alle Arbeitselemente verwenden bereits Status aus dem neuen Workflow.',
+      configUpdatedSuccess: 'Konfigurationssatz erfolgreich aktualisiert. Alle Vorgänge verwenden bereits Status aus dem neuen Workflow.',
       failedToSave: 'Speichern fehlgeschlagen: {error}',
       failedToDelete: 'Löschen fehlgeschlagen: {error}',
       failedToUpdate: 'Aktualisieren fehlgeschlagen: {error}',
@@ -330,8 +331,8 @@ export default {
     },
     pagination: {
       showingRange: 'Zeige {start}-{end} von {total}',
-      limitedTo: 'begrenzt auf {max} Einträge',
-      itemsPerPage: 'Einträge pro Seite:',
+      limitedTo: 'begrenzt auf {max} Vorgänge',
+      itemsPerPage: 'Vorgänge pro Seite:',
       previousPage: 'Vorherige Seite',
       nextPage: 'Nächste Seite',
       goToPage: 'Gehe zu Seite {page}',
@@ -372,7 +373,7 @@ export default {
     deleteSection: 'Abschnitt löschen',
     editMode: 'Bearbeitungsmodus',
     editDisplaySettings: 'Anzeigeeinstellungen bearbeiten',
-    items: 'Einträge',
+    items: 'Vorgänge',
   },
   widgets: {
     removeWidget: 'Widget entfernen',
@@ -396,7 +397,7 @@ export default {
     mediumWidth: 'Mittel (2/3 Breite)',
     fullWidth: 'Volle Breite',
     chart: {
-      items: 'Einträge',
+      items: 'Vorgänge',
     },
     completionChart: {
       emptyMessage: 'Keine Abschlussdaten verfügbar',
@@ -407,13 +408,13 @@ export default {
     savedSearch: {
       loadingCollections: 'Gespeicherte Sammlungen werden geladen...',
       setupTitle: 'Gespeicherte Sammlung auswählen',
-      setupSubtitle: 'Wähle eine Sammlung, deren Arbeitselemente hier angezeigt werden.',
+      setupSubtitle: 'Wähle eine Sammlung, deren Vorgänge hier angezeigt werden.',
       selectCollection: 'Sammlung auswählen',
       noCollections: 'Keine gespeicherten Sammlungen verfügbar',
       collectionUnavailable: 'Gespeicherte Sammlung nicht verfügbar',
-      itemCount: '{count} Einträge',
-      emptyTitle: 'Keine passenden Arbeitselemente',
-      emptySubtitle: 'Diese gespeicherte Sammlung enthält keine passenden Elemente',
+      itemCount: '{count} Vorgänge',
+      emptyTitle: 'Keine passenden Vorgänge',
+      emptySubtitle: 'Diese gespeicherte Sammlung enthält keine passenden Vorgänge',
       loadError: 'Gespeicherte Sammlung konnte nicht geladen werden',
     },
     milestoneProgress: {
@@ -421,9 +422,9 @@ export default {
       emptySubtitle: 'Erstellen Sie Meilensteine, um den Fortschritt zu verfolgen',
       due: 'Fällig',
       done: 'erledigt',
-      item: 'Element',
-      items: 'Elemente',
-      noItems: 'Keine Elemente',
+      item: 'Vorgang',
+      items: 'Vorgänge',
+      noItems: 'Keine Vorgänge',
       noStatus: 'Kein Status',
       activeMilestone: 'Aktiv',
       noCategorizedWork: 'Keine kategorisierte Arbeit',
@@ -436,12 +437,12 @@ export default {
     },
     overdueItems: {
       loadingStatus: 'Wird geladen...',
-      itemCount: '{count} überfällige Elemente',
-      refreshAriaLabel: 'Überfällige Elemente aktualisieren',
-      loadingText: 'Überfällige Elemente werden geladen...',
-      emptyTitle: 'Keine überfälligen Elemente',
-      emptySubtitle: 'Alle Elemente sind im Zeitplan',
-      loadError: 'Überfällige Elemente konnten nicht geladen werden',
+      itemCount: '{count} überfällige Vorgänge',
+      refreshAriaLabel: 'Überfällige Vorgänge aktualisieren',
+      loadingText: 'Überfällige Vorgänge werden geladen...',
+      emptyTitle: 'Keine überfälligen Vorgänge',
+      emptySubtitle: 'Alle Vorgänge sind im Zeitplan',
+      loadError: 'Überfällige Vorgänge konnten nicht geladen werden',
       daysOverdue: '{days}T überfällig',
     },
     upcomingDeadlines: {
@@ -450,7 +451,7 @@ export default {
       refreshAriaLabel: 'Anstehende Fristen aktualisieren',
       loadingText: 'Anstehende Fristen werden geladen...',
       emptyTitle: 'Keine anstehenden Fristen',
-      emptySubtitle: 'Elemente mit Fälligkeitsdatum erscheinen hier',
+      emptySubtitle: 'Vorgänge mit Fälligkeitsdatum erscheinen hier',
       loadError: 'Anstehende Fristen konnten nicht geladen werden',
     },
     iterationTimeline: {

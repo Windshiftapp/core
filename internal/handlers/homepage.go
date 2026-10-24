@@ -78,6 +78,7 @@ type ItemActivity struct {
 	PriorityBuiltinKey  string  `json:"priority_builtin_key,omitempty"`
 	PriorityColor       *string `json:"priority_color,omitempty"`
 	LastActivity        string  `json:"last_activity"`
+	LastActiveAt        string  `json:"last_active_at,omitempty"`
 	ActivityCount       int     `json:"activity_count"`
 }
 
@@ -257,6 +258,13 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 				}
 				homepageData.WatchedItems = append(homepageData.WatchedItems, item)
 			}
+			// The feed timestamp is the item's own recency, so watched items
+			// surface when any user updates them, not only the watcher.
+			sort.SliceStable(homepageData.WatchedItems, func(i, j int) bool {
+				left, _ := time.Parse(time.RFC3339, homepageData.WatchedItems[i].LastActiveAt)
+				right, _ := time.Parse(time.RFC3339, homepageData.WatchedItems[j].LastActiveAt)
+				return left.After(right)
+			})
 		}
 	}
 
@@ -362,6 +370,17 @@ func (h *HomepageHandler) getItemActivitiesBatch(ctx context.Context, activities
 		itemActivity.StatusColor = optionalString(item.StatusColor)
 		itemActivity.PriorityName = optionalString(item.PriorityName)
 		itemActivity.PriorityColor = optionalString(item.PriorityColor)
+
+		// last_active_at is the item's global recency, so news feeds reflect
+		// updates from any user. last_activity stays the requesting user's own
+		// activity timestamp and is only used by the "your activity" feeds.
+		lastActive := item.LastActiveAt
+		if lastActive.IsZero() {
+			lastActive = item.UpdatedAt
+		}
+		if !lastActive.IsZero() {
+			itemActivity.LastActiveAt = lastActive.Format("2006-01-02T15:04:05Z07:00")
+		}
 
 		if activity, ok := activities[itemActivity.ItemID]; ok {
 			if !activity.ActivityAt.IsZero() {

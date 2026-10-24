@@ -1,6 +1,10 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { ChevronLeft, Send, Sparkles, Loader, Trash2 } from '@lucide/svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import Send from '@lucide/svelte/icons/send';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import Loader from '@lucide/svelte/icons/loader';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { chatStore, preprocessItemKeys } from '../stores/chatStore.svelte.js';
   import { buildChatContext } from '../features/chat/chatContext.js';
   import { currentRoute, navigate } from '../router.js';

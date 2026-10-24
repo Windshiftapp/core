@@ -1,5 +1,7 @@
+import { milestones as milestonesApi } from '../../api/milestones.js';
+
 /** Load test statistics for every visible milestone with one batch request. */
-export async function loadMilestoneTestStatistics(apiClient, milestones) {
+export async function loadMilestoneTestStatistics(milestones) {
   const ids = [
     ...new Set(
       (Array.isArray(milestones) ? milestones : [])
@@ -8,7 +10,7 @@ export async function loadMilestoneTestStatistics(apiClient, milestones) {
     ),
   ];
   if (ids.length === 0) return {};
-  const statistics = await apiClient.milestones.getTestStatisticsMany(ids);
+  const statistics = await milestonesApi.getTestStatisticsMany(ids);
   return statistics && typeof statistics === 'object' && !Array.isArray(statistics)
     ? statistics
     : {};

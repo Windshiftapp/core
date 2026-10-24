@@ -1,6 +1,7 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown, Check } from '@lucide/svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Check from '@lucide/svelte/icons/check';
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
@@ -217,7 +218,10 @@
             class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
             style="background-color: {triggerIconBgColor};"
           >
-            <TriggerIconComp class="w-3.5 h-3.5 text-white" />
+            <TriggerIconComp
+              class="w-3.5 h-3.5"
+              style="color: {getTextColorForBackground(triggerIconBgColor)}"
+            />
           </div>
         {:else}
           {@const TriggerIconComp = triggerIcon}
@@ -404,11 +408,12 @@
             data-menu-item
             data-testid={itemData.testid || undefined}
             data-id={itemData.id ?? undefined}
-            role="menuitem"
+            role={itemData.selected !== undefined ? 'menuitemradio' : 'menuitem'}
+            aria-checked={itemData.selected !== undefined ? (itemData.selected ? 'true' : 'false') : undefined}
             aria-disabled={itemData.disabled ? 'true' : undefined}
             tabindex={itemData.disabled ? -1 : 0}
             onclick={(e) => handleItemClick(itemData, e)}
-            class="menu-item flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {itemData.disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''} {itemData.class || ''}"
+            class="menu-item flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {itemData.selected ? 'menu-item-selected' : ''} {itemData.disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''} {itemData.class || ''}"
             style="color: {itemData.color || 'var(--ds-text)'}; {itemData.style || ''}"
           >
             {#if itemData.type === 'checkbox'}
@@ -468,6 +473,16 @@
 <style>
   .menu-item:hover {
     background-color: var(--ds-surface-raised-hovered);
+  }
+
+  /* A selected radio row keeps a subtle tint instead of the neutral hover so
+     the choice stays readable without a separate "selected" badge. */
+  .menu-item-selected {
+    background-color: var(--ds-background-selected);
+  }
+
+  .menu-item-selected:hover {
+    background-color: var(--ds-background-selected);
   }
 
   /* Radio-checked items keep their selected background instead of the hover. */

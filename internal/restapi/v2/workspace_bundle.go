@@ -76,6 +76,20 @@ func registerWorkspaceBundleRoutes(b *routeBuilder, deps Deps) {
 				return nil, err
 			}
 		}
+		// The nav preset and SLA seeds are workspace configuration, not content.
+		// Their dedicated routes require workspace admin (board-configuration
+		// writes and SLA calendar/metric creation), so a content import must not
+		// become a side door that writes them.
+		if bundle.Payload.ViewSettings != nil || bundle.Payload.SLAs != nil {
+			isAdmin, err := deps.PageAccess.HasWorkspacePermissionFor(user.ID, workspaceID, models.PermissionWorkspaceAdmin)
+			if err != nil {
+				return nil, internalError(err)
+			}
+			if !isAdmin {
+				return nil, newError(http.StatusForbidden, "insufficient_permission",
+					"Importing a bundle with view settings or SLAs requires workspace admin permission")
+			}
+		}
 		// The importer needs create rights over both content kinds the
 		// bundle carries; individual entities re-check through their own
 		// application services.

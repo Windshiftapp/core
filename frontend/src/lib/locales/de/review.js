@@ -3,114 +3,114 @@ export default {
   "settings": {
     "adminItems": {
       "linkTypes": {
-        "description": "Verknüpfungstypen zwischen Arbeitselementen verwalten"
+        "description": "Verknüpfungstypen zwischen Vorgängen verwalten"
       }
     },
     "aiFeatures": {
       "features": {
         "dependency_analysis": {
-          "description": "Abhängigkeiten zwischen Arbeitselementen analysieren und vorschlagen"
+          "description": "Abhängigkeiten zwischen Vorgängen analysieren und vorschlagen"
         }
       }
     },
     "permissions": {
-      "itemPermissions": "Arbeitselement-Berechtigungen"
+      "itemPermissions": "Vorgangs-Berechtigungen"
     }
   },
   "common": {
-    "ticketsComingSoon": "Arbeitselementverwaltung kommt bald"
+    "ticketsComingSoon": "Vorgangsverwaltung kommt bald"
   },
   "channel": {
-    "itemCreation": "Arbeitselementerstellung"
+    "itemCreation": "Vorgangserstellung"
   },
   "jiraImport": {
     "mapping": {
-      "issueTypesDesc": "Arbeitselementtypen werden als Arbeitselementtypen in Windshift erstellt"
+      "issueTypesDesc": "Vorgangstypen werden als Vorgangstypen in Windshift erstellt"
     },
     "preview": {
-      "itemTypes": "Arbeitselementtypen"
+      "itemTypes": "Vorgangstypen"
     }
   },
   "migrationAssistant": {
-    "itemTypes": "Arbeitselementtypen",
-    "itemTypeMigrations": "Arbeitselementtyp-Migrationen"
+    "itemTypes": "Vorgangstypen",
+    "itemTypeMigrations": "Vorgangstyp-Migrationen"
   },
   "itemTypes": {
-    "title": "Arbeitselementtypen",
-    "subtitle": "Arbeitselementtypen und ihre Eigenschaften konfigurieren",
-    "itemType": "Arbeitselementtyp",
-    "itemTypes_one": "{count} Arbeitselementtyp",
-    "itemTypes_other": "{count} Arbeitselementtypen",
-    "createItemType": "Arbeitselementtyp erstellen",
-    "editItemType": "Arbeitselementtyp bearbeiten",
-    "deleteItemType": "Arbeitselementtyp löschen",
-    "noItemTypes": "Keine Arbeitselementtypen gefunden",
-    "itemTypeCreated": "Arbeitselementtyp erfolgreich erstellt",
-    "itemTypeUpdated": "Arbeitselementtyp erfolgreich aktualisiert",
-    "itemTypeDeleted": "Arbeitselementtyp erfolgreich gelöscht"
+    "title": "Vorgangstypen",
+    "subtitle": "Vorgangstypen und ihre Eigenschaften konfigurieren",
+    "itemType": "Vorgangstyp",
+    "itemTypes_one": "{count} Vorgangstyp",
+    "itemTypes_other": "{count} Vorgangstypen",
+    "createItemType": "Vorgangstyp erstellen",
+    "editItemType": "Vorgangstyp bearbeiten",
+    "deleteItemType": "Vorgangstyp löschen",
+    "noItemTypes": "Keine Vorgangstypen gefunden",
+    "itemTypeCreated": "Vorgangstyp erfolgreich erstellt",
+    "itemTypeUpdated": "Vorgangstyp erfolgreich aktualisiert",
+    "itemTypeDeleted": "Vorgangstyp erfolgreich gelöscht"
   },
   "auditLog": {
-    "itemTypeCreated": "Arbeitselementtyp erstellt",
-    "itemTypeUpdated": "Arbeitselementtyp aktualisiert",
-    "itemTypeDeleted": "Arbeitselementtyp gelöscht",
-    "itemType": "Arbeitselementtyp"
+    "itemTypeCreated": "Vorgangstyp erstellt",
+    "itemTypeUpdated": "Vorgangstyp aktualisiert",
+    "itemTypeDeleted": "Vorgangstyp gelöscht",
+    "itemType": "Vorgangstyp"
   },
   "commandPalette": {
     "commands": {
       "collections": {
-        "description": "Arbeitselementsammlungen und Ansichten verwalten"
+        "description": "Vorgangssammlungen und Ansichten verwalten"
       },
       "createCollection": {
-        "description": "Neue Arbeitselementsammlung erstellen"
+        "description": "Neue Vorgangssammlung erstellen"
       },
       "adminHierarchyLevels": {
-        "description": "Arbeitselement-Hierarchieebenen konfigurieren"
+        "description": "Vorgangs-Hierarchieebenen konfigurieren"
       },
       "adminStatuses": {
-        "description": "Einzelne Arbeitselementstatus verwalten"
+        "description": "Einzelne Vorgangsstatus verwalten"
       }
     }
   },
   "onboarding": {
-    "getStartedMessage": "Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Arbeitselements beginnen"
+    "getStartedMessage": "Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Vorgangs beginnen"
   },
   "pickers": {
-    "itemType": "Arbeitselementtyp",
-    "itemTypes": "Arbeitselementtypen",
+    "itemType": "Vorgangstyp",
+    "itemTypes": "Vorgangstypen",
     "fields": {
       "title": {
-        "description": "Arbeitselementtitel"
+        "description": "Vorgangstitel"
       },
       "description": {
-        "description": "Arbeitselementbeschreibung"
+        "description": "Vorgangsbeschreibung"
       },
       "type": {
-        "description": "Arbeitselementtyp"
+        "description": "Vorgangstyp"
       },
       "labels": {
-        "description": "Arbeitselementlabels"
+        "description": "Vorgangslabels"
       }
     }
   },
   "items": {
-    "itemType": "Arbeitselementtyp",
-    "workItemInformation": "Arbeitselementinformationen",
-    "workItemDetails": "Arbeitselementdetails",
-    "errorLoadingWorkItem": "Fehler beim Laden des Arbeitselements",
-    "cascadeDeleteFailed": "Löschen des Arbeitselementbaums fehlgeschlagen",
-    "clickToViewDetails": "Klicken, um Arbeitselementdetails anzuzeigen"
+    "itemType": "Vorgangstyp",
+    "workItemInformation": "Vorgangsinformationen",
+    "workItemDetails": "Vorgangsdetails",
+    "errorLoadingWorkItem": "Fehler beim Laden des Vorgangs",
+    "cascadeDeleteFailed": "Löschen des Vorgangsbaums fehlgeschlagen",
+    "clickToViewDetails": "Klicken, um Vorgangsdetails anzuzeigen"
   },
   "collectionTree": {
     "itemKey": "Schlüssel"
   },
   "collections": {
-    "selectItemType": "Arbeitselementtyp auswählen",
-    "noCollectionsFound": "Erstellen Sie Ihre erste Sammlung, um Arbeitselementabfragen zu speichern und wiederzuverwenden."
+    "selectItemType": "Vorgangstyp auswählen",
+    "noCollectionsFound": "Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden."
   },
   "workspaceSettings": {
-    "enableInternalCommentsHint": "Ermöglicht es, Kommentare bei allen Arbeitselementen als interne Notizen zu markieren, nicht nur bei Portal-Anfragen."
+    "enableInternalCommentsHint": "Ermöglicht es, Kommentare bei allen Vorgängen als interne Notizen zu markieren, nicht nur bei Portal-Anfragen."
   },
   "approvalSets": {
-    "approverSourceCreator": "Ersteller des Arbeitselements"
+    "approverSourceCreator": "Ersteller des Vorgangs"
   }
 };

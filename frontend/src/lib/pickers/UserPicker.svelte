@@ -1,8 +1,9 @@
 <script>
-  import { ChevronDown, X } from '@lucide/svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import X from '@lucide/svelte/icons/x';
   import { BasePicker } from '.';
   import { createAsyncLoader } from '../composables';
-  import { api } from '../api.js';
+  import { getAssignableUsers, getUsers } from '../api/users.js';
   import { onDestroy, onMount } from 'svelte';
   import Avatar from '../components/Avatar.svelte';
   import Text from '../components/Text.svelte';
@@ -37,7 +38,7 @@
 
   // Load users — use assignable-users endpoint when workspaceId is provided
   const loader = createAsyncLoader(() =>
-    workspaceId ? api.getAssignableUsers(workspaceId) : api.getUsers()
+    workspaceId ? getAssignableUsers(workspaceId) : getUsers()
   );
   onMount(() => { if (!users) loader.load(); });
   onDestroy(() => loader.dispose());
@@ -65,6 +66,31 @@
     if (!user) return '';
     return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.username || '';
   }
+
+  // Display names are not unique. The username is the stable handle, so show
+  // it whenever the roster contains another user with the same name. Emails
+  // are only present for rosters that include them (for example /users).
+  function displayNameKey(user) {
+    return `${user?.first_name || ''} ${user?.last_name || ''}`.trim().toLowerCase();
+  }
+
+  function userHandleLine(user) {
+    const handle = user?.username ? `@${user.username}` : '';
+    return [handle, user?.email || ''].filter(Boolean).join(' · ');
+  }
+
+  const duplicateDisplayNames = $derived.by(() => {
+    const counts = new Map();
+    for (const user of usersList) {
+      const key = displayNameKey(user);
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  });
+
+  const selectedNameAmbiguous = $derived(
+    !!selectedUser && (duplicateDisplayNames.get(displayNameKey(selectedUser)) || 0) > 1
+  );
 
   function handleSelect(user) {
     onSelect(user);
@@ -114,6 +140,9 @@
           {#if selectedUser && showSelectedInTrigger}
             <Avatar src={selectedUser.avatar_url} firstName={selectedUser.first_name} lastName={selectedUser.last_name} size="xs" />
             <span class="truncate">{selectedUser.first_name} {selectedUser.last_name}</span>
+            {#if selectedNameAmbiguous && selectedUser.username}
+              <Text size="xs" variant="subtle" truncate class="shrink-0">@{selectedUser.username}</Text>
+            {/if}
           {:else if !selectedUser && showSelectedInTrigger && value != null && (resolveMissingLabel?.(value) || '')}
             <span class="truncate">{resolveMissingLabel(value)}</span>
           {:else}
@@ -143,7 +172,7 @@
             <span class="inline-block w-2 h-2 rounded-full shrink-0" style="background-color: {presence.color};" title={presence.label} data-testid={`agent-presence-${user.id}`}></span>
           {/if}
         </span>
-        <Text size="xs" variant="subtle" truncate>{user.email}</Text>
+        <Text size="xs" variant="subtle" truncate>{userHandleLine(user)}</Text>
       </div>
     </div>
   {/snippet}

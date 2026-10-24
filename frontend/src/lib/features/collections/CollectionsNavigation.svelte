@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { Tag, FolderOpen } from '@lucide/svelte';
+  import Tag from '@lucide/svelte/icons/tag';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import NavigationSidebar from '../../layout/NavigationSidebar.svelte';

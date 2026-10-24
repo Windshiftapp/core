@@ -6,7 +6,12 @@
   import SlaTeamBindingsTab from './SlaTeamBindingsTab.svelte';
   import SlaComplianceReportTab from './SlaComplianceReportTab.svelte';
   import TabStrip from '../../components/TabStrip.svelte';
-  import { BarChart3, BellRing, Calendar, Gauge, Handshake, RefreshCw } from '@lucide/svelte';
+  import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
+  import BellRing from '@lucide/svelte/icons/bell-ring';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import Gauge from '@lucide/svelte/icons/gauge';
+  import Handshake from '@lucide/svelte/icons/handshake';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { workspaceId = null } = $props();

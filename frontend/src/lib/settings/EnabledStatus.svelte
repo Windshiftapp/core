@@ -1,5 +1,6 @@
 <script>
-  import { Power, PowerOff } from '@lucide/svelte';
+  import Power from '@lucide/svelte/icons/power';
+  import PowerOff from '@lucide/svelte/icons/power-off';
   import { t } from '../stores/i18n.svelte.js';
 
   let { enabled = false } = $props();

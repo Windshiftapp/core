@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconTag } from '@tabler/icons-svelte-runes';
+  import IconTag from '@tabler/icons-svelte-runes/icons/tag';
   import { navigate, currentRoute } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
   import Button from '../../components/Button.svelte';

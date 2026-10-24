@@ -1,7 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { BookOpen, ChevronRight, FileText } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import BookOpen from '@lucide/svelte/icons/book-open';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import { portal } from '../api/portal.js';
   import { navigate } from '../router.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import StateDisplay from '../components/StateDisplay.svelte';
@@ -38,7 +40,7 @@
     loading = true;
     error = '';
     try {
-      const result = await api.portal.listKnowledgeBasePages(slug);
+      const result = await portal.listKnowledgeBasePages(slug);
       pages = Array.isArray(result) ? result : (result?.data ?? []);
     } catch (err) {
       error = err?.message || 'Failed to load the knowledge base.';

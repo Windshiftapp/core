@@ -1,7 +1,11 @@
 <script>
-  import { api } from '../../api.js';
+  import { contactRoles, customerOrganisations, portalCustomers } from '../../api/portal.js';
+  import { time } from '../../api/time.js';
   import Progress from '../../components/Progress.svelte';
-  import { Clock, Briefcase, User, X } from '@lucide/svelte';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Briefcase from '@lucide/svelte/icons/briefcase';
+  import User from '@lucide/svelte/icons/user';
+  import X from '@lucide/svelte/icons/x';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -48,19 +52,19 @@
       error = '';
 
       // Create the customer organisation
-      createdCustomer = await api.customerOrganisations.create(customerData);
+      createdCustomer = await customerOrganisations.create(customerData);
       projectData.customer_id = createdCustomer.id;
 
       // Create a portal customer (contact) for this organisation
       // Get role IDs for "Primary Contact" and "Portal Customer"
-      const roles = await api.contactRoles.getAll();
+      const roles = await contactRoles.getAll();
       const primaryContactRole = roles.find(r => r.name === 'Primary Contact');
       const portalCustomerRole = roles.find(r => r.name === 'Portal Customer');
       const roleIds = [primaryContactRole?.id, portalCustomerRole?.id].filter(id => id != null);
 
       // Create the portal customer with the contact person info
       if (customerData.contact_person && customerData.email) {
-        await api.portalCustomers.create({
+        await portalCustomers.create({
           name: customerData.contact_person,
           email: customerData.email,
           customer_organisation_id: createdCustomer.id,
@@ -88,7 +92,7 @@
     try {
       loading = true;
       error = '';
-      createdProject = await api.time.projects.create(projectData);
+      createdProject = await time.projects.create(projectData);
       return true;
     } catch (err) {
       console.error('Failed to create project:', err);

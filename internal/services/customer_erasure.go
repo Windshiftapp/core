@@ -243,11 +243,12 @@ func EraseCustomerWithOptions(db database.Database, customerID int, actor AuditA
 
 	// Email tracking rows keep the ticket thread intact but lose the erased
 	// sender identity; subject lines remain part of the retained ticket
-	// record.
+	// record. Match case-insensitively: the address is stored as it arrived
+	// in the From header, which may differ in case from portal_customers.email.
 	if priorEmail != "" {
 		if _, err := tx.Exec(`
 			UPDATE email_message_tracking SET from_email = ?, from_name = ?
-			WHERE from_email = ?
+			WHERE UPPER(from_email) = UPPER(?)
 		`, pseudonymEmail, pseudonymName, priorEmail); err != nil {
 			return evidence, fmt.Errorf("failed to de-identify email tracking rows: %w", err)
 		}

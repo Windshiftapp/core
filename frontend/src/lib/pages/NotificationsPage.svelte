@@ -1,7 +1,11 @@
 <script>
   import { onMount } from 'svelte';
   import { notifications, notificationActions } from '../stores/notifications.js';
-  import { Bell, Check, Filter, MoreHorizontal, X } from '@lucide/svelte';
+  import Bell from '@lucide/svelte/icons/bell';
+  import Check from '@lucide/svelte/icons/check';
+  import Filter from '@lucide/svelte/icons/filter';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast } from '../stores/toasts.svelte.js';

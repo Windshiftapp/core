@@ -1,5 +1,6 @@
 <script>
-  import { X, ChevronDown } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { onClickOutside } from 'runed';
   import Label from '../components/Label.svelte';
   import Input from '../components/Input.svelte';

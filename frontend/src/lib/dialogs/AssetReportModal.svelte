@@ -1,6 +1,8 @@
 <script>
-  import { Trash2 } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { assetSets } from '../api/assets.js';
+  import { itemTypes as itemTypesApi } from '../api/configuration.js';
+  import { assetReports, requestTypes as requestTypesApi } from '../api/channels.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import BasePicker from '../pickers/BasePicker.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
@@ -63,9 +65,9 @@
   async function loadPickers() {
     try {
       const [sets, itemTypes, requestTypes] = await Promise.all([
-        api.assetSets.getAll(),
-        api.itemTypes.getAll(),
-        channelId ? api.requestTypes.getForChannel(channelId) : Promise.resolve([])
+        assetSets.getAll(),
+        itemTypesApi.getAll(),
+        channelId ? requestTypesApi.getForChannel(channelId) : Promise.resolve([])
       ]);
       availableAssetSets = sets || [];
       availableItemTypes = itemTypes || [];
@@ -93,7 +95,7 @@
   async function loadRequestTypeFields(requestTypeId) {
     if (!requestTypeId || requestTypeFields[requestTypeId]) return;
     try {
-      const fields = await api.requestTypes.getFields(requestTypeId);
+      const fields = await requestTypesApi.getFields(requestTypeId);
       requestTypeFields = { ...requestTypeFields, [requestTypeId]: fields || [] };
     } catch (err) {
       console.error('Failed to load request type fields:', err);
@@ -281,9 +283,9 @@
       };
 
       if (mode === 'create') {
-        await api.assetReports.create(channelId, payload);
+        await assetReports.create(channelId, payload);
       } else {
-        await api.assetReports.update(channelId, assetReport.id, {
+        await assetReports.update(channelId, assetReport.id, {
           ...payload,
           column_config: assetReport.column_config,
           visibility_group_ids: assetReport.visibility_group_ids,

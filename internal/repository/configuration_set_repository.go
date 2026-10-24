@@ -14,7 +14,9 @@ import (
 )
 
 // FallbackScreenID is the absolute worst-case screen used when neither the
-// assigned nor the default configuration set resolves a screen for a mode.
+// assigned nor the default configuration set resolves a screen for a mode. It
+// points at the full edit/view screen, which carries more fields than the lean
+// create screen, so an unresolved mode never hides data.
 const FallbackScreenID = 1
 
 // ConfigurationSetRepository provides data access methods for configuration sets

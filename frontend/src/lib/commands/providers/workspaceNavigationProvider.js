@@ -1,11 +1,14 @@
 import {
   testNavigationItems,
+  visibleWorkspaceSettingsItems,
   workspaceOnlyViews,
+  workspaceSettingsRoute,
+  workspaceSettingsSubtitleKeys,
   workspaceViewItems,
 } from '../../navigation/workspaceNavigation.js';
-import { workspacePermissions } from '../../stores';
 import { t } from '../../stores/i18n.svelte.js';
 import { viewSettingsStore } from '../../stores/viewSettings.svelte.js';
+import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 
@@ -89,6 +92,34 @@ export function workspaceNavigationProvider(ctx) {
           bucket: BUCKET.WORKSPACE_NAVIGATION,
           keywords: ['test', 'testing', 'qa', view.id, label.toLowerCase()],
           url: `/workspaces/${workspaceId}/${slug}`,
+        })
+      );
+    }
+  }
+
+  // Workspace settings modules. The settings area itself needs workspace.admin;
+  // permissioned modules are filtered exactly like the settings sidebar.
+  if (!collectionId && workspacePermissions.canAdminWorkspace(workspaceId)) {
+    const settings = visibleWorkspaceSettingsItems(workspaceId, (wsId, permission) =>
+      workspacePermissions.hasPermission(wsId, permission)
+    );
+    for (const item of settings) {
+      const label = t(item.labelKey);
+      out.push(
+        createCommand({
+          id: `workspace-settings-${item.id}`,
+          label: `${name}: ${label}`,
+          description: t(workspaceSettingsSubtitleKeys[item.id] || 'workspaceSettings.title'),
+          bucket: BUCKET.WORKSPACE_NAVIGATION,
+          keywords: [
+            'settings',
+            'admin',
+            'workspace',
+            item.id,
+            label.toLowerCase(),
+            name.toLowerCase(),
+          ],
+          url: workspaceSettingsRoute(workspaceId, item.id),
         })
       );
     }

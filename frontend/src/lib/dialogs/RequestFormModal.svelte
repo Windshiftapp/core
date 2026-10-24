@@ -1,7 +1,9 @@
 <script>
-  import { api } from '../api.js';
+  import { portal } from '../api/portal.js';
+  import { requestTypes } from '../api/channels.js';
+  import { customFields } from '../api/configuration.js';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { authStore } from '../stores';
+  import { authStore } from '../stores/auth.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { iconMap } from '../stores/portalPresentation.js';
@@ -9,7 +11,11 @@
   import Checkbox from '../components/Checkbox.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import PortalModal from './PortalModal.svelte';
-  import { ChevronLeft, ChevronRight, Package, Paperclip, X } from '@lucide/svelte';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Package from '@lucide/svelte/icons/package';
+  import Paperclip from '@lucide/svelte/icons/paperclip';
+  import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
   import FormFields from '../features/forms/FormFields.svelte';
   import {
@@ -113,9 +119,9 @@
       // Load request type fields configuration
       // Use portal API if on portal, otherwise use internal API
       if (portalSlug) {
-        fields = await api.portal.getRequestTypeFields(portalSlug, requestType.id);
+        fields = await portal.getRequestTypeFields(portalSlug, requestType.id);
       } else {
-        fields = await api.requestTypes.getFields(requestType.id);
+        fields = await requestTypes.getFields(requestType.id);
       }
 
       // Calculate steps from field data
@@ -126,9 +132,9 @@
       // Use portal API if on portal (only returns fields used by this portal)
       // Otherwise use internal API (returns all fields)
       if (portalSlug) {
-        customFieldDefinitions = await api.portal.getCustomFields(portalSlug) || [];
+        customFieldDefinitions = await portal.getCustomFields(portalSlug) || [];
       } else {
-        customFieldDefinitions = await api.customFields.getAll();
+        customFieldDefinitions = await customFields.getAll();
       }
 
       const initialValues = initializeFormValues(fields, null, customFieldDefinitions);
@@ -155,7 +161,7 @@
 
   async function applyDraftIfPresent() {
     try {
-      const draft = await api.portal.drafts.getForRequestType(portalSlug, requestType.id);
+      const draft = await portal.drafts.getForRequestType(portalSlug, requestType.id);
       if (!draft) {
         resumedDraft = null;
         return;
@@ -230,7 +236,7 @@
     savingDraft = true;
     draftJustSaved = false;
     try {
-      const saved = await api.portal.drafts.save(portalSlug, buildDraftPayload());
+      const saved = await portal.drafts.save(portalSlug, buildDraftPayload());
       if (saved) {
         draftJustSaved = true;
         if (draftSavedTimer) clearTimeout(draftSavedTimer);
@@ -249,7 +255,7 @@
   async function startFreshFromDraft() {
     if (!portalSlug || !requestType) return;
     try {
-      await api.portal.drafts.delete(portalSlug, requestType.id);
+      await portal.drafts.delete(portalSlug, requestType.id);
     } catch (err) {
       // 404 (no draft to delete) is fine — the user is starting fresh anyway.
       if (err?.status !== 404) {
@@ -335,7 +341,7 @@
         share_with_organisation: canShareWithOrg && shareWithOrganisation
       };
 
-      const result = await api.portal.submit(portalSlug, submissionData);
+      const result = await portal.submit(portalSlug, submissionData);
 
       // Upload staged files to the created request. The request already
       // exists at this point, so per-file failures are reported but never
@@ -345,7 +351,7 @@
         const failures = [];
         for (const file of stagedFiles) {
           try {
-            await api.portal.addRequestAttachment(portalSlug, result.item_id, file);
+            await portal.addRequestAttachment(portalSlug, result.item_id, file);
           } catch (err) {
             console.error('Failed to upload attachment after submit:', err);
             failures.push(file.name);
@@ -362,7 +368,7 @@
       // submission see a consistent view without depending on backend
       // ordering. Best-effort.
       if (portalSlug) {
-        api.portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
+        portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
           if (err?.status !== 404) {
             console.warn('Failed to delete draft after submit:', err);
           }

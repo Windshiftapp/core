@@ -354,6 +354,9 @@ func (c *workspaceTemplateClone) recordCreatedItems() error {
 	records := make([]itemevents.CreateRecord, 0, len(items))
 	metadata := c.eventMetadata()
 	for _, item := range items {
+		if err := RecordItemCreationHistory(c.service.db, c.tx, item, c.creator, nil, metadata); err != nil {
+			return fmt.Errorf("record cloned item creation history: %w", err)
+		}
 		records = append(records, itemevents.CreateRecord{Item: item, Metadata: metadata})
 	}
 	_, err = itemevents.NewRecorder(c.service.db).CreatedBatch(c.ctx, c.tx, records)

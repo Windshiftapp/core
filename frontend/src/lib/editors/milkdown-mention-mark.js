@@ -48,6 +48,7 @@ function createMentionDecorations(doc) {
             Decoration.inline(from + 2, to - 1, {
               class: 'mention-chip mention-chip-name',
               'data-mention': identifier,
+              'data-testid': `mention-chip-${identifier}`,
             })
           );
 
@@ -63,6 +64,7 @@ function createMentionDecorations(doc) {
             Decoration.inline(from, to, {
               class: 'mention-chip',
               'data-mention': identifier,
+              'data-testid': `mention-chip-${identifier}`,
             })
           );
         }

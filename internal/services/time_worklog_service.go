@@ -136,28 +136,30 @@ func (s *TimeWorklogService) ListPage(filter repository.WorklogDetailFilter) ([]
 // WorklogDailyAggregate splits one worklog's elapsed minutes across the civil
 // days it touches, in the reporting timezone.
 type WorklogDailyAggregate struct {
-	Day          string `json:"day"`
-	UserID       int    `json:"user_id"`
-	UserName     string `json:"user_name"`
-	ProjectID    int    `json:"project_id"`
-	ProjectName  string `json:"project_name"`
-	CustomerID   int    `json:"customer_id"`
-	CustomerName string `json:"customer_name"`
-	Minutes      int64  `json:"minutes"`
+	Day                string `json:"day"`
+	UserID             int    `json:"user_id"`
+	UserName           string `json:"user_name"`
+	ProjectID          int    `json:"project_id"`
+	ProjectName        string `json:"project_name"`
+	CustomerID         int    `json:"customer_id"`
+	CustomerName       string `json:"customer_name"`
+	CustomerBuiltinKey string `json:"customer_builtin_key,omitempty"`
+	Minutes            int64  `json:"minutes"`
 }
 
 // WorklogTotalAggregate sums booked duration and entry counts per
 // (user, project, customer) — not day-partitioned, matching the stored
 // duration_minutes contract.
 type WorklogTotalAggregate struct {
-	UserID          int    `json:"user_id"`
-	UserName        string `json:"user_name"`
-	ProjectID       int    `json:"project_id"`
-	ProjectName     string `json:"project_name"`
-	CustomerID      int    `json:"customer_id"`
-	CustomerName    string `json:"customer_name"`
-	DurationMinutes int64  `json:"duration_minutes"`
-	Entries         int64  `json:"entries"`
+	UserID             int    `json:"user_id"`
+	UserName           string `json:"user_name"`
+	ProjectID          int    `json:"project_id"`
+	ProjectName        string `json:"project_name"`
+	CustomerID         int    `json:"customer_id"`
+	CustomerName       string `json:"customer_name"`
+	CustomerBuiltinKey string `json:"customer_builtin_key,omitempty"`
+	DurationMinutes    int64  `json:"duration_minutes"`
+	Entries            int64  `json:"entries"`
 }
 
 // WorklogAggregate is the report document: day-split minutes for charts and
@@ -229,6 +231,7 @@ func (s *TimeWorklogService) Aggregate(ctx context.Context, filter repository.Wo
 				Day: slice.Day, UserID: input.UserID, UserName: input.UserName,
 				ProjectID: input.ProjectID, ProjectName: input.ProjectName,
 				CustomerID: input.CustomerID, CustomerName: input.CustomerName,
+				CustomerBuiltinKey: input.CustomerBuiltinKey,
 			}
 			idx, ok := dailyIndex[key]
 			if !ok {
@@ -244,6 +247,7 @@ func (s *TimeWorklogService) Aggregate(ctx context.Context, filter repository.Wo
 			UserID: input.UserID, UserName: input.UserName,
 			ProjectID: input.ProjectID, ProjectName: input.ProjectName,
 			CustomerID: input.CustomerID, CustomerName: input.CustomerName,
+			CustomerBuiltinKey: input.CustomerBuiltinKey,
 		}
 		idx, ok := totalIndex[key]
 		if !ok {

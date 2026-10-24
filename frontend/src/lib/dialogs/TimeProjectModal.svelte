@@ -3,6 +3,7 @@
   import Label from '../components/Label.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { isNoCustomer } from '../utils/customerLabel.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 	import TextField from '../components/TextField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
@@ -68,7 +69,7 @@
     <div>
       <SelectField
         label={t('timeProject.customerOptional')}
-        options={[{ value: '', label: t('timeProject.none') }, ...customers.filter(c => c.active).map(customer => ({ value: customer.id, label: customer.name }))]}
+        options={[{ value: '', label: t('time.noCustomer') }, ...customers.filter(c => c.active && !isNoCustomer(c)).map(customer => ({ value: customer.id, label: customer.name }))]}
         bind:value={formData.customer_id}
       />
     </div>

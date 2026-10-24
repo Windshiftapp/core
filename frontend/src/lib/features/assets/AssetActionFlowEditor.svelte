@@ -1,5 +1,10 @@
 <script>
-  import { FileText, Pencil, Bell, HelpCircle, Zap, X } from '@lucide/svelte';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Bell from '@lucide/svelte/icons/bell';
+  import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import Zap from '@lucide/svelte/icons/zap';
+  import X from '@lucide/svelte/icons/x';
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
@@ -16,7 +21,8 @@
   import { assetActionFlowStore } from '../../stores/assetActionFlowStore.svelte.js';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
-  import { api } from '../../api.js';
+  import { assetStatuses as assetStatusesApi, assetTypes as assetTypesApi } from '../../api/assets.js';
+  import { getUsers } from '../../api/users.js';
   import { t } from '../../stores/i18n.svelte.js';
   import {
     assetActionConditionFields,
@@ -57,8 +63,8 @@
     }
     const token = ++taxonomyLoadToken;
     Promise.all([
-      api.assetTypes.getAll(setId),
-      api.assetStatuses.getAll(setId),
+      assetTypesApi.getAll(setId),
+      assetStatusesApi.getAll(setId),
     ]).then(([types, statuses]) => {
       if (token !== taxonomyLoadToken) return;
       assetTypes = types || [];
@@ -77,7 +83,7 @@
       assetCustomFields = [];
       return;
     }
-    loadAssetActionCustomFields(api, typeId).then((result) => {
+    loadAssetActionCustomFields(typeId).then((result) => {
       if (token !== fieldLoadToken) return;
       assetCustomFields = result;
     }).catch(() => {
@@ -87,7 +93,7 @@
   });
 
   $effect(() => {
-    api.getUsers().then((result) => {
+    getUsers().then((result) => {
       users = result || [];
     }).catch(() => {
       users = [];

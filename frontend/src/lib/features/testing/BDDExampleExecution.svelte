@@ -1,6 +1,6 @@
 <script>
-  import { Loader2 } from '@lucide/svelte';
-  import { api } from '../../api.js';
+  import Loader2 from '@lucide/svelte/icons/loader-2';
+  import { tests } from '../../api/tests/index.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Badge from '../../components/Badge.svelte';
   import { parseScenarioSpec, flattenExamples, applyExampleRow } from './bddSpec.js';
@@ -85,7 +85,7 @@
   async function saveExample(exampleIndex, fields) {
     saving = { ...saving, [exampleIndex]: true };
     try {
-      await api.tests.testRuns.updateExampleResult(workspaceId, runId, testCase.id, exampleIndex, fields);
+      await tests.testRuns.updateExampleResult(workspaceId, runId, testCase.id, exampleIndex, fields);
       notifyChange();
     } catch (err) {
       console.error('Failed to save example result:', err);
@@ -126,7 +126,7 @@
   async function saveExampleStep(exampleIndex, stepNumber, fields) {
     saving = { ...saving, [`${exampleIndex}_${stepNumber}`]: true };
     try {
-      await api.tests.testRuns.updateExampleStepResult(
+      await tests.testRuns.updateExampleStepResult(
         workspaceId,
         runId,
         testCase.id,

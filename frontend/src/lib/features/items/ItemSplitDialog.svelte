@@ -4,7 +4,8 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import TextField from '../../components/TextField.svelte';
   import SelectField from '../../components/SelectField.svelte';
-  import { api } from '../../api.js';
+  import { getComments } from '../../api/misc.js';
+  import { items } from '../../api/items.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { isOpen = $bindable(false), item = null, itemTypes = [], onSplit = null } = $props();
@@ -52,7 +53,7 @@
     loadingComments = true;
     error = '';
     try {
-      const result = await api.getComments(item.id);
+      const result = await getComments(item.id);
       comments = result?.comments || result || [];
     } catch (err) {
       comments = [];
@@ -82,7 +83,7 @@
     try {
       splitting = true;
       error = '';
-      const result = await api.items.split(item.id, {
+      const result = await items.split(item.id, {
         title: title.trim(),
         item_type_id: itemTypeId,
         comment_ids: [...selected],

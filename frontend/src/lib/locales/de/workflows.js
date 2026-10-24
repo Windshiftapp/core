@@ -127,7 +127,7 @@ export default {
 
   screens: {
     title: 'Masken',
-    subtitle: 'Feldlayouts für Einträge und Projekte definieren',
+    subtitle: 'Feldlayouts für Vorgänge und Projekte definieren',
     screen: 'Maske',
     screens_one: '{count} Maske',
     screens_other: '{count} Masken',
@@ -175,7 +175,7 @@ export default {
       'Die Standardmaske kann nicht gelöscht werden. Diese Maske wird für Arbeitsbereiche ohne Konfigurationsset benötigt.',
     confirmDeleteScreen:
       'Möchten Sie die Maske "{name}" wirklich löschen? Dies betrifft alle Arbeitsbereiche, die diese Maske verwenden.',
-    defaults: { default: { name: 'Standardmaske', description: 'Standardmaske mit den wichtigsten Aufgabenfeldern' } },
+    defaults: { default: { name: 'Standardmaske', description: 'Standardmaske mit den wichtigsten Aufgabenfeldern' }, default_create: { name: 'Standard-Erstellungsmaske', description: 'Fokussierte Maske zum Erstellen von Aufgaben' } },
     fieldWidths: {
       full: 'Volle Breite',
       half: 'Halbe Breite',

@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { getScopeCatalog } from '../api/users.js';
 
 let catalog = $state([]);
 let loading = $state(false);
@@ -15,7 +15,7 @@ async function load({ force = false } = {}) {
   error = null;
   const currentLoadId = ++loadId;
   loadPromise = Promise.resolve()
-    .then(() => api.getScopeCatalog?.())
+    .then(() => getScopeCatalog?.())
     .then((result) => {
       if (currentLoadId !== loadId) return catalog;
       catalog = result || [];

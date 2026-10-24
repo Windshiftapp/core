@@ -21,8 +21,9 @@ func registerAttachmentRoutes(builder *routeBuilder, deps Deps) {
 	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/items/{item_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"items:write"}, uploadItemAttachment(attachments))
 	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"pages:write"}, uploadPageAttachment(deps))
 	builder.Read("/attachments/{attachment_id}", AuthAuthenticated, []string{"items:read"}, getItemAttachment(attachments))
-	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/content", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, false))
-	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/thumbnail", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, true))
+	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/content", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, attachmentServeContent))
+	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/download", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, attachmentServeDownload))
+	builder.RawResponse[[]byte](http.MethodGet, "/attachments/{attachment_id}/thumbnail", http.StatusOK, "application/octet-stream", AuthAuthenticated, []string{"items:read"}, serveItemAttachment(attachments, attachmentServeThumbnail))
 	builder.Command(http.MethodDelete, "/attachments/{attachment_id}", AuthAuthenticated, []string{"items:write"}, deleteItemAttachment(attachments))
 }
 
@@ -140,7 +141,21 @@ func uploadItemAttachment(attachments attachmentApplication) Handler {
 	}
 }
 
-func serveItemAttachment(attachments attachmentApplication, thumbnail bool) Handler {
+// attachmentServeMode selects the response headers for a stored attachment.
+type attachmentServeMode int
+
+const (
+	// attachmentServeContent is the rendering endpoint: renderable media is
+	// served inline so browsers can display it (e.g. the PDF lightbox iframe),
+	// while everything else falls back to a forced download.
+	attachmentServeContent attachmentServeMode = iota
+	// attachmentServeDownload always forces a download.
+	attachmentServeDownload
+	// attachmentServeThumbnail serves the generated JPEG thumbnail.
+	attachmentServeThumbnail
+)
+
+func serveItemAttachment(attachments attachmentApplication, mode attachmentServeMode) Handler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		user, err := principal(r)
 		if err != nil {
@@ -150,7 +165,7 @@ func serveItemAttachment(attachments attachmentApplication, thumbnail bool) Hand
 		if err != nil {
 			return err
 		}
-		binary, err := attachments.OpenItemAttachment(user.ID, attachmentID, thumbnail)
+		binary, err := attachments.OpenItemAttachment(user.ID, attachmentID, mode == attachmentServeThumbnail)
 		if err != nil {
 			return attachmentError(err)
 		}
@@ -162,10 +177,22 @@ func serveItemAttachment(attachments attachmentApplication, thumbnail bool) Hand
 		w.Header().Set("Content-Type", binary.MimeType)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("ETag", fmt.Sprintf("\"attachment-%d-%d\"", attachmentID, binary.FileSize))
-		if thumbnail {
+		switch mode {
+		case attachmentServeThumbnail:
 			w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
-		} else {
+		case attachmentServeDownload:
 			w.Header().Set("Content-Disposition", fileserve.ContentDisposition("attachment", binary.OriginalFilename))
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+		default:
+			// Renderable media is served inline; the frontend download flow
+			// uses the dedicated download endpoint and fetches the bytes as a
+			// blob, so it does not depend on this disposition.
+			if fileserve.IsInlineSafeMimeType(binary.MimeType) {
+				w.Header().Set("Content-Disposition", fileserve.ContentDisposition("inline", binary.OriginalFilename))
+			} else {
+				w.Header().Set("Content-Disposition", fileserve.ContentDisposition("attachment", binary.OriginalFilename))
+				w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+			}
 		}
 		http.ServeContent(w, r, binary.OriginalFilename, info.ModTime(), binary.File)
 		return nil

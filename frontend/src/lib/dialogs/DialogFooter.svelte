@@ -18,6 +18,13 @@
    *     <Button variant="ghost" onclick={resetForm}>Reset</Button>
    *   {/snippet}
    * </DialogFooter>
+   *
+   * @example with an alternate confirm action
+   * <DialogFooter onCancel={close} onConfirm={save}>
+   *   {#snippet secondaryAction()}
+   *     <Button onclick={saveAndApply}>Save and apply</Button>
+   *   {/snippet}
+   * </DialogFooter>
    */
   let {
     cancelLabel = null,
@@ -30,6 +37,7 @@
     onCancel = null,
     onConfirm = null,
     extra = null,
+    secondaryAction = null,
     confirmType = 'button',
     showKeyboardHint = false,
     cancelKeyboardHint = 'Esc',
@@ -62,6 +70,9 @@
       >
         {cancelLabel ?? t('dialogs.cancel')}
       </Button>
+    {/if}
+    {#if secondaryAction}
+      {@render secondaryAction()}
     {/if}
     {#if onConfirm}
       <Button

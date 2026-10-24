@@ -224,7 +224,10 @@ func (h *RunnerBrokerHandler) ProxyLLM(w http.ResponseWriter, r *http.Request) {
 
 	// Inference can outlive the server's ordinary 30s response deadline.
 	unbindStreamDeadlines(w)
-	response, err := client.Complete(r.Context(), request)
+	// A run is one conversation. Every turn, retry, and tool call from the
+	// harness shares this id so the provider can route and cache consistently.
+	ctx := llm.WithSessionID(r.Context(), fmt.Sprintf("ws-run-%d", runID))
+	response, err := client.Complete(ctx, request)
 	if err != nil {
 		respondServiceUnavailable(w, r, services.RedactString(err.Error()))
 		return

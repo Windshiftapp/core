@@ -1,5 +1,8 @@
 <script>
-  import { Plus, ChevronUp, ChevronDown, Trash2 } from '@lucide/svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import HubPortalCard from './HubPortalCard.svelte';

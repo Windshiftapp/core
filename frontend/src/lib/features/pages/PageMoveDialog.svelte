@@ -3,7 +3,7 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
-  import { api } from '../../api.js';
+  import { pages } from '../../api/pages.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { isSelfOrDescendant } from './pageHierarchy.js';
@@ -60,7 +60,7 @@
     loading = true;
     error = '';
     try {
-      const all = (await api.pages.getAll(destinationWorkspaceId)) || [];
+      const all = (await pages.getAll(destinationWorkspaceId)) || [];
       if (rememberSource) sourceTree = all;
       candidates = destinationWorkspaceId === workspaceId
         ? all.filter((candidate) => {
@@ -108,7 +108,7 @@
     saving = true;
     error = '';
     try {
-      const moved = await api.pages.movePage(workspaceId, page.id, pickedParentId, {
+      const moved = await pages.movePage(workspaceId, page.id, pickedParentId, {
         destinationWorkspaceId: pickedWorkspaceId,
       });
       isOpen = false;

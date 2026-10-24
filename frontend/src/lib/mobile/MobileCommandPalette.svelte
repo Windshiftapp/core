@@ -1,9 +1,10 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { Loader, Search } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Loader from '@lucide/svelte/icons/loader';
+  import Search from '@lucide/svelte/icons/search';
+  import { search } from '../api/misc.js';
   import { navigate } from '../router.js';
-  import { workspacesStore } from '../stores';
+  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { BUCKET_LABEL_KEYS } from '../commands/buckets.js';
   import { buildContext } from '../commands/context.js';
   import { buildCommands } from '../commands/buildCommands.js';
@@ -93,7 +94,7 @@
     searching = true;
     try {
       const [itemsRes, pagesRes] = await Promise.allSettled([
-        api.search.items({ query: trimmed, limit: 6, signal: ac.signal }),
+        search.items({ query: trimmed, limit: 6, signal: ac.signal }),
         searchPagesAcrossWorkspaces(workspacesForSearch, trimmed, { signal: ac.signal }),
       ]);
       if (seq !== searchSeq) return;

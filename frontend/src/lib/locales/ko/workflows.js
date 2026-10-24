@@ -181,6 +181,10 @@ export default {
       "default": {
         "name": "기본 화면",
         "description": "필수 작업 필드가 있는 기본 화면"
+      },
+      "default_create": {
+        "name": "기본 생성 화면",
+        "description": "작업 항목 생성을 위한 간결한 화면"
       }
     },
     "fieldWidths": {

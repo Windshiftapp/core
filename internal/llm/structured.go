@@ -41,6 +41,11 @@ func CompleteStructured[T any](
 	client Client,
 	req CompletionRequest,
 ) (*T, error) {
+	// The parse/schema retry below is the same logical request, so both
+	// attempts share one provider session.
+	if SessionIDFromContext(ctx) == "" {
+		ctx = WithSessionID(ctx, NewSessionID("ws-structured"))
+	}
 	for attempt := 0; attempt < 2; attempt++ {
 		resp, err := client.Complete(ctx, req)
 		if err != nil {

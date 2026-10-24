@@ -4,7 +4,10 @@
   import { viewSettingsStore } from '../../stores/viewSettings.svelte.js';
   import { collectionStore } from '../../stores/collectionContext.svelte.js';
   import { authStore } from '../../stores/auth.svelte.js';
-  import { SquareKanban, Inbox, Settings, Globe } from '@lucide/svelte';
+  import SquareKanban from '@lucide/svelte/icons/square-kanban';
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import Settings from '@lucide/svelte/icons/settings';
+  import Globe from '@lucide/svelte/icons/globe';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 
   // Props

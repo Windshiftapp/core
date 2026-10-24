@@ -1,5 +1,5 @@
 <script>
-  import { Send } from '@lucide/svelte';
+  import Send from '@lucide/svelte/icons/send';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

@@ -8,8 +8,8 @@ import MilestoneActivity from './MilestoneActivity.svelte';
 
 const mocks = vi.hoisted(() => ({ getActivity: vi.fn() }));
 
-vi.mock('../../api.js', () => ({
-  api: { milestones: { getActivity: mocks.getActivity } },
+vi.mock('../../api/milestones.js', () => ({
+  milestones: { getActivity: mocks.getActivity },
 }));
 vi.mock('../../stores/i18n.svelte.js', () => ({ t: (key) => key }));
 

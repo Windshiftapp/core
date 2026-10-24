@@ -73,21 +73,33 @@ func NewProviderClient(cfg ConnectionConfig) Client {
 		baseURL = provider.BaseURL
 	}
 
-	switch ResolveGenerationProtocol(cfg.ProviderType, cfg.BaseURL, cfg.ProviderConfig) {
-	case APIContractAnthropic:
-		return newFantasyClient(baseURL, cfg.Model, cfg.APIKey, APIContractAnthropic, provider.ChatPath, cfg.ProviderConfig, cfg.Timeout)
-	case APIContractResponses:
-		return newFantasyClient(baseURL, cfg.Model, cfg.APIKey, APIContractResponses, provider.ChatPath, cfg.ProviderConfig, cfg.Timeout)
-	default:
-		return newFantasyClient(baseURL, cfg.Model, cfg.APIKey, APIContractChatCompletions, provider.ChatPath, cfg.ProviderConfig, cfg.Timeout)
-	}
+	return newFantasyClient(fantasyClientOptions{
+		baseURL:        baseURL,
+		model:          cfg.Model,
+		apiKey:         cfg.APIKey,
+		protocol:       ResolveGenerationProtocolForModel(cfg.ProviderType, cfg.Model, cfg.BaseURL, cfg.ProviderConfig),
+		chatPath:       provider.ChatPath,
+		providerConfig: cfg.ProviderConfig,
+		timeout:        cfg.Timeout,
+		userAgent:      provider.UserAgent,
+		sessionHeader:  provider.SessionHeader,
+	})
 }
 
 // ResolveGenerationProtocol resolves the connection once into the protocol
-// its model client must speak. The coding-agent binding receives this value so
-// it uses the same dispatch decision as in-process callers without learning a
-// provider credential or upstream URL.
+// its model client must speak, ignoring any per-model routing. It remains for
+// callers that have no model context; prefer ResolveGenerationProtocolForModel.
 func ResolveGenerationProtocol(providerType ProviderType, baseURL, providerConfig string) string {
+	return ResolveGenerationProtocolForModel(providerType, "", baseURL, providerConfig)
+}
+
+// ResolveGenerationProtocolForModel resolves the protocol for a specific model.
+// An explicit provider_config api_contract wins; otherwise a provider that
+// routes by model (OpenCode Go) uses the model's format, falling back to the
+// provider default. The coding-agent binding receives this value so it uses the
+// same dispatch decision as in-process callers without learning a provider
+// credential or upstream URL.
+func ResolveGenerationProtocolForModel(providerType ProviderType, model, baseURL, providerConfig string) string {
 	provider := GetProvider(providerType)
 	if provider == nil {
 		return APIContractChatCompletions
@@ -98,6 +110,9 @@ func ResolveGenerationProtocol(providerType ProviderType, baseURL, providerConfi
 	contract := ProviderConfigAPIContract(providerConfig)
 	if contract == APIContractResponses || contract == APIContractChatCompletions {
 		return contract
+	}
+	if format := ModelAPIFormat(providerType, model); format != "" {
+		return format
 	}
 	usesCatalogEndpoint := baseURL == "" || strings.TrimRight(baseURL, "/") == strings.TrimRight(provider.BaseURL, "/")
 	if provider.APIFormat == "openai-responses" && usesCatalogEndpoint {

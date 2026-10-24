@@ -28,13 +28,14 @@ type FindSimilarResponse struct {
 
 // SimilarItem represents a similar item identified by the LLM.
 type SimilarItem struct {
-	ItemID      int    `json:"item_id"`
-	ItemKey     string `json:"item_key"`
-	Title       string `json:"title"`
-	StatusName  string `json:"status_name"`
-	Similarity  string `json:"similarity"`
-	Reason      string `json:"reason"`
-	WorkspaceID int    `json:"workspace_id"`
+	ItemID                  int    `json:"item_id"`
+	ItemKey                 string `json:"item_key"`
+	Title                   string `json:"title"`
+	StatusName              string `json:"status_name"`
+	Similarity              string `json:"similarity"`
+	Reason                  string `json:"reason"`
+	WorkspaceID             int    `json:"workspace_id"`
+	CreatorPortalCustomerID *int   `json:"creator_portal_customer_id,omitempty"`
 }
 
 // DecomposeResponse is the response for the Decompose Item endpoint.
@@ -420,13 +421,14 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 		key := strings.TrimPrefix(strings.TrimSuffix(si.ItemKey, "]"), "[")
 		if candidate, ok := candidateMap[key]; ok {
 			enriched = append(enriched, SimilarItem{
-				ItemID:      candidate.ID,
-				ItemKey:     candidate.ItemKey,
-				Title:       candidate.Title,
-				StatusName:  candidate.StatusName,
-				Similarity:  si.Similarity,
-				Reason:      si.Reason,
-				WorkspaceID: item.WorkspaceID,
+				ItemID:                  candidate.ID,
+				ItemKey:                 candidate.ItemKey,
+				Title:                   candidate.Title,
+				StatusName:              candidate.StatusName,
+				Similarity:              si.Similarity,
+				Reason:                  si.Reason,
+				WorkspaceID:             item.WorkspaceID,
+				CreatorPortalCustomerID: candidate.CreatorPortalCustomerID,
 			})
 		}
 	}

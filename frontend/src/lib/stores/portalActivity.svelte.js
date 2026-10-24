@@ -1,7 +1,7 @@
-import { api } from '../api.js';
+import { portal } from '../api/portal.js';
 import { confirm } from '../composables/useConfirm.js';
 import { navigate } from '../router.js';
-import { authStore } from '../stores';
+import { authStore } from './auth.svelte.js';
 import { portalAuthStore } from './portalAuth.svelte.js';
 import { errorToast } from './toasts.svelte.js';
 
@@ -66,7 +66,7 @@ async function loadRequests() {
   const loadId = ++requestsLoadId;
   loadingRequests = true;
   try {
-    const result = await api.portal.getMyRequests(slug);
+    const result = await portal.getMyRequests(slug);
     if (loadId === requestsLoadId) requests = result || [];
   } catch (err) {
     console.error('Failed to load requests:', err);
@@ -81,7 +81,7 @@ async function loadComments(itemId) {
   const loadId = ++commentsLoadId;
   loadingComments = true;
   try {
-    const result = await api.portal.getRequestComments(slug, itemId);
+    const result = await portal.getRequestComments(slug, itemId);
     if (loadId === commentsLoadId) comments = result || [];
   } catch (err) {
     console.error('Failed to load comments:', err);
@@ -95,7 +95,7 @@ async function loadAttachments(itemId) {
   if (!slug) return;
   const loadId = ++attachmentsLoadId;
   try {
-    const result = await api.portal.getRequestAttachments(slug, itemId);
+    const result = await portal.getRequestAttachments(slug, itemId);
     if (loadId === attachmentsLoadId) attachments = result || [];
   } catch (err) {
     // Attachments stay empty on failure; the timeline must still render.
@@ -110,7 +110,7 @@ async function addAttachment(file) {
   const requestId = selectedRequest.id;
   try {
     uploadingAttachment = true;
-    const result = await api.portal.addRequestAttachment(slug, requestId, file);
+    const result = await portal.addRequestAttachment(slug, requestId, file);
     // The upload endpoint answers with an AttachmentUploadResponse wrapper;
     // list entries are bare attachment objects.
     const attachment = result?.attachment ?? result;
@@ -137,16 +137,16 @@ async function loadAndViewRequest(requestId) {
   const slug = context.getSlug();
   if (!slug) return;
   try {
-    let request = await api.portal.getRequestDetail(slug, requestId);
+    let request = await portal.getRequestDetail(slug, requestId);
     // A merged duplicate is a redirect to its canonical (WI-1528). Follow a
     // bounded chain so a stale deep link lands on the live thread. When the
     // canonical is not readable here (a cross-requester merge keeps the
     // content on the source), fall back to the duplicate itself.
     for (let hops = 0; request?.merged_into_item_id && hops < 5; hops += 1) {
       try {
-        request = await api.portal.getRequestDetail(slug, request.merged_into_item_id);
+        request = await portal.getRequestDetail(slug, request.merged_into_item_id);
       } catch {
-        request = await api.portal.getRequestDetail(slug, requestId);
+        request = await portal.getRequestDetail(slug, requestId);
         break;
       }
     }
@@ -164,7 +164,7 @@ async function addComment() {
   const draft = newComment;
   try {
     addingComment = true;
-    const comment = await api.portal.addRequestComment(slug, requestId, draft);
+    const comment = await portal.addRequestComment(slug, requestId, draft);
     // The user may have switched requests while the POST was in flight; apply
     // the result only to the request it belongs to.
     if (selectedRequest?.id !== requestId) return;
@@ -217,7 +217,7 @@ async function loadDrafts() {
   const loadId = ++draftsLoadId;
   loadingDrafts = true;
   try {
-    const result = await api.portal.drafts.list(slug);
+    const result = await portal.drafts.list(slug);
     if (loadId === draftsLoadId) drafts = result || [];
   } catch (err) {
     console.error('Failed to load drafts:', err);
@@ -231,7 +231,7 @@ async function deleteDraft(requestTypeId) {
   const slug = context.getSlug();
   if (!slug || requestTypeId == null) return;
   try {
-    await api.portal.drafts.delete(slug, requestTypeId);
+    await portal.drafts.delete(slug, requestTypeId);
     drafts = drafts.filter((draft) => draft.request_type_id !== requestTypeId);
   } catch (err) {
     if (err?.status !== 404) {
@@ -270,7 +270,7 @@ async function loadApprovals() {
   const loadId = ++approvalsLoadId;
   loadingApprovals = true;
   try {
-    const result = await api.portal.getMyApprovals(slug);
+    const result = await portal.getMyApprovals(slug);
     if (loadId === approvalsLoadId) approvals = result || [];
   } catch (err) {
     console.error('Failed to load approvals:', err);
@@ -286,13 +286,13 @@ async function loadAndViewApproval(approvalId, _replaceState = true) {
   const loadId = ++approvalDetailLoadId;
   loadingApprovalDetail = true;
   try {
-    const detail = await api.portal.getApproval(slug, approvalId);
+    const detail = await portal.getApproval(slug, approvalId);
     if (loadId !== approvalDetailLoadId) return;
     selectedApproval = detail;
     selectedApprovalRequest = null;
     if (detail?.item_id) {
       try {
-        selectedApprovalRequest = await api.portal.getRequestDetail(slug, detail.item_id);
+        selectedApprovalRequest = await portal.getRequestDetail(slug, detail.item_id);
       } catch (err) {
         console.warn('Failed to load request context for approval:', err);
       }
@@ -326,7 +326,7 @@ async function decideApproval(decision) {
   }
   try {
     decidingApproval = true;
-    await api.portal.decideApproval(slug, selectedApproval.id, decision, approvalComment);
+    await portal.decideApproval(slug, selectedApproval.id, decision, approvalComment);
     approvalComment = '';
     await loadAndViewApproval(selectedApproval.id);
     await loadApprovals();
@@ -455,7 +455,7 @@ export const portalRequestsStore = {
   attachmentUrl: (attachmentId) => {
     const slug = context.getSlug();
     if (!slug || !selectedRequest) return '#';
-    return api.portal.requestAttachmentUrl(slug, selectedRequest.id, attachmentId);
+    return portal.requestAttachmentUrl(slug, selectedRequest.id, attachmentId);
   },
   closeDetail: closeRequestDetail,
   toggle: toggleRequests,

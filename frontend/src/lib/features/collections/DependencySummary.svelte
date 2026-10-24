@@ -1,5 +1,6 @@
 <script>
-  import { AlertTriangle, GitBranch } from '@lucide/svelte';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import { t } from '../../stores/i18n.svelte.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import { splitDependencies, dependencyKey } from './dependencySummary.js';

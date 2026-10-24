@@ -1,15 +1,13 @@
 <script>
-  import {
-    Building,
-    ChevronRight,
-    FileText,
-    FolderOpen,
-    ListPlus,
-    Send,
-    Settings2,
-    Target,
-    X,
-  } from '@lucide/svelte';
+  import Building from '@lucide/svelte/icons/building';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import FolderOpen from '@lucide/svelte/icons/folder-open';
+  import ListPlus from '@lucide/svelte/icons/list-plus';
+  import Send from '@lucide/svelte/icons/send';
+  import Settings2 from '@lucide/svelte/icons/settings-2';
+  import Target from '@lucide/svelte/icons/target';
+  import X from '@lucide/svelte/icons/x';
   import AlertBox from '../../../lib/components/AlertBox.svelte';
   import Button from '../../../lib/components/Button.svelte';
   import Tabs from '../../../lib/components/Tabs.svelte';

@@ -10,14 +10,24 @@ import (
 // per-connection vision override. It is windshift-private — see
 // reservedProviderConfigKeys.
 const (
-	providerConfigVisionModeKey  = "vision_mode"
-	providerConfigAPIContractKey = "api_contract"
-	providerConfigReasoningKey   = "reasoning"
+	providerConfigVisionModeKey      = "vision_mode"
+	providerConfigAPIContractKey     = "api_contract"
+	providerConfigReasoningLevelKey  = "reasoning_level"
+	providerConfigMaxOutputTokensKey = "max_output_tokens"
 
 	APIContractAuto            = "auto"
 	APIContractResponses       = "responses"
 	APIContractChatCompletions = "chat_completions"
 	APIContractAnthropic       = "anthropic"
+)
+
+// Normalized reasoning levels accepted in provider_config.reasoning_level.
+// ReasoningLevelDefault leaves the provider's own reasoning behavior in place.
+const (
+	ReasoningLevelDefault = "default"
+	ReasoningLevelLow     = "low"
+	ReasoningLevelMedium  = "medium"
+	ReasoningLevelHigh    = "high"
 )
 
 // reservedProviderConfigKeys are provider_config keys that windshift interprets
@@ -26,20 +36,16 @@ const (
 // key like vision_mode would be sent to OpenAI/OpenRouter as an unknown request
 // field and could be rejected.
 var reservedProviderConfigKeys = map[string]bool{
-	providerConfigVisionModeKey:  true,
-	providerConfigAPIContractKey: true,
-	providerConfigReasoningKey:   true,
+	providerConfigVisionModeKey:      true,
+	providerConfigAPIContractKey:     true,
+	providerConfigReasoningLevelKey:  true,
+	providerConfigMaxOutputTokensKey: true,
 }
 
-// ResponsesReasoningConfig contains the Responses reasoning controls that
-// Windshift accepts from a connection's provider_config. It is deliberately
-// limited to the request fields used by the Responses API so the private
-// connection setting cannot leak to another provider protocol.
-type ResponsesReasoningConfig struct {
-	Effort       string `json:"effort,omitempty"`
-	Summary      string `json:"summary,omitempty"`
-	BudgetTokens int64  `json:"budget_tokens,omitempty"`
-}
+// reasoningOverrideKeys are provider-native reasoning fields. When an operator
+// sets any of them the value is forwarded verbatim and takes precedence over the
+// normalized reasoning_level setting.
+var reasoningOverrideKeys = []string{"reasoning", "reasoning_effort", "thinking"}
 
 // ValidateProviderConfig verifies the per-connection provider_config blob.
 // It is intentionally generic: any provider can use it, but it must be a JSON
@@ -75,20 +81,49 @@ func ValidateProviderConfig(raw string) error {
 			return fmt.Errorf("provider_config.api_contract must be one of auto, responses, chat_completions")
 		}
 	}
-	if rawReasoning, ok := cfg[providerConfigReasoningKey]; ok {
-		var reasoningObject map[string]json.RawMessage
-		if err := json.Unmarshal(rawReasoning, &reasoningObject); err != nil || reasoningObject == nil {
-			return fmt.Errorf("provider_config.reasoning must be an object with string effort and summary fields")
+	if rawLevel, ok := cfg[providerConfigReasoningLevelKey]; ok {
+		var level string
+		if err := json.Unmarshal(rawLevel, &level); err != nil {
+			return fmt.Errorf("provider_config.reasoning_level must be a string")
 		}
-		var reasoning ResponsesReasoningConfig
-		if err := json.Unmarshal(rawReasoning, &reasoning); err != nil {
-			return fmt.Errorf("provider_config.reasoning must contain valid effort, summary, and budget_tokens fields")
+		if !isValidReasoningLevel(strings.ToLower(strings.TrimSpace(level))) {
+			return fmt.Errorf("provider_config.reasoning_level must be one of default, low, medium, high")
 		}
-		if reasoning.BudgetTokens < 0 {
-			return fmt.Errorf("provider_config.reasoning.budget_tokens must be non-negative")
+	}
+	if rawMax, ok := cfg[providerConfigMaxOutputTokensKey]; ok {
+		var value int
+		if err := json.Unmarshal(rawMax, &value); err != nil {
+			return fmt.Errorf("provider_config.max_output_tokens must be an integer")
+		}
+		if value < 0 {
+			return fmt.Errorf("provider_config.max_output_tokens must be non-negative")
 		}
 	}
 	return nil
+}
+
+// ProviderConfigMaxOutputTokens returns the per-connection output-token
+// override, or 0 when absent or invalid. A positive value replaces the model
+// catalog's output limit so an operator can force a larger (or smaller) cap for
+// a model the catalog describes incorrectly or does not describe at all.
+func ProviderConfigMaxOutputTokens(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return 0
+	}
+	rawMax, ok := cfg[providerConfigMaxOutputTokensKey]
+	if !ok {
+		return 0
+	}
+	var value int
+	if err := json.Unmarshal(rawMax, &value); err != nil || value < 0 {
+		return 0
+	}
+	return value
 }
 
 // ProviderConfigAPIContract returns the requested generation wire contract.
@@ -155,30 +190,85 @@ func ProviderConfigVisionMode(raw string) string {
 	return mode
 }
 
-// ProviderConfigResponsesReasoning extracts Responses reasoning controls from
-// provider_config. Invalid or incomplete input deliberately falls back to nil,
-// matching the permissive read behavior of the other provider config accessors.
-func ProviderConfigResponsesReasoning(raw string) *ResponsesReasoningConfig {
+func isValidReasoningLevel(level string) bool {
+	switch level {
+	case ReasoningLevelDefault, ReasoningLevelLow, ReasoningLevelMedium, ReasoningLevelHigh:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProviderConfigReasoningLevel returns the normalized reasoning level
+// (low/medium/high), or "" when the operator left it at the provider default.
+// Invalid or unparseable input deliberately falls back to "", matching the
+// permissive read behavior of the other provider config accessors.
+func ProviderConfigReasoningLevel(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil
+		return ""
 	}
 	var cfg map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
-		return nil
+		return ""
 	}
-	rawReasoning, ok := cfg[providerConfigReasoningKey]
+	rawLevel, ok := cfg[providerConfigReasoningLevelKey]
 	if !ok {
+		return ""
+	}
+	var level string
+	if err := json.Unmarshal(rawLevel, &level); err != nil {
+		return ""
+	}
+	level = strings.ToLower(strings.TrimSpace(level))
+	if !isValidReasoningLevel(level) || level == ReasoningLevelDefault {
+		return ""
+	}
+	return level
+}
+
+// ProviderConfigHasReasoningOverride reports whether the operator supplied a
+// provider-native reasoning field. Such a field is forwarded verbatim and takes
+// precedence over the normalized reasoning_level.
+func ProviderConfigHasReasoningOverride(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false
+	}
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return false
+	}
+	for _, key := range reasoningOverrideKeys {
+		if _, ok := cfg[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// providerConfigReasoningOverrideBody returns the operator-supplied
+// provider-native reasoning fields. Protocols that take generic provider_config
+// passthrough (Responses, Chat Completions) forward them through the request
+// body already; this accessor lets the Anthropic path forward them verbatim too.
+func providerConfigReasoningOverrideBody(raw string) map[string]any {
+	var cfg map[string]json.RawMessage
+	if json.Unmarshal([]byte(raw), &cfg) != nil {
 		return nil
 	}
-	var reasoning ResponsesReasoningConfig
-	if err := json.Unmarshal(rawReasoning, &reasoning); err != nil {
+	body := map[string]any{}
+	for _, key := range reasoningOverrideKeys {
+		rawValue, ok := cfg[key]
+		if !ok {
+			continue
+		}
+		var value any
+		if json.Unmarshal(rawValue, &value) == nil {
+			body[key] = value
+		}
+	}
+	if len(body) == 0 {
 		return nil
 	}
-	reasoning.Effort = strings.TrimSpace(reasoning.Effort)
-	reasoning.Summary = strings.TrimSpace(reasoning.Summary)
-	if reasoning.Effort == "" && reasoning.Summary == "" && reasoning.BudgetTokens == 0 {
-		return nil
-	}
-	return &reasoning
+	return body
 }

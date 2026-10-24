@@ -4,8 +4,11 @@
   // instances registered against it. Backend lifecycle: WI-177.
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { api } from '../api.js';
-  import { Plus, Trash2, Server, KeyRound } from '@lucide/svelte';
+  import { actionCapabilities, runnerPools } from '../api/ai.js';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Server from '@lucide/svelte/icons/server';
+  import KeyRound from '@lucide/svelte/icons/key-round';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -50,7 +53,7 @@
   async function loadPools() {
     loadingPools = true;
     try {
-      const all = await api.actionCapabilities.getAll();
+      const all = await actionCapabilities.getAll();
       pools = (all || []).filter((c) => c.capability_type === 'runner_pool');
       // Keep the selection valid across reloads.
       if (selectedPool) {
@@ -71,7 +74,7 @@
   async function loadTokens(poolId) {
     loadingTokens = true;
     try {
-      tokens = (await api.runnerPools.listTokens(poolId)) || [];
+      tokens = (await runnerPools.listTokens(poolId)) || [];
     } catch (e) {
       errorToast(e?.message || t('settings.adminOperations.runnerPools.tokensLoadFailed'));
     } finally {
@@ -82,7 +85,7 @@
   async function loadInstances(poolId) {
     loadingInstances = true;
     try {
-      instances = (await api.runnerPools.listInstances(poolId)) || [];
+      instances = (await runnerPools.listInstances(poolId)) || [];
     } catch (e) {
       errorToast(e?.message || t('settings.adminOperations.runnerPools.runnersLoadFailed'));
     } finally {
@@ -99,7 +102,7 @@
     if (!canCreate) return;
     creating = true;
     try {
-      await api.actionCapabilities.create({
+      await actionCapabilities.create({
         name: poolForm.name.trim(),
         capability_type: 'runner_pool',
         config: JSON.stringify({ max_concurrent_runs: Number(poolForm.maxConcurrent) || 0 }),
@@ -126,7 +129,7 @@
     if (!selectedPool) return;
     minting = true;
     try {
-      const res = await api.runnerPools.mintToken(selectedPool.id, {
+      const res = await runnerPools.mintToken(selectedPool.id, {
         description: mintForm.description.trim(),
         ttl_hours: Number(mintForm.ttlHours) || 0,
       });
@@ -150,7 +153,7 @@
     });
     if (!ok) return;
     try {
-      await api.runnerPools.revokeToken(selectedPool.id, tok.id);
+      await runnerPools.revokeToken(selectedPool.id, tok.id);
       successToast(t('settings.adminOperations.runnerPools.tokenRevoked'));
       await loadTokens(selectedPool.id);
     } catch (e) {
@@ -167,7 +170,7 @@
     });
     if (!ok) return;
     try {
-      await api.runnerPools.revokeInstance(selectedPool.id, inst.id);
+      await runnerPools.revokeInstance(selectedPool.id, inst.id);
       successToast(t('settings.adminOperations.runnerPools.runnerRevoked'));
       await loadInstances(selectedPool.id);
     } catch (e) {

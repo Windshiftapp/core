@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { queryLanguage } from '../../api/queryLanguage.js';
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -65,7 +65,7 @@
   async function loadCatalog() {
     catalogLoading = true;
     try {
-      remoteCatalog = await api.queryLanguage.getCatalog();
+      remoteCatalog = await queryLanguage.getCatalog();
     } catch (err) {
       console.warn('Failed to load QL completion catalog:', err);
     } finally {
@@ -100,7 +100,7 @@
 
     availableValues = [];
     try {
-      const rows = await api.queryLanguage.getValues(valueHelp, fragment);
+      const rows = await queryLanguage.getValues(valueHelp, fragment);
       if (token !== valueLoadToken) return;
       const values = completionValues(rows, valueHelp);
       valueCache.set(cacheKey, values);

@@ -410,10 +410,11 @@ func (h *JiraImportHandler) enqueueJiraImport(
 			return err
 		}
 		if err := jobs.Insert(repository.JiraImportJobInsert{
-			ID:           jobID,
-			ConnectionID: req.ConnectionID,
-			ConfigJSON:   string(configJSON),
-			CreatedBy:    userID,
+			ID:             jobID,
+			ConnectionID:   req.ConnectionID,
+			ConfigJSON:     string(configJSON),
+			CreatedBy:      userID,
+			LeaseExpiresAt: time.Now().UTC().Add(jiraimport.JiraImportLeaseDuration).Unix(),
 		}); err != nil {
 			return err
 		}
@@ -767,6 +768,27 @@ func (h *JiraImportHandler) clearMappingFailure(jobID string) {
 	delete(h.mappingFailures, jobID)
 }
 
+func (h *JiraImportHandler) setJobToken(jobID, token string) {
+	h.mappingFailuresMu.Lock()
+	defer h.mappingFailuresMu.Unlock()
+	if h.jobTokens == nil {
+		h.jobTokens = make(map[string]string)
+	}
+	h.jobTokens[jobID] = token
+}
+
+func (h *JiraImportHandler) jobToken(jobID string) string {
+	h.mappingFailuresMu.Lock()
+	defer h.mappingFailuresMu.Unlock()
+	return h.jobTokens[jobID]
+}
+
+func (h *JiraImportHandler) clearJobToken(jobID string) {
+	h.mappingFailuresMu.Lock()
+	defer h.mappingFailuresMu.Unlock()
+	delete(h.jobTokens, jobID)
+}
+
 func (h *JiraImportHandler) failOnMappingFailure(jobID string, progress *ImportProgress) bool {
 	err := h.mappingFailure(jobID)
 	if err == nil {
@@ -801,16 +823,18 @@ func (h *JiraImportHandler) recordMappingAndTransferOwnership(
 	return h.rememberMappingFailure(jobID, err)
 }
 
-// updateJobStatus updates the status of an import job.
+// updateJobStatus updates the status of an import job. The write is fenced by
+// the worker's ownership token so a recovered worker cannot change job state.
 func (h *JiraImportHandler) updateJobStatus(jobID, status, phase string, progress *ImportProgress, errorMessage string) {
-	if err := h.imports.UpdateStatus(jobID, status, phase, progress, errorMessage); err != nil {
+	if err := h.imports.UpdateStatus(jobID, h.jobToken(jobID), status, phase, progress, errorMessage); err != nil {
 		slog.Error("Failed to update job status", slog.String("component", "jira"), slog.Any("error", err))
 	}
 }
 
-// updateJobProgress updates just the progress of a running job.
+// updateJobProgress updates just the progress of a running job, fenced by the
+// worker's ownership token.
 func (h *JiraImportHandler) updateJobProgress(jobID string, progress *ImportProgress) {
-	if err := h.imports.UpdateProgress(jobID, progress); err != nil {
+	if err := h.imports.UpdateProgress(jobID, h.jobToken(jobID), progress); err != nil {
 		slog.Error("Failed to update job progress", slog.String("component", "jira"), slog.Any("error", err))
 	}
 }

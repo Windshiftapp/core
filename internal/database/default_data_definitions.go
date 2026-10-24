@@ -49,6 +49,9 @@ type defaultScreenField struct {
 	fieldWidth      string
 }
 
+// defaultScreenFields is the full edit/view layout. Planning fields
+// (milestone, iteration, start/end dates) live here so they stay available
+// after an item exists.
 var defaultScreenFields = []defaultScreenField{
 	{"system", "title", 1, true, "full"},
 	{"system", "description", 2, false, "full"},
@@ -63,7 +66,18 @@ var defaultScreenFields = []defaultScreenField{
 	{"system", "labels", 11, false, "full"},
 }
 
-var defaultScreenContexts = []string{"create", "edit", "view"}
+// defaultCreateScreenFields is the leaner create layout. Planning fields are
+// intentionally omitted so first-run creation stays focused; they remain on
+// the edit screen once the item exists.
+var defaultCreateScreenFields = []defaultScreenField{
+	{"system", "title", 1, true, "full"},
+	{"system", "description", 2, false, "full"},
+	{"system", "status", 3, true, "half"},
+	{"system", "priority", 4, false, "half"},
+	{"system", "assignee", 5, false, "half"},
+	{"system", "due_date", 6, false, "half"},
+	{"system", "labels", 7, false, "full"},
+}
 
 type defaultLinkType struct {
 	builtinKey         string
@@ -152,7 +166,8 @@ const defaultNotificationChannelConfig = `{
 	"smtp_password": "",
 	"smtp_from_email": "",
 	"smtp_from_name": "Windshift",
-	"smtp_encryption": "tls"
+	"smtp_encryption": "tls",
+	"smtp_auth_method": "auto"
 }`
 
 type defaultTheme struct {

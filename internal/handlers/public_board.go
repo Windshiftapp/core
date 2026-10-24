@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -86,10 +87,19 @@ type publicBoardCard struct {
 	AssigneeName   string        `json:"assignee_name,omitempty"`
 	AssigneeAvatar string        `json:"assignee_avatar,omitempty"`
 	Labels         []publicLabel `json:"labels,omitempty"`
+	MilestoneIDs   []int         `json:"milestone_ids,omitempty"`
 	DueDate        string        `json:"due_date,omitempty"`
 	StatusName     string        `json:"status_name,omitempty"`
 	ItemTypeName   string        `json:"item_type_name,omitempty"`
 	StoryPoints    *float64      `json:"story_points,omitempty"`
+}
+
+type publicMilestone struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	TargetDate    string `json:"target_date,omitempty"`
+	Status        string `json:"status,omitempty"`
+	CategoryColor string `json:"category_color,omitempty"`
 }
 
 type publicLabel struct {
@@ -111,6 +121,8 @@ type publicBoardResponse struct {
 	} `json:"collection"`
 	Columns     []publicColumn      `json:"columns"`
 	CardFields  []models.ListColumn `json:"card_fields,omitempty"`
+	Swimlanes   bool                `json:"swimlanes"`
+	Milestones  []publicMilestone   `json:"milestones,omitempty"`
 	TotalItems  int                 `json:"total_items"`
 	LoadedItems int                 `json:"loaded_items"`
 	Truncated   bool                `json:"truncated"`
@@ -174,7 +186,7 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 	var collectionID int
 	err = h.db.QueryRow(`
 		SELECT id FROM collections
-		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
+		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
 	`, slug).Scan(&collectionID)
 	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
@@ -271,11 +283,12 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	// Look up collection by public_slug where is_public = true
 	var collectionID int
 	var collectionName, collectionDescription, qlQuery, updatedAt string
+	var publicMilestoneSwimlanes bool
 	err := h.db.QueryRow(`
-		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), updated_at
+		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), public_milestone_swimlanes, updated_at
 		FROM collections
-		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
-	`, slug).Scan(&collectionID, &collectionName, &collectionDescription, &qlQuery, &updatedAt)
+		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
+	`, slug).Scan(&collectionID, &collectionName, &collectionDescription, &qlQuery, &publicMilestoneSwimlanes, &updatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
@@ -357,7 +370,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	}
 	if len(scopedWorkspaceIDs) == 0 {
 		// No workspaces, return empty board
-		resp := h.buildEmptyResponse(collectionName, collectionDescription, columns, cardFields, updatedAt)
+		resp := h.buildEmptyResponse(collectionName, collectionDescription, columns, cardFields, updatedAt, publicMilestoneSwimlanes)
 		respondJSONOK(w, resp)
 		return
 	}
@@ -378,6 +391,56 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 
 	// Load labels for all items
 	itemLabels := h.loadItemLabels(items)
+
+	// Public milestone lanes are opt-in. Only load and expose milestone data
+	// when the owner enabled them, so flat public boards keep the minimal
+	// projection.
+	var publicMilestones []publicMilestone
+	itemMilestoneIDs := make(map[int][]int)
+	if publicMilestoneSwimlanes {
+		if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(items); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		byID := make(map[int]publicMilestone)
+		for _, item := range items {
+			if len(item.Milestones) == 0 {
+				continue
+			}
+			ids := make([]int, 0, len(item.Milestones))
+			for _, milestone := range item.Milestones {
+				ids = append(ids, milestone.ID)
+				pm := publicMilestone{
+					ID:            milestone.ID,
+					Name:          milestone.Name,
+					Status:        milestone.Status,
+					CategoryColor: milestone.CategoryColor,
+				}
+				if milestone.TargetDate != nil {
+					pm.TargetDate = *milestone.TargetDate
+				}
+				byID[milestone.ID] = pm
+			}
+			itemMilestoneIDs[item.ID] = ids
+		}
+		publicMilestones = make([]publicMilestone, 0, len(byID))
+		for _, milestone := range byID {
+			publicMilestones = append(publicMilestones, milestone)
+		}
+		sort.Slice(publicMilestones, func(i, j int) bool {
+			a, b := publicMilestones[i], publicMilestones[j]
+			if (a.TargetDate == "") != (b.TargetDate == "") {
+				return b.TargetDate == ""
+			}
+			if a.TargetDate != b.TargetDate {
+				return a.TargetDate < b.TargetDate
+			}
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+			return a.ID < b.ID
+		})
+	}
 
 	// Build response columns with grouped items
 	responseColumns := make([]publicColumn, len(columns))
@@ -415,6 +478,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 			StatusName:     item.StatusName,
 			ItemTypeName:   item.ItemTypeName,
 			StoryPoints:    item.StoryPoints,
+			MilestoneIDs:   itemMilestoneIDs[item.ID],
 		}
 
 		if item.DueDate != nil {
@@ -432,6 +496,8 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	resp := publicBoardResponse{
 		Columns:     responseColumns,
 		CardFields:  cardFields,
+		Swimlanes:   publicMilestoneSwimlanes,
+		Milestones:  publicMilestones,
 		TotalItems:  totalItems,
 		LoadedItems: len(items),
 		Truncated:   totalItems > len(items),
@@ -618,9 +684,10 @@ func (h *PublicBoardHandler) loadItemLabels(items []models.Item) map[int][]publi
 	return result
 }
 
-func (h *PublicBoardHandler) buildEmptyResponse(name, desc string, columns []boardColumnInfo, cardFields []models.ListColumn, updatedAt string) publicBoardResponse {
+func (h *PublicBoardHandler) buildEmptyResponse(name, desc string, columns []boardColumnInfo, cardFields []models.ListColumn, updatedAt string, swimlanes bool) publicBoardResponse {
 	resp := publicBoardResponse{
 		CardFields: cardFields,
+		Swimlanes:  swimlanes,
 		ItemLimit:  publicBoardItemLimit,
 		UpdatedAt:  updatedAt,
 	}
@@ -719,7 +786,7 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	var collectionID int
 	err = h.db.QueryRow(`
 		SELECT id FROM collections
-		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
+		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
 	`, slug).Scan(&collectionID)
 	if err != nil {
 		respondNotFound(w, r, "attachment")

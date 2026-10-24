@@ -1,5 +1,8 @@
 <script>
-  import { IconActivity, IconCheck, IconX, IconClock } from '@tabler/icons-svelte-runes';
+  import IconActivity from '@tabler/icons-svelte-runes/icons/activity';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconClock from '@tabler/icons-svelte-runes/icons/clock';
   import StatCard from '../../components/StatCard.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import {

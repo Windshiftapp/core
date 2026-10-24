@@ -1,7 +1,11 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { ChevronRight, Plus, Trash2, X, Package } from '@lucide/svelte';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import X from '@lucide/svelte/icons/x';
+  import Package from '@lucide/svelte/icons/package';
   import {
     portalCatalogStore,
     portalCustomizationStore as portalStore,
@@ -296,7 +300,7 @@
                             }
                           }
                         }}
-                        class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity cursor-pointer"
                         style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
                         title={t('portal.removeFromSection')}
                       >

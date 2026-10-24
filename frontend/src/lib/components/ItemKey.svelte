@@ -1,11 +1,14 @@
 <script>
   import LinkComponent from './Link.svelte';
+  import { itemModalStore } from '../stores/itemModalStore.svelte.js';
   import { formatItemKey } from '../utils/itemKey.js';
 
   /**
    * Inline work-item key. `plain` renders the mono key on its own; `badge`
    * renders the neutral metadata chip used in ticket lists and card rows.
-   * Accepts an `item` object or a pre-formatted `itemKey` string.
+   * Accepts an `item` object or a pre-formatted `itemKey` string. A standalone
+   * key opens the global item modal unless `clickable={false}` or an explicit
+   * `href`/`onClick` takes over.
    */
   let {
     item = null,
@@ -17,6 +20,7 @@
     href = null,
     onClick = null,
     monospace = true,
+    clickable = true,
     dataTestid = undefined,
     title = undefined,
     class: className = '',
@@ -32,8 +36,31 @@
     return key ? `${key}-${item.workspace_item_number}` : `ITEM-${item.workspace_item_number}`;
   });
 
-  const interactive = $derived(!!(href || onClick));
+  // A standalone key opens the global item modal. Keys nested in an existing
+  // link or button pass `clickable={false}` so they stay plain text.
+  const canOpenModal = $derived(clickable && !href && !onClick && item?.id != null);
+  const interactive = $derived(!!(href || onClick || canOpenModal));
   const badge = $derived(variant === 'badge');
+
+  // Keep a real href so cmd/ctrl/shift/middle-click still open a new tab; only
+  // an unmodified left-click is diverted to the modal.
+  const itemHref = $derived.by(() => {
+    const wsId = item?.workspace_id ?? workspace?.id;
+    return item?.id != null && wsId != null ? `/workspaces/${wsId}/items/${item.id}` : null;
+  });
+  const linkHref = $derived(href ?? (canOpenModal ? itemHref : null));
+
+  function handleClick(event) {
+    if (onClick) {
+      onClick(event);
+      return;
+    }
+    if (canOpenModal) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      itemModalStore.open(item.id, item.workspace_id ?? workspace?.id ?? null);
+    }
+  }
 
   const sizeClass = $derived.by(() => {
     if (badge) {
@@ -71,12 +98,12 @@
   );
 </script>
 
-{#if href}
-  <LinkComponent {href} {onClick} class={classes} style={resolvedStyle} data-testid={dataTestid} {title}>
+{#if linkHref}
+  <LinkComponent href={linkHref} onClick={handleClick} class={classes} style={resolvedStyle} data-testid={dataTestid} {title}>
     {displayKey}
   </LinkComponent>
-{:else if onClick}
-  <button class={classes} style={resolvedStyle} onclick={onClick} type="button" data-testid={dataTestid} {title}>
+{:else if interactive}
+  <button class={classes} style={resolvedStyle} onclick={handleClick} type="button" data-testid={dataTestid} {title}>
     {displayKey}
   </button>
 {:else}

@@ -1,8 +1,14 @@
 <script>
   import { onMount } from 'svelte';
-  import { Square, Clock, Plus, ExternalLink, Pencil, Trash2, Command as CommandIcon } from '@lucide/svelte';
+  import Square from '@lucide/svelte/icons/square';
+  import Clock from '@lucide/svelte/icons/clock';
+  import Plus from '@lucide/svelte/icons/plus';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import CommandIcon from '@lucide/svelte/icons/command';
   import { timerStore } from '../stores/timerStore.svelte.js';
-  import { timeEntryStore } from '../stores';
+  import { timeEntryStore } from '../stores/timeEntryStore.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatItemKey } from '../utils/itemKey.js';

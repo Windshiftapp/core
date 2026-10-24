@@ -591,6 +591,20 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		respondInternalError(w, r, err)
 		return
 	}
+	// The monitored mailbox is entered by the admin and is what IMAP XOAUTH2
+	// authenticates as; require it before starting so the callback never has to
+	// guess an identity from the token.
+	var startingChannelConfig models.ChannelConfig
+	if startingConfig != "" {
+		if err := json.Unmarshal([]byte(startingConfig), &startingChannelConfig); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+	if _, ok := bareEmailAddress(startingChannelConfig.EmailOAuthMailbox); !ok {
+		respondValidationError(w, r, "Enter the mailbox address to connect before starting OAuth")
+		return
+	}
 	// Bind the state to the channel config at flow start. Central providers are
 	// independent of the channel config, so without this guard a callback from
 	// an old tab could silently switch a channel back from a newer basic/inline
@@ -748,11 +762,18 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	// registered callback route at /api/email/oauth/{slug}/callback).
 	redirectURI := fmt.Sprintf("%s/api/email/oauth/%s/callback", h.baseURL, slug)
 
-	// Exchange code for tokens
+	// Exchange code for tokens. The mailbox address is configuration the admin
+	// already saved, not a value discovered from the token.
 	scopes := strings.Fields(provider.OAuthScopes)
 
+	userEmail, ok := bareEmailAddress(expectedConfig.EmailOAuthMailbox)
+	if !ok {
+		slog.Error("email OAuth callback has no usable mailbox address", slog.String("component", "email_providers"), slog.Int("channel_id", channelID))
+		http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
+		return
+	}
+
 	var tokens *email.OAuthTokens
-	var userEmail string
 
 	switch provider.Type {
 	case models.EmailProviderTypeMicrosoft:
@@ -763,12 +784,6 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
 			return
 		}
-		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
-		if err != nil || strings.TrimSpace(userEmail) == "" {
-			slog.Error("failed to get user email from Microsoft", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
-			http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
-			return
-		}
 
 	case models.EmailProviderTypeGoogle:
 		p := email.NewGoogleProvider(provider.OAuthClientID, clientSecret, scopes)
@@ -776,12 +791,6 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 		if err != nil {
 			slog.Error("failed to exchange code", "error", err)
 			http.Redirect(w, r, "/admin/channels?oauth_error=exchange_failed", http.StatusFound)
-			return
-		}
-		userEmail, err = p.GetUserEmail(ctx, tokens.AccessToken)
-		if err != nil || strings.TrimSpace(userEmail) == "" {
-			slog.Error("failed to get user email from Google", slog.String("component", "email_providers"), slog.Int("provider_id", provider.ID), slog.Any("error", err))
-			http.Redirect(w, r, "/admin/channels?oauth_error=identity_failed", http.StatusFound)
 			return
 		}
 

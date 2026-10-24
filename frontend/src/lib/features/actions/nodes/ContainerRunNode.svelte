@@ -1,5 +1,5 @@
 <script>
-  import { Box } from '@lucide/svelte';
+  import Box from '@lucide/svelte/icons/box';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import BaseActionNode from '../shared/BaseActionNode.svelte';

@@ -1,8 +1,9 @@
 <script>
-  import { ListChecks } from '@lucide/svelte';
-  import { authStore, workspacesStore } from '../../stores';
+  import ListChecks from '@lucide/svelte/icons/list-checks';
+  import { authStore } from '../../stores/auth.svelte.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { api } from '../../api.js';
+  import { items } from '../../api/items.js';
   import DashboardTaskList from './DashboardTaskList.svelte';
   import {
     completedSinceCutoff,
@@ -49,7 +50,7 @@
     loading = true;
     errored = false;
     try {
-      const response = await api.items.getAll({
+      const response = await items.getAll({
         ql: `workspace_id = ${workspaceId}`,
         limit: fetchLimit,
         order_by: 'updated_at',

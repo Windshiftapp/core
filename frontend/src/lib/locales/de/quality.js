@@ -3,32 +3,32 @@ export default {
   "settings": {
     "adminItems": {
       "hierarchyLevels": {
-        "description": "Hierarchieebenen für Arbeitselemente konfigurieren"
+        "description": "Hierarchieebenen für Vorgänge konfigurieren"
       },
       "itemTypes": {
-        "title": "Arbeitselementtypen",
-        "description": "Arbeitselementtypen mit Symbolen und Farben verwalten"
+        "title": "Vorgangstypen",
+        "description": "Vorgangstypen mit Symbolen und Farben verwalten"
       }
     },
     "configSets": {
-      "itemTypes": "Arbeitselementtypen",
-      "noItemTypesAssigned": "Keine Arbeitselementtypen zugewiesen",
-      "defaultItemType": "Standard-Arbeitselementtyp",
-      "configurePerItemType": "Pro Arbeitselementtyp konfigurieren",
-      "preselectedItemType": "Vorausgewählter Arbeitselementtyp beim Erstellen neuer Arbeitselemente",
-      "selectItemTypes": "Wählen Sie, welche Arbeitselementtypen in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.",
-      "overridesDesc": "Benutzerdefinierte Workflows und Ansichten pro Arbeitselementtyp konfigurieren. 'Standard' verwenden, um vom Allgemein-Tab zu erben.",
-      "itemType": "Arbeitselementtyp"
+      "itemTypes": "Vorgangstypen",
+      "noItemTypesAssigned": "Keine Vorgangstypen zugewiesen",
+      "defaultItemType": "Standard-Vorgangstyp",
+      "configurePerItemType": "Pro Vorgangstyp konfigurieren",
+      "preselectedItemType": "Vorausgewählter Vorgangstyp beim Erstellen neuer Vorgänge",
+      "selectItemTypes": "Wählen Sie, welche Vorgangstypen in Arbeitsbereichen mit diesem Konfigurationsset verfügbar sind.",
+      "overridesDesc": "Benutzerdefinierte Workflows und Ansichten pro Vorgangstyp konfigurieren. 'Standard' verwenden, um vom Allgemein-Tab zu erben.",
+      "itemType": "Vorgangstyp"
     },
     "itemTypes": {
-      "title": "Arbeitselementtypen",
-      "subtitle": "Arbeitselementtypen verwalten und Hierarchieebenen zuweisen",
-      "addItemType": "Arbeitselementtyp hinzufügen",
-      "failedToSave": "Arbeitselementtyp konnte nicht gespeichert werden:",
-      "noItemTypes": "Noch keine Arbeitselementtypen konfiguriert."
+      "title": "Vorgangstypen",
+      "subtitle": "Vorgangstypen verwalten und Hierarchieebenen zuweisen",
+      "addItemType": "Vorgangstyp hinzufügen",
+      "failedToSave": "Vorgangstyp konnte nicht gespeichert werden:",
+      "noItemTypes": "Noch keine Vorgangstypen konfiguriert."
     },
     "boardConfig": {
-      "backlogStatusesHelp": "Arbeitselemente mit diesen Status erscheinen im Backlog"
+      "backlogStatusesHelp": "Vorgänge mit diesen Status erscheinen im Backlog"
     },
     "aiFeatures": {
       "features": {
@@ -39,42 +39,42 @@ export default {
     }
   },
   "users": {
-    "calendarIntegrationDesc": "Abonnieren Sie Ihre geplanten Arbeitselemente in externen Kalender-Apps",
-    "calendarFeedWarning": "Teilen Sie diese URL nicht, da sie Zugriff auf Ihre geplanten Arbeitselemente gewährt."
+    "calendarIntegrationDesc": "Abonnieren Sie Ihre geplanten Vorgänge in externen Kalender-Apps",
+    "calendarFeedWarning": "Teilen Sie diese URL nicht, da sie Zugriff auf Ihre geplanten Vorgänge gewährt."
   },
   "common": {
-    "noItems": "Keine Arbeitselemente",
-    "noItemsFound": "Keine Arbeitselemente gefunden",
-    "ticket": "Arbeitselement",
-    "tickets": "Arbeitselemente",
-    "noTickets": "Keine Arbeitselemente",
-    "item": "Arbeitselement",
-    "items": "Arbeitselemente"
+    "noItems": "Keine Vorgänge",
+    "noItemsFound": "Keine Vorgänge gefunden",
+    "ticket": "Vorgang",
+    "tickets": "Vorgänge",
+    "noTickets": "Keine Vorgänge",
+    "item": "Vorgang",
+    "items": "Vorgänge"
   },
   "errors": {
-    "ITEM_NOT_FOUND": "Der Arbeitselement wurde nicht gefunden."
+    "ITEM_NOT_FOUND": "Der Vorgang wurde nicht gefunden."
   },
   "placeholders": {
-    "searchWorkItems": "Arbeitselemente suchen..."
+    "searchWorkItems": "Vorgänge suchen..."
   },
   "emptyStates": {
-    "noItemsMatch": "Keine Arbeitselemente entsprechen dem Filter",
-    "configureFilter": "Filter konfigurieren, um Arbeitselemente zu sehen"
+    "noItemsMatch": "Keine Vorgänge entsprechen dem Filter",
+    "configureFilter": "Filter konfigurieren, um Vorgänge zu sehen"
   },
   "channel": {
-    "allItems": "Alle Arbeitselemente (instanzweit)",
-    "itemType": "Arbeitselementtyp",
-    "itemTypeRequired": "Arbeitselementtyp ist erforderlich",
-    "selectItemType": "Arbeitselementtyp auswählen...",
-    "markAsReadHelp": "E-Mails als gelesen markieren, sobald sie in Arbeitselemente umgewandelt wurden",
-    "items": "Arbeitselemente",
-    "itemCreated": "Arbeitselement erstellt",
-    "itemUpdated": "Arbeitselement aktualisiert",
-    "itemDeleted": "Arbeitselement gelöscht",
-    "itemAssigned": "Arbeitselement zugewiesen",
-    "itemLinked": "Arbeitselement verknüpft",
+    "allItems": "Alle Vorgänge (instanzweit)",
+    "itemType": "Vorgangstyp",
+    "itemTypeRequired": "Vorgangstyp ist erforderlich",
+    "selectItemType": "Vorgangstyp auswählen...",
+    "markAsReadHelp": "E-Mails als gelesen markieren, sobald sie in Vorgänge umgewandelt wurden",
+    "items": "Vorgänge",
+    "itemCreated": "Vorgang erstellt",
+    "itemUpdated": "Vorgang aktualisiert",
+    "itemDeleted": "Vorgang gelöscht",
+    "itemAssigned": "Vorgang zugewiesen",
+    "itemLinked": "Vorgang verknüpft",
     "emailLog": {
-      "newItem": "Neuer Arbeitselement {key}"
+      "newItem": "Neuer Vorgang {key}"
     },
     "workspaceFieldResolution": "Arbeitsbereich-Feldauflösung"
   },
@@ -82,98 +82,98 @@ export default {
     "draftsTitle": "Ihre Entwürfe",
     "draftsSubtitle": "Machen Sie dort weiter, wo Sie aufgehört hast.",
     "draftsEmpty": "Noch keine Entwürfe. Starte eine Anfrage und Ihr Fortschritt wird automatisch gespeichert.",
-    "itemTypeRequired": "Arbeitselementtyp ist erforderlich",
-    "createsItemType": "Erstellt Arbeitselementtyp",
-    "selectItemType": "Arbeitselementtyp auswählen...",
-    "submissionsCreateItemType": "Einreichungen erstellen diesen Arbeitselementtyp als Arbeitselement",
-    "itemType": "Arbeitselementtyp"
+    "itemTypeRequired": "Vorgangstyp ist erforderlich",
+    "createsItemType": "Erstellt Vorgangstyp",
+    "selectItemType": "Vorgangstyp auswählen...",
+    "submissionsCreateItemType": "Einreichungen erstellen diesen Vorgangstyp als Vorgang",
+    "itemType": "Vorgangstyp"
   },
   "forms": {
-    "createsItemType": "Erstellt Arbeitselementtyp",
-    "selectItemType": "Arbeitselementtyp auswählen"
+    "createsItemType": "Erstellt Vorgangstyp",
+    "selectItemType": "Vorgangstyp auswählen"
   },
   "jiraImport": {
     "subtitle": {
-      "cloud": "Arbeitselemente aus Jira Cloud importieren",
-      "datacenter": "Arbeitselemente aus Jira Data Center importieren"
+      "cloud": "Vorgänge aus Jira Cloud importieren",
+      "datacenter": "Vorgänge aus Jira Data Center importieren"
     },
     "mapping": {
-      "issueTypesDesc": "Arbeitselementtypen werden als Eintragstypen in Windshift erstellt",
+      "issueTypesDesc": "Ordnen Sie jeden Jira-Issuetyp einem neuen oder vorhandenen Windshift-Vorgangstyp zu",
       "versionsDesc": "Jira-Versionen werden als Arbeitsbereich-Meilensteine importiert."
     },
     "preview": {
-      "workItems": "Arbeitselemente"
+      "workItems": "Vorgänge"
     },
     "import": {
-      "success": "{count} Arbeitselemente erfolgreich importiert.",
-      "failed": "{count} Arbeitselemente konnten nicht importiert werden.",
-      "readyDesc": "Klicken Sie auf \"Import starten\", um {count} Arbeitselemente zu importieren."
+      "success": "{count} Vorgänge erfolgreich importiert.",
+      "failed": "{count} Vorgänge konnten nicht importiert werden.",
+      "readyDesc": "Klicken Sie auf \"Import starten\", um {count} Vorgänge zu importieren."
     }
   },
   "iterations": {
-    "noItems": "Keine Arbeitselemente",
-    "noItemsAssigned": "Keine Arbeitselemente zugewiesen",
-    "itemsDone": "{count} Arbeitselemente erledigt",
-    "allItemsDone": "Alle Arbeitselemente sind erledigt!",
-    "incompleteItemsAction": "Unvollständige Arbeitselemente:"
+    "noItems": "Keine Vorgänge",
+    "noItemsAssigned": "Keine Vorgänge zugewiesen",
+    "itemsDone": "{count} Vorgänge erledigt",
+    "allItemsDone": "Alle Vorgänge sind erledigt!",
+    "incompleteItemsAction": "Unvollständige Vorgänge:"
   },
   "milestones": {
-    "noItems": "Keine Arbeitselemente",
-    "noItemsAssigned": "Keine Arbeitselemente zugewiesen",
+    "noItems": "Keine Vorgänge",
+    "noItemsAssigned": "Keine Vorgänge zugewiesen",
     "globalMilestoneDescription": "Sichtbar in allen Arbeitsbereiche",
     "localMilestoneDescription": "Nur in diesem Arbeitsbereich sichtbar"
   },
   "personal": {
-    "loadingCompletedItems": "Erledigte Arbeitselemente werden geladen...",
-    "noCompletedItemsDay": "Keine erledigten Arbeitselemente für diesen Tag",
-    "noCompletedItemsWeek": "Keine erledigten Arbeitselemente für diese Woche"
+    "loadingCompletedItems": "Erledigte Vorgänge werden geladen...",
+    "noCompletedItemsDay": "Keine erledigten Vorgänge für diesen Tag",
+    "noCompletedItemsWeek": "Keine erledigten Vorgänge für diese Woche"
   },
   "migration": {
-    "migrationSuccess": "Alle Arbeitselemente wurden erfolgreich migriert"
+    "migrationSuccess": "Alle Vorgänge wurden erfolgreich migriert"
   },
   "migrationAssistant": {
-    "allItemsCompatible": "Alle Arbeitselemente ({count}) sind mit der neuen Konfiguration kompatibel.",
-    "itemsNeedMigration": "{count} Arbeitselemente müssen migriert werden. Bitte überprüfen Sie die Zuordnungen unten.",
-    "noItemsToMigrate": "Keine Arbeitselemente zu migrieren.",
-    "item": "Arbeitselement",
-    "items": "Arbeitselemente",
-    "allItemsMigrated": "Alle Arbeitselemente wurden erfolgreich migriert.",
-    "pleaseSelectTargetStatuses": "Bitte wählen Sie Zielstatus für alle Arbeitselemente aus, die eine Migration erfordern.",
-    "pleaseSelectTargetItemTypes": "Bitte wählen Sie Zieltypen für alle Arbeitselemente aus, die eine Migration erfordern.",
-    "pleaseSelectTargetPriorities": "Bitte wählen Sie Zielprioritäten für alle Arbeitselemente aus, die eine Migration erfordern."
+    "allItemsCompatible": "Alle Vorgänge ({count}) sind mit der neuen Konfiguration kompatibel.",
+    "itemsNeedMigration": "{count} Vorgänge müssen migriert werden. Bitte überprüfen Sie die Zuordnungen unten.",
+    "noItemsToMigrate": "Keine Vorgänge zu migrieren.",
+    "item": "Vorgang",
+    "items": "Vorgänge",
+    "allItemsMigrated": "Alle Vorgänge wurden erfolgreich migriert.",
+    "pleaseSelectTargetStatuses": "Bitte wählen Sie Zielstatus für alle Vorgänge aus, die eine Migration erfordern.",
+    "pleaseSelectTargetItemTypes": "Bitte wählen Sie Zieltypen für alle Vorgänge aus, die eine Migration erfordern.",
+    "pleaseSelectTargetPriorities": "Bitte wählen Sie Zielprioritäten für alle Vorgänge aus, die eine Migration erfordern."
   },
   "createModal": {
-    "workItem": "Arbeitselement"
+    "workItem": "Vorgang"
   },
   "scm": {
-    "linkDevResourceDesc": "PR, Branch oder Commit mit diesem Arbeitselement verbinden"
+    "linkDevResourceDesc": "PR, Branch oder Commit mit diesem Vorgang verbinden"
   },
   "fields": {
-    "subtitle": "Benutzerdefinierte Felder für Ihre Arbeitselemente definieren"
+    "subtitle": "Benutzerdefinierte Felder für Ihre Vorgänge definieren"
   },
   "categories": {
-    "deleteWarning": "Arbeitselemente in dieser Kategorie werden unkategorisiert",
-    "confirmDeleteCategory": "Kategorie \"{name}\" löschen? Arbeitselemente in dieser Kategorie werden unkategorisiert."
+    "deleteWarning": "Vorgänge in dieser Kategorie werden unkategorisiert",
+    "confirmDeleteCategory": "Kategorie \"{name}\" löschen? Vorgänge in dieser Kategorie werden unkategorisiert."
   },
   "commandPalette": {
     "commands": {
       "search": {
-        "description": "Arbeitselemente und Inhalte durchsuchen"
+        "description": "Vorgänge und Inhalte durchsuchen"
       },
       "createWorkItem": {
-        "label": "Arbeitselement erstellen",
-        "description": "Neuen Arbeitselement oder Aufgabe erstellen"
+        "label": "Vorgang erstellen",
+        "description": "Neuen Vorgang oder Aufgabe erstellen"
       },
       "adminItemTypes": {
-        "label": "Arbeitselementtypen",
-        "description": "Arbeitselementtypen mit Icons und Farben verwalten"
+        "label": "Vorgangstypen",
+        "description": "Vorgangstypen mit Icons und Farben verwalten"
       },
       "createItem": {
-        "label": "Arbeitselement erstellen",
-        "description": "Neuen Arbeitselement erstellen"
+        "label": "Vorgang erstellen",
+        "description": "Neuen Vorgang erstellen"
       },
       "assets": {
-        "description": "Asset-Sets und Arbeitselemente verwalten"
+        "description": "Asset-Sets und Vorgänge verwalten"
       }
     },
     "recentlyViewed": {
@@ -181,98 +181,98 @@ export default {
     }
   },
   "dashboard": {
-    "subtitle": "Übersicht über Ihre Arbeitselemente und Projekte",
-    "recentItems": "Letzte Arbeitselemente",
-    "overdueItems": "Überfällige Arbeitselemente",
-    "recentItemsHint": "Aktualisierte Arbeitselemente erscheinen hier",
-    "dueDatesHint": "Arbeitselemente mit Fälligkeitsdaten erscheinen hier",
-    "noOverdueItems": "Keine überfälligen Arbeitselemente",
-    "loadingRecentItems": "Lade letzte Arbeitselemente...",
-    "loadingOverdueItems": "Lade überfällige Arbeitselemente...",
-    "workItemStatusOverview": "Arbeitselement-Status Übersicht",
-    "createWorkItem": "Arbeitselement erstellen",
-    "createWorkItemDesc": "Neuen Arbeitselement erfassen",
-    "recentWorkItems": "Letzte Arbeitselemente",
-    "noRecentlyViewed": "Keine kürzlich angesehenen Arbeitselemente",
-    "noRecentlyEdited": "Keine kürzlich bearbeiteten Arbeitselemente",
-    "noRecentlyCommented": "Keine kürzlich kommentierten Arbeitselemente"
+    "subtitle": "Übersicht über Ihre Vorgänge und Projekte",
+    "recentItems": "Letzte Vorgänge",
+    "overdueItems": "Überfällige Vorgänge",
+    "recentItemsHint": "Aktualisierte Vorgänge erscheinen hier",
+    "dueDatesHint": "Vorgänge mit Fälligkeitsdaten erscheinen hier",
+    "noOverdueItems": "Keine überfälligen Vorgänge",
+    "loadingRecentItems": "Lade letzte Vorgänge...",
+    "loadingOverdueItems": "Lade überfällige Vorgänge...",
+    "workItemStatusOverview": "Vorgangs-Status Übersicht",
+    "createWorkItem": "Vorgang erstellen",
+    "createWorkItemDesc": "Neuen Vorgang erfassen",
+    "recentWorkItems": "Letzte Vorgänge",
+    "noRecentlyViewed": "Keine kürzlich angesehenen Vorgänge",
+    "noRecentlyEdited": "Keine kürzlich bearbeiteten Vorgänge",
+    "noRecentlyCommented": "Keine kürzlich kommentierten Vorgänge"
   },
   "search": {
-    "searchItems": "Arbeitselemente suchen...",
-    "configureFilter": "Filter konfigurieren, um Arbeitselemente zu sehen",
+    "searchItems": "Vorgänge suchen...",
+    "configureFilter": "Filter konfigurieren, um Vorgänge zu sehen",
     "workspace": "Arbeitsbereich"
   },
   "about": {
-    "projectManagementDesc": "Organisieren Sie Arbeitselemente hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung."
+    "projectManagementDesc": "Organisieren Sie Vorgänge hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung."
   },
   "onboarding": {
-    "createFirstWorkItem": "Ersten Arbeitselement erstellen",
-    "createWorkItemBtn": "Arbeitselement erstellen",
+    "createFirstWorkItem": "Ersten Vorgang erstellen",
+    "createWorkItemBtn": "Vorgang erstellen",
     "getStartedMember": "Hier sind die für Sie verfügbaren Arbeitsbereiche",
     "selectWorkspace": "Wählen Sie einen Arbeitsbereich zum Starten",
     "noWorkspacesAvailable": "Es sind noch keine Arbeitsbereiche verfügbar. Bitte kontaktieren Sie Ihren Administrator, um Zugang zu einem Arbeitsbereich zu erhalten."
   },
   "testing": {
-    "linkExistingItem": "Vorhandenen Arbeitselement verknüpfen",
-    "searchItemsToLink": "Arbeitselemente zum Verknüpfen suchen...",
-    "unknownItem": "Unbekannter Arbeitselement",
-    "itemsWithoutTestCoverage": "Arbeitselemente ohne Testabdeckung",
-    "selectWorkspacesAndTypes": "Wählen Sie Arbeitsbereiche und Arbeitselementtypen aus, die in den Bericht aufgenommen werden sollen",
-    "itemTypes": "Arbeitselementtypen",
-    "selectItemTypes": "Arbeitselementtypen auswählen",
-    "allItemTypes": "Alle Arbeitselementtypen",
-    "selectItemTypesForCoverage": "Wählen Sie Arbeitselementtypen aus, die für die Abdeckungsberichte verfolgt werden sollen",
-    "selectItemTypesForCoverageAnalysis": "Wählen Sie Arbeitselementtypen für die Abdeckungsanalyse aus",
-    "noItemsMatchingRequirements": "Keine Arbeitselemente entsprechen den konfigurierten Anforderungstypen",
-    "noItemTypesAvailable": "Keine Arbeitselementtypen verfügbar"
+    "linkExistingItem": "Vorhandenen Vorgang verknüpfen",
+    "searchItemsToLink": "Vorgänge zum Verknüpfen suchen...",
+    "unknownItem": "Unbekannter Vorgang",
+    "itemsWithoutTestCoverage": "Vorgänge ohne Testabdeckung",
+    "selectWorkspacesAndTypes": "Wählen Sie Arbeitsbereiche und Vorgangstypen aus, die in den Bericht aufgenommen werden sollen",
+    "itemTypes": "Vorgangstypen",
+    "selectItemTypes": "Vorgangstypen auswählen",
+    "allItemTypes": "Alle Vorgangstypen",
+    "selectItemTypesForCoverage": "Wählen Sie Vorgangstypen aus, die für die Abdeckungsberichte verfolgt werden sollen",
+    "selectItemTypesForCoverageAnalysis": "Wählen Sie Vorgangstypen für die Abdeckungsanalyse aus",
+    "noItemsMatchingRequirements": "Keine Vorgänge entsprechen den konfigurierten Anforderungstypen",
+    "noItemTypesAvailable": "Keine Vorgangstypen verfügbar"
   },
   "testCase": {
-    "backToItem": "Zurück zum Arbeitselement"
+    "backToItem": "Zurück zum Vorgang"
   },
   "time": {
-    "subtitle": "Zeit für Arbeitselemente erfassen",
-    "workItemOptional": "Arbeitselement (Optional)",
+    "subtitle": "Zeit für Vorgänge erfassen",
+    "workItemOptional": "Vorgang (Optional)",
     "timer": {
-      "goToWorkItem": "Zum Arbeitselement gehen: {title}"
+      "goToWorkItem": "Zum Vorgang gehen: {title}"
     },
     "calendar": {
-      "itemCount": "{count} Arbeitselemente",
-      "myWorkItems": "Meine Arbeitselemente",
-      "dragToSchedule": "Arbeitselemente ziehen zum Planen",
-      "noWorkItems": "Keine Arbeitselemente zugewiesen",
-      "workItemsWillAppear": "Arbeitselemente erscheinen hier, wenn sie Ihnen zugewiesen werden"
+      "itemCount": "{count} Vorgänge",
+      "myWorkItems": "Meine Vorgänge",
+      "dragToSchedule": "Vorgänge ziehen zum Planen",
+      "noWorkItems": "Keine Vorgänge zugewiesen",
+      "workItemsWillAppear": "Vorgänge erscheinen hier, wenn sie Ihnen zugewiesen werden"
     }
   },
   "pickers": {
-    "noItemsFound": "Keine Arbeitselemente gefunden",
-    "noItemsAvailable": "Keine Arbeitselemente verfügbar",
+    "noItemsFound": "Keine Vorgänge gefunden",
+    "noItemsAvailable": "Keine Vorgänge verfügbar",
     "fields": {
       "reporter": {
-        "description": "Wer den Arbeitselement erstellt hat"
+        "description": "Wer den Vorgang erstellt hat"
       },
       "createdAt": {
-        "description": "Wann das Arbeitselement erstellt wurde"
+        "description": "Wann der Vorgang erstellt wurde"
       },
       "updatedAt": {
-        "description": "Wann das Arbeitselement zuletzt aktualisiert wurde"
+        "description": "Wann der Vorgang zuletzt aktualisiert wurde"
       },
       "dueDate": {
-        "description": "Wann das Arbeitselement fällig ist"
+        "description": "Wann der Vorgang fällig ist"
       },
       "parent": {
-        "description": "Übergeordneter Arbeitselement"
+        "description": "Übergeordneter Vorgang"
       },
       "children": {
-        "description": "Untergeordnete Arbeitselemente"
+        "description": "Untergeordnete Vorgänge"
       },
       "links": {
-        "description": "Verwandte Arbeitselemente"
+        "description": "Verwandte Vorgänge"
       },
       "watchers": {
-        "description": "Benutzer, die dieses Arbeitselement beobachten"
+        "description": "Benutzer, die diesen Vorgang beobachten"
       }
     },
-    "agentOffline": "Agent offline – sein Läuferpool hat keinen Live-Läufer; Zugewiesene Arbeitselemente werden in die Warteschlange gestellt"
+    "agentOffline": "Agent offline – sein Läuferpool hat keinen Live-Läufer; Zugewiesene Vorgänge werden in die Warteschlange gestellt"
   },
   "dialogs": {
     "confirmations": {
@@ -281,21 +281,21 @@ export default {
   },
   "components": {
     "pagination": {
-      "limitedTo": "begrenzt auf {max} Arbeitselemente",
-      "itemsPerPage": "Arbeitselemente pro Seite:"
+      "limitedTo": "begrenzt auf {max} Vorgänge",
+      "itemsPerPage": "Vorgänge pro Seite:"
     }
   },
   "layout": {
-    "items": "Arbeitselemente"
+    "items": "Vorgänge"
   },
   "widgets": {
     "chart": {
-      "items": "Arbeitselemente"
+      "items": "Vorgänge"
     },
     "milestoneProgress": {
-      "item": "Arbeitselement",
-      "items": "Arbeitselemente",
-      "noItems": "Keine Arbeitselemente"
+      "item": "Vorgang",
+      "items": "Vorgänge",
+      "noItems": "Keine Vorgänge"
     },
     "myTasks": {
       "loadingText": "Ihre Aufgaben werden geladen...",
@@ -303,217 +303,217 @@ export default {
       "emptySubtitle": "Ihnen zugewiesene Aufgaben erscheinen hier"
     },
     "overdueItems": {
-      "itemCount": "{count} überfällige Arbeitselemente",
-      "refreshAriaLabel": "Überfällige Arbeitselemente aktualisieren",
-      "loadingText": "Überfällige Arbeitselemente werden geladen...",
-      "emptyTitle": "Keine überfälligen Arbeitselemente",
-      "emptySubtitle": "Alle Arbeitselemente sind im Zeitplan",
-      "loadError": "Überfällige Arbeitselemente konnten nicht geladen werden"
+      "itemCount": "{count} überfällige Vorgänge",
+      "refreshAriaLabel": "Überfällige Vorgänge aktualisieren",
+      "loadingText": "Überfällige Vorgänge werden geladen...",
+      "emptyTitle": "Keine überfälligen Vorgänge",
+      "emptySubtitle": "Alle Vorgänge sind im Zeitplan",
+      "loadError": "Überfällige Vorgänge konnten nicht geladen werden"
     },
     "upcomingDeadlines": {
-      "emptySubtitle": "Arbeitselemente mit Fälligkeitsdatum erscheinen hier"
+      "emptySubtitle": "Vorgänge mit Fälligkeitsdatum erscheinen hier"
     },
     "recentItems": {
-      "loadingText": "Letzte Arbeitselemente werden geladen...",
-      "emptyTitle": "Keine aktuellen Arbeitselemente",
-      "emptySubtitle": "Kürzlich angesehene Arbeitselemente werden angezeigt hier",
-      "loadError": "Letzte Arbeitselemente konnten nicht geladen werden"
+      "loadingText": "Letzte Vorgänge werden geladen...",
+      "emptyTitle": "Keine aktuellen Vorgänge",
+      "emptySubtitle": "Kürzlich angesehene Vorgänge werden angezeigt hier",
+      "loadError": "Letzte Vorgänge konnten nicht geladen werden"
     }
   },
   "statusCategory": {
-    "marksWorkCompletedHelp": "Arbeitselemente, die in Status dieser Kategorie verschoben werden, werden in Berichten und Rückblicken als abgeschlossen behandelt."
+    "marksWorkCompletedHelp": "Vorgänge, die in Status dieser Kategorie verschoben werden, werden in Berichten und Rückblicken als abgeschlossen behandelt."
   },
   "items": {
-    "title": "Arbeitselemente",
-    "subtitle": "Arbeitselemente anzeigen und verwalten",
-    "item": "Arbeitselement",
-    "items_one": "{count} Arbeitselement",
-    "items_other": "{count} Arbeitselemente",
-    "createItem": "Arbeitselement erstellen",
-    "editItem": "Arbeitselement bearbeiten",
-    "deleteItem": "Arbeitselement löschen",
-    "viewItem": "Arbeitselement anzeigen",
-    "linkedItems": "Verknüpfte Arbeitselemente",
-    "noItems": "Keine Arbeitselemente gefunden",
-    "noItemsInFilter": "Keine Arbeitselemente entsprechen dem aktuellen Filter",
-    "createToStart": "Erstellen Sie ein Arbeitselement, um zu beginnen",
-    "itemCreated": "Arbeitselement erfolgreich erstellt",
-    "itemUpdated": "Arbeitselement erfolgreich aktualisiert",
-    "itemDeleted": "Arbeitselement erfolgreich gelöscht",
-    "workItem": "Arbeitselement",
-    "startTimerTitle": "Zeiterfassung für dieses Arbeitselement starten",
-    "logTimeTitle": "Arbeitszeit für dieses Arbeitselement manuell erfassen",
-    "includeChildItems": "Untergeordnete Arbeitselemente einbeziehen",
-    "rollupTruncated": "Auf erste {max} untergeordnete Arbeitselemente begrenzt",
-    "rollupItemCount_one": "aggregiert über {count} Arbeitselement",
-    "rollupItemCount_other": "aggregiert über {count} Arbeitselemente",
-    "workItemNotFound": "Arbeitselement nicht gefunden",
-    "itemCopiedAs": "Arbeitselement erfolgreich als {key} kopiert",
-    "clickToViewCopied": "Klicken, um kopierten Arbeitselement anzuzeigen",
-    "deleteWorkItem": "Arbeitselement löschen",
-    "deleteItemWithChildren": "Arbeitselement mit untergeordneten Einträgen löschen",
-    "itemHasChildren": "Dieser Arbeitselement hat {count} untergeordnete Arbeitselemente.",
-    "itemHasChildrenSingular": "Dieser Arbeitselement hat 1 untergeordneten Arbeitselement.",
-    "deleteAllOption": "Alle löschen ({count} Arbeitselemente)",
-    "deleteAllDescription": "Diesen Arbeitselement und alle untergeordneten Arbeitselemente dauerhaft löschen",
-    "reparentDescription": "Untergeordnete zum übergeordneten Arbeitselement verschieben, dann nur dieses Arbeitselement löschen",
-    "deleteAllItems": "Alle Arbeitselemente löschen",
-    "deletedItemsCount": "{count} Arbeitselemente gelöscht",
-    "reparentedAndDeleted": "Untergeordnete verschoben und Arbeitselement gelöscht",
-    "selectNewParentPlaceholder": "Übergeordneten Arbeitselement auswählen...",
-    "reparentLevelHint": "Zeigt nur Arbeitselemente auf derselben Hierarchieebene",
-    "noOtherItemsAtLevel": "Keine anderen Arbeitselemente auf dieser Ebene - wählen Sie \"Zu Stammeinträgen machen\" oder wählen Sie aus der Liste oben",
-    "copyWorkItem": "Arbeitselement kopieren",
-    "unwatchWorkItem": "Arbeitselement nicht mehr beobachten",
-    "watchWorkItem": "Arbeitselement beobachten",
-    "cannotCreateChildItems": "Für diese Hierarchieebene können keine untergeordneten Arbeitselemente erstellt werden.",
-    "workItems": "Arbeitselemente",
-    "goToLinkedWorkItem": "Zum verknüpften Arbeitselement gehen",
-    "searchForParentItem": "Nach übergeordnetem Arbeitselement suchen...",
-    "showingItemsFromLevel": "Zeige nur Arbeitselemente der Hierarchieebene {level}",
-    "searchParentAcrossWorkspaces": "Nach übergeordnetem Arbeitselement in allen Arbeitsbereichen suchen",
-    "noItemsAtLevel": "Keine Arbeitselemente auf Hierarchieebene {level} gefunden",
-    "searchWorkItems": "Arbeitselemente suchen...",
-    "linkToTestCase": "Diesen Arbeitselement mit einem Testfall verknüpfen.",
-    "childWorkItems": "Untergeordnete Arbeitselemente",
-    "loadingChildItems": "Untergeordnete Arbeitselemente werden geladen...",
-    "agentLogEmpty": "Für dieses Arbeitselement wird noch kein Agent ausgeführt",
-    "agentRerunTitle": "Führen Sie den Agenten für dieses Arbeitselement erneut aus.",
-    "rollupItemCount": "zusammengefasst über {count} Arbeitselemente",
-    "linkToPage": "Verknüpfen Sie dieses Arbeitselement mit einer Wissensseite im selben Arbeitsbereich."
+    "title": "Vorgänge",
+    "subtitle": "Vorgänge anzeigen und verwalten",
+    "item": "Vorgang",
+    "items_one": "{count} Vorgang",
+    "items_other": "{count} Vorgänge",
+    "createItem": "Vorgang erstellen",
+    "editItem": "Vorgang bearbeiten",
+    "deleteItem": "Vorgang löschen",
+    "viewItem": "Vorgang anzeigen",
+    "linkedItems": "Verknüpfte Vorgänge",
+    "noItems": "Keine Vorgänge gefunden",
+    "noItemsInFilter": "Keine Vorgänge entsprechen dem aktuellen Filter",
+    "createToStart": "Erstellen Sie einen Vorgang, um zu beginnen",
+    "itemCreated": "Vorgang erfolgreich erstellt",
+    "itemUpdated": "Vorgang erfolgreich aktualisiert",
+    "itemDeleted": "Vorgang erfolgreich gelöscht",
+    "workItem": "Vorgang",
+    "startTimerTitle": "Zeiterfassung für diesen Vorgang starten",
+    "logTimeTitle": "Arbeitszeit für diesen Vorgang manuell erfassen",
+    "includeChildItems": "Untergeordnete Vorgänge einbeziehen",
+    "rollupTruncated": "Auf erste {max} untergeordnete Vorgänge begrenzt",
+    "rollupItemCount_one": "aggregiert über {count} Vorgang",
+    "rollupItemCount_other": "aggregiert über {count} Vorgänge",
+    "workItemNotFound": "Vorgang nicht gefunden",
+    "itemCopiedAs": "Vorgang erfolgreich als {key} kopiert",
+    "clickToViewCopied": "Klicken, um kopierten Vorgang anzuzeigen",
+    "deleteWorkItem": "Vorgang löschen",
+    "deleteItemWithChildren": "Vorgang mit untergeordneten Vorgängen löschen",
+    "itemHasChildren": "Dieser Vorgang hat {count} untergeordnete Vorgänge.",
+    "itemHasChildrenSingular": "Dieser Vorgang hat 1 untergeordneten Vorgang.",
+    "deleteAllOption": "Alle löschen ({count} Vorgänge)",
+    "deleteAllDescription": "Diesen Vorgang und alle untergeordneten Vorgänge dauerhaft löschen",
+    "reparentDescription": "Untergeordnete zum übergeordneten Vorgang verschieben, dann nur diesen Vorgang löschen",
+    "deleteAllItems": "Alle Vorgänge löschen",
+    "deletedItemsCount": "{count} Vorgänge gelöscht",
+    "reparentedAndDeleted": "Untergeordnete verschoben und Vorgang gelöscht",
+    "selectNewParentPlaceholder": "Übergeordneten Vorgang auswählen...",
+    "reparentLevelHint": "Zeigt nur Vorgänge auf derselben Hierarchieebene",
+    "noOtherItemsAtLevel": "Keine anderen Vorgänge auf dieser Ebene - wählen Sie \"Zu Stammeinträgen machen\" oder wählen Sie aus der Liste oben",
+    "copyWorkItem": "Vorgang kopieren",
+    "unwatchWorkItem": "Vorgang nicht mehr beobachten",
+    "watchWorkItem": "Vorgang beobachten",
+    "cannotCreateChildItems": "Für diese Hierarchieebene können keine untergeordneten Vorgänge erstellt werden.",
+    "workItems": "Vorgänge",
+    "goToLinkedWorkItem": "Zum verknüpften Vorgang gehen",
+    "searchForParentItem": "Nach übergeordnetem Vorgang suchen...",
+    "showingItemsFromLevel": "Zeige nur Vorgänge der Hierarchieebene {level}",
+    "searchParentAcrossWorkspaces": "Nach übergeordnetem Vorgang in allen Arbeitsbereichen suchen",
+    "noItemsAtLevel": "Keine Vorgänge auf Hierarchieebene {level} gefunden",
+    "searchWorkItems": "Vorgänge suchen...",
+    "linkToTestCase": "Diesen Vorgang mit einem Testfall verknüpfen.",
+    "childWorkItems": "Untergeordnete Vorgänge",
+    "loadingChildItems": "Untergeordnete Vorgänge werden geladen...",
+    "agentLogEmpty": "Für diesen Vorgang wird noch kein Agent ausgeführt",
+    "agentRerunTitle": "Führen Sie den Agenten für diesen Vorgang erneut aus.",
+    "rollupItemCount": "zusammengefasst über {count} Vorgänge",
+    "linkToPage": "Verknüpfen Sie diesen Vorgang mit einer Wissensseite im selben Arbeitsbereich."
   },
   "comments": {
-    "beFirstToComment": "Seien Sie der Erste, der dieses Arbeitselement kommentiert."
+    "beFirstToComment": "Seien Sie der Erste, der diesen Vorgang kommentiert."
   },
   "todo": {
-    "assignedItemsWillAppear": "Ihnen zugewiesene Arbeitselemente werden hier angezeigt."
+    "assignedItemsWillAppear": "Ihnen zugewiesene Vorgänge werden hier angezeigt."
   },
   "collectionTree": {
-    "noWorkItemsYet": "Noch keine Arbeitselemente",
-    "createFirstWorkItem": "Erstellen Sie Ihren ersten Arbeitselement, um den Hierarchiebaum zu sehen."
+    "noWorkItemsYet": "Noch keine Vorgänge",
+    "createFirstWorkItem": "Erstellen Sie Ihren ersten Vorgang, um den Hierarchiebaum zu sehen."
   },
   "collections": {
-    "searchItems": "Arbeitselemente suchen...",
-    "searchItemsTitle": "Arbeitselemente suchen",
-    "noItemsInBacklog": "Keine Arbeitselemente im Backlog",
-    "noItemsInBacklogDesc": "Alle Arbeitselemente sind entweder abgeschlossen oder es existieren noch keine Arbeitselemente.",
-    "showingItemsFromBacklog": "{count} Arbeitselemente aus dem Backlog anzeigen",
-    "childItems": "{count} untergeordnete(r) Arbeitselement/Arbeitselemente",
-    "childWorkItems": "Untergeordnete Arbeitselemente ({count})",
-    "noChildItems": "Noch keine untergeordneten Arbeitselemente",
-    "noChildItemsLowest": "Keine untergeordneten Arbeitselemente (niedrigste Hierarchieebene)",
-    "noTopLevelItems": "Keine Arbeitselemente auf oberster Ebene gefunden",
-    "noTopLevelItemsDesc": "Erstellen Sie einige Arbeitselemente, um Ihre Story Map zu sehen",
-    "loadingWorkItems": "Arbeitselemente werden geladen...",
-    "noWorkItemsFound": "Keine Arbeitselemente gefunden",
-    "showingWorkItems": "{count} Arbeitselemente anzeigen",
-    "boardSummary": "Gesamt: {itemCount} Arbeitselemente in {columnCount} Spalten",
-    "roadmapNoItems": "Keine Arbeitselemente mit Daten im aktuellen Zeitraum.",
-    "dragItemsHere": "Arbeitselemente hierher ziehen, um sie diesem Sprint hinzuzufügen",
-    "allItems": "Alle Arbeitselemente"
+    "searchItems": "Vorgänge suchen...",
+    "searchItemsTitle": "Vorgänge suchen",
+    "noItemsInBacklog": "Keine Vorgänge im Backlog",
+    "noItemsInBacklogDesc": "Alle Vorgänge sind entweder abgeschlossen oder es existieren noch keine Vorgänge.",
+    "showingItemsFromBacklog": "{count} Vorgänge aus dem Backlog anzeigen",
+    "childItems": "{count} untergeordnete(r) Vorgang/Vorgänge",
+    "childWorkItems": "Untergeordnete Vorgänge ({count})",
+    "noChildItems": "Noch keine untergeordneten Vorgänge",
+    "noChildItemsLowest": "Keine untergeordneten Vorgänge (niedrigste Hierarchieebene)",
+    "noTopLevelItems": "Keine Vorgänge auf oberster Ebene gefunden",
+    "noTopLevelItemsDesc": "Erstellen Sie einige Vorgänge, um Ihre Story Map zu sehen",
+    "loadingWorkItems": "Vorgänge werden geladen...",
+    "noWorkItemsFound": "Keine Vorgänge gefunden",
+    "showingWorkItems": "{count} Vorgänge anzeigen",
+    "boardSummary": "Gesamt: {itemCount} Vorgänge in {columnCount} Spalten",
+    "roadmapNoItems": "Keine Vorgänge mit Daten im aktuellen Zeitraum.",
+    "dragItemsHere": "Vorgänge hierher ziehen, um sie diesem Sprint hinzuzufügen",
+    "allItems": "Alle Vorgänge"
   },
   "links": {
-    "subtitle": "Arbeitselement-Links verwalten"
+    "subtitle": "Vorgangs-Links verwalten"
   },
   "workspaceSettings": {
-    "workspaceKeyHelp": "Wird für Arbeitselement-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.",
-    "defaultTimeProjectHelp": "Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Arbeitselement überschrieben werden.",
-    "removeWarningItems": "Alle Arbeitselemente und Projekte in diesem Arbeitsbereich",
+    "workspaceKeyHelp": "Wird für Vorgangs-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.",
+    "defaultTimeProjectHelp": "Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Vorgang überschrieben werden.",
+    "removeWarningItems": "Alle Vorgänge und Projekte in diesem Arbeitsbereich",
     "headers": {
-      "recurrence": "Regeln für wiederkehrende Arbeitselemente verwalten",
-      "templates": "Wiederverwendbare Beschreibungsgerüste für neue Arbeitselemente"
+      "recurrence": "Regeln für wiederkehrende Vorgänge verwalten",
+      "templates": "Wiederverwendbare Beschreibungsgerüste für neue Vorgänge"
     }
   },
   "issueSync": {
-    "subtitle": "GitHub Issues als Arbeitselemente in diesen Arbeitsbereich synchronisieren",
+    "subtitle": "GitHub Issues als Vorgänge in diesen Arbeitsbereich synchronisieren",
     "noConfig": "Die Issue-Synchronisierung ist für diesen Arbeitsbereich nicht konfiguriert.",
-    "noConfigDescription": "Verknüpfen Sie ein Repository und konfigurieren Sie, wie GitHub Issues in Windshift-Arbeitselemente synchronisiert werden sollen.",
+    "noConfigDescription": "Verknüpfen Sie ein Repository und konfigurieren Sie, wie GitHub Issues in Windshift-Vorgänge synchronisiert werden sollen.",
     "enabledDescription": "Wenn aktiviert, werden GitHub Issues regelmäßig in diesen Arbeitsbereich synchronisiert.",
-    "itemType": "Arbeitselementtyp",
-    "itemTypeDescription": "Wählen Sie den Arbeitselementtyp für synchronisierte Issues. Dies bestimmt, welche Workflow-Status für die Zuordnung verfügbar sind.",
-    "selectItemType": "Arbeitselementtyp auswählen",
-    "selectItemTypeHint": "Wählen Sie oben einen Arbeitselementtyp, um die Status-Zuordnung zu konfigurieren.",
-    "syncedItems": "Synchronisierte Arbeitselemente",
+    "itemType": "Vorgangstyp",
+    "itemTypeDescription": "Wählen Sie den Vorgangstyp für synchronisierte Issues. Dies bestimmt, welche Workflow-Status für die Zuordnung verfügbar sind.",
+    "selectItemType": "Vorgangstyp auswählen",
+    "selectItemTypeHint": "Wählen Sie oben einen Vorgangstyp, um die Status-Zuordnung zu konfigurieren.",
+    "syncedItems": "Synchronisierte Vorgänge",
     "noLinkedRepos": "Keine Repositories mit diesem Arbeitsbereich verknüpft. Verknüpfen Sie zuerst ein Repository in den Quellcodeverwaltungseinstellungen.",
-    "confirmDelete": "Möchten Sie die Issue-Synchronisierungskonfiguration wirklich entfernen? Synchronisierte Arbeitselemente bleiben erhalten, werden aber nicht mehr aktualisiert."
+    "confirmDelete": "Möchten Sie die Issue-Synchronisierungskonfiguration wirklich entfernen? Synchronisierte Vorgänge bleiben erhalten, werden aber nicht mehr aktualisiert."
   },
   "actions": {
-    "noActionsDescription": "Erstellen Sie Aktionen, um Ihre Workflows basierend auf Arbeitselement-Ereignissen zu automatisieren",
+    "noActionsDescription": "Erstellen Sie Aktionen, um Ihre Workflows basierend auf Vorgangs-Ereignissen zu automatisieren",
     "trigger": {
-      "itemCreated": "Arbeitselement erstellt",
-      "itemUpdated": "Arbeitselement aktualisiert",
-      "itemLinked": "Arbeitselement verknüpft"
+      "itemCreated": "Vorgang erstellt",
+      "itemUpdated": "Vorgang aktualisiert",
+      "itemLinked": "Vorgang verknüpft"
     },
     "nodes": {
-      "relatedItems": "Für jedes verwandte Arbeitselement",
-      "transitionItem": "Arbeitselement überführen"
+      "relatedItems": "Für jeden verwandten Vorgang",
+      "transitionItem": "Vorgang überführen"
     },
     "config": {
-      "includeLink": "Link zum Arbeitselement einfügen",
-      "sourceAssetField": "Asset-Feld am Arbeitselement",
-      "sourceTypeItemField": "Arbeitselement-Feld"
+      "includeLink": "Link zum Vorgang einfügen",
+      "sourceAssetField": "Asset-Feld am Vorgang",
+      "sourceTypeItemField": "Vorgangs-Feld"
     },
     "test": {
-      "description": "Wählen Sie ein Arbeitselement aus, für das diese Aktion ausgeführt werden soll. Die Aktion wird sofort ausgeführt und umgeht den normalen Auslöser.",
-      "selectItem": "Arbeitselement auswählen",
-      "itemPlaceholder": "Nach einem Arbeitselement suchen..."
+      "description": "Wählen Sie einen Vorgang aus, für den diese Aktion ausgeführt werden soll. Die Aktion wird sofort ausgeführt und umgeht den normalen Auslöser.",
+      "selectItem": "Vorgang auswählen",
+      "itemPlaceholder": "Nach einem Vorgang suchen..."
     },
     "placeholders": {
       "categories": {
-        "item": "Arbeitselement-Felder"
+        "item": "Vorgangs-Felder"
       },
       "item": {
-        "title": "Arbeitselement-Titel",
-        "id": "Arbeitselement-ID",
-        "any": "Beliebiges Arbeitselement-Feld"
+        "title": "Vorgangs-Titel",
+        "id": "Vorgangs-ID",
+        "any": "Beliebiges Vorgangs-Feld"
       },
       "trigger": {
-        "itemId": "Auslösendes Arbeitselement-ID"
+        "itemId": "Auslösende Vorgangs-ID"
       }
     }
   },
   "analytics": {
-    "collectionLoadError": "Sammlungen konnten nicht geladen werden. Die Analyse zeigt alle Arbeitsbereich-Arbeitselemente.",
-    "allItems": "Alle Arbeitsbereich-Arbeitselemente",
-    "items_one": "{count} Arbeitselement",
-    "items_other": "{count} Arbeitselemente",
+    "collectionLoadError": "Sammlungen konnten nicht geladen werden. Die Analyse zeigt alle Arbeitsbereich-Vorgänge.",
+    "allItems": "Alle Arbeitsbereich-Vorgänge",
+    "items_one": "{count} Vorgang",
+    "items_other": "{count} Vorgänge",
     "scope": {
-      "summary": "{items} aktuelle Arbeitselemente · {from}–{to}",
+      "summary": "{items} aktuelle Vorgänge · {from}–{to}",
       "currentWorkspace": "Aktuelle Arbeitsbereich-Kohorte",
-      "currentWorkspaceNote": "Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Arbeitselemente, die heute in diesem Arbeitsbereich liegen. Verschobene oder gelöschte Arbeitselemente sind nicht enthalten.",
-      "currentCollectionNote": "Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Arbeitselemente, die heute zur Sammlung passen. Änderungen an der Sammlung können die Kohorte verändern."
+      "currentWorkspaceNote": "Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Vorgänge, die heute in diesem Arbeitsbereich liegen. Verschobene oder gelöschte Vorgänge sind nicht enthalten.",
+      "currentCollectionNote": "Der Zeitraum gilt für Fluss- und Lieferdiagramme; Zustand und Alter sind aktuelle Momentaufnahmen. Historische Diagramme verwenden Vorgänge, die heute zur Sammlung passen. Änderungen an der Sammlung können die Kohorte verändern."
     },
     "health": {
-      "attentionItems": "Zu prüfende Arbeitselemente",
-      "item": "Arbeitselement",
-      "allClear": "Keine unerledigten Arbeitselemente entsprechen derzeit einem Warnsignal."
+      "attentionItems": "Zu prüfende Vorgänge",
+      "item": "Vorgang",
+      "allClear": "Keine unerledigten Vorgänge entsprechen derzeit einem Warnsignal."
     },
     "aging": {
-      "description": "Wie lange aktuell unerledigte Arbeitselemente bereits offen sind.",
-      "total": "Aktive Arbeitselemente",
-      "itemCount": "Arbeitselemente",
-      "oldest": "Älteste unerledigte Arbeitselemente"
+      "description": "Wie lange aktuell unerledigte Vorgänge bereits offen sind.",
+      "total": "Aktive Vorgänge",
+      "itemCount": "Vorgänge",
+      "oldest": "Älteste unerledigte Vorgänge"
     },
     "deliveryTime": {
-      "analyzed": "Abgeschlossene Arbeitselemente",
-      "missingHistory_one": "1 aktuell abgeschlossenes Arbeitselement wurde wegen fehlender Abschlusshistorie ausgeschlossen.",
-      "missingHistory_other": "{count} aktuell abgeschlossene Arbeitselemente wurden wegen fehlender Abschlusshistorie ausgeschlossen.",
-      "missingHistory": "{count} Derzeit abgeschlossene Arbeitselemente wurden ausgeschlossen, da ihr Abschlussverlauf fehlt."
+      "analyzed": "Abgeschlossene Vorgänge",
+      "missingHistory_one": "1 aktuell abgeschlossener Vorgang wurde wegen fehlender Abschlusshistorie ausgeschlossen.",
+      "missingHistory_other": "{count} aktuell abgeschlossene Vorgänge wurden wegen fehlender Abschlusshistorie ausgeschlossen.",
+      "missingHistory": "{count} Derzeit abgeschlossene Vorgänge wurden ausgeschlossen, da ihr Abschlussverlauf fehlt."
     },
     "insufficientData": {
-      "no_items": "Dieser Bereich enthält noch keine Arbeitselemente.",
-      "few_completed_items": "In diesem Zeitraum wurden nur wenige Arbeitselemente abgeschlossen. Perzentile sind daher nur als Tendenz zu verstehen."
+      "no_items": "Dieser Bereich enthält noch keine Vorgänge.",
+      "few_completed_items": "In diesem Zeitraum wurden nur wenige Vorgänge abgeschlossen. Perzentile sind daher nur als Tendenz zu verstehen."
     }
   },
   "recurrence": {
-    "emptyDesc": "Hier werden Wiederholungsregeln angezeigt wenn für Arbeitselemente wiederkehrende Zeitpläne konfiguriert sind.",
-    "createFromItem": "Um eine Wiederholungsregel zu erstellen, öffnen Sie ein Arbeitselement und richten Sie die Wiederholung in der Detailseitenleiste ein."
+    "emptyDesc": "Hier werden Wiederholungsregeln angezeigt wenn für Vorgänge wiederkehrende Zeitpläne konfiguriert sind.",
+    "createFromItem": "Um eine Wiederholungsregel zu erstellen, öffnen Sie einen Vorgang und richten Sie die Wiederholung in der Detailseitenleiste ein."
   },
   "conditionSets": {
-    "errorMessagePlaceholder": "z. B. „Nur Tester können Arbeitselemente zur Qualitätssicherung verschieben“"
+    "errorMessagePlaceholder": "z. B. „Nur Tester können Vorgänge zur Qualitätssicherung verschieben“"
   },
   "approvalSets": {
-    "allowSelfApproval": "Selbstgenehmigung zulassen – Erlaubt demselben Benutzer, das Arbeitselement sowohl zu übertragen als auch zu genehmigen."
+    "allowSelfApproval": "Selbstgenehmigung zulassen – Erlaubt demselben Benutzer, den Vorgang sowohl zu übertragen als auch zu genehmigen."
   }
 };
 

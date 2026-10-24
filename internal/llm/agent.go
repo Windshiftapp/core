@@ -39,15 +39,31 @@ type ToolCallRecord struct {
 }
 
 // StopReason describes why the agent loop ended. Callers use it to
-// distinguish a clean answer from a budget exhaustion, so the chat UI can
-// flag the latter instead of silently passing off the boilerplate "I
-// wasn't able to complete..." message as a normal reply.
+// distinguish a clean answer from a truncated, empty, stalled, or
+// budget-exhausted one so the UI can flag the latter instead of passing off a
+// partial reply as a normal answer.
 type StopReason string
 
 const (
 	StopReasonDone          StopReason = "done"
 	StopReasonMaxIterations StopReason = "max_iterations"
+	// StopReasonMaxTokens means the provider stopped because the output token
+	// budget was exhausted. The answer is truncated, not final, so callers must
+	// not present it as a completed result.
+	StopReasonMaxTokens StopReason = "max_tokens"
+	// StopReasonContentFilter means the provider blocked the response.
+	StopReasonContentFilter StopReason = "content_filter"
+	// StopReasonEmpty means the model returned neither tool calls nor text.
+	StopReasonEmpty StopReason = "empty"
+	// StopReasonNoProgress means the model repeated tool calls it had already
+	// made and the loop was stopped to avoid burning tokens.
+	StopReasonNoProgress StopReason = "no_progress"
 )
+
+// defaultNoProgressLimit is how many consecutive all-duplicate iterations the
+// loop tolerates before it stops. Two gives the model one chance to react to
+// the corrective nudge without paying for a long repeat loop.
+const defaultNoProgressLimit = 2
 
 // AgentResult contains the outcome of an agent run.
 type AgentResult struct {
@@ -82,6 +98,13 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// One agent run is one conversation: every iteration and tool round-trip
+	// must reuse the same provider session id. Callers that already attached a
+	// longer-lived conversation id (a chat session) keep it.
+	if SessionIDFromContext(ctx) == "" {
+		ctx = WithSessionID(ctx, NewSessionID("ws-agent"))
+	}
+
 	messages := []Message{
 		{Role: "system", Content: cfg.SystemPrompt},
 	}
@@ -92,6 +115,11 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 	var totalUsage Usage
 	var totalImages int
 	terminalResults := map[string]string{}
+	// readResults caches successful non-terminal tool results for the current
+	// mutation epoch. Any successful mutation clears it, because the cached
+	// reads may now be stale.
+	readResults := map[string]string{}
+	stalledIterations := 0
 	forceFinalWithoutTools := false
 
 	for i := 0; i < maxIter; i++ {
@@ -135,21 +163,34 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 
 		choice := resp.Choices[0]
 
-		// If no tool calls, this is the final answer
-		if choice.FinishReason != "tool_calls" || len(choice.Message.ToolCalls) == 0 {
+		// A response with no tool calls ends the loop. Classify why it ended so a
+		// truncated, filtered, or empty response is not mistaken for a real
+		// answer. Trust the presence of tool calls over the reported finish
+		// reason: providers disagree on the latter.
+		if len(choice.Message.ToolCalls) == 0 {
+			answer := choice.Message.Content
+			stopReason := finalStopReason(choice.FinishReason, answer)
+			// A mutation already succeeded this run, so the model's summary is
+			// optional. A truncated or empty follow-up still counts as done and
+			// must not invite a retry that duplicates the side effect.
+			if forceFinalWithoutTools && stopReason != StopReasonDone {
+				answer = "The requested action completed successfully."
+				stopReason = StopReasonDone
+			}
 			slog.Info("agent loop finished",
-				slog.String("stop_reason", string(StopReasonDone)),
+				slog.String("stop_reason", string(stopReason)),
+				slog.String("finish_reason", choice.FinishReason),
 				slog.Int("iterations", i+1),
 				slog.Int("max_iterations", maxIter),
 				slog.Int("tool_calls", len(allToolCalls)),
 				slog.Int("total_tokens", totalUsage.TotalTokens),
 			)
 			return &AgentResult{
-				Answer:     choice.Message.Content,
+				Answer:     answer,
 				ToolCalls:  allToolCalls,
 				Iterations: i + 1,
 				MaxIter:    maxIter,
-				StopReason: StopReasonDone,
+				StopReason: stopReason,
 				Usage:      totalUsage,
 				Calls:      i + 1,
 				Images:     totalImages,
@@ -164,16 +205,14 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 		// mutating calls in one response, and waiting until the next iteration to
 		// disable tools is too late for those calls.
 		terminalCompletedThisTurn := false
+		freshExecutions := 0
 		for _, tc := range choice.Message.ToolCalls {
 			start := time.Now()
 			isTerminalTool := cfg.TerminalTools != nil && cfg.TerminalTools[tc.Function.Name]
 			if !isTerminalTool && cfg.TerminalToolFunc != nil {
 				isTerminalTool = cfg.TerminalToolFunc(tc.Function.Name, tc.Function.Arguments)
 			}
-			terminalKey := ""
-			if isTerminalTool {
-				terminalKey = toolCallDedupeKey(tc.Function.Name, tc.Function.Arguments)
-			}
+			key := toolCallDedupeKey(tc.Function.Name, tc.Function.Arguments)
 
 			var result string
 			var execErr error
@@ -184,22 +223,37 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 				result = skippedAfterTerminalToolResult(tc.Function.Name)
 				afterTerminalSuppressed = true
 			case isTerminalTool:
-				if previous, ok := terminalResults[terminalKey]; ok {
+				if previous, ok := terminalResults[key]; ok {
 					result = duplicateTerminalToolResult(tc.Function.Name, previous)
 					duplicateSuppressed = true
 				} else {
 					result, execErr = executeTool(ctx, tc.Function.Name, tc.Function.Arguments)
+					freshExecutions++
 				}
 			default:
-				result, execErr = executeTool(ctx, tc.Function.Name, tc.Function.Arguments)
+				// Read-only tools are deduplicated until a mutation invalidates
+				// the cache. Weak models otherwise re-issue identical reads until
+				// the iteration budget (and the user's token budget) is gone.
+				if _, ok := readResults[key]; ok {
+					result = duplicateReadToolResult(tc.Function.Name)
+					duplicateSuppressed = true
+				} else {
+					result, execErr = executeTool(ctx, tc.Function.Name, tc.Function.Arguments)
+					freshExecutions++
+				}
 			}
 			if execErr != nil {
 				result = fmt.Sprintf(`{"error": "%s"}`, execErr.Error()) //nolint:gocritic // JSON string, not Go quoting
 			}
-			if isTerminalTool && !duplicateSuppressed && !afterTerminalSuppressed && execErr == nil && !toolReturnedError(result) {
-				terminalResults[terminalKey] = result
+			succeeded := execErr == nil && !toolReturnedError(result)
+			if isTerminalTool && !duplicateSuppressed && !afterTerminalSuppressed && succeeded {
+				terminalResults[key] = result
 				forceFinalWithoutTools = true
 				terminalCompletedThisTurn = true
+				// A mutation may have changed what reads return.
+				readResults = map[string]string{}
+			} else if !isTerminalTool && !duplicateSuppressed && !afterTerminalSuppressed && succeeded {
+				readResults[key] = result
 			}
 			slog.Info("agent tool call",
 				slog.Int("iteration", i+1),
@@ -232,6 +286,38 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 				ToolCallID: tc.ID,
 				Name:       tc.Function.Name,
 			})
+		}
+
+		// Every call this turn was a suppressed duplicate: the model is stuck
+		// re-reading instead of acting. Nudge it once, then stop rather than
+		// paying for the rest of the iteration budget.
+		if freshExecutions == 0 {
+			stalledIterations++
+			if stalledIterations >= defaultNoProgressLimit {
+				slog.Warn("agent loop stopped after repeated no-progress iterations",
+					slog.String("stop_reason", string(StopReasonNoProgress)),
+					slog.Int("iterations", i+1),
+					slog.Int("max_iterations", maxIter),
+					slog.Int("tool_calls", len(allToolCalls)),
+					slog.Int("total_tokens", totalUsage.TotalTokens),
+				)
+				return &AgentResult{
+					Answer:     "I stopped because I kept repeating the same steps without making progress. Review the tool calls and try again with a more specific instruction.",
+					ToolCalls:  allToolCalls,
+					Iterations: i + 1,
+					MaxIter:    maxIter,
+					StopReason: StopReasonNoProgress,
+					Usage:      totalUsage,
+					Calls:      i + 1,
+					Images:     totalImages,
+				}, nil
+			}
+			messages = append(messages, Message{
+				Role:    "user",
+				Content: "You repeated tool calls that were already answered and nothing changed. Do not call them again. Either take a different action or give your final answer now.",
+			})
+		} else {
+			stalledIterations = 0
 		}
 	}
 
@@ -296,6 +382,22 @@ func wrapUntrustedToolResult(toolName, payload string) string {
 	return fmt.Sprintf(`<tool_result name=%q trust="untrusted">%s</tool_result>`, toolName, payload)
 }
 
+// finalStopReason classifies a no-tool-call response. Only an explicit stop
+// with text is a clean completion; everything else is surfaced to the caller so
+// it can fail, retry, or flag the run instead of presenting a partial answer.
+func finalStopReason(finishReason, content string) StopReason {
+	switch finishReason {
+	case "length":
+		return StopReasonMaxTokens
+	case "content_filter":
+		return StopReasonContentFilter
+	}
+	if strings.TrimSpace(content) == "" {
+		return StopReasonEmpty
+	}
+	return StopReasonDone
+}
+
 func toolCallDedupeKey(name, arguments string) string {
 	trimmed := strings.TrimSpace(arguments)
 	var parsed any
@@ -327,6 +429,26 @@ func duplicateTerminalToolResult(toolName, previous string) string {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return `{"skipped":true,"reason":"duplicate terminal tool call suppressed"}`
+	}
+	return string(b)
+}
+
+// duplicateReadToolResult marks a repeated read as suppressed without echoing
+// the earlier payload. The model already has that result in its history, so
+// repeating it would spend the very tokens the suppression exists to save.
+func duplicateReadToolResult(toolName string) string {
+	payload := struct {
+		Skipped bool   `json:"skipped"`
+		Tool    string `json:"tool"`
+		Reason  string `json:"reason"`
+	}{
+		Skipped: true,
+		Tool:    toolName,
+		Reason:  "duplicate read tool call suppressed; the result is unchanged from your earlier identical call",
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return `{"skipped":true,"reason":"duplicate read tool call suppressed"}`
 	}
 	return string(b)
 }

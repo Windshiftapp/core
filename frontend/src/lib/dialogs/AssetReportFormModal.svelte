@@ -1,5 +1,6 @@
 <script>
-  import { api } from '../api.js';
+  import { assetReports } from '../api/channels.js';
+  import { portal } from '../api/portal.js';
   import StateDisplay from '../components/StateDisplay.svelte';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
@@ -67,8 +68,8 @@
       loading = true;
       error = null;
       const [fieldList, defs] = await Promise.all([
-        api.assetReports.getPortalFields(portalSlug, report.id),
-        api.portal.getCustomFields(portalSlug).catch(() => [])
+        assetReports.getPortalFields(portalSlug, report.id),
+        portal.getCustomFields(portalSlug).catch(() => [])
       ]);
       fields = fieldList || [];
       customFieldDefinitions = defs || [];
@@ -156,7 +157,7 @@
         if (normalized === undefined || normalized === '') continue;
         params[f.field_identifier] = normalized;
       }
-      results = await api.assetReports.submit(portalSlug, report.id, { params, page: 1, perPage: 50 });
+      results = await assetReports.submit(portalSlug, report.id, { params, page: 1, perPage: 50 });
     } catch (err) {
       console.error('Failed to run asset report:', err);
       error = err.message || t('portal.failedToRunReport');

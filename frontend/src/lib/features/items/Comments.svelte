@@ -1,26 +1,28 @@
 <script>
 	import { onMount, onDestroy, tick } from 'svelte';
 	import ColorDot from '../../components/ColorDot.svelte';
-	import { api } from '../../api.js';
-	import { authStore } from '../../stores';
+	import { createComment, deleteComment as deleteCommentApi, updateComment } from '../../api/misc.js';
+	import { authStore } from '../../stores/auth.svelte.js';
 	import { subscribeToNewNotifications } from '../../stores/notifications.js';
 	import { useEventListener } from 'runed';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
 	import Avatar from '../../components/Avatar.svelte';
 	import Checkbox from '../../components/Checkbox.svelte';
-	import { formatRelativeTime } from '../../utils/dateFormatter.js';
+	import { formatHistoryTimestamp, formatRelativeTime, getUserTimezone } from '../../utils/dateFormatter.js';
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
 	import { confirm } from '../../composables/useConfirm.js';
 	import Badge from '../../components/Badge.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import Tooltip from '../../components/Tooltip.svelte';
-	import { Shield, Bot } from '@lucide/svelte';
+	import Shield from '@lucide/svelte/icons/shield';
+	import Bot from '@lucide/svelte/icons/bot';
 	import { agentOwnerName, loadAttributedComments } from './activityAttributionData.js';
 	import { isExpectedBackgroundSyncError } from '../../utils/backgroundSync.js';
 	import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 	import CannedResponsePicker from '../support/CannedResponsePicker.svelte';
+	import CommentReactions from './CommentReactions.svelte';
 
 	const COMMENT_PAGE_SIZE = 25;
 
@@ -51,6 +53,15 @@
 	// comment.edit_others holders may moderate foreign comments (mirrors
 	// requireCommentEdit in the v2 API).
 	const canEditOthersComments = $derived(workspacePermissions.canEditOthersComments(workspaceId));
+	// Reacting needs the comment permission (mirrors requireCommentPermission in the v2 API).
+	const canReact = $derived(Boolean(authStore.currentUser) && (!workspaceId || workspacePermissions.canComment(workspaceId)));
+
+	function setReactions(commentId, reactions) {
+		comments = comments.map((c) => (c.id === commentId ? { ...c, reactions } : c));
+	}
+
+	// Get user's timezone
+	let timezone = $derived(getUserTimezone(authStore.currentUser));
 
 	// Sort state
 	let sortOrder = $state('oldest'); // 'oldest' | 'newest'
@@ -150,7 +161,7 @@
 		const version = ++reconciliationVersion;
 		let response;
 		try {
-			response = await loadAttributedComments(api, itemId, { limit: COMMENT_PAGE_SIZE });
+			response = await loadAttributedComments(itemId, { limit: COMMENT_PAGE_SIZE, include_reactions: true });
 		} catch (err) {
 			if (version !== reconciliationVersion) return;
 			// Navigation can unload the document while this request is in flight.
@@ -190,8 +201,9 @@
 	async function syncNewComments() {
 		let response;
 		try {
-			response = await loadAttributedComments(api, itemId, {
+			response = await loadAttributedComments(itemId, {
 				limit: COMMENT_PAGE_SIZE,
+				include_reactions: true,
 				...(refreshCursor ? { cursor: refreshCursor } : {})
 			});
 		} catch (err) {
@@ -243,8 +255,9 @@
 		try {
 			while (fresh.length < targetCount) {
 				const isFirstPage = firstResponse === null;
-				const response = await loadAttributedComments(api, itemId, {
+				const response = await loadAttributedComments(itemId, {
 					limit: Math.min(100, targetCount - fresh.length),
+					include_reactions: true,
 					...(cursor ? { cursor } : {})
 				});
 				if (version !== reconciliationVersion) return;
@@ -300,9 +313,10 @@
 		isLoadingMore = true;
 		error = '';
 		try {
-			const response = await loadAttributedComments(api, itemId, {
+			const response = await loadAttributedComments(itemId, {
 				limit: COMMENT_PAGE_SIZE,
-				cursor: olderCursor
+				cursor: olderCursor,
+				include_reactions: true
 			});
 			comments = mergeCommentRows(comments, response?.comments || []);
 			hasMore = Boolean(response?.has_more);
@@ -366,7 +380,7 @@
 		error = '';
 
 		try {
-			const newComment = await api.createComment(itemId, {
+			const newComment = await createComment(itemId, {
 				content: newCommentContent,
 				author_id: authStore.currentUser.id,
 				is_private: isInternalComment
@@ -413,7 +427,7 @@
 		if (!confirmed) return;
 
 		try {
-			await api.deleteComment(commentId);
+			await deleteCommentApi(commentId);
 			comments = comments.filter(c => c.id !== commentId);
 			totalCount = Math.max(0, totalCount - 1);
 			// Update comment count
@@ -443,7 +457,7 @@
 		error = '';
 
 		try {
-			const updated = await api.updateComment(editingCommentId, {
+			const updated = await updateComment(editingCommentId, {
 				content: editingContent
 			});
 
@@ -564,9 +578,11 @@
 								<h4 class="text-sm font-medium" style="color: var(--ds-text);">
 									{comment.author_name || t('common.unknownUser')}
 								</h4>
-								<span class="text-xs" style="color: var(--ds-text-subtle);">
-									{formatRelativeTime(comment.created_at) || '-'}
-								</span>
+								<Tooltip content={formatHistoryTimestamp(comment.created_at, timezone)} placement="top">
+									<span data-testid="comment-time" class="text-xs" style="color: var(--ds-text-subtle);">
+										{formatRelativeTime(comment.created_at) || '-'}
+									</span>
+								</Tooltip>
 								{#if isEdited(comment)}
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">({t('comments.edited')})</span>
 								{/if}
@@ -575,7 +591,7 @@
 								{/if}
 							</div>
 							{#if comment.source !== 'approval' && authStore.currentUser && (comment.author_id === authStore.currentUser.id || canEditOthersComments) && editingCommentId !== comment.id}
-								<div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+								<div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity" data-testid="comment-actions">
 									<button
 										onclick={() => startEdit(comment)}
 										data-testid="comment-edit"
@@ -641,8 +657,16 @@
 						{:else}
 							<!-- Read Mode -->
 							<div class="comment-content text-sm" style="color: var(--ds-text);">
-								<MilkdownEditor content={comment.content} readonly={true} showToolbar={false} compact={true} />
+								<MilkdownEditor content={comment.content} readonly={true} showToolbar={false} compact={true} {workspaceId} />
 							</div>
+							{#if comment.source !== 'approval'}
+								<CommentReactions
+									{comment}
+									{canReact}
+									onChange={(reactions) => setReactions(comment.id, reactions)}
+									onError={(message) => (error = message)}
+								/>
+							{/if}
 						{/if}
 					</div>
 				</div>

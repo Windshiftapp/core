@@ -1,4 +1,4 @@
-import { Calendar } from '@lucide/svelte';
+import Calendar from '@lucide/svelte/icons/calendar';
 
 const STATUS_COLORS = {
   active: '#0052CC',

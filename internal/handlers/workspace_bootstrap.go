@@ -24,6 +24,23 @@ type WorkspaceBootstrapHandler struct {
 	projects   *TimeProjectHandler
 }
 
+// planningLookaheadLimit queries one row past the returned cap so the response
+// can state whether a planning family was fully loaded. Exactly planningListLimit
+// rows means complete; a lookahead row means partial. Never trust a best-effort
+// count total for this decision.
+const (
+	planningListLimit      = 1000
+	planningLookaheadLimit = planningListLimit + 1
+)
+
+// PlanningCompleteness states whether each bootstrap planning list contains
+// every selectable row. A false flag means the list is a partial page that must
+// not be treated as a complete option directory.
+type PlanningCompleteness struct {
+	Milestones bool `json:"milestones"`
+	Iterations bool `json:"iterations"`
+}
+
 type WorkspaceBootstrapResponse struct {
 	Workspace              *models.Workspace              `json:"workspace"`
 	HomepageLayout         models.WorkspaceHomepageLayout `json:"homepage_layout"`
@@ -36,6 +53,7 @@ type WorkspaceBootstrapResponse struct {
 	StatusCategories       []models.StatusCategory        `json:"status_categories"`
 	Priorities             []models.Priority              `json:"priorities"`
 	CustomFieldDefinitions []models.CustomFieldDefinition `json:"custom_field_definitions"`
+	PlanningCompleteness   PlanningCompleteness           `json:"planning_completeness"`
 }
 
 func NewWorkspaceBootstrapHandler(
@@ -129,13 +147,15 @@ func (h *WorkspaceBootstrapHandler) load(ctx context.Context, userID int, worksp
 		return err
 	})
 	run("milestones", func() error {
-		milestones, err := h.listMilestones(userID, workspace.ID)
+		milestones, complete, err := h.listMilestones(userID, workspace.ID)
 		response.Milestones = milestones
+		response.PlanningCompleteness.Milestones = complete
 		return err
 	})
 	run("iterations", func() error {
-		iterations, err := h.listIterations(workspace.ID)
+		iterations, complete, err := h.listIterations(workspace.ID)
 		response.Iterations = iterations
+		response.PlanningCompleteness.Iterations = complete
 		return err
 	})
 	run("projects", func() error {
@@ -197,32 +217,40 @@ func (h *WorkspaceBootstrapHandler) listAssignableUsers(ctx context.Context, wor
 	return h.users.workspaceUsers.List(ctx, workspaceID)
 }
 
-func (h *WorkspaceBootstrapHandler) listMilestones(userID, workspaceID int) ([]models.Milestone, error) {
+func (h *WorkspaceBootstrapHandler) listMilestones(userID, workspaceID int) ([]models.Milestone, bool, error) {
 	results, _, err := h.planning.ListMilestones(services.MilestoneListParams{
-		Limit: 1000, WorkspaceID: &workspaceID, IncludeGlobal: true,
+		Limit: planningLookaheadLimit, WorkspaceID: &workspaceID, IncludeGlobal: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	complete := len(results) <= planningListLimit
+	if !complete {
+		results = results[:planningListLimit]
 	}
 	milestones := make([]models.Milestone, 0, len(results))
 	for i := range results {
 		milestones = append(milestones, h.milestoneResult(&results[i], userID))
 	}
-	return milestones, nil
+	return milestones, complete, nil
 }
 
-func (h *WorkspaceBootstrapHandler) listIterations(workspaceID int) ([]models.Iteration, error) {
+func (h *WorkspaceBootstrapHandler) listIterations(workspaceID int) ([]models.Iteration, bool, error) {
 	results, _, err := h.planning.ListIterations(services.IterationListParams{
-		Limit: 1000, WorkspaceID: &workspaceID, IncludeGlobal: true,
+		Limit: planningLookaheadLimit, WorkspaceID: &workspaceID, IncludeGlobal: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	complete := len(results) <= planningListLimit
+	if !complete {
+		results = results[:planningListLimit]
 	}
 	iterations := make([]models.Iteration, 0, len(results))
 	for i := range results {
 		iterations = append(iterations, iterationResult(&results[i]))
 	}
-	return iterations, nil
+	return iterations, complete, nil
 }
 
 func (h *WorkspaceBootstrapHandler) milestoneResult(result *services.MilestoneResult, userID int) models.Milestone {

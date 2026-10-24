@@ -1,8 +1,10 @@
 <script>
 	import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-	import { api } from '../api.js';
- import { Plus, Edit2, Trash2 } from '@lucide/svelte';
+	import { integrationProviders } from '../api/integrations.js';
+ import Plus from '@lucide/svelte/icons/plus';
+ import Edit2 from '@lucide/svelte/icons/edit-2';
+ import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Button from '../components/Button.svelte';
 	import CopyButton from '../components/CopyButton.svelte';
 	import Modal from '../dialogs/Modal.svelte';
@@ -55,7 +57,7 @@
 		loading = true;
 		error = '';
 		try {
-			providers = await api.integrationProviders.getAll() || [];
+			providers = await integrationProviders.getAll() || [];
 		} catch (err) {
 			console.error('Failed to load providers:', err);
 			error = t('integrations.providers.loadFailed');
@@ -104,10 +106,10 @@
 			}
 
 			if (editingProvider) {
-				await api.integrationProviders.update(editingProvider.id, data);
+				await integrationProviders.update(editingProvider.id, data);
 				successToast(t('integrations.providers.updated'));
 			} else {
-				await api.integrationProviders.create(data);
+				await integrationProviders.create(data);
 				successToast(t('integrations.providers.created'));
 			}
 
@@ -129,7 +131,7 @@
 		if (!confirmed) return;
 
 		try {
-			await api.integrationProviders.delete(provider.id);
+			await integrationProviders.delete(provider.id);
 			successToast(t('integrations.providers.deleted'));
 			await loadProviders();
 		} catch (err) {

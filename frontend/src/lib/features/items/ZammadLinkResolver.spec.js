@@ -7,7 +7,7 @@ import ZammadLinkResolver from './ZammadLinkResolver.svelte';
 
 const mocks = vi.hoisted(() => ({ resolve: vi.fn(), navigate: vi.fn() }));
 
-vi.mock('../../api.js', () => ({ api: { zammadTickets: { resolve: mocks.resolve } } }));
+vi.mock('../../api/integrations.js', () => ({ zammadTickets: { resolve: mocks.resolve } }));
 vi.mock('../../router.js', () => ({ navigate: mocks.navigate }));
 vi.mock('../../stores/i18n.svelte.js', () => ({ t: (key) => key }));
 

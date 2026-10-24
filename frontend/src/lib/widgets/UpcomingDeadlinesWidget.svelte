@@ -1,6 +1,10 @@
 <script>
-  import { Calendar, CalendarDays, Flag, RefreshCw } from '@lucide/svelte';
-  import { api } from '../api.js';
+  import Calendar from '@lucide/svelte/icons/calendar';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
+  import Flag from '@lucide/svelte/icons/flag';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { items as itemsApi } from '../api/items.js';
+  import { iterations, milestones } from '../api/milestones.js';
   import DueMark from './dashboard/DueMark.svelte';
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -50,9 +54,9 @@
       const vql = parts.join(' AND ');
 
       const [itemsResponse, allMilestones, allIterations] = await Promise.all([
-        api.items.getAll({ ql: vql, limit: 50 }),
-        api.milestones.getAll({ workspace_id: workspaceId }),
-        api.iterations.getAll({ workspace_id: workspaceId }),
+        itemsApi.getAll({ ql: vql, limit: 50 }),
+        milestones.getAll({ workspace_id: workspaceId }),
+        iterations.getAll({ workspace_id: workspaceId }),
       ]);
 
       const items = itemsResponse?.data ?? [];

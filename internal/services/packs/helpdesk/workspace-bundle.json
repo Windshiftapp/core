@@ -3,7 +3,7 @@
   "kind": "windshift.workspace-bundle",
   "payload": {
     "view_settings": {
-      "enabled_views": ["backlog", "board", "list", "queue", "agents", "analytics", "actions", "pages"]
+      "enabled_views": ["board", "list", "queue", "agents", "analytics", "actions", "pages"]
     },
     "slas": {
       "calendars": [
@@ -32,7 +32,7 @@
           "is_active": true,
           "conditions": [
             { "phase": "start", "condition_type": "created" },
-            { "phase": "stop", "condition_type": "assignee_set" }
+            { "phase": "stop", "condition_type": "comment_by_agent" }
           ],
           "goals": [
             {

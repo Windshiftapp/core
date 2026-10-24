@@ -37,6 +37,9 @@ var (
 
 type LLMResolver interface {
 	Resolve(connectionID int) (llm.Client, error)
+	// MaxOutputTokens returns the model's resolved output cap for the
+	// connection, or 0 when it cannot be resolved.
+	MaxOutputTokens(connectionID int) int
 }
 
 type Options struct {
@@ -293,14 +296,14 @@ Profile instructions:
 		Tools:         aitooladapter.BuildTools(entries),
 		MaxIterations: defaultMaxIterations,
 		Timeout:       d.opts.RunTimeout,
-		MaxTokens:     2048,
+		MaxTokens:     d.maxOutputTokens(*binding.LLMConnectionID),
 		Temperature:   0.2,
 	}, prompt, executor.Execute, nil)
 	if err != nil {
 		return nil, err
 	}
-	if result.StopReason != llm.StopReasonDone || strings.TrimSpace(result.Answer) == "" {
-		return nil, errors.New("private Standard test stopped before producing a final answer")
+	if cause := stopReasonError(result); cause != nil {
+		return nil, cause
 	}
 	for _, call := range result.ToolCalls {
 		var body map[string]any
@@ -468,7 +471,7 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		TerminalTools: aitooladapter.TerminalTools(entries),
 		MaxIterations: defaultMaxIterations,
 		Timeout:       d.opts.RunTimeout,
-		MaxTokens:     2048,
+		MaxTokens:     d.maxOutputTokens(snapshot.LLMConnectionID),
 		Temperature:   0.2,
 	}, userPrompt(run), executor.Execute, nil)
 	if err != nil {
@@ -492,8 +495,8 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		d.fail(run, errors.New("one or more admitted tool calls failed"))
 		return
 	}
-	if result.StopReason != llm.StopReasonDone || strings.TrimSpace(result.Answer) == "" {
-		d.fail(run, errors.New("agent stopped before producing a final answer"))
+	if cause := stopReasonError(result); cause != nil {
+		d.fail(run, cause)
 		return
 	}
 
@@ -527,18 +530,25 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 	}))
 }
 
+// maxOutputTokens sizes the run's per-request output cap from the connection's
+// resolved model limit, mirroring the coding-agent broker. The fallback keeps a
+// run usable when the resolver cannot name a limit.
+func (d *Dispatcher) maxOutputTokens(connectionID int) int {
+	if limit := d.opts.LLMs.MaxOutputTokens(connectionID); limit > 0 {
+		return limit
+	}
+	return llm.FallbackMaxOutputTokens
+}
+
 func (d *Dispatcher) fail(run *models.AgentRun, cause error) {
 	if cause != nil {
-		slog.Warn("Standard agent run failed", "run_id", run.ID, "error_type", fmt.Sprintf("%T", cause))
+		slog.Warn("Standard agent run failed", "run_id", run.ID, "error", cause.Error())
 	}
 	status := models.AgentRunStatusFailed
-	message := "The Standard agent could not complete this run."
 	if errors.Is(cause, context.Canceled) {
 		status = models.AgentRunStatusCanceled
-		message = "The Standard agent run was canceled."
-	} else if errors.Is(cause, context.DeadlineExceeded) {
-		message = "The Standard agent run timed out."
 	}
+	message := runFailureMessage(cause)
 	now := time.Now().UTC()
 	transitioned, err := d.opts.Runs.FinalizeRunning(context.Background(), run.ID, status, message, now)
 	if err != nil {
@@ -562,6 +572,72 @@ func (d *Dispatcher) notifyFailure(rootID, workspaceID, itemID, actingID int, ti
 	if err := d.opts.Notifications.NotifyUsers([]int{rootID}, workspaceID, itemID, actingID,
 		"agent_run_failed", title, message); err != nil {
 		slog.Warn("failed to notify Standard run initiator", "user_id", rootID, "item_id", itemID, "error", err)
+	}
+}
+
+// stopReasonError turns a non-clean agent result into an actionable error.
+// Returns nil only when the loop produced a real final answer. The messages are
+// safe to persist because this package constructs them.
+func stopReasonError(result *llm.AgentResult) error {
+	if result.StopReason == llm.StopReasonDone && strings.TrimSpace(result.Answer) != "" {
+		return nil
+	}
+	switch result.StopReason {
+	case llm.StopReasonMaxTokens:
+		return newRunCauseError("The model hit its output token limit before finishing.")
+	case llm.StopReasonContentFilter:
+		return newRunCauseError("The model's response was blocked by a content filter.")
+	case llm.StopReasonNoProgress:
+		return newRunCauseError("The model kept repeating the same tool calls without making progress.")
+	case llm.StopReasonEmpty:
+		return newRunCauseError("The model returned an empty response.")
+	case llm.StopReasonMaxIterations:
+		return newRunCauseError("The model ran out of steps before finishing.")
+	default:
+		return newRunCauseError("The model stopped before producing a final answer.")
+	}
+}
+
+// runCauseError is a failure whose message is safe to persist on the run row.
+// Only messages this package constructs use it. Arbitrary provider errors may
+// embed secrets, so runFailureMessage classifies those instead of echoing them.
+type runCauseError struct{ msg string }
+
+func (e *runCauseError) Error() string { return e.msg }
+
+func newRunCauseError(msg string) error { return &runCauseError{msg: msg} }
+
+// runFailureMessage turns a run's cause into the message persisted on the run
+// row. Operators need an actionable reason, but the field is user-visible, so
+// uncontrolled provider errors are mapped to a safe category instead of being
+// echoed verbatim.
+func runFailureMessage(cause error) string {
+	var controlled *runCauseError
+	switch {
+	case cause == nil:
+		return "The Standard agent could not complete this run."
+	case errors.As(cause, &controlled):
+		return controlled.msg
+	case errors.Is(cause, context.Canceled):
+		return "The Standard agent run was canceled."
+	case errors.Is(cause, context.DeadlineExceeded):
+		return "The Standard agent run timed out."
+	case errors.Is(cause, llm.ErrServiceNotReady), errors.Is(cause, llm.ErrNotConfigured):
+		return "The model provider is not available."
+	}
+	switch llm.ClassifyError(cause.Error()) {
+	case llm.ErrorClassAuthFailed:
+		return "The agent could not authenticate with the model provider."
+	case llm.ErrorClassRateLimited:
+		return "The model provider rate-limited the run."
+	case llm.ErrorClassModelNotFound:
+		return "The configured model is no longer available."
+	case llm.ErrorClassServerError:
+		return "The model provider returned a server error."
+	case llm.ErrorClassConnectionFailed:
+		return "The agent could not reach the model provider."
+	default:
+		return "The Standard agent could not complete this run."
 	}
 }
 

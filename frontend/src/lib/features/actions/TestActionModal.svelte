@@ -4,9 +4,10 @@
   import Button from '../../components/Button.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import FormField from '../../components/FormField.svelte';
-  import { api } from '../../api.js';
+  import { search } from '../../api/misc.js';
+  import { actions } from '../../api/actions.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { Play } from '@lucide/svelte';
+  import Play from '@lucide/svelte/icons/play';
 
   let { action, workspaceId, onclose, onsuccess } = $props();
 
@@ -25,7 +26,7 @@
 
     loading = true;
     try {
-      const results = await api.search.items({
+      const results = await search.items({
         query: term,
         workspaceIds: [workspaceId],
         limit: 20
@@ -46,7 +47,7 @@
     error = null;
 
     try {
-      await api.actions.execute(workspaceId, action.id, selectedItemId);
+      await actions.execute(workspaceId, action.id, selectedItemId);
       onsuccess?.();
       onclose();
     } catch (err) {

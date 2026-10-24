@@ -5,7 +5,7 @@
 	import UserPicker from '../pickers/UserPicker.svelte';
 	import Modal from '../dialogs/Modal.svelte';
 	import ModalHeader from '../dialogs/ModalHeader.svelte';
-	import { api } from '../api.js';
+	import { getUser } from '../api/users.js';
 	import { themeStore } from '../stores/theme.svelte.js';
 
 	let { pluginName = '', src = '' } = $props();
@@ -29,7 +29,7 @@
 		if (userId && bridge) {
 			try {
 				// Fetch user details to send back to plugin
-				const user = await api.getUser(userId);
+				const user = await getUser(userId);
 				bridge.sendToPlugin({
 					type: MESSAGE_TYPES.USER_PICKER_RESULT,
 					user

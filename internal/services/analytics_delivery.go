@@ -423,20 +423,17 @@ func analyticsFirstCompletions(data *analyticsDeliveryData) map[int]time.Time {
 	completions := make(map[int]time.Time)
 	for itemID, events := range data.EventsByItem {
 		for _, event := range events {
-			if !event.HasNew {
+			// Creation writes the item's starting status with no prior value.
+			// That is not a transition into a completed state, so it cannot be
+			// the completion event delivery time measures from.
+			if !event.HasNew || !event.HasOld {
 				continue
 			}
 			newStatus, ok := data.StatusByID[event.NewStatusID]
 			if !ok || !newStatus.Completed {
 				continue
 			}
-			oldCompleted := false
-			if event.HasOld {
-				if oldStatus, ok := data.StatusByID[event.OldStatusID]; ok {
-					oldCompleted = oldStatus.Completed
-				}
-			}
-			if oldCompleted {
+			if oldStatus, ok := data.StatusByID[event.OldStatusID]; ok && oldStatus.Completed {
 				continue
 			}
 			if previous, exists := completions[itemID]; !exists || event.At.Before(previous) {

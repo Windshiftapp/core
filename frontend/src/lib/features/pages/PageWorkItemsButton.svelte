@@ -1,8 +1,11 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { Link2, Trash2, Plus, X } from '@lucide/svelte';
+  import Link2 from '@lucide/svelte/icons/link-2';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
-  import { api } from '../../api.js';
+  import { links } from '../../api/configuration.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
@@ -85,7 +88,7 @@
 
   async function searchItems(q, version) {
     try {
-      const results = await api.links.search(q, 'item', 10);
+      const results = await links.search(q, 'item', 10);
       if (version !== searchVersion) return;
       searchResults = Array.isArray(results) ? results : [];
       highlightedIndex = searchResults.length > 0 ? 0 : -1;
@@ -102,7 +105,7 @@
     if (!pageLinkTypeId || submitting) return;
     submitting = true;
     try {
-      const link = await api.links.create({
+      const link = await links.create({
         link_type_id: pageLinkTypeId,
         source_type: 'item',
         source_id: item.id,
@@ -120,7 +123,7 @@
 
   async function unlinkItem(linkId) {
     try {
-      await api.links.delete(linkId);
+      await links.delete(linkId);
       onlinkRemoved(linkId);
     } catch (err) {
       errorToast(err?.message || t('pages.workItemsErrorUnlink'));
@@ -293,8 +296,9 @@
   .trigger {
     display: inline-flex;
     align-items: center;
+    height: 2rem;
     gap: 0.375rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0 0.625rem;
     border: 1px solid var(--ds-border);
     background: transparent;
     color: var(--ds-text-subtle);

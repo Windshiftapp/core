@@ -1,5 +1,6 @@
 <script>
-  import { CheckCircle, X } from '@lucide/svelte';
+  import CheckCircle from '@lucide/svelte/icons/check-circle';
+  import X from '@lucide/svelte/icons/x';
   import Button from '../components/Button.svelte';
   import Radio from '../components/Radio.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';

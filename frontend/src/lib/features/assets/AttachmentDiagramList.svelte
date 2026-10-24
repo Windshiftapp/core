@@ -1,9 +1,13 @@
 <script>
-  import { IconPaperclip, IconPencil, IconTrash, IconPhoto } from '@tabler/icons-svelte-runes';
+  import IconPaperclip from '@tabler/icons-svelte-runes/icons/paperclip';
+  import IconPencil from '@tabler/icons-svelte-runes/icons/pencil';
+  import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
+  import IconPhoto from '@tabler/icons-svelte-runes/icons/photo';
+  import IconDownload from '@tabler/icons-svelte-runes/icons/download';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { portal } from '../../actions/portal.js';
-  import { api } from '../../api.js';
+  import { attachments as attachmentsApi } from '../../api/misc.js';
 
   let {
     attachments = [],
@@ -47,11 +51,11 @@
   }
 
   function thumbUrl(att) {
-    return api.attachments.getThumbnailUrl(att.id);
+    return attachmentsApi.getThumbnailUrl(att.id);
   }
 
   function contentUrl(att) {
-    return api.attachments.getDownloadUrl(att.id);
+    return attachmentsApi.getContentUrl(att.id);
   }
 
   function formatFileSize(bytes) {
@@ -64,7 +68,7 @@
 
   async function handleDownload(attachment) {
     try {
-      const downloadUrl = api.attachments.getDownloadUrl(attachment.id);
+      const downloadUrl = attachmentsApi.getDownloadUrl(attachment.id);
       const response = await fetch(downloadUrl);
       if (!response.ok) {
         throw new Error(`Download failed: ${response.statusText}`);
@@ -148,7 +152,7 @@
         </span>
         {#if canDelete}
           <button
-            class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
+            class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDelete(attachment)}
             title={t('common.delete')}
@@ -178,7 +182,7 @@
         </span>
         {#if canDelete}
           <button
-            class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
+            class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDeleteDiagram(diagram)}
             title={t('common.delete')}
@@ -208,14 +212,26 @@
     aria-modal="true"
     tabindex="-1"
   >
-    <button
-      type="button"
-      class="absolute top-4 right-4 text-white/80 hover:text-white text-3xl leading-none"
-      onclick={closeLightbox}
-      aria-label={t('common.close') || 'Close'}
-    >
-      ×
-    </button>
+    <div class="absolute top-4 right-4 flex items-center gap-3">
+      <button
+        type="button"
+        class="text-white/80 hover:text-white"
+        onclick={() => handleDownload(lightbox)}
+        aria-label={t('common.download') || 'Download'}
+        title={t('common.download') || 'Download'}
+        data-testid="attachment-lightbox-download"
+      >
+        <IconDownload class="w-7 h-7" />
+      </button>
+      <button
+        type="button"
+        class="text-white/80 hover:text-white text-3xl leading-none"
+        onclick={closeLightbox}
+        aria-label={t('common.close') || 'Close'}
+      >
+        ×
+      </button>
+    </div>
     <div class="max-w-full max-h-full">
       {#if isImage(lightbox)}
         <img

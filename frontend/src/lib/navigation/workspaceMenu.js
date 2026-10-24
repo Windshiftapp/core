@@ -1,7 +1,9 @@
-import { IconSettings } from '@tabler/icons-svelte-runes';
+import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
 import { workspaceIconMap } from '../utils/icons.js';
 
-export function workspaceMenuItems(workspaces, searchQuery, onSearch, t) {
+// recentWorkspaceIds is only supplied by the sidebar menu. Other workspace
+// menus keep the directory order so recency does not leak into every list.
+export function workspaceMenuItems(workspaces, searchQuery, onSearch, t, recentWorkspaceIds = []) {
   const items = [];
 
   // Add search input at the top
@@ -30,11 +32,13 @@ export function workspaceMenuItems(workspaces, searchQuery, onSearch, t) {
         return nameMatch || keyMatch || descriptionMatch;
       });
 
+  const orderedWorkspaces = orderByRecent(filteredWorkspaces, recentWorkspaceIds);
+
   // Add workspace items
-  if (filteredWorkspaces.length > 0) {
+  if (orderedWorkspaces.length > 0) {
     const maxVisible = 10;
-    const hasMore = filteredWorkspaces.length > maxVisible;
-    const visibleWorkspaces = filteredWorkspaces.slice(0, maxVisible);
+    const hasMore = orderedWorkspaces.length > maxVisible;
+    const visibleWorkspaces = orderedWorkspaces.slice(0, maxVisible);
     const workspaceItems = visibleWorkspaces.map((workspace) => {
       const hasAvatar = workspace.avatar_url;
       const workspaceIcon = workspaceIconMap[workspace.icon] || workspaceIconMap.Package;
@@ -77,4 +81,24 @@ export function workspaceMenuItems(workspaces, searchQuery, onSearch, t) {
   });
 
   return items;
+}
+
+// Put recently visited workspaces first in visit order, then keep the
+// directory order for everything else.
+function orderByRecent(workspaces, recentWorkspaceIds) {
+  if (recentWorkspaceIds.length === 0) return workspaces;
+
+  const rank = new Map();
+  for (const id of recentWorkspaceIds) {
+    if (!rank.has(id)) rank.set(id, rank.size);
+  }
+
+  return [...workspaces].sort((left, right) => {
+    const leftRank = rank.get(left.id);
+    const rightRank = rank.get(right.id);
+    if (leftRank === undefined && rightRank === undefined) return 0;
+    if (leftRank === undefined) return 1;
+    if (rightRank === undefined) return -1;
+    return leftRank - rightRank;
+  });
 }

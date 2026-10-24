@@ -7,7 +7,9 @@
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
   import FloatingTimer from '../features/time/FloatingTimer.svelte';
   import { aiStore } from '../stores/aiStore.svelte.js';
+  import { itemModalStore } from '../stores/itemModalStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { currentRoute } from '../router.js';
   import { getMainAppLazyState } from './mainAppRoutes.js';
 
   let {
@@ -26,6 +28,7 @@
 
   let PomodoroSettingsModalComponent = $state(null);
   let AboutModalComponent = $state(null);
+  let ItemDetailModalComponent = $state(null);
   let desktopModalLoading = $state(false);
 
   const commandPaletteState = $derived.by(() =>
@@ -65,6 +68,31 @@
 
   $effect(() => {
     if (desktopBridge.modal) void loadDesktopModal(desktopBridge.modal);
+  });
+
+  async function loadItemDetailModal() {
+    if (ItemDetailModalComponent) return;
+    try {
+      const module = await import('../features/items/ItemDetail.svelte');
+      ItemDetailModalComponent = module.default;
+    } catch (error) {
+      console.error('Failed to load item detail modal:', error);
+      // Avoid leaving the loading backdrop stuck if the chunk cannot load.
+      itemModalStore.close();
+    }
+  }
+
+  $effect(() => {
+    if (itemModalStore.isOpen) void loadItemDetailModal();
+  });
+
+  // The host outlives the view that opened it; close on route changes so the
+  // modal cannot float above an unrelated destination.
+  let lastRoutePath = null;
+  $effect(() => {
+    const path = $currentRoute.path;
+    if (lastRoutePath !== null && path !== lastRoutePath) itemModalStore.close();
+    lastRoutePath = path;
   });
 </script>
 
@@ -142,6 +170,24 @@
 {/if}
 
 <FloatingTimer />
+
+{#if itemModalStore.isOpen}
+  {#if ItemDetailModalComponent}
+    <ItemDetailModalComponent
+      isModal={true}
+      itemId={itemModalStore.itemId}
+      workspaceId={itemModalStore.workspaceId}
+      onclose={() => itemModalStore.close()}
+    />
+  {:else}
+    <ModalBackdrop show={true} opacity={0.4} closeOnClick={false} closeOnEscape={false}>
+      <div class="rounded-lg p-6" style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);">
+        <Spinner class="mx-auto mb-4" />
+        <p>{t('common.loading')}</p>
+      </div>
+    </ModalBackdrop>
+  {/if}
+{/if}
 
 {#if aiStore.chatAvailable && showChatPanel && chatPanelState.component}
   {@const ChatPanelComponent = chatPanelState.component}

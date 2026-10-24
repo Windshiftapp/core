@@ -9,7 +9,7 @@
   } from './dashboard/taskWidgetState.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { useEventListener } from 'runed';
-  import { MoreHorizontal } from '@lucide/svelte';
+  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 
   let {
     title = '',
@@ -25,6 +25,7 @@
     onremove = null,
     onwidthchange = null,
     onconfigchange = null,
+    extraMenuItems = [],
     children,
   } = $props();
 
@@ -117,6 +118,8 @@
   ]);
 
   const menuItems = $derived([
+    ...extraMenuItems,
+    ...(extraMenuItems.length > 0 ? [{ type: 'divider' }] : []),
     ...presetItems,
     ...(supportsRowCount ? [{ type: 'divider' }] : []),
     ...(supportsRowCount ? rowCountItems : []),
@@ -236,7 +239,6 @@
       <!-- Width presets menu (available outside edit mode too) -->
       <DropdownMenu
         triggerIcon={MoreHorizontal}
-        triggerIconBgColor="transparent"
         iconOnly={true}
         showChevron={false}
         triggerLabel={t('widgets.resizeAriaLabel')}

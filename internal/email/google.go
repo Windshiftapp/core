@@ -18,15 +18,14 @@ const (
 
 // Google OAuth endpoints
 const (
-	googleAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
-	googleTokenURL    = "https://oauth2.googleapis.com/token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
-	googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+	googleAuthURL  = "https://accounts.google.com/o/oauth2/v2/auth"
+	googleTokenURL = "https://oauth2.googleapis.com/token" //nolint:gosec // G101 false positive: OAuth endpoint URL, not a credential
 )
 
-// GoogleDefaultScopes defines the default scopes for Gmail IMAP access.
+// GoogleDefaultScopes defines the default scopes for Gmail IMAP access. The
+// mailbox address is entered by the admin, so no userinfo scope is requested.
 var GoogleDefaultScopes = []string{
 	"https://mail.google.com/", // Full Gmail access (required for IMAP)
-	"https://www.googleapis.com/auth/userinfo.email",
 }
 
 // GoogleProvider implements OAuth email provider for Gmail
@@ -103,20 +102,6 @@ func (p *GoogleProvider) RefreshToken(ctx context.Context, refreshToken string) 
 	tokens.RefreshToken = refreshToken
 
 	return tokens, nil
-}
-
-// GetUserEmail retrieves the email address of the authenticated user
-func (p *GoogleProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	var userInfo struct {
-		Email         string `json:"email"`
-		VerifiedEmail bool   `json:"verified_email"`
-	}
-
-	if err := fetchOAuthJSON(ctx, googleUserInfoURL, accessToken, &userInfo); err != nil {
-		return "", err
-	}
-
-	return userInfo.Email, nil
 }
 
 // Connect establishes an IMAP connection using OAuth

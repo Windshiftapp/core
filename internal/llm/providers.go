@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
+
+	"windshift/internal/version"
 )
 
 // ProviderType identifies an LLM provider.
@@ -38,6 +41,11 @@ type ModelInfo struct {
 	// them (OpenRouter today). nil means rates are unknown — usage is metered in
 	// tokens but cost is left unknown rather than guessed.
 	Pricing *Pricing `json:"pricing,omitempty"`
+	// APIFormat is the wire protocol this specific model requires when it
+	// differs from the provider default (OpenCode Go routes different models to
+	// Chat Completions, Responses, or Anthropic Messages). Empty means the
+	// provider/connection default applies. Values are the APIContract* constants.
+	APIFormat string `json:"api_format,omitempty"`
 }
 
 // Pricing is a model's per-unit cost in USD, as advertised by a provider
@@ -120,6 +128,16 @@ type ProviderInfo struct {
 	ModelsAuthScheme     string       `json:"models_auth_scheme,omitempty"`
 	ModelsResponseFormat string       `json:"models_response_format,omitempty"`
 	Models               []ModelInfo  `json:"models"`
+	// UserAgent identifies Windshift on every request to providers that ask for
+	// a non-generic client identity (OpenCode Go). Empty leaves the SDK default.
+	// A "{version}" placeholder is replaced with the running build version.
+	UserAgent string `json:"user_agent,omitempty"`
+	// SessionHeader names the header carrying a stable conversation/session ID
+	// (OpenCode Go's x-opencode-session). Empty means the provider needs none.
+	SessionHeader string `json:"session_header,omitempty"`
+	// UsageNote is operator-facing guidance about provider restrictions that the
+	// connection form surfaces verbatim (OpenCode Go's coding-agent restriction).
+	UsageNote string `json:"usage_note,omitempty"`
 }
 
 // HasDynamicModels reports whether the provider exposes a `/models` catalog
@@ -199,9 +217,12 @@ func loadProvidersFromJSON(data []byte) error {
 	// Enrich static seed models with the curated vision map so a providers file
 	// listing a known vision model (e.g. gpt-4o) without an explicit
 	// supports_vision still resolves vision-capable — matching the enrichment
-	// dynamic catalogs already get on refresh/cache-read.
+	// dynamic catalogs already get on refresh/cache-read. Per-model wire
+	// protocols are enriched the same way for providers that route by model.
 	for i := range f.Providers {
+		f.Providers[i].UserAgent = strings.ReplaceAll(f.Providers[i].UserAgent, "{version}", version.Version)
 		EnrichModelsVision(f.Providers[i].Type, f.Providers[i].Models)
+		EnrichModelsAPIFormat(f.Providers[i].Type, f.Providers[i].Models)
 	}
 	providerMu.Lock()
 	providerRegistry = f.Providers

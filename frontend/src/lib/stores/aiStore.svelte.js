@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { ai } from '../api/ai.js';
 
 let available = $state(false);
 let chatEnabled = $state(false);
@@ -13,7 +13,7 @@ async function load() {
   loading = true;
 
   try {
-    const result = await api.ai.status();
+    const result = await ai.status();
     available = result?.available === true;
     chatEnabled = result?.chat_enabled === true;
     features = result?.features ?? {};

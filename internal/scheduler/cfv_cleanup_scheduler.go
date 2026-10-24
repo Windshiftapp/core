@@ -113,7 +113,7 @@ func (s *CFVCleanupScheduler) tick() {
 	start := time.Now()
 	totalItems := 0
 	var runErr error
-	defer recordSchedulerRun(s.runRepo, schedulerName, start, &totalItems, &runErr)
+	defer recordSchedulerRun(s.runRepo, schedulerName, start, &totalItems, &runErr, time.Now)
 
 	// First: rehabilitate stale 'running' rows so a crashed process doesn't
 	// strand jobs indefinitely.
@@ -347,7 +347,8 @@ func (s *CFVCleanupScheduler) processOptionRemoval(payload string) (int, error) 
 	if p.FieldID == 0 || len(p.RemovedIDs) == 0 {
 		return 0, nil
 	}
-	if p.FieldType != "select" && p.FieldType != "multiselect" {
+	if p.FieldType != "select" && p.FieldType != "multiselect" &&
+		p.FieldType != "milestone" && p.FieldType != "multi_milestone" {
 		return 0, fmt.Errorf("option_removal: unsupported field type %q", p.FieldType)
 	}
 
@@ -489,14 +490,14 @@ func (s *CFVCleanupScheduler) scrubPortalOptions(cfRepo *repository.CustomFieldR
 		for _, row := range batch {
 			lastID = row.ID
 			switch fieldType {
-			case "select":
+			case "select", "milestone":
 				if numVal, err := strconv.Atoi(row.Value); err == nil && removed[numVal] {
 					if err := cfRepo.DeletePortalCFV(row.ID); err != nil {
 						return processed, err
 					}
 					processed++
 				}
-			case "multiselect":
+			case "multiselect", "multi_milestone":
 				var ids []int
 				if err := json.Unmarshal([]byte(row.Value), &ids); err != nil {
 					continue
@@ -551,12 +552,12 @@ func stripCFVOptionIDs(cfvJSON, fieldKey, fieldType string, removed map[int]bool
 	}
 
 	switch fieldType {
-	case "select":
+	case "select", "milestone":
 		if optionID, ok := cleanupOptionID(val); ok && removed[optionID] {
 			delete(cfv, fieldKey)
 			changed = true
 		}
-	case "multiselect":
+	case "multiselect", "multi_milestone":
 		if arr, ok := val.([]any); ok {
 			var filtered []any
 			for _, item := range arr {
@@ -707,9 +708,10 @@ func EnqueueFieldCleanup(db database.Database, fieldID int) error {
 	return err
 }
 
-// EnqueueOptionRemoval inserts a job to strip the given removed select/
-// multiselect option ids from items, assets, and portal custom_field_values.
-// Called by handlers/custom_fields.go Update instead of cleaning inline.
+// EnqueueOptionRemoval inserts a job to strip the given removed choice ids
+// (select/multiselect options or milestone references) from items, assets, and
+// portal custom_field_values. Called by handlers/custom_fields.go Update and
+// milestone deletion instead of cleaning inline.
 //
 // Unlike EnqueueFieldCleanup this does NOT dedup: each edit removes a distinct
 // set of option ids, and the removed-id set is captured here (the field's

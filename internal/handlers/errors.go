@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -84,9 +85,22 @@ func respondValidationError(w http.ResponseWriter, r *http.Request, message stri
 	restapi.RespondError(w, r, err)
 }
 
-// respondInternalError logs the error and writes a 500 Internal Server Error JSON response
-// The actual error message is logged but not exposed to the client
+// respondInternalError logs the error and writes a 500 Internal Server Error
+// JSON response. A canceled request context is expected client control flow, so
+// it is logged at debug level and answered with 408 instead. The actual error
+// message is logged but not exposed to the client.
 func respondInternalError(w http.ResponseWriter, r *http.Request, err error) {
+	// A canceled context means the client went away while the request was in
+	// flight (navigation or reload). That is expected control flow, not a server
+	// fault, so it must not be logged as an internal error.
+	if errors.Is(err, context.Canceled) {
+		slog.Debug("request canceled by client",
+			slog.String("path", r.URL.Path),
+			slog.String("method", r.Method),
+		)
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusRequestTimeout, "REQUEST_CANCELED", "Request was canceled"))
+		return
+	}
 	slog.Error("internal server error",
 		slog.Any("error", err),
 		slog.String("path", r.URL.Path),

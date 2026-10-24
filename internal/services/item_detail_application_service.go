@@ -44,6 +44,7 @@ type ItemDetailSummary struct {
 	RequestTypeFields      []models.RequestTypeField     `json:"request_type_fields"`
 	Transitions            ItemTransitionSummary         `json:"transitions"`
 	Watching               bool                          `json:"watching"`
+	WatcherCount           int                           `json:"watcher_count"`
 	MergedIntoItemID       *int                          `json:"merged_into_item_id,omitempty"`
 	Children               []models.Item                 `json:"children"`
 	StoryPointsRollup      *repository.StoryPointsRollup `json:"story_points_rollup,omitempty"`
@@ -147,6 +148,7 @@ func (s *ItemDetailApplicationService) load(ctx context.Context, userID int, ite
 		value, err := s.items.WatchStatus(ctx, userID, item.ID)
 		if err == nil {
 			result.Watching = value.Watching
+			result.WatcherCount = value.WatcherCount
 		}
 		return err
 	})

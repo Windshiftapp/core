@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { permissions } from '../api/permissions.js';
 
 // One permission-profile request feeds both the global and workspace permission
 // stores. Entries are scoped to an authenticated-shell generation so remounts
@@ -26,7 +26,7 @@ export function loadPermissionProfile(userId) {
   const cached = profiles.get(key);
   if (cached) return cached;
 
-  const request = api.permissions.getUserPermissions(userId).catch((error) => {
+  const request = permissions.getUserPermissions(userId).catch((error) => {
     // Failed requests are retryable; only successful profiles stay cached for
     // the current authenticated-shell generation.
     profiles.delete(key);

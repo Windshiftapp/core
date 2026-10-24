@@ -11,9 +11,9 @@ type DefaultTemplate struct {
 	TextBody    string
 }
 
-// DefaultTemplates returns the four built-in transactional email templates
-// shipped with Windshift. Each template uses email-safe HTML (table layout,
-// inline styles, no flexbox or CSS variables) and the brand color #2874bb.
+// DefaultTemplates returns the built-in transactional email templates shipped
+// with Windshift. Each template uses email-safe HTML (table layout, inline
+// styles, no flexbox or CSS variables) and the brand color #2874bb.
 func DefaultTemplates() []DefaultTemplate {
 	return []DefaultTemplate{
 		{
@@ -45,6 +45,13 @@ func DefaultTemplates() []DefaultTemplate {
 			TextBody:    notificationBatchText,
 		},
 		{
+			Name:        TemplateMention,
+			Description: "Sent to a user who was @mentioned in a comment or item description. Includes the message body.",
+			Subject:     `{{.ActorName}} mentioned you in {{.ItemKey}}`,
+			HTMLBody:    mentionHTML,
+			TextBody:    mentionText,
+		},
+		{
 			Name:        TemplatePortalReply,
 			Description: "Threaded reply sent to a portal customer when an internal user comments on their ticket (email or portal origin).",
 			Subject:     `Re: {{.OriginalSubject}}`,
@@ -58,17 +65,26 @@ func DefaultTemplates() []DefaultTemplate {
 			HTMLBody:    approvalRequestedHTML,
 			TextBody:    approvalRequestedText,
 		},
+		{
+			Name:        TemplateIntakeConfirmation,
+			Description: "Receipt sent to the sender when an email intake creates a new request. Includes a portal link when the intake exposes the request to a portal.",
+			Subject:     `We've received your submission ({{.ItemKey}})`,
+			HTMLBody:    intakeConfirmationHTML,
+			TextBody:    intakeConfirmationText,
+		},
 	}
 }
 
 // Template name constants. Senders look up rows by these keys.
 const (
-	TemplateMagicLink         = "magic_link"
-	TemplateEmailVerification = "email_verification"
-	TemplateInvitation        = "invitation"
-	TemplateNotificationBatch = "notification_batch"
-	TemplatePortalReply       = "portal_reply"
-	TemplateApprovalRequested = "approval_requested"
+	TemplateMagicLink          = "magic_link"
+	TemplateEmailVerification  = "email_verification"
+	TemplateInvitation         = "invitation"
+	TemplateMention            = "mention"
+	TemplateNotificationBatch  = "notification_batch"
+	TemplatePortalReply        = "portal_reply"
+	TemplateApprovalRequested  = "approval_requested"
+	TemplateIntakeConfirmation = "intake_confirmation"
 )
 
 const emailShellOpen = `<!DOCTYPE html>
@@ -206,12 +222,35 @@ You have {{.NotificationCount}} new notification{{if ne .NotificationCount 1}}s{
 Manage your notification preferences in Windshift.
 `
 
+const mentionHTML = emailShellOpen + `<p style="margin:0 0 8px;">Hi {{.RecipientName}},</p>
+<p style="margin:0 0 16px;font-size:14px;color:#6b7280;">
+<strong style="color:#0f172a;">{{.ActorName}}</strong> mentioned you in {{.SourceLabel}} on
+<span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:#2874bb;">{{.ItemKey}}</span>
+&nbsp;·&nbsp; {{.ItemTitle}}
+</p>
+<div class="ws-md" style="font-size:15px;line-height:1.6;color:#1f2937;border-left:3px solid #a855f7;background:#fafbfc;border-radius:6px;padding:16px;">{{markdown .Content}}</div>
+{{if .ActionURL}}<p style="margin:20px 0 0;"><a href="{{.ActionURL}}" style="` + buttonStyle + `">View in Windshift</a></p>{{end}}
+` + emailShellClose
+
+const mentionText = `Hi {{.RecipientName}},
+
+{{.ActorName}} mentioned you in {{.SourceLabel}} on {{.ItemKey}} · {{.ItemTitle}}
+
+─────────────────────────────
+{{.Content}}
+─────────────────────────────
+{{if .ActionURL}}
+View in Windshift: {{.ActionURL}}
+{{end}}
+`
+
 const portalReplyHTML = emailShellOpen + `<p style="margin:0 0 16px;font-size:14px;color:#6b7280;">
 <strong style="color:#0f172a;">{{.AuthorName}}</strong> replied on
 <span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:#2874bb;">{{.ItemKey}}</span>
 &nbsp;·&nbsp; {{.ItemTitle}}
 </p>
 <div class="ws-md" style="font-size:15px;line-height:1.6;color:#1f2937;border-left:3px solid #2874bb;background:#fafbfc;border-radius:6px;padding:16px;">{{markdown .Content}}</div>
+{{if .PortalURL}}<p style="margin:16px 0 0;font-size:13px;"><a href="{{.PortalURL}}" style="color:#2874bb;text-decoration:underline;">View this request in your portal</a></p>{{end}}
 <p style="margin:24px 0 0;font-size:13px;color:#6b7280;">To continue the conversation, simply reply to this email.</p>
 ` + emailShellCloseRepliable
 
@@ -220,8 +259,33 @@ const portalReplyText = `{{.AuthorName}} replied on {{.ItemKey}} · {{.ItemTitle
 ─────────────────────────────
 {{.Content}}
 ─────────────────────────────
-
+{{if .PortalURL}}
+View this request in your portal: {{.PortalURL}}
+{{end}}
 To continue the conversation, simply reply to this email.
+`
+
+const intakeConfirmationHTML = emailShellOpen + `<h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;">We've received your submission</h1>
+<p style="margin:0 0 8px;">Hi {{.FirstName}},</p>
+<p style="margin:0 0 8px;">Thanks for contacting us. We've logged your request as
+<span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:#2874bb;">{{.ItemKey}}</span>
+&nbsp;·&nbsp; {{.ItemTitle}}.</p>
+<p style="margin:0 0 24px;">Our team will review it and get back to you as soon as possible.</p>
+{{if .PortalURL}}<p style="margin:0 0 16px;">You can follow progress and add details in your portal:</p>
+<p style="margin:0 0 24px;"><a href="{{.PortalURL}}" style="` + buttonStyle + `">View your request</a></p>{{end}}
+<p style="margin:0;font-size:13px;color:#6b7280;">To add more information, simply reply to this email.</p>
+` + emailShellCloseRepliable
+
+const intakeConfirmationText = `Hi {{.FirstName}},
+
+Thanks for contacting us. We've received your submission and logged it as {{.ItemKey}} · {{.ItemTitle}}.
+
+Our team will review it and get back to you as soon as possible.
+{{if .PortalURL}}
+You can follow progress and add details in your portal:
+{{.PortalURL}}
+{{end}}
+To add more information, simply reply to this email.
 `
 
 const approvalRequestedHTML = emailShellOpen + `<h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;">Approval requested</h1>

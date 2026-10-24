@@ -336,11 +336,3 @@ func GetInitialStatusForItemType(db database.Database, itemTypeID int) (string, 
 
 	return statusName, nil
 }
-
-// nullString converts an empty string to sql.NullString
-func nullString(s string) sql.NullString {
-	if s == "" {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: s, Valid: true}
-}

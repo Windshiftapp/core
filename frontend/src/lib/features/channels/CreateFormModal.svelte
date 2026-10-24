@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../../api.js';
+  import { configurationSets, itemTypes as itemTypesApi } from '../../api/configuration.js';
+  import { requestTypes } from '../../api/channels.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -37,7 +38,7 @@
   onMount(async () => {
     try {
       const [allConfigSets] = await Promise.all([
-        api.configurationSets.getAll(),
+        configurationSets.getAll(),
       ]);
       const allWorkspaces = await workspacesStore.load();
       configSets = allConfigSets?.configuration_sets || [];
@@ -75,7 +76,7 @@
     }
     const filters = configSetId ? { configuration_set_id: configSetId } : {};
     const requestedWsId = wsId;
-    api.itemTypes.getAll(filters).then(types => {
+    itemTypesApi.getAll(filters).then(types => {
       // Out-of-order responses: if workspace_id changed while the request was
       // in flight, drop this result so a slower earlier fetch can't clobber a
       // faster later one.
@@ -102,7 +103,7 @@
     try {
       submitting = true;
       await onPrepare(formData.workspace_id);
-      await api.requestTypes.create(channelId, {
+      await requestTypes.create(channelId, {
         name: formData.name.trim(),
         description: formData.description.trim(),
         icon: formData.icon,

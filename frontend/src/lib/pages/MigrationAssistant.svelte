@@ -1,5 +1,6 @@
 <script>
-  import { api } from '../api.js';
+  import { configurationSets } from '../api/configuration.js';
+  import { workflows } from '../api/workflows.js';
   import StateDisplay from '../components/StateDisplay.svelte';
   import Button from '../components/Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -8,7 +9,12 @@
   import Badge from '../components/Badge.svelte';
   import TabStrip from '../components/TabStrip.svelte';
   import Input from '../components/Input.svelte';
-  import { X, ArrowRight, Type, FileText, Flag, Activity } from '@lucide/svelte';
+  import X from '@lucide/svelte/icons/x';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Type from '@lucide/svelte/icons/type';
+  import FileText from '@lucide/svelte/icons/file-text';
+  import Flag from '@lucide/svelte/icons/flag';
+  import Activity from '@lucide/svelte/icons/activity';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
@@ -126,12 +132,12 @@
     try {
       let response;
       if (comprehensive) {
-        response = await api.configurationSets.analyzeComprehensiveMigration(
+        response = await configurationSets.analyzeComprehensiveMigration(
           targetConfigurationSet.id,
           workspaceId
         );
       } else {
-        response = await api.configurationSets.analyzeMigration(configurationSet.id, workspaceId);
+        response = await configurationSets.analyzeMigration(configurationSet.id, workspaceId);
       }
       migrationAnalysis = response;
 
@@ -291,7 +297,7 @@
             }))
         };
 
-        await api.configurationSets.executeComprehensiveMigration(migrationRequest);
+        await configurationSets.executeComprehensiveMigration(migrationRequest);
       } else {
         const migrationRequest = {
           configuration_set_id: configurationSet.id,
@@ -307,7 +313,7 @@
             }))
         };
 
-        await api.configurationSets.executeMigration(migrationRequest);
+        await configurationSets.executeMigration(migrationRequest);
       }
 
       migrationSuccess = true;
@@ -389,7 +395,7 @@
 
   async function loadWorkflowStatuses() {
     try {
-      const workflow = await api.workflows.get(migrationAnalysis.new_workflow_id);
+      const workflow = await workflows.get(migrationAnalysis.new_workflow_id);
       // Extract unique statuses from workflow transitions
       const statusSet = new Set();
       workflow.transitions.forEach(transition => {

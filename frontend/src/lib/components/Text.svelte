@@ -7,6 +7,7 @@
     truncate = false,
     leading = null,      // 'none', 'tight', 'snug', 'normal', 'relaxed', 'loose'
     align = null,        // 'left', 'center', 'right'
+    style: styleProp = '',
     class: className = '',
     children
   } = $props();
@@ -74,6 +75,6 @@
   ].filter(Boolean).join(' '));
 </script>
 
-<svelte:element this={as} class={allClasses} style={colorStyle}>
+<svelte:element this={as} class={allClasses} style="{colorStyle} {styleProp}">
   {@render children?.()}
 </svelte:element>

@@ -6,7 +6,12 @@
   import { currentWorkspace } from '../../stores/workspaces.svelte.js';
   import { currentRoute } from '../../router.js';
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { IconPlus, IconX, IconTerminal, IconFolder, IconCheck, IconAlertTriangle } from '@tabler/icons-svelte-runes';
+  import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
+  import IconTerminal from '@tabler/icons-svelte-runes/icons/terminal';
+  import IconFolder from '@tabler/icons-svelte-runes/icons/folder';
+  import IconCheck from '@tabler/icons-svelte-runes/icons/check';
+  import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
   import WsTomlProvisioner from './WsTomlProvisioner.svelte';
   import { publicBaseURL } from '../../runtime/contextPath.js';
   import { isTauri as getIsTauri } from '../../utils/isTauri.js';
@@ -511,7 +516,7 @@
     {#each store.tabs as tab (tab.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        class="terminal-tab flex items-center gap-1.5 px-3 py-1 text-xs rounded-t cursor-pointer transition-colors {tab.id === store.activeTabId ? 'active' : ''}"
+        class="terminal-tab flex items-center gap-1.5 px-3 py-1 text-xs rounded-t cursor-pointer transition-colors whitespace-nowrap {tab.id === store.activeTabId ? 'active' : ''}"
         onclick={() => switchTab(tab.id)}
         onkeydown={(e) => { if (e.key === 'Enter') switchTab(tab.id); }}
         role="tab"
