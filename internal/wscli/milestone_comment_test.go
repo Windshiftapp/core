@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -172,50 +170,16 @@ func TestMilestoneCommentAddSendsMessage(t *testing.T) {
 	}
 }
 
-func TestMilestoneCommentAddReadsFileVerbatim(t *testing.T) {
-	server, requests := milestoneCommentServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusCreated, map[string]any{"data": milestoneCommentJSON(8, "from file")})
-	})
-	markdown := "# Update\n\n- literal \\n stays\n"
-	path := filepath.Join(t.TempDir(), "update.md")
-	if err := os.WriteFile(path, []byte(markdown), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "5", "--file", path)
-	if code != 0 {
-		t.Fatalf("exit code %d, stderr: %s", code, errOut)
-	}
-	code, _, errOut = runWS(t, server.URL, markdown, "milestone", "comment", "add", "5", "-f", "-")
-	if code != 0 {
-		t.Fatalf("stdin: exit code %d, stderr: %s", code, errOut)
-	}
-
-	got := requests()
-	if len(got) != 2 {
-		t.Fatalf("expected 2 requests, got %d", len(got))
-	}
-	for i, req := range got {
-		var body map[string]string
-		if err := json.Unmarshal([]byte(req.Body), &body); err != nil || body["content"] != markdown {
-			t.Fatalf("request %d: unexpected body %q", i, req.Body)
-		}
-	}
-}
-
-func TestMilestoneCommentAddRejectsMissingOrConflictingBody(t *testing.T) {
+func TestMilestoneCommentAddRejectsMissingBody(t *testing.T) {
 	server, requests := milestoneCommentServer(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	if code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "5"); code == 0 || !strings.Contains(errOut, "comment body is required") {
+	if code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "5"); code == 0 || !strings.Contains(errOut, "message is required") {
 		t.Fatalf("missing body: exit %d, stderr %q", code, errOut)
 	}
-	if code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "5", "-m", "   "); code == 0 || !strings.Contains(errOut, "comment body is required") {
+	if code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "5", "-m", "   "); code == 0 || !strings.Contains(errOut, "message is required") {
 		t.Fatalf("blank body: exit %d, stderr %q", code, errOut)
-	}
-	if code, _, _ := runWS(t, server.URL, "", "milestone", "comment", "add", "5", "-m", "x", "--file", "notes.md"); code == 0 {
-		t.Fatal("expected -m and --file together to fail")
 	}
 	if code, _, errOut := runWS(t, server.URL, "", "milestone", "comment", "add", "PROJ", "-m", "x"); code == 0 || !strings.Contains(errOut, "invalid milestone ID") {
 		t.Fatalf("non-numeric milestone: exit %d, stderr %q", code, errOut)
