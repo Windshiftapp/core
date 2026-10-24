@@ -2647,8 +2647,8 @@ var Catalog = []Migration{
 				milestone_id INTEGER NOT NULL,
 				author_id INTEGER NOT NULL,
 				content TEXT NOT NULL,
-				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-				updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
 				FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
 			);
@@ -2671,7 +2671,7 @@ var Catalog = []Migration{
 				new_value TEXT,
 				changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
-				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 			);
 			CREATE INDEX idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
 			CREATE INDEX idx_milestone_history_user ON milestone_history(user_id);
@@ -2687,9 +2687,9 @@ var Catalog = []Migration{
 				field_name TEXT NOT NULL,
 				old_value TEXT,
 				new_value TEXT,
-				changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+				changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
-				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 			);
 			CREATE INDEX IF NOT EXISTS idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
 			CREATE INDEX IF NOT EXISTS idx_milestone_history_user ON milestone_history(user_id);
