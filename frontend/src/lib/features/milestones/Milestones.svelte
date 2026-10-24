@@ -207,8 +207,12 @@
   // Global view: global milestones plus milestones from every workspace the
   // viewer can access (the unscoped list). Workspace view: the workspace's
   // milestones plus global ones.
+  // Only the global view shows the Updated column, so only it asks the
+  // server to work out last_updated_at.
   function listFilters() {
-    return isGlobalView ? {} : { workspace_id: workspaceId, include_global: true };
+    return isGlobalView
+      ? { include_last_updated: true }
+      : { workspace_id: workspaceId, include_global: true };
   }
 
   async function loadTestStatistics() {

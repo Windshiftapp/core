@@ -7942,6 +7942,16 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "Name": "include_last_updated",
+            "In": "query",
+            "Description": "Adds each milestone's last_updated_at: the latest change to the milestone or its accessible items.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -12756,6 +12766,16 @@
             "Name": "include_global",
             "In": "query",
             "Description": "Includes global milestones alongside the workspace's own.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "include_last_updated",
+            "In": "query",
+            "Description": "Adds each milestone's last_updated_at: the latest change to the milestone or its accessible items.",
             "Required": false,
             "Schema": {
               "default": false,

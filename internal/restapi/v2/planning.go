@@ -161,12 +161,13 @@ type completeIterationRequest struct {
 	TargetIterationID *int `json:"move_incomplete_to_iteration_id"`
 }
 
-// milestoneListEntry is a milestone in a list response, with its last-updated
-// time: the latest change to the milestone or anything in it, counting item
-// changes only for items the viewer can access.
+// milestoneListEntry is a milestone in a list response. With
+// include_last_updated it adds the last-updated time: the latest change to the
+// milestone or anything in it, counting item changes only for items the
+// viewer can access.
 type milestoneListEntry struct {
 	models.Milestone
-	LastUpdatedAt time.Time `json:"last_updated_at"`
+	LastUpdatedAt *time.Time `json:"last_updated_at,omitempty"`
 }
 
 func listMilestones(planning planningApplication, workspaceScoped bool) pageOperation[milestoneListEntry] {
@@ -196,7 +197,8 @@ func listMilestones(planning planningApplication, workspaceScoped bool) pageOper
 		rows, total, err := planning.ListMilestones(user.ID, services.MilestoneListParams{
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, CategoryID: categoryID,
 			Status: r.URL.Query().Get("status"), SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
-			IncludeGlobal: includeGlobal, IsGlobal: isGlobal, IncludeLastUpdated: true,
+			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
+			IncludeLastUpdated: r.URL.Query().Get("include_last_updated") == "true",
 		})
 		return mapMilestoneListEntries(rows), page, total, planningError(err)
 	}
@@ -557,10 +559,7 @@ func milestoneReleaseModel(result services.MilestoneReleaseResult) models.Milest
 func mapMilestoneListEntries(rows []services.MilestoneResult) []milestoneListEntry {
 	result := make([]milestoneListEntry, len(rows))
 	for i := range rows {
-		result[i] = milestoneListEntry{Milestone: milestoneModel(&rows[i]), LastUpdatedAt: rows[i].UpdatedAt}
-		if rows[i].LastUpdatedAt != nil {
-			result[i].LastUpdatedAt = *rows[i].LastUpdatedAt
-		}
+		result[i] = milestoneListEntry{Milestone: milestoneModel(&rows[i]), LastUpdatedAt: rows[i].LastUpdatedAt}
 	}
 	return result
 }
