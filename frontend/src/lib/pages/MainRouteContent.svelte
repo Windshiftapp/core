@@ -2,15 +2,18 @@
   import Button from '../components/Button.svelte';
   import DelayedMount from '../components/DelayedMount.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import Footer from '../layout/Footer.svelte';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import { authStore } from '../stores/auth.svelte.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { moduleSettings } from '../stores/moduleSettings.js';
+  import { uiStore } from '../stores/ui.svelte.js';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
   import {
     getMainAppLazyState,
     getMainAppRouteProps,
+    isMainAppFooterView,
     resolveMainAppRoute,
   } from './mainAppRoutes.js';
 
@@ -18,6 +21,16 @@
 
   const routeEntry = $derived(resolveMainAppRoute(view));
   const wrapper = $derived(routeEntry.config?.wrapper || null);
+  const routeState = $derived(getMainAppLazyState(lazyComponents, view));
+  // Only render the footer on opted-in routes and only once the route has
+  // rendered successfully, so it never appears under a spinner or error state.
+  const showFooter = $derived(
+    isMainAppFooterView(view) &&
+      Boolean(routeState.component) &&
+      !routeState.loading &&
+      !routeState.error &&
+      !$uiStore.reviewFullscreen
+  );
   const routeProps = $derived.by(() =>
     getMainAppRouteProps(view, route, {
       currentUser: authStore.currentUser,
@@ -51,6 +64,12 @@
       </Button>
     </div>
   </div>
+{/snippet}
+
+{#snippet routeFooter()}
+  {#if showFooter}
+    <Footer />
+  {/if}
 {/snippet}
 
 {#snippet lazyLoadedComponent(lazyView, props)}
@@ -93,23 +112,38 @@
   </div>
 {:else if routeEntry.config}
   {#if wrapper === 'surface-full'}
-    <div class="h-full min-h-0 overflow-y-auto" style="background-color: var(--ds-surface);">
+    <div
+      class="h-full min-h-0 overflow-y-auto"
+      class:flex={showFooter}
+      class:flex-col={showFooter}
+      style="background-color: var(--ds-surface);"
+    >
       {@render lazyLoadedComponent(view, routeProps)}
+      {@render routeFooter()}
     </div>
   {:else if wrapper === 'surface-padded'}
     <div class="p-6" style="background-color: var(--ds-surface);">
       {@render lazyLoadedComponent(view, routeProps)}
     </div>
+    {@render routeFooter()}
   {:else if wrapper === 'surface-admin'}
-    <div class="px-16 py-12 flex-1 overflow-y-auto" style="background-color: var(--ds-surface);">
+    <div
+      class="flex-1 overflow-y-auto px-16 py-12"
+      class:flex={showFooter}
+      class:flex-col={showFooter}
+      style="background-color: var(--ds-surface);"
+    >
       {@render lazyLoadedComponent(view, routeProps)}
+      {@render routeFooter()}
     </div>
   {:else if wrapper === 'surface'}
     <div style="background-color: var(--ds-surface);">
       {@render lazyLoadedComponent(view, routeProps)}
     </div>
+    {@render routeFooter()}
   {:else}
     {@render lazyLoadedComponent(view, routeProps)}
+    {@render routeFooter()}
   {/if}
 {:else}
   {@render lazyLoadedComponent('workspaces', { showAdminHeader: false })}
