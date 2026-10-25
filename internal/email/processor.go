@@ -1,6 +1,7 @@
 package email
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -8,11 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/mail"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
@@ -32,17 +33,17 @@ type IntakeConfirmationSender interface {
 // Processor handles email-to-item/comment conversion
 type Processor struct {
 	db                 database.Database
-	attachmentPath     string
+	storage            *blobstore.Store
 	commentService     *services.CommentService
 	eventCoordinator   *services.EventCoordinator
 	confirmationSender IntakeConfirmationSender
 }
 
 // NewProcessor creates a new email processor
-func NewProcessor(db database.Database, attachmentPath string) *Processor {
+func NewProcessor(db database.Database, storage *blobstore.Store) *Processor {
 	return &Processor{
-		db:             db,
-		attachmentPath: attachmentPath,
+		db:      db,
+		storage: storage,
 	}
 }
 
@@ -779,7 +780,7 @@ type attachmentResult struct {
 // failures are absorbed into result.failed.
 func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachment, itemID int) (attachmentResult, error) {
 	var out attachmentResult
-	if p.attachmentPath == "" {
+	if !p.storage.Enabled() {
 		return out, nil // Attachments not enabled — silently skip
 	}
 
@@ -850,19 +851,11 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 		ext := filepath.Ext(att.Filename)
 		uniqueFilename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
-		// Create directory if needed
-		dir := filepath.Join(p.attachmentPath, "items", fmt.Sprintf("%d", itemID))
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return out, fmt.Errorf("failed to create attachment directory: %w", err)
-		}
-
-		// Write to a .tmp sibling and rename into place so a partial write never
-		// leaves a truncated file that the UI would later serve. If the DB insert
-		// that follows fails, delete the file so we don't orphan it on disk.
+		// Store the object under a root-relative key; the local backend resolves
+		// it against ATTACHMENT_PATH and S3 uses it directly.
 		relPath := filepath.Join("items", fmt.Sprintf("%d", itemID), uniqueFilename)
-		filePath := filepath.Join(p.attachmentPath, relPath)
-		if err := writeFileAtomic(filePath, att.Data, 0o600); err != nil {
-			slog.Error("failed to write attachment", "error", err, "filename", att.Filename, "path", filePath)
+		if err := p.storage.Put(ctx, relPath, bytes.NewReader(att.Data), int64(len(att.Data)), att.ContentType); err != nil {
+			slog.Error("failed to write attachment", "error", err, "filename", att.Filename, "path", relPath)
 			out.failed++
 			continue
 		}
@@ -875,10 +868,10 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, itemID, uniqueFilename, att.Filename, relPath, att.ContentType, att.Size, now)
 		if err != nil {
-			slog.Error("failed to create attachment record, deleting orphaned file",
-				"error", err, "filename", att.Filename, "path", filePath)
-			if rmErr := os.Remove(filePath); rmErr != nil {
-				slog.Warn("failed to remove orphaned attachment file", "path", filePath, "error", rmErr)
+			slog.Error("failed to create attachment record, deleting orphaned object",
+				"error", err, "filename", att.Filename, "path", relPath)
+			if rmErr := p.storage.Remove(ctx, relPath); rmErr != nil {
+				slog.Warn("failed to remove orphaned attachment object", "path", relPath, "error", rmErr)
 			}
 			out.failed++
 			continue
@@ -906,44 +899,6 @@ func (p *Processor) setAttachmentsStatus(ctx context.Context, channelID int, ded
 	`, status, channelID, dedupKey); err != nil {
 		slog.Warn("failed to set attachments_status", "error", err, "channel_id", channelID, "dedup_key", dedupKey)
 	}
-}
-
-// writeFileAtomic writes data to a temp file in the same directory as path and
-// renames it into place. On any failure before the rename it tries to remove
-// the temp file so a crash doesn't leak a partial write.
-func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	// Best-effort cleanup; harmless if the rename already consumed the file.
-	cleanup := func() { _ = os.Remove(tmpName) }
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		cleanup()
-		return err
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		cleanup()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		cleanup()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		cleanup()
-		return err
-	}
-	if err := os.Rename(tmpName, path); err != nil { //nolint:gosec // G703: path is attachmentPath + "items" + itemID + uuid + filepath.Ext (caller-controlled root, no traversal possible)
-		cleanup()
-		return err
-	}
-	return nil
 }
 
 const trackingClaimStaleAfter = 5 * time.Minute

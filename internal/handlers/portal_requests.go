@@ -357,7 +357,7 @@ func (h *PortalHandler) DownloadRequestAttachment(w http.ResponseWriter, r *http
 	defer func() { _ = binary.File.Close() }()
 
 	w.Header().Set("Content-Type", binary.MimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(binary.FileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(binary.File.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	if fileserve.IsInlineSafeMimeType(binary.MimeType) {

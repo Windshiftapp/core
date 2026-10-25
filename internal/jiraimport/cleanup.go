@@ -1,21 +1,19 @@
 package jiraimport
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/repository"
 )
-
-var errAttachmentPathOutsideRoot = errors.New("attachment path is outside configured storage root")
 
 type mapping struct {
 	entityType   string
@@ -659,6 +657,17 @@ func (s *Service) deleteAttachment(attachmentID int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// Blob-first: remove the file and thumbnail before the row. A removal
+	// failure returns an error so the cleanup job records it and the row
+	// remains for a retry; a missing object is already success.
+	for _, path := range []string{filePath, thumbnailPath.String} {
+		if path == "" {
+			continue
+		}
+		if err := s.removeAttachmentFile(path); err != nil {
+			return false, fmt.Errorf("remove imported attachment file: %w", err)
+		}
+	}
 	result, err := s.db.ExecWrite(`DELETE FROM attachments WHERE id = ?`, attachmentID)
 	if err != nil {
 		return false, err
@@ -670,61 +679,18 @@ func (s *Service) deleteAttachment(attachmentID int) (bool, error) {
 	if affected == 0 {
 		return false, nil
 	}
-	s.removeAttachmentFile(filePath)
-	if thumbnailPath.Valid && strings.TrimSpace(thumbnailPath.String) != "" {
-		s.removeAttachmentFile(thumbnailPath.String)
-	}
 	return true, nil
 }
 
-func (s *Service) removeAttachmentFile(storedPath string) {
-	var root string
-	if err := s.db.QueryRow(`
-		SELECT attachment_path FROM attachment_settings WHERE enabled = true LIMIT 1
-	`).Scan(&root); err != nil {
-		return
+func (s *Service) removeAttachmentFile(storedPath string) error {
+	if s.storage == nil || !s.storage.Enabled() {
+		return nil
 	}
-	path, err := resolvePathWithinRoot(root, storedPath)
-	if err != nil {
-		slog.Warn("refusing to delete imported attachment outside storage root", slog.String("path", storedPath), slog.Any("error", err))
-		return
-	}
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) { //nolint:gosec // path is confined to the configured attachment root.
-		slog.Warn("failed to delete imported attachment file", slog.String("path", path), slog.Any("error", err))
-	}
-}
-
-func resolvePathWithinRoot(root, storedPath string) (string, error) {
-	if strings.TrimSpace(root) == "" {
-		return "", errAttachmentPathOutsideRoot
-	}
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	inside := func(candidate string) (string, bool, error) {
-		absPath, err := filepath.Abs(candidate)
-		if err != nil {
-			return "", false, err
+	if err := s.storage.Remove(context.Background(), storedPath); err != nil {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
+			return nil
 		}
-		return absPath, absPath == absRoot || strings.HasPrefix(absPath, absRoot+string(os.PathSeparator)), nil
+		return err
 	}
-	if filepath.IsAbs(storedPath) {
-		path, ok, err := inside(storedPath)
-		if err != nil || !ok {
-			return "", errAttachmentPathOutsideRoot
-		}
-		return path, nil
-	}
-	if path, ok, err := inside(storedPath); err == nil && ok {
-		return path, nil
-	}
-	path, ok, err := inside(filepath.Join(root, storedPath))
-	if err != nil {
-		return "", err
-	}
-	if !ok {
-		return "", errAttachmentPathOutsideRoot
-	}
-	return path, nil
+	return nil
 }

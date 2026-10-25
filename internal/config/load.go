@@ -83,6 +83,12 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	pgConn = firstNonEmpty(os.Getenv("POSTGRES_CONNECTION_STRING"), pgConn)
 	sqlitePath := firstNonEmpty(os.Getenv("DB_PATH"), *dbPath)
 	attachPath := firstNonEmpty(os.Getenv("ATTACHMENT_PATH"), *attachmentPath)
+
+	storageConfig, storageErr := resolveStorageConfig(attachPath, storageEnv())
+	if storageErr != nil {
+		slog.Error("FATAL: invalid storage configuration", "error", storageErr)
+		os.Exit(1)
+	}
 	resolvedLogLevel := firstNonEmpty(os.Getenv("LOG_LEVEL"), *logLevel)
 	resolvedLogFormat := firstNonEmpty(os.Getenv("LOG_FORMAT"), *logFormat)
 
@@ -292,7 +298,8 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		Jira: JiraConfig{
 			CapturePayloadsDir: os.Getenv("JIRA_CAPTURE_PAYLOADS"),
 		},
-		Memory: MemoryConfig{LimitMB: resolvedMemoryLimitMB},
+		Memory:  MemoryConfig{LimitMB: resolvedMemoryLimitMB},
+		Storage: storageConfig,
 
 		AttachmentPath:              attachPath,
 		EnableAdminFallback:         adminFallbackEnabled,
@@ -421,4 +428,73 @@ func normalizeContextPath(raw string) string {
 		os.Exit(1)
 	}
 	return p
+}
+
+// StorageEnv is the raw environment input for storage resolution. Keeping it
+// as a value (rather than reading os.Getenv inside the resolver) makes the
+// fail-fast matrix testable.
+type StorageEnv struct {
+	Backend          string
+	S3Endpoint       string
+	S3Bucket         string
+	S3Region         string
+	S3AccessKeyID    string
+	S3SecretKey      string
+	S3ForcePathStyle bool
+	S3Prefix         string
+}
+
+func storageEnv() StorageEnv {
+	return StorageEnv{
+		Backend:          os.Getenv("STORAGE_BACKEND"),
+		S3Endpoint:       os.Getenv("S3_ENDPOINT"),
+		S3Bucket:         os.Getenv("S3_BUCKET"),
+		S3Region:         os.Getenv("S3_REGION"),
+		S3AccessKeyID:    os.Getenv("S3_ACCESS_KEY_ID"),
+		S3SecretKey:      os.Getenv("S3_SECRET_ACCESS_KEY"),
+		S3ForcePathStyle: parseBoolEnv("S3_FORCE_PATH_STYLE"),
+		S3Prefix:         os.Getenv("S3_PREFIX"),
+	}
+}
+
+// resolveStorageConfig validates STORAGE_BACKEND and the S3_* family. Local
+// disk remains the default; S3 is opt-in and must carry a bucket.
+func resolveStorageConfig(localPath string, env StorageEnv) (StorageConfig, error) {
+	backend := strings.ToLower(strings.TrimSpace(env.Backend))
+	if backend == "" {
+		backend = StorageBackendLocal
+	}
+
+	switch backend {
+	case StorageBackendLocal:
+		return StorageConfig{Backend: StorageBackendLocal, LocalPath: localPath}, nil
+
+	case StorageBackendS3:
+		bucket := strings.TrimSpace(env.S3Bucket)
+		if bucket == "" {
+			return StorageConfig{}, fmt.Errorf("STORAGE_BACKEND=s3 requires S3_BUCKET")
+		}
+		if (env.S3AccessKeyID == "") != (env.S3SecretKey == "") {
+			return StorageConfig{}, fmt.Errorf("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together (leave both unset to use the AWS credential chain)")
+		}
+		region := strings.TrimSpace(env.S3Region)
+		if region == "" {
+			region = "us-east-1"
+		}
+		return StorageConfig{
+			Backend:   StorageBackendS3,
+			LocalPath: localPath,
+			S3: S3StorageConfig{
+				Endpoint:        strings.TrimSpace(env.S3Endpoint),
+				Bucket:          bucket,
+				Region:          region,
+				AccessKeyID:     env.S3AccessKeyID,
+				SecretAccessKey: env.S3SecretKey,
+				Prefix:          strings.Trim(strings.TrimSpace(env.S3Prefix), "/"),
+				ForcePathStyle:  env.S3ForcePathStyle,
+			},
+		}, nil
+	}
+
+	return StorageConfig{}, fmt.Errorf(`STORAGE_BACKEND must be "local" or "s3", got %q`, env.Backend)
 }

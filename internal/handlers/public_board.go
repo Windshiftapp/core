@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
 	"windshift/internal/markdown"
@@ -59,16 +60,16 @@ type PublicBoardHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
 	publicBoardScope  *services.PublicBoardScopeService
-	attachmentPath    string
+	storage           *blobstore.Store
 }
 
 // NewPublicBoardHandler creates a new PublicBoardHandler
-func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService, attachmentPath string) *PublicBoardHandler {
+func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService, storage *blobstore.Store) *PublicBoardHandler {
 	return &PublicBoardHandler{
 		db:                db,
 		permissionService: permissionService,
 		publicBoardScope:  services.NewPublicBoardScopeService(db, permissionService),
-		attachmentPath:    attachmentPath,
+		storage:           storage,
 	}
 }
 
@@ -828,8 +829,9 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Confine reads to storage root and hide traversal or symlink failures as 404.
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, filePath)
+	// Read through the configured backend and hide traversal or missing-object
+	// failures as 404.
+	file, err := h.storage.Open(r.Context(), filePath)
 	if err != nil {
 		respondNotFound(w, r, "attachment")
 		return
@@ -837,7 +839,7 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	defer func() { _ = file.Close() }()
 
 	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Disposition", fileserve.ContentDisposition("inline", originalFilename))

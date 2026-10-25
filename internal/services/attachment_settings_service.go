@@ -1,29 +1,33 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
 
 // AttachmentSettingsService encapsulates business logic for attachment settings.
 type AttachmentSettingsService struct {
-	db database.Database
+	db      database.Database
+	storage *blobstore.Store
 }
 
 // NewAttachmentSettingsService creates a new AttachmentSettingsService.
-func NewAttachmentSettingsService(db database.Database) *AttachmentSettingsService {
-	return &AttachmentSettingsService{db: db}
+func NewAttachmentSettingsService(db database.Database, storage *blobstore.Store) *AttachmentSettingsService {
+	return &AttachmentSettingsService{db: db, storage: storage}
 }
 
-// Initialize creates initial attachment settings in the database or updates the path if changed.
-func (s *AttachmentSettingsService) Initialize(attachmentPath string) error {
+// Initialize creates initial attachment settings in the database or updates the
+// descriptor if the configured backend changed.
+func (s *AttachmentSettingsService) Initialize() error {
+	attachmentPath := s.storage.Describe()
 	// Check if settings already exist
 	var exists bool
 	err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM attachment_settings)").Scan(&exists)
@@ -131,77 +135,41 @@ func (s *AttachmentSettingsService) Update(settingsID int, req *models.Attachmen
 type AttachmentStatus struct {
 	Enabled        bool   `json:"enabled"`
 	AttachmentPath string `json:"attachment_path"`
+	Backend        string `json:"backend"`
 	Writable       bool   `json:"writable"`
 }
 
-// GetStatus returns the attachment system status (enabled/disabled, path info).
+// GetStatus returns the attachment system status (enabled/disabled, backend,
+// and a writability probe).
 func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 	status := &AttachmentStatus{
-		Enabled:        false,
-		AttachmentPath: "",
+		Enabled:        s.storage.Enabled(),
+		AttachmentPath: s.storage.Describe(),
+		Backend:        s.storage.Backend(),
 		Writable:       false,
 	}
 
 	var enabled bool
-	var attachmentPath string
 	err := s.db.QueryRow(`
-		SELECT enabled, attachment_path FROM attachment_settings ORDER BY id DESC LIMIT 1
-	`).Scan(&enabled, &attachmentPath)
+		SELECT enabled FROM attachment_settings ORDER BY id DESC LIMIT 1
+	`).Scan(&enabled)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		// No settings in database
 		return status, nil
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get attachment status: %w", err)
 	}
 
-	status.Enabled = enabled
-	status.AttachmentPath = attachmentPath
-
-	if attachmentPath == "" {
+	status.Enabled = enabled && s.storage.Enabled()
+	if !status.Enabled {
 		return status, nil
 	}
 
-	info, err := os.Stat(attachmentPath)
-	if err != nil {
-		slog.Warn("attachment storage path stat failed",
+	if err := s.storage.Probe(context.Background()); err != nil {
+		slog.Warn("attachment storage probe failed",
 			slog.String("component", "attachments"),
-			slog.String("path", attachmentPath),
-			slog.Any("error", err))
-		return status, nil
-	}
-	if !info.IsDir() {
-		slog.Warn("attachment storage path is not a directory",
-			slog.String("component", "attachments"),
-			slog.String("path", attachmentPath))
-		return status, nil
-	}
-
-	// Use a unique file so concurrent status requests cannot race over a shared
-	// probe or overwrite a user-created file with the same name.
-	testFile, err := os.CreateTemp(attachmentPath, ".windshift-write-test-*")
-	if err != nil {
-		slog.Warn("attachment storage path write probe failed",
-			slog.String("component", "attachments"),
-			slog.String("path", attachmentPath),
-			slog.Any("error", err))
-		return status, nil
-	}
-	testFilePath := testFile.Name()
-	if err := testFile.Close(); err != nil {
-		_ = os.Remove(testFilePath)
-		slog.Warn("attachment storage path write probe close failed",
-			slog.String("component", "attachments"),
-			slog.String("path", attachmentPath),
-			slog.Any("error", err))
-		return status, nil
-	}
-	if err := os.Remove(testFilePath); err != nil {
-		slog.Warn("attachment storage path write probe cleanup failed",
-			slog.String("component", "attachments"),
-			slog.String("path", attachmentPath),
+			slog.String("backend", s.storage.Backend()),
 			slog.Any("error", err))
 		return status, nil
 	}

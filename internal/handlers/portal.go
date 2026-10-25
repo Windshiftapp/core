@@ -10,11 +10,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"windshift/internal/auth"
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
 	"windshift/internal/itemevents"
@@ -48,7 +48,7 @@ type PortalHandler struct {
 	portalAuthRepo       *repository.PortalAuthRepository
 	approvalService      *services.ApprovalService
 	draftRepo            *repository.PortalDraftRepository
-	attachmentPath       string
+	storage              *blobstore.Store
 	attachments          *services.ItemAttachmentService
 	eventCoordinator     *services.EventCoordinator
 	publication          *services.KnowledgePublicationService
@@ -343,10 +343,10 @@ func applyRequestTypeVisibility(rt *models.RequestType, groups, orgs sql.NullStr
 }
 
 // NewPortalHandler creates a new portal handler
-func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, attachmentPath string) *PortalHandler {
+func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, storage *blobstore.Store) *PortalHandler {
 	var attachments *services.ItemAttachmentService
-	if attachmentPath != "" {
-		attachments = services.NewItemAttachmentService(db, attachmentPath, nil)
+	if storage.Enabled() {
+		attachments = services.NewItemAttachmentService(db, storage, nil)
 	}
 	return &PortalHandler{
 		db:                   db,
@@ -356,7 +356,7 @@ func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager,
 		portalService:        services.NewPortalService(db),
 		portalAuthRepo:       repository.NewPortalAuthRepository(db),
 		draftRepo:            repository.NewPortalDraftRepository(db),
-		attachmentPath:       attachmentPath,
+		storage:              storage,
 		attachments:          attachments,
 	}
 }
@@ -1272,17 +1272,16 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Open the file confined to the attachment storage root. os.OpenRoot (via
-	// fileserve.OpenUnderRoot) rejects ".." traversal and symlink escapes, so a
-	// malicious stored path or planted symlink cannot read outside the root.
-	// Escapes and missing files both surface as 404 to avoid disclosing
-	// filesystem details or enabling enumeration.
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, filePath)
+	// Read through the configured backend. The local backend confines reads to
+	// the storage root; S3 maps the stored path to an object key. Escapes and
+	// missing objects both surface as 404 to avoid disclosing storage details
+	// or enabling enumeration.
+	file, err := h.storage.Open(r.Context(), filePath)
 	if err != nil {
-		if !errors.Is(err, fileserve.ErrOutsideRoot) && !errors.Is(err, os.ErrNotExist) {
-			slog.Error("failed to open attachment file", slog.String("component", "portal"), slog.String("path", filePath), slog.Any("error", err))
-		} else if errors.Is(err, fileserve.ErrOutsideRoot) {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
 			slog.Warn("path traversal attempt blocked", slog.String("component", "portal"), slog.String("file_path", filePath))
+		} else if !errors.Is(err, blobstore.ErrNotFound) {
+			slog.Error("failed to open attachment file", slog.String("component", "portal"), slog.String("path", filePath), slog.Any("error", err))
 		}
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
 		return
@@ -1290,7 +1289,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 	defer func() { _ = file.Close() }()
 
 	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")

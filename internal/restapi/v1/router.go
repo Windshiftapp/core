@@ -64,7 +64,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 	actionHandler := handlers.NewActionHandler(db, permissionService, deps.ActionService)
 	actionHandler.SetAssetService(deps.AssetService)
-	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.AttachmentPath)
+	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.Storage)
 	pagePermissionService := services.NewPagePermissionService(db, permissionService)
 	pageApplicationService := deps.PageApplicationService
 	if pageApplicationService == nil {
@@ -79,7 +79,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	if pageDiagramService == nil {
 		pageDiagramService = services.NewPageDiagramService(
 			db,
-			deps.AttachmentPath,
+			deps.Storage,
 			pageApplicationService,
 			pagePermissionService,
 			permissionService,
@@ -100,11 +100,11 @@ func RegisterRoutes(deps restapi.Deps) {
 
 	pageAttachmentUploadHandler := handlers.NewPageAttachmentUploadHandler(
 		handlers.NewBaseHandler(db, permissionService),
-		services.NewPageAttachmentUploadService(db, deps.AttachmentPath, permissionService, pagePermissionService),
+		services.NewPageAttachmentUploadService(db, deps.Storage, permissionService, pagePermissionService),
 	)
 	itemAttachmentHandler := handlers.NewItemAttachmentHandler(
 		handlers.NewBaseHandler(db, permissionService),
-		services.NewItemAttachmentService(db, deps.AttachmentPath, permissionService),
+		services.NewItemAttachmentService(db, deps.Storage, permissionService),
 	)
 
 	timePermService := services.NewTimePermissionService(db, permissionService)

@@ -2130,17 +2130,10 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 		return nil, nil
 	}
 
-	// Get attachment storage path from settings.
-	attachmentPath, ok := h.imports.AttachmentPath()
-	if !ok {
-		slog.Warn("Attachment settings not configured, skipping attachment import",
+	if !h.storage.Enabled() {
+		slog.Warn("Attachment storage not configured, skipping attachment import",
 			slog.String("component", "jira"), slog.String("issue", issue.Key))
 		return jiraNoAttachmentMediaRefs()
-	}
-	if err := ensureJiraAttachmentStorage(attachmentPath); err != nil {
-		slog.Error("Failed to prepare attachment storage",
-			slog.String("component", "jira"), slog.String("issue", issue.Key), slog.Any("error", err))
-		return map[string]jira.MediaAttachment{}, nil
 	}
 
 	mediaRefs := make(map[string]jira.MediaAttachment)
@@ -2184,9 +2177,9 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 			}
 		}
 
-		reader, _, err := client.DownloadAttachment(ctx, attachment.Content)
+		filePath, storedFilename, mimeType, fileSize, err := h.storeJiraAttachment(ctx, attachment, client)
 		if err != nil {
-			slog.Error("Failed to download attachment",
+			slog.Error("Failed to store Jira attachment",
 				slog.String("component", "jira"),
 				slog.String("issue", issue.Key),
 				slog.String("filename", attachment.Filename),
@@ -2194,52 +2187,11 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 			continue
 		}
 
-		storedFilename := fmt.Sprintf("%s_%s", uuid.New().String(), filepath.Base(attachment.Filename))
-		filePath := filepath.Join(attachmentPath, storedFilename)
-
-		file, err := os.Create(filePath) //nolint:gosec // G304 — filePath from attachmentPath + UUID + filename
-		if err != nil {
-			_ = reader.Close()
-			slog.Error("Failed to create attachment file",
-				slog.String("component", "jira"),
-				slog.String("path", filePath),
-				slog.Any("error", err))
-			continue
-		}
-
-		written, err := io.Copy(file, reader)
-		_ = file.Close()
-		_ = reader.Close()
-		if err != nil {
-			_ = os.Remove(filePath) //nolint:gosec // G703 — filePath from attachmentPath + UUID + filepath.Base(filename)
-			slog.Error("Failed to write attachment file",
-				slog.String("component", "jira"),
-				slog.String("path", filePath),
-				slog.Any("error", err))
-			continue
-		}
-
-		// Use actual written size if Jira didn't report one
-		fileSize := attachment.Size
-		if fileSize == 0 {
-			fileSize = written
-		}
-
 		var uploadedBy *int
 		if attachment.Author != nil && attachment.Author.GetIdentifier() != "" {
 			if uid, ok := userMap[attachment.Author.GetIdentifier()]; ok {
 				uploadedBy = &uid
 			}
-		}
-
-		// SECURITY: do not trust the remote-declared Content-Type. A malicious
-		// or compromised Jira source controls attachment.MimeType, and the
-		// download handler uses the stored MIME to decide inline rendering.
-		// Detect the type from the actual bytes so a remote source cannot get a
-		// script-capable document served inline in the app origin (stored XSS).
-		mimeType := detectStoredMimeType(filePath)
-		if mimeType == "" {
-			mimeType = "application/octet-stream"
 		}
 
 		attachmentSvc := services.NewAttachmentService(h.db)
@@ -2309,28 +2261,75 @@ func jiraNoAttachmentMediaRefs() (map[string]jira.MediaAttachment, error) {
 	return nil, nil
 }
 
-func ensureJiraAttachmentStorage(attachmentPath string) error {
-	if err := os.MkdirAll(attachmentPath, 0o750); err != nil {
-		return fmt.Errorf("create attachment directory: %w", err)
+// sniffAttachmentMimeType reads the first 512 bytes from f, rewinds it, and
+// returns the detected Content-Type. The caller still owns f.
+//
+// SECURITY: the remote-declared Content-Type is not trusted. A malicious or
+// compromised Jira source controls attachment.MimeType, and the download
+// handler uses the stored MIME to decide inline rendering. Sniffing the actual
+// bytes keeps a script-capable document out of the app origin (stored XSS).
+func sniffAttachmentMimeType(f *os.File) (string, error) {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return "", err
 	}
-	return nil
+	head := make([]byte, 512)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	if n == 0 {
+		return "application/octet-stream", nil
+	}
+	return http.DetectContentType(head[:n]), nil
 }
 
-// detectStoredMimeType sniffs the Content-Type of an already-written file from
-// its leading bytes via http.DetectContentType, so the stored MIME reflects the
-// actual content rather than a remote-declared value. Returns "" if the file
-// cannot be read (caller falls back to application/octet-stream).
-func detectStoredMimeType(path string) string {
-	f, err := os.Open(path) //nolint:gosec // G304 — path is attachmentPath + UUID + filepath.Base(filename)
+// storeJiraAttachment downloads attachment, streams it to a temp file, sniffs
+// the MIME type, and stores it through the configured blob backend. The temp
+// file is always removed. Returns the stored path, stored filename, detected
+// MIME type, and size.
+func (h *JiraImportHandler) storeJiraAttachment(ctx context.Context, attachment jira.JiraAttachment, client jira.Client) (storedPath, storedFilename, mimeType string, size int64, err error) {
+	reader, _, err := client.DownloadAttachment(ctx, attachment.Content)
 	if err != nil {
-		return ""
+		return "", "", "", 0, fmt.Errorf("download: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() { _ = reader.Close() }()
 
-	buf := make([]byte, 512)
-	n, err := f.Read(buf)
-	if err != nil && n == 0 {
-		return ""
+	// Stream to a local temp file so a large attachment never has to fit in
+	// memory; the blob store then consumes the file.
+	tmp, err := os.CreateTemp("", "windshift-jira-attachment-*")
+	if err != nil {
+		return "", "", "", 0, fmt.Errorf("create staging file: %w", err)
 	}
-	return http.DetectContentType(buf[:n])
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	written, err := io.Copy(tmp, reader)
+	if err != nil {
+		_ = tmp.Close()
+		return "", "", "", 0, fmt.Errorf("stage attachment: %w", err)
+	}
+	mimeType, err = sniffAttachmentMimeType(tmp)
+	if err != nil {
+		_ = tmp.Close()
+		return "", "", "", 0, fmt.Errorf("detect content type: %w", err)
+	}
+
+	storedFilename = fmt.Sprintf("%s_%s", uuid.New().String(), filepath.Base(attachment.Filename))
+	storedPath = h.storage.Path(storedFilename)
+	if err := h.storage.Put(ctx, storedPath, tmp, written, mimeType); err != nil {
+		_ = tmp.Close()
+		return "", "", "", 0, fmt.Errorf("store: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", "", "", 0, fmt.Errorf("close staging file: %w", err)
+	}
+
+	size = attachment.Size
+	if size == 0 {
+		size = written
+	}
+	return storedPath, storedFilename, mimeType, size, nil
 }

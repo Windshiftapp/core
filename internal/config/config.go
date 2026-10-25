@@ -57,6 +57,7 @@ type Config struct {
 	Push         PushConfig
 	Jira         JiraConfig
 	Memory       MemoryConfig
+	Storage      StorageConfig
 
 	// Flat fields (no logical grouping)
 	AttachmentPath              string
@@ -84,6 +85,31 @@ type Config struct {
 // process. The runtime heap target and cache allocations are derived from it.
 type MemoryConfig struct {
 	LimitMB int
+}
+
+// Storage backend names accepted by STORAGE_BACKEND.
+const (
+	StorageBackendLocal = "local"
+	StorageBackendS3    = "s3"
+)
+
+// StorageConfig selects where attachment blobs live. Local disk stays the
+// zero-config default; S3 is opt-in.
+type StorageConfig struct {
+	Backend   string
+	LocalPath string
+	S3        S3StorageConfig
+}
+
+// S3StorageConfig holds the S3-compatible bucket settings.
+type S3StorageConfig struct {
+	Endpoint        string
+	Bucket          string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Prefix          string
+	ForcePathStyle  bool
 }
 
 // DBConfig holds database connection + pool configuration.

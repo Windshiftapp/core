@@ -1222,6 +1222,48 @@ func (r *ItemRepository) ClearWorklogItemReferences(tx database.Tx, itemID int) 
 	return nil
 }
 
+// AttachmentPathsForItemsTx returns the main file and thumbnail paths for the
+// item-scoped attachments of the given items. Item deletion uses it to remove
+// blobs before deleting the attachment rows.
+func (r *ItemRepository) AttachmentPathsForItemsTx(tx database.Tx, itemIDs []int) ([]string, error) {
+	if len(itemIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(itemIDs)), ",")
+	args := make([]any, 0, len(itemIDs))
+	for _, id := range itemIDs {
+		args = append(args, id)
+	}
+	rows, err := tx.Query(`
+		SELECT file_path, COALESCE(thumbnail_path, '')
+		FROM attachments
+		WHERE COALESCE(entity_type, 'item') = 'item'
+		  AND item_id IN (`+placeholders+`)
+	`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query item attachment paths: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var paths []string
+	for rows.Next() {
+		var filePath, thumbnailPath string
+		if err := rows.Scan(&filePath, &thumbnailPath); err != nil {
+			return nil, fmt.Errorf("scan item attachment path: %w", err)
+		}
+		if filePath != "" {
+			paths = append(paths, filePath)
+		}
+		if thumbnailPath != "" {
+			paths = append(paths, thumbnailPath)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate item attachment paths: %w", err)
+	}
+	return paths, nil
+}
+
 func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 	var parentID sql.NullInt64
 	if err := r.scanItemColumn(itemID, "parent_id", "get parent id", &parentID); err != nil {

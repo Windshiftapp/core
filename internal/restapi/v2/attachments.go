@@ -170,10 +170,6 @@ func serveItemAttachment(attachments attachmentApplication, mode attachmentServe
 			return attachmentError(err)
 		}
 		defer func() { _ = binary.File.Close() }()
-		info, err := binary.File.Stat()
-		if err != nil {
-			return internalError(err)
-		}
 		w.Header().Set("Content-Type", binary.MimeType)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("ETag", fmt.Sprintf("\"attachment-%d-%d\"", attachmentID, binary.FileSize))
@@ -194,7 +190,7 @@ func serveItemAttachment(attachments attachmentApplication, mode attachmentServe
 				w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 			}
 		}
-		http.ServeContent(w, r, binary.OriginalFilename, info.ModTime(), binary.File)
+		http.ServeContent(w, r, binary.OriginalFilename, binary.File.ModTime(), binary.File)
 		return nil
 	}
 }

@@ -22,6 +22,13 @@ An empty `DB_PATH` is rejected because Windshift would otherwise fall back to a 
 The database path is recorded in the manifest and must exist as a nonempty regular archive entry.
 The script also checks `ATTACHMENT_PATH`, `PLUGIN_DIR`, `AI_PROMPTS_DIR`, `LLM_PROVIDERS_FILE`, and trimmed comma-separated `PLUGIN_DIRS` when configured.
 An empty `PLUGIN_DIR` is rejected because Windshift would otherwise fall back to a relative path outside the data mount.
+
+> **S3 attachment storage:** when `STORAGE_BACKEND=s3`, attachments live in the
+> bucket rather than under `ATTACHMENT_PATH`. This workflow still backs up the
+> database, but it does **not** cover attachment blobs; use the bucket's own
+> versioning/replication or backup mechanism. See
+> `docs/self-hosting/configuration.md` (private working copy) for the full S3
+> settings.
 SSH host keys and SSH-enabled deployments are outside this workflow because the image-relative default path is not guaranteed to be under `/data`.
 Any extra host mounts or persisted paths outside `/data` are out of scope and cause a safe failure when they are configured through these variables.
 

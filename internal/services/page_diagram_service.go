@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
-	"windshift/internal/fileserve"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -70,28 +71,28 @@ var pageDiagramFencePattern = regexp.MustCompile("(?m)^```excalidraw[ \\t]*\\r?\
 // revisions keep immutable attachment IDs; only failed mutations are cleaned
 // up, never superseded successful versions.
 type PageDiagramService struct {
-	db             database.Database
-	attachmentPath string
-	pages          *PageApplicationService
-	pageAuth       *PagePermissionService
-	uploads        *PageAttachmentUploadService
-	attachments    *repository.AttachmentRepository
+	db          database.Database
+	storage     *blobstore.Store
+	pages       *PageApplicationService
+	pageAuth    *PagePermissionService
+	uploads     *PageAttachmentUploadService
+	attachments *repository.AttachmentRepository
 }
 
 func NewPageDiagramService(
 	db database.Database,
-	attachmentPath string,
+	storage *blobstore.Store,
 	pages *PageApplicationService,
 	pageAuth *PagePermissionService,
 	permissionService *PermissionService,
 ) *PageDiagramService {
 	return &PageDiagramService{
-		db:             db,
-		attachmentPath: attachmentPath,
-		pages:          pages,
-		pageAuth:       pageAuth,
-		uploads:        NewPageAttachmentUploadService(db, attachmentPath, permissionService, pageAuth),
-		attachments:    repository.NewAttachmentRepository(db),
+		db:          db,
+		storage:     storage,
+		pages:       pages,
+		pageAuth:    pageAuth,
+		uploads:     NewPageAttachmentUploadService(db, storage, permissionService, pageAuth),
+		attachments: repository.NewAttachmentRepository(db),
 	}
 }
 
@@ -282,7 +283,7 @@ func (s *PageDiagramService) readPageDiagramPayload(pageID, attachmentID int) (r
 	if err != nil {
 		return nil, nil, "", err
 	}
-	file, err := fileserve.OpenUnderRoot(s.attachmentPath, record.FilePath)
+	file, err := s.storage.Open(context.Background(), record.FilePath)
 	if err != nil {
 		return nil, nil, "", ErrPageDiagramNotFound
 	}

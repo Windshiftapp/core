@@ -150,6 +150,7 @@ type PageAttachmentRecord struct {
 	Filename         string
 	OriginalFilename string
 	FilePath         string
+	ThumbnailPath    string
 	MimeType         string
 	FileSize         int64
 	UploadedBy       *int
@@ -278,7 +279,7 @@ func (r *AttachmentRepository) GetPageAttachmentRecord(pageID, attachmentID int)
 	var uploadedBy sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT a.id, p.id, p.workspace_id, a.filename, a.original_filename,
-		       a.file_path, a.mime_type, a.file_size, a.uploaded_by, a.created_at
+		       a.file_path, COALESCE(a.thumbnail_path, ''), a.mime_type, a.file_size, a.uploaded_by, a.created_at
 		FROM attachments a
 		JOIN pages p ON p.id = a.item_id
 		WHERE a.id = ?
@@ -286,7 +287,7 @@ func (r *AttachmentRepository) GetPageAttachmentRecord(pageID, attachmentID int)
 		  AND a.entity_type = 'page'
 	`, attachmentID, pageID).Scan(
 		&rec.ID, &rec.PageID, &rec.WorkspaceID, &rec.Filename,
-		&rec.OriginalFilename, &rec.FilePath, &rec.MimeType, &rec.FileSize,
+		&rec.OriginalFilename, &rec.FilePath, &rec.ThumbnailPath, &rec.MimeType, &rec.FileSize,
 		&uploadedBy, &rec.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {

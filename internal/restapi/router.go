@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"windshift/internal/auth"
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/services"
@@ -22,10 +23,9 @@ type Deps struct {
 	// surface. v1 falls back to "next periodic refresh" when nil, which is
 	// fine for cold-start tooling but worth wiring for production.
 	ActionService *services.ActionService
-	// AttachmentPath is the base directory where attachment blobs are stored.
-	// Empty when attachments are disabled — the v1 download route falls back
-	// to a not-enabled response in that case.
-	AttachmentPath string
+	// Storage is the configured attachment blob backend. A nil/disabled store
+	// makes the v1 attachment routes report "not enabled".
+	Storage *blobstore.Store
 	// ItemLinkService is the fully-wired link orchestration service
 	// (asset/page permission checkers, notification + action emitters)
 	// shared with the cookie-auth handler. Required for the v1 link

@@ -148,6 +148,19 @@ func (s *ItemCRUDService) deleteSingleWithAuthorization(itemID int, metadata ite
 		if err := s.stampEmailTrackingCompletedTx(tx, []int{itemID}); err != nil {
 			return err
 		}
+		// Blob-first for this item's attachments (children are detached, not
+		// deleted, so only the root's blobs are removed here).
+		if itemAttachmentBlobRemover != nil {
+			paths, err := s.repo.AttachmentPathsForItemsTx(tx, []int{itemID})
+			if err != nil {
+				return err
+			}
+			for _, path := range paths {
+				if err := itemAttachmentBlobRemover.Remove(ctx, path); err != nil {
+					return fmt.Errorf("remove item attachment blob: %w", err)
+				}
+			}
+		}
 		if err := s.deleteItemRelationsTx(tx, itemID); err != nil {
 			return err
 		}
@@ -227,6 +240,22 @@ func (s *ItemCRUDService) deleteWithAuthorization(itemID int, metadata itemevent
 		if err := s.stampEmailTrackingCompletedTx(tx, itemIDs); err != nil {
 			return err
 		}
+		// Blob-first: remove attachment files before deleting their rows. If a
+		// removal fails the transaction rolls back, so the rows remain and the
+		// delete can be retried. Store.Remove is idempotent, so a retry after a
+		// partial removal is safe. The I/O happens after authorization and the
+		// protected-link guard.
+		if itemAttachmentBlobRemover != nil {
+			paths, err := s.repo.AttachmentPathsForItemsTx(tx, itemIDs)
+			if err != nil {
+				return err
+			}
+			for _, path := range paths {
+				if err := itemAttachmentBlobRemover.Remove(ctx, path); err != nil {
+					return fmt.Errorf("remove item attachment blob: %w", err)
+				}
+			}
+		}
 		// Remove children first so the foreign key cannot bypass their cleanup.
 		for i := len(items) - 1; i >= 0; i-- {
 			id := items[i].ID
@@ -280,6 +309,12 @@ func (s *ItemCRUDService) stampEmailTrackingCompletedTx(tx database.Tx, itemIDs 
 }
 
 func (s *ItemCRUDService) deleteItemRelationsTx(tx database.Tx, itemID int) error {
+	if _, err := tx.Exec(`
+		DELETE FROM attachments
+		WHERE item_id = ? AND COALESCE(entity_type, 'item') = 'item'
+	`, itemID); err != nil {
+		return fmt.Errorf("failed to delete item attachments: %w", err)
+	}
 	if err := s.repo.DeleteItemWatches(tx, itemID); err != nil {
 		return err
 	}

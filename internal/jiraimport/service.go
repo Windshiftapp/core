@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -22,6 +23,7 @@ const JiraImportLeaseDuration = 2 * time.Minute
 
 type Service struct {
 	db           database.Database
+	storage      *blobstore.Store
 	statuses     *repository.StatusRepository
 	itemTypes    *repository.ItemTypeRepository
 	customFields *repository.CustomFieldRepository
@@ -46,9 +48,10 @@ type Service struct {
 	workspaces   *repository.WorkspaceRepository
 }
 
-func New(db database.Database) *Service {
+func New(db database.Database, storage *blobstore.Store) *Service {
 	return &Service{
 		db:           db,
+		storage:      storage,
 		statuses:     repository.NewStatusRepository(db),
 		itemTypes:    repository.NewItemTypeRepository(db),
 		customFields: repository.NewCustomFieldRepository(db),

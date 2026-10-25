@@ -5,9 +5,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strconv"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
 	"windshift/internal/repository"
@@ -23,18 +23,18 @@ import (
 // route explicitly rejects bearer tokens.
 type AttachmentHandler struct {
 	BaseHandler
-	attachmentPath string
-	repo           *repository.AttachmentRepository
+	storage *blobstore.Store
+	repo    *repository.AttachmentRepository
 }
 
-// NewAttachmentHandler constructs the v1 attachment handler. attachmentPath is
-// the configured base directory for attachment storage; when empty, the
-// Download handler responds with a service-unavailable error.
-func NewAttachmentHandler(db database.Database, permissionService *services.PermissionService, attachmentPath string) *AttachmentHandler {
+// NewAttachmentHandler constructs the v1 attachment handler. storage selects
+// the configured attachment backend; when disabled, the handlers respond with a
+// service-unavailable error.
+func NewAttachmentHandler(db database.Database, permissionService *services.PermissionService, storage *blobstore.Store) *AttachmentHandler {
 	return &AttachmentHandler{
-		BaseHandler:    NewBaseHandler(db, permissionService),
-		attachmentPath: attachmentPath,
-		repo:           repository.NewAttachmentRepository(db),
+		BaseHandler: NewBaseHandler(db, permissionService),
+		storage:     storage,
+		repo:        repository.NewAttachmentRepository(db),
 	}
 }
 
@@ -52,7 +52,7 @@ func NewAttachmentHandler(db database.Database, permissionService *services.Perm
 // @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /attachments/{id}/download [get]
 func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
-	if h.attachmentPath == "" {
+	if !h.storage.Enabled() {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable, "Attachments are not enabled on this server"))
 		return
 	}
@@ -84,18 +84,17 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the file confined to the attachment storage root. os.OpenRoot (via
-	// fileserve.OpenUnderRoot) rejects ".." traversal and symlink escapes, so a
-	// malicious stored path or planted symlink cannot read outside the root.
-	// Relative rows from older email ingestion resolve against that root.
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, record.FilePath)
+	// Open the blob through the configured backend. The local backend keeps its
+	// os.Root confinement; relative email-ingestion rows resolve against the
+	// same root.
+	file, err := h.storage.Open(r.Context(), record.FilePath)
 	if err != nil {
-		if errors.Is(err, fileserve.ErrOutsideRoot) {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
 			slog.Warn("attachment path traversal blocked", slog.String("component", "v1/attachments"), slog.Int("attachment_id", attachmentID), slog.String("file_path", record.FilePath))
 			restapi.RespondError(w, r, restapi.ErrItemNotFound)
 			return
 		}
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, blobstore.ErrNotFound) {
 			restapi.RespondError(w, r, restapi.ErrItemNotFound)
 			return
 		}
@@ -106,7 +105,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = file.Close() }()
 
 	w.Header().Set("Content-Type", record.MimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(record.FileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	// CLI consumers always want a download; force the disposition rather than
@@ -134,7 +133,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /attachments/{id}/thumbnail [get]
 func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
-	if h.attachmentPath == "" {
+	if !h.storage.Enabled() {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable, "Attachments are not enabled on this server"))
 		return
 	}
@@ -166,14 +165,14 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, record.ThumbnailPath)
+	file, err := h.storage.Open(r.Context(), record.ThumbnailPath)
 	if err != nil {
-		if errors.Is(err, fileserve.ErrOutsideRoot) {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
 			slog.Warn("attachment thumbnail path traversal blocked", slog.String("component", "v1/attachments"), slog.Int("attachment_id", attachmentID), slog.String("thumbnail_path", record.ThumbnailPath))
 			restapi.RespondError(w, r, restapi.ErrItemNotFound)
 			return
 		}
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, blobstore.ErrNotFound) {
 			restapi.RespondError(w, r, restapi.ErrItemNotFound)
 			return
 		}
@@ -183,14 +182,8 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
