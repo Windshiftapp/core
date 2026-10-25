@@ -1,13 +1,7 @@
 /** @vitest-environment jsdom */
 
 import '@testing-library/jest-dom/vitest';
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MilestoneComments from './MilestoneComments.svelte';
 
@@ -72,13 +66,10 @@ describe('MilestoneComments', () => {
 
     const composer = screen.getByTestId('milestone-comment-editor');
     expect(
-      composer.compareDocumentPosition(rows[0]) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      composer.compareDocumentPosition(rows[0]) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(mocks.getComments).toHaveBeenCalledWith(50, { limit: 25 });
-    expect(
-      screen.queryByTestId('milestone-comments-load-more'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('milestone-comments-load-more')).not.toBeInTheDocument();
   });
 
   it('loads older comments with the next cursor and appends them', async () => {
@@ -109,9 +100,7 @@ describe('MilestoneComments', () => {
       });
     render(MilestoneComments, { milestoneId: 50 });
 
-    await fireEvent.click(
-      await screen.findByTestId('milestone-comments-load-more'),
-    );
+    await fireEvent.click(await screen.findByTestId('milestone-comments-load-more'));
 
     await waitFor(() => {
       const rows = screen.getAllByTestId('milestone-comment');
@@ -121,9 +110,7 @@ describe('MilestoneComments', () => {
       limit: 25,
       cursor: 'older-than-3',
     });
-    expect(
-      screen.queryByTestId('milestone-comments-load-more'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('milestone-comments-load-more')).not.toBeInTheDocument();
     expect(screen.getByText('(2)')).toBeInTheDocument();
   });
 
@@ -131,9 +118,7 @@ describe('MilestoneComments', () => {
     const editableIds = async () => {
       const rows = await screen.findAllByTestId('milestone-comment');
       return rows
-        .filter((row) =>
-          row.querySelector('[data-testid="milestone-comment-edit"]'),
-        )
+        .filter((row) => row.querySelector('[data-testid="milestone-comment-edit"]'))
         .map((row) => row.dataset.commentId);
     };
 
