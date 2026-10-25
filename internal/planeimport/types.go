@@ -25,15 +25,16 @@ import "time"
 // silently mis-parsing rows.
 const ContractSchemaVersion = 1
 
-// ContractRecord is one JSONL line of the import contract. Issue and comment
-// records carry their payload in Issue/Comment; meta and unmapped records
-// carry counts or source facts. All fields not relevant to a record type are
-// zero and omitted from the JSON.
+// ContractRecord is one JSONL line of the import contract. Issue, comment,
+// and user records carry their payload in Issue/Comment/User; meta records
+// name the source project. All fields not relevant to a record type are zero
+// and omitted from the JSON.
 type ContractRecord struct {
-	Type    string         `json:"type"` // "meta" | "issue" | "comment"
+	Type    string         `json:"type"` // "meta" | "issue" | "comment" | "user"
 	Meta    *Meta          `json:"meta,omitempty"`
 	Issue   *Issue         `json:"issue,omitempty"`
 	Comment *Comment       `json:"comment,omitempty"`
+	User    *UserRow       `json:"user,omitempty"`
 	Counts  map[string]int `json:"counts,omitempty"` // per-source-field drop counts reported by the producer
 }
 
@@ -76,28 +77,29 @@ type Issue struct {
 
 // Comment is one Plane issue comment in contract shape. DeltaJSON is the
 // TipTap document the comment stores; DeltaHTML is the fallback render.
+// Comment is one Plane comment in contract shape. CommentJSON is the editor
+// document the comment stores (issue_comments.comment_json); CommentHTML is
+// Plane's render (comment_html); Text is the stripped plain text
+// (comment_stripped) used as last-resort content. Access is Plane's
+// visibility enum as stored ('INTERNAL' observed fleet-wide).
 type Comment struct {
 	ID          string     `json:"id"`
 	IssueID     string     `json:"issue_id"`
-	DeltaJSON   string     `json:"delta_json"`
-	DeltaHTML   string     `json:"delta_html"`
+	CommentJSON string     `json:"comment_json"`
+	CommentHTML string     `json:"comment_html"`
 	Text        string     `json:"text"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 	CreatedByID string     `json:"created_by_id"`
-	Access      int        `json:"access"` // Plane visibility enum; 1 = full (public to members)
+	Access      string     `json:"access"`
 }
 
-// UserRow is one Plane users-table row carried so the loader can map authors
-// without reaching back into the source database.
+// UserRow is one Plane users-table row carried inside the contract so the
+// loader can map authors without reaching back into the source database.
 type UserRow struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 }
-
-// UserRow records accompany the dump as a sidecar file (one JSON array), not
-// as contract lines: the loader maps authors before loading and never needs a
-// per-user event.

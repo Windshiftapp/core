@@ -60,6 +60,7 @@ func run() error {
 	var (
 		connection = flag.String("connection", envOr("POSTGRES_CONNECTION_STRING", ""), "Windshift Postgres connection string (default $POSTGRES_CONNECTION_STRING)")
 		workspace  = flag.String("workspace", "", "destination workspace key (required)")
+		wsSlug     = flag.String("workspace-slug", "", "source Plane workspace slug; when set it must match the contract meta (guards against a wrong dump file)")
 		contract   = flag.String("contract", "", "path to the JSONL import contract (required)")
 		usersPath  = flag.String("users", "", "path to the users sidecar JSON array (optional)")
 		dryRun     = flag.Bool("dry-run", false, "parse, map, and report without writing")
@@ -89,6 +90,7 @@ func run() error {
 
 	loader := planeimport.NewLoader(db, planeimport.Options{
 		WorkspaceKey: *workspace,
+		SourceSlug:   *wsSlug,
 		ContractPath: *contract,
 		UsersPath:    *usersPath,
 		Aliases:      aliases.aliases,

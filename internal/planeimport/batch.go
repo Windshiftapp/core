@@ -271,16 +271,17 @@ func (l *Loader) runBatch(
 		}
 		parentID := 0
 		if i.ParentID != nil {
-			// Every Plane parent has a lower sequence_id than its child, so the
-			// parent is either already mapped from a previous run or was inserted
-			// earlier in this same pass; numberToPlaneID tracks the latter.
+			// Usual case: Plane parents carry a lower sequence_id, so they are
+			// already mapped (previous run) or already inserted (this pass).
+			// Measured exceptions exist (a parent newer than its child), so an
+			// unresolvable parent is DEFERRED to the after-batch parent pass
+			// rather than dropped or aborted.
 			if mapped, ok := existing["issue"][*i.ParentID]; ok {
 				parentID = mapped
 			} else if owner := numberToPlaneID[i.ParentSequence]; owner != "" && owner == *i.ParentID {
 				parentID = existing["issue"][owner]
-			} else if i.ParentSequence > 0 {
-				l.report.Collisions = append(l.report.Collisions,
-					fmt.Sprintf("issue %d parent %s not imported before the child", i.SequenceID, *i.ParentID))
+			} else {
+				l.deferred = append(l.deferred, planeID{i.ID, *i.ParentID})
 			}
 		}
 		item, err := l.buildItem(i, i.SequenceID, parentID, existing)
@@ -338,6 +339,43 @@ func idOf(existing map[string]map[string]int, planeID string) int {
 	return existing["issue"][planeID]
 }
 
+// parentPass attaches parent links that the in-pass resolution could not
+// reach — the deferred pairs. Parents are resolved through the same mapping
+// map, so a rerun that re-imported the parent also fixes the child.
+func (l *Loader) parentPass(existing map[string]map[string]int, repo *repository.ItemRepository) error {
+	for _, pair := range l.deferred {
+		childID, ok := existing["issue"][pair.child]
+		if !ok {
+			continue // child was not imported by this workspace/run — nothing to link
+		}
+		parentID, ok := existing["issue"][pair.parent]
+		if !ok {
+			l.report.Collisions = append(l.report.Collisions,
+				fmt.Sprintf("issue %s has parent %s which the contract never carried", pair.child, pair.parent))
+			continue
+		}
+		tx, err := l.db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin parent pass: %w", err)
+		}
+		item, err := repo.FindByIDForUpdate(tx, childID)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("load child %d for parent pass: %w", childID, err)
+		}
+		item.ParentID = &parentID
+		if err := repo.Update(tx, item); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("link child %d to parent %d: %w", childID, parentID, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit parent pass: %w", err)
+		}
+		l.report.ParentsLinkedLate++
+	}
+	return nil
+}
+
 // insertComment writes one comment row with the contract's author and
 // timestamps, records its idempotency mapping, and counts it.
 func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]int, itemID int, c *Comment) error {
@@ -346,10 +384,10 @@ func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]in
 		return nil
 	}
 	content := c.Text
-	if md, ok := ConvertDescriptionJSON(c.DeltaJSON); ok && md != "" {
+	if md, ok := ConvertDescriptionJSON(c.CommentJSON); ok && md != "" {
 		content = md
 	} else if strings.TrimSpace(content) == "" {
-		content = ConvertDescriptionFromHTML(c.DeltaHTML)
+		content = ConvertDescriptionFromHTML(c.CommentHTML)
 	}
 	if content == "" {
 		return nil

@@ -20,6 +20,9 @@ import (
 type Options struct {
 	// WorkspaceKey is the destination workspace key (e.g. "VECTIS").
 	WorkspaceKey string
+	// SourceSlug, when set, must equal the contract meta's workspace_slug —
+	// a cheap guard against pointing the wrong dump file at a workspace.
+	SourceSlug string
 	// ContractPath is the JSONL file produced by the dumper.
 	ContractPath string
 	// UsersPath is the users sidecar (JSON array of UserRow). Optional.
@@ -54,6 +57,7 @@ type Report struct {
 	CommentsImported  int       `json:"comments_imported"`
 	CommentsExisting  int       `json:"comments_skipped_existing"`
 	CommentsSkipped   int       `json:"comments_skipped_unmapped_issue"`
+	ParentsLinkedLate int       `json:"parents_linked_in_second_pass"`
 	HTMLFallbacks     int       `json:"descriptions_html_fallback"`
 	UnmappedUsers     []string  `json:"unmapped_users,omitempty"`
 	MissingStatuses   []string  `json:"missing_statuses,omitempty"`
@@ -99,8 +103,13 @@ type Loader struct {
 	users       []UserRow
 	typeID      map[string]int      // resolved item type id by builtin_key ("task"/"subtask")
 	prioSeen    map[string]struct{} // dedup for unmapped-priority report lines
+	deferred    []planeID           // child/parent plane uuid pairs resolved after batching
 	report      Report
 }
+
+// planeID is a child/parent pair whose parent was not yet mapped when the
+// child was inserted. The parent pass resolves them once every batch committed.
+type planeID struct{ child, parent string }
 
 // NewLoader opens the destination database and prepares the run. The
 // connection string is Windshift's own (POSTGRES_CONNECTION_STRING shape);
@@ -161,6 +170,11 @@ func (l *Loader) LoadContract() error {
 				return fmt.Errorf("contract line %d: comment record without payload", line)
 			}
 			l.comments = append(l.comments, rec.Comment)
+		case "user":
+			if rec.User == nil {
+				return fmt.Errorf("contract line %d: user record without payload", line)
+			}
+			l.users = append(l.users, *rec.User)
 		default:
 			// Unknown record types are future-proofing slots, not errors.
 			continue
@@ -194,6 +208,11 @@ func (l *Loader) LoadContract() error {
 func (l *Loader) Resolve() error {
 	l.report.WorkspaceKey = l.opts.WorkspaceKey
 	l.report.StartedAt = time.Now()
+
+	if l.opts.SourceSlug != "" && l.meta != nil && l.meta.WorkspaceSlug != l.opts.SourceSlug {
+		return fmt.Errorf("contract is from Plane workspace %q, --workspace-slug says %q",
+			l.meta.WorkspaceSlug, l.opts.SourceSlug)
+	}
 
 	var wsID int
 	if err := l.db.QueryRow(`SELECT id FROM workspaces WHERE key = ?`, l.opts.WorkspaceKey).Scan(&wsID); err != nil {
@@ -378,6 +397,15 @@ func (l *Loader) Run(ctx context.Context) (*Report, error) {
 			return nil, err
 		}
 		l.report.Batches++
+	}
+
+	// Second pass for parent links whose source parent had not been mapped
+	// yet (measured: some Plane parents carry a HIGHER sequence_id than the
+	// child — the in-pass assumption does not hold universally).
+	if !l.opts.DryRun && len(l.deferred) > 0 {
+		if err := l.parentPass(existing, repo); err != nil {
+			return nil, err
+		}
 	}
 
 	l.finalizeReport(takenNumbers)
