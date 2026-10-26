@@ -46,26 +46,27 @@ type Options struct {
 // Report is the reconciliation output of one run. Every count is measured
 // during the run; zero means "none seen", not "not checked".
 type Report struct {
-	WorkspaceKey      string    `json:"workspace_key"`
-	DryRun            bool      `json:"dry_run"`
-	StartedAt         time.Time `json:"started_at"`
-	FinishedAt        time.Time `json:"finished_at"`
-	IssuesImported    int       `json:"issues_imported"`
-	IssuesExisting    int       `json:"issues_skipped_existing"`
-	IssuesSoftDeleted int       `json:"issues_skipped_soft_deleted"`
-	IssuesDraft       int       `json:"issues_skipped_draft"`
-	CommentsImported  int       `json:"comments_imported"`
-	CommentsExisting  int       `json:"comments_skipped_existing"`
-	CommentsSkipped   int       `json:"comments_skipped_unmapped_issue"`
-	ParentsLinkedLate int       `json:"parents_linked_in_second_pass"`
-	HTMLFallbacks     int       `json:"descriptions_html_fallback"`
-	UnmappedUsers     []string  `json:"unmapped_users,omitempty"`
-	MissingStatuses   []string  `json:"missing_statuses,omitempty"`
-	UnmappedStates    []string  `json:"unmapped_state_names,omitempty"`
-	Collisions        []string  `json:"collisions,omitempty"`
-	NumberGaps        []int     `json:"number_gaps_preserved,omitempty"`
-	MaxNumber         int       `json:"max_number_after_import"`
-	Batches           int       `json:"batches"`
+	WorkspaceKey       string    `json:"workspace_key"`
+	DryRun             bool      `json:"dry_run"`
+	StartedAt          time.Time `json:"started_at"`
+	FinishedAt         time.Time `json:"finished_at"`
+	IssuesImported     int       `json:"issues_imported"`
+	IssuesExisting     int       `json:"issues_skipped_existing"`
+	IssuesSoftDeleted  int       `json:"issues_skipped_soft_deleted"`
+	IssuesDraft        int       `json:"issues_skipped_draft"`
+	CommentsImported   int       `json:"comments_imported"`
+	CommentsExisting   int       `json:"comments_skipped_existing"`
+	CommentsSkipped    int       `json:"comments_skipped_unmapped_issue"`
+	ParentsLinkedLate  int       `json:"parents_linked_in_second_pass"`
+	HTMLFallbacks      int       `json:"descriptions_html_fallback"`
+	UnmappedUsers      []string  `json:"unmapped_users,omitempty"`
+	MissingStatuses    []string  `json:"missing_statuses,omitempty"`
+	UnmappedStates     []string  `json:"unmapped_state_names,omitempty"`
+	UnmappedPriorities []string  `json:"unmapped_priorities,omitempty"`
+	Collisions         []string  `json:"collisions,omitempty"`
+	NumberGaps         []int     `json:"number_gaps_preserved,omitempty"`
+	MaxNumber          int       `json:"max_number_after_import"`
+	Batches            int       `json:"batches"`
 }
 
 // DefaultPlaneStatusMap maps Plane state names to Windshift status builtin
@@ -103,6 +104,7 @@ type Loader struct {
 	users       []UserRow
 	typeID      map[string]int      // resolved item type id by builtin_key ("task"/"subtask")
 	prioSeen    map[string]struct{} // dedup for unmapped-priority report lines
+	stateSeen   map[string]struct{} // dedup for unmapped-state report lines (its own map: a state named like a priority must not hide either)
 	deferred    []planeID           // child/parent plane uuid pairs resolved after batching
 	report      Report
 }
@@ -122,7 +124,7 @@ func NewLoader(db database.Database, opts Options) *Loader {
 	if opts.DefaultStatusMap == nil {
 		opts.DefaultStatusMap = DefaultPlaneStatusMap
 	}
-	return &Loader{db: db, opts: opts, prioSeen: map[string]struct{}{}, report: Report{}}
+	return &Loader{db: db, opts: opts, prioSeen: map[string]struct{}{}, stateSeen: map[string]struct{}{}, report: Report{}}
 }
 
 // LoadContract reads the JSONL contract and the users sidecar into memory.

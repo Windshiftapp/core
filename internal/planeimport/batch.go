@@ -15,10 +15,10 @@ import (
 )
 
 // fallbackStatusID is the status used when a source state maps to a name the
-// workspace does not have: the workspace default status (In Progress in the
-// default data), so an unmapped state never lands on a null status. Resolve()
-// normally refuses to run with missing statuses; this is the belt for the
-// post-resolve race where a status disappears mid-run.
+// workspace does not have: whatever row carries is_default (measured on a
+// default-seeded deployment: Open), so an unmapped state never lands on a null
+// status. Resolve() normally refuses to run with missing statuses; this is the
+// belt for the post-resolve race where a status disappears mid-run.
 func (l *Loader) fallbackStatusID() int {
 	var id int
 	if err := l.db.QueryRow(`SELECT id FROM statuses WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&id); err != nil {
@@ -105,36 +105,39 @@ func (l *Loader) issueDescription(i *Issue) string {
 	return ConvertDescriptionFromHTML(i.DescriptionHTML)
 }
 
+// reportUnmappedState records a Plane state name the status map does not cover,
+// once per name. It dedups on its own map: sharing the priority map would let
+// a state named like a priority key (or the reverse) silence a report line,
+// and this tool's whole promise is that nothing is dropped quietly.
+func (l *Loader) reportUnmappedState(name string) {
+	if _, seen := l.stateSeen[name]; seen {
+		return
+	}
+	l.stateSeen[name] = struct{}{}
+	l.report.UnmappedStates = append(l.report.UnmappedStates, name)
+}
+
 // buildItem assembles the models.Item the repository inserts. Every field the
 // fidelity contract promises is set here explicitly: number, creator, status,
 // dates, story points, and both timestamps.
 func (l *Loader) buildItem(i *Issue, number int, parentWindshiftID int, existing map[string]map[string]int) (*models.Item, error) {
 	creatorID := l.userID[i.CreatedByID]
 	if _, configured := l.opts.DefaultStatusMap[i.StateName]; !configured {
-		key := "unmapped-state:" + i.StateName
-		if _, seen := l.prioSeen[key]; !seen {
-			l.prioSeen[key] = struct{}{}
-			l.report.UnmappedStates = append(l.report.UnmappedStates, "state "+i.StateName)
-		}
+		l.reportUnmappedState(i.StateName)
 	}
 	statusKey := l.mapStateName(i.StateName)
 	statusID, ok := l.statusID[statusKey]
 	if !ok {
-		key := "unmapped-state:" + i.StateName
-		if _, seen := l.prioSeen[key]; !seen {
-			l.prioSeen[key] = struct{}{}
-			l.report.UnmappedStates = append(l.report.UnmappedStates, "state "+i.StateName)
-		}
+		l.reportUnmappedState(i.StateName)
 		statusID = l.fallbackStatusID()
 	}
 	var priorityID *int
 	if id, ok := l.prioID[i.Priority]; ok {
 		priorityID = &id
 	} else if i.Priority != "" && i.Priority != "none" {
-		key := "unmapped:" + i.Priority
-		if _, seen := l.prioSeen[key]; !seen {
-			l.prioSeen[key] = struct{}{}
-			l.report.UnmappedStates = append(l.report.UnmappedStates, "priority "+i.Priority)
+		if _, seen := l.prioSeen[i.Priority]; !seen {
+			l.prioSeen[i.Priority] = struct{}{}
+			l.report.UnmappedPriorities = append(l.report.UnmappedPriorities, i.Priority)
 		}
 	}
 	item := &models.Item{
