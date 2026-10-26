@@ -3040,6 +3040,14 @@ var Catalog = []Migration{
 				WHERE field_name = 'milestones';
 		`,
 	},
+	{
+		Version:       "20261109_milestone_last_activity",
+		Name:          "Store the time of each milestone's newest Activity entry",
+		CheckSQLite:   sqliteColumnCheck("milestones", "last_activity_at"),
+		CheckPostgres: pgColumnCheck("milestones", "last_activity_at"),
+		SQLite:        `ALTER TABLE milestones ADD COLUMN last_activity_at DATETIME;`,
+		Postgres:      `ALTER TABLE milestones ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;`,
+	},
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have

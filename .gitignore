@@ -26,7 +26,7 @@ cx
 !/internal/services/planning_milestones_release_test.go
 !/internal/wscli/milestone_comment_test.go
 !/internal/wscli/milestone_page_test.go
-!/internal/services/planning_milestone_last_updated_test.go
+!/internal/services/milestone_last_activity_test.go
 !/internal/services/milestone_membership_history_test.go
 !/internal/database/milestone_schema_test.go
 !/internal/services/milestone_activity_service_test.go

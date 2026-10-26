@@ -94,7 +94,7 @@ func (r *ItemRepository) RecordHistory(w HistoryWriter, entry HistoryEntry) erro
 	if err != nil {
 		return fmt.Errorf("failed to record history: %w", err)
 	}
-	return nil
+	return touchItemHistoryMilestoneActivity(w, entry)
 }
 
 // RecordHistoryBatch records multiple history entries in one operation

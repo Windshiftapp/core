@@ -101,14 +101,20 @@ func (r *MilestoneCommentRepository) GetByID(id int) (*models.MilestoneComment, 
 	return &comment, nil
 }
 
-// Create inserts a milestone comment and returns its ID.
+// Create inserts a milestone comment, moves the milestone's last activity
+// time, and returns the comment ID.
 func (r *MilestoneCommentRepository) Create(milestoneID, authorID int, content string) (int, error) {
 	now := time.Now().UTC()
 	var id int
-	err := r.db.QueryRow(`
-		INSERT INTO milestone_comments (milestone_id, author_id, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
-	`, milestoneID, authorID, content, now, now).Scan(&id)
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		if err := tx.QueryRow(`
+			INSERT INTO milestone_comments (milestone_id, author_id, content, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, milestoneID, authorID, content, now, now).Scan(&id); err != nil {
+			return err
+		}
+		return TouchMilestoneActivity(tx, now, milestoneID)
+	})
 	if err != nil {
 		return 0, fmt.Errorf("create milestone comment: %w", err)
 	}

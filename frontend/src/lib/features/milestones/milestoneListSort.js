@@ -11,12 +11,15 @@ export function timestampSortValue(value) {
 }
 
 /**
- * When the milestone or anything in it last changed. List responses carry
- * `last_updated_at`; a milestone just saved on this page only has the
- * `updated_at` of that save, which is then the latest change.
+ * When the milestone or anything in it last changed: the later of its newest
+ * Activity entry (`last_activity_at`, unset until the first one) and its own
+ * `updated_at`.
  */
 export function milestoneLastUpdated(milestone) {
-  return milestone.last_updated_at ?? milestone.updated_at ?? null;
+  const activity = milestone.last_activity_at;
+  const updated = milestone.updated_at;
+  if (!activity || !updated) return activity || updated || null;
+  return timestampSortValue(activity) > timestampSortValue(updated) ? activity : updated;
 }
 
 /** Lifecycle order: planning, in progress, completed, cancelled. */

@@ -10189,6 +10189,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -11535,6 +11541,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -13016,6 +13028,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -14266,6 +14284,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -15310,6 +15334,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -16399,6 +16429,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -17545,6 +17581,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -20712,6 +20754,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -21968,6 +22016,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -23788,6 +23842,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -24857,6 +24917,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -27119,6 +27185,12 @@
                 "description": "The is global value.",
                 "type": "boolean"
               },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
               "latest_release": {
                 "additionalProperties": false,
                 "description": "The latest release value.",
@@ -27541,8 +27613,8 @@
                   "description": "The is global value.",
                   "type": "boolean"
                 },
-                "last_updated_at": {
-                  "description": "The last updated at value.",
+                "last_activity_at": {
+                  "description": "The last activity at value.",
                   "format": "date-time",
                   "nullable": true,
                   "type": "string"
@@ -37058,6 +37130,12 @@
                 "description": "The is global value.",
                 "type": "boolean"
               },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
               "latest_release": {
                 "additionalProperties": false,
                 "description": "The latest release value.",
@@ -37432,8 +37510,8 @@
                   "description": "The is global value.",
                   "type": "boolean"
                 },
-                "last_updated_at": {
-                  "description": "The last updated at value.",
+                "last_activity_at": {
+                  "description": "The last activity at value.",
                   "format": "date-time",
                   "nullable": true,
                   "type": "string"
@@ -42849,6 +42927,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -45460,6 +45544,12 @@
                             "description": "The is global value.",
                             "type": "boolean"
                           },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "latest_release": {
                             "additionalProperties": false,
                             "description": "The latest release value.",
@@ -46548,6 +46638,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -47694,6 +47790,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -49907,6 +50009,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -55353,6 +55461,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -56602,6 +56716,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -57636,6 +57756,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -60244,6 +60370,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -71472,6 +71604,12 @@
                               "description": "The is global value.",
                               "type": "boolean"
                             },
+                            "last_activity_at": {
+                              "description": "The last activity at value.",
+                              "format": "date-time",
+                              "nullable": true,
+                              "type": "string"
+                            },
                             "latest_release": {
                               "additionalProperties": false,
                               "description": "The latest release value.",
@@ -72541,6 +72679,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -73701,6 +73845,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -74883,6 +75033,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -76086,6 +76242,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -77268,6 +77430,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -78841,6 +79009,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -80571,6 +80745,12 @@
                           "description": "The is global value.",
                           "type": "boolean"
                         },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
+                        },
                         "latest_release": {
                           "additionalProperties": false,
                           "description": "The latest release value.",
@@ -81765,6 +81945,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -82902,6 +83088,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -84634,6 +84826,12 @@
                 "description": "The is global value.",
                 "type": "boolean"
               },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
               "latest_release": {
                 "additionalProperties": false,
                 "description": "The latest release value.",
@@ -85082,6 +85280,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -90854,6 +91058,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -113318,16 +113528,6 @@
               "default": false,
               "type": "boolean"
             }
-          },
-          {
-            "description": "Adds each milestone's last_updated_at: the latest change to the milestone or its accessible items.",
-            "in": "query",
-            "name": "include_last_updated",
-            "required": false,
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
           }
         ],
         "responses": {
@@ -123401,16 +123601,6 @@
             "description": "Includes global milestones alongside the workspace's own.",
             "in": "query",
             "name": "include_global",
-            "required": false,
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "description": "Adds each milestone's last_updated_at: the latest change to the milestone or its accessible items.",
-            "in": "query",
-            "name": "include_last_updated",
             "required": false,
             "schema": {
               "default": false,

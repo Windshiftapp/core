@@ -7,14 +7,24 @@ import (
 )
 
 const (
-	milestoneCommentsMigrationVersion = "20261109_milestone_comments"
-	milestoneActivityMigrationVersion = "20261109_milestone_activity"
+	milestoneCommentsMigrationVersion     = "20261109_milestone_comments"
+	milestoneActivityMigrationVersion     = "20261109_milestone_activity"
+	milestoneLastActivityMigrationVersion = "20261109_milestone_last_activity"
 )
 
 func sqliteObjectCount(t *testing.T, db Database, kind, name string) int {
 	t.Helper()
 	var count int
 	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type=? AND name=?", kind, name).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	return count
+}
+
+func sqliteColumnCount(t *testing.T, db Database, table, column string) int {
+	t.Helper()
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?", table, column).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	return count
@@ -48,7 +58,10 @@ func TestMilestoneSchemaFreshInstallAndUpgrade(t *testing.T) {
 	if sqliteObjectCount(t, db, "index", "idx_item_history_milestones") != 1 {
 		t.Fatal("expected idx_item_history_milestones on a fresh install")
 	}
-	for _, version := range []string{milestoneCommentsMigrationVersion, milestoneActivityMigrationVersion} {
+	if sqliteColumnCount(t, db, "milestones", "last_activity_at") != 1 {
+		t.Fatal("expected milestones.last_activity_at on a fresh install")
+	}
+	for _, version := range []string{milestoneCommentsMigrationVersion, milestoneActivityMigrationVersion, milestoneLastActivityMigrationVersion} {
 		var stamped int
 		if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version=?", version).Scan(&stamped); err != nil {
 			t.Fatal(err)
@@ -59,12 +72,14 @@ func TestMilestoneSchemaFreshInstallAndUpgrade(t *testing.T) {
 	}
 
 	// Simulate an existing install from before the migrations: no tables, no
-	// item_history index, and no stamps. The catalog must create them all.
+	// item_history index, no last_activity_at column, and no stamps. The
+	// catalog must create them all.
 	if _, err := db.Exec(`
 		DROP TABLE milestone_comments;
 		DROP TABLE milestone_history;
 		DROP INDEX idx_item_history_milestones;
-		DELETE FROM schema_migrations WHERE version IN ('` + milestoneCommentsMigrationVersion + `', '` + milestoneActivityMigrationVersion + `');
+		ALTER TABLE milestones DROP COLUMN last_activity_at;
+		DELETE FROM schema_migrations WHERE version IN ('` + milestoneCommentsMigrationVersion + `', '` + milestoneActivityMigrationVersion + `', '` + milestoneLastActivityMigrationVersion + `');
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +99,9 @@ func TestMilestoneSchemaFreshInstallAndUpgrade(t *testing.T) {
 			t.Fatalf("expected index %s after migration", index)
 		}
 	}
+	if sqliteColumnCount(t, db, "milestones", "last_activity_at") != 1 {
+		t.Fatal("expected the migration to add milestones.last_activity_at")
+	}
 }
 
 func TestMilestoneMigrationsBackendParity(t *testing.T) {
@@ -101,6 +119,10 @@ func TestMilestoneMigrationsBackendParity(t *testing.T) {
 			"idx_milestone_history_milestone",
 			"idx_item_history_milestones",
 			"WHERE field_name = 'milestones'",
+		},
+		milestoneLastActivityMigrationVersion: {
+			"ALTER TABLE milestones ADD COLUMN",
+			"last_activity_at",
 		},
 	} {
 		migration := catalogMigration(t, version)
@@ -122,6 +144,9 @@ func TestMilestoneMigrationsBackendParity(t *testing.T) {
 		if !strings.Contains(schema, "CREATE TABLE IF NOT EXISTS "+table) {
 			t.Fatalf("expected %s in %s", table, name)
 		}
+	}
+	if !strings.Contains(milestonesSchema, "last_activity_at") || !strings.Contains(milestonesSchemaPostgres, "last_activity_at") {
+		t.Fatal("expected milestones.last_activity_at in both canonical milestones schema files")
 	}
 	if !strings.Contains(itemsSchema, "idx_item_history_milestones") || !strings.Contains(itemsSchemaPostgres, "idx_item_history_milestones") {
 		t.Fatal("expected idx_item_history_milestones in both canonical items schema files")

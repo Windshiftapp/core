@@ -169,6 +169,9 @@ type Milestone struct {
 	Position    int       `json:"position"`               // Manual sort order (drag-and-drop), scoped per (is_global, workspace_id, category_id)
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// LastActivityAt is the time of the newest milestone Activity entry; nil
+	// until the first activity.
+	LastActivityAt *time.Time `json:"last_activity_at,omitempty"`
 	// Joined fields for API responses
 	CategoryName  string             `json:"category_name,omitempty"`
 	CategoryColor string             `json:"category_color,omitempty"`

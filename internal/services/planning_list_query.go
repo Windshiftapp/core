@@ -11,11 +11,8 @@ const iterationSelectQuery = `
 	LEFT JOIN iteration_types it ON i.type_id = it.id
 	LEFT JOIN workspaces w ON i.workspace_id = w.id`
 
-// milestoneSelectQuery is split into its column list and FROM clause so the
-// milestone list can add its last-updated columns between them.
-const milestoneSelectQuery = "\n\tSELECT" + milestoneSelectColumns + milestoneSelectFrom
-
-const milestoneSelectColumns = ` m.id, m.name, m.description, m.target_date, m.status, m.category_id,
+const milestoneSelectQuery = `
+	SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
 	       mc.name as category_name, mc.color as category_color,
 	       m.is_global, m.workspace_id, w.name as workspace_name,
 	       m.external_key, m.position,
@@ -24,9 +21,7 @@ const milestoneSelectColumns = ` m.id, m.name, m.description, m.target_date, m.s
 	       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
 	       mr.scm_connection_id, mr.scm_repository,
 	       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
-	       m.created_at, m.updated_at`
-
-const milestoneSelectFrom = `
+	       m.created_at, m.updated_at, m.last_activity_at
 	FROM milestones m
 	LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 	LEFT JOIN workspaces w ON m.workspace_id = w.id

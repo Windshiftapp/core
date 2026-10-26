@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -161,17 +160,8 @@ type completeIterationRequest struct {
 	TargetIterationID *int `json:"move_incomplete_to_iteration_id"`
 }
 
-// milestoneListEntry is a milestone in a list response. With
-// include_last_updated it adds the last-updated time: the latest change to the
-// milestone or anything in it, counting item changes only for items the
-// viewer can access.
-type milestoneListEntry struct {
-	models.Milestone
-	LastUpdatedAt *time.Time `json:"last_updated_at,omitempty"`
-}
-
-func listMilestones(planning planningApplication, workspaceScoped bool) pageOperation[milestoneListEntry] {
-	return func(r *http.Request) ([]milestoneListEntry, Pagination, int, error) {
+func listMilestones(planning planningApplication, workspaceScoped bool) pageOperation[models.Milestone] {
+	return func(r *http.Request) ([]models.Milestone, Pagination, int, error) {
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err
@@ -198,9 +188,8 @@ func listMilestones(planning planningApplication, workspaceScoped bool) pageOper
 			Limit: page.PageSize, Offset: page.Offset, WorkspaceID: workspaceID, CategoryID: categoryID,
 			Status: r.URL.Query().Get("status"), SortBy: page.Sort, SortOrder: sortDirection(page.Desc),
 			IncludeGlobal: includeGlobal, IsGlobal: isGlobal,
-			IncludeLastUpdated: r.URL.Query().Get("include_last_updated") == "true",
 		})
-		return mapMilestoneListEntries(rows), page, total, planningError(err)
+		return mapMilestones(rows), page, total, planningError(err)
 	}
 }
 
@@ -531,6 +520,7 @@ func milestoneModel(result *services.MilestoneResult) models.Milestone {
 		CategoryID: result.CategoryID, CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
 		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
 		ExternalKey: result.ExternalKey, Position: result.Position, CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+		LastActivityAt: result.LastActivityAt,
 	}
 	if result.LatestRelease != nil {
 		latest := milestoneReleaseModel(*result.LatestRelease)
@@ -556,10 +546,10 @@ func milestoneReleaseModel(result services.MilestoneReleaseResult) models.Milest
 	}
 }
 
-func mapMilestoneListEntries(rows []services.MilestoneResult) []milestoneListEntry {
-	result := make([]milestoneListEntry, len(rows))
+func mapMilestones(rows []services.MilestoneResult) []models.Milestone {
+	result := make([]models.Milestone, len(rows))
 	for i := range rows {
-		result[i] = milestoneListEntry{Milestone: milestoneModel(&rows[i]), LastUpdatedAt: rows[i].LastUpdatedAt}
+		result[i] = milestoneModel(&rows[i])
 	}
 	return result
 }

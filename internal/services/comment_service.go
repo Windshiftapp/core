@@ -417,6 +417,9 @@ func (s *CommentService) CreateInTx(ctx context.Context, tx database.Tx, itemID,
 	if err != nil {
 		return 0, err
 	}
+	if err := repository.TouchItemMilestoneActivity(tx, itemID, createdAt); err != nil {
+		return 0, err
+	}
 	var workspaceID int
 	if err := tx.QueryRowContext(ctx, "SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID); err != nil {
 		return 0, fmt.Errorf("load comment item workspace: %w", err)
@@ -524,6 +527,9 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 		return nil, fmt.Errorf("failed to create comment: %w", err)
 	}
 	if err := repository.NewItemRepository(s.db).TouchActivity(tx, params.ItemID, now); err != nil {
+		return nil, fmt.Errorf("failed to record comment activity: %w", err)
+	}
+	if err := repository.TouchItemMilestoneActivity(tx, params.ItemID, now); err != nil {
 		return nil, fmt.Errorf("failed to record comment activity: %w", err)
 	}
 	fallback := itemevents.System("application")

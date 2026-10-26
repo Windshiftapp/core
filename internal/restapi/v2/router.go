@@ -1100,7 +1100,6 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, positiveIDQuery("category_id", "Restricts results to one milestone category."))
 		upsertParameter(route, stringQuery("status", "Restricts results to a milestone status."))
 		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order. ID is the stable final tie-breaker.", "position", "-position", "name", "-name", "target_date", "-target_date", "status", "-status", "created_at", "-created_at", "updated_at", "-updated_at"))
-		upsertParameter(route, booleanQuery("include_last_updated", "Adds each milestone's last_updated_at: the latest change to the milestone or its accessible items.", false))
 		if route.Path == "/milestones" {
 			upsertParameter(route, booleanQuery("is_global", "Restricts results to global milestones instead of global and accessible-workspace milestones.", false))
 		} else {
