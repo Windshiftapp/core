@@ -703,7 +703,7 @@ func (s *Server) initialize() error {
 	services.SetItemAttachmentBlobRemover(attachmentStorage)
 
 	// CSV import staging is transient and stays on local disk. Local mode keeps
-	// the historical ATTACHMENT_PATH behaviour (empty disables imports); S3 mode
+	// the historical ATTACHMENT_PATH behavior (empty disables imports); S3 mode
 	// falls back to the OS temp directory when no local path is configured.
 	importScratch := cfg.Storage.LocalPath
 	if importScratch == "" {
@@ -3281,7 +3281,7 @@ func newAttachmentStorage(cfg Config) (*blobstore.Store, error) {
 	localPath := cfg.Storage.LocalPath
 	if localPath == "" {
 		// Callers that build Config directly (rather than via config.Load) still
-		// get the historical ATTACHMENT_PATH behaviour.
+		// get the historical ATTACHMENT_PATH behavior.
 		localPath = cfg.AttachmentPath
 	}
 	switch cfg.Storage.Backend {

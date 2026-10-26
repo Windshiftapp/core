@@ -229,19 +229,14 @@ func (p *Processor) ProcessEmailWithIntake(
 	// status on the tracking row so operators can see when attachments were
 	// dropped — the item itself stays in place either way.
 	if result.ItemID != nil && len(email.Attachments) > 0 {
-		attRes, err := p.handleAttachments(ctx, email.Attachments, *result.ItemID)
-		if err != nil {
-			slog.Error("failed to handle attachments", "error", err, "item_id", result.ItemID)
+		attRes := p.handleAttachments(ctx, email.Attachments, *result.ItemID)
+		switch {
+		case attRes.failed > 0 && attRes.saved > 0:
+			p.setAttachmentsStatus(ctx, channelID, dedupKey, "partial")
+		case attRes.failed > 0 && attRes.saved == 0:
 			p.setAttachmentsStatus(ctx, channelID, dedupKey, "failed")
-		} else {
-			switch {
-			case attRes.failed > 0 && attRes.saved > 0:
-				p.setAttachmentsStatus(ctx, channelID, dedupKey, "partial")
-			case attRes.failed > 0 && attRes.saved == 0:
-				p.setAttachmentsStatus(ctx, channelID, dedupKey, "failed")
-			case attRes.saved > 0:
-				p.setAttachmentsStatus(ctx, channelID, dedupKey, "ok")
-			}
+		case attRes.saved > 0:
+			p.setAttachmentsStatus(ctx, channelID, dedupKey, "ok")
 		}
 	}
 
@@ -775,13 +770,12 @@ type attachmentResult struct {
 
 // handleAttachments saves email attachments to the item. Returns counts of
 // successfully stored vs. write/insert-failed attachments so the caller can
-// stamp an attachments_status on the tracking row. Returns a non-nil error
-// only for fatal setup errors (mkdir, settings load mishaps) — per-attachment
-// failures are absorbed into result.failed.
-func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachment, itemID int) (attachmentResult, error) {
+// stamp an attachments_status on the tracking row. Per-attachment failures are
+// absorbed into result.failed.
+func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachment, itemID int) attachmentResult {
 	var out attachmentResult
 	if !p.storage.Enabled() {
-		return out, nil // Attachments not enabled — silently skip
+		return out // Attachments not enabled — silently skip
 	}
 
 	// Load attachment settings
@@ -798,7 +792,7 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 		enabled = true
 	}
 	if !enabled {
-		return out, nil
+		return out
 	}
 
 	// Parse allowed MIME types
@@ -882,7 +876,7 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 		accepted++
 	}
 
-	return out, nil
+	return out
 }
 
 // setAttachmentsStatus writes the partial-ingestion marker onto the tracking

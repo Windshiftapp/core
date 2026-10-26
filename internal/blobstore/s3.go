@@ -48,6 +48,11 @@ type s3Backend struct {
 
 // NewS3 builds an S3-backed store. It validates configuration but does not make
 // a network call; call Probe at startup to check reachability.
+//
+// Credentials come from cfg.AccessKeyID/SecretAccessKey when both are set
+// (S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY); when both are empty the AWS SDK's
+// default credential chain resolves them (env vars, shared config/SSO, web
+// identity, instance profile). Setting exactly one is a configuration error.
 func NewS3(cfg S3Config) (*Store, error) {
 	bucket := strings.TrimSpace(cfg.Bucket)
 	if bucket == "" {
@@ -58,14 +63,16 @@ func NewS3(cfg S3Config) (*Store, error) {
 		region = "us-east-1"
 	}
 
-	loadOpts := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(region)}
-	if cfg.AccessKeyID == "" || cfg.SecretAccessKey == "" {
-		return nil, errors.New("S3 access key id or secret access key is empty, check keys!")
+	loadOpts := make([]func(*awsconfig.LoadOptions) error, 0, 2)
+	loadOpts = append(loadOpts, awsconfig.WithRegion(region))
+	if cfg.AccessKeyID != "" || cfg.SecretAccessKey != "" {
+		if cfg.AccessKeyID == "" || cfg.SecretAccessKey == "" {
+			return nil, errors.New("S3 access key id and secret access key must be set together")
+		}
+		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+		))
 	}
-
-	loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
-		credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-	))
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOpts...)
 	if err != nil {

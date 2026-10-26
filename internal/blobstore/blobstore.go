@@ -1,5 +1,5 @@
 // Package blobstore abstracts attachment blob storage. The local backend
-// preserves the historical ATTACHMENT_PATH filesystem behaviour; the S3 backend
+// preserves the historical ATTACHMENT_PATH filesystem behavior; the S3 backend
 // stores the same objects in an S3-compatible bucket.
 //
 // Stored paths are the values persisted in attachments.file_path and
@@ -23,7 +23,7 @@ var (
 	ErrOutsideRoot = errors.New("blob path is outside the configured storage root")
 )
 
-// Object is an open blob. It supports seeking so http.ServeContent can honour
+// Object is an open blob. It supports seeking so http.ServeContent can honor
 // range requests without buffering the whole object.
 type Object interface {
 	io.ReadSeekCloser
@@ -52,7 +52,7 @@ type Store struct {
 
 // NewLocal builds a filesystem-backed store rooted at root. An empty root
 // produces a disabled store, preserving the historical "no ATTACHMENT_PATH
-// means attachments are off" behaviour.
+// means attachments are off" behavior.
 func NewLocal(root string) *Store {
 	if root == "" {
 		return &Store{}

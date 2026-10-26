@@ -13,7 +13,7 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// ProbeClass categorises a startup probe failure so the retry policy can decide
+// ProbeClass categorizes a startup probe failure so the retry policy can decide
 // whether to retry, continue, or fail fast.
 type ProbeClass int
 
@@ -138,5 +138,7 @@ func jitter(d time.Duration) time.Duration {
 		return 0
 	}
 	half := d / 2
-	return half + time.Duration(rand.Int64N(int64(half)+1))
+	// Retry jitter only needs to spread attempts; unpredictability is not a
+	// security property here.
+	return half + time.Duration(rand.Int64N(int64(half)+1)) //nolint:gosec // retry jitter, not a security-sensitive value
 }
