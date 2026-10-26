@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS intakes (
 	rate_limit_per_hour INTEGER,
 	processing_disposition TEXT NOT NULL DEFAULT '',
 	send_confirmation BOOLEAN NOT NULL DEFAULT false,
+	import_existing_mail BOOLEAN NOT NULL DEFAULT false,
 	status TEXT NOT NULL DEFAULT 'enabled',
 	status_reason TEXT NOT NULL DEFAULT '',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

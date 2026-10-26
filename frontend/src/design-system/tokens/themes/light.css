@@ -7,6 +7,7 @@
 html,
 html[data-color-mode="light"],
 [data-ds-color-mode="light"] {
+  color-scheme: light;
   /* =================================================================
      SURFACE COLORS
      Background colors for UI layers

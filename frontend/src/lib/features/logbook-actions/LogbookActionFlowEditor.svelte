@@ -18,6 +18,7 @@
   import BaseActionFlowEditor from '../actions/shared/BaseActionFlowEditor.svelte';
   import ConditionConfigPanel from '../actions/shared/ConditionConfigPanel.svelte';
   import { logbookActionFlowStore } from '../../stores/logbookActionFlowStore.svelte.js';
+  import { conditionOperatorsWithRegex } from '../actions/conditionOperators.js';
 
   let { action, onSave, onCancel } = $props();
 
@@ -51,15 +52,7 @@
     { value: 'author', label: 'Author' }
   ];
 
-  const conditionOperators = [
-    { value: 'eq', label: 'Equals' },
-    { value: 'ne', label: 'Not Equals' },
-    { value: 'contains', label: 'Contains' },
-    { value: 'not_contains', label: 'Not Contains' },
-    { value: 'starts_with', label: 'Starts With' },
-    { value: 'ends_with', label: 'Ends With' },
-    { value: 'matches', label: 'Matches (Regex)' }
-  ];
+  const conditionOperators = conditionOperatorsWithRegex;
 </script>
 
 <BaseActionFlowEditor

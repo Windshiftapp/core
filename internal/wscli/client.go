@@ -24,6 +24,7 @@ type Client struct {
 }
 
 func NewClient() (*Client, error) {
+	emitConfigWarnings()
 	if cfg.Server.URL == "" {
 		return nil, fmt.Errorf("server URL not configured. Set WS_URL, use --url, or run 'ws config init'")
 	}

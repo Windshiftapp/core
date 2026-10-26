@@ -5,12 +5,19 @@
   import { t } from '../stores/i18n.svelte.js';
   import { downloadSupportMetricsCSV } from '../features/support/metricColumns.js';
   import Chart from './Chart.svelte';
+  import SupportStatTile from './SupportStatTile.svelte';
+  import {
+    supportChartData,
+    supportDateRange,
+    supportHasActivity,
+    supportSlaLabel,
+    supportWindowDays,
+    toISOStringDate,
+  } from './supportMetricsShared.js';
 
   let { workspaceId, collectionId = null, config = {} } = $props();
 
-  const windowDays = $derived(
-    config?.window === '7d' ? 7 : config?.window === '84d' ? 84 : 28
-  );
+  const windowDays = $derived(supportWindowDays(config));
 
   let doc = $state(/** @type {any} */ (null));
   let loading = $state(false);
@@ -22,27 +29,11 @@
     workspaceId ? `${workspaceId}:${collectionId ?? 'ws'}:${windowDays}` : null
   );
 
-  const hasActivity = $derived(
-    !!doc && (doc.summary.created > 0 || doc.summary.resolved > 0 || doc.summary.backlog > 0)
-  );
+  const hasActivity = $derived(supportHasActivity(doc));
 
-  const chartData = $derived.by(() => {
-    if (!doc) return { categories: [], series: [] };
-    const buckets = doc.buckets ?? [];
-    return {
-      categories: buckets.map((bucket) => bucket.bucket_start),
-      series: [
-        { key: 'created', label: t('dashboard.states.supportCreated'), color: '#6366f1', values: buckets.map((b) => b.created) },
-        { key: 'resolved', label: t('dashboard.states.supportResolved'), color: '#22c55e', values: buckets.map((b) => b.resolved) },
-      ],
-    };
-  });
+  const chartData = $derived(supportChartData(doc, t));
 
-  const slaLabel = $derived(
-    doc?.summary?.sla && doc.summary.sla.completed > 0
-      ? `${Math.round(doc.summary.sla.compliant_pct)}%`
-      : t('dashboard.states.supportSlaNone')
-  );
+  const slaLabel = $derived(supportSlaLabel(doc?.summary, t));
 
   $effect(() => {
     if (loadKey && loadKey !== lastLoadKey) {
@@ -56,12 +47,10 @@
     loading = true;
     errored = false;
     try {
-      const to = new Date();
-      const from = new Date(to);
-      from.setDate(from.getDate() - (windowDays - 1));
+      const { from, to } = supportDateRange(windowDays);
       const params = {
-        from: toISOStringDate(from),
-        to: toISOStringDate(to),
+        from,
+        to,
         bucket: 'day',
       };
       if (collectionId) {
@@ -115,10 +104,6 @@
     };
   });
 
-  function toISOStringDate(date) {
-    return date.toISOString().slice(0, 10);
-  }
-
   function exportCSV() {
     if (!doc) return;
     downloadSupportMetricsCSV(doc, `support-metrics-${toISOStringDate(new Date())}.csv`);
@@ -138,26 +123,15 @@
     </p>
   {:else if doc}
     <div class="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5" data-testid="support-metrics-summary">
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);" data-testid="support-metrics-backlog">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.backlog}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportBacklog')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.unassigned}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportUnassigned')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.created}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportCreated')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.resolved}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportResolved')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{slaLabel}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportSlaCompliance')}</div>
-      </div>
+      <SupportStatTile
+        label={t('dashboard.states.supportBacklog')}
+        value={doc.summary.backlog}
+        dataTestid="support-metrics-backlog"
+      />
+      <SupportStatTile label={t('dashboard.states.supportUnassigned')} value={doc.summary.unassigned} />
+      <SupportStatTile label={t('dashboard.states.supportCreated')} value={doc.summary.created} />
+      <SupportStatTile label={t('dashboard.states.supportResolved')} value={doc.summary.resolved} />
+      <SupportStatTile label={t('dashboard.states.supportSlaCompliance')} value={slaLabel} />
     </div>
 
     {#if chartData.categories.length > 0}

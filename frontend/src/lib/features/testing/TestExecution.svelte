@@ -23,6 +23,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import AlertBox from '../../components/AlertBox.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
+  import StatusButton from '../../components/StatusButton.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import CreateModal from '../../dialogs/CreateModal.svelte';
@@ -755,49 +756,49 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
               {#if canExecuteTests}
               <!-- Status Buttons -->
               <div class="flex gap-3 mb-4">
-                <button
+                <StatusButton
+                  status="passed"
+                  selected={stepResults[currentStep.id]?.status === 'passed'}
+                  dataTestid="test-execution-status-passed"
                   onclick={() => markStepStatus(currentStep.id, 'passed')}
-                  data-testid="test-execution-status-passed"
-                  class="status-btn flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
-                  data-status="passed"
-                  class:selected={stepResults[currentStep.id]?.status === 'passed'}
+                  class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
                 >
                   <IconCheck class="w-4 h-4" />
                   {t('testing.pass')}
-                </button>
+                </StatusButton>
 
-                <button
+                <StatusButton
+                  status="failed"
+                  selected={stepResults[currentStep.id]?.status === 'failed'}
+                  dataTestid="test-execution-status-failed"
                   onclick={() => markStepStatus(currentStep.id, 'failed')}
-                  data-testid="test-execution-status-failed"
-                  class="status-btn flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
-                  data-status="failed"
-                  class:selected={stepResults[currentStep.id]?.status === 'failed'}
+                  class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
                 >
                   <IconX class="w-4 h-4" />
                   {t('testing.fail')}
-                </button>
+                </StatusButton>
 
-                <button
+                <StatusButton
+                  status="blocked"
+                  selected={stepResults[currentStep.id]?.status === 'blocked'}
+                  dataTestid="test-execution-status-blocked"
                   onclick={() => markStepStatus(currentStep.id, 'blocked')}
-                  data-testid="test-execution-status-blocked"
-                  class="status-btn flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
-                  data-status="blocked"
-                  class:selected={stepResults[currentStep.id]?.status === 'blocked'}
+                  class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
                 >
                   <IconBug class="w-4 h-4" />
                   {t('testing.blocked')}
-                </button>
+                </StatusButton>
 
-                <button
+                <StatusButton
+                  status="skipped"
+                  selected={stepResults[currentStep.id]?.status === 'skipped'}
+                  dataTestid="test-execution-status-skipped"
                   onclick={() => markStepStatus(currentStep.id, 'skipped')}
-                  data-testid="test-execution-status-skipped"
-                  class="status-btn flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
-                  data-status="skipped"
-                  class:selected={stepResults[currentStep.id]?.status === 'skipped'}
+                  class="flex items-center gap-2 px-4 py-2 rounded transition cursor-pointer"
                 >
                   <IconPlayerSkipForward class="w-4 h-4" />
                   {t('testing.skip')}
-                </button>
+                </StatusButton>
               </div>
 
               <!-- Actual Result -->
@@ -1070,71 +1071,5 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
 
   .step-seg:hover:not(.current) {
     background-color: var(--ds-background-neutral-hovered);
-  }
-
-  /* Step status buttons: tint with the status background while unselected. */
-  .status-btn {
-    background-color: transparent;
-    border: 1px solid;
-  }
-
-  .status-btn[data-status='passed'] {
-    color: var(--ds-status-success-text);
-    border-color: var(--ds-status-success-border);
-  }
-
-  .status-btn[data-status='failed'] {
-    color: var(--ds-status-danger-text);
-    border-color: var(--ds-status-danger-border);
-  }
-
-  .status-btn[data-status='blocked'] {
-    color: var(--ds-status-warning-text);
-    border-color: var(--ds-status-warning-border);
-  }
-
-  .status-btn[data-status='skipped'] {
-    color: var(--ds-status-neutral-text);
-    border-color: var(--ds-status-neutral-border);
-  }
-
-  .status-btn.selected {
-    color: white;
-  }
-
-  .status-btn[data-status='passed'].selected {
-    background-color: var(--ds-status-success-solid);
-    border-color: var(--ds-status-success-solid);
-  }
-
-  .status-btn[data-status='failed'].selected {
-    background-color: var(--ds-status-danger-solid);
-    border-color: var(--ds-status-danger-solid);
-  }
-
-  .status-btn[data-status='blocked'].selected {
-    background-color: var(--ds-status-warning-solid);
-    border-color: var(--ds-status-warning-solid);
-  }
-
-  .status-btn[data-status='skipped'].selected {
-    background-color: var(--ds-status-neutral-solid);
-    border-color: var(--ds-status-neutral-solid);
-  }
-
-  .status-btn[data-status='passed']:hover:not(.selected) {
-    background-color: var(--ds-status-success-bg);
-  }
-
-  .status-btn[data-status='failed']:hover:not(.selected) {
-    background-color: var(--ds-status-danger-bg);
-  }
-
-  .status-btn[data-status='blocked']:hover:not(.selected) {
-    background-color: var(--ds-status-warning-bg);
-  }
-
-  .status-btn[data-status='skipped']:hover:not(.selected) {
-    background-color: var(--ds-status-neutral-bg);
   }
 </style>

@@ -3,7 +3,14 @@
 @import "@xterm/xterm/css/xterm.css";
 @import "./design-system/index.css";
 @source not "./design-system/viewer";
-@custom-variant dark (&:where([data-color-mode="dark"], [data-color-mode="dark"] *));
+@custom-variant dark (
+  &:where(
+    [data-color-mode="dark"],
+    [data-color-mode="dark"] *,
+    [data-ds-color-mode="dark"],
+    [data-ds-color-mode="dark"] *
+  )
+);
 
 @theme {
   /* text-* font sizes and their line-height companions are pinned unlayered in

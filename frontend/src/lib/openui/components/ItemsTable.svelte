@@ -1,9 +1,9 @@
 <script>
   import ItemKey from '../../components/ItemKey.svelte';
   import Link from '../../components/Link.svelte';
-  import { getSource, getWidgetDataContext } from '../context.js';
-  import { itemSpec, assetSpec, sourceKey, fieldValue, formatValue, parseColumns } from '../querySpec.js';
+  import { fieldValue, formatValue, parseColumns } from '../querySpec.js';
   import SourceBoundary from './SourceBoundary.svelte';
+  import { useChartSource } from './chartSource.svelte.js';
 
   /**
    * @type {{
@@ -18,30 +18,13 @@
    */
   let { props } = $props();
 
-  const context = getWidgetDataContext();
-  const entity = $derived(props.entity === 'asset' ? 'asset' : 'item');
-  const spec = $derived(
-    entity === 'asset'
-      ? assetSpec({
-          query: props.query,
-          sort: props.sort,
-          limit: props.limit,
-          assetSetId: context?.assetSetId,
-        })
-      : itemSpec({ query: props.query, sort: props.sort, limit: props.limit })
-  );
-  const source = $derived(getSource(sourceKey(spec)));
-
-  $effect(() => {
-    if (source) return;
-    context?.requestSource?.(spec, sourceKey(spec));
-  });
+  const chart = useChartSource(() => props);
   /**
    * Deep link to the row's item. Only items have one, and only when the server
    * sent the workspace; anything else stays plain text.
    */
   function itemHref(row) {
-    if (entity !== 'item') return null;
+    if (chart.entity !== 'item') return null;
     // Coerced, so only digits can ever reach the path.
     const id = Number(row?.id);
     const workspaceId = Number(row?.workspace_id);
@@ -51,17 +34,17 @@
   }
 
   function openRow(event, row) {
-    if (!context?.openItem) return;
+    if (!chart.context?.openItem) return;
     event?.preventDefault?.();
-    context.openItem(Number(row.id));
+    chart.context.openItem(Number(row.id));
   }
 
   const columns = $derived(
-    parseColumns(props.columns ?? (entity === 'asset' ? 'key,title,status,type' : 'key,title,status,assignee,due_date'))
+    parseColumns(props.columns ?? (chart.entity === 'asset' ? 'key,title,status,type' : 'key,title,status,assignee,due_date'))
   );
 </script>
 
-<SourceBoundary {source}>
+<SourceBoundary source={chart.source}>
   {#snippet ready(rows)}
     <div class="overflow-x-auto">
       <table class="w-full text-sm" data-testid="openui-items-table">

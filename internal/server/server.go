@@ -1037,6 +1037,9 @@ func (s *Server) initialize() error {
 		slog.Info("reconciled interrupted ticket imports", slog.Int("count", n))
 	}
 	s.emailScheduler = scheduler.NewEmailScheduler(s.db, emailCredManager, cfg.AttachmentPath)
+	s.emailScheduler.SetPollInterval(cfg.Email.PollInterval)
+	s.emailScheduler.SetBatchSize(cfg.Email.BatchSize)
+	s.emailScheduler.SetPollConcurrency(cfg.Email.PollConcurrency)
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
 

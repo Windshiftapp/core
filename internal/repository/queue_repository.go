@@ -26,12 +26,23 @@ const queueColumns = `id, workspace_id, collection_id, name, ql_query, filter_st
 	position, created_by, builtin_key, is_hidden, created_at, updated_at`
 
 // queueScopeClause builds the WHERE fragment for a queue scope. A nil
-// collectionID selects the workspace default view (collection_id IS NULL).
+// collectionID selects the workspace default view (collection_id IS NULL). A
+// collection scope is identified by collection_id alone so a collection that
+// spans multiple workspaces keeps one set of views.
 func queueScopeClause(workspaceID int, collectionID *int) (where string, args []any) {
 	if collectionID == nil {
 		return "workspace_id = ? AND collection_id IS NULL", []any{workspaceID}
 	}
-	return "workspace_id = ? AND collection_id = ?", []any{workspaceID, *collectionID}
+	return "collection_id = ?", []any{*collectionID}
+}
+
+// nullableWorkspaceID maps the zero value to SQL NULL so a collection scope
+// with no single workspace stores no workspace reference.
+func nullableWorkspaceID(id int) any {
+	if id <= 0 {
+		return nil
+	}
+	return id
 }
 
 // ListByScope returns every queue row in the scope ordered by position, id.
@@ -43,7 +54,7 @@ func (r *QueueRepository) ListByScope(workspaceID int, collectionID *int) ([]mod
 		"SELECT "+queueColumns+" FROM queues WHERE "+where+" ORDER BY position, id", args...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list queues for workspace %d: %w", workspaceID, err)
+		return nil, fmt.Errorf("list queues: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	return scanQueues(rows)
@@ -63,17 +74,20 @@ func (r *QueueRepository) GetByBuiltinKey(workspaceID int, collectionID *int, bu
 
 func (r *QueueRepository) getQueue(where string, args ...any) (*models.Queue, error) {
 	var q models.Queue
-	var collectionID, createdBy sql.NullInt64
+	var workspaceID, collectionID, createdBy sql.NullInt64
 	var filterState, builtinKey sql.NullString
 	err := r.db.QueryRow(
 		"SELECT "+queueColumns+" FROM queues WHERE "+where, args...,
-	).Scan(&q.ID, &q.WorkspaceID, &collectionID, &q.Name, &q.QLQuery, &filterState,
+	).Scan(&q.ID, &workspaceID, &collectionID, &q.Name, &q.QLQuery, &filterState,
 		&q.Position, &createdBy, &builtinKey, &q.IsHidden, &q.CreatedAt, &q.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get queue: %w", err)
+	}
+	if workspaceID.Valid {
+		q.WorkspaceID = int(workspaceID.Int64)
 	}
 	applyQueueNullables(&q, collectionID, createdBy, filterState, builtinKey)
 	return &q, nil
@@ -109,7 +123,7 @@ func (r *QueueRepository) Create(q *models.Queue) (*models.Queue, error) {
 			INSERT INTO queues
 				(workspace_id, collection_id, name, ql_query, filter_state, position, created_by, builtin_key, is_hidden, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-		`, q.WorkspaceID, q.CollectionID, q.Name, q.QLQuery, q.FilterState, q.Position,
+		`, nullableWorkspaceID(q.WorkspaceID), q.CollectionID, q.Name, q.QLQuery, q.FilterState, q.Position,
 			q.CreatedBy, q.BuiltinKey, q.IsHidden, now, now).Scan(&id)
 	})
 	if err != nil {
@@ -123,10 +137,22 @@ func (r *QueueRepository) Create(q *models.Queue) (*models.Queue, error) {
 }
 
 // lockQueueCollectionScope serializes queue writes with collection scope
-// changes. A stale workspace is rejected after any in-flight move commits.
+// changes. A stale workspace is rejected after any in-flight move commits; a
+// collection with no single workspace locks by id alone.
 func lockQueueCollectionScope(tx database.Tx, workspaceID int, collectionID *int) error {
 	if collectionID == nil {
 		return nil
+	}
+	if workspaceID <= 0 {
+		var currentID int
+		err := tx.QueryRow(`
+			UPDATE collections SET updated_at = updated_at
+			WHERE id = ? RETURNING id
+		`, *collectionID).Scan(&currentID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
 	}
 	var currentWorkspace int
 	err := tx.QueryRow(`
@@ -172,7 +198,7 @@ func (r *QueueRepository) SetBuiltinHidden(q *models.Queue, hidden bool) error {
 			INSERT INTO queues
 				(workspace_id, collection_id, name, ql_query, position, created_by, builtin_key, is_hidden, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, q.WorkspaceID, q.CollectionID, q.Name, q.QLQuery, q.Position, q.CreatedBy, q.BuiltinKey, true)
+		`, nullableWorkspaceID(q.WorkspaceID), q.CollectionID, q.Name, q.QLQuery, q.Position, q.CreatedBy, q.BuiltinKey, true)
 		if database.IsUniqueConstraintError(err) {
 			return ErrDuplicateEntry
 		}
@@ -235,11 +261,14 @@ func scanQueues(rows *sql.Rows) ([]models.Queue, error) {
 	result := []models.Queue{}
 	for rows.Next() {
 		var q models.Queue
-		var collectionID, createdBy sql.NullInt64
+		var workspaceID, collectionID, createdBy sql.NullInt64
 		var filterState, builtinKey sql.NullString
-		if err := rows.Scan(&q.ID, &q.WorkspaceID, &collectionID, &q.Name, &q.QLQuery, &filterState,
+		if err := rows.Scan(&q.ID, &workspaceID, &collectionID, &q.Name, &q.QLQuery, &filterState,
 			&q.Position, &createdBy, &builtinKey, &q.IsHidden, &q.CreatedAt, &q.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan queue: %w", err)
+		}
+		if workspaceID.Valid {
+			q.WorkspaceID = int(workspaceID.Int64)
 		}
 		applyQueueNullables(&q, collectionID, createdBy, filterState, builtinKey)
 		result = append(result, q)

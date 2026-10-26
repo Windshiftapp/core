@@ -358,9 +358,6 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 		}
 	}
 	if err := s.repository.Update(id, collection); err != nil {
-		if errors.Is(err, repository.ErrCollectionQueuesRequireWorkspace) {
-			return nil, collectionValidation("remove collection queues before clearing its workspace")
-		}
 		if database.IsUniqueConstraintError(err) {
 			return nil, ErrCollectionConflict
 		}
@@ -895,7 +892,13 @@ func normalizeStoredViewSettings(settings *models.ViewSettings) {
 // are limited to the collection-scoped views because tools and
 // test-management entries only render in the workspace default context.
 func validateViewSettings(settings *models.ViewSettings, collectionScope bool) error {
-	if settings == nil || settings.EnabledViews == nil {
+	if settings == nil {
+		return nil
+	}
+	if settings.CompletedVisibility != nil && !models.IsCompletedVisibility(*settings.CompletedVisibility) {
+		return collectionValidation(fmt.Sprintf("unknown completed_visibility %q", *settings.CompletedVisibility))
+	}
+	if settings.EnabledViews == nil {
 		return nil
 	}
 	views := *settings.EnabledViews
@@ -961,6 +964,9 @@ func mergeViewSettings(current, update *models.ViewSettings) *models.ViewSetting
 	if update.MilestoneSwimlanes != nil {
 		merged.MilestoneSwimlanes = update.MilestoneSwimlanes
 	}
+	if update.CompletedVisibility != nil {
+		merged.CompletedVisibility = update.CompletedVisibility
+	}
 	return &merged
 }
 
@@ -1002,8 +1008,22 @@ func (s *CollectionApplicationService) applyEffectiveViewSettings(config *models
 	if resolvedMilestones == nil && wsErr == nil && wsConfig.ViewSettings != nil {
 		resolvedMilestones = wsConfig.ViewSettings.MilestoneSwimlanes
 	}
+	// Completed-work visibility shares the board-options JSON and inherits the
+	// workspace default the same way milestone lanes do.
+	var ownCompletedVisibility *string
+	if config.ViewSettings != nil {
+		ownCompletedVisibility = config.ViewSettings.CompletedVisibility
+	}
+	resolvedCompletedVisibility := ownCompletedVisibility
+	if resolvedCompletedVisibility == nil && wsErr == nil && wsConfig.ViewSettings != nil {
+		resolvedCompletedVisibility = wsConfig.ViewSettings.CompletedVisibility
+	}
 	settingsWith := func(views *[]string) *models.ViewSettings {
-		return &models.ViewSettings{EnabledViews: views, MilestoneSwimlanes: resolvedMilestones}
+		return &models.ViewSettings{
+			EnabledViews:        views,
+			MilestoneSwimlanes:  resolvedMilestones,
+			CompletedVisibility: resolvedCompletedVisibility,
+		}
 	}
 	allViews := func() *models.ViewSettings {
 		views := slices.Clone(models.BoardViewIDs)
@@ -1022,6 +1042,7 @@ func (s *CollectionApplicationService) applyEffectiveViewSettings(config *models
 	}
 	if config.ViewSettings.HasEnabledViewsOverride() {
 		config.ViewSettings.MilestoneSwimlanes = resolvedMilestones
+		config.ViewSettings.CompletedVisibility = resolvedCompletedVisibility
 		return nil
 	}
 	config.ViewSettingsInherited = true

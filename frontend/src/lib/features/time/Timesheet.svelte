@@ -14,6 +14,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { customerDisplayName, customerOrganisationName } from '../../utils/customerLabel.js';
   import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
+  import { formatDurationMinutes } from '../../utils/timeUtils.js';
   import { serverNow } from '../../utils/serverClock.js';
   import { authStore } from '../../stores/auth.svelte.js';
   import {
@@ -271,12 +272,7 @@
   }
 
   function formatDuration(minutes) {
-    if (!minutes) return '';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
+    return minutes ? formatDurationMinutes(minutes) : '';
   }
 
   // Navigation

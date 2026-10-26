@@ -18,6 +18,7 @@
   import Input from '../../components/Input.svelte';
   import DocumentUpload from './DocumentUpload.svelte';
   import { computeDocumentHealth } from './healthScore.js';
+  import { getDocumentStatusColor } from '../../utils/statusMaps.js';
   import Plus from '@tabler/icons-svelte-runes/icons/plus';
   import Upload from '@tabler/icons-svelte-runes/icons/upload';
   import FileText from '@tabler/icons-svelte-runes/icons/file-text';
@@ -155,16 +156,6 @@
       case 'knowledge': return 'blue';
       case 'record': return 'grey';
       case 'correspondence': return 'purple';
-      default: return 'grey';
-    }
-  }
-
-  function getStatusColor(status) {
-    switch (status) {
-      case 'pending': return 'grey';
-      case 'processing': return 'blue';
-      case 'ready': return 'green';
-      case 'error': return 'red';
       default: return 'grey';
     }
   }
@@ -357,7 +348,7 @@
             </div>
 
             <div class="flex items-center justify-between">
-              <Lozenge color={getStatusColor(doc.status)} text={t(`logbook.status.${doc.status}`)} />
+              <Lozenge color={getDocumentStatusColor(doc.status)} text={t(`logbook.status.${doc.status}`)} />
               <span class="text-xs" style="color: var(--ds-text-subtlest);">
                 {formatDateShort(doc.created_at)}
               </span>

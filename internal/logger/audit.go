@@ -608,6 +608,7 @@ const (
 	ActionJiraDisconnect       = "jira.disconnect"
 	ActionJiraImport           = "jira.import"
 	ActionJiraImportDeleteData = "jira.import.delete_data"
+	ActionJiraImportHide       = "jira.import.hide"
 
 	// Iteration management
 	ActionIterationCreate = "iteration.create"

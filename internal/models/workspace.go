@@ -371,6 +371,20 @@ type ViewSettings struct {
 	// the same board-options JSON. It is independent of the enabled-views
 	// override/inherit state.
 	MilestoneSwimlanes *MilestoneSwimlaneConfig `json:"milestone_swimlanes,omitempty"`
+	// CompletedVisibility selects how much completed work a board fetches:
+	// "all", "last_day", "last_week", "current_iteration", or "none". nil
+	// inherits; an explicit empty string keeps the legacy
+	// show_rightmost_column_last_50 / completed_item_retention_days behavior.
+	CompletedVisibility *string `json:"completed_visibility,omitempty"`
+}
+
+// CompletedVisibilityValues are the accepted completed-work presets. The empty
+// string is the legacy behavior and is only valid as an explicit reset.
+var CompletedVisibilityValues = []string{"", "all", "last_day", "last_week", "current_iteration", "none"}
+
+// IsCompletedVisibility reports whether value is an accepted preset.
+func IsCompletedVisibility(value string) bool {
+	return slices.Contains(CompletedVisibilityValues, value)
 }
 
 // UnmarshalJSON rejects unknown keys and distinguishes an omitted
@@ -383,7 +397,7 @@ func (v *ViewSettings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for key := range fields {
-		if key != "enabled_views" && key != "milestone_swimlanes" {
+		if key != "enabled_views" && key != "milestone_swimlanes" && key != "completed_visibility" {
 			return fmt.Errorf("view_settings: unknown key %q", key)
 		}
 	}
@@ -404,6 +418,16 @@ func (v *ViewSettings) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		v.MilestoneSwimlanes = &milestoneSwimlanes
+	}
+	v.CompletedVisibility = nil
+	if raw, ok := fields["completed_visibility"]; ok {
+		visibility := ""
+		if string(raw) != "null" {
+			if err := json.Unmarshal(raw, &visibility); err != nil {
+				return err
+			}
+		}
+		v.CompletedVisibility = &visibility
 	}
 	return nil
 }
@@ -430,6 +454,13 @@ func (v ViewSettings) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		fields["milestone_swimlanes"] = encoded
+	}
+	if v.CompletedVisibility != nil {
+		encoded, err := json.Marshal(*v.CompletedVisibility)
+		if err != nil {
+			return nil, err
+		}
+		fields["completed_visibility"] = encoded
 	}
 	return json.Marshal(fields)
 }

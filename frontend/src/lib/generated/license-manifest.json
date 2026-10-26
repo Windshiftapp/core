@@ -8392,7 +8392,7 @@
       "ecosystem": "npm",
       "project": "App frontend",
       "name": "dompurify",
-      "version": "3.4.16",
+      "version": "3.4.17",
       "license": "(MPL-2.0 OR Apache-2.0)",
       "scope": "runtime",
       "licenseFile": "frontend/node_modules/dompurify/LICENSE, frontend/node_modules/dompurify/LICENSE-MPL",

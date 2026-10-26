@@ -224,6 +224,55 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 	return &u, nil
 }
 
+// ListByIDs returns the users matching ids in one bounded IN query. Callers
+// that need request-order results reorder after scanning.
+func (r *UserRepository) ListByIDs(ctx context.Context, ids []int) ([]models.User, error) {
+	if len(ids) == 0 {
+		return []models.User{}, nil
+	}
+	placeholders, args := inPlaceholders(ids)
+	//nolint:gosec // G201: placeholders is a fixed "?," pattern, never user input
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at, updated_at
+		FROM users WHERE id IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list users by id: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	users := make([]models.User, 0, len(ids))
+	for rows.Next() {
+		var u models.User
+		var avatarURL, timezone, language sql.NullString
+		var requiresPasswordReset sql.NullBool
+		var agentOwnerUserID sql.NullInt64
+		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName,
+			&u.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &u.IsAgent, &agentOwnerUserID, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan user by id: %w", err)
+		}
+		u.AvatarURL = avatarURL.String
+		u.RequiresPasswordReset = requiresPasswordReset.Bool
+		u.Timezone = "UTC"
+		if timezone.Valid {
+			u.Timezone = timezone.String
+		}
+		u.Language = "en"
+		if language.Valid {
+			u.Language = language.String
+		}
+		if agentOwnerUserID.Valid {
+			ownerID := int(agentOwnerUserID.Int64)
+			u.AgentOwnerUserID = &ownerID
+		}
+		u.FullName = strings.TrimSpace(u.FirstName + " " + u.LastName)
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users by id: %w", err)
+	}
+	return users, nil
+}
+
 // AgentOwnerInfo carries just the fields the UI needs to attribute an agent
 // row to its owner. Only populated for users where is_agent = TRUE and
 // agent_owner_user_id is non-NULL.

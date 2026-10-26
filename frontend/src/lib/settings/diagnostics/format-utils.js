@@ -62,6 +62,38 @@ export function successSummary(row) {
   return `${successes}${rate != null ? ` (${rate}%)` : ''}`;
 }
 
+/**
+ * Aggregate the per-row diagnostics stats into the headline tile totals.
+ * `avgField` selects the row field to weight-average (`avg_duration_ms` for
+ * scheduler runs, `avg_latency_ms` for webhook deliveries).
+ *
+ * @param {Array<any>} stats
+ * @param {string} avgField
+ */
+export function diagnosticsTotals(stats, avgField) {
+  let total = 0;
+  let success = 0;
+  let failed = 0;
+  let weighted = 0;
+  let count = 0;
+  for (const s of stats) {
+    total += s.total ?? 0;
+    success += s.successes ?? 0;
+    failed += s.failures ?? 0;
+    if (s[avgField] != null && s.total) {
+      weighted += s[avgField] * s.total;
+      count += s.total;
+    }
+  }
+  return {
+    total,
+    success,
+    failed,
+    successRate: total > 0 ? Math.round((success / total) * 100) : null,
+    avg: count > 0 ? Math.round(weighted / count) : null,
+  };
+}
+
 export async function runDiagnosticsPurge({
   olderThan,
   confirmMessage,

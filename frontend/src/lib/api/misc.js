@@ -331,6 +331,11 @@ export const jiraImport = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  // Clear an import from the history without deleting its data
+  hideImportJob: (jobId) =>
+    fetchAPI(`/admin/jira-import/jobs/${jobId}`, {
+      method: 'DELETE',
+    }),
   // Delete all data mapped to an import job after explicit confirmation
   deleteImportedData: (jobId, confirmation) =>
     fetchAPI(`/admin/jira-import/jobs/${jobId}/data`, {

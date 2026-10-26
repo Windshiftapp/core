@@ -112,6 +112,13 @@ type UserPreferencesData struct {
 	ThemeID         *int                 `json:"theme_id,omitempty"`
 	DashboardLayout *UserDashboardLayout `json:"dashboard_layout,omitempty"`
 	TUI             *UserTUIPreferences  `json:"tui,omitempty"`
+	// ViewState holds per-user collection view configuration keyed by scope id
+	// ("collection-<id>" or "workspace-<id>") and then view id. The values are
+	// opaque client-owned JSON. Keeping it here instead of localStorage makes
+	// the setting follow the user across devices.
+	ViewState map[string]map[string]any `json:"view_state,omitempty"`
+	// SavedFilters holds the user's personal named filters keyed by scope id.
+	SavedFilters map[string]any `json:"saved_filters,omitempty"`
 }
 
 // UserTUIPreferences is the SSH TUI's persisted state sub-document. Pointer

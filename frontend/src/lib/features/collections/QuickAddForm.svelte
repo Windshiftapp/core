@@ -24,6 +24,7 @@
     parentId,
     formState,
     workspaces = [],
+    directoryLoading = false,
     compact = false,
     cardBgStyle = '',
     onUpdateField = () => {},
@@ -33,6 +34,9 @@
 
   let selectedWorkspace = $derived(workspaces.find(w => w.id === formState.workspaceId));
   let selectedItemType = $derived(formState.availableTypes?.find(it => it.id === formState.itemTypeId));
+  // While the directory settles there is no workspace list to choose from, so
+  // the selector reads as loading instead of an empty menu.
+  let workspacesPending = $derived(directoryLoading && workspaces.length === 0);
 
   // Dropdown management. Both menus are portalled to <body> and positioned
   // against their trigger: the board clips swimlanes with overflow-hidden, so
@@ -181,9 +185,12 @@
         onclick={toggleWorkspaceDropdown}
         class={compact ? '!size-7 !p-0' : '!size-6 !p-0 !rounded-[3px]'}
         dataTestid="quick-add-workspace"
-        title={selectedWorkspace?.name || 'Select workspace'}
+        disabled={workspacesPending}
+        title={workspacesPending ? t('common.loading') : (selectedWorkspace?.name || 'Select workspace')}
       >
-        {#if selectedWorkspace?.avatar_url}
+        {#if workspacesPending}
+          <LoaderCircle class="{compact ? 'w-4 h-4' : 'w-3.5 h-3.5'} animate-spin" />
+        {:else if selectedWorkspace?.avatar_url}
           <img
             src={selectedWorkspace.avatar_url}
             alt="{selectedWorkspace.name} avatar"
@@ -200,7 +207,7 @@
         {/if}
       </Button>
 
-      {#if showWorkspaceDropdown}
+      {#if showWorkspaceDropdown && !workspacesPending}
         <div
           use:portal
           data-quick-add-menu
@@ -371,7 +378,7 @@
         class="!size-7 !p-0"
         dataTestid="quick-add-create"
         title={t('common.create')}
-        disabled={formState.loadingTypes || !formState.itemTypeId}
+        disabled={formState.loadingTypes || !formState.itemTypeId || (workspacesPending && !formState.workspaceId)}
       />
     {:else}
       <Button
@@ -381,7 +388,7 @@
         onclick={() => onCreate(parentId)}
         class="!h-6 !px-1 !text-xs !gap-1"
         dataTestid="quick-add-create"
-        disabled={formState.loadingTypes || !formState.itemTypeId}
+        disabled={formState.loadingTypes || !formState.itemTypeId || (workspacesPending && !formState.workspaceId)}
       >
         {t('common.create')}
       </Button>

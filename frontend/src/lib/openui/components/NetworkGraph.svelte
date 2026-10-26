@@ -2,6 +2,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import SourceBoundary from './SourceBoundary.svelte';
   import { useGraphSource } from './graphSource.svelte.js';
+  import { prepareCanvas, splitGraphNodes } from './graphCanvas.js';
 
   /**
    * Bipartite layout: items in one column, assets in another, links as lines.
@@ -20,37 +21,27 @@
 
   const { source, graph } = useGraphSource(() => props);
 
-  const RENDERED_NODES_DEFAULT = 200;
   const COLUMN_WIDTH = 220;
   const ROW_HEIGHT = 18;
 
   let canvas = $state(null);
   let canvasUnavailable = $state(false);
 
-  const items = $derived(graph.nodes.filter((node) => node.type === 'item'));
-  const assets = $derived(graph.nodes.filter((node) => node.type === 'asset'));
-  const renderedLimit = $derived(Math.max(20, Number(props.rendered_nodes) || RENDERED_NODES_DEFAULT));
-  const renderedItems = $derived(items.slice(0, renderedLimit));
-  const renderedAssets = $derived(assets.slice(0, renderedLimit));
-  const rendered = $derived(renderedItems.length < items.length || renderedAssets.length < assets.length);
+  const { items, assets, renderedItems, renderedAssets, rendered } = $derived(
+    splitGraphNodes(graph, props.rendered_nodes, { minRendered: 20 })
+  );
 
   const height = $derived(Math.max(120, Math.max(renderedItems.length, renderedAssets.length) * ROW_HEIGHT + 24));
 
   function draw() {
-    if (!canvas) return;
-    const context = canvas.getContext?.('2d');
-    if (!context) {
+    const width = canvas?.clientWidth || 400;
+    const context = prepareCanvas(canvas, width, height);
+    if (context === undefined) return;
+    if (context === null) {
       canvasUnavailable = true;
       return;
     }
     canvasUnavailable = false;
-
-    const ratio = window.devicePixelRatio || 1;
-    const width = canvas.clientWidth || 400;
-    canvas.width = width * ratio;
-    canvas.height = height * ratio;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, width, height);
 
     const itemIndex = new Map(renderedItems.map((node, index) => [node.id, index]));
     const assetIndex = new Map(renderedAssets.map((node, index) => [node.id, index]));

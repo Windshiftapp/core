@@ -69,6 +69,7 @@ Examples:
 
 func runGlobalInit() error {
 	reader := bufio.NewReader(stdin)
+	emitConfigWarnings()
 
 	// Short-circuit when there's already a working global token and the
 	// user didn't ask for a refresh.
@@ -138,6 +139,7 @@ func runGlobalInit() error {
 
 func runProjectInit() error {
 	reader := bufio.NewReader(stdin)
+	emitConfigWarnings()
 
 	// --new-agent mints a project-specific agent + token before workspace
 	// discovery. Token is written into ws.toml and overrides the global

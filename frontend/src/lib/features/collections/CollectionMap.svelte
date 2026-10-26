@@ -10,6 +10,7 @@
     scheduleCollectionReconciliation,
   } from '../../stores/collectionContext.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { capabilitiesStore } from '../../stores/capabilities.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
@@ -59,6 +60,7 @@
   let statuses = $derived(workspaceDataStore.statuses);
   let statusCategories = $derived(workspaceDataStore.statusCategories);
   let workspaces = $derived($workspacesStore.regularWorkspaces || []);
+  let directoryReady = $derived($workspacesStore.loaded);
   let currentParentId = $state(null); // null = root level, otherwise parent ID for current backbone
   let hierarchyBreadcrumbs = $state([]); // Navigation breadcrumbs for hierarchy levels
 
@@ -87,6 +89,16 @@
   }
 
   function loadSwimlanePreference() {
+    const stored = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'map',
+      'swimlane_dimension'
+    );
+    if (stored !== undefined) {
+      if (stored && SWIMLANE_DIMENSIONS.includes(stored)) swimlaneDimension = stored;
+      return;
+    }
     const saved = localStorage.getItem(mapSwimlaneStorageKey(mapPreferenceScope()));
     if (saved && SWIMLANE_DIMENSIONS.includes(saved)) {
       swimlaneDimension = saved;
@@ -96,12 +108,9 @@
   function setSwimlaneDimension(value) {
     swimlaneDimension = SWIMLANE_DIMENSIONS.includes(value) ? value : null;
     swimlaneCollapsed = {};
-    const storageKey = mapSwimlaneStorageKey(mapPreferenceScope());
-    if (swimlaneDimension) {
-      localStorage.setItem(storageKey, swimlaneDimension);
-    } else {
-      localStorage.removeItem(storageKey);
-    }
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'map', {
+      swimlane_dimension: swimlaneDimension,
+    });
   }
 
   function toggleSwimlaneCollapsed(laneKey) {
@@ -207,11 +216,13 @@
 
   async function loadAllData() {
     loading = true;
+    // The directory only feeds quick-add workspace choices, so it warms
+    // independently instead of gating the map paint.
+    void workspacesStore.load();
     await Promise.all([
       workspaceId
         ? workspaceDataStore.initialize(workspaceId)
         : workspaceDataStore.initializeGlobal(),
-      workspacesStore.load(),
     ]);
     loadStoryMapDataFromURL();
     loadSwimlanePreference();
@@ -741,7 +752,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mt-4">
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} {collectionId} />
       </div>
 
       <!-- Hierarchy Breadcrumbs -->
@@ -978,6 +989,7 @@
                   parentId={quickAddKey(parentId, laneKey)}
                   formState={quickAddState[quickAddKey(parentId, laneKey)]}
                   {workspaces}
+                  directoryLoading={!directoryReady}
                   compact={true}
                   cardBgStyle={styles.cardStyle(8)}
                   onUpdateField={updateQuickAddField}

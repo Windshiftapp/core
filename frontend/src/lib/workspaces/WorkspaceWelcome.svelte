@@ -26,7 +26,7 @@
   import { createId } from '../utils/uuid.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
   import {
     WORKSPACE_WIDGET_GRID_COLUMNS,
     clampWidgetWidth,
@@ -89,7 +89,6 @@
   let isEditMode = $state(false);
   let isCustomizeMode = $state(false);
   let customizationCategory = $state('built-in');
-  let setupCleanups = [];
   let savePending = $state(false);
   let savedWidgetWidths = new Map();
 
@@ -179,14 +178,33 @@
   });
 
   // Setup drag and drop when in customize mode
+  const dnd = createDashboardWidgetDrag({
+    widgetCardSelector: '[data-widget-card]',
+    dropZoneSelector: '[data-section-drop-zone]',
+    dragType: 'widget-type',
+    setDraggedWidget: (value) => {
+      draggedWidget = value;
+    },
+    setDropZoneState: (sectionId, state) => {
+      dropZoneStates.set(sectionId, state);
+      dropZoneStates = new Map(dropZoneStates);
+    },
+    resetDropZones: () => {
+      dropZoneStates = new Map();
+    },
+    onDropWidget: (sectionId, widgetType) => {
+      addWidgetToSection(sectionId, widgetType);
+    },
+  });
+
   let dragSetupKey = $derived(isCustomizeMode ? customizationCategory : null);
   $effect(() => {
     if (dragSetupKey === null) {
-      cleanupDragAndDrop();
+      dnd.cleanup();
       return;
     }
-    const id = setTimeout(() => setupDragAndDrop(), 350);
-    return () => clearTimeout(id);
+    dnd.schedule();
+    return () => dnd.cleanup();
   });
 
   async function loadData() {
@@ -581,73 +599,8 @@
     debouncedSave();
   }
 
-  // Drag and drop setup
-  function setupDragAndDrop() {
-    cleanupDragAndDrop();
-
-    // Setup draggable widget cards in sidebar
-    const widgetCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-widget-card]'));
-    widgetCards.forEach(cardElement => {
-      const cleanup = draggable({
-        element: cardElement,
-        getInitialData: () => ({
-          type: 'widget-type',
-          widgetType: cardElement.dataset.widgetType
-        }),
-        onDragStart: () => {
-          const currentType = cardElement.dataset.widgetType;
-          draggedWidget = currentType ? { type: currentType } : null;
-          cardElement.style.opacity = '0.5';
-        },
-        onDrop: () => {
-          draggedWidget = null;
-          cardElement.style.opacity = '';
-          dropZoneStates = new Map();
-        }
-      });
-      setupCleanups.push(cleanup);
-    });
-
-    // Setup drop zones for sections
-    const sectionDropZones = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-section-drop-zone]'));
-    sectionDropZones.forEach(element => {
-      const sectionId = element.dataset.sectionId;
-
-      dropZoneStates.set(sectionId, { isOver: false });
-
-      const cleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => source.data.type === 'widget-type',
-        onDragEnter: () => {
-          dropZoneStates.set(sectionId, { isOver: true });
-          dropZoneStates = new Map(dropZoneStates);
-        },
-        onDragLeave: () => {
-          dropZoneStates.set(sectionId, { isOver: false });
-          dropZoneStates = new Map(dropZoneStates);
-        },
-        onDrop: ({ source }) => {
-          dropZoneStates.set(sectionId, { isOver: false });
-          dropZoneStates = new Map(dropZoneStates);
-
-          const data = source.data;
-          if (data.type === 'widget-type') {
-            addWidgetToSection(sectionId, data.widgetType);
-          }
-        }
-      });
-
-      setupCleanups.push(cleanup);
-    });
-  }
-
-  function cleanupDragAndDrop() {
-    setupCleanups.forEach(cleanup => cleanup());
-    setupCleanups = [];
-  }
-
   onDestroy(() => {
-    cleanupDragAndDrop();
+    dnd.cleanup();
     debouncedSave.cancel();
   });
 

@@ -2965,6 +2965,14 @@ var Catalog = []Migration{
 		Postgres:      `ALTER TABLE jira_import_connections ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
 	},
 	{
+		Version:       "20261109_jira_import_job_hidden_at",
+		Name:          "Let operators clear a Jira import from the history without deleting data",
+		CheckSQLite:   sqliteColumnCheck("jira_import_jobs", "hidden_at"),
+		CheckPostgres: pgColumnCheck("jira_import_jobs", "hidden_at"),
+		SQLite:        `ALTER TABLE jira_import_jobs ADD COLUMN hidden_at DATETIME;`,
+		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;`,
+	},
+	{
 		Version:       "20261109_milestone_comments",
 		Name:          "Markdown comments on milestones",
 		CheckSQLite:   sqliteTableCheck("milestone_comments"),
@@ -3047,6 +3055,30 @@ var Catalog = []Migration{
 		CheckPostgres: pgColumnCheck("milestones", "last_activity_at"),
 		SQLite:        `ALTER TABLE milestones ADD COLUMN last_activity_at DATETIME;`,
 		Postgres:      `ALTER TABLE milestones ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;`,
+	},
+	{
+		Version:       "20261110_intake_import_existing_mail",
+		Name:          "Let a new email intake start from new mail instead of importing the mailbox history (WI-1775)",
+		CheckSQLite:   sqliteColumnCheck("intakes", "import_existing_mail"),
+		CheckPostgres: pgColumnCheck("intakes", "import_existing_mail"),
+		SQLite:        `ALTER TABLE intakes ADD COLUMN import_existing_mail BOOLEAN NOT NULL DEFAULT false`,
+		Postgres:      `ALTER TABLE intakes ADD COLUMN IF NOT EXISTS import_existing_mail BOOLEAN NOT NULL DEFAULT false`,
+	},
+	{
+		Version:       "20261111_queues_collection_scope",
+		Name:          "Scope saved collection views by collection instead of workspace (WI-1870)",
+		CheckSQLite:   sqliteIndexCheck("idx_queues_collection_scope"),
+		CheckPostgres: pgIndexCheck("idx_queues_collection_scope"),
+		// A collection scope is identified by collection_id alone; workspace_id
+		// is NULL for a collection that spans multiple workspaces. SQLite cannot
+		// drop NOT NULL in place, so ApplySQLite rebuilds the table. The SQLite
+		// body must stay non-empty or the runner would stamp without applying.
+		SQLite: "queues collection scope rebuild (applySQLiteQueuesCollectionScope)",
+		Postgres: `
+			ALTER TABLE queues ALTER COLUMN workspace_id DROP NOT NULL;
+			CREATE INDEX IF NOT EXISTS idx_queues_collection_scope ON queues(collection_id, position);
+		`,
+		ApplySQLite: applySQLiteQueuesCollectionScope,
 	},
 }
 
@@ -4670,4 +4702,83 @@ func stampMigration(db Database, m Migration, driver string) error {
 		m.Version, m.Name, m.checksum(driver),
 	)
 	return err
+}
+
+// applySQLiteQueuesCollectionScope rebuilds queues with a nullable
+// workspace_id so a collection that spans multiple workspaces can own saved
+// views, and adds the collection-scope index. A collection scope is keyed by
+// collection_id alone; workspace_id only identifies the workspace default
+// view. SQLite cannot drop a NOT NULL constraint in place, so the rows are
+// copied into a fresh table and swapped.
+func applySQLiteQueuesCollectionScope(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin queues scope rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE queues_scope_rebuild (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			workspace_id INTEGER,
+			collection_id INTEGER,
+			name TEXT NOT NULL,
+			ql_query TEXT NOT NULL,
+			filter_state TEXT,
+			position INTEGER NOT NULL DEFAULT 0,
+			created_by INTEGER,
+			builtin_key TEXT,
+			is_hidden BOOLEAN NOT NULL DEFAULT false,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+			FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+		)`,
+		`INSERT INTO queues_scope_rebuild (id, workspace_id, collection_id, name, ql_query, filter_state, position, created_by, builtin_key, is_hidden, created_at, updated_at)
+			SELECT id, workspace_id, collection_id, name, ql_query, filter_state, position, created_by, builtin_key, is_hidden, created_at, updated_at FROM queues`,
+		`DROP TABLE queues`,
+		`ALTER TABLE queues_scope_rebuild RENAME TO queues`,
+		`CREATE INDEX IF NOT EXISTS idx_queues_workspace_scope ON queues(workspace_id, collection_id, position)`,
+		`CREATE INDEX IF NOT EXISTS idx_queues_collection_scope ON queues(collection_id, position)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_queues_ws_builtin ON queues(workspace_id, builtin_key) WHERE collection_id IS NULL AND builtin_key IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_queues_coll_builtin ON queues(collection_id, builtin_key) WHERE collection_id IS NOT NULL AND builtin_key IS NOT NULL`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild queues for collection scope: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit queues scope rebuild: %w", err)
+	}
+	return nil
 }

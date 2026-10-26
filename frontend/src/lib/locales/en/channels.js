@@ -288,6 +288,9 @@ export default {
     intakeSendConfirmation: 'Send a submission receipt',
     intakeSendConfirmationHint:
       'Email the sender a confirmation that their request was received. The receipt includes a portal link when this intake is linked to a portal.',
+    intakeImportExistingMail: 'Import existing mail',
+    intakeImportExistingMailHint:
+      'When this intake polls for the first time, import messages already in the mailbox instead of starting with new mail. Leave off to avoid turning the mailbox history into tickets.',
     intakeConfirmationOn: 'Receipt on',
     intakeSaved: 'Intake saved',
     intakeSaveFailed: 'Failed to save intake',

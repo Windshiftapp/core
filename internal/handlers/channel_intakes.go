@@ -22,6 +22,7 @@ type intakeRequest struct {
 	RateLimitPerHour      *int   `json:"rate_limit_per_hour"`
 	ProcessingDisposition string `json:"processing_disposition"`
 	SendConfirmation      bool   `json:"send_confirmation"`
+	ImportExistingMail    bool   `json:"import_existing_mail"`
 	Status                string `json:"status"`
 }
 
@@ -176,6 +177,7 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 		RateLimitPerHour:      req.RateLimitPerHour,
 		ProcessingDisposition: req.ProcessingDisposition,
 		SendConfirmation:      req.SendConfirmation,
+		ImportExistingMail:    req.ImportExistingMail,
 		Status:                status,
 	}, nil
 }

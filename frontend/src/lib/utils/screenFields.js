@@ -1,5 +1,3 @@
-import { resolveScreenId } from './screenResolution.js';
-
 // System fields that are shown in the desktop create form and can be submitted
 // through the existing work-item create API. Fields omitted here are either
 // server-managed (key, created_at, time_in_status), relationship-context fields
@@ -145,24 +143,13 @@ export function customFieldsFromScreen(screen) {
 }
 
 /**
- * Checks whether an item can use a system field on its effective edit screen.
- * A missing workspace mapping means the screen configuration is unresolved.
+ * Checks whether a system field is configured on the effective edit screen of
+ * a resolved effective configuration. A missing config or screen means the
+ * configuration is unresolved, which reads as unavailable rather than false.
  */
-export function isSystemFieldAvailableForItem(
-  item,
-  fieldName,
-  configSetsByWorkspaceId,
-  screensById,
-  fallbackScreenId = 1
-) {
-  const workspaceId = item?.workspace_id;
-  const workspaceKey = workspaceId == null ? null : String(workspaceId);
-  if (!workspaceKey || !configSetsByWorkspaceId?.has(workspaceKey)) return false;
-
-  const configSet = configSetsByWorkspaceId.get(workspaceKey);
-  if (configSet === undefined) return false;
-  const screenId = resolveEffectiveScreenIds(configSet, item?.item_type_id, fallbackScreenId).edit;
-  const screen = screensById?.get(screenId) || screensById?.get(String(screenId));
+export function isSystemFieldAvailableInEffectiveConfig(effectiveConfig, fieldName) {
+  const screen = effectiveConfig?.edit_screen;
+  if (!screen) return false;
   return isSystemFieldConfigured(systemFieldsFromScreen(screen), fieldName);
 }
 
@@ -192,13 +179,5 @@ export function buildDetailScreenFieldConfig(editScreen, viewScreen = null) {
       editCustom.map(customFieldDefinitionIdFromScreenField).filter((id) => id !== null)
     ),
     editableSystemFields: new Set(withAlwaysVisibleSystemFields(editSystem)),
-  };
-}
-
-export function resolveEffectiveScreenIds(configSet, itemTypeId, fallbackScreenId = 1) {
-  return {
-    create: resolveScreenId(configSet, itemTypeId, 'create') ?? fallbackScreenId,
-    edit: resolveScreenId(configSet, itemTypeId, 'edit') ?? fallbackScreenId,
-    view: resolveScreenId(configSet, itemTypeId, 'view') ?? fallbackScreenId,
   };
 }

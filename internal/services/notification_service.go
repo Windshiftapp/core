@@ -179,6 +179,12 @@ func (ns *NotificationService) UnreadEmailBatches(maxBatchSize int) (map[string]
 	return ns.unreadEmailBatches(maxBatchSize, time.Now())
 }
 
+// UnreadEmailBatchesAt is UnreadEmailBatches with an explicit clock so the
+// scheduler can select batches and claim them against the same instant.
+func (ns *NotificationService) UnreadEmailBatchesAt(maxBatchSize int, now time.Time) (map[string]*UserNotificationBatch, error) {
+	return ns.unreadEmailBatches(maxBatchSize, now)
+}
+
 // SetRecipientEligibility installs a predicate the digest recipient scan
 // consults before claiming a per-tick slot for a recipient. The scheduler uses
 // it to hold back users in an SMTP failure cooldown instead of claiming and
@@ -424,6 +430,40 @@ func (ns *NotificationService) queryUnreadEmailNotificationPage(userID, pageSize
 		return nil, fmt.Errorf("iterate unread notifications for user %d: %w", userID, err)
 	}
 	return page, nil
+}
+
+// ClaimNotificationEmailBatch fences one already-selected recipient batch. The
+// scheduler claims each batch immediately before sending it, so a long tick
+// cannot let an unsent batch's lease expire while another instance is free to
+// claim and duplicate it (WI-1773).
+func (ns *NotificationService) ClaimNotificationEmailBatch(batch *UserNotificationBatch, owner string, now time.Time, lease time.Duration) (*NotificationEmailClaim, error) {
+	if batch == nil || len(batch.NotificationIDs) == 0 {
+		return nil, fmt.Errorf("claim notification email batch: batch is empty")
+	}
+	if strings.TrimSpace(owner) == "" {
+		return nil, fmt.Errorf("claim notification email batch: owner is required")
+	}
+	if lease <= 0 {
+		return nil, fmt.Errorf("claim notification email batch: lease must be positive")
+	}
+	token, err := newNotificationClaimToken()
+	if err != nil {
+		return nil, err
+	}
+	expiresAt := now.Add(lease)
+	claimed, err := ns.claimNotificationIDs(batch.NotificationIDs, owner, token, now, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	if !claimed {
+		return nil, nil
+	}
+	return &NotificationEmailClaim{
+		UserNotificationBatch: batch,
+		Owner:                 owner,
+		Token:                 token,
+		ExpiresAt:             expiresAt,
+	}, nil
 }
 
 // ClaimUnreadEmailBatches atomically fences each selected recipient batch.

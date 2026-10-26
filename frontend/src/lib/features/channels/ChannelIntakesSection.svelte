@@ -66,6 +66,7 @@
       rate_limit_per_hour: '',
       processing_disposition: '',
       send_confirmation: false,
+      import_existing_mail: false,
       status: 'enabled'
     };
   }
@@ -144,6 +145,7 @@
           : Number(editing.rate_limit_per_hour),
       processing_disposition: editing.processing_disposition || '',
       send_confirmation: !!editing.send_confirmation,
+      import_existing_mail: !!editing.import_existing_mail,
       status: editing.status || 'enabled'
     };
     try {
@@ -382,6 +384,13 @@
           hint={t('channel.intakeSendConfirmationHint')}
           dataTestid="channel-intake-send-confirmation"
           bind:checked={editing.send_confirmation}
+        />
+
+        <Checkbox
+          label={t('channel.intakeImportExistingMail')}
+          hint={t('channel.intakeImportExistingMailHint')}
+          dataTestid="channel-intake-import-existing-mail"
+          bind:checked={editing.import_existing_mail}
         />
 
         <div class="flex justify-end gap-2">

@@ -454,10 +454,17 @@ func (s *CommentService) UpdateContentInTx(ctx context.Context, tx database.Tx, 
 }
 
 func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResult, error) {
+	return s.CreateContext(context.Background(), params)
+}
+
+// CreateContext is Create with cancellation propagated into the comment
+// transaction. Callers with a per-request budget (email intake) use it so a
+// slow database cannot outlive the caller's deadline.
+func (s *CommentService) CreateContext(ctx context.Context, params CreateCommentParams) (*CreateCommentResult, error) {
 	if err := validateCommentSource(params.Content); err != nil {
 		return nil, err
 	}
-	return s.create(params)
+	return s.create(ctx, params)
 }
 
 // CreateImported creates a comment from an external system without rejecting
@@ -467,7 +474,7 @@ func (s *CommentService) CreateImported(params CreateCommentParams) (*CreateComm
 	if params.EventMetadata.SourceKind == "" {
 		params.EventMetadata.SourceKind = "import"
 	}
-	return s.create(params)
+	return s.create(context.Background(), params)
 }
 
 // isPublicAgentComment reports whether a comment counts as the
@@ -477,7 +484,10 @@ func isPublicAgentComment(isPrivate bool, authorID int, portalCustomerID *int) b
 	return !isPrivate && authorID > 0 && portalCustomerID == nil
 }
 
-func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResult, error) {
+func (s *CommentService) create(ctx context.Context, params CreateCommentParams) (*CreateCommentResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// 2. Get item details for notifications and the webhook payload
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(params.ItemID)
 	if err != nil {
@@ -502,7 +512,7 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 		updatedAt = *params.UpdatedAt
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin comment transaction: %w", err)
 	}
@@ -547,7 +557,7 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 	}
 	fallback.OccurredAt = now
 	metadata := mergeItemEventMetadata(params.EventMetadata, fallback)
-	if _, err := itemevents.NewRecorder(s.db).CommentCreated(context.Background(), tx, item.WorkspaceID, itemevents.CommentCreatedV1{
+	if _, err := itemevents.NewRecorder(s.db).CommentCreated(ctx, tx, item.WorkspaceID, itemevents.CommentCreatedV1{
 		ItemID: params.ItemID, CommentID: commentID, AuthorID: authorID,
 		PortalCustomerID: params.PortalCustomerID, IsPrivate: params.IsPrivate,
 		SuppressSideEffects: params.SuppressNotifications,
@@ -754,6 +764,7 @@ func (s *CommentService) create(params CreateCommentParams) (*CreateCommentResul
 	PublishItemChange(params.ItemID)
 
 	if s.issueSync != nil && !params.IsPrivate && !params.SuppressNotifications && params.AuthorID > 0 {
+		//nolint:gosec // The GitHub push intentionally outlives the request.
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()

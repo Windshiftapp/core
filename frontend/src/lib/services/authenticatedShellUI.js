@@ -3,6 +3,7 @@ import { shellBootstrap, themes } from '../api/admin.js';
 import { aiStore } from '../stores/aiStore.svelte.js';
 import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
 import { logbookStore } from '../stores/logbook.svelte.js';
 import { moduleSettings } from '../stores/moduleSettings.js';
 import { permissionStore } from '../stores/permissions.svelte.js';
@@ -59,6 +60,10 @@ export function loadAuthenticatedShellUI(userId, { force = false, timeout = 0 } 
   const generation = ++shellUILoadGeneration;
   shellUILoadAudience = audience;
 
+  // Warm the per-user view preferences alongside the shell bootstrap so
+  // collection views read the server value on their first render.
+  void collectionPreferences.ensureLoaded(userId);
+
   const request = shellBootstrap
     .get({ timeout })
     .then((bootstrap) => {
@@ -93,6 +98,7 @@ export function resetAuthenticatedShellUILoad() {
   shellUILoadPromise = null;
   shellUISettledAudience = null;
   shellUISettledResult = false;
+  collectionPreferences.reset();
 }
 
 /**

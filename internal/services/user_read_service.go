@@ -141,6 +141,11 @@ func (s *UserReadService) GetByID(id int) (*models.User, error) {
 	return repository.NewUserRepository(s.db).GetByID(id)
 }
 
+// ListByIDs returns users for a bounded id set in one repository query.
+func (s *UserReadService) ListByIDs(ctx context.Context, ids []int) ([]models.User, error) {
+	return repository.NewUserRepository(s.db).ListByIDs(ctx, ids)
+}
+
 // ListAdmin returns all users, including inactive users, with stable pagination.
 func (s *UserReadService) ListAdmin(pagination PaginationParams) ([]models.User, int, error) {
 	users, err := repository.NewUserRepository(s.db).ListAdmin()

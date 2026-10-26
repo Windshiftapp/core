@@ -3,6 +3,7 @@
   import { tests } from '../../api/tests/index.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Badge from '../../components/Badge.svelte';
+  import StatusButton from '../../components/StatusButton.svelte';
   import { parseScenarioSpec, flattenExamples, applyExampleRow } from './bddSpec.js';
   import BDDScenarioView from './BDDScenarioView.svelte';
 
@@ -161,6 +162,7 @@
     });
   }
 
+  /** @type {Array<{ status: 'passed' | 'failed' | 'blocked' | 'skipped', label: string }>} */
   const statusButtons = [
     { status: 'passed', label: t('testing.pass') },
     { status: 'failed', label: t('testing.fail') },
@@ -203,16 +205,15 @@
             {/if}
             {#if canExecute}
             {#each statusButtons as button (button.status)}
-              <button
-                type="button"
-                class="status-btn flex items-center gap-1 px-3 py-1.5 rounded transition cursor-pointer text-sm"
-                data-status={button.status}
-                class:selected={result.status === button.status}
-                data-testid="bdd-example-status-{button.status}"
+              <StatusButton
+                status={button.status}
+                selected={result.status === button.status}
+                dataTestid="bdd-example-status-{button.status}"
                 onclick={() => setExampleStatus(row.exampleIndex, button.status)}
+                class="flex items-center gap-1 px-3 py-1.5 rounded transition cursor-pointer text-sm"
               >
                 {button.label}
-              </button>
+              </StatusButton>
             {/each}
             {/if}
           </div>
@@ -304,69 +305,3 @@
   {/if}
 </div>
 
-<style>
-  .status-btn {
-    background-color: transparent;
-    border: 1px solid;
-  }
-
-  .status-btn[data-status='passed'] {
-    color: var(--ds-status-success-text);
-    border-color: var(--ds-status-success-border);
-  }
-
-  .status-btn[data-status='failed'] {
-    color: var(--ds-status-danger-text);
-    border-color: var(--ds-status-danger-border);
-  }
-
-  .status-btn[data-status='blocked'] {
-    color: var(--ds-status-warning-text);
-    border-color: var(--ds-status-warning-border);
-  }
-
-  .status-btn[data-status='skipped'] {
-    color: var(--ds-status-neutral-text);
-    border-color: var(--ds-status-neutral-border);
-  }
-
-  .status-btn.selected {
-    color: white;
-  }
-
-  .status-btn[data-status='passed'].selected {
-    background-color: var(--ds-status-success-solid);
-    border-color: var(--ds-status-success-solid);
-  }
-
-  .status-btn[data-status='failed'].selected {
-    background-color: var(--ds-status-danger-solid);
-    border-color: var(--ds-status-danger-solid);
-  }
-
-  .status-btn[data-status='blocked'].selected {
-    background-color: var(--ds-status-warning-solid);
-    border-color: var(--ds-status-warning-solid);
-  }
-
-  .status-btn[data-status='skipped'].selected {
-    background-color: var(--ds-status-neutral-solid);
-    border-color: var(--ds-status-neutral-solid);
-  }
-
-  .status-btn[data-status='passed']:hover:not(.selected) {
-    background-color: var(--ds-status-success-bg);
-  }
-
-  .status-btn[data-status='failed']:hover:not(.selected) {
-    background-color: var(--ds-status-danger-bg);
-  }
-
-  .status-btn[data-status='blocked']:hover:not(.selected) {
-    background-color: var(--ds-status-warning-bg);
-  }
-
-  .status-btn[data-status='skipped']:hover:not(.selected) {
-    background-color: var(--ds-status-neutral-bg);
-  }
-</style>

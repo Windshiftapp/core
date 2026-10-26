@@ -27,6 +27,7 @@
   import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
   import { itemTestCaseLinksStore } from '../../stores/itemTestCaseLinksStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import {
     getListColumnLabel,
     listGridMinWidth,
@@ -101,10 +102,20 @@
 
   // On mount, request the same page size used by collection store filter reloads.
   onMount(async () => {
-    // Load test case toggle preference from localStorage
-    const saved = localStorage.getItem('collectionTree_showTestCases');
-    if (saved !== null) {
-      showTestCases = saved === 'true';
+    // Prefer the server preference; fall back to the legacy localStorage key.
+    const stored = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'tree',
+      'show_test_cases'
+    );
+    if (stored !== undefined) {
+      showTestCases = stored === true;
+    } else {
+      const saved = localStorage.getItem('collectionTree_showTestCases');
+      if (saved !== null) {
+        showTestCases = saved === 'true';
+      }
     }
 
     if (workspaceId) {
@@ -336,8 +347,9 @@
   async function toggleShowTestCases() {
     showTestCases = !showTestCases;
 
-    // Save preference to localStorage
-    localStorage.setItem('collectionTree_showTestCases', showTestCases.toString());
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'tree', {
+      show_test_cases: showTestCases,
+    });
 
     if (showTestCases) {
       await loadPendingTestCases();
@@ -447,7 +459,7 @@
       <!-- Controls Bar -->
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
-          <SubFilterBar {workspaceId} />
+          <SubFilterBar {workspaceId} {collectionId} />
         </div>
         <div class="flex items-center gap-2">
           <ColumnSelector

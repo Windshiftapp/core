@@ -14,6 +14,7 @@
   import ExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
   import Share from '@tabler/icons-svelte-runes/icons/share';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { getDocumentStatusColor } from '../utils/statusMaps.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Avatar from '../components/Avatar.svelte';
@@ -233,16 +234,6 @@
       default: return FileText;
     }
   }
-
-  function getStatusColor(status) {
-    switch (status) {
-      case 'pending': return 'grey';
-      case 'processing': return 'blue';
-      case 'ready': return 'green';
-      case 'error': return 'red';
-      default: return 'grey';
-    }
-  }
 </script>
 
 <!-- Header -->
@@ -444,7 +435,7 @@
               </div>
 
               <div class="flex items-center justify-between">
-                <Lozenge color={getStatusColor(doc.status)} text={doc.status} />
+                <Lozenge color={getDocumentStatusColor(doc.status)} text={doc.status} />
                 <span class="text-xs" style="color: var(--ds-text-subtlest);">
                   {formatDateShort(doc.created_at)}
                 </span>

@@ -1,5 +1,4 @@
 <script>
-  import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -11,6 +10,7 @@
   } from '../../stores/collectionContext.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { useCollectionSearch } from '../../composables/useCollectionSearch.svelte.js';
+  import { useCollectionEditorOptionsPrime } from '../../composables/useCollectionEditorOptionsPrime.svelte.js';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
   import {
     getListColumnLabel,
@@ -19,7 +19,6 @@
   } from '../../utils/workItemListColumns.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
   import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
@@ -92,31 +91,10 @@
   // workspace store. Prime the row-editor cache so opening a cell does not
   // repeat those requests. Global collections deliberately skip this: their
   // rows can belong to different workspaces and must resolve independently.
-  $effect(() => {
-    const id = Number(workspaceId);
-    if (
-      !Number.isInteger(id) ||
-      id <= 0 ||
-      !workspaceDataStore.initialized ||
-      Number(workspaceDataStore.workspaceId) !== id
-    ) {
-      return;
-    }
-
-    untrack(() =>
-      collectionEditorOptions.prime(
-        id,
-        {
-          statuses,
-          users,
-          milestones,
-          iterations,
-          projects,
-        },
-        workspaceDataStore.planningCompleteness
-      )
-    );
-  });
+  useCollectionEditorOptionsPrime(
+    () => workspaceId,
+    () => ({ statuses, users, milestones, iterations, projects })
+  );
 
   // Computed: Generate grid-template-columns CSS via the shared list grid
   // helpers (also used by the support queue's list-shaped table).
@@ -275,7 +253,7 @@
             placeholder={t('common.search')}
             dataTestid="list-search-input"
           />
-          <SubFilterBar {workspaceId} />
+          <SubFilterBar {workspaceId} {collectionId} />
         </div>
 
         <div class="flex items-center gap-2">

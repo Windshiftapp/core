@@ -9,6 +9,7 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Badge from '../../components/Badge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { getActionLogStatusColor } from '../../utils/statusMaps.js';
 
   let { log, onclose } = $props();
 
@@ -76,19 +77,6 @@
     }
   }
 
-  function getStatusColor(status) {
-    switch (status) {
-      case 'completed':
-        return 'var(--ds-success, #22c55e)';
-      case 'failed':
-        return 'var(--ds-error, #ef4444)';
-      case 'running':
-        return 'var(--ds-info, #3b82f6)';
-      default:
-        return 'var(--ds-text-subtle)';
-    }
-  }
-
   const steps = $derived(parseTrace(log));
 </script>
 
@@ -111,7 +99,7 @@
             <div class="timeline-connector">
               <div
                 class="timeline-marker"
-                style="background-color: {getStatusColor(step.status)};"
+                style="background-color: {getActionLogStatusColor(step.status)};"
               >
                 <StatusIcon
                   class="w-4 h-4"
@@ -129,7 +117,7 @@
                 <span class="step-type">{getNodeTypeLabel(step.node_type)}</span>
                 <span
                   class="step-status"
-                  style="color: {getStatusColor(step.status)};"
+                  style="color: {getActionLogStatusColor(step.status)};"
                 >
                   {t(`actions.logs.${step.status}`)}
                 </span>

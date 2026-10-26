@@ -52,6 +52,7 @@ type Config struct {
 	CodingAgent  CodingAgentConfig
 	Logbook      LogbookConfig
 	Notification NotificationConfig
+	Email        EmailConfig
 	OutboundTLS  OutboundTLSConfig
 	Push         PushConfig
 	Jira         JiraConfig
@@ -219,6 +220,19 @@ type NotificationConfig struct {
 	// OutboxBatchSize is how many outbox rows one drain pass claims
 	// (WINDSHIFT_EMAIL_OUTBOX_BATCH_SIZE). Zero means the built-in default.
 	OutboxBatchSize int
+}
+
+// EmailConfig holds inbound email polling knobs.
+type EmailConfig struct {
+	// PollInterval is how often the scheduler polls mailboxes
+	// (WINDSHIFT_EMAIL_POLL_INTERVAL). Zero means the built-in default.
+	PollInterval time.Duration
+	// BatchSize is how many messages one intake fetches per poll
+	// (WINDSHIFT_EMAIL_BATCH_SIZE). Zero means the built-in default.
+	BatchSize int
+	// PollConcurrency bounds how many mailboxes poll at once
+	// (WINDSHIFT_EMAIL_POLL_CONCURRENCY). Zero means the built-in default.
+	PollConcurrency int
 }
 
 // OutboundTLSConfig controls process-wide certificate verification for

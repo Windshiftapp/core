@@ -247,6 +247,8 @@ export default withEnglishAdminOperations({
     scopes: { workItems: 'Vorgänge' },
     deleteData: 'Daten löschen',
     unavailable: 'Nicht verfügbar',
+    removeFromList: 'Aus Liste entfernen',
+    importRemovedFromHistory: 'Import aus dem Verlauf entfernt',
     dataDeleted: 'Importierte Jira-Daten gelöscht. Sie können den Import erneut ausführen.',
     deleteImportedTitle: 'Importierte Jira-Daten löschen',
     deleteWarningTitle: 'Dies kann mehrere Windshift-Arbeitsbereiche löschen.',

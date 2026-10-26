@@ -453,6 +453,17 @@ export default {
       callbackUrlHelp: '在您的身份提供商中配置此 URL 作为重定向/回调 URL',
       scopes: '范围',
       scopesHelp: '以空格分隔的 OIDC 范围列表',
+      nameClaimsHelp:
+        '某些提供商（例如 Microsoft Entra ID）默认只提供显示名称。请将 given_name 和 family_name 添加为可选声明，以便 Windshift 获取结构化姓名，而不是解析显示名称。',
+      attributeMapping: '属性映射',
+      attributeMappingHelp:
+        '可选。当您的提供商使用非标准声明名称时，覆盖每个字段读取的声明。将字段留空以使用占位符中显示的默认声明。',
+      attributeEmail: '电子邮件声明',
+      attributeEmailVerified: '电子邮件验证声明',
+      attributeName: '全名声明',
+      attributeGivenName: '名字声明',
+      attributeFamilyName: '姓氏声明',
+      attributeUsername: '用户名声明',
       enabled: '已启用',
       disabled: '已禁用',
       default: '默认',

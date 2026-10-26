@@ -1,34 +1,17 @@
 <script>
-  import { getSource, getWidgetDataContext } from '../context.js';
-  import { itemSpec, assetSpec, sourceKey, formatValue } from '../querySpec.js';
+  import { formatValue } from '../querySpec.js';
   import SourceBoundary from './SourceBoundary.svelte';
+  import { useChartSource } from './chartSource.svelte.js';
 
   /**
    * @type {{ props: { query?: string, sort?: string, limit?: number, entity?: 'item'|'asset' } }}
    */
   let { props } = $props();
 
-  const context = getWidgetDataContext();
-  const entity = $derived(props.entity === 'asset' ? 'asset' : 'item');
-  const spec = $derived(
-    entity === 'asset'
-      ? assetSpec({
-          query: props.query,
-          sort: props.sort ?? '-updated_at',
-          limit: props.limit,
-          assetSetId: context?.assetSetId,
-        })
-      : itemSpec({ query: props.query, sort: props.sort ?? '-updated_at', limit: props.limit })
-  );
-  const source = $derived(getSource(sourceKey(spec)));
-
-  $effect(() => {
-    if (source) return;
-    context?.requestSource?.(spec, sourceKey(spec));
-  });
+  const chart = useChartSource(() => props, { defaultSort: '-updated_at' });
 </script>
 
-<SourceBoundary {source}>
+<SourceBoundary source={chart.source}>
   {#snippet ready(rows)}
     <ol class="space-y-2" data-testid="openui-activity-feed">
       {#each rows as row, index (row.id ?? index)}
@@ -39,7 +22,7 @@
               type="button"
               class="block truncate text-left text-sm hover:underline"
               style="color: var(--ds-text);"
-              onclick={() => context?.openItem?.(Number(row.id))}
+              onclick={() => chart.context?.openItem?.(Number(row.id))}
             >
               {row.title}
             </button>

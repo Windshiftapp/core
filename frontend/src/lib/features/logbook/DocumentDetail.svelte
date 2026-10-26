@@ -14,6 +14,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Progress from '../../components/Progress.svelte';
   import { computeDocumentHealth } from './healthScore.js';
+  import { getDocumentStatusColor } from '../../utils/statusMaps.js';
   import Save from '@tabler/icons-svelte-runes/icons/device-floppy';
   import FileText from '@tabler/icons-svelte-runes/icons/file-text';
   import StickyNote from '@tabler/icons-svelte-runes/icons/note';
@@ -119,16 +120,6 @@
     }
   }
 
-  function getStatusColor(status) {
-    switch (status) {
-      case 'pending': return 'grey';
-      case 'processing': return 'blue';
-      case 'ready': return 'green';
-      case 'error': return 'red';
-      default: return 'grey';
-    }
-  }
-
   let deleting = $state(false);
 
   async function deleteDocument() {
@@ -217,7 +208,7 @@
           {/if}
 
           <div class="flex items-center gap-3 mt-2 flex-wrap">
-            <Lozenge color={getStatusColor(doc.status)} text={t(`logbook.status.${doc.status}`)} />
+            <Lozenge color={getDocumentStatusColor(doc.status)} text={t(`logbook.status.${doc.status}`)} />
             <span class="text-sm" style="color: var(--ds-text-subtle);">
               {t(`logbook.sourceType.${doc.source_type}`)}
             </span>

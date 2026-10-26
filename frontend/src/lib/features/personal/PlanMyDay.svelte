@@ -16,6 +16,7 @@
   import Select from '../../components/Select.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
+  import { formatDurationMinutes } from '../../utils/timeUtils.js';
 
   let loading = $state(false);
   let scheduling = $state(false);
@@ -53,12 +54,7 @@
   }
 
   function formatDuration(minutes) {
-    if (minutes >= 60) {
-      const h = Math.floor(minutes / 60);
-      const m = minutes % 60;
-      return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
-    return `${minutes}m`;
+    return formatDurationMinutes(minutes);
   }
 
   async function addToCalendar() {

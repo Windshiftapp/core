@@ -11,12 +11,11 @@
   import Plus from '@lucide/svelte/icons/plus';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Trash2 from '@lucide/svelte/icons/trash-2';
-  import ChevronDown from '@lucide/svelte/icons/chevron-down';
-  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import GitBranchPlus from '@lucide/svelte/icons/git-branch-plus';
   import Link2 from '@lucide/svelte/icons/link-2';
   import Button from '../../components/Button.svelte';
   import Text from '../../components/Text.svelte';
+  import LinkSectionHeader from './LinkSectionHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { safeHref } from '../../utils/sanitize';
@@ -233,26 +232,18 @@
   <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
 
   <!-- Section Header -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="w-full flex items-center justify-between mb-3 group cursor-pointer"
-    onclick={() => expanded = !expanded}
+  <LinkSectionHeader
+    title={t('scm.development')}
+    count={links.length}
+    {expanded}
+    ontoggle={() => (expanded = !expanded)}
   >
-    <div class="flex items-center gap-2">
-      <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('scm.development')}</Text>
-      {#if links.length > 0}
-        <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-          {links.length}
-        </span>
-      {/if}
-    </div>
-    <div class="flex items-center gap-1">
+    {#snippet actions()}
       {#if connectionStatus?.connected}
         <button
           class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
           class:invisible={!expanded}
-          onclick={e => { e.stopPropagation(); openCreateBranchModal(); }}
+          onclick={(e) => { e.stopPropagation(); openCreateBranchModal(); }}
           title={t('scm.createBranch')}
         >
           <GitBranchPlus class="w-4 h-4" style="color: var(--ds-text-subtle);" />
@@ -260,19 +251,14 @@
         <button
           class="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
           class:invisible={!expanded}
-          onclick={e => { e.stopPropagation(); openAddLinkModal(); }}
+          onclick={(e) => { e.stopPropagation(); openAddLinkModal(); }}
           title={t('scm.linkExisting')}
         >
           <Plus class="w-4 h-4" style="color: var(--ds-text-subtle);" />
         </button>
       {/if}
-      {#if expanded}
-        <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-      {:else}
-        <ChevronRight class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-      {/if}
-    </div>
-  </div>
+    {/snippet}
+  </LinkSectionHeader>
 
   {#if expanded}
     <div class="space-y-2 mt-1">

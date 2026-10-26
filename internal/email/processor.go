@@ -183,7 +183,7 @@ func (p *Processor) ProcessEmailWithIntake(
 	var result *ProcessingResult
 	if parentItemID != nil {
 		// This is a reply - add comment to existing item
-		result, err = p.addCommentFromReply(email, *parentItemID, customerID)
+		result, err = p.addCommentFromReply(ctx, email, *parentItemID, customerID)
 	} else {
 		// This is a new conversation - create item
 		result, err = p.createItemFromEmail(ctx, email, channelID, config, customerID, intakeID)
@@ -597,7 +597,7 @@ func normalizedEmail(s string) string {
 }
 
 // createItemFromEmail creates a new item from an email
-func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for future use
+func (p *Processor) createItemFromEmail(
 	ctx context.Context,
 	email *ParsedEmail,
 	channelID int,
@@ -605,8 +605,6 @@ func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for fu
 	customerID int,
 	intakeID *int,
 ) (*ProcessingResult, error) {
-	_ = ctx
-
 	workspaceID, itemTypeID, requestTypeID, err := p.resolveEmailIntakeTarget(config)
 	if err != nil {
 		return nil, err
@@ -650,7 +648,7 @@ func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for fu
 	}
 
 	// Create the item via the shared service entry point.
-	itemID, err := services.CreateItem(p.db, params)
+	itemID, err := services.CreateItemContext(ctx, p.db, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create item: %w", err)
 	}
@@ -717,6 +715,7 @@ func (p *Processor) resolveEmailIntakeTarget(config *models.ChannelConfig) (work
 
 // addCommentFromReply adds a comment to an existing item from an email reply
 func (p *Processor) addCommentFromReply(
+	ctx context.Context,
 	email *ParsedEmail,
 	itemID int,
 	customerID int,
@@ -739,7 +738,7 @@ func (p *Processor) addCommentFromReply(
 	if p.commentService == nil {
 		return nil, fmt.Errorf("comment service not configured")
 	}
-	result, err := p.commentService.Create(services.CreateCommentParams{
+	result, err := p.commentService.CreateContext(ctx, services.CreateCommentParams{
 		ItemID:           itemID,
 		AuthorID:         0,
 		PortalCustomerID: &customerID,

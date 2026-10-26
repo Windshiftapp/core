@@ -1,9 +1,8 @@
 <script>
   import Chart from '../../widgets/Chart.svelte';
-  import { getSource, getWidgetDataContext } from '../context.js';
-  import { itemSpec, assetSpec, sourceKey } from '../querySpec.js';
   import { bucketByDate } from '../aggregate.js';
   import SourceBoundary from './SourceBoundary.svelte';
+  import { useChartSource } from './chartSource.svelte.js';
 
   /**
    * @type {{
@@ -20,28 +19,12 @@
    */
   let { props } = $props();
 
-  const context = getWidgetDataContext();
-  const entity = $derived(props.entity === 'asset' ? 'asset' : 'item');
-  const spec = $derived(
-    entity === 'asset'
-      ? assetSpec({
-          query: props.query,
-          sort: props.sort,
-          limit: props.limit,
-          assetSetId: context?.assetSetId,
-        })
-      : itemSpec({ query: props.query, sort: props.sort, limit: props.limit })
-  );
-  const source = $derived(getSource(sourceKey(spec)));
+  const chart = useChartSource(() => props);
 
-  $effect(() => {
-    if (source) return;
-    context?.requestSource?.(spec, sourceKey(spec));
-  });
   const dateField = $derived(props.field ?? 'created_at');
 
   const buckets = $derived.by(() =>
-    bucketByDate(source?.rows ?? [], dateField, props.bucket ?? 'week', {
+    bucketByDate(chart.source?.rows ?? [], dateField, props.bucket ?? 'week', {
       metric: props.metric ?? 'count',
       sumField: dateField,
     })
@@ -63,7 +46,7 @@
   ]);
 </script>
 
-<SourceBoundary {source}>
+<SourceBoundary source={chart.source}>
   {#snippet ready()}
     <Chart type="line" {series} {categories} minHeight={160} showYAxis={false} />
   {/snippet}

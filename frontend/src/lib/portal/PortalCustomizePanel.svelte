@@ -575,6 +575,7 @@
             {gradients}
             selectedIndex={portalStore.selectedGradient}
             hasBackgroundImage={portalStore.hasBackgroundImage}
+            isDarkMode={portalStore.isDarkMode}
             onSelect={(index) => portalStore.selectGradient(index)}
             columns={6}
             size={25}

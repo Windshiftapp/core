@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -191,9 +192,16 @@ func (os *OutboundEmailScheduler) processOutboundEmails(ctx context.Context) {
 	os.mu.RUnlock()
 
 	deadline := start.Add(os.drainBudget)
+	// Pass a deadline into each outbox pass so one hanging SMTP send cannot
+	// outlive the drain budget (WI-1772). The outbox loop checks the context
+	// between rows and the sender propagates it through dial, auth, and DATA.
+	drainCtx, cancel := context.WithTimeout(ctx, os.drainBudget)
+	defer cancel()
 	for {
-		if err := ctx.Err(); err != nil {
-			runErr = err
+		if err := drainCtx.Err(); err != nil {
+			if ctx.Err() == nil && !errors.Is(err, context.DeadlineExceeded) {
+				runErr = err
+			}
 			break
 		}
 		if os.now().After(deadline) {
@@ -202,7 +210,7 @@ func (os *OutboundEmailScheduler) processOutboundEmails(ctx context.Context) {
 
 		pass := 0
 		if replyOutbox != nil {
-			sent, err := replyOutbox.ProcessPendingReplies(ctx, os.batchSize)
+			sent, err := replyOutbox.ProcessPendingReplies(drainCtx, os.batchSize)
 			pass += sent
 			if err != nil {
 				slog.Error("failed to process pending threaded email replies", slog.Any("error", err))
@@ -210,7 +218,7 @@ func (os *OutboundEmailScheduler) processOutboundEmails(ctx context.Context) {
 			}
 		}
 		if mentionOutbox != nil {
-			sent, err := mentionOutbox.ProcessPendingMentions(ctx, os.batchSize)
+			sent, err := mentionOutbox.ProcessPendingMentions(drainCtx, os.batchSize)
 			pass += sent
 			if err != nil {
 				slog.Error("failed to process pending mention emails", slog.Any("error", err))

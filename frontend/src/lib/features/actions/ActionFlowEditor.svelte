@@ -5,6 +5,7 @@
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import Bell from '@lucide/svelte/icons/bell';
   import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import PlaceholderFieldLabel from './PlaceholderFieldLabel.svelte';
   import Database from '@lucide/svelte/icons/database';
   import PlusSquare from '@lucide/svelte/icons/plus-square';
   import Box from '@lucide/svelte/icons/box';
@@ -893,16 +894,11 @@
         />
       </div>
       <div>
-        <div class="flex items-center gap-1 mb-1">
-          <label for="config-set-field-value" class="block text-xs font-medium">{t('actions.config.value')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="config-set-field-value"
+          label={t('actions.config.value')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         {#if isMilestoneSetField(selectedNode.data?.config)}
           <MilestoneCombobox
             value={getSetFieldMilestoneIDs(selectedNode.data?.config)}
@@ -945,16 +941,11 @@
       </div>
     {:else if selectedNode.type === 'add_comment'}
       <div>
-        <div class="flex items-center gap-1 mb-1">
-          <label for="config-comment-content" class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="config-comment-content"
+          label={t('actions.config.commentContent')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Textarea
           id="config-comment-content"
           rows={4}
@@ -1070,16 +1061,11 @@
         </div>
       {/if}
       <div>
-        <div class="flex items-center gap-1 mb-1">
-          <label for="config-notify-message" class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="config-notify-message"
+          label={t('actions.config.notifyMessage')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Textarea
           id="config-notify-message"
           rows={4}
@@ -1114,16 +1100,11 @@
         />
       </div>
       <div>
-        <div class="flex items-center gap-1 mb-1">
-          <label for="config-notify-customer-message" class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="config-notify-customer-message"
+          label={t('actions.config.notifyMessage')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Textarea
           id="config-notify-customer-message"
           data-testid="notify-customer-message"
@@ -1390,16 +1371,11 @@
         />
       </div>
       <div>
-        <div class="flex items-center gap-1 mb-1">
-          <label for="config-http-url" class="block text-xs font-medium">{t('actions.config.urlTemplate')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="config-http-url"
+          label={t('actions.config.urlTemplate')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Input
           id="config-http-url"
           type="text"

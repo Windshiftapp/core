@@ -1,8 +1,7 @@
 <script>
-  import { getSource, getWidgetDataContext } from '../context.js';
-  import { itemSpec, assetSpec, sourceKey } from '../querySpec.js';
   import { groupRows } from '../aggregate.js';
   import SourceBoundary from './SourceBoundary.svelte';
+  import { useChartSource } from './chartSource.svelte.js';
 
   /**
    * Share-of-total bars: one row per distinct value of `group_by`.
@@ -23,27 +22,10 @@
    */
   let { props } = $props();
 
-  const context = getWidgetDataContext();
-  const entity = $derived(props.entity === 'asset' ? 'asset' : 'item');
-  const spec = $derived(
-    entity === 'asset'
-      ? assetSpec({
-          query: props.query,
-          sort: props.sort,
-          limit: props.limit,
-          assetSetId: context?.assetSetId,
-        })
-      : itemSpec({ query: props.query, sort: props.sort, limit: props.limit })
-  );
-  const source = $derived(getSource(sourceKey(spec)));
-
-  $effect(() => {
-    if (source) return;
-    context?.requestSource?.(spec, sourceKey(spec));
-  });
+  const chart = useChartSource(() => props);
 
   const buckets = $derived.by(() => {
-    const rows = source?.rows ?? [];
+    const rows = chart.source?.rows ?? [];
     if (rows.length === 0) return [];
     return groupRows(rows, {
       groupBy: props.group_by,
@@ -57,7 +39,7 @@
   const total = $derived(buckets.reduce((sum, bucket) => sum + bucket.value, 0));
 </script>
 
-<SourceBoundary {source}>
+<SourceBoundary source={chart.source}>
   {#snippet ready()}
     <ul class="space-y-2" data-testid="openui-progress-list">
       {#each buckets as bucket (bucket.label)}

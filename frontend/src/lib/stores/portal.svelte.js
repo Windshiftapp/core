@@ -11,6 +11,7 @@ import {
 } from '../api/channels.js';
 import { attachments } from '../api/misc.js';
 import { portal } from '../api/portal.js';
+import { uploadBrandImage } from '../utils/brandLogoUpload.js';
 import { safeCssUrl } from '../utils/sanitize';
 import { createId } from '../utils/uuid.js';
 import { authStore } from './auth.svelte.js';
@@ -25,6 +26,14 @@ import {
 import { portalAuthStore } from './portalAuth.svelte.js';
 import { gradients } from './portalPresentation.js';
 import { configurePortalSearchStore, portalSearchStore } from './portalSearch.svelte.js';
+import {
+  addSectionMember,
+  addSection as addSectionToList,
+  moveSection,
+  removeSection as removeSectionFromList,
+  removeSectionMember,
+  updateSectionField,
+} from './sectionManagement.js';
 import { errorToast } from './toasts.svelte.js';
 
 // Transitional exports for consumers that have not moved to portalPresentation yet.
@@ -255,27 +264,16 @@ function removeBackgroundImage() {
  * Handle background image upload
  */
 async function handleBackgroundUpload(files) {
-  if (!files || files.length === 0) return;
-
-  const file = files[0];
-  if (!file.type.startsWith('image/')) {
-    console.error('Please select an image file');
-    return;
-  }
-
   uploadingBackground = true;
   try {
-    const uploadFormData = new FormData();
-    uploadFormData.append('file', file);
-    uploadFormData.append('category', 'portal_background');
-    if (portalData?.channel_id) {
-      uploadFormData.append('entity_id', String(portalData.channel_id));
-    }
-
-    const uploadResult = await attachments.upload(uploadFormData);
-
-    if (uploadResult?.success && uploadResult.background_url) {
-      selectBackgroundImage(uploadResult.background_url);
+    const url = await uploadBrandImage(files, {
+      category: 'portal_background',
+      entityId: portalData?.channel_id,
+      responseKey: 'background_url',
+      upload: attachments.upload,
+    });
+    if (url) {
+      selectBackgroundImage(url);
     }
   } catch (err) {
     console.error('Failed to upload portal background:', err);
@@ -288,27 +286,15 @@ async function handleBackgroundUpload(files) {
  * Handle logo upload
  */
 async function handleLogoUpload(files) {
-  if (!files || files.length === 0) return;
-
-  const file = files[0];
-  if (!file.type.startsWith('image/')) {
-    console.error('Please select an image file');
-    return;
-  }
-
   uploadingLogo = true;
   try {
-    const uploadFormData = new FormData();
-    uploadFormData.append('file', file);
-    uploadFormData.append('category', 'portal_logo');
-    if (portalData?.channel_id) {
-      uploadFormData.append('entity_id', String(portalData.channel_id));
-    }
-
-    const uploadResult = await attachments.upload(uploadFormData);
-
-    if (uploadResult?.success && uploadResult.logo_url) {
-      logoUrl = uploadResult.logo_url;
+    const url = await uploadBrandImage(files, {
+      category: 'portal_logo',
+      entityId: portalData?.channel_id,
+      upload: attachments.upload,
+    });
+    if (url) {
+      logoUrl = url;
       saveCustomizations();
     }
   } catch (err) {
@@ -561,105 +547,54 @@ function getSectionRequestTypes(section, inCustomizeMode = false) {
 
 // Portal Sections Management
 function addSection() {
-  const newSection = {
-    id: createId(),
-    title: '',
-    subtitle: '',
-    display_order: portalSections.length,
-    request_type_ids: [],
-  };
-  portalSections = [...portalSections, newSection];
+  const id = createId();
+  portalSections = addSectionToList(portalSections, 'request_type_ids', id);
   saveCustomizations();
-  return newSection.id;
+  return id;
 }
 
 function deleteSection(sectionId) {
-  portalSections = portalSections
-    .filter((s) => s.id !== sectionId)
-    .map((s, i) => ({ ...s, display_order: i }));
+  portalSections = removeSectionFromList(portalSections, sectionId);
   saveCustomizations();
 }
 
 function updateSection(sectionId, field, value) {
-  portalSections = portalSections.map((s) => {
-    if (s.id === sectionId) {
-      return { ...s, [field]: value };
-    }
-    return s;
-  });
+  portalSections = updateSectionField(portalSections, sectionId, field, value);
   saveCustomizations();
 }
 
 function moveSectionUp(index) {
-  if (index === 0) return;
-  const newSections = [...portalSections];
-  [newSections[index - 1], newSections[index]] = [newSections[index], newSections[index - 1]];
-  portalSections = newSections.map((s, i) => ({ ...s, display_order: i }));
+  portalSections = moveSection(portalSections, index, -1);
   saveCustomizations();
 }
 
 function moveSectionDown(index) {
-  if (index === portalSections.length - 1) return;
-  const newSections = [...portalSections];
-  [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
-  portalSections = newSections.map((s, i) => ({ ...s, display_order: i }));
+  portalSections = moveSection(portalSections, index, 1);
   saveCustomizations();
 }
 
 function addRequestTypeToSection(sectionId, requestTypeId) {
-  portalSections = portalSections.map((s) => {
-    if (s.id === sectionId) {
-      if (!s.request_type_ids.includes(requestTypeId)) {
-        return {
-          ...s,
-          request_type_ids: [...s.request_type_ids, requestTypeId],
-        };
-      }
-    }
-    return s;
-  });
+  portalSections = addSectionMember(portalSections, sectionId, 'request_type_ids', requestTypeId);
   saveCustomizations();
 }
 
 function removeRequestTypeFromSection(sectionId, requestTypeId) {
-  portalSections = portalSections.map((s) => {
-    if (s.id === sectionId) {
-      return {
-        ...s,
-        request_type_ids: s.request_type_ids.filter((id) => id !== requestTypeId),
-      };
-    }
-    return s;
-  });
+  portalSections = removeSectionMember(
+    portalSections,
+    sectionId,
+    'request_type_ids',
+    requestTypeId
+  );
   saveCustomizations();
 }
 
 function addAssetReportToSection(sectionId, reportId) {
-  portalSections = portalSections.map((s) => {
-    if (s.id === sectionId) {
-      const currentIds = s.asset_report_ids || [];
-      if (!currentIds.includes(reportId)) {
-        return {
-          ...s,
-          asset_report_ids: [...currentIds, reportId],
-        };
-      }
-    }
-    return s;
-  });
+  portalSections = addSectionMember(portalSections, sectionId, 'asset_report_ids', reportId);
   saveCustomizations();
 }
 
 function removeAssetReportFromSection(sectionId, reportId) {
-  portalSections = portalSections.map((s) => {
-    if (s.id === sectionId) {
-      return {
-        ...s,
-        asset_report_ids: (s.asset_report_ids || []).filter((id) => id !== reportId),
-      };
-    }
-    return s;
-  });
+  portalSections = removeSectionMember(portalSections, sectionId, 'asset_report_ids', reportId);
   saveCustomizations();
 }
 

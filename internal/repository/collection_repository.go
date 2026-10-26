@@ -31,10 +31,6 @@ type CollectionRepository struct {
 	db database.Database
 }
 
-// ErrCollectionQueuesRequireWorkspace prevents orphaning queues when a
-// collection is moved to the global scope, which has no queue storage scope.
-var ErrCollectionQueuesRequireWorkspace = errors.New("collection queues require a workspace")
-
 // NewCollectionRepository creates a collection repository.
 func NewCollectionRepository(db database.Database) *CollectionRepository {
 	return &CollectionRepository{db: db}
@@ -238,28 +234,19 @@ func (r *CollectionRepository) Create(collection *models.Collection, userID int)
 // Update replaces all editable collection fields.
 func (r *CollectionRepository) Update(id int, collection *models.Collection) error {
 	err := database.WithTx(r.db, func(tx database.Tx) error {
-		// Serialize scope changes with queue creation before checking for queues.
-		// Updating only updated_at locks the row without firing the collection
-		// change trigger, which watches query, filter, and workspace columns.
-		var currentWorkspace sql.NullInt64
+		// Serialize scope changes with queue creation. Updating only updated_at
+		// locks the row without firing the collection change trigger, which
+		// watches query, filter, and workspace columns.
+		var lockedID int
 		err := tx.QueryRow(`
 			UPDATE collections SET updated_at = updated_at WHERE id = ?
-			RETURNING workspace_id
-		`, id).Scan(&currentWorkspace)
+			RETURNING id
+		`, id).Scan(&lockedID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return err
-		}
-		if collection.WorkspaceID == nil && currentWorkspace.Valid {
-			var queueCount int
-			if err := tx.QueryRow("SELECT COUNT(*) FROM queues WHERE collection_id = ?", id).Scan(&queueCount); err != nil {
-				return err
-			}
-			if queueCount > 0 {
-				return ErrCollectionQueuesRequireWorkspace
-			}
 		}
 		if _, err := tx.Exec(`
 			UPDATE collections
@@ -269,11 +256,21 @@ func (r *CollectionRepository) Update(id int, collection *models.Collection) err
 			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug, id); err != nil {
 			return err
 		}
+		// Keep the informational workspace reference on collection-scoped queues
+		// in sync when the collection moves between the workspace and global
+		// scopes. The queue scope itself is the collection id.
 		if collection.WorkspaceID != nil {
 			if _, err := tx.Exec(`
 				UPDATE queues SET workspace_id = ?, updated_at = CURRENT_TIMESTAMP
-				WHERE collection_id = ? AND workspace_id != ?
+				WHERE collection_id = ? AND COALESCE(workspace_id, 0) != ?
 			`, *collection.WorkspaceID, id, *collection.WorkspaceID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(`
+				UPDATE queues SET workspace_id = NULL, updated_at = CURRENT_TIMESTAMP
+				WHERE collection_id = ? AND workspace_id IS NOT NULL
+			`, id); err != nil {
 				return err
 			}
 		}

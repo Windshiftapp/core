@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy, onMount, untrack } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { collections } from '../../api/collections.js';
   import { items as itemsApi } from '../../api/items.js';
@@ -12,6 +12,7 @@
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
+  import { useCollectionEditorOptionsPrime } from '../../composables/useCollectionEditorOptionsPrime.svelte.js';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -38,7 +39,6 @@
   } from '../../utils/workItemListColumns.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { collectionEditorOptions } from '../../stores/collectionEditorOptions.svelte.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -186,31 +186,10 @@
   // A workspace-scoped list already has these option sets in the shared
   // workspace store. Prime the row-editor cache so opening a cell does not
   // repeat those requests, exactly like the list view does.
-  $effect(() => {
-    const id = Number(workspaceId);
-    if (
-      !Number.isInteger(id) ||
-      id <= 0 ||
-      !workspaceDataStore.initialized ||
-      Number(workspaceDataStore.workspaceId) !== id
-    ) {
-      return;
-    }
-
-    untrack(() =>
-      collectionEditorOptions.prime(
-        id,
-        {
-          statuses,
-          users,
-          milestones,
-          iterations,
-          projects,
-        },
-        workspaceDataStore.planningCompleteness
-      )
-    );
-  });
+  useCollectionEditorOptionsPrime(
+    () => workspaceId,
+    () => ({ statuses, users, milestones, iterations, projects })
+  );
 
   async function loadCollection() {
     if (!collectionId) {

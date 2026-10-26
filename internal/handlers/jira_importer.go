@@ -710,6 +710,42 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 	respondJSONOK(w, map[string]any{"success": true, "deleted": deleted})
 }
 
+// HideImportJob handles DELETE /api/admin/jira-import/jobs/{jobId}. It clears
+// the job from the history listing without deleting the job or its imported
+// data; destructive removal stays on DELETE .../jobs/{jobId}/data.
+func (h *JiraImportHandler) HideImportJob(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobId")
+	if jobID == "" {
+		respondInvalidID(w, r, "jobId")
+		return
+	}
+	err := h.imports.HideJob(jobID)
+	if errors.Is(err, jiraimport.ErrJobNotFound) {
+		respondNotFound(w, r, "job")
+		return
+	}
+	if errors.Is(err, jiraimport.ErrJobActive) {
+		respondConflict(w, r, "Cannot clear an import from the history while it is queued or running.")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID: currentUser.ID, Username: currentUser.Username,
+			IPAddress: utils.GetClientIP(r), UserAgent: r.UserAgent(),
+			ActionType:   logger.ActionJiraImportHide,
+			ResourceType: logger.ResourceJiraImport, ResourceName: jobID,
+			Details: map[string]any{"job_id": jobID},
+			Success: true,
+		})
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // GetPreviousImports handles GET /api/admin/jira-import/previous-imports.
 func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Request) {
 	projectKeys := r.URL.Query()["project_key"]

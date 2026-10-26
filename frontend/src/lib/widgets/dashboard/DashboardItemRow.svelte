@@ -1,5 +1,6 @@
 <script>
   import DueMark from './DueMark.svelte';
+  import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import Link from '../../components/Link.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { objectDisplayName } from '../../utils/systemLabels.js';
@@ -7,6 +8,9 @@
   let {
     title,
     itemKey = null,
+    itemTypeName = null,
+    itemTypeIcon = null,
+    itemTypeColor = null,
     href = null,
     unread = false,
     statusName = null,
@@ -58,7 +62,20 @@
 
   <div class="dashboard-item-meta flex items-center gap-2 flex-shrink-0 text-[0.7rem]" style="color: var(--ds-text-subtle);">
     {#if itemKey}
-      <span class="dashboard-item-key font-mono" data-testid="dashboard-item-key">{itemKey}</span>
+      <span
+        class="dashboard-item-key inline-flex items-center gap-1 font-mono"
+        data-testid="dashboard-item-key"
+      >
+        {#if itemTypeName || itemTypeIcon}
+          <ItemTypeIcon
+            icon={itemTypeIcon}
+            color={itemTypeColor}
+            title={itemTypeName || undefined}
+            testId="dashboard-item-type-icon"
+          />
+        {/if}
+        {itemKey}
+      </span>
     {/if}
     {#if hasStatus}
       <span

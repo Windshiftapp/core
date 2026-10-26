@@ -131,6 +131,9 @@
                 <DashboardItemRow
                   title={e.item.title}
                   itemKey={itemKey(e.item)}
+                  itemTypeName={e.item.item_type_name}
+                  itemTypeIcon={e.item.item_type_icon}
+                  itemTypeColor={e.item.item_type_color}
                   href={`/workspaces/${e.item.workspace_id}/items/${e.item.item_id}`}
                   statusName={e.item.status}
                   statusBuiltinKey={e.item.status_builtin_key}

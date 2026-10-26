@@ -208,6 +208,9 @@ export default {
     intakeSendConfirmation: 'Eingangsbestätigung senden',
     intakeSendConfirmationHint:
       'Der absendenden Person eine Bestätigung senden, dass ihre Anfrage eingegangen ist. Die Bestätigung enthält einen Portal-Link, wenn dieser Eingang mit einem Portal verknüpft ist.',
+    intakeImportExistingMail: 'Vorhandene E-Mails importieren',
+    intakeImportExistingMailHint:
+      'Beim ersten Abruf bereits vorhandene Nachrichten importieren, statt mit neuer Post zu beginnen. Deaktiviert lassen, damit der Postfachverlauf nicht zu Tickets wird.',
     intakeConfirmationOn: 'Bestätigung aktiv',
     // Form Channel Configuration
     openForm: 'Open Form',

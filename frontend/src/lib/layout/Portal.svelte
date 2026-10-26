@@ -184,9 +184,6 @@
     portalStore.hydrateUserBootstrap(userBootstrap);
     previousAuthState = userBootstrap?.authenticated === true;
     authCheckComplete = true;
-
-    // Apply theme CSS variables
-    applyThemeStyles();
   });
 
   onDestroy(() => {
@@ -272,16 +269,6 @@
 
     previousAuthState = currentAuth;
   });
-
-  // Apply theme CSS variables when isDarkMode changes
-  $effect(() => {
-    applyThemeStyles();
-  });
-
-  function applyThemeStyles() {
-    if (typeof document === 'undefined') return;
-    document.documentElement.dataset.colorMode = portalStore.isDarkMode ? 'dark' : 'light';
-  }
 
   // Handle ESC key to close customize panel
   function handleKeydown(event) {
@@ -482,9 +469,14 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <!-- Portal Page - Standalone, no Windshift navigation -->
+<!-- The portal theme is a channel look-and-feel setting, independent of the
+     signed-in user's app color mode. Scope it to this subtree with
+     data-ds-color-mode so it never mutates the document root, which would
+     otherwise leak into the app on Back to App. -->
 <div
   class="min-h-screen flex flex-col"
   style="background-color: var(--ds-surface, #ffffff);"
+  data-ds-color-mode={portalStore.isDarkMode ? 'dark' : 'light'}
   data-testid="portal-page"
   data-ready={!!portalStore.portalData && authCheckComplete && !portalStore.loading}
 >

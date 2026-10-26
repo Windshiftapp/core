@@ -186,18 +186,9 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 	// Generate username from claims
 	username := generateUsername(claims)
 
-	// Use first/last name from claims
-	firstName := claims.GivenName
-	lastName := claims.FamilyName
-
-	// If no first/last name, try to parse from full name
-	if firstName == "" && lastName == "" && claims.Name != "" {
-		parts := strings.SplitN(claims.Name, " ", 2)
-		firstName = parts[0]
-		if len(parts) > 1 {
-			lastName = parts[1]
-		}
-	}
+	// Resolve first/last name from the explicit claims, falling back to the
+	// display name (which some IdPs format as "Last, First").
+	firstName, lastName := resolveNames(claims)
 
 	// Avatar URL from claims
 	avatarURL := claims.Picture
@@ -256,6 +247,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 		if err != nil {
 			return nil, err
 		}
+		s.syncNamesFromProvider(user, claims, provider)
 		result.User = user
 		return result, nil
 	}
@@ -273,6 +265,7 @@ func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) 
 			if err = s.LinkExternalAccount(existingUser.ID, provider.ID, claims.Subject, claims.Email, claims); err != nil {
 				return nil, fmt.Errorf("%w: %w", ErrAccountLinkingFailed, err)
 			}
+			s.syncNamesFromProvider(existingUser, claims, provider)
 			result.User = existingUser
 			return result, nil
 		}
@@ -382,6 +375,92 @@ func (s *UserStore) UnlinkExternalAccount(accountID, userID int) error {
 		return ErrExternalAccountNotFound
 	}
 
+	return nil
+}
+
+// resolveNames derives the first and last name to persist from IdP claims.
+// Explicit given_name / family_name win. A missing half is only filled from a
+// comma-separated display name ("Last, First"), where the family/given
+// boundary is unambiguous. A space-separated display name is left unparsed
+// because multi-part names cannot be split reliably.
+func resolveNames(claims *OIDCClaims) (firstName, lastName string) {
+	firstName = strings.TrimSpace(claims.GivenName)
+	lastName = strings.TrimSpace(claims.FamilyName)
+	if firstName != "" && lastName != "" {
+		return firstName, lastName
+	}
+
+	fallbackFirst, fallbackLast, ok := splitCommaDisplayName(claims.Name)
+	if !ok {
+		return firstName, lastName
+	}
+	if firstName == "" {
+		firstName = fallbackFirst
+	}
+	if lastName == "" {
+		lastName = fallbackLast
+	}
+	return firstName, lastName
+}
+
+// splitCommaDisplayName splits the "Last, First" display name some IdPs (e.g.
+// Entra) use. It reports ok=false when the name has no comma, since a
+// space-separated name does not reliably mark the family/given boundary for
+// multi-part names.
+func splitCommaDisplayName(name string) (firstName, lastName string, ok bool) {
+	name = strings.TrimSpace(name)
+	comma := strings.Index(name, ",")
+	if comma < 0 {
+		return "", "", false
+	}
+	family := strings.TrimSpace(name[:comma])
+	given := strings.TrimSpace(name[comma+1:])
+	if family == "" && given == "" {
+		return "", "", false
+	}
+	return given, family, true
+}
+
+// syncNamesFromProvider updates a user's name from the IdP claims, best-effort:
+// a name-sync failure must not block authentication.
+func (s *UserStore) syncNamesFromProvider(user *models.User, claims *OIDCClaims, provider *SSOProvider) {
+	if err := s.syncNames(user, claims); err != nil {
+		slog.Warn("failed to sync SSO user name",
+			slog.String("component", "sso"),
+			slog.String("provider", provider.Slug),
+			slog.Int("user_id", user.ID),
+			slog.Any("error", err))
+	}
+}
+
+// syncNames updates a user's name from the identity provider. It only runs
+// when the provider sends an explicit given_name or family_name, so a
+// display-name guess cannot overwrite a locally corrected name. A half that
+// the provider omits keeps the stored value.
+func (s *UserStore) syncNames(user *models.User, claims *OIDCClaims) error {
+	if strings.TrimSpace(claims.GivenName) == "" && strings.TrimSpace(claims.FamilyName) == "" {
+		return nil
+	}
+
+	firstName, lastName := resolveNames(claims)
+	if firstName == "" {
+		firstName = user.FirstName
+	}
+	if lastName == "" {
+		lastName = user.LastName
+	}
+	if firstName == user.FirstName && lastName == user.LastName {
+		return nil
+	}
+
+	if _, err := s.db.ExecWrite(
+		`UPDATE users SET first_name = ?, last_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		firstName, lastName, user.ID,
+	); err != nil {
+		return err
+	}
+	user.FirstName = firstName
+	user.LastName = lastName
 	return nil
 }
 

@@ -255,16 +255,25 @@ func portalServedWorkspace(served []int, workspaceID int) bool {
 }
 
 // portalActorCanViewRequest checks the approver pool. While a request is
-// pending only the active pool may read it; after it resolves, prior approvers
-// retain read access to the history.
+// pending only an active approver on a started pending step may read it; after
+// it resolves, prior approvers retain read access to the history.
 func portalActorCanViewRequest(actor portalApprovalActor, req *models.ApprovalRequest) bool {
-	requireActive := req.Status == models.ApprovalRequestStatusPending
-	for _, si := range req.StepInstances {
-		for _, app := range si.Approvers {
-			if !portalActorMatchesApprover(actor, app) {
+	if req.Status == models.ApprovalRequestStatusPending {
+		for _, si := range req.StepInstances {
+			if si.Status != models.ApprovalStepStatusPending || si.StartedAt == nil {
 				continue
 			}
-			if !requireActive || app.IsActive {
+			for _, app := range si.Approvers {
+				if app.IsActive && portalActorMatchesApprover(actor, app) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for _, si := range req.StepInstances {
+		for _, app := range si.Approvers {
+			if portalActorMatchesApprover(actor, app) {
 				return true
 			}
 		}

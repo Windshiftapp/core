@@ -34,8 +34,12 @@ type Intake struct {
 	ProcessingDisposition string `json:"processing_disposition,omitempty"`
 	// SendConfirmation emails the sender a receipt when this intake creates a
 	// new item. Off by default.
-	SendConfirmation bool   `json:"send_confirmation"`
-	Status           string `json:"status"`
+	SendConfirmation bool `json:"send_confirmation"`
+	// ImportExistingMail imports the mailbox's existing messages when the
+	// intake polls for the first time. Off by default so connecting a mailbox
+	// does not turn its whole history into tickets.
+	ImportExistingMail bool   `json:"import_existing_mail"`
+	Status             string `json:"status"`
 	// StatusReason explains a needs_attention status for the admin UI.
 	StatusReason string    `json:"status_reason,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`

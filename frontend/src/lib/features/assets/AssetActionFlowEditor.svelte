@@ -28,6 +28,7 @@
     assetActionConditionFields,
     loadAssetActionCustomFields,
   } from './assetActionVariables.js';
+  import { conditionOperators } from '../actions/conditionOperators.js';
 
   let { action, onSave, onCancel } = $props();
 
@@ -171,15 +172,6 @@
   ];
 
   const conditionFields = assetActionConditionFields;
-
-  const conditionOperators = [
-    { value: 'eq', label: 'Equals' },
-    { value: 'ne', label: 'Not Equals' },
-    { value: 'contains', label: 'Contains' },
-    { value: 'not_contains', label: 'Not Contains' },
-    { value: 'starts_with', label: 'Starts With' },
-    { value: 'ends_with', label: 'Ends With' },
-  ];
 </script>
 
 <BaseActionFlowEditor

@@ -557,6 +557,17 @@ export default {
       callbackUrlHelp: 'Konfigurieren Sie diese URL als Redirect/Callback-URL in Ihrem Identitätsanbieter',
       scopes: 'Scopes',
       scopesHelp: 'Leerzeichen-getrennte Liste von OIDC-Scopes',
+      nameClaimsHelp:
+        'Manche Anbieter (zum Beispiel Microsoft Entra ID) liefern standardmäßig nur den Anzeigenamen. Fügen Sie given_name und family_name als optionale Ansprüche hinzu, damit Windshift den strukturierten Namen erhält, statt den Anzeigenamen zu zerlegen.',
+      attributeMapping: 'Attributzuordnung',
+      attributeMappingHelp:
+        'Optional. Überschreiben Sie, aus welchem Claim ein Feld gelesen wird, wenn Ihr Anbieter keine Standard-Claim-Namen verwendet. Lassen Sie ein Feld leer, um den im Platzhalter angezeigten Standard-Claim zu verwenden.',
+      attributeEmail: 'E-Mail-Claim',
+      attributeEmailVerified: 'Claim für bestätigte E-Mail',
+      attributeName: 'Claim für vollständigen Namen',
+      attributeGivenName: 'Claim für Vorname',
+      attributeFamilyName: 'Claim für Nachname',
+      attributeUsername: 'Claim für Benutzername',
       enabled: 'Aktiviert',
       disabled: 'Deaktiviert',
       default: 'Standard',

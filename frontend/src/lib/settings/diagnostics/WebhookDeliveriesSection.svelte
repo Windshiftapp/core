@@ -13,7 +13,9 @@
   } from '../../api/diagnostics.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import DiagnosticsSection from './DiagnosticsSection.svelte';
-  import { formatLatencyMs, formatUtcTime, runDiagnosticsPurge, successSummary, truncateText } from './format-utils.js';
+  import DiagnosticsTotalsGrid from './DiagnosticsTotalsGrid.svelte';
+  import DiagnosticsFailuresTable from './DiagnosticsFailuresTable.svelte';
+  import { diagnosticsTotals, formatLatencyMs, formatUtcTime, runDiagnosticsPurge, successSummary } from './format-utils.js';
 
   let view = $state({ loading: true, error: null, recent: [], stats: [], dispatch: null });
   let lastRefreshed = $state(null);
@@ -45,25 +47,7 @@
   }
 
   // Aggregate totals across all channels for the headline tiles.
-  const totals = $derived.by(() => {
-    let total = 0;
-    let success = 0;
-    let failed = 0;
-    let latencyWeighted = 0;
-    let latencyCount = 0;
-    for (const s of view.stats) {
-      total += s.total ?? 0;
-      success += s.successes ?? 0;
-      failed += s.failures ?? 0;
-      if (s.avg_latency_ms != null && s.total) {
-        latencyWeighted += s.avg_latency_ms * s.total;
-        latencyCount += s.total;
-      }
-    }
-    const successRate = total > 0 ? Math.round((success / total) * 100) : null;
-    const avgLatency = latencyCount > 0 ? Math.round(latencyWeighted / latencyCount) : null;
-    return { total, success, failed, successRate, avgLatency };
-  });
+  const totals = $derived(diagnosticsTotals(view.stats, 'avg_latency_ms'));
 
   const failuresOnly = $derived(view.recent.filter((d) => !d.success));
 
@@ -100,35 +84,18 @@
   bind:error={view.error}
 >
   {#snippet children()}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div data-testid="webhook-stat-total">
-        <StatCard icon={IconActivity} label="Total deliveries" value={totals.total.toString()} color="blue" />
-      </div>
-      <div data-testid="webhook-stat-success-rate">
-        <StatCard
-          icon={IconCheck}
-          label="Success rate"
-          value={totals.successRate == null ? '—' : `${totals.successRate}%`}
-          color={totals.successRate != null && totals.successRate < 95 ? 'orange' : 'green'}
-        />
-      </div>
-      <div data-testid="webhook-stat-failures">
-        <StatCard
-          icon={IconX}
-          label="Failures"
-          value={totals.failed.toString()}
-          color={totals.failed > 0 ? 'orange' : 'green'}
-        />
-      </div>
-      <div data-testid="webhook-stat-avg-latency">
-        <StatCard
-          icon={IconClock}
-          label="Avg latency"
-          value={totals.avgLatency == null ? '—' : formatLatencyMs(totals.avgLatency)}
-          color="purple"
-        />
-      </div>
-    </div>
+    <DiagnosticsTotalsGrid
+      {totals}
+      testids={{
+        total: 'webhook-stat-total',
+        successRate: 'webhook-stat-success-rate',
+        failures: 'webhook-stat-failures',
+        avg: 'webhook-stat-avg-latency',
+      }}
+      totalLabel="Total deliveries"
+      avgLabel="Avg latency"
+      formatAvg={formatLatencyMs}
+    />
 
     <div>
       <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Dispatch pipeline</h4>
@@ -180,16 +147,11 @@
 
     <div>
       <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Recent failures</h4>
-      <DataTable
+      <DiagnosticsFailuresTable
         columns={failureColumns}
-        data={failuresOnly}
-        keyField="id"
+        rows={failuresOnly}
         emptyMessage="No failed deliveries in the last 24h."
-      >
-        {#snippet errorMessage(d)}
-          <span style="color: var(--ds-text);" title={d.error_message}>{truncateText(d.error_message, 80) || '—'}</span>
-        {/snippet}
-      </DataTable>
+      />
     </div>
   {/snippet}
 </DiagnosticsSection>

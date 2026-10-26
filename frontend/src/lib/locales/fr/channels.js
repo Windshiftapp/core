@@ -237,6 +237,9 @@ export default {
     intakeSendConfirmation: 'Envoyer un accusé de réception',
     intakeSendConfirmationHint:
       "Envoyer à l'expéditeur une confirmation que sa demande a bien été reçue. L'accusé inclut un lien vers le portail lorsque cet accueil est lié à un portail.",
+    intakeImportExistingMail: 'Importer les e-mails existants',
+    intakeImportExistingMailHint:
+      'Lors de la première relève, importer les messages déjà présents dans la boîte au lieu de commencer par les nouveaux. Laissez désactivé pour éviter de transformer l\'historique en tickets.',
     intakeConfirmationOn: 'Accusé actif',
     // Form Channel Configuration
     openForm: 'Ouvrir le formulaire',

@@ -742,7 +742,21 @@ export default {
     "globalMilestonesHint": "全局里程碑在所有工作区之间共享；只有选中的里程碑会保留空泳道。带有卡片的里程碑始终显示。",
     "noGlobalMilestones": "没有可用的全局里程碑。",
     "completedMilestones": "已完成的里程碑",
-    "milestoneSwimlanesSaved": "里程碑泳道设置已保存"
+    "milestoneSwimlanesSaved": "里程碑泳道设置已保存",
+    "completedLabel": "已完成：{value}",
+    "completedAll": "显示全部",
+    "completedAllDescription": "加载所有已完成事项",
+    "completedLastDay": "最近一天",
+    "completedLastDayDescription": "最近 24 小时内有活动的已完成事项",
+    "completedLastWeek": "最近一周",
+    "completedLastWeekDescription": "最近 7 天内有活动的已完成事项",
+    "completedCurrentIteration": "当前迭代",
+    "completedCurrentIterationDescription": "当前活动迭代中的已完成事项",
+    "completedNone": "隐藏已完成",
+    "completedNoneDescription": "不在此看板加载已完成工作",
+    "completedLatestFifty": "最近 50 项",
+    "completedCustom": "自定义",
+    "completedVisibilitySaved": "已完成工作可见性已保存"
   },
   "collections": {
     "selectType": "选择类型",

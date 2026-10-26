@@ -25,7 +25,7 @@ func NewIntakeRepository(db database.Database) *IntakeRepository {
 const intakeSelectColumns = `
 	i.id, i.mailbox_id, i.folder, i.workspace_id, i.portal_channel_id,
 	i.request_type_id, i.item_type_id, i.rate_limit_per_hour,
-	i.processing_disposition, i.send_confirmation, i.status, i.status_reason, i.created_at, i.updated_at,
+	i.processing_disposition, i.send_confirmation, i.import_existing_mail, i.status, i.status_reason, i.created_at, i.updated_at,
 	COALESCE(c.name, '') AS mailbox_name,
 	COALESCE(s.last_uid, 0), COALESCE(s.uid_validity, 0), s.updated_at,
 	COALESCE((
@@ -47,7 +47,7 @@ func scanIntake(scanner interface {
 	if err := scanner.Scan(
 		&in.ID, &in.MailboxID, &in.Folder, &in.WorkspaceID, &portalChannelID,
 		&requestTypeID, &itemTypeID, &rateLimit,
-		&in.ProcessingDisposition, &in.SendConfirmation, &in.Status, &in.StatusReason, &in.CreatedAt, &in.UpdatedAt,
+		&in.ProcessingDisposition, &in.SendConfirmation, &in.ImportExistingMail, &in.Status, &in.StatusReason, &in.CreatedAt, &in.UpdatedAt,
 		&in.MailboxName,
 		&in.LastUID, &in.UIDValidity, &lastPolledAt, &in.RateLimitedCount,
 	); err != nil {
@@ -228,10 +228,10 @@ func (r *IntakeRepository) Create(ctx context.Context, in *models.Intake) (int, 
 	err := r.db.QueryRowContext(ctx, `
 		INSERT INTO intakes (
 			mailbox_id, folder, workspace_id, portal_channel_id, request_type_id, item_type_id,
-			rate_limit_per_hour, processing_disposition, send_confirmation, status, status_reason, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+			rate_limit_per_hour, processing_disposition, send_confirmation, import_existing_mail, status, status_reason, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, in.MailboxID, folder, in.WorkspaceID, in.PortalChannelID, in.RequestTypeID, in.ItemTypeID,
-		in.RateLimitPerHour, in.ProcessingDisposition, in.SendConfirmation, status, in.StatusReason, now, now).Scan(&id)
+		in.RateLimitPerHour, in.ProcessingDisposition, in.SendConfirmation, in.ImportExistingMail, status, in.StatusReason, now, now).Scan(&id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return 0, ErrDuplicateEntry
@@ -250,10 +250,10 @@ func (r *IntakeRepository) Update(ctx context.Context, in *models.Intake) error 
 	res, err := r.db.ExecWriteContext(ctx, `
 		UPDATE intakes SET
 			folder = ?, workspace_id = ?, portal_channel_id = ?, request_type_id = ?, item_type_id = ?,
-			rate_limit_per_hour = ?, processing_disposition = ?, send_confirmation = ?, status = ?, status_reason = ?, updated_at = ?
+			rate_limit_per_hour = ?, processing_disposition = ?, send_confirmation = ?, import_existing_mail = ?, status = ?, status_reason = ?, updated_at = ?
 		WHERE id = ?
 	`, folder, in.WorkspaceID, in.PortalChannelID, in.RequestTypeID, in.ItemTypeID,
-		in.RateLimitPerHour, in.ProcessingDisposition, in.SendConfirmation, in.Status, in.StatusReason, time.Now(), in.ID)
+		in.RateLimitPerHour, in.ProcessingDisposition, in.SendConfirmation, in.ImportExistingMail, in.Status, in.StatusReason, time.Now(), in.ID)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return ErrDuplicateEntry

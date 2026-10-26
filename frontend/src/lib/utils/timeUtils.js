@@ -102,6 +102,39 @@ export function durationToString(totalMinutes, options = {}) {
 }
 
 /**
+ * Convert total minutes to the spaced "1h 30m" form used by time reports,
+ * timesheets, and the day planner. Returns '0m' for zero/negative input.
+ */
+export function formatDurationMinutes(totalMinutes) {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
+/**
+ * Format an elapsed-millisecond span as "Nms" / "N.Ns". Callers pick the
+ * decimal precision their surface needs (2 for compact log rows, 1 for
+ * detail views). Returns '-' for non-finite input.
+ */
+export function formatElapsedMs(ms, decimals = 1) {
+  if (!Number.isFinite(ms)) return '-';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(decimals)}s`;
+}
+
+/**
+ * Elapsed milliseconds between an action log's start and completion, or null
+ * when either timestamp is missing.
+ */
+export function actionLogElapsedMs(log) {
+  if (!log?.started_at || !log?.completed_at) return null;
+  return new Date(log.completed_at).getTime() - new Date(log.started_at).getTime();
+}
+
+/**
  * Compute positive minutes between two HH:MM times; an end at or before the
  * start wraps to the next day (overnight entry). Returns 0 for invalid input.
  */

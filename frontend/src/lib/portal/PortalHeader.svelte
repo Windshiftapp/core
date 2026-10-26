@@ -265,7 +265,12 @@
               class="absolute top-11 right-0 w-56 rounded-lg border p-1.5 shadow-lg"
               style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
             >
-              <button type="button" onclick={() => navigate('/')} class="portal-menu-item">
+              <button
+                type="button"
+                onclick={() => navigate('/')}
+                class="portal-menu-item"
+                data-testid="portal-back-to-app"
+              >
                 <ArrowLeft class="w-4 h-4" />
                 <span>{t('portal.backToApp')}</span>
               </button>

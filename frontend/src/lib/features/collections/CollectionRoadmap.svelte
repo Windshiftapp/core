@@ -1300,7 +1300,7 @@
 
       <!-- Controls Bar -->
       <div class="relative z-40 flex items-center mb-4">
-        <SubFilterBar {workspaceId} />
+        <SubFilterBar {workspaceId} {collectionId} />
       </div>
 
       <!-- Toolbar: Zoom + Navigation + Settings toggle -->

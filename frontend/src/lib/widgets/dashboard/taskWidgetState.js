@@ -140,3 +140,22 @@ export function normalizeTaskResponse(response, maxItems = 6) {
 export function openTask(task) {
   itemModalStore.open(task.id, task.workspace_id);
 }
+
+/**
+ * Per-mode config for the dashboard task-list widgets. `assigned` and
+ * `created` share the whole load/render path and differ only here.
+ */
+export const TASK_LIST_MODES = {
+  assigned: {
+    query: assignedToMeQuery,
+    errorKey: 'dashboard.states.assignedLoadError',
+    emptyKey: 'dashboard.states.assignedEmpty',
+    logLabel: 'assigned items',
+  },
+  created: {
+    query: createdByMeQuery,
+    errorKey: 'dashboard.states.createdLoadError',
+    emptyKey: 'dashboard.states.createdEmpty',
+    logLabel: 'created items',
+  },
+};

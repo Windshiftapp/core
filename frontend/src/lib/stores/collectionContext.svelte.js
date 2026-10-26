@@ -16,6 +16,7 @@ import {
 import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
 import { isExpectedBackgroundSyncError } from '../utils/backgroundSync.js';
 import { calcHasMore } from '../utils/paginationUtils.js';
+import { collectionPreferences } from './collectionPreferences.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 
 const COLLECTION_VIEWS = new Set([
@@ -97,7 +98,14 @@ class CollectionStore {
   backlogItems = $state([]);
   collectionName = $state('Default');
   collectionTotal = $state(null);
-  #countRequestId = 0;
+  // Deferred count coalescing: at most one in-flight count per scope
+  // generation, plus a dirty flag that turns any number of invalidations into
+  // a single follow-up read. The generation changes on scope change so a late
+  // response from a previous scope cannot write the current one.
+  #countPending = null;
+  #countPendingGeneration = -1;
+  #countDirty = false;
+  #countGeneration = 0;
   publicSlug = $state(null);
   loading = $state(false);
 
@@ -111,6 +119,9 @@ class CollectionStore {
   // The rightmost cap is retained as a specialized view of that partition.
   boardDeferred = $state(null);
   rightmostCap = $state(null);
+  // Iteration that the "current_iteration" completed-visibility preset scopes
+  // completed work to. The board sets it once its iteration catalog loads.
+  boardCompletedIterationId = $state(null);
 
   // View search is a separate server-scoped result set, shared by the board
   // and list views. Keeping it apart prevents a search from changing the
@@ -145,19 +156,45 @@ class CollectionStore {
     return `collection-show-completed:${scope}:${view?.split('-').at(-1)}`;
   }
 
+  // View state lives in user preferences; the localStorage key is only the
+  // fallback for settings saved before that moved to the server.
+  #showCompletedFor(wsId, colId, view) {
+    const stored = collectionPreferences.getViewState(wsId, colId, view?.split('-').at(-1));
+    if (stored && typeof stored.show_completed === 'boolean') return stored.show_completed;
+    try {
+      return localStorage.getItem(this.#completionPreferenceKey(wsId, colId, view)) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
   async setShowCompleted(value) {
     this.showCompleted = value;
-    try {
-      localStorage.setItem(
-        this.#completionPreferenceKey(this.#wsId, this.#colId, this.#currentView),
-        String(value)
-      );
-    } catch {
-      // Keep the setting usable when browser storage is unavailable.
-    }
+    collectionPreferences.patchViewState(
+      this.#wsId,
+      this.#colId,
+      this.#currentView?.split('-').at(-1),
+      {
+        show_completed: value,
+      }
+    );
     this.clearSearch();
     if (this.#wsId || this.#colId) {
       await this.load(this.#wsId, this.#colId, this.#currentView);
+    }
+  }
+
+  /**
+   * Scopes the "current_iteration" completed-visibility preset to an
+   * iteration. The board calls this once its iteration catalog resolves; a
+   * change re-runs the partition fetch so completed work matches the preset.
+   */
+  setBoardCompletedIteration(id) {
+    const next = id == null ? null : Number(id);
+    if (next === this.boardCompletedIterationId) return;
+    this.boardCompletedIterationId = next;
+    if (BOARD_VIEWS.has(this.#currentView) && (this.#wsId || this.#colId)) {
+      this.load(this.#wsId, this.#colId, this.#currentView);
     }
   }
 
@@ -236,12 +273,7 @@ class CollectionStore {
     if (BOARD_VIEWS.has(view)) {
       this.showCompleted = true;
     } else if (!sameCollection || viewChanged) {
-      try {
-        this.showCompleted =
-          localStorage.getItem(this.#completionPreferenceKey(wsId, colId, view)) === 'true';
-      } catch {
-        this.showCompleted = false;
-      }
+      this.showCompleted = this.#showCompletedFor(wsId, colId, view);
     }
 
     // Switching between passive collection views does not need another network
@@ -285,6 +317,7 @@ class CollectionStore {
       this.boardBackgroundLoading = false;
       this.boardDeferred = null;
       this.rightmostCap = null;
+      this.boardCompletedIterationId = null;
       this.backlogPagination = null;
       this.backlogHasMore = false;
       this.backlogLoadingMore = false;
@@ -303,6 +336,10 @@ class CollectionStore {
       this.#boardConfigurationPromise = null;
       this.#boardConfigurationLoaded = false;
       this.#changesWatermark = null;
+      this.#countGeneration += 1;
+      this.#countPending = null;
+      this.#countPendingGeneration = -1;
+      this.#countDirty = false;
       this.clearSearch();
     }
     this.#wsId = wsId;
@@ -321,8 +358,12 @@ class CollectionStore {
           : await getCollection(colId)
         : null;
       if (loadId !== this.#loadId) return; // stale
+      // Keep the collection record available to view-scoped controls (shared
+      // named views, configure affordances) on every collection view, not just
+      // the board where the board bootstrap normally populates it.
+      if (collection) this.boardCollection = collection;
 
-      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
         loadsItems(view)
           ? this.#fetchMainItems(
               wsId,
@@ -345,7 +386,6 @@ class CollectionStore {
         loadsItems(view)
           ? this.#fetchBoardDeferredItems(wsId, colId, boardPartition, collection)
           : Promise.resolve(null),
-        this.#refreshCollectionTotal(),
       ]);
 
       if (loadId !== this.#loadId) return; // stale
@@ -354,10 +394,11 @@ class CollectionStore {
         itemsResult,
         backlogResult,
         deferredResult,
-        countResult,
         boardPartition,
         collection,
       });
+      // The count is not needed to paint rows; fetch it after they are visible.
+      void this.#requestCollectionTotal();
       if (itemsResult && BOARD_VIEWS.has(view)) {
         void this.#loadRemainingBoardItems({
           first: itemsResult,
@@ -391,14 +432,7 @@ class CollectionStore {
    * Apply one round of fetched results to store state. Load and refresh share
    * this so their state shapes cannot drift apart.
    */
-  #applyResults({
-    itemsResult,
-    backlogResult,
-    deferredResult,
-    countResult,
-    boardPartition,
-    collection,
-  }) {
+  #applyResults({ itemsResult, backlogResult, deferredResult, boardPartition, collection }) {
     if (itemsResult) {
       this.items = deferredResult
         ? [...itemsResult.items, ...deferredResult.items]
@@ -435,30 +469,49 @@ class CollectionStore {
           collection?.is_public && collection?.public_slug ? collection.public_slug : null;
       }
     }
-    this.#changesWatermark = snapshotWatermark(
-      itemsResult,
-      backlogResult,
-      deferredResult,
-      countResult
-    );
+    this.#changesWatermark = snapshotWatermark(itemsResult, backlogResult, deferredResult);
   }
 
-  async #refreshCollectionTotal() {
+  /**
+   * Request the unfiltered collection count without blocking item paint. One
+   * read is in flight per scope generation; any invalidation that arrives
+   * while it is pending is folded into a single follow-up read. A response
+   * from a previous scope is discarded.
+   */
+  #requestCollectionTotal() {
     if (!this.#wsId && !this.#colId) return null;
-    const requestId = ++this.#countRequestId;
-    const loadId = this.#loadId;
+    const generation = this.#countGeneration;
+    if (this.#countPending && this.#countPendingGeneration === generation) {
+      this.#countDirty = true;
+      return this.#countPending;
+    }
+    this.#countDirty = false;
+    const run = this.#runCollectionTotal(generation);
+    this.#countPending = run;
+    this.#countPendingGeneration = generation;
+    return run;
+  }
+
+  async #runCollectionTotal(generation) {
     try {
-      const result = await fetchCollectionTotal(this.#wsId, this.#colId, FOREGROUND_READ);
-      if (requestId === this.#countRequestId && loadId === this.#loadId) {
-        this.collectionTotal = result.total;
-        this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark);
-      }
-      return result;
+      const result = await fetchCollectionTotal(this.#wsId, this.#colId, BACKGROUND_READ);
+      if (generation !== this.#countGeneration) return;
+      if (result?.total != null) this.collectionTotal = result.total;
+      this.#changesWatermark = minimumWatermark(this.#changesWatermark, result?.watermark);
     } catch (error) {
-      if (requestId !== this.#countRequestId || loadId !== this.#loadId) return;
-      this.collectionTotal = null;
+      if (generation !== this.#countGeneration) return;
+      // Keep the last known count as stale. An unavailable count is never 0.
       if (!isExpectedBackgroundSyncError(error)) {
         console.error('[collectionStore] Count refresh failed:', error);
+      }
+    } finally {
+      if (this.#countPendingGeneration === generation) {
+        this.#countPending = null;
+        this.#countPendingGeneration = -1;
+        if (this.#countDirty) {
+          this.#countDirty = false;
+          void this.#requestCollectionTotal();
+        }
       }
     }
   }
@@ -483,13 +536,40 @@ class CollectionStore {
       }
 
       const cappedStatusIds = rightmostCapStatusIds(config, statuses);
+      const completedStatusIds = statuses
+        .filter((status) => status.is_completed)
+        .map((status) => status.id);
+      const visibility = config?.view_settings?.completed_visibility ?? '';
+
+      // Explicit presets take precedence over the legacy cap/retention pair.
+      if (visibility === 'none') {
+        // Keep completed statuses out of the main fetch without a second
+        // request; the board renders no completed work at all.
+        return completedStatusIds.length
+          ? { statusIds: completedStatusIds, limit: 0, capped: false, hidden: true }
+          : null;
+      }
+      if (
+        visibility === 'all' ||
+        visibility === 'last_day' ||
+        visibility === 'last_week' ||
+        visibility === 'current_iteration'
+      ) {
+        if (completedStatusIds.length === 0) return null;
+        const activityDays = visibility === 'last_day' ? 1 : visibility === 'last_week' ? 7 : null;
+        return {
+          statusIds: completedStatusIds,
+          limit: DEFAULT_PAGE_SIZE,
+          capped: false,
+          completedActivityDays: activityDays,
+          iterationId: visibility === 'current_iteration' ? this.boardCompletedIterationId : null,
+        };
+      }
+
       if (cappedStatusIds?.length) {
         return { statusIds: cappedStatusIds, limit: RIGHTMOST_COLUMN_LIMIT, capped: true };
       }
 
-      const completedStatusIds = statuses
-        .filter((status) => status.is_completed)
-        .map((status) => status.id);
       const retentionDays = Number(config?.completed_item_retention_days);
       const completedActivityDays =
         Number.isInteger(retentionDays) && retentionDays >= 1 && retentionDays <= 3650
@@ -716,7 +796,7 @@ class CollectionStore {
   }
 
   #fetchBoardDeferredItems(wsId, colId, boardPartition, collection, limitOverride = null) {
-    if (!boardPartition?.statusIds?.length) return Promise.resolve(null);
+    if (!boardPartition?.statusIds?.length || boardPartition.hidden) return Promise.resolve(null);
     const limit = boardPartition.capped
       ? RIGHTMOST_COLUMN_LIMIT
       : Math.max(DEFAULT_PAGE_SIZE, limitOverride ?? boardPartition.limit ?? 0);
@@ -728,6 +808,7 @@ class CollectionStore {
       requestOptions: FOREGROUND_READ,
       status_id: boardPartition.statusIds.join(','),
       completed_activity_days: boardPartition.completedActivityDays || undefined,
+      iteration_id: boardPartition.iterationId || undefined,
       ...(boardPartition.capped
         ? { order_by: 'last_active_at', sort_direction: 'desc' }
         : this.#itemSortOptions()),
@@ -879,6 +960,7 @@ class CollectionStore {
           ? {
               status_id: deferred.statusIds.join(','),
               completed_activity_days: deferred.completedActivityDays || undefined,
+              iteration_id: deferred.iterationId || undefined,
             }
           : this.#boardExclusionFilter()),
       });
@@ -948,16 +1030,13 @@ class CollectionStore {
     const loadId = ++this.#loadId;
 
     try {
-      const [result] = await Promise.all([
-        fetchCollectionItems(this.#wsId, this.#colId, {
-          page,
-          limit,
-          sub_ql: this.effectiveSubFilterQL || undefined,
-          requestOptions: FOREGROUND_READ,
-          ...this.#itemSortOptions(),
-        }),
-        this.#refreshCollectionTotal(),
-      ]);
+      const result = await fetchCollectionItems(this.#wsId, this.#colId, {
+        page,
+        limit,
+        sub_ql: this.effectiveSubFilterQL || undefined,
+        requestOptions: FOREGROUND_READ,
+        ...this.#itemSortOptions(),
+      });
 
       if (loadId !== this.#loadId) return;
 
@@ -974,6 +1053,7 @@ class CollectionStore {
         this.sortableFields = result.sortableFields;
       }
       this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
+      void this.#requestCollectionTotal();
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] setItemsPage failed:', error);
@@ -1011,7 +1091,7 @@ class CollectionStore {
       if (loadId !== this.#loadId) return false;
 
       const deferredLoadedCount = this.items.length - this.mainItemsLoadedCount;
-      const [itemsResult, backlogResult, deferredResult, countResult] = await Promise.all([
+      const [itemsResult, backlogResult, deferredResult] = await Promise.all([
         loadsItems(this.#currentView)
           ? this.#fetchCompleteMainItems(
               this.#wsId,
@@ -1042,7 +1122,6 @@ class CollectionStore {
               deferredLoadedCount
             )
           : Promise.resolve(null),
-        this.#refreshCollectionTotal(),
       ]);
       if (loadId !== this.#loadId) return false;
 
@@ -1050,10 +1129,10 @@ class CollectionStore {
         itemsResult,
         backlogResult,
         deferredResult,
-        countResult,
         boardPartition,
         collection,
       });
+      void this.#requestCollectionTotal();
       return true;
     } catch (error) {
       if (loadId !== this.#loadId) return false;
@@ -1132,7 +1211,7 @@ class CollectionStore {
     try {
       const updated = await itemsApi.get(itemId);
       this.#applyUpdatedItem(updated);
-      await this.#refreshCollectionTotal();
+      await this.#requestCollectionTotal();
     } catch (e) {
       console.error('[collectionStore] refreshItem failed:', e);
     }
@@ -1140,7 +1219,7 @@ class CollectionStore {
 
   applyItem(item) {
     if (!item?.id) return;
-    void this.#refreshCollectionTotal();
+    void this.#requestCollectionTotal();
     if (this.#hideCompletedItem(item)) return;
     const index = this.items.findIndex((current) => current.id === item.id);
     if (index === -1) {
@@ -1302,7 +1381,7 @@ class CollectionStore {
       // object identity for rows/cards that were patched in place.
       this.items = [...this.items];
       this.backlogItems = [...this.backlogItems];
-      await this.#refreshCollectionTotal();
+      await this.#requestCollectionTotal();
       // Commit the cursor only after the patch applied successfully so a
       // failure preserves the previous cursor for replay.
       this.#changesWatermark = nextWatermark;

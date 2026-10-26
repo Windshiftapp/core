@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS jira_import_jobs (
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
+    -- Set when the operator clears the job from the import history. The job
+    -- and its imported data are retained; only the history listing hides it.
+    hidden_at TIMESTAMPTZ,
     -- Epoch seconds until which the in-process worker owns this job. A live
     -- worker renews it; startup reconciliation fails queued/running jobs whose
     -- lease expired so a restart cannot block retry or cleanup.

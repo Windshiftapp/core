@@ -280,6 +280,61 @@ func (s *CatalogReadService) GetUser(userID, targetID int) (*models.User, error)
 	return user, nil
 }
 
+// GetUserDisplayBatch returns active users for a bounded id set. Self is
+// returned without user.list; any other id requires it. Forbidden, inactive,
+// and nonexistent ids are omitted identically, and results preserve the
+// caller's request order.
+func (s *CatalogReadService) GetUserDisplayBatch(ctx context.Context, userID int, ids []int) ([]models.User, error) {
+	if len(ids) == 0 {
+		return []models.User{}, nil
+	}
+
+	allowedIDs := ids
+	needsDirectory := false
+	for _, id := range ids {
+		if id != userID {
+			needsDirectory = true
+			break
+		}
+	}
+	if needsDirectory {
+		allowed, err := s.access.HasGlobalPermission(userID, models.PermissionUserList)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			allowedIDs = nil
+			for _, id := range ids {
+				if id == userID {
+					allowedIDs = []int{id}
+					break
+				}
+			}
+		}
+	}
+	if len(allowedIDs) == 0 {
+		return []models.User{}, nil
+	}
+
+	users, err := s.users.ListByIDs(ctx, allowedIDs)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int]models.User, len(users))
+	for _, user := range users {
+		if user.IsActive {
+			byID[user.ID] = user
+		}
+	}
+	result := make([]models.User, 0, len(byID))
+	for _, id := range allowedIDs {
+		if user, ok := byID[id]; ok {
+			result = append(result, user)
+		}
+	}
+	return result, nil
+}
+
 func (s *CatalogReadService) ListLabels(userID, workspaceID int) ([]models.Label, error) {
 	if _, err := s.GetWorkspace(userID, workspaceID); err != nil {
 		return nil, err

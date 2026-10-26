@@ -69,6 +69,9 @@
           <DashboardItemRow
             title={item.title}
             itemKey={itemKey(item)}
+            itemTypeName={item.item_type_name}
+            itemTypeIcon={item.item_type_icon}
+            itemTypeColor={item.item_type_color}
             href={`/workspaces/${item.workspace_id}/items/${item.item_id}`}
             statusName={item.status}
             statusBuiltinKey={item.status_builtin_key}

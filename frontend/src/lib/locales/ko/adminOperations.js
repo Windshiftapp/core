@@ -358,6 +358,8 @@ export default {
     },
     "deleteData": "데이터 삭제",
     "unavailable": "사용 불가",
+    "removeFromList": "목록에서 제거",
+    "importRemovedFromHistory": "가져오기 기록에서 제거했습니다",
     "dataDeleted": "가져온 Jira 데이터를 삭제했습니다. 다시 가져올 수 있습니다.",
     "deleteImportedTitle": "가져온 Jira 데이터 삭제",
     "deleteWarningTitle": "여러 Windshift 워크스페이스가 삭제될 수 있습니다.",

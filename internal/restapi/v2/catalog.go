@@ -44,6 +44,7 @@ type configurationReader interface {
 }
 
 func registerCatalogRoutes(builder *routeBuilder, deps Deps) {
+	builder.Read("/catalogs/global-bootstrap", AuthAuthenticated, []string{"item-types:read", "statuses:read", "priorities:read"}, globalCatalogBootstrap(deps))
 	builder.Read("/query-language/catalog", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionCatalog(deps.Configuration))
 	builder.Read("/query-language/values", AuthAuthenticated, []string{"items:read"}, queryLanguageCompletionValues(queryLanguageValueLoader{
 		configuration: deps.Configuration,
@@ -492,6 +493,72 @@ func getCustomField(reader configurationReader) readOperation[customFieldDTO] {
 		}
 		return item, nil
 	}
+}
+
+// globalBootstrapDTO is the single-request global reference catalog. Custom
+// fields stay optional: a bearer caller without custom-fields:read, or a
+// failing reader, gets null definitions plus an error code instead of an
+// empty list that looks like a complete read.
+type globalBootstrapDTO struct {
+	ItemTypes              []itemTypeDTO       `json:"item_types"`
+	Statuses               []statusDTO         `json:"statuses"`
+	StatusCategories       []statusCategoryDTO `json:"status_categories"`
+	Priorities             []priorityDTO       `json:"priorities"`
+	CustomFieldDefinitions []customFieldDTO    `json:"custom_field_definitions"`
+	CustomFieldsError      *string             `json:"custom_fields_error"`
+}
+
+func globalCatalogBootstrap(deps Deps) readOperation[globalBootstrapDTO] {
+	return func(r *http.Request) (globalBootstrapDTO, error) {
+		itemTypes, err := listItemTypes(deps.Configuration, deps.ObjectTranslations)(r)
+		if err != nil {
+			return globalBootstrapDTO{}, err
+		}
+		statuses, err := listStatuses(deps.Statuses, deps.ObjectTranslations)(r)
+		if err != nil {
+			return globalBootstrapDTO{}, err
+		}
+		categories, err := listStatusCategories(deps.Statuses, deps.ObjectTranslations)(r)
+		if err != nil {
+			return globalBootstrapDTO{}, err
+		}
+		priorities, err := listPriorities(deps.Configuration, deps.ObjectTranslations)(r)
+		if err != nil {
+			return globalBootstrapDTO{}, err
+		}
+
+		result := globalBootstrapDTO{
+			ItemTypes:        itemTypes,
+			Statuses:         statuses,
+			StatusCategories: categories,
+			Priorities:       priorities,
+		}
+
+		if !canReadCustomFields(r, deps) {
+			code := "insufficient_permission"
+			result.CustomFieldsError = &code
+			return result, nil
+		}
+		fields, _, err := listCustomFields(deps)(r)
+		if err != nil {
+			code := "custom_fields_unavailable"
+			result.CustomFieldsError = &code
+			return result, nil //nolint:nilerr // custom fields are optional; the bootstrap reports the failure inline
+		}
+		result.CustomFieldDefinitions = fields
+		return result, nil
+	}
+}
+
+// canReadCustomFields keeps the optional custom-field read separate from the
+// required catalog scopes. Session callers use the session mount; bearer
+// callers must carry the custom-fields:read scope.
+func canReadCustomFields(r *http.Request, deps Deps) bool {
+	token, _ := r.Context().Value(contextkeys.APIToken).(*models.APIToken)
+	if token == nil {
+		return true
+	}
+	return deps.Tokens.CheckTokenPermissions(token, []string{"custom-fields:read"})
 }
 
 func customFieldFromResult(result services.CustomFieldResult) (customFieldDTO, error) {

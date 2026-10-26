@@ -975,7 +975,7 @@ func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[
 	allowed := make(map[string]struct{}, len(screenFields))
 	for _, field := range screenFields {
 		if field.FieldType == "custom" && field.FieldName != "" &&
-			isPublicFormFillableCustomFieldType(field.CustomFieldType) {
+			IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
 			allowed[field.FieldIdentifier] = struct{}{}
 		}
 	}

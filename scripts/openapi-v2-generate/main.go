@@ -329,7 +329,7 @@ func schemaFor(t reflect.Type, active map[reflect.Type]bool) map[string]any {
 			}
 			propertySchema := schemaFor(field.Type, active)
 			properties[name] = propertySchema
-			applyFieldDescription(name, propertySchema)
+			applyFieldDescription(field, name, propertySchema)
 			if !options["omitempty"] && field.Type.Kind() != reflect.Pointer && !isOptional(field.Type) {
 				required = append(required, name)
 			}
@@ -346,13 +346,21 @@ func schemaFor(t reflect.Type, active map[reflect.Type]bool) map[string]any {
 	return nullableSchema(schema, nullable)
 }
 
-func applyFieldDescription(name string, schema map[string]any) {
+func applyFieldDescription(field reflect.StructField, name string, schema map[string]any) {
 	schema["description"] = "The " + strings.ReplaceAll(name, "_", " ") + " value."
 	switch name {
 	case "is_task":
 		schema["description"] = "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status."
 	case "ids":
 		schema["description"] = "Resource IDs in preferred response order. At most 500 IDs are accepted; duplicates use their first occurrence and missing or invisible resources are omitted."
+	}
+	if raw := field.Tag.Get("maxItems"); raw != "" {
+		if limit, err := strconv.Atoi(raw); err == nil {
+			schema["maxItems"] = limit
+			if name == "ids" {
+				schema["description"] = fmt.Sprintf("Resource IDs in preferred response order. At most %d IDs are accepted; duplicates use their first occurrence and missing or invisible resources are omitted.", limit)
+			}
+		}
 	}
 }
 

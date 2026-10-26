@@ -38,6 +38,9 @@
         <DashboardItemRow
           title={task.title}
           itemKey={`${task.workspace_key}-${task.workspace_item_number}`}
+          itemTypeName={task.item_type_name}
+          itemTypeIcon={task.item_type_icon}
+          itemTypeColor={task.item_type_color}
           href={`/workspaces/${task.workspace_id}/items/${task.id}`}
           statusName={task.status_name}
           statusBuiltinKey={task.status_builtin_key}

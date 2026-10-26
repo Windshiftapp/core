@@ -5,9 +5,18 @@
 
 import { hub } from '../api/hub.js';
 import { attachments } from '../api/misc.js';
+import { uploadBrandImage } from '../utils/brandLogoUpload.js';
 import { createId } from '../utils/uuid.js';
 import { authStore } from './auth.svelte.js';
 import { createFooterLinkHelpers } from './footerLinks.js';
+import {
+  addSectionMember,
+  addSection as addSectionToList,
+  moveSection,
+  removeSection as removeSectionFromList,
+  removeSectionMember,
+  updateSectionField,
+} from './sectionManagement.js';
 
 export { WINDSHIFT_GRADIENT } from '../utils/gradients.js';
 export { gradients, iconMap } from './portalPresentation.js';
@@ -151,24 +160,14 @@ function selectGradient(index) {
  * Handle logo upload
  */
 async function handleLogoUpload(files) {
-  if (!files || files.length === 0) return;
-
-  const file = files[0];
-  if (!file.type.startsWith('image/')) {
-    console.error('Please select an image file');
-    return;
-  }
-
   uploadingLogo = true;
   try {
-    const uploadFormData = new FormData();
-    uploadFormData.append('file', file);
-    uploadFormData.append('category', 'hub_logo');
-
-    const uploadResult = await attachments.upload(uploadFormData);
-
-    if (uploadResult?.success && uploadResult.logo_url) {
-      logoUrl = uploadResult.logo_url;
+    const url = await uploadBrandImage(files, {
+      category: 'hub_logo',
+      upload: attachments.upload,
+    });
+    if (url) {
+      logoUrl = url;
       saveCustomizations();
     }
   } catch (err) {
@@ -218,76 +217,39 @@ async function saveCustomizations() {
 
 // Hub Sections Management
 function addSection() {
-  const newSection = {
-    id: createId(),
-    title: '',
-    subtitle: '',
-    display_order: hubSections.length,
-    portal_ids: [],
-  };
-  hubSections = [...hubSections, newSection];
+  const id = createId();
+  hubSections = addSectionToList(hubSections, 'portal_ids', id);
   saveCustomizations();
-  return newSection.id;
+  return id;
 }
 
 function deleteSection(sectionId) {
-  hubSections = hubSections
-    .filter((s) => s.id !== sectionId)
-    .map((s, i) => ({ ...s, display_order: i }));
+  hubSections = removeSectionFromList(hubSections, sectionId);
   saveCustomizations();
 }
 
 function updateSection(sectionId, field, value) {
-  hubSections = hubSections.map((s) => {
-    if (s.id === sectionId) {
-      return { ...s, [field]: value };
-    }
-    return s;
-  });
+  hubSections = updateSectionField(hubSections, sectionId, field, value);
   saveCustomizations();
 }
 
 function moveSectionUp(index) {
-  if (index === 0) return;
-  const newSections = [...hubSections];
-  [newSections[index - 1], newSections[index]] = [newSections[index], newSections[index - 1]];
-  hubSections = newSections.map((s, i) => ({ ...s, display_order: i }));
+  hubSections = moveSection(hubSections, index, -1);
   saveCustomizations();
 }
 
 function moveSectionDown(index) {
-  if (index === hubSections.length - 1) return;
-  const newSections = [...hubSections];
-  [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
-  hubSections = newSections.map((s, i) => ({ ...s, display_order: i }));
+  hubSections = moveSection(hubSections, index, 1);
   saveCustomizations();
 }
 
 function addPortalToSection(sectionId, portalId) {
-  hubSections = hubSections.map((s) => {
-    if (s.id === sectionId) {
-      if (!s.portal_ids.includes(portalId)) {
-        return {
-          ...s,
-          portal_ids: [...s.portal_ids, portalId],
-        };
-      }
-    }
-    return s;
-  });
+  hubSections = addSectionMember(hubSections, sectionId, 'portal_ids', portalId);
   saveCustomizations();
 }
 
 function removePortalFromSection(sectionId, portalId) {
-  hubSections = hubSections.map((s) => {
-    if (s.id === sectionId) {
-      return {
-        ...s,
-        portal_ids: s.portal_ids.filter((id) => id !== portalId),
-      };
-    }
-    return s;
-  });
+  hubSections = removeSectionMember(hubSections, sectionId, 'portal_ids', portalId);
   saveCustomizations();
 }
 

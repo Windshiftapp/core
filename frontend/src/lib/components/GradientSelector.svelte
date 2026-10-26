@@ -5,6 +5,7 @@
     gradients = [],
     selectedIndex = 0,
     hasBackgroundImage = false,
+    isDarkMode = false,
     onSelect = () => {},
     columns = 6,
     size = 25
@@ -39,9 +40,14 @@
         </div>
       {/if}
 
-      <!-- Dimmed state when background image is selected -->
+      <!-- Dimmed state when background image is selected. The scrim follows
+           the surface's own theme rather than the document root. -->
       {#if hasBackgroundImage && index !== 0}
-        <div class="absolute inset-0 bg-white/50 dark:bg-black/50"></div>
+        <div
+          class="absolute inset-0"
+          data-testid="gradient-scrim"
+          style="background-color: {isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)'};"
+        ></div>
       {/if}
     </button>
   {/each}

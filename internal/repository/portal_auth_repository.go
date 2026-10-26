@@ -48,7 +48,7 @@ func (r *PortalAuthRepository) CustomerEmailHasChannelAccess(ctx context.Context
 		SELECT EXISTS(
 			SELECT 1 FROM portal_customer_channels pcc
 			JOIN portal_customers pc ON pc.id = pcc.portal_customer_id
-			WHERE pc.email = ? AND pcc.channel_id = ?
+			WHERE LOWER(pc.email) = LOWER(?) AND pcc.channel_id = ?
 		)
 	`, email, channelID).Scan(&hasAccess)
 	if err != nil {

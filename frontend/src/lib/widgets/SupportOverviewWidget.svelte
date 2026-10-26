@@ -6,15 +6,22 @@
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { downloadSupportMetricsCSV } from '../features/support/metricColumns.js';
   import Chart from './Chart.svelte';
+  import SupportStatTile from './SupportStatTile.svelte';
+  import {
+    supportChartData,
+    supportDateRange,
+    supportHasActivity,
+    supportSlaLabel,
+    supportWindowDays,
+    toISOStringDate,
+  } from './supportMetricsShared.js';
 
   let { config = {}, onconfigchange = null } = $props();
 
   const configuredIds = $derived(
     Array.isArray(config?.workspace_ids) ? config.workspace_ids.map(Number) : []
   );
-  const windowDays = $derived(
-    config?.window === '7d' ? 7 : config?.window === '84d' ? 84 : 28
-  );
+  const windowDays = $derived(supportWindowDays(config));
 
   let availableWorkspaces = $state([]);
   let editingWorkspaces = $state(false);
@@ -30,25 +37,15 @@
     configuredIds.length > 0 ? `${configuredIds.join(',')}:${windowDays}` : null
   );
 
-  const hasActivity = $derived(
-    !!doc && (doc.summary.created > 0 || doc.summary.resolved > 0 || doc.summary.backlog > 0)
-  );
+  const hasActivity = $derived(supportHasActivity(doc));
 
   const workspaceNameById = $derived(
     new Map(availableWorkspaces.map((workspace) => [Number(workspace.id), workspace.name]))
   );
 
-  const chartData = $derived.by(() => {
-    if (!doc) return { categories: [], series: [] };
-    const buckets = doc.buckets ?? [];
-    return {
-      categories: buckets.map((bucket) => bucket.bucket_start),
-      series: [
-        { key: 'created', label: t('dashboard.states.supportCreated'), color: '#6366f1', values: buckets.map((b) => b.created) },
-        { key: 'resolved', label: t('dashboard.states.supportResolved'), color: '#22c55e', values: buckets.map((b) => b.resolved) },
-      ],
-    };
-  });
+  const chartData = $derived(supportChartData(doc, t));
+
+  const slaLabel = $derived(supportSlaLabel(doc?.summary, t));
 
   $effect(() => {
     loadWorkspaces();
@@ -78,13 +75,11 @@
     errored = false;
     unavailableCount = 0;
     try {
-      const to = new Date();
-      const from = new Date(to);
-      from.setDate(from.getDate() - (windowDays - 1));
+      const { from, to } = supportDateRange(windowDays);
       const response = await support.getMetricsAggregate({
         workspace_ids: configuredIds,
-        from: toISOStringDate(from),
-        to: toISOStringDate(to),
+        from,
+        to,
         bucket: 'day',
       });
       if (current !== version) return;
@@ -108,10 +103,6 @@
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   });
-
-  function toISOStringDate(date) {
-    return date.toISOString().slice(0, 10);
-  }
 
   function toggleWorkspace(id) {
     const next = configuredIds.includes(id)
@@ -185,24 +176,10 @@
       </p>
     {/if}
     <div class="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.backlog}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportBacklog')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.unassigned}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportUnassigned')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">{doc.summary.created}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportCreated')}</div>
-      </div>
-      <div class="rounded-lg px-2 py-1.5" style="background: var(--ds-surface-sunken);">
-        <div class="text-lg font-semibold" style="color: var(--ds-text);">
-          {doc.summary.sla && doc.summary.sla.completed > 0 ? `${Math.round(doc.summary.sla.compliant_pct)}%` : t('dashboard.states.supportSlaNone')}
-        </div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{t('dashboard.states.supportSlaCompliance')}</div>
-      </div>
+      <SupportStatTile label={t('dashboard.states.supportBacklog')} value={doc.summary.backlog} />
+      <SupportStatTile label={t('dashboard.states.supportUnassigned')} value={doc.summary.unassigned} />
+      <SupportStatTile label={t('dashboard.states.supportCreated')} value={doc.summary.created} />
+      <SupportStatTile label={t('dashboard.states.supportSlaCompliance')} value={slaLabel} />
     </div>
 
     {#if chartData.categories.length > 0}

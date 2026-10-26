@@ -6,21 +6,16 @@ import {
   resetAuthenticatedShellState,
   runAuthenticatedShellBootstrap,
 } from '../services/authenticatedShellBootstrap.js';
-import {
-  loadAuthenticatedShellUI,
-  refreshAuthenticatedShellUI,
-} from '../services/authenticatedShellUI.js';
+import { refreshAuthenticatedShellUI } from '../services/authenticatedShellUI.js';
 import { activityStore } from '../stores/activityStore.svelte.js';
 import { authStore } from '../stores/auth.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { homepageStore } from '../stores/homepageStore.svelte.js';
 import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
-import { permissionStore } from '../stores/permissions.svelte.js';
-import { ssoStore } from '../stores/sso.svelte.js';
 import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
-import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
 import { workspacesStore } from '../stores/workspaces.svelte.js';
 import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
+import { buildAuthenticatedShellTasks } from './authenticatedShellTasks.js';
 
 const DOUBLE_SPACE_THRESHOLD_MS = 300;
 const ADMIN_UI_REFRESH_DEBOUNCE_MS = 75;
@@ -74,29 +69,11 @@ export function useMainAppLifecycle({
 
     const user = authStore.currentUser;
     const userId = user?.id;
-    const criticalTasks = [
-      () => workspacesStore.load(),
-      () => permissionStore.loadAllPermissions(user),
-    ];
-    if (userId) {
-      criticalTasks.push(
-        () => permissionStore.loadUserPermissions(userId),
-        () => workspacePermissions.loadPermissions(userId)
-      );
-    }
-
-    const deferredTasks = [
-      () => workspacesStore.loadPersonalWorkspace(),
-      () => loadAuthenticatedShellUI(userId),
-      async () => {
-        try {
-          const status = await ssoStore.getVerificationStatus();
-          onEmailVerificationChange(Boolean(status.configured && !status.email_verified));
-        } catch (error) {
-          console.warn('Failed to check email verification status:', error);
-        }
-      },
-    ];
+    const { criticalTasks, deferredTasks } = buildAuthenticatedShellTasks({
+      user,
+      userId,
+      onEmailVerificationChange,
+    });
 
     void runAuthenticatedShellBootstrap({
       userId,

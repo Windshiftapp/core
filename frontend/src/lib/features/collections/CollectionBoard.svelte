@@ -3,6 +3,8 @@
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { items as itemsApi } from '../../api/items.js';
+  import { getAssignableUsers } from '../../api/users.js';
+  import { labels as labelsApi } from '../../api/misc.js';
   import { collections as collectionsApi } from '../../api/collections.js';
   import { workspaces as workspacesApi } from '../../api/workspaces.js';
   import { iterations as iterationsApi } from '../../api/milestones.js';
@@ -49,6 +51,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import Layers from '@lucide/svelte/icons/layers';
+  import Eye from '@lucide/svelte/icons/eye';
   import Milestone from '@lucide/svelte/icons/milestone';
   import ArrowDownUp from '@lucide/svelte/icons/arrow-down-up';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -72,11 +75,13 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { backlogStore } from '../../stores/backlogStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { createDependencyLoader } from './dependencyLoader.svelte.js';
+  import { loadedVisibleItemIDs, visibleAssigneeIDs } from './boardHydration.js';
   import { useCollectionSearch } from '../../composables/useCollectionSearch.svelte.js';
   import { invalidateSLAState } from '../sla/slaState.js';
   import { agentRuns } from '../../stores/agentRuns.svelte.js';
@@ -119,9 +124,22 @@
   let items = $derived(search.items);
   let itemsById = $derived(new Map(items.map((item) => [item.id, item])));
 
-  // Hydrate only the assignees the visible cards reference.
+  // Optional card reads stay scoped to cards near the viewport.
+  let visibleBoardItemIds = $state(new Set());
+
+  function handleCardVisibility(itemId, visible) {
+    const next = new Set(visibleBoardItemIds);
+    if (visible) {
+      if (next.has(itemId)) return;
+      next.add(itemId);
+    } else if (!next.delete(itemId)) {
+      return;
+    }
+    visibleBoardItemIds = next;
+  }
+
   $effect(() => {
-    const ids = items.map((item) => item.assignee_id).filter(Boolean);
+    const ids = visibleAssigneeIDs(visibleBoardItemIds, itemsById);
     if (ids.length > 0) void workspaceDataStore.hydrateUsers(ids);
   });
   let transitions = $state([]);
@@ -143,6 +161,7 @@
   );
   let milestoneSwimlaneDialogOpen = $state(false);
   let savingMilestoneSwimlaneConfig = $state(false);
+  let savingCompletedVisibility = $state(false);
 
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
@@ -157,6 +176,7 @@
   // Quick-add state per column
   let quickAddState = $state({});
   let workspaces = $derived($workspacesStore.regularWorkspaces || []);
+  let directoryReady = $derived($workspacesStore.loaded);
   // The workspace directory caches only its first page, so the personal
   // workspace is not guaranteed to be in allWorkspaces. Merge the on-demand
   // personal workspace too, otherwise a personal task opens the generic item
@@ -367,7 +387,6 @@
     quickAddState[quickAddKey] = {
       show: true,
       workspaceId: preselectedWorkspaceId,
-      workspaces: laneWorkspaces,
       itemTypeId: null,
       availableTypes: [],
       loadingTypes: Boolean(preselectedWorkspaceId),
@@ -484,12 +503,16 @@
   }
 
   onMount(async () => {
+    // The directory is cached/single-flight and only feeds quick-add workspace
+    // choices, so it warms independently instead of gating the board paint.
+    void workspacesStore.load();
     await Promise.all([
       workspaceId ? loadWorkspaceGradient(workspaceId) : Promise.resolve(),
       workspaceId
         ? workspaceDataStore.initialize(workspaceId)
         : workspaceDataStore.initializeGlobal(),
-      workspacesStore.load(),
+      // Personal-workspace loading stays on the critical path: personal item
+      // classification, opening and drag behavior need it before paint.
       workspacesStore.loadPersonalWorkspace(),
     ]);
     loading = false;
@@ -517,13 +540,26 @@
       if (requestedView !== viewSignature) return;
       allIterations = iters || [];
 
-      const saved = localStorage.getItem(`board-iteration-filter-${requestedWorkspaceId}`);
-      if (saved) {
-        const id = parseInt(saved, 10);
-        if (allIterations.some((iteration) => iteration.id === id)) {
-          iterationFilterId = id;
-        } else {
+      const storedIteration = collectionPreferences.viewStateValue(
+        workspaceId,
+        collectionId,
+        'board',
+        'iteration_id'
+      );
+      let savedIterationId = storedIteration;
+      if (savedIterationId === undefined) {
+        const saved = localStorage.getItem(`board-iteration-filter-${requestedWorkspaceId}`);
+        savedIterationId = saved ? parseInt(saved, 10) : null;
+      }
+      if (savedIterationId != null) {
+        if (allIterations.some((iteration) => iteration.id === savedIterationId)) {
+          iterationFilterId = savedIterationId;
+        } else if (storedIteration === undefined) {
           localStorage.removeItem(`board-iteration-filter-${requestedWorkspaceId}`);
+        } else {
+          collectionPreferences.patchViewState(workspaceId, collectionId, 'board', {
+            iteration_id: null,
+          });
         }
       }
     } catch (error) {
@@ -560,20 +596,37 @@
     if (view === setupViewSignature) return;
     setupViewSignature = view;
     dependencyLoader.reset();
+    visibleBoardItemIds = new Set();
     allIterations = [];
     iterationFilterId = null;
     boardGroupBy = null;
     excludeRightmostSwimlaneParents = false;
     swimlaneCollapsed = {};
     try {
+      const storedGroupBy = collectionPreferences.viewStateValue(
+        workspaceId,
+        collectionId,
+        'board',
+        'group_by'
+      );
       boardGroupBy = resolveStoredBoardGroupBy(
-        localStorage.getItem(boardGroupStorageKey()),
+        storedGroupBy !== undefined ? storedGroupBy : localStorage.getItem(boardGroupStorageKey()),
         localStorage.getItem(legacyGroupByItemTypeStorageKey()),
         []
       );
-      const savedExcludeRightmost = localStorage.getItem(excludeRightmostSwimlaneParentsStorageKey());
-      if (savedExcludeRightmost !== null) {
-        excludeRightmostSwimlaneParents = savedExcludeRightmost === 'true';
+      const storedExcludeRightmost = collectionPreferences.viewStateValue(
+        workspaceId,
+        collectionId,
+        'board',
+        'exclude_rightmost'
+      );
+      if (storedExcludeRightmost !== undefined) {
+        excludeRightmostSwimlaneParents = storedExcludeRightmost === true;
+      } else {
+        const savedExcludeRightmost = localStorage.getItem(excludeRightmostSwimlaneParentsStorageKey());
+        if (savedExcludeRightmost !== null) {
+          excludeRightmostSwimlaneParents = savedExcludeRightmost === 'true';
+        }
       }
     } catch (e) { /* ignore storage errors */ }
     // MainApp reuses this component across boards, so restore per-view preferences here.
@@ -591,12 +644,14 @@
     }
   });
 
-  // Preload dependency links when the loaded item set changes. Overlapping
-  // waves join pending ids; each successful chunk commits independently.
+  // Load dependency links only for cards near the viewport. Overlapping waves
+  // join pending ids; each successful chunk commits independently.
   $effect(() => {
-    if (collectionStore.items.length > 0 && !collectionStore.loading) {
+    if (collectionStore.loading) return;
+    const ids = loadedVisibleItemIDs(visibleBoardItemIds, itemsById);
+    if (ids.length > 0) {
       // Avoid subscribing this effect to cache writes.
-      untrack(() => dependencyLoader.ensure(collectionStore.items.map((item) => item.id)));
+      untrack(() => dependencyLoader.ensure(ids));
     }
   });
 
@@ -642,6 +697,37 @@
       warningToast(error?.message || t('dialogs.alerts.failedToSave', { error: error?.message ?? '' }));
     } finally {
       savingMilestoneSwimlaneConfig = false;
+    }
+  }
+
+  async function saveCompletedVisibility(visibility) {
+    if (visibility === completedVisibilityPreset) return;
+    savingCompletedVisibility = true;
+    try {
+      const payload = buildBoardConfigurationPayload(boardConfig, {
+        globalMilestoneIds: pinnedGlobalMilestoneIds,
+        showCompleted: showCompletedMilestones,
+        showOpenFromCompleted: showOpenFromCompletedMilestones,
+        completedVisibility: visibility,
+      });
+      if (boardConfig?.id) {
+        await collectionsApi.updateBoardConfiguration(
+          collectionId,
+          boardConfig.id,
+          payload,
+          workspaceId
+        );
+      } else {
+        await collectionsApi.createBoardConfiguration(collectionId, workspaceId, payload);
+      }
+      collectionStore.invalidateBoardConfiguration(workspaceId, collectionId);
+      await loadBoardConfig();
+      successToast(t('boardControls.completedVisibilitySaved'));
+    } catch (error) {
+      console.error('Failed to save completed visibility:', error);
+      warningToast(error?.message || t('dialogs.alerts.failedToSave', { error: error?.message ?? '' }));
+    } finally {
+      savingCompletedVisibility = false;
     }
   }
 
@@ -695,6 +781,14 @@
 
   // Iteration filter derived values
   let activeLocalIteration = $derived(allIterations.find(i => !i.is_global && i.status === 'active'));
+
+  // The "current_iteration" completed preset scopes the deferred completed
+  // fetch to the board's active iteration once the catalog resolves.
+  $effect(() => {
+    const visibility = boardConfig?.view_settings?.completed_visibility ?? '';
+    if (visibility !== 'current_iteration') return;
+    collectionStore.setBoardCompletedIteration(activeLocalIteration?.id ?? null);
+  });
 
   let iterationFilterOptions = $derived.by(() => {
     const seen = new Set();
@@ -976,11 +1070,9 @@
 
   function setIterationFilter(iterationId) {
     iterationFilterId = iterationId;
-    if (iterationId) {
-      localStorage.setItem(`board-iteration-filter-${workspaceId}`, String(iterationId));
-    } else {
-      localStorage.removeItem(`board-iteration-filter-${workspaceId}`);
-    }
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'board', {
+      iteration_id: iterationId ?? null,
+    });
   }
 
   function boardPreferenceScope() {
@@ -1004,6 +1096,8 @@
   }
 
   function loadSortMode() {
+    const stored = collectionPreferences.viewStateValue(workspaceId, collectionId, 'board', 'sort_mode');
+    if (stored !== undefined) return stored === 'bubble' ? 'bubble' : 'rank';
     try {
       return localStorage.getItem(sortModeStorageKey()) === 'bubble' ? 'bubble' : 'rank';
     } catch (e) {
@@ -1013,36 +1107,24 @@
 
   function setSortMode(mode) {
     sortMode = mode === 'bubble' ? 'bubble' : 'rank';
-    try {
-      if (sortMode === 'bubble') {
-        localStorage.setItem(sortModeStorageKey(), sortMode);
-      } else {
-        localStorage.removeItem(sortModeStorageKey());
-      }
-    } catch (e) { /* ignore storage errors */ }
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'board', { sort_mode: sortMode });
     collectionStore.setBoardSortMode(sortMode);
   }
 
   function setBoardGroupBy(groupBy) {
     boardGroupBy = groupBy;
     swimlaneCollapsed = {};
-    try {
-      const serialized = serializeBoardGroupBy(groupBy);
-      if (serialized) {
-        localStorage.setItem(boardGroupStorageKey(), serialized);
-      } else {
-        localStorage.removeItem(boardGroupStorageKey());
-      }
-      localStorage.removeItem(legacyGroupByItemTypeStorageKey());
-    } catch (e) { /* ignore storage errors */ }
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'board', {
+      group_by: serializeBoardGroupBy(groupBy),
+    });
   }
 
   function setExcludeRightmostSwimlaneParents(value) {
     excludeRightmostSwimlaneParents = value;
     swimlaneCollapsed = {};
-    try {
-      localStorage.setItem(excludeRightmostSwimlaneParentsStorageKey(), String(value));
-    } catch (e) { /* ignore storage errors */ }
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'board', {
+      exclude_rightmost: value,
+    });
   }
 
   function toggleSwimlane(swimlaneId) {
@@ -1062,28 +1144,32 @@
   }
 
   function loadCollapsedColumns() {
-    try {
-      const saved = localStorage.getItem(collapsedColumnsStorageKey());
-      if (!saved) return {};
-      const ids = JSON.parse(saved);
-      if (!Array.isArray(ids)) return {};
-      const map = {};
-      for (const id of ids) map[id] = true;
-      return map;
-    } catch (e) {
-      return {};
+    const stored = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'board',
+      'collapsed_columns'
+    );
+    let ids = Array.isArray(stored) ? stored : null;
+    if (stored === undefined) {
+      try {
+        const saved = localStorage.getItem(collapsedColumnsStorageKey());
+        ids = saved ? JSON.parse(saved) : null;
+      } catch (e) {
+        ids = null;
+      }
     }
+    if (!Array.isArray(ids)) return {};
+    const map = {};
+    for (const id of ids) map[id] = true;
+    return map;
   }
 
   function saveCollapsedColumns() {
-    try {
-      const collapsed = Object.keys(collapsedColumns).filter((id) => collapsedColumns[id]);
-      if (collapsed.length > 0) {
-        localStorage.setItem(collapsedColumnsStorageKey(), JSON.stringify(collapsed));
-      } else {
-        localStorage.removeItem(collapsedColumnsStorageKey());
-      }
-    } catch (e) { /* ignore storage errors */ }
+    const collapsed = Object.keys(collapsedColumns).filter((id) => collapsedColumns[id]);
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'board', {
+      collapsed_columns: collapsed,
+    });
   }
 
   function isColumnCollapsed(columnId) {
@@ -1201,6 +1287,78 @@
     ).length;
   });
 
+  // Completed-work visibility. Explicit presets live in view_settings; a board
+  // saved before presets existed is mapped back onto the closest preset so the
+  // menu reflects what the board actually does.
+  let completedVisibilityPreset = $derived.by(() => {
+    const explicit = boardConfig?.view_settings?.completed_visibility ?? '';
+    if (explicit) return explicit;
+    if (boardConfig?.show_rightmost_column_last_50) return 'latest_50';
+    const days = Number(boardConfig?.completed_item_retention_days);
+    if (Number.isInteger(days) && days >= 1) return 'custom';
+    return 'all';
+  });
+  let completedVisibilityLabel = $derived.by(() => {
+    switch (completedVisibilityPreset) {
+      case 'last_day':
+        return t('boardControls.completedLastDay');
+      case 'last_week':
+        return t('boardControls.completedLastWeek');
+      case 'current_iteration':
+        return t('boardControls.completedCurrentIteration');
+      case 'none':
+        return t('boardControls.completedNone');
+      case 'latest_50':
+        return t('boardControls.completedLatestFifty');
+      case 'custom':
+        return t('boardControls.completedCustom');
+      default:
+        return t('boardControls.completedAll');
+    }
+  });
+  let completedVisibilityMenuItems = $derived([
+    {
+      id: 'completed-all',
+      testid: 'board-completed-all',
+      title: t('boardControls.completedAll'),
+      subtitle: t('boardControls.completedAllDescription'),
+      selected: completedVisibilityPreset === 'all',
+      onClick: () => saveCompletedVisibility('all'),
+    },
+    {
+      id: 'completed-last-day',
+      testid: 'board-completed-last-day',
+      title: t('boardControls.completedLastDay'),
+      subtitle: t('boardControls.completedLastDayDescription'),
+      selected: completedVisibilityPreset === 'last_day',
+      onClick: () => saveCompletedVisibility('last_day'),
+    },
+    {
+      id: 'completed-last-week',
+      testid: 'board-completed-last-week',
+      title: t('boardControls.completedLastWeek'),
+      subtitle: t('boardControls.completedLastWeekDescription'),
+      selected: completedVisibilityPreset === 'last_week',
+      onClick: () => saveCompletedVisibility('last_week'),
+    },
+    {
+      id: 'completed-current-iteration',
+      testid: 'board-completed-current-iteration',
+      title: t('boardControls.completedCurrentIteration'),
+      subtitle: t('boardControls.completedCurrentIterationDescription'),
+      selected: completedVisibilityPreset === 'current_iteration',
+      onClick: () => saveCompletedVisibility('current_iteration'),
+    },
+    {
+      id: 'completed-none',
+      testid: 'board-completed-none',
+      title: t('boardControls.completedNone'),
+      subtitle: t('boardControls.completedNoneDescription'),
+      selected: completedVisibilityPreset === 'none',
+      onClick: () => saveCompletedVisibility('none'),
+    },
+  ]);
+
   let sortByMenuItems = $derived([
     {
       id: 'sort-rank',
@@ -1301,6 +1459,379 @@
       allItemsTitle: t('collections.allItems'),
     })
   );
+
+  // --- Keyboard navigation (WI-97) ---------------------------------------
+  // Roving focus: one card is tabbable at a time; arrows move within and
+  // across columns, Enter opens the card, c quick-adds, / focuses search and
+  // m opens the card's move menu.
+  let focusedItemId = $state(null);
+  const boardCardElements = new Map();
+
+  function registerBoardCardElement(element, itemId) {
+    boardCardElements.set(itemId, element);
+    return {
+      destroy() {
+        boardCardElements.delete(itemId);
+      },
+    };
+  }
+
+  // Rendered column model per lane, used for both navigation and the default
+  // tab stop. Collapsed columns render no cards, so they are skipped.
+  let keyboardNavLanes = $derived(
+    boardSwimlanes.map((lane) => ({
+      lane,
+      columns: validColumns
+        .map((column, columnIndex) => ({
+          column,
+          columnIndex,
+          items: isColumnCollapsed(column.id)
+            ? []
+            : getDisplayItemsByColumn(column, columnIndex, validColumns, lane.items),
+        }))
+        .filter((entry) => !isColumnCollapsed(entry.column.id)),
+    }))
+  );
+
+  let firstRenderedItemId = $derived.by(() => {
+    for (const lane of keyboardNavLanes) {
+      for (const entry of lane.columns) {
+        if (entry.items.length > 0) return entry.items[0].id;
+      }
+    }
+    return null;
+  });
+
+  let tabbableItemId = $derived(
+    focusedItemId != null && itemsById.has(focusedItemId) ? focusedItemId : firstRenderedItemId
+  );
+
+  function locateFocusedCard(itemId) {
+    for (const lane of keyboardNavLanes) {
+      for (let columnIndex = 0; columnIndex < lane.columns.length; columnIndex++) {
+        const entry = lane.columns[columnIndex];
+        const itemIndex = entry.items.findIndex((item) => item.id === itemId);
+        if (itemIndex >= 0) return { lane, columnIndex, itemIndex };
+      }
+    }
+    return null;
+  }
+
+  function neighborItemId(itemId, key) {
+    const location = locateFocusedCard(itemId);
+    if (!location) return null;
+    const { lane, columnIndex, itemIndex } = location;
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      const delta = key === 'ArrowUp' ? -1 : 1;
+      return lane.columns[columnIndex].items[itemIndex + delta]?.id ?? null;
+    }
+    const targetColumn = lane.columns[columnIndex + (key === 'ArrowLeft' ? -1 : 1)];
+    if (!targetColumn || targetColumn.items.length === 0) return null;
+    return targetColumn.items[Math.min(itemIndex, targetColumn.items.length - 1)]?.id ?? null;
+  }
+
+  function openQuickAddForFocusedCard(itemId) {
+    const location = locateFocusedCard(itemId);
+    if (!location) return;
+    const { lane, columnIndex } = location;
+    const column = lane.columns[columnIndex].column;
+    const laneQuickAddTypes = quickAddTypesFor(lane.lane.parent ?? null);
+    if (laneQuickAddTypes.length === 0 || quickAddWorkspacesForLane(lane.lane).length === 0) return;
+    const quickAddKey = `${lane.lane.id}-${column.id}`;
+    initQuickAdd(column.id, column.status_ids[0], quickAddKey, lane.lane.parent ?? null, lane.lane);
+  }
+
+  function handleBoardCardKeydown(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.matches('[data-item-card]')) return;
+    const itemId = Number(target.dataset.itemId);
+    if (!Number.isFinite(itemId)) return;
+
+    if (
+      event.key === 'ArrowUp' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowRight'
+    ) {
+      const nextId = neighborItemId(itemId, event.key);
+      if (nextId != null) {
+        event.preventDefault();
+        if (event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+          selectRangeTo(nextId);
+        }
+        focusedItemId = nextId;
+      }
+      return;
+    }
+    if (event.key === ' ') {
+      event.preventDefault();
+      toggleSelected(itemId);
+      return;
+    }
+    if (event.key === 'c' || event.key === 'C') {
+      event.preventDefault();
+      openQuickAddForFocusedCard(itemId);
+      return;
+    }
+    if (event.key === 'm' || event.key === 'M') {
+      const trigger = document.querySelector(`[data-testid="board-card-move-menu-${itemId}"]`);
+      if (trigger instanceof HTMLElement) {
+        event.preventDefault();
+        trigger.click();
+      }
+    }
+  }
+
+  function handleBoardGlobalKeydown(event) {
+    if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
+      return;
+    }
+    const searchInput = document.querySelector('[data-testid="board-search-input"]');
+    if (searchInput instanceof HTMLInputElement) {
+      event.preventDefault();
+      searchInput.focus();
+    }
+  }
+
+  useEventListener(() => window, 'keydown', handleBoardGlobalKeydown);
+
+  // --- Multi-select and bulk actions (WI-98) ------------------------------
+  let selectedIds = $state([]);
+  let selectionAnchorId = $state(null);
+  let bulkBusy = $state(false);
+  let assignableUsers = $state([]);
+  let assignableUsersLoaded = $state(false);
+  let assignableUsersLoading = $state(false);
+
+  let selectedIdSet = $derived(new Set(selectedIds));
+  let selectedCount = $derived(selectedIds.length);
+  let selectedItems = $derived(items.filter((item) => selectedIdSet.has(item.id)));
+  let selectedItemsEditable = $derived(
+    selectedItems.length > 0 &&
+      selectedItems.every((item) => workspacePermissions.canEdit(item.workspace_id))
+  );
+
+  // Drop ids that leave the loaded set so the toolbar never acts on stale rows.
+  $effect(() => {
+    const present = new Set(items.map((item) => item.id));
+    const pruned = selectedIds.filter((id) => present.has(id));
+    if (pruned.length !== selectedIds.length) selectedIds = pruned;
+  });
+
+  function toggleSelected(itemId) {
+    selectedIds = selectedIdSet.has(itemId)
+      ? selectedIds.filter((id) => id !== itemId)
+      : [...selectedIds, itemId];
+    selectionAnchorId = itemId;
+  }
+
+  // Shift selection extends from the anchor within the focused card's column.
+  function selectRangeTo(itemId) {
+    const target = locateFocusedCard(itemId);
+    const anchor = selectionAnchorId ?? focusedItemId;
+    const origin = anchor != null ? locateFocusedCard(anchor) : null;
+    if (
+      !target ||
+      !origin ||
+      target.lane.lane.id !== origin.lane.lane.id ||
+      target.columnIndex !== origin.columnIndex
+    ) {
+      toggleSelected(itemId);
+      return;
+    }
+    const columnItems = target.lane.columns[target.columnIndex].items;
+    const from = Math.min(origin.itemIndex, target.itemIndex);
+    const to = Math.max(origin.itemIndex, target.itemIndex);
+    const rangeIds = columnItems.slice(from, to + 1).map((item) => item.id);
+    selectedIds = [...new Set([...selectedIds, ...rangeIds])];
+  }
+
+  function clearSelection() {
+    selectedIds = [];
+    selectionAnchorId = null;
+  }
+
+  function itemLabelIds(item) {
+    if (Array.isArray(item.label_ids)) return item.label_ids;
+    return (item.labels || []).map((label) => label.id);
+  }
+
+  function bulkSelectionIds() {
+    return selectedItems.map((item) => item.id);
+  }
+
+  async function bulkMoveToColumn(column) {
+    const targetStatusId = column.status_ids?.[0];
+    if (targetStatusId == null || bulkBusy) return;
+    const ids = bulkSelectionIds();
+    bulkBusy = true;
+    try {
+      const result = await itemsApi.bulkTransition(ids, targetStatusId);
+      const failed = result?.failed_count ?? 0;
+      if (failed > 0) {
+        warningToast(t('collections.bulkStatusPartial', {
+          count: result?.transitioned_count ?? 0,
+          failed,
+        }));
+      } else {
+        successToast(t('collections.bulkStatusSuccess', { count: result?.transitioned_count ?? ids.length }));
+      }
+      clearSelection();
+      reloadCollection();
+    } catch (error) {
+      console.error('Bulk transition failed:', error);
+      warningToast(error?.message || t('collections.bulkUpdateFailed'));
+    } finally {
+      bulkBusy = false;
+    }
+  }
+
+  async function bulkUpdateFields(fields) {
+    if (bulkBusy) return;
+    const ids = bulkSelectionIds();
+    if (ids.length === 0) return;
+    bulkBusy = true;
+    try {
+      const result = await itemsApi.bulkUpdate(ids, fields);
+      successToast(t('collections.bulkUpdateSuccess', { count: result?.updated_count ?? ids.length }));
+      clearSelection();
+      reloadCollection();
+    } catch (error) {
+      console.error('Bulk update failed:', error);
+      warningToast(error?.message || t('collections.bulkUpdateFailed'));
+    } finally {
+      bulkBusy = false;
+    }
+  }
+
+  // Labels are a join table with no bulk endpoint, so v1 applies them one item
+  // at a time and reports a combined result.
+  async function bulkToggleLabel(labelId) {
+    if (bulkBusy) return;
+    const targets = selectedItems;
+    if (targets.length === 0) return;
+    const removing = targets.every((item) => itemLabelIds(item).includes(labelId));
+    bulkBusy = true;
+    let updated = 0;
+    let failed = 0;
+    for (const item of targets) {
+      const current = itemLabelIds(item);
+      const next = removing
+        ? current.filter((id) => id !== labelId)
+        : [...new Set([...current, labelId])];
+      try {
+        await labelsApi.setForItem(item.id, next);
+        updated += 1;
+      } catch (error) {
+        console.error('Bulk label update failed:', error);
+        failed += 1;
+      }
+    }
+    if (failed > 0) {
+      warningToast(t('collections.bulkLabelPartial', { count: updated, failed }));
+    } else {
+      successToast(t('collections.bulkLabelSuccess', { count: updated }));
+    }
+    bulkBusy = false;
+    clearSelection();
+    reloadCollection();
+  }
+
+  async function ensureAssignableUsers() {
+    if (assignableUsersLoaded || assignableUsersLoading) return;
+    const scopeWorkspaceId = workspaceId ?? selectedItems[0]?.workspace_id;
+    if (!scopeWorkspaceId) return;
+    assignableUsersLoading = true;
+    try {
+      assignableUsers = (await getAssignableUsers(scopeWorkspaceId)) || [];
+      assignableUsersLoaded = true;
+    } catch (error) {
+      console.error('Failed to load assignable users:', error);
+    } finally {
+      assignableUsersLoading = false;
+    }
+  }
+
+  let bulkStatusMenuItems = $derived(
+    validColumns.map((column) => ({
+      id: `bulk-status-${column.id}`,
+      testid: `bulk-status-${column.status_ids[0]}`,
+      title: objectDisplayName(column, 'status'),
+      iconDot: true,
+      iconColor: column.color || 'var(--ds-text-subtle)',
+      onClick: () => bulkMoveToColumn(column),
+    }))
+  );
+
+  let bulkAssigneeMenuItems = $derived([
+    {
+      id: 'bulk-assignee-none',
+      testid: 'bulk-assignee-none',
+      title: t('common.unassigned'),
+      onClick: () => bulkUpdateFields({ assignee_id: null }),
+    },
+    ...assignableUsers.map((user) => ({
+      id: `bulk-assignee-${user.id}`,
+      testid: `bulk-assignee-${user.id}`,
+      title: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.username,
+      onClick: () => bulkUpdateFields({ assignee_id: user.id }),
+    })),
+  ]);
+
+  let bulkPriorityMenuItems = $derived([
+    {
+      id: 'bulk-priority-none',
+      testid: 'bulk-priority-none',
+      title: t('pickers.noPriority'),
+      onClick: () => bulkUpdateFields({ priority_id: null }),
+    },
+    ...priorities.map((priority) => ({
+      id: `bulk-priority-${priority.id}`,
+      testid: `bulk-priority-${priority.id}`,
+      title: priority.name,
+      iconDot: true,
+      iconColor: priority.color || 'var(--ds-text-subtle)',
+      onClick: () => bulkUpdateFields({ priority_id: priority.id }),
+    })),
+  ]);
+
+  let bulkLabelMenuItems = $derived(
+    wdsLabels.map((label) => ({
+      id: `bulk-label-${label.id}`,
+      testid: `bulk-label-${label.id}`,
+      type: 'checkbox',
+      checked: selectedItems.length > 0 && selectedItems.every((item) => itemLabelIds(item).includes(label.id)),
+      title: label.name,
+      closeOnSelect: false,
+      onChange: () => bulkToggleLabel(label.id),
+    }))
+  );
+
+  // Card keydown lives on the scrolling canvas so it never fires for the
+  // chrome above it; bound programmatically to keep the layout div role-free.
+  $effect(() => {
+    const element = boardScrollElement;
+    if (!element) return;
+    const handler = (event) => handleBoardCardKeydown(event);
+    element.addEventListener('keydown', handler);
+    return () => element.removeEventListener('keydown', handler);
+  });
+
+  // Move DOM focus when the roving target changes, but never steal it back
+  // from a card the user already focused.
+  $effect(() => {
+    const itemId = focusedItemId;
+    if (itemId == null) return;
+    const element = boardCardElements.get(itemId);
+    if (element && document.activeElement !== element) {
+      element.focus();
+    }
+  });
 
   // Calculate total visible items across all display columns
   let totalVisibleItems = $derived.by(() => {
@@ -1874,7 +2405,17 @@
             placeholder={t('common.search')}
             dataTestid="board-search-input"
           />
-          <SubFilterBar {workspaceId} showCompletionToggle={false} />
+          <SubFilterBar {workspaceId} {collectionId} showCompletionToggle={false} />
+          <DropdownMenu
+            items={completedVisibilityMenuItems}
+            triggerIcon={Eye}
+            triggerText={t('boardControls.completedLabel', { value: completedVisibilityLabel })}
+            placement="bottom-start"
+            maxWidth="max-w-xs"
+            triggerClass="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            triggerStyle="color: var(--ds-text); background-color: var(--ctx-surface, var(--ds-background-neutral));"
+            triggerTestid="board-completed-visibility-menu"
+          />
         </div>
       </div>
 
@@ -1884,6 +2425,13 @@
         bind:this={boardScrollElement}
         class="min-h-0 min-w-0 max-w-full flex-1 w-full overflow-auto overscroll-contain"
         data-testid="board-scroll-container"
+        onfocusin={(event) => {
+          const target = event.target;
+          if (target instanceof HTMLElement && target.matches('[data-item-card]')) {
+            const id = Number(target.dataset.itemId);
+            if (Number.isFinite(id)) focusedItemId = id;
+          }
+        }}
       >
       <div class="px-6 py-6 min-w-fit">
 
@@ -2058,7 +2606,7 @@
                       textStyle={styles.glassTextStyle}
                       subtleTextStyle={styles.glassSubtleTextStyle}
                       dndAction={registerBoardColumn}
-                      onadd={laneQuickAddTypes.length > 0 && quickAddWorkspacesForLane(lane).length > 0
+                      onadd={laneQuickAddTypes.length > 0 && (!directoryReady || quickAddWorkspacesForLane(lane).length > 0)
                         ? () => initQuickAdd(column.id, column.status_ids[0], quickAddKey, lane.parent ?? null, lane)
                         : null}
                       oncollapse={() => toggleColumnCollapse(column.id)}
@@ -2068,7 +2616,8 @@
                             <QuickAddForm
                               parentId={quickAddKey}
                               formState={quickAddState[quickAddKey]}
-                              workspaces={quickAddState[quickAddKey]?.workspaces ?? creatableWorkspaces}
+                              workspaces={quickAddWorkspacesForLane(lane)}
+                              directoryLoading={!directoryReady}
                               cardBgStyle={styles.cardStyle(8)}
                               onUpdateField={updateQuickAddField}
                               onCreate={createColumnItem}
@@ -2115,7 +2664,14 @@
                                 dndAction={registerBoardCard}
                                 canDrag={canDragCard}
                                 refreshToken={slaRefreshToken}
+                                focused={tabbableItemId === item.id}
+                                selected={selectedIdSet.has(item.id)}
+                                visible={visibleBoardItemIds.has(item.id)}
+                                onvisibilitychange={handleCardVisibility}
+                                onselect={toggleSelected}
+                                onshiftselect={selectRangeTo}
                                 onopen={openItem}
+                                registerElement={registerBoardCardElement}
                               />
                             {/each}
                           </div>
@@ -2159,6 +2715,72 @@
       </div>
       </div>
     </StaticViewBackground>
+
+    {#if selectedCount > 0}
+      <div
+        class="fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-lg border px-3 py-2 shadow-xl"
+        style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
+        data-testid="board-bulk-toolbar"
+      >
+        <span
+          class="mr-1 text-sm font-medium"
+          style="color: var(--ds-text);"
+          data-testid="board-bulk-count"
+        >
+          {t('collections.bulkSelected', { count: selectedCount })}
+        </span>
+        <DropdownMenu
+          items={bulkStatusMenuItems}
+          triggerText={t('collections.bulkSetStatus')}
+          placement="top-start"
+          maxWidth="max-w-xs"
+          disabled={bulkBusy || !selectedItemsEditable}
+          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
+          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
+          triggerTestid="board-bulk-status"
+        />
+        <DropdownMenu
+          items={bulkAssigneeMenuItems}
+          triggerText={t('collections.bulkSetAssignee')}
+          placement="top-start"
+          maxWidth="max-w-xs"
+          disabled={bulkBusy || !selectedItemsEditable}
+          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
+          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
+          triggerTestid="board-bulk-assignee"
+          onOpen={ensureAssignableUsers}
+        />
+        <DropdownMenu
+          items={bulkPriorityMenuItems}
+          triggerText={t('collections.bulkSetPriority')}
+          placement="top-start"
+          maxWidth="max-w-xs"
+          disabled={bulkBusy || !selectedItemsEditable}
+          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
+          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
+          triggerTestid="board-bulk-priority"
+        />
+        <DropdownMenu
+          items={bulkLabelMenuItems}
+          triggerText={t('collections.bulkLabels')}
+          placement="top-start"
+          maxWidth="max-w-xs"
+          disabled={bulkBusy || !selectedItemsEditable || wdsLabels.length === 0}
+          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
+          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
+          triggerTestid="board-bulk-labels"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={clearSelection}
+          disabled={bulkBusy}
+          dataTestid="board-bulk-clear"
+        >
+          {t('collections.bulkClear')}
+        </Button>
+      </div>
+    {/if}
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">

@@ -1,8 +1,8 @@
-import { customFields, itemTypes, priorities } from '../api/configuration.js';
+import { catalogs, customFields, itemTypes, priorities } from '../api/configuration.js';
 import { iterations, milestones } from '../api/milestones.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
-import { getAssignableUsers, getUser } from '../api/users.js';
-import { statusCategories, statuses } from '../api/workflows.js';
+import { getAssignableUsers, getUserDisplayBatch } from '../api/users.js';
+import { statusCategories } from '../api/workflows.js';
 import { workspaces } from '../api/workspaces.js';
 import {
   canRunBackgroundSync,
@@ -11,6 +11,11 @@ import {
 } from '../utils/backgroundSync.js';
 
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const USER_DISPLAY_BATCH_SIZE = 200;
+const USER_DISPLAY_CACHE_LIMIT = 2000;
+const USER_DISPLAY_FRESH_MS = 5 * 60 * 1000;
+const USER_DISPLAY_MAX_OUTSTANDING = 2;
+const SCREEN_CONFIG_CACHE_LIMIT = 50;
 
 /**
  * Shared workspace data store that caches reference data at workspace scope.
@@ -22,12 +27,22 @@ class WorkspaceDataStore {
 
   /** @type {Map<string, Promise<object>>} */
   #screenConfigPromises = new Map();
-  /** @type {Map<number, Promise<object|null>>} */
+  #screenConfigEpoch = 0;
+  /** @type {Map<string, true>} Insertion order is least-recently-used first. */
+  #screenConfigAccess = new Map();
+  /** @type {Map<number, {promise: Promise<object|null>, resolve: (user: object|null) => void}>} */
   #userHydrationPromises = new Map();
+  /** @type {Map<number, number>} */
+  #userDisplayFetchedAt = new Map();
+  /** @type {Map<number, number>} */
+  #userDisplayNegativeUntil = new Map();
+  /** @type {{id: number, resolve: (user: object|null) => void}[]} */
+  #userDisplayQueue = [];
+  #userDisplayFlushScheduled = false;
+  #userDisplayOutstanding = 0;
+  #userDisplayGeneration = 0;
   /** @type {Map<number, Promise<object|null>>} */
   #bootstrapPromises = new Map();
-  /** @type {Set<number>} */
-  #userHydrationFailed = new Set();
   workspace = $state(null);
   homepageLayout = $state(null);
   statuses = $state([]);
@@ -40,8 +55,9 @@ class WorkspaceDataStore {
   projects = $state([]);
   customFieldDefinitions = $state([]);
   labels = $state([]);
-  // Resolved effective configuration per item type, keyed by item type id or
-  // 'default'. Fetched once per workspace, invalidated on workspace switch.
+  // Resolved effective configuration keyed by "<workspaceId>:<itemTypeId|default>".
+  // Bounded and invalidated on workspace switch and config mutation.
+  /** @type {Record<string, any>} */
   screenConfigs = $state({});
   // Whether bootstrap's milestone/iteration lists are complete directories.
   // null means the server did not report completeness (unknown, not complete).
@@ -232,7 +248,7 @@ class WorkspaceDataStore {
         } else {
           await this._fetchAll(id);
         }
-        await this.#refreshScreenConfigs(id);
+        await this.#refreshScreenConfigs();
         if (this.workspaceId === id) {
           this.lastRefreshedAt = Date.now();
         }
@@ -279,18 +295,35 @@ class WorkspaceDataStore {
     this.projects = [];
     this.customFieldDefinitions = [];
     this.labels = [];
+    this.#screenConfigEpoch += 1;
     this.screenConfigs = {};
+    this.#screenConfigAccess.clear();
     this.planningCompleteness = null;
     this.#screenConfigPromises.clear();
-    this.#userHydrationPromises.clear();
-    this.#userHydrationFailed.clear();
+    this.resetUserDisplayCache();
     this.#bootstrapPromises.clear();
     this.lastRefreshedAt = null;
   }
 
   /**
-   * Fetch display records for the referenced user IDs only, reusing users that
-   * are already loaded. A workspace switch discards results from the old scope.
+   * Drop every cached display user and pending batch. Used on scope or
+   * authentication changes so one principal's display cache never serves
+   * another.
+   */
+  resetUserDisplayCache() {
+    for (const pending of this.#userHydrationPromises.values()) pending.resolve(null);
+    this.#userHydrationPromises.clear();
+    this.#userDisplayFetchedAt.clear();
+    this.#userDisplayNegativeUntil.clear();
+    this.#userDisplayQueue.length = 0;
+    this.#userDisplayFlushScheduled = false;
+    this.#userDisplayGeneration += 1;
+  }
+
+  /**
+   * Fetch display records for the referenced user IDs only. Unknown IDs are
+   * microtask-coalesced into bounded batch reads, and results are cached for
+   * this workspace scope. A workspace switch discards the old scope's work.
    * @param {Array<number|string>} ids
    */
   async hydrateUsers(ids = []) {
@@ -299,64 +332,159 @@ class WorkspaceDataStore {
     ];
     if (wanted.length === 0) return;
 
-    const known = new Set(this.users.map((user) => user.id));
-    const missing = wanted.filter((id) => !known.has(id) && !this.#userHydrationFailed.has(id));
-    if (missing.length === 0) return;
-
-    const workspaceId = this.workspaceId;
-    const results = await Promise.all(
-      missing.map((id) => {
-        const pending = this.#userHydrationPromises.get(id);
-        if (pending) return pending;
-        const promise = getUser(id, BACKGROUND_READ)
-          .catch((error) => {
-            // A denied or missing user is permanent for this scope; do not
-            // retry it on every row update. Transient failures may retry.
-            if (error?.status === 403 || error?.status === 404) {
-              this.#userHydrationFailed.add(id);
-            }
-            return null;
-          })
-          .finally(() => {
-            if (this.#userHydrationPromises.get(id) === promise) {
-              this.#userHydrationPromises.delete(id);
-            }
-          });
-        this.#userHydrationPromises.set(id, promise);
-        return promise;
-      })
+    await Promise.all(
+      wanted.map((id) =>
+        this.#displayUserFresh(id) ? Promise.resolve(null) : this.#pendingDisplayUser(id)
+      )
     );
+  }
 
-    if (this.workspaceId !== workspaceId) return;
-    const fetched = results.filter(Boolean);
-    if (fetched.length === 0) return;
+  #displayUserFresh(id) {
+    const negativeUntil = this.#userDisplayNegativeUntil.get(id);
+    if (negativeUntil !== undefined) {
+      if (negativeUntil > Date.now()) return true;
+      this.#userDisplayNegativeUntil.delete(id);
+    }
+    if (!this.users.some((user) => user.id === id)) return false;
+    const fetchedAt = this.#userDisplayFetchedAt.get(id);
+    return fetchedAt === undefined || Date.now() - fetchedAt < USER_DISPLAY_FRESH_MS;
+  }
 
-    const byId = new Map(this.users.map((user) => [user.id, user]));
-    for (const user of fetched) byId.set(user.id, user);
+  #pendingDisplayUser(id) {
+    const pending = this.#userHydrationPromises.get(id);
+    if (pending) return pending.promise;
+
+    /** @type {(user: object|null) => void} */
+    let resolve = () => {};
+    const promise = new Promise((res) => {
+      resolve = res;
+    });
+    const entry = { promise, resolve };
+    this.#userHydrationPromises.set(id, entry);
+    this.#userDisplayQueue.push({ id, resolve });
+    this.#scheduleDisplayFlush();
+    return promise;
+  }
+
+  #scheduleDisplayFlush() {
+    if (this.#userDisplayFlushScheduled) return;
+    this.#userDisplayFlushScheduled = true;
+    queueMicrotask(() => {
+      this.#userDisplayFlushScheduled = false;
+      this.#flushDisplayBatch();
+    });
+  }
+
+  #flushDisplayBatch() {
+    if (
+      this.#userDisplayOutstanding >= USER_DISPLAY_MAX_OUTSTANDING ||
+      this.#userDisplayQueue.length === 0
+    ) {
+      return;
+    }
+
+    const chunk = this.#userDisplayQueue.splice(0, USER_DISPLAY_BATCH_SIZE);
+    const generation = this.#userDisplayGeneration;
+    this.#userDisplayOutstanding += 1;
+    getUserDisplayBatch(
+      chunk.map((entry) => entry.id),
+      BACKGROUND_READ
+    )
+      .then((users) => this.#settleDisplayBatch(chunk, generation, users, null))
+      .catch((error) => this.#settleDisplayBatch(chunk, generation, null, error))
+      .finally(() => {
+        this.#userDisplayOutstanding = Math.max(0, this.#userDisplayOutstanding - 1);
+        this.#flushDisplayBatch();
+      });
+
+    this.#flushDisplayBatch();
+  }
+
+  #settleDisplayBatch(chunk, generation, users, error) {
+    const now = Date.now();
+    const byId = new Map((users || []).map((user) => [user.id, user]));
+    const scopeChanged = generation !== this.#userDisplayGeneration;
+
+    for (const entry of chunk) {
+      const pending = this.#userHydrationPromises.get(entry.id);
+      if (pending?.resolve === entry.resolve) {
+        this.#userHydrationPromises.delete(entry.id);
+      }
+      if (scopeChanged) {
+        entry.resolve(null);
+        continue;
+      }
+      if (error) {
+        // Transient failures stay retryable; only successful omissions are
+        // negatively cached.
+        entry.resolve(null);
+        continue;
+      }
+      const user = byId.get(entry.id);
+      if (!user) {
+        this.#userDisplayNegativeUntil.set(entry.id, now + USER_DISPLAY_FRESH_MS);
+        entry.resolve(null);
+        continue;
+      }
+      this.#mergeDisplayUser(user, now);
+      entry.resolve(user);
+    }
+  }
+
+  #mergeDisplayUser(user, fetchedAt) {
+    const byId = new Map(this.users.map((candidate) => [candidate.id, candidate]));
+    byId.set(user.id, user);
     this.users = [...byId.values()];
+
+    this.#userDisplayFetchedAt.delete(user.id);
+    this.#userDisplayFetchedAt.set(user.id, fetchedAt);
+    if (this.#userDisplayFetchedAt.size <= USER_DISPLAY_CACHE_LIMIT) return;
+
+    const evicted = new Set();
+    for (const id of this.#userDisplayFetchedAt.keys()) {
+      if (this.#userDisplayFetchedAt.size <= USER_DISPLAY_CACHE_LIMIT) break;
+      this.#userDisplayFetchedAt.delete(id);
+      evicted.add(id);
+    }
+    if (evicted.size > 0) {
+      this.users = this.users.filter((candidate) => !evicted.has(candidate.id));
+    }
   }
 
   /**
    * Resolved effective configuration for the current workspace and optional
-   * item type: assigned config set (else the global default), its effective
-   * screens with fields, and config-set priorities. Cached per item type;
-   * in-flight requests are shared.
+   * item type. Convenience delegate for the workspace-scoped callers; see
+   * screenConfigFor for the cross-workspace contract.
    */
-  async screenConfig(itemTypeId = null) {
-    if (!this.workspaceId || this.workspaceId === 'global') return null;
-    const key = itemTypeId == null ? 'default' : String(itemTypeId);
+  screenConfig(itemTypeId = null) {
+    return this.screenConfigFor(this.workspaceId, itemTypeId);
+  }
+
+  /**
+   * Resolved effective configuration for any workspace and optional item type:
+   * assigned config set (else the global default), its effective screens with
+   * fields, and config-set priorities. Cached per (workspace, item type);
+   * in-flight requests are shared and the cache is bounded. A delayed response
+   * is written only when the cache has not been invalidated in the meantime.
+   */
+  async screenConfigFor(workspaceId, itemTypeId = null) {
+    if (!workspaceId || workspaceId === 'global') return null;
+    const key = `${workspaceId}:${itemTypeId == null ? 'default' : itemTypeId}`;
     const cached = this.screenConfigs[key];
-    if (cached) return cached;
+    if (cached) {
+      this.#touchScreenConfig(key);
+      return cached;
+    }
 
     const pending = this.#screenConfigPromises.get(key);
     if (pending) return pending;
 
-    const workspaceId = this.workspaceId;
+    const epoch = this.#screenConfigEpoch;
     const promise = workspaces
       .getEffectiveConfig(workspaceId, itemTypeId, FOREGROUND_READ)
       .then((config) => {
-        if (this.workspaceId === workspaceId) {
-          this.screenConfigs = { ...this.screenConfigs, [key]: config };
+        if (this.#screenConfigEpoch === epoch) {
+          this.#storeScreenConfig(key, config);
         }
         return config;
       })
@@ -371,21 +499,44 @@ class WorkspaceDataStore {
 
   /** Drop cached effective configurations (after admin config changes). */
   invalidateScreenConfigs() {
+    this.#screenConfigEpoch += 1;
     this.screenConfigs = {};
+    this.#screenConfigAccess.clear();
     this.#screenConfigPromises.clear();
   }
 
+  #storeScreenConfig(key, config) {
+    this.screenConfigs = { ...this.screenConfigs, [key]: config };
+    this.#touchScreenConfig(key);
+    while (this.#screenConfigAccess.size > SCREEN_CONFIG_CACHE_LIMIT) {
+      const oldest = /** @type {string} */ (this.#screenConfigAccess.keys().next().value);
+      if (oldest === key) break;
+      this.#screenConfigAccess.delete(oldest);
+      const { [oldest]: _evicted, ...rest } = this.screenConfigs;
+      this.screenConfigs = rest;
+    }
+  }
+
+  #touchScreenConfig(key) {
+    this.#screenConfigAccess.delete(key);
+    this.#screenConfigAccess.set(key, true);
+  }
+
   // Silent re-fetch of cached screen configurations; keeps stale data on error.
-  async #refreshScreenConfigs(workspaceId) {
+  async #refreshScreenConfigs() {
     const keys = Object.keys(this.screenConfigs);
     if (keys.length === 0) return;
     await Promise.all(
       keys.map(async (key) => {
-        const itemTypeId = key === 'default' ? null : Number(key);
+        const [workspacePart, itemTypePart] = key.split(':');
+        const workspaceId = Number(workspacePart);
+        const itemTypeId = itemTypePart === 'default' ? null : Number(itemTypePart);
+        if (!Number.isInteger(workspaceId) || workspaceId <= 0) return;
+        const epoch = this.#screenConfigEpoch;
         try {
           const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId);
-          if (this.workspaceId === workspaceId) {
-            this.screenConfigs = { ...this.screenConfigs, [key]: config };
+          if (this.#screenConfigEpoch === epoch) {
+            this.#storeScreenConfig(key, config);
           }
         } catch (err) {
           if (!isExpectedBackgroundSyncError(err)) {
@@ -450,39 +601,33 @@ class WorkspaceDataStore {
 
   /** @private */
   async _fetchAllGlobal() {
-    const [itemTypesData, statusesData, statusCategoriesData, prioritiesData] = await Promise.all([
-      itemTypes.getAll({}, FOREGROUND_READ),
-      statuses.getAll({}, FOREGROUND_READ),
-      statusCategories.getAll({}, FOREGROUND_READ),
-      priorities.getAll({}, FOREGROUND_READ),
-    ]);
+    const bootstrap = await catalogs.getGlobalBootstrap(FOREGROUND_READ);
 
     if (this.workspaceId !== 'global') return;
 
     this.workspace = null;
-    this.itemTypes = itemTypesData || [];
-    this.statuses = statusesData || [];
-    this.statusCategories = statusCategoriesData || [];
+    this.itemTypes = bootstrap?.item_types ?? [];
+    this.statuses = bootstrap?.statuses ?? [];
+    this.statusCategories = bootstrap?.status_categories ?? [];
+    this.priorities = bootstrap?.priorities ?? [];
     // The global roster is deliberately not enumerated here: with a large
     // directory that is many sequential pages before anything can render.
-    // Views hydrate only the users their visible rows reference.
-    this.users = [];
-    this.priorities = prioritiesData || [];
+    // Views hydrate only the users their visible rows reference. Hydrated
+    // user-display records survive reference refreshes; only a scope or auth
+    // reset clears them.
     this.milestones = [];
     this.iterations = [];
     this.projects = [];
     this.labels = [];
 
-    try {
-      const cfData = await customFields.getAll({}, FOREGROUND_READ);
-      if (this.workspaceId === 'global') {
-        this.customFieldDefinitions = cfData || [];
-      }
-    } catch (e) {
-      console.warn('WorkspaceDataStore: failed to load custom field definitions', e);
-      if (this.workspaceId === 'global') {
-        this.customFieldDefinitions = [];
-      }
+    if (bootstrap?.custom_field_definitions != null) {
+      this.customFieldDefinitions = bootstrap.custom_field_definitions;
+    } else {
+      console.warn(
+        'WorkspaceDataStore: failed to load custom field definitions',
+        bootstrap?.custom_fields_error
+      );
+      this.customFieldDefinitions = [];
     }
   }
 

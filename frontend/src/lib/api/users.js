@@ -6,6 +6,12 @@ export const getAdminUsers = () => fetchAllV2Pages('/admin/users');
 export const getAssignableUsers = (workspaceId, requestOptions = {}) =>
   fetchV2Data(`/workspaces/${workspaceId}/assignable-users`, requestOptions);
 export const getUser = (id, requestOptions = {}) => fetchV2Data(`/users/${id}`, requestOptions);
+export const getUserDisplayBatch = (ids, requestOptions = {}) =>
+  fetchV2Data('/users/display-batch', {
+    ...requestOptions,
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
 export const getAgentOwner = (id) => fetchAPI(`/users/${id}/agent-owner`);
 export const createUser = (data) =>
   fetchAPI('/users', {

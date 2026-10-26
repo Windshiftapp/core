@@ -27,6 +27,7 @@ type catalogReader interface {
 	ListAssignableUsers(context.Context, int, int) ([]models.User, error)
 	ListUsers(int, services.CatalogPageParams) ([]models.User, int, error)
 	GetUser(userID, targetID int) (*models.User, error)
+	GetUserDisplayBatch(context.Context, int, []int) ([]models.User, error)
 	ListLabels(userID, workspaceID int) ([]models.Label, error)
 	GetLabel(userID, workspaceID, labelID int) (*models.Label, error)
 	ListItemTemplates(userID, workspaceID int, itemTypeID *int) (services.ItemTemplateListResult, error)
@@ -60,6 +61,7 @@ func registerScopedCatalogRoutes(builder *routeBuilder, catalog catalogReader, w
 	builder.Read("/workspaces/{workspace_id}/assignable-users", AuthAuthenticated, []string{"users:read"}, listAssignableUsers(catalog))
 	builder.Page("/users", AuthAuthenticated, []string{"users:read"}, listUsers(catalog))
 	builder.Read("/users/{user_id}", AuthAuthenticated, []string{"users:read"}, getUser(catalog))
+	builder.JSON(http.MethodPost, "/users/display-batch", http.StatusOK, false, AuthAuthenticated, []string{"users:read"}, userDisplayBatch(catalog))
 	builder.Read("/workspaces/{workspace_id}/labels", AuthAuthenticated, []string{"items:read"}, listLabels(catalog))
 	builder.Read("/workspaces/{workspace_id}/labels/{label_id}", AuthAuthenticated, []string{"items:read"}, getLabel(catalog))
 	builder.RawResponse[itemTemplateListDocument](http.MethodGet, "/workspaces/{workspace_id}/item-templates", http.StatusOK, "application/json", AuthAuthenticated, []string{"item-templates:read"}, listItemTemplates(catalog))
@@ -488,6 +490,42 @@ func getUser(catalog catalogReader) readOperation[userSummaryDTO] {
 			return userSummaryDTO{}, scopedReadError(err, "User was not found")
 		}
 		return userSummaryFromModel(item), nil
+	}
+}
+
+const maxUserDisplayBatchIDs = 200
+
+type userDisplayBatchRequest struct {
+	IDs []int `json:"ids" maxItems:"200"`
+}
+
+func userDisplayBatch(catalog catalogReader) jsonOperation[userDisplayBatchRequest, []userSummaryDTO] {
+	return func(r *http.Request, request userDisplayBatchRequest) ([]userSummaryDTO, error) {
+		if len(request.IDs) == 0 || len(request.IDs) > maxUserDisplayBatchIDs {
+			return nil, newError(http.StatusBadRequest, "invalid_request", "ids must contain between 1 and 200 user ids")
+		}
+		seen := make(map[int]struct{}, len(request.IDs))
+		ids := make([]int, 0, len(request.IDs))
+		for _, id := range request.IDs {
+			if id <= 0 {
+				return nil, newError(http.StatusBadRequest, "invalid_request", "ids must contain positive integers")
+			}
+			if _, duplicate := seen[id]; duplicate {
+				continue
+			}
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		items, err := catalog.GetUserDisplayBatch(r.Context(), user.ID, ids)
+		if err != nil {
+			return nil, internalError(err)
+		}
+		return userSummaries(items), nil
 	}
 }
 

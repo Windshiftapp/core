@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { assetCategories, assetSets as assetSetsApi, assetStatuses, assetTypes as assetTypesApi } from '../../api/assets.js';
-  import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import PlaceholderFieldLabel from './PlaceholderFieldLabel.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import Select from '../../components/Select.svelte';
@@ -160,17 +160,12 @@
     <div class="pt-2 border-t" style="border-color: var(--ds-border);">
       <!-- Title -->
       <div class="mb-3">
-        <div class="flex items-center gap-1 mb-1">
-          <label for="asset-title" class="block text-xs font-medium">{t('actions.config.assetTitle')}</label>
-          <span class="text-ds-text-danger text-xs">*</span>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="asset-title"
+          label={t('actions.config.assetTitle')}
+          required
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Input
           id="asset-title"
           type="text"
@@ -184,16 +179,11 @@
 
       <!-- Description -->
       <div class="mb-3">
-        <div class="flex items-center gap-1 mb-1">
-          <label for="asset-description" class="block text-xs font-medium">{t('actions.config.assetDescription')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="asset-description"
+          label={t('actions.config.assetDescription')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Textarea
           id="asset-description"
           rows={2}
@@ -205,16 +195,11 @@
 
       <!-- Asset Tag -->
       <div class="mb-3">
-        <div class="flex items-center gap-1 mb-1">
-          <label for="asset-tag" class="block text-xs font-medium">{t('actions.config.assetTagLabel')}</label>
-          <button
-            onclick={() => showPlaceholderModal = true}
-            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-            title={t('actions.placeholders.showReference')}
-          >
-            <HelpCircle class="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <PlaceholderFieldLabel
+          forId="asset-tag"
+          label={t('actions.config.assetTagLabel')}
+          onShowReference={() => (showPlaceholderModal = true)}
+        />
         <Input
           id="asset-tag"
           type="text"

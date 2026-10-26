@@ -10,7 +10,10 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"windshift/internal/database"
 	"windshift/internal/email"
@@ -30,7 +33,9 @@ type EmailScheduler struct {
 	stopChan        chan struct{}
 	mu              sync.RWMutex
 	running         bool
-	defaultInterval time.Duration
+	pollInterval    time.Duration
+	batchSize       int
+	pollConcurrency int
 	attachmentPath  string
 
 	// providerForChannel resolves the IMAP provider + decrypted config for a
@@ -50,10 +55,43 @@ func NewEmailScheduler(db database.Database, credentials *email.CredentialManage
 		runRepo:            repository.NewSchedulerRunRepository(db),
 		stopChan:           make(chan struct{}),
 		running:            false,
-		defaultInterval:    5 * time.Minute,
+		pollInterval:       5 * time.Minute,
+		batchSize:          50,
+		pollConcurrency:    2,
 		attachmentPath:     attachmentPath,
 		providerForChannel: credentials.GetProviderForChannel,
 	}
+}
+
+// SetPollInterval overrides the mailbox poll cadence. Non-positive values keep
+// the current setting.
+func (es *EmailScheduler) SetPollInterval(interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	es.mu.Lock()
+	es.pollInterval = interval
+	es.mu.Unlock()
+}
+
+// SetBatchSize overrides how many messages one intake fetches per poll.
+func (es *EmailScheduler) SetBatchSize(size int) {
+	if size <= 0 {
+		return
+	}
+	es.mu.Lock()
+	es.batchSize = size
+	es.mu.Unlock()
+}
+
+// SetPollConcurrency overrides how many mailboxes poll at once.
+func (es *EmailScheduler) SetPollConcurrency(limit int) {
+	if limit <= 0 {
+		return
+	}
+	es.mu.Lock()
+	es.pollConcurrency = limit
+	es.mu.Unlock()
 }
 
 // SetCommentService passes the CommentService through to the email processor
@@ -84,7 +122,7 @@ func (es *EmailScheduler) Start() {
 		return
 	}
 
-	es.ticker = time.NewTicker(es.defaultInterval)
+	es.ticker = time.NewTicker(es.pollInterval)
 	es.stopChan = make(chan struct{})
 	es.running = true
 	slog.Info("starting email scheduler (IMAP polling)")
@@ -148,23 +186,40 @@ func (es *EmailScheduler) processEmailChannels() {
 
 	slog.Debug("processing email channels", "count", len(channels))
 
+	// Poll mailboxes concurrently with a small bound. One slow IMAP server must
+	// not delay every other mailbox; the per-mailbox processing lease keeps a
+	// second instance from overlapping the same mailbox.
+	es.mu.RLock()
+	concurrency := es.pollConcurrency
+	es.mu.RUnlock()
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
 	// Count per-channel failures so the deferred recordSchedulerRun reflects them.
 	// Without this, channelsProcessed grows on every tick and success stays true even
 	// when every IMAP connect / parse / process step fails — admin Diagnostics then
 	// shows a green "100% success rate" while real mail is silently dropped.
-	failures := 0
+	var processed atomic.Int64
+	var failures atomic.Int64
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(concurrency)
 	for _, channel := range channels {
-		channelCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		ok := es.processChannel(channelCtx, channel)
-		cancel()
-		if !ok {
-			failures++
-		}
-		channelsProcessed++
+		group.Go(func() error {
+			channelCtx, cancel := context.WithTimeout(groupCtx, 2*time.Minute)
+			defer cancel()
+			if !es.processChannel(channelCtx, channel) {
+				failures.Add(1)
+			}
+			processed.Add(1)
+			return nil
+		})
 	}
+	_ = group.Wait()
+	channelsProcessed = int(processed.Load())
 
-	if failures > 0 {
-		runErr = fmt.Errorf("%d of %d email channels failed", failures, len(channels))
+	if failed := failures.Load(); failed > 0 {
+		runErr = fmt.Errorf("%d of %d email channels failed", failed, len(channels))
 	}
 }
 
@@ -239,6 +294,14 @@ func (es *EmailScheduler) acquireProcessingLease(ctx context.Context, channelID 
 		return "", false, fmt.Errorf("count claimed email processing leases: %w", err)
 	}
 	return owner, rows > 0, nil
+}
+
+// detachedPersistenceContext returns a short context that survives the caller's
+// cancellation. Watermark and health writes must land even when a mailbox's
+// processing budget expired mid-batch; otherwise the next tick refetches the
+// same mail and the configured disposition never runs.
+func detachedPersistenceContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 }
 
 func (es *EmailScheduler) releaseProcessingLease(ctx context.Context, channelID int, owner string) {
@@ -423,13 +486,29 @@ func (es *EmailScheduler) pollIntake(
 		sinceUID = 0
 	}
 
-	messages, err := client.FetchMessages(sinceUID, 50)
+	// A brand-new intake starts at the current UIDNEXT unless the operator
+	// explicitly opted into importing the mailbox's existing mail. Without this
+	// a mailbox with years of history turns into years of tickets.
+	firstPoll := state.UIDValidity == 0 && state.LastUID == 0
+	skipExisting := firstPoll && !intake.ImportExistingMail && selectData.UIDNext > 0
+	if skipExisting {
+		sinceUID = uint32(selectData.UIDNext) - 1
+	}
+
+	es.mu.RLock()
+	batchSize := es.batchSize
+	es.mu.RUnlock()
+	messages, err := client.FetchMessages(sinceUID, batchSize)
 	if err != nil {
 		slog.Error("failed to fetch messages", "channel_id", ch.ID, "intake_id", intake.ID, "error", err)
 		return err
 	}
 	if len(messages) == 0 {
-		es.updatePollLastChecked(ctx, ch, intake, currentValidity)
+		if skipExisting {
+			es.updatePollState(ctx, ch, intake, int(sinceUID), currentValidity, 0, 0, 0)
+		} else {
+			es.updatePollLastChecked(ctx, ch, intake, currentValidity)
+		}
 		return nil
 	}
 
@@ -444,6 +523,12 @@ func (es *EmailScheduler) pollIntake(
 	deferredClaim := false
 	disposition := email.ResolveEmailDisposition(&effective)
 	for _, msg := range messages {
+		if ctx.Err() != nil {
+			// The per-mailbox budget expired between messages. Stop cleanly so
+			// the watermark covers everything already processed instead of
+			// recording a processing error for mail we never started.
+			break
+		}
 		if msg.FetchError != nil {
 			slog.Error("failed to fetch bounded email body, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID, "intake_id", intake.ID, "uid", msg.UID, "error", msg.FetchError)
@@ -458,6 +543,11 @@ func (es *EmailScheduler) pollIntake(
 		// requeue still finds it.
 		result, processErr := es.processor.ProcessEmailWithIntake(ctx, parsed, ch.ID, currentValidity, &effective, intake)
 		if processErr != nil {
+			if ctx.Err() != nil {
+				// The budget expired inside the message. Leave the cursor before
+				// it so the next tick retries; do not count it as a poison email.
+				break
+			}
 			slog.Error("failed to process email, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID, "intake_id", intake.ID, "uid", msg.UID,
 				"message_id", parsed.MessageID, "error", processErr)
@@ -484,9 +574,11 @@ func (es *EmailScheduler) pollIntake(
 
 		// Rate-limited mail is left untouched in the mailbox (unread, not
 		// deleted) so an operator can requeue it; the watermark still advances
-		// past it so one flooding sender cannot wedge the intake.
+		// past it so one flooding sender cannot wedge the intake. Deduplicated
+		// mail still gets the configured disposition: an earlier run may have
+		// created the ticket but expired before marking or deleting it.
 		rateLimited := result.Action == email.ActionRateLimited
-		if !rateLimited && result.Action != email.ActionAlreadyExists {
+		if !rateLimited {
 			switch disposition {
 			case models.EmailDispositionMarkRead:
 				if markErr := client.MarkAsRead(msg.UID); markErr != nil {
@@ -607,7 +699,9 @@ func (es *EmailScheduler) updateIntakeState(
 	failedMessageUIDValidity uint32,
 	failedMessageCount int,
 ) {
-	if _, err := es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	if _, err := es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_intake_state
 		SET last_uid = ?, uid_validity = ?, failed_message_uid = ?,
 		    failed_message_uid_validity = ?, failed_message_count = ?, updated_at = CURRENT_TIMESTAMP
@@ -619,7 +713,9 @@ func (es *EmailScheduler) updateIntakeState(
 
 // updateIntakeLastChecked records a clean empty poll and clears poison state.
 func (es *EmailScheduler) updateIntakeLastChecked(ctx context.Context, intakeID int, uidValidity uint32) {
-	_, _ = es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, _ = es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_intake_state
 		SET last_uid = CASE
 		        WHEN uid_validity <> 0 AND uid_validity <> ? THEN 0
@@ -673,7 +769,9 @@ func (es *EmailScheduler) updatePollLastChecked(ctx context.Context, ch channelI
 // markChannelChecked clears channel-level health after a clean poll. The
 // per-folder cursors live on email_intake_state.
 func (es *EmailScheduler) markChannelChecked(ctx context.Context, channelID int) {
-	_, _ = es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, _ = es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_channel_state
 		SET last_checked_at = CURRENT_TIMESTAMP, error_count = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
@@ -749,7 +847,9 @@ func (es *EmailScheduler) updateChannelState(
 	if lastBatchError != "" {
 		lastError = sql.NullString{String: lastBatchError, Valid: true}
 	}
-	_, err := es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, err := es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_channel_state
 		SET last_uid = ?, uid_validity = ?, last_checked_at = CURRENT_TIMESTAMP,
 		    error_count = ?, last_error = ?, failed_message_uid = ?,
@@ -769,7 +869,9 @@ func (es *EmailScheduler) updateChannelState(
 // by preserving LastUID when the stored validity is 0 (unknown), but reset it
 // when a known epoch changes.
 func (es *EmailScheduler) updateLastChecked(ctx context.Context, channelID int, uidValidity uint32) {
-	_, _ = es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, _ = es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_channel_state
 		SET last_uid = CASE
 		        WHEN uid_validity <> 0 AND uid_validity <> ? THEN 0
@@ -785,7 +887,9 @@ func (es *EmailScheduler) updateLastChecked(ctx context.Context, channelID int, 
 
 // recordError records an error for the channel
 func (es *EmailScheduler) recordError(ctx context.Context, channelID int, err error) {
-	_, _ = es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, _ = es.db.ExecWriteContext(persistCtx, `
 		UPDATE email_channel_state
 		SET error_count = error_count + 1, last_error = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
@@ -794,7 +898,9 @@ func (es *EmailScheduler) recordError(ctx context.Context, channelID int, err er
 
 // updateLastActivity updates the channel's last_activity timestamp
 func (es *EmailScheduler) updateLastActivity(ctx context.Context, channelID int) {
-	_, _ = es.db.ExecWriteContext(ctx, `
+	persistCtx, cancel := detachedPersistenceContext(ctx)
+	defer cancel()
+	_, _ = es.db.ExecWriteContext(persistCtx, `
 		UPDATE channels SET last_activity = CURRENT_TIMESTAMP WHERE id = ?
 	`, channelID)
 }

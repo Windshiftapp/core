@@ -276,6 +276,11 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			OutboxInterval:  parseDurationEnv("WINDSHIFT_EMAIL_OUTBOX_INTERVAL", 0),
 			OutboxBatchSize: parseIntEnv("WINDSHIFT_EMAIL_OUTBOX_BATCH_SIZE", 0),
 		},
+		Email: EmailConfig{
+			PollInterval:    parseDurationEnv("WINDSHIFT_EMAIL_POLL_INTERVAL", 0),
+			BatchSize:       parseIntEnv("WINDSHIFT_EMAIL_BATCH_SIZE", 0),
+			PollConcurrency: parseIntEnv("WINDSHIFT_EMAIL_POLL_CONCURRENCY", 0),
+		},
 		OutboundTLS: OutboundTLSConfig{
 			SkipVerify: parseBoolEnv("TLS_SKIP_VERIFY"),
 		},

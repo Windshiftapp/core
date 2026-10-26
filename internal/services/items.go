@@ -260,7 +260,13 @@ func resolveItemTypeForCreation(db database.Database, workspaceID int, itemTypeI
 // CreateItem creates a new item with proper transaction handling and number generation
 // This centralizes the item creation logic used by normal creation, portal submissions, and copying
 func CreateItem(db database.Database, params ItemCreationParams) (int64, error) {
-	return createItem(context.Background(), db, params)
+	return CreateItemContext(context.Background(), db, params)
+}
+
+// CreateItemContext is CreateItem with cancellation propagated into item
+// creation. Email intake uses it so a mailbox budget also bounds the write.
+func CreateItemContext(ctx context.Context, db database.Database, params ItemCreationParams) (int64, error) {
+	return createItem(ctx, db, params)
 }
 
 func createItem(ctx context.Context, db database.Database, params ItemCreationParams) (int64, error) {

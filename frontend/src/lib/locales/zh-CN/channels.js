@@ -205,6 +205,9 @@ export default {
     intakeRateLimited: '已暂缓 {count} 封',
     intakeSendConfirmation: '发送提交回执',
     intakeSendConfirmationHint: '向发件人发送请求已收到的确认邮件。当此收件箱关联门户时，回执会包含门户链接。',
+    intakeImportExistingMail: '导入现有邮件',
+    intakeImportExistingMailHint:
+      '首次轮询时导入邮箱中已有的邮件，而不是从新邮件开始。保持关闭可避免将邮箱历史变成工单。',
     intakeConfirmationOn: '回执已开启',
     // Form Channel Configuration
     openForm: 'Open Form',

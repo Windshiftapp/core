@@ -142,6 +142,7 @@ func (s *Service) ListJobs() ([]JobInfo, error) {
 		       j.config_json, j.progress_json, j.result_json, j.error_message, j.created_at, j.started_at, j.completed_at
 		FROM jira_import_jobs j
 		LEFT JOIN jira_import_connections c ON j.connection_id = c.id
+		WHERE j.hidden_at IS NULL
 		ORDER BY j.created_at DESC
 	`)
 	if err != nil {
@@ -271,6 +272,32 @@ func (s *Service) PreviousImports(projectKeys []string) ([]PreviousImport, error
 		imports = append(imports, previous)
 	}
 	return imports, rows.Err()
+}
+
+// HideJob clears a finished import from the history listing without touching
+// the job or its imported data. The job keeps driving conflict detection, so a
+// re-import of the same projects still requires an explicit force.
+func (s *Service) HideJob(jobID string) error {
+	var status string
+	var hiddenAt sql.NullTime
+	err := s.db.QueryRow(`SELECT status, hidden_at FROM jira_import_jobs WHERE id = ?`, jobID).Scan(&status, &hiddenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrJobNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if status == "queued" || status == "running" {
+		return ErrJobActive
+	}
+	if hiddenAt.Valid {
+		return nil
+	}
+	_, err = s.db.ExecWrite(`
+		UPDATE jira_import_jobs SET hidden_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND hidden_at IS NULL
+	`, jobID)
+	return err
 }
 
 func (s *Service) Creator(jobID string) (int, error) {

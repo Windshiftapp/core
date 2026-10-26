@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
-  import { configurationSets, screens } from '../../api/configuration.js';
   import { items } from '../../api/items.js';
   import { iterations } from '../../api/milestones.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -26,14 +25,14 @@
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { backlogStore } from '../../stores/backlogStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { errorToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
-  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { formatItemCount } from '../../utils/itemCount.js';
-  import { isSystemFieldAvailableForItem } from '../../utils/screenFields.js';
+  import { isSystemFieldAvailableInEffectiveConfig } from '../../utils/screenFields.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -60,11 +59,6 @@
   let sectionDropHighlight = $state(new Map()); // iterationId|'unassigned' -> boolean
   let pendingActionItemIds = $state(new Set());
   let pendingStoryPointsItemIds = $state(new Set());
-  let storyPointsScreenConfiguration = $state({
-    ready: false,
-    configSetsByWorkspaceId: new Map(),
-    screensById: new Map(),
-  });
 
   // --- Complete Iteration dialog state ---
   let completeIterationShow = $state(false);
@@ -72,28 +66,53 @@
   let iterationIncompleteItems = $state([]);
   let iterationCompleteTargets = $state([]);
 
-  // localStorage keys
+  // Legacy localStorage keys, read only as a fallback for settings saved
+  // before backlog view state moved into user preferences.
   const globalIdsKey = $derived(`backlog-global-iterations-${workspaceId}`);
   const collapsedKey = $derived(`backlog-collapsed-sections-${workspaceId}`);
 
-  // Restore persisted state from localStorage
   function restorePersistedState() {
-    try {
-      const savedGlobal = localStorage.getItem(globalIdsKey);
-      if (savedGlobal) addedGlobalIds = new Set(JSON.parse(savedGlobal));
-    } catch { /* ignore */ }
-    try {
-      const savedCollapsed = localStorage.getItem(collapsedKey);
-      if (savedCollapsed) collapsedSections = new Set(JSON.parse(savedCollapsed));
-    } catch { /* ignore */ }
+    const storedGlobal = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'backlog',
+      'global_iteration_ids'
+    );
+    if (Array.isArray(storedGlobal)) {
+      addedGlobalIds = new Set(storedGlobal);
+    } else {
+      try {
+        const savedGlobal = localStorage.getItem(globalIdsKey);
+        if (savedGlobal) addedGlobalIds = new Set(JSON.parse(savedGlobal));
+      } catch { /* ignore */ }
+    }
+
+    const storedCollapsed = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'backlog',
+      'collapsed_sections'
+    );
+    if (Array.isArray(storedCollapsed)) {
+      collapsedSections = new Set(storedCollapsed);
+    } else {
+      try {
+        const savedCollapsed = localStorage.getItem(collapsedKey);
+        if (savedCollapsed) collapsedSections = new Set(JSON.parse(savedCollapsed));
+      } catch { /* ignore */ }
+    }
   }
 
   function persistGlobalIds() {
-    localStorage.setItem(globalIdsKey, JSON.stringify([...addedGlobalIds]));
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'backlog', {
+      global_iteration_ids: [...addedGlobalIds],
+    });
   }
 
   function persistCollapsed() {
-    localStorage.setItem(collapsedKey, JSON.stringify([...collapsedSections]));
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'backlog', {
+      collapsed_sections: [...collapsedSections],
+    });
   }
 
   // Derived iteration groupings
@@ -150,75 +169,26 @@
     addIterationPickerValue = null;
   }
 
-  async function loadStoryPointsScreenConfiguration() {
-    const workspaceRecords = workspaceId
-      ? [{
-          id: workspaceDataStore.workspace?.id ?? Number(workspaceId),
-          configuration_set_id: workspaceDataStore.workspace?.configuration_set_id ?? null,
-        }]
-      : (await workspacesStore.load()).map((availableWorkspace) => ({
-          id: availableWorkspace.id,
-          configuration_set_id: availableWorkspace.configuration_set_id ?? null,
-        }));
-
-    const configSetIds = [...new Set(
-      workspaceRecords
-        .map((record) => record.configuration_set_id)
-        .filter((configSetId) => configSetId != null)
-        .map((configSetId) => String(configSetId))
-    )];
-
-    const [screensOutcome, configSetOutcomes] = await Promise.all([
-      screens.getAllWithFields()
-        .then((screens) => ({ status: 'fulfilled', value: screens }))
-        .catch((error) => ({ status: 'rejected', reason: error })),
-      Promise.allSettled(configSetIds.map((configSetId) => configurationSets.get(configSetId))),
-    ]);
-
-    if (screensOutcome.status === 'rejected') {
-      console.error('Failed to load screens for backlog fields:', screensOutcome.reason);
+  // Field availability resolves through the shared effective-config cache,
+  // keyed by (workspace, item type). Rows render before metadata; a pair that
+  // is still unknown leaves its story-points control hidden.
+  $effect(() => {
+    const pairs = new Map();
+    for (const item of backlogItems) {
+      if (item.workspace_id == null) continue;
+      const key = `${item.workspace_id}:${item.item_type_id ?? 'default'}`;
+      if (!pairs.has(key)) pairs.set(key, [item.workspace_id, item.item_type_id ?? null]);
     }
-
-    const screensById = new Map(
-      (Array.isArray(screensOutcome.value) ? screensOutcome.value : [])
-        .filter((screen) => screen?.id != null)
-        .map((screen) => [screen.id, screen])
-    );
-    const configSetsById = new Map();
-    configSetOutcomes.forEach((outcome, index) => {
-      if (outcome.status === 'fulfilled' && outcome.value) {
-        configSetsById.set(configSetIds[index], outcome.value);
-      } else if (outcome.status === 'rejected') {
-        console.error(`Failed to load configuration set ${configSetIds[index]} for backlog fields:`, outcome.reason);
-      }
-    });
-
-    const configSetsByWorkspaceId = new Map();
-    workspaceRecords.forEach((record) => {
-      if (record?.id == null) return;
-      const workspaceKey = String(record.id);
-      const configSetId = record.configuration_set_id;
-      configSetsByWorkspaceId.set(
-        workspaceKey,
-        configSetId == null ? null : configSetsById.get(String(configSetId))
-      );
-    });
-
-    storyPointsScreenConfiguration = {
-      ready: true,
-      configSetsByWorkspaceId,
-      screensById,
-    };
-  }
+    for (const [workspaceIdForItem, itemTypeId] of pairs.values()) {
+      void workspaceDataStore.screenConfigFor(workspaceIdForItem, itemTypeId);
+    }
+  });
 
   function storyPointsConfiguredForItem(item) {
-    if (!storyPointsScreenConfiguration.ready) return false;
-    return isSystemFieldAvailableForItem(
-      item,
-      'story_points',
-      storyPointsScreenConfiguration.configSetsByWorkspaceId,
-      storyPointsScreenConfiguration.screensById
-    );
+    if (item.workspace_id == null) return false;
+    const key = `${item.workspace_id}:${item.item_type_id == null ? 'default' : item.item_type_id}`;
+    const config = workspaceDataStore.screenConfigs[key];
+    return !!config && isSystemFieldAvailableInEffectiveConfig(config, 'story_points');
   }
 
   function setStoryPointsPending(itemId, pending) {
@@ -287,7 +257,6 @@
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await workspaceDataStore.initialize(workspaceId);
-      await loadStoryPointsScreenConfiguration();
 
       // Load iterations for this workspace
       try {
@@ -311,7 +280,6 @@
       restorePersistedState();
     } else {
       await workspaceDataStore.initializeGlobal();
-      await loadStoryPointsScreenConfiguration();
     }
     loading = false;
   });
@@ -765,7 +733,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mb-6">
-        <SubFilterBar {workspaceId} showCompletionToggle={false} />
+        <SubFilterBar {workspaceId} {collectionId} showCompletionToggle={false} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}

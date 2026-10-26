@@ -18,6 +18,7 @@
   import Users from '@lucide/svelte/icons/users';
   import PieChart from '@lucide/svelte/icons/pie-chart';
   import StatCard from '../../components/StatCard.svelte';
+  import { formatDurationMinutes } from '../../utils/timeUtils.js';
   import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { customerDisplayName, customerOrganisationName } from '../../utils/customerLabel.js';
@@ -294,11 +295,7 @@
   }
 
   function formatDuration(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
+    return formatDurationMinutes(minutes);
   }
 
   function formatTime(unixTimestamp) {

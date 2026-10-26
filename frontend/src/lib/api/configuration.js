@@ -79,6 +79,14 @@ export const screens = {
     }),
 };
 
+export const catalogs = {
+  // One request for every global reference catalog. Custom fields are
+  // optional: the server returns null plus custom_fields_error when the
+  // caller may not read them or the reader failed.
+  getGlobalBootstrap: (requestOptions = {}) =>
+    fetchV2Data('/catalogs/global-bootstrap', requestOptions),
+};
+
 export const customFields = {
   ...createCrudClient('/custom-fields', { adminBasePath: '/admin/custom-fields', readV2: true }),
   getOverview: async (requestOptions = {}) => {

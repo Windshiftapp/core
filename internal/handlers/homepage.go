@@ -73,6 +73,10 @@ type ItemActivity struct {
 	Status              string  `json:"status"`
 	StatusBuiltinKey    string  `json:"status_builtin_key,omitempty"`
 	StatusColor         *string `json:"status_color,omitempty"`
+	ItemTypeName        string  `json:"item_type_name,omitempty"`
+	ItemTypeBuiltinKey  string  `json:"item_type_builtin_key,omitempty"`
+	ItemTypeIcon        string  `json:"item_type_icon,omitempty"`
+	ItemTypeColor       string  `json:"item_type_color,omitempty"`
 	PriorityID          *int    `json:"priority_id,omitempty"`
 	PriorityName        *string `json:"priority_name,omitempty"`
 	PriorityBuiltinKey  string  `json:"priority_builtin_key,omitempty"`
@@ -360,6 +364,10 @@ func (h *HomepageHandler) getItemActivitiesBatch(ctx context.Context, activities
 			Title:               item.Title,
 			Status:              item.StatusName,
 			StatusBuiltinKey:    item.StatusBuiltinKey,
+			ItemTypeName:        item.ItemTypeName,
+			ItemTypeBuiltinKey:  item.ItemTypeBuiltinKey,
+			ItemTypeIcon:        item.ItemTypeIcon,
+			ItemTypeColor:       item.ItemTypeColor,
 			PriorityID:          item.PriorityID,
 			PriorityBuiltinKey:  item.PriorityBuiltinKey,
 			WorkspaceKey:        item.WorkspaceKey,

@@ -22,6 +22,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
@@ -117,6 +118,18 @@ func decryptOrLegacy(enc Encryptor, value string) (string, error) {
 const smtpDialTimeout = 15 * time.Second
 const smtpOperationTimeout = 30 * time.Second
 
+// A global SMTP outage must not make every outbound path wait out its own
+// per-message timeout. After this many consecutive connection-level failures
+// the sender stops dialing for the cooldown and callers release or retry their
+// claims without a network attempt.
+const (
+	smtpBreakerFailureThreshold = 3
+	smtpBreakerCooldown         = time.Minute
+)
+
+// ErrSMTPCircuitOpen is returned while the shared SMTP breaker is open.
+var ErrSMTPCircuitOpen = errors.New("SMTP circuit breaker is open")
+
 // hostFromAddr returns just the host portion of an SMTP address, handling
 // IPv6 bracketed notation safely. The old `strings.Split(addr, ":")[0]` path
 // returned "[" for `[::1]:465`, which makes TLS SNI verification impossible.
@@ -195,6 +208,30 @@ type NotificationSMTPSender struct {
 	templates  *repository.EmailTemplateRepository
 	encryption Encryptor
 	baseURL    string
+
+	breakerMu        sync.Mutex
+	breakerFailures  int
+	breakerOpenUntil time.Time
+
+	// Idle authenticated sessions are reused across consecutive sends so a drain
+	// pass or digest tick does not pay a TCP + TLS + AUTH handshake per message.
+	// A small pool keeps concurrent transactional sends from queueing behind a
+	// long digest delivery.
+	sessionMu sync.Mutex
+	sessions  []*smtpSession
+}
+
+const (
+	smtpSessionIdleTimeout = 30 * time.Second
+	smtpSessionPoolSize    = 4
+)
+
+// smtpSession is a reusable authenticated SMTP connection.
+type smtpSession struct {
+	conn        net.Conn
+	client      *smtp.Client
+	fingerprint string
+	lastUsed    time.Time
 }
 
 // NewNotificationSMTPSender creates a new SMTP notification sender
@@ -679,16 +716,225 @@ func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *mo
 
 	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
 
-	switch strings.ToLower(strings.TrimSpace(config.SMTPEncryption)) {
-	case "tls", "starttls":
-		return sendWithStartTLSContext(ctx, addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
-	case "ssl":
-		return sendWithSSLContext(ctx, addr, auth, fromEmail, toEmail, message, config.SMTPSkipTLSVerify)
-	case "none":
-		return sendPlaintextContext(ctx, addr, fromEmail, toEmail, message)
+	if s.breakerOpen() {
+		return ErrSMTPCircuitOpen
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(config.SMTPEncryption))
+	switch mode {
+	case "tls", "starttls", "ssl", "none":
 	default:
 		return fmt.Errorf("SMTP encryption %q not allowed", config.SMTPEncryption)
 	}
+
+	fingerprint := fmt.Sprintf("%s|%d|%s|%s|%s|%s|%t",
+		config.SMTPHost, config.SMTPPort, mode, config.SMTPUsername,
+		config.SMTPPassword, config.SMTPAuthMethod, config.SMTPSkipTLSVerify)
+
+	session, err := s.acquireSession(ctx, fingerprint, addr, mode, auth, config.SMTPSkipTLSVerify)
+	if err != nil {
+		s.observeDispatch(err)
+		return err
+	}
+	if err := session.send(ctx, fromEmail, toEmail, message); err != nil {
+		s.releaseSession(session, false)
+		s.observeDispatch(err)
+		return err
+	}
+	s.releaseSession(session, true)
+	s.observeDispatch(nil)
+	return nil
+}
+
+// acquireSession returns a live session for the config, preferring an idle
+// pooled connection. Callers release it when the send finishes.
+func (s *NotificationSMTPSender) acquireSession(ctx context.Context, fingerprint, addr, mode string, auth smtp.Auth, skipTLSVerify bool) (*smtpSession, error) {
+	for {
+		s.sessionMu.Lock()
+		var candidate *smtpSession
+		kept := s.sessions[:0]
+		for _, session := range s.sessions {
+			if session.fingerprint != fingerprint {
+				_ = session.client.Close()
+				_ = session.conn.Close()
+				continue
+			}
+			if candidate == nil {
+				candidate = session
+				continue
+			}
+			kept = append(kept, session)
+		}
+		s.sessions = kept
+		s.sessionMu.Unlock()
+
+		if candidate == nil {
+			break
+		}
+		if time.Since(candidate.lastUsed) < smtpSessionIdleTimeout {
+			if err := setSMTPDeadline(ctx, candidate.conn); err == nil {
+				if err := candidate.client.Noop(); err == nil {
+					return candidate, nil
+				}
+			}
+		}
+		_ = candidate.client.Close()
+		_ = candidate.conn.Close()
+	}
+
+	conn, client, err := openSMTPClient(ctx, addr, mode, skipTLSVerify)
+	if err != nil {
+		return nil, err
+	}
+	if auth != nil {
+		stopAuthCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+		err := client.Auth(auth)
+		stopAuthCancellation()
+		if err != nil { //nolint:gocritic
+			_ = client.Close()
+			_ = conn.Close()
+			return nil, err
+		}
+	}
+	return &smtpSession{conn: conn, client: client, fingerprint: fingerprint, lastUsed: time.Now()}, nil
+}
+
+// releaseSession returns a healthy connection to the idle pool. A failed send
+// closes it so the next attempt dials fresh.
+func (s *NotificationSMTPSender) releaseSession(session *smtpSession, healthy bool) {
+	if session == nil {
+		return
+	}
+	if !healthy {
+		_ = session.client.Close()
+		_ = session.conn.Close()
+		return
+	}
+	s.sessionMu.Lock()
+	if len(s.sessions) < smtpSessionPoolSize {
+		s.sessions = append(s.sessions, session)
+		s.sessionMu.Unlock()
+		return
+	}
+	s.sessionMu.Unlock()
+	_ = session.client.Close()
+	_ = session.conn.Close()
+}
+
+// send delivers one message on the cached connection and refreshes its idle
+// clock. A failed send poisons the session; the caller closes it.
+func (session *smtpSession) send(ctx context.Context, from, to string, message []byte) error {
+	if err := setSMTPDeadline(ctx, session.conn); err != nil {
+		return err
+	}
+	stop := context.AfterFunc(ctx, func() { _ = session.conn.Close() })
+	defer stop()
+	if err := sendMessageWithClient(ctx, session.client, from, to, message); err != nil {
+		return err
+	}
+	session.lastUsed = time.Now()
+	return nil
+}
+
+// openSMTPClient dials and authenticates the transport for one connection.
+func openSMTPClient(ctx context.Context, addr, mode string, skipTLSVerify bool) (net.Conn, *smtp.Client, error) {
+	rawConn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := setSMTPDeadline(ctx, rawConn); err != nil {
+		_ = rawConn.Close()
+		return nil, nil, err
+	}
+	stopCancellation := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
+	defer stopCancellation()
+
+	conn := rawConn
+	if mode == "ssl" {
+		tlsConn := tls.Client(rawConn, smtpTLSConfig(addr, skipTLSVerify))
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = rawConn.Close()
+			return nil, nil, err
+		}
+		conn = tlsConn
+	}
+
+	client, err := smtp.NewClient(conn, hostFromAddr(addr))
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+
+	if mode == "tls" || mode == "starttls" {
+		if err := client.StartTLS(smtpTLSConfig(addr, skipTLSVerify)); err != nil { //nolint:gocritic
+			_ = client.Close()
+			_ = conn.Close()
+			return nil, nil, err
+		}
+	}
+
+	if err := setSMTPDeadline(ctx, conn); err != nil {
+		_ = client.Close()
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return conn, client, nil
+}
+
+// breakerOpen reports whether the shared circuit breaker is currently blocking
+// new SMTP attempts. An expired cooldown allows one probe through.
+func (s *NotificationSMTPSender) breakerOpen() bool {
+	s.breakerMu.Lock()
+	defer s.breakerMu.Unlock()
+	if s.breakerOpenUntil.IsZero() {
+		return false
+	}
+	if time.Now().Before(s.breakerOpenUntil) {
+		return true
+	}
+	s.breakerOpenUntil = time.Time{}
+	s.breakerFailures = 0
+	return false
+}
+
+// observeDispatch updates the breaker from one send result.
+func (s *NotificationSMTPSender) observeDispatch(err error) {
+	if err == nil {
+		s.breakerMu.Lock()
+		s.breakerFailures = 0
+		s.breakerOpenUntil = time.Time{}
+		s.breakerMu.Unlock()
+		return
+	}
+	if !smtpConnectionFailure(err) {
+		return
+	}
+	s.breakerMu.Lock()
+	defer s.breakerMu.Unlock()
+	s.breakerFailures++
+	if s.breakerFailures >= smtpBreakerFailureThreshold {
+		s.breakerOpenUntil = time.Now().Add(smtpBreakerCooldown)
+		s.breakerFailures = 0
+	}
+}
+
+// smtpConnectionFailure distinguishes transport/auth failures from a
+// per-recipient rejection. A 550 for one address must not stop every other
+// recipient; a dial failure, timeout, TLS error, or auth rejection must.
+func smtpConnectionFailure(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var protocolErr *textproto.Error
+	if errors.As(err, &protocolErr) {
+		switch protocolErr.Code {
+		case 421, 450, 451, 452, 454, 530, 534, 535:
+			return true
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // sendEmail sends a transactional (non-threaded) email using the SMTP config.
@@ -711,66 +957,6 @@ func (s *NotificationSMTPSender) sendEmailContext(ctx context.Context, config *m
 	return s.dispatchContext(ctx, config, toEmail, message)
 }
 
-// sendWithStartTLS sends email using STARTTLS encryption. The dial goes
-// through utils.SafeNetDialer so a maliciously-configured SMTPHost cannot
-// reach loopback / private-IP / link-local / CGNAT targets.
-func sendWithStartTLSContext(ctx context.Context, addr string, auth smtp.Auth, from, to string, message []byte, skipTLSVerify bool) error {
-	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return err
-	}
-	if err := setSMTPDeadline(ctx, conn); err != nil {
-		_ = conn.Close()
-		return err
-	}
-	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
-	defer stopCancellation()
-	client, err := smtp.NewClient(conn, hostFromAddr(addr))
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = client.Close() }()
-
-	tlsConfig := smtpTLSConfig(addr, skipTLSVerify)
-
-	if err = client.StartTLS(tlsConfig); err != nil { //nolint:gocritic
-		return err
-	}
-
-	return sendWithClientContext(ctx, client, auth, from, to, message)
-}
-
-// sendWithSSL sends email using SSL/TLS encryption. SafeNetDialer enforces
-// the SSRF reject list before the TLS handshake.
-func sendWithSSLContext(ctx context.Context, addr string, auth smtp.Auth, from, to string, message []byte, skipTLSVerify bool) error {
-	tlsConfig := smtpTLSConfig(addr, skipTLSVerify)
-	rawConn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return err
-	}
-	if err := setSMTPDeadline(ctx, rawConn); err != nil {
-		_ = rawConn.Close()
-		return err
-	}
-	stopCancellation := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
-	defer stopCancellation()
-	conn := tls.Client(rawConn, tlsConfig)
-	if err := conn.HandshakeContext(ctx); err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = conn.Close() }()
-
-	client, err := smtp.NewClient(conn, hostFromAddr(addr))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = client.Close() }()
-
-	return sendWithClientContext(ctx, client, auth, from, to, message)
-}
-
 func smtpTLSConfig(addr string, skipTLSVerify bool) *tls.Config {
 	config := utils.OutboundTLSConfig(hostFromAddr(addr))
 	config.InsecureSkipVerify = config.InsecureSkipVerify || skipTLSVerify //nolint:gosec // Explicit SMTP channel or process-wide opt-in.
@@ -779,39 +965,24 @@ func smtpTLSConfig(addr string, skipTLSVerify bool) *tls.Config {
 
 // sendPlaintext sends unauthenticated email over an unencrypted connection.
 // SafeNetDialer keeps the process-wide local-connection policy effective for
-// this transport just as it is for TLS SMTP.
+// this transport just as it is for TLS SMTP. It backs the SMTP conversation
+// tests in core-tests.
+//
+//nolint:unused // Test-only entry point; production sends go through dispatchContext.
 func sendPlaintextContext(ctx context.Context, addr, from, to string, message []byte) error {
-	conn, err := utils.SafeNetDialer(smtpDialTimeout).DialContext(ctx, "tcp", addr)
+	conn, client, err := openSMTPClient(ctx, addr, "none", false)
 	if err != nil {
 		return err
 	}
-	if err := setSMTPDeadline(ctx, conn); err != nil {
-		_ = conn.Close()
-		return err
-	}
+	defer func() { _ = conn.Close() }()
+	defer func() { _ = client.Close() }()
 	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stopCancellation()
-	client, err := smtp.NewClient(conn, hostFromAddr(addr))
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = client.Close() }()
-
-	return sendWithClientContext(ctx, client, nil, from, to, message)
+	return sendMessageWithClient(ctx, client, from, to, message)
 }
 
-// sendWithClient performs authentication, addressing, and message delivery on an established SMTP client.
-func sendWithClientContext(ctx context.Context, client *smtp.Client, auth smtp.Auth, from, to string, message []byte) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if auth != nil {
-		if err := client.Auth(auth); err != nil { //nolint:gocritic
-			return err
-		}
-	}
-
+// sendMessageWithClient delivers one message on an already-authenticated client.
+func sendMessageWithClient(ctx context.Context, client *smtp.Client, from, to string, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

@@ -2894,6 +2894,22 @@
         ]
       }
     },
+    "/catalogs/global-bootstrap": {
+      "get": {
+        "description": "Load global reference catalogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Load global reference catalogs",
+        "tags": [
+          "Workspace configuration"
+        ]
+      }
+    },
     "/collection-categories": {
       "get": {
         "description": "List collection categories. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -10634,6 +10650,25 @@
           "500": {}
         },
         "summary": "List users",
+        "tags": [
+          "People"
+        ]
+      }
+    },
+    "/users/display-batch": {
+      "post": {
+        "description": "Batch user display. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Batch user display",
         "tags": [
           "People"
         ]

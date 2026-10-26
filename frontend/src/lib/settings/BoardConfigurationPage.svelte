@@ -30,6 +30,7 @@
   import EmptyState from '../components/EmptyState.svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import Input from '../components/Input.svelte';
+  import NativeSelect from '../components/NativeSelect.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import DragHandleDots from '../components/DragHandleDots.svelte';
@@ -57,6 +58,10 @@
   let trimCompletedItemsByAge = $state(false);
   let completedItemRetentionDays = $state(30);
   let completedItemRetentionError = $state('');
+  // Explicit completed-work preset (WI-100). Empty means the legacy cap/age
+  // controls below are the source of truth.
+  let completedVisibility = $state('');
+  let completedVisibilityDirty = $state(false);
   let customFieldDefinitions = $state([]);
   let enabledViews = $state([]);
   // Collection scopes may only toggle collection-scoped views; the workspace
@@ -222,6 +227,8 @@
         trimCompletedItemsByAge = !showRightmostColumnLast50 && Number.isInteger(savedRetentionDays) && savedRetentionDays > 0;
         completedItemRetentionDays = trimCompletedItemsByAge ? savedRetentionDays : 30;
         completedItemRetentionError = '';
+        completedVisibility = boardConfig.view_settings?.completed_visibility ?? '';
+        completedVisibilityDirty = false;
       } else {
         columns = [];
         backlogStatusIDs = statuses.filter(s => !s.is_default && !s.is_completed).map(s => s.id);
@@ -230,6 +237,8 @@
         trimCompletedItemsByAge = false;
         completedItemRetentionDays = 30;
         completedItemRetentionError = '';
+        completedVisibility = '';
+        completedVisibilityDirty = false;
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -602,12 +611,45 @@
 
   // --- Board display options ---
 
+  const COMPLETED_VISIBILITY_OPTIONS = [
+    { value: 'all', labelKey: 'completedAll' },
+    { value: 'last_day', labelKey: 'completedLastDay' },
+    { value: 'last_week', labelKey: 'completedLastWeek' },
+    { value: 'current_iteration', labelKey: 'completedCurrentIteration' },
+    { value: 'none', labelKey: 'completedNone' },
+  ];
+  let completedVisibilityOptions = $derived([
+    { value: '', label: t('settings.boardConfig.completedVisibilityCustom') },
+    ...COMPLETED_VISIBILITY_OPTIONS.map((option) => ({
+      value: option.value,
+      label: t(`settings.boardConfig.${option.labelKey}`),
+    })),
+  ]);
+
+  function setCompletedVisibility(value) {
+    completedVisibility = value;
+    completedVisibilityDirty = true;
+    // Keep the legacy fields aligned so old readers agree with the preset.
+    showRightmostColumnLast50 = false;
+    trimCompletedItemsByAge = value === 'last_day' || value === 'last_week';
+    completedItemRetentionDays = value === 'last_day' ? 1 : value === 'last_week' ? 7 : 30;
+    completedItemRetentionError = '';
+    hasChanges = true;
+  }
+
+  // Editing the legacy controls means the board no longer follows a preset.
+  function clearCompletedVisibilityPreset() {
+    completedVisibility = '';
+    completedVisibilityDirty = true;
+  }
+
   function setShowRightmostColumnLast50(value) {
     showRightmostColumnLast50 = value;
     if (value) {
       trimCompletedItemsByAge = false;
       completedItemRetentionError = '';
     }
+    clearCompletedVisibilityPreset();
     hasChanges = true;
   }
 
@@ -615,12 +657,14 @@
     trimCompletedItemsByAge = value;
     if (value) showRightmostColumnLast50 = false;
     completedItemRetentionError = '';
+    clearCompletedVisibilityPreset();
     hasChanges = true;
   }
 
   function updateCompletedItemRetentionDays(value) {
     completedItemRetentionDays = value;
     completedItemRetentionError = '';
+    clearCompletedVisibilityPreset();
     hasChanges = true;
   }
 
@@ -752,10 +796,17 @@
       // Only carry view settings when this scope owns an override, the user
       // changed the selection, or an explicit reset was requested — otherwise
       // inheritance stays untouched.
+      const viewSettings = {};
       if (viewsResetPending) {
-        payload.view_settings = { enabled_views: null };
+        viewSettings.enabled_views = null;
       } else if (viewsDirty || boardConfig?.view_settings) {
-        payload.view_settings = { enabled_views: [...enabledViews] };
+        viewSettings.enabled_views = [...enabledViews];
+      }
+      if (completedVisibilityDirty) {
+        viewSettings.completed_visibility = completedVisibility;
+      }
+      if (Object.keys(viewSettings).length > 0) {
+        payload.view_settings = viewSettings;
       }
 
       if (boardConfig && boardConfig.id) {
@@ -804,6 +855,8 @@
         trimCompletedItemsByAge = false;
         completedItemRetentionDays = 30;
         completedItemRetentionError = '';
+        completedVisibility = '';
+        completedVisibilityDirty = false;
         hasChanges = false;
         goToBoard();
       } catch (error) {
@@ -818,6 +871,8 @@
       trimCompletedItemsByAge = false;
       completedItemRetentionDays = 30;
       completedItemRetentionError = '';
+      completedVisibility = '';
+      completedVisibilityDirty = false;
       hasChanges = false;
     }
   }
@@ -891,6 +946,27 @@
           <div>
             <h4 class="text-sm font-semibold" style="color: var(--ds-text);">{t('settings.boardConfig.displayOptions')}</h4>
             <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{t('settings.boardConfig.displayOptionsHint')}</p>
+          </div>
+          <div class="max-w-xs">
+            <label
+              for="board-completed-visibility"
+              class="mb-1.5 block text-xs font-medium"
+              style="color: var(--ds-text-subtle);"
+            >
+              {t('settings.boardConfig.completedVisibility')}
+            </label>
+            <NativeSelect
+              id="board-completed-visibility"
+              value={completedVisibility}
+              options={completedVisibilityOptions}
+              disabled={!canConfigure}
+              size="small"
+              dataTestid="board-completed-visibility"
+              onchange={(value) => setCompletedVisibility(value)}
+            />
+            <p class="mt-1.5 text-xs" style="color: var(--ds-text-subtlest);">
+              {t('settings.boardConfig.completedVisibilityHint')}
+            </p>
           </div>
           <Checkbox
             bind:checked={showRightmostColumnLast50}

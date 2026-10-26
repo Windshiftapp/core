@@ -67,14 +67,55 @@
     client_secret: '',
     scopes: 'openid email profile',
     auto_provision_users: false,
-    require_verified_email: true,
-    attribute_mapping: ''
+    require_verified_email: true
   });
 
   let canAddProvider = $derived(providers.length === 0 || capabilitiesStore.has('sso.multi-provider'));
 
   /** @type {Record<string, string>} */
   let formErrors = $state({});
+
+  // Attribute mapping is edited as individual fields and serialized to the JSON
+  // blob the API stores. Empty fields fall back to the standard claim.
+  const ATTRIBUTE_KEYS = ['email', 'email_verified', 'name', 'given_name', 'family_name', 'username'];
+
+  function emptyAttributeMapping() {
+    return { email: '', email_verified: '', name: '', given_name: '', family_name: '', username: '' };
+  }
+
+  /** @type {Record<string, string>} */
+  let attributeMapping = $state(emptyAttributeMapping());
+
+  function parseAttributeMapping(raw) {
+    const fields = emptyAttributeMapping();
+    if (!raw) return fields;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        for (const key of ATTRIBUTE_KEYS) {
+          if (typeof parsed[key] === 'string') fields[key] = parsed[key];
+        }
+      }
+    } catch {
+      // A malformed blob is treated as unset; saving rewrites it.
+    }
+    return fields;
+  }
+
+  function serializeAttributeMapping() {
+    const mapping = {};
+    for (const key of ATTRIBUTE_KEYS) {
+      const value = attributeMapping[key]?.trim();
+      if (value) mapping[key] = value;
+    }
+    // Always send valid JSON: the API treats an empty string as "leave the
+    // stored mapping unchanged", so "{}" is how the fields get cleared.
+    return JSON.stringify(mapping);
+  }
+
+  function buildPayload() {
+    return { ...formData, attribute_mapping: serializeAttributeMapping() };
+  }
 
   // Load providers on mount
   onMount(async () => {
@@ -110,10 +151,10 @@
       client_secret: '',
       scopes: 'openid email profile',
       auto_provision_users: false,
-      require_verified_email: true,
-      attribute_mapping: ''
+      require_verified_email: true
     };
     formErrors = {};
+    attributeMapping = emptyAttributeMapping();
     testResult = null;
     showCreateModal = true;
   }
@@ -132,9 +173,9 @@
       scopes: provider.scopes || 'openid email profile',
       auto_provision_users: provider.auto_provision_users,
       require_verified_email: provider.require_verified_email !== false, // Default to true
-      attribute_mapping: provider.attribute_mapping || ''
     };
     formErrors = {};
+    attributeMapping = parseAttributeMapping(provider.attribute_mapping);
     testResult = null;
     showEditModal = true;
   }
@@ -187,7 +228,7 @@
     try {
       saving = true;
       error = null;
-      await ssoStore.createProvider(formData);
+      await ssoStore.createProvider(buildPayload());
       closeModals();
       await loadProviders();
     } catch (err) {
@@ -207,7 +248,7 @@
     try {
       saving = true;
       error = null;
-      await ssoStore.updateProvider(editingProvider.id, formData);
+      await ssoStore.updateProvider(editingProvider.id, buildPayload());
       closeModals();
       await loadProviders();
     } catch (err) {
@@ -528,6 +569,44 @@
           bind:value={formData.scopes}
         />
         <DescriptionText>{t('settings.sso.scopesHelp')}</DescriptionText>
+      </div>
+
+      <AlertBox type="info">
+        {t('settings.sso.nameClaimsHelp')}
+      </AlertBox>
+
+      <!-- Attribute mapping (advanced) -->
+      <div class="pt-4 border-t" style="border-color: var(--ds-border);">
+        <h3 class="text-sm font-semibold mb-1" style="color: var(--ds-text);">
+          {t('settings.sso.attributeMapping')}
+        </h3>
+        <DescriptionText class="mb-3">{t('settings.sso.attributeMappingHelp')}</DescriptionText>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <Label for="attr_email" color="default" class="mb-1">{t('settings.sso.attributeEmail')}</Label>
+            <Input type="text" id="attr_email" bind:value={attributeMapping.email} class="font-mono" size="small" placeholder="email" />
+          </div>
+          <div>
+            <Label for="attr_email_verified" color="default" class="mb-1">{t('settings.sso.attributeEmailVerified')}</Label>
+            <Input type="text" id="attr_email_verified" bind:value={attributeMapping.email_verified} class="font-mono" size="small" placeholder="email_verified" />
+          </div>
+          <div>
+            <Label for="attr_name" color="default" class="mb-1">{t('settings.sso.attributeName')}</Label>
+            <Input type="text" id="attr_name" bind:value={attributeMapping.name} class="font-mono" size="small" placeholder="name" />
+          </div>
+          <div>
+            <Label for="attr_username" color="default" class="mb-1">{t('settings.sso.attributeUsername')}</Label>
+            <Input type="text" id="attr_username" bind:value={attributeMapping.username} class="font-mono" size="small" placeholder="preferred_username" />
+          </div>
+          <div>
+            <Label for="attr_given_name" color="default" class="mb-1">{t('settings.sso.attributeGivenName')}</Label>
+            <Input type="text" id="attr_given_name" bind:value={attributeMapping.given_name} class="font-mono" size="small" placeholder="given_name" />
+          </div>
+          <div>
+            <Label for="attr_family_name" color="default" class="mb-1">{t('settings.sso.attributeFamilyName')}</Label>
+            <Input type="text" id="attr_family_name" bind:value={attributeMapping.family_name} class="font-mono" size="small" placeholder="family_name" />
+          </div>
+        </div>
       </div>
 
       <!-- Checkboxes -->

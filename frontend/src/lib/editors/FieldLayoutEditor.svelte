@@ -1,7 +1,5 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import Settings from '@lucide/svelte/icons/settings';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -12,6 +10,7 @@
   import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
+  import { createFieldLayoutDrag } from './fieldLayoutDrag.js';
 
   let {
     isOpen = $bindable(false),
@@ -35,126 +34,9 @@
   // Drag and drop state
   let draggedField = $state(null);
   let fieldDragState = $state(new Map());
-  let setupCleanups = [];
-  let setupTimeout;
 
   onDestroy(() => {
-    cleanupDragAndDrop();
-  });
-
-  function cleanupDragAndDrop() {
-    if (setupTimeout) clearTimeout(setupTimeout);
-    setupCleanups.forEach(fn => fn());
-    setupCleanups = [];
-    fieldDragState = new Map();
-  }
-
-  function setupDragAndDrop() {
-    cleanupDragAndDrop();
-
-    // Setup available fields as draggable
-    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-available-field-editor]')).forEach(element => {
-      const fieldData = JSON.parse(element.dataset.availableFieldEditor);
-
-      const cleanup = draggable({
-        element,
-        getInitialData: () => ({ field: fieldData, type: 'available-field' }),
-        onDragStart: () => { element.style.opacity = '0.5'; },
-        onDrop: () => { element.style.opacity = ''; }
-      });
-
-      setupCleanups.push(cleanup);
-    });
-
-    // Setup selected fields as both draggable and drop targets with edge detection
-    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-selected-field-editor]')).forEach(element => {
-      const fieldIndex = parseInt(element.dataset.fieldIndex);
-      const fieldId = element.dataset.fieldId;
-
-      fieldDragState.set(fieldId, { closestEdge: null });
-
-      // Make draggable
-      const dragHandle = element.querySelector('.cursor-grab');
-      const draggableCleanup = draggable({
-        element,
-        dragHandle: dragHandle || element,
-        getInitialData: () => ({ fieldIndex, fieldId, type: 'selected-field' }),
-        onDragStart: () => { element.style.opacity = '0.5'; },
-        onDrop: () => {
-          element.style.opacity = '';
-          fieldDragState.forEach((state, id) => {
-            fieldDragState.set(id, { closestEdge: null });
-          });
-          fieldDragState = new Map(fieldDragState);
-        }
-      });
-
-      // Make drop target with edge detection
-      const dropTargetCleanup = dropTargetForElements({
-        element,
-        canDrop: ({ source }) => {
-          const data = source.data;
-          if (data.type === 'selected-field' && data.fieldIndex === fieldIndex) return false;
-          return data.type === 'available-field' || data.type === 'selected-field';
-        },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({}, { input, element, allowedEdges: ['top', 'bottom'] });
-        },
-        onDragEnter: ({ self }) => {
-          const closestEdge = extractClosestEdge(self.data);
-          fieldDragState.set(fieldId, { closestEdge });
-          fieldDragState = new Map(fieldDragState);
-        },
-        onDragLeave: () => {
-          fieldDragState.set(fieldId, { closestEdge: null });
-          fieldDragState = new Map(fieldDragState);
-        },
-        onDrop: ({ self, source }) => {
-          const closestEdge = extractClosestEdge(self.data);
-          const data = source.data;
-
-          if (data.type === 'available-field') {
-            addFieldAtPosition(data.field, fieldIndex, closestEdge);
-          } else if (data.type === 'selected-field') {
-            reorderFieldWithEdge(data.fieldIndex, fieldIndex, closestEdge);
-          }
-
-          fieldDragState.set(fieldId, { closestEdge: null });
-          fieldDragState = new Map(fieldDragState);
-        }
-      });
-
-      setupCleanups.push(() => {
-        draggableCleanup();
-        dropTargetCleanup();
-      });
-    });
-
-    // Setup drop zone for empty area / append to end
-    const dropZone = /** @type {HTMLElement | null} */ (document.querySelector('[data-drop-zone-editor]'));
-    if (dropZone) {
-      const cleanup = dropTargetForElements({
-        element: dropZone,
-        canDrop: ({ source }) => source.data.type === 'available-field',
-        onDragEnter: () => { draggedField = true; },
-        onDragLeave: () => { draggedField = null; },
-        onDrop: ({ source }) => {
-          if (source.data.type === 'available-field') {
-            addFieldToEnd(source.data.field);
-          }
-          draggedField = null;
-        }
-      });
-      setupCleanups.push(cleanup);
-    }
-  }
-
-  // Re-setup drag and drop when modal is shown or fields change
-  $effect(() => {
-    if (isOpen && selectedFields && typeof document !== 'undefined') {
-      if (setupTimeout) clearTimeout(setupTimeout);
-      setupTimeout = setTimeout(() => setupDragAndDrop(), 50);
-    }
+    fieldDrag.cleanup();
   });
 
   function addFieldToEnd(fieldData) {
@@ -210,6 +92,34 @@
     selectedFields = newFields.map((f, i) => ({ ...f, display_order: i }));
   }
 
+  const fieldDrag = createFieldLayoutDrag({
+    availableSelector: '[data-available-field-editor]',
+    availableDataKey: 'availableFieldEditor',
+    selectedSelector: '[data-selected-field-editor]',
+    dropZoneSelector: '[data-drop-zone-editor]',
+    selectedType: 'selected-field',
+    onDragState: (fieldId, state) => {
+      fieldDragState.set(fieldId, state);
+      fieldDragState = new Map(fieldDragState);
+    },
+    clearDragState: () => {
+      fieldDragState = new Map([...fieldDragState].map(([id]) => [id, { closestEdge: null }]));
+    },
+    setDraggedField: (value) => {
+      draggedField = value ? true : null;
+    },
+    addFieldAtPosition,
+    reorderFieldWithEdge,
+    addFieldToEnd,
+  });
+
+  // Re-setup drag and drop when modal is shown or fields change
+  $effect(() => {
+    if (isOpen && selectedFields && typeof document !== 'undefined') {
+      fieldDrag.schedule();
+    }
+  });
+
   function removeField(index) {
     const field = selectedFields[index];
 
@@ -257,14 +167,14 @@
   function handleClose() {
     if (saving) return;
     fieldSearchQuery = '';
-    cleanupDragAndDrop();
+    fieldDrag.cleanup();
     onCancel();
   }
 
   function handleSave() {
     if (saving) return;
     fieldSearchQuery = '';
-    cleanupDragAndDrop();
+    fieldDrag.cleanup();
     onSave();
   }
 

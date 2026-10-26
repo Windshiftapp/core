@@ -308,15 +308,32 @@ func (s *ItemApplicationService) resolveQueues(ctx context.Context, userID int, 
 		})
 	}
 
-	if err := s.fillQueueCounts(ctx, userID, scope.WorkspaceID, views); err != nil {
+	if err := s.fillQueueCounts(ctx, userID, scope, views); err != nil {
 		return nil, err
 	}
 	return views, nil
 }
 
 // fillQueueCounts evaluates every visible queue in one batched COUNT
-// statement, so adding custom queues does not add a round trip per queue.
-func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID, workspaceID int, views []QueueView) error {
+// statement, so adding custom queues does not add a round trip per queue. A
+// scope with no single workspace (a collection that spans workspaces) counts
+// across every workspace the caller can access.
+func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID int, scope QueueScope, views []QueueView) error {
+	workspaceIDs := []int{scope.WorkspaceID}
+	if scope.WorkspaceID <= 0 {
+		ids, err := s.perm.AccessibleWorkspaceIDs(userID)
+		if err != nil {
+			return err
+		}
+		workspaceIDs = ids
+	}
+	if len(workspaceIDs) == 0 {
+		for i := range views {
+			views[i].Count = 0
+		}
+		return nil
+	}
+
 	queries := make([]repository.QueueCountQuery, 0, len(views))
 	for i := range views {
 		resolved, err := s.crud.resolveItemListQLContext(ctx, views[i].QL, 0, "", userID)
@@ -328,7 +345,7 @@ func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID, wo
 			Filters: repository.ItemFilters{QLQuery: resolved.sql, QLArgs: resolved.args},
 		})
 	}
-	counts, err := s.crud.repo.CountQLQueries(ctx, []int{workspaceID}, queries)
+	counts, err := s.crud.repo.CountQLQueries(ctx, workspaceIDs, queries)
 	if err != nil {
 		return err
 	}
@@ -339,7 +356,9 @@ func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID, wo
 }
 
 // queueScope resolves a workspace id plus optional collection id into a
-// storage scope. A collection must belong to a workspace.
+// storage scope. A collection scope is identified by the collection alone;
+// its workspace is carried when it has one, and a collection that spans
+// workspaces is a valid scope.
 func (s *ItemApplicationService) queueScope(workspaceID int, collectionID *int) (QueueScope, error) {
 	if collectionID == nil {
 		if workspaceID <= 0 {
@@ -351,21 +370,26 @@ func (s *ItemApplicationService) queueScope(workspaceID int, collectionID *int) 
 	if err != nil {
 		return QueueScope{}, err
 	}
-	if collection.WorkspaceID == nil {
-		return QueueScope{}, repository.ErrNotFound
+	scope := QueueScope{CollectionID: collectionID}
+	if collection.WorkspaceID != nil {
+		scope.WorkspaceID = *collection.WorkspaceID
 	}
-	return QueueScope{WorkspaceID: *collection.WorkspaceID, CollectionID: collectionID}, nil
+	return scope, nil
 }
 
+// authorizeQueueRead mirrors the collection read rule: a private collection is
+// creator-only, and a collection bound to a workspace additionally requires
+// item.view there. A collection that spans workspaces has no single workspace
+// to check.
 func (s *ItemApplicationService) authorizeQueueRead(userID int, scope QueueScope) error {
-	allowed, err := s.perm.HasWorkspacePermission(userID, scope.WorkspaceID, models.PermissionItemView)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return repository.ErrNotFound
-	}
 	if scope.CollectionID == nil {
+		allowed, err := s.perm.HasWorkspacePermission(userID, scope.WorkspaceID, models.PermissionItemView)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return repository.ErrNotFound
+		}
 		return nil
 	}
 	collection, err := repository.NewCollectionRepository(s.db).GetByID(*scope.CollectionID)
@@ -375,9 +399,21 @@ func (s *ItemApplicationService) authorizeQueueRead(userID int, scope QueueScope
 	if collection.IsPrivate && (collection.CreatedBy == nil || *collection.CreatedBy != userID) {
 		return repository.ErrNotFound
 	}
+	if collection.WorkspaceID != nil {
+		allowed, err := s.perm.HasWorkspacePermission(userID, *collection.WorkspaceID, models.PermissionItemView)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return repository.ErrNotFound
+		}
+	}
 	return nil
 }
 
+// authorizeQueueWrite keeps the collection owner as the only author, with the
+// workspace item.view check retained when the collection is bound to one. The
+// workspace default view remains admin-only.
 func (s *ItemApplicationService) authorizeQueueWrite(userID int, scope QueueScope) error {
 	if scope.CollectionID == nil {
 		allowed, err := s.perm.HasWorkspacePermission(userID, scope.WorkspaceID, models.PermissionWorkspaceAdmin)
@@ -389,19 +425,21 @@ func (s *ItemApplicationService) authorizeQueueWrite(userID int, scope QueueScop
 		}
 		return nil
 	}
-	allowed, err := s.perm.HasWorkspacePermission(userID, scope.WorkspaceID, models.PermissionItemView)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return repository.ErrNotFound
-	}
 	collection, err := repository.NewCollectionRepository(s.db).GetByID(*scope.CollectionID)
 	if err != nil {
 		return err
 	}
 	if collection.CreatedBy == nil || *collection.CreatedBy != userID {
 		return repository.ErrNotFound
+	}
+	if collection.WorkspaceID != nil {
+		allowed, err := s.perm.HasWorkspacePermission(userID, *collection.WorkspaceID, models.PermissionItemView)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return repository.ErrNotFound
+		}
 	}
 	return nil
 }

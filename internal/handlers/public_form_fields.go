@@ -9,6 +9,7 @@ import (
 
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
+	"windshift/internal/services"
 )
 
 const (
@@ -35,8 +36,8 @@ type virtualFieldOption struct {
 // availableCreateFields is the canonical create-screen lookup for both
 // request-type and asset-report form schemas. Keeping validation and the
 // management picker on the same result prevents a direct API caller from
-// binding a custom field that the target workspace's create screen does not
-// expose.
+// binding a custom field the target create screen does not expose or the
+// public form cannot render.
 func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID *int, itemTypeID int) ([]AvailableField, error) {
 	fields := []AvailableField{
 		{Identifier: "title", Name: "Title", Type: "default"},
@@ -59,6 +60,9 @@ func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID 
 	}
 	for _, field := range screenFields {
 		if field.FieldType != "custom" || field.FieldIdentifier == "" || field.FieldName == "" {
+			continue
+		}
+		if !services.IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
 			continue
 		}
 		fields = append(fields, AvailableField{

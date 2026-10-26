@@ -62,9 +62,9 @@ type virtualRequestField struct {
 	required  bool
 }
 
-// isPublicFormFillableCustomFieldType keeps public forms to values that can be
+// IsPublicFormFillableCustomFieldType keeps public forms to values that can be
 // entered without loading options from authenticated internal APIs.
-func isPublicFormFillableCustomFieldType(fieldType string) bool {
+func IsPublicFormFillableCustomFieldType(fieldType string) bool {
 	switch models.CanonicalCustomFieldType(fieldType) {
 	case "text", "textarea", "select", "multiselect", "number", "date",
 		models.CustomFieldTypeBoolean, "email", "url":
@@ -159,7 +159,7 @@ func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID
 	}
 	for _, field := range fields {
 		if field.FieldType == "custom" && field.FieldIdentifier != "" && field.FieldName != "" &&
-			isPublicFormFillableCustomFieldType(field.CustomFieldType) {
+			IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
 			allowed[field.FieldIdentifier] = struct{}{}
 		}
 	}
