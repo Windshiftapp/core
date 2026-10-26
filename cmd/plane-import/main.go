@@ -8,6 +8,10 @@
 //	  --workspace VECTIS --contract vectis.jsonl --users users.json \
 //	  --alias hakerx1@gmail.com=oskars_germovs@inbox.lv [--dry-run] [--batch 200]
 //
+// By default the command runs the Windshift migration catalog first (that is
+// how plane_import_mappings gets created). --skip-migrate skips it when the
+// target schema is already managed by the application deployment.
+//
 // The JSON report goes to stdout; progress lines to stderr. The run is
 // idempotent: reruns skip every source uuid already in plane_import_mappings
 // and fail loudly on any number collision the importer does not own.
@@ -65,6 +69,7 @@ func run() error {
 		usersPath  = flag.String("users", "", "path to the users sidecar JSON array (optional)")
 		dryRun     = flag.Bool("dry-run", false, "parse, map, and report without writing")
 		strict     = flag.Bool("strict", false, "fail when an author cannot be resolved")
+		skipMig    = flag.Bool("skip-migrate", false, "do not run Initialize()/migrations: use against a deployment whose schema the app manages")
 		batchSize  = flag.Int("batch", 200, "issues committed per transaction")
 		aliases    aliasList
 	)
@@ -83,8 +88,15 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("open windshift database: %w", err)
 	}
-	if err := db.Initialize(); err != nil {
-		return fmt.Errorf("initialize windshift database: %w", err)
+	if !*skipMig {
+		// Initialize() applies every catalog migration (including this
+		// importer's plane_import_mappings). Against a live deployment that
+		// means the schema moves to this binary's version — forward-only, the
+		// same upgrade the app itself runs at boot. --skip-migrate instead
+		// requires the operator to have applied those migrations already.
+		if err := db.Initialize(); err != nil {
+			return fmt.Errorf("initialize windshift database: %w", err)
+		}
 	}
 	defer func() { _ = db.Close() }()
 

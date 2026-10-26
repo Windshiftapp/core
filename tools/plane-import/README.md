@@ -45,6 +45,23 @@ authors, unmapped states/priorities, collisions, and the preserved gap list.
 author whose emails differ across the two systems is reported unmapped and
 imports with `creator_id` NULL rather than inventing a user.
 
+## Schema: two supported paths
+
+- **Default** — the command runs the Windshift migration catalog (`Initialize`),
+  which is how `plane_import_mappings` appears. Use this on a fresh install or a
+  deployment already at this binary's version. Against a deployment that lags the
+  catalog it moves the shared database forward to this binary's version, and the
+  older app container will then refuse to restart (catalog checksums) until it is
+  updated too. That is a deployment decision, not a detail.
+- **`--skip-migrate`** — the app manages its own schema; the operator applies any
+  missing pieces first. For a deployment measured at `20260918` (42 migrations)
+  the complete set this importer needs is `legacy-schema.sql`: three nullable
+  `items` columns (`team_id`, `intake_id`, `portal_org_shared`) plus
+  `plane_import_mappings`. Every statement is copied from the upstream migration
+  that owns it and is `IF NOT EXISTS`, so a later app upgrade finds them present,
+  stamps the catalog itself, and changes nothing else. Nothing here touches
+  `schema_migrations`, so the running app's checksums are untouched.
+
 ## Gates this tooling enforces
 
 - meta must be the first contract line (loader refuses otherwise) — so a
