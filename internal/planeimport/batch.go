@@ -119,8 +119,9 @@ func (l *Loader) reportUnmappedState(name string) {
 
 // buildItem assembles the models.Item the repository inserts. Every field the
 // fidelity contract promises is set here explicitly: number, creator, status,
-// dates, story points, and both timestamps.
-func (l *Loader) buildItem(i *Issue, number int, parentWindshiftID int, existing map[string]map[string]int) (*models.Item, error) {
+// dates, story points, and both timestamps. It cannot fail: an unmapped status
+// or priority lands on the fallback with a report line, never on an error.
+func (l *Loader) buildItem(i *Issue, number, parentWindshiftID int) *models.Item {
 	creatorID := l.userID[i.CreatedByID]
 	if _, configured := l.opts.DefaultStatusMap[i.StateName]; !configured {
 		l.reportUnmappedState(i.StateName)
@@ -163,13 +164,13 @@ func (l *Loader) buildItem(i *Issue, number int, parentWindshiftID int, existing
 	if id, ok := l.typeID[builtin]; ok {
 		item.ItemTypeID = &id
 	}
-	return item, nil
+	return item
 }
 
 // dryRunBatch validates one batch without writing: mapping collisions, taken
 // numbers, state/user resolution. It mutates the same bookkeeping maps the
 // write path uses so the report is identical in shape.
-func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comment, existing map[string]map[string]int, takenNumbers map[int]string, numberToPlaneID map[int]string) error {
+func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comment, existing map[string]map[string]int, takenNumbers, numberToPlaneID map[int]string) {
 	for _, i := range batch {
 		switch {
 		case i.DeletedAt != nil:
@@ -203,10 +204,8 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 		}
 		takenNumbers[i.SequenceID] = i.ID
 		numberToPlaneID[i.SequenceID] = i.ID
-		if _, ok := l.userID[i.CreatedByID]; !ok {
-			// resolveUser already recorded the uuid in the report; the creator
-			// column stays NULL and honest about it.
-		}
+		// An author Resolve() could not map is already named in the report;
+		// the creator column stays NULL rather than getting an invented user.
 		l.report.IssuesImported++
 		if n := i.SequenceID; n > l.report.MaxNumber {
 			l.report.MaxNumber = n
@@ -218,7 +217,6 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 			l.report.CommentsImported++
 		}
 	}
-	return nil
 }
 
 // runBatch imports one batch inside a single transaction. A batch is the
@@ -287,10 +285,7 @@ func (l *Loader) runBatch(
 				l.deferred = append(l.deferred, planeID{i.ID, *i.ParentID})
 			}
 		}
-		item, err := l.buildItem(i, i.SequenceID, parentID, existing)
-		if err != nil {
-			return err
-		}
+		item := l.buildItem(i, i.SequenceID, parentID)
 		id, err := repo.Create(tx, item)
 		if err != nil {
 			return fmt.Errorf("insert plane issue %s (number %d): %w", i.ID, i.SequenceID, err)
@@ -415,8 +410,8 @@ func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]in
 }
 
 // recordMapping writes one idempotency/provenance row. The metadata_json
-// keeps the source state name so a cancelled Plane ticket remains visibly
-// cancelled even though Windshift files it under Done.
+// keeps the source state name, so a ticket the source closed by abandoning it
+// stays visibly that way even though Windshift files it under Done.
 func (l *Loader) recordMapping(tx database.Tx, entity, externalID string, windshiftID int, metadata any) error {
 	metaJSON, err := json.Marshal(metadata)
 	if err != nil {

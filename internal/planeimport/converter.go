@@ -336,11 +336,12 @@ func renderTable(n tiptapNode) (string, bool) {
 // word boundary; the camelCase variants only lowercase the first letter.
 func unwrapEditorNode(n tiptapNode) tiptapNode {
 	plain := n.Type
-	if plain == "editor-paragraph-block" {
+	switch {
+	case plain == "editor-paragraph-block":
 		plain = "paragraph"
-	} else if strings.HasPrefix(plain, "editor-") {
+	case strings.HasPrefix(plain, "editor-"):
 		plain = strings.TrimPrefix(plain, "editor-")
-	} else if strings.HasPrefix(plain, "editor") {
+	case strings.HasPrefix(plain, "editor"):
 		rest := strings.TrimPrefix(plain, "editor")
 		plain = strings.ToLower(rest[:1]) + rest[1:]
 	}

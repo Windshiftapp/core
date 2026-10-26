@@ -70,13 +70,13 @@ type Report struct {
 }
 
 // DefaultPlaneStatusMap maps Plane state names to Windshift status builtin
-// keys. Cancelled maps to done: Windshift's default workflow has no cancelled
-// category, and the report keeps the source state on every row via
-// plane_import_mappings.metadata_json, so the distinction survives where it
-// matters. Keys are builtin keys (stable across installs; the user-visible
-// names differ between fresh seeds and provisioned workspaces), so a renamed
-// default status still resolves. Unknown names map onto the to_do bucket and
-// are reported so provisioning can catch them.
+// keys. The source's abandoned-work state maps to done: Windshift's default
+// workflow has no such category, and the report keeps the source state on
+// every row via plane_import_mappings.metadata_json, so the distinction
+// survives where it matters. Keys are builtin keys (stable across installs;
+// the user-visible names differ between fresh seeds and provisioned
+// workspaces), so a renamed default status still resolves. Unknown names map
+// onto the to_do bucket and are reported so provisioning can catch them.
 var DefaultPlaneStatusMap = map[string]string{
 	"Todo":        "to_do",
 	"Backlog":     "to_do",
@@ -86,7 +86,9 @@ var DefaultPlaneStatusMap = map[string]string{
 	"Started":     "in_progress",
 	"Done":        "done",
 	"Completed":   "done",
-	"Cancelled":   "done",
+	// The key is the source's own state name, not prose: Plane spells it with
+	// two l's, and renaming the key would silently unmap the state.
+	"Cancelled": "done", //nolint:misspell // Plane's state name is source data
 }
 
 // Loader runs the import. One Loader holds one database handle and the
@@ -389,9 +391,7 @@ func (l *Loader) Run(ctx context.Context) (*Report, error) {
 		}
 		batch := l.issues[start:end]
 		if l.opts.DryRun {
-			if err := l.dryRunBatch(batch, commentsByIssue, existing, takenNumbers, numberToPlaneID); err != nil {
-				return nil, err
-			}
+			l.dryRunBatch(batch, commentsByIssue, existing, takenNumbers, numberToPlaneID)
 			l.report.Batches++
 			continue
 		}
