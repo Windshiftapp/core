@@ -3,7 +3,7 @@ module windshift
 go 1.27.3
 
 require (
-	charm.land/bubbles/v2 v2.2.0
+	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.0.8
 	charm.land/fantasy v0.40.0
 	charm.land/glamour/v2 v2.0.1
