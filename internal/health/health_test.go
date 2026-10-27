@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 )
 
@@ -17,15 +16,11 @@ func (f fakeDB) PingContext(context.Context) error { return f.err }
 type fakeAttachment struct {
 	enabled bool
 	err     error
-	calls   int32
 }
 
 func (f *fakeAttachment) Enabled() bool { return f.enabled }
 
-func (f *fakeAttachment) HealthCheck(context.Context) error {
-	atomic.AddInt32(&f.calls, 1)
-	return f.err
-}
+func (f *fakeAttachment) CachedHealthCheck(context.Context) error { return f.err }
 
 func ready(h *Handler) (*httptest.ResponseRecorder, readinessResponse) {
 	rec := httptest.NewRecorder()
@@ -77,22 +72,6 @@ func TestReadinessDisabledAttachments(t *testing.T) {
 	}
 	if body.Attachments != "disabled" {
 		t.Fatalf("attachments = %q, want disabled", body.Attachments)
-	}
-	if probe.calls != 0 {
-		t.Fatalf("disabled probe calls = %d, want 0", probe.calls)
-	}
-}
-
-func TestReadinessCachesAttachmentProbe(t *testing.T) {
-	probe := &fakeAttachment{enabled: true}
-	h := NewHandler(fakeDB{}, probe)
-	for i := 0; i < 5; i++ {
-		if rec, _ := ready(h); rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", rec.Code)
-		}
-	}
-	if probe.calls != 1 {
-		t.Fatalf("probe calls = %d, want 1 (cached)", probe.calls)
 	}
 }
 

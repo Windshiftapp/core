@@ -46,6 +46,7 @@ cx
 !/internal/health/health_test.go
 !/internal/handlers/attachment_classification_test.go
 !/internal/handlers/jira_attachment_test.go
+!/internal/services/item_attachment_cleanup_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

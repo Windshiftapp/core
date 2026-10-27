@@ -7,20 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 )
 
-const (
-	readinessTimeout = 2 * time.Second
-	// attachmentHealthCacheTTL keeps a readiness tick from turning into an
-	// object-store request on every call. Ten seconds is short enough to pull a
-	// pod out of rotation promptly and long enough for a busy probe to be cheap.
-	attachmentHealthCacheTTL = 10 * time.Second
-)
+const readinessTimeout = 2 * time.Second
 
 // Pinger is the database capability required by the readiness probe.
 type Pinger interface {
@@ -28,10 +21,11 @@ type Pinger interface {
 }
 
 // AttachmentProbe is the attachment-storage capability required by the
-// readiness probe. Disabled storage is reported as healthy.
+// readiness probe. Disabled storage is reported as healthy. Implementations own
+// the short-lived result cache.
 type AttachmentProbe interface {
 	Enabled() bool
-	HealthCheck(context.Context) error
+	CachedHealthCheck(context.Context) error
 }
 
 // Handler serves the liveness and readiness contracts.
@@ -39,9 +33,7 @@ type Handler struct {
 	database    Pinger
 	attachments AttachmentProbe
 
-	mu              sync.Mutex
-	attachmentErr   error
-	attachmentCheck time.Time
+	mu sync.Mutex
 }
 
 type livenessResponse struct {
@@ -71,8 +63,6 @@ func (h *Handler) SetAttachmentProbe(probe AttachmentProbe) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.attachments = probe
-	h.attachmentErr = nil
-	h.attachmentCheck = time.Time{}
 }
 
 // Liveness reports whether the HTTP process and router are serving requests.
@@ -127,40 +117,18 @@ func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// attachmentStatus returns the cached attachment-storage state. The check runs
-// at most once per attachmentHealthCacheTTL; holding the mutex across the probe
-// also collapses a burst of readiness requests into one upstream call.
+// attachmentStatus maps the shared cached attachment-storage state to the
+// readiness payload. The cache lives on the store so /readyz, the settings
+// status endpoint, and shell bootstrap all share one probe result.
 func (h *Handler) attachmentStatus(ctx context.Context) (string, bool) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	probe := h.attachments
+	h.mu.Unlock()
 
-	if h.attachments == nil || !h.attachments.Enabled() {
+	if probe == nil || !probe.Enabled() {
 		return "disabled", true
 	}
-
-	if !h.attachmentCheck.IsZero() && time.Since(h.attachmentCheck) < attachmentHealthCacheTTL {
-		return attachmentResult(h.attachmentErr)
-	}
-
-	wasHealthy := h.attachmentErr == nil
-	checkCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
-	defer cancel()
-	err := h.attachments.HealthCheck(checkCtx)
-	h.attachmentErr = err
-	h.attachmentCheck = time.Now()
-
-	switch {
-	case err != nil && wasHealthy:
-		slog.Warn("attachment storage readiness check failed", slog.String("component", "health"), slog.Any("error", err))
-	case err == nil && !wasHealthy:
-		slog.Info("attachment storage recovered", slog.String("component", "health"))
-	}
-
-	return attachmentResult(err)
-}
-
-func attachmentResult(err error) (string, bool) {
-	if err != nil {
+	if err := probe.CachedHealthCheck(ctx); err != nil {
 		return "unavailable", false
 	}
 	return "ok", true

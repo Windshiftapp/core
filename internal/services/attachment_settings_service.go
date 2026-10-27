@@ -166,11 +166,20 @@ func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 		return status, nil
 	}
 
-	if err := s.storage.Probe(context.Background()); err != nil {
+	// S3 status is read frequently (admin status and shell bootstrap); reuse the
+	// readiness cache instead of issuing a HeadBucket per request. Local mode
+	// keeps its cheap write probe so "writable" still means writable.
+	var probeErr error
+	if s.storage.IsS3() {
+		probeErr = s.storage.CachedHealthCheck(context.Background())
+	} else {
+		probeErr = s.storage.Probe(context.Background())
+	}
+	if probeErr != nil {
 		slog.Warn("attachment storage probe failed",
 			slog.String("component", "attachments"),
 			slog.String("backend", s.storage.Backend()),
-			slog.Any("error", err))
+			slog.Any("error", probeErr))
 		return status, nil
 	}
 	status.Writable = true

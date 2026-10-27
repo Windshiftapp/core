@@ -11,8 +11,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"path"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -48,7 +50,19 @@ type Store struct {
 	local    bool
 	root     string
 	describe string
+
+	healthMu  sync.Mutex
+	healthErr error
+	healthAt  time.Time
+	healthTTL time.Duration
 }
+
+const (
+	// defaultHealthCacheTTL keeps readiness ticks and status/bootstrap calls
+	// from issuing one object-store request per request handler.
+	defaultHealthCacheTTL = 10 * time.Second
+	healthProbeTimeout    = 2 * time.Second
+)
 
 // NewLocal builds a filesystem-backed store rooted at root. An empty root
 // produces a disabled store, preserving the historical "no ATTACHMENT_PATH
@@ -85,6 +99,11 @@ func (s *Store) Backend() string {
 		return "local"
 	}
 	return "s3"
+}
+
+// IsS3 reports whether the store is backed by an S3-compatible bucket.
+func (s *Store) IsS3() bool {
+	return s != nil && s.enabled && !s.local
 }
 
 // Describe returns a non-sensitive descriptor for admin status output.
@@ -154,6 +173,51 @@ func (s *Store) HealthCheck(ctx context.Context) error {
 		return nil
 	}
 	return s.backend.health(ctx)
+}
+
+// CachedHealthCheck returns a shared, TTL-cached readiness result. The probe is
+// detached from the caller's cancellation (context.WithoutCancel) so a canceled
+// HTTP readiness request cannot poison the cache; the probe keeps its own
+// timeout. Caller/system cancellation errors are not cached.
+func (s *Store) CachedHealthCheck(ctx context.Context) error {
+	if s == nil || !s.enabled {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	s.healthMu.Lock()
+	defer s.healthMu.Unlock()
+
+	ttl := s.healthTTL
+	if ttl <= 0 {
+		ttl = defaultHealthCacheTTL
+	}
+	if !s.healthAt.IsZero() && time.Since(s.healthAt) < ttl {
+		return s.healthErr
+	}
+
+	probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), healthProbeTimeout)
+	defer cancel()
+
+	previousErr := s.healthErr
+	err := s.backend.health(probeCtx)
+	if errors.Is(err, context.Canceled) {
+		// A canceled caller/system is not a storage-health result.
+		return err
+	}
+	s.healthErr = err
+	s.healthAt = time.Now()
+
+	switch {
+	case err != nil && previousErr == nil:
+		slog.Warn("attachment storage readiness check failed",
+			slog.String("component", "blobstore"), slog.Any("error", err))
+	case err == nil && previousErr != nil:
+		slog.Info("attachment storage recovered", slog.String("component", "blobstore"))
+	}
+	return err
 }
 
 // Probe checks that the backend is reachable and writable where applicable.
