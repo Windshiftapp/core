@@ -3,12 +3,20 @@
 -- Run against the Plane database with psql 10+. It is ONE SELECT, so with
 -- -q -t -A stdout is exactly one JSON record per line. Record order: meta,
 -- users, issues (ascending sequence_id, soft-deleted rows included so their
--- numbers stay reserved), comments.
+-- numbers stay reserved), comments, states, labels.
 --
---   psql "$PLANE_DATABASE_URL" -v ON_ERROR_STOP=1 -v project_id='<uuid>' -q -t -A -f dump.sql > contract.jsonl
+--   psql "$PLANE_DATABASE_URL" -v ON_ERROR_STOP=1 -v project_id='<uuid>' -v max_sequence='' -q -t -A -f dump.sql > contract.jsonl
 --
--- Replace <uuid> with the target project's id (projects.id). Columns and the
+-- Replace <uuid> with the target project's id (projects.id). max_sequence,
+-- when set to a number, freezes the number range: only issues at or below the
+-- cap (and their comments/parents/involved users) are emitted, so post-dump
+-- creates on the source cannot reach the destination mid-migration — a
+-- cutover import uses the cutover sequence as the cap. Set it to '' (the
+-- default if the variable is not passed) for the full corpus. Columns and the
 -- wrap expression below were verified against a live Plane v1.3.1 database.
+-- Schema v2 adds each issue's state_group and applied label_ids, plus state
+-- and label vocabulary records for the whole project — the loader needs them
+-- to carry the source's states and labels instead of collapsing them.
 --
 -- Why wrap() exists: Postgres renders jsonb with REAL newlines inside JSON
 -- string values (measured: Plane's description_html and comment text columns
@@ -19,14 +27,18 @@
 -- corpus: 5/5 rows with newlines and quotes round-trip equal.) A missing
 -- project_id empties every branch — a meta-less stream, which the loader
 -- refuses outright.
-WITH params AS MATERIALIZED (SELECT :'project_id'::uuid AS pid)
+\if :{?max_sequence}
+\else
+\set max_sequence ''
+\endif
+WITH params AS MATERIALIZED (SELECT :'project_id'::uuid AS pid, NULLIF(:'max_sequence', '')::int AS ms)
 SELECT line FROM (
 	-- 1. meta: must be the first record (the loader refuses otherwise).
 	(
 		SELECT json_build_object(
 			'type', 'meta',
 			'meta', json_build_object(
-				'schema_version', 1,
+				'schema_version', 2,
 				'source', 'plane',
 				'workspace_slug', COALESCE(w.slug, ''),
 				'project_id', p.id::text,
@@ -59,10 +71,12 @@ SELECT line FROM (
 		FROM users u
 		JOIN (
 			SELECT DISTINCT created_by_id FROM issues WHERE project_id = (SELECT pid FROM params)
+				AND ((SELECT ms FROM params) IS NULL OR sequence_id <= (SELECT ms FROM params))
 			UNION
 			SELECT DISTINCT ic.created_by_id
 			FROM issue_comments ic JOIN issues i ON i.id = ic.issue_id
 			WHERE i.project_id = (SELECT pid FROM params)
+				AND ((SELECT ms FROM params) IS NULL OR i.sequence_id <= (SELECT ms FROM params))
 		) involved ON involved.created_by_id = u.id
 		JOIN projects p ON p.id = (SELECT pid FROM params)
 		WHERE NOT EXISTS (
@@ -94,6 +108,12 @@ SELECT line FROM (
 					chr(13), chr(92) || 'r'), chr(10), chr(92) || 'n'),
 					chr(9), chr(92) || 't') || '"')::jsonb,
 				'state_name', COALESCE(st.name, ''),
+				'state_group', COALESCE(st."group", ''),
+				'label_ids', COALESCE((
+					SELECT json_agg(il.label_id::text ORDER BY il.label_id::text)
+					FROM issue_labels il
+					WHERE il.issue_id = i.id AND il.deleted_at IS NULL
+				), '[]'::json),
 				'priority', COALESCE(i.priority, 'none'),
 				'estimate_point', NULLIF(ep.value, ''),
 				'start_date', to_char(i.start_date, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
@@ -118,6 +138,7 @@ SELECT line FROM (
 		LEFT JOIN estimate_points ep ON ep.id = i.estimate_point_id
 		LEFT JOIN issues ps ON ps.id = i.parent_id
 		WHERE p.id = (SELECT pid FROM params)
+		  AND ((SELECT ms FROM params) IS NULL OR i.sequence_id <= (SELECT ms FROM params))
 	)
 	UNION ALL
 	-- 4. comments: joined through issues so project scoping is exact.
@@ -152,6 +173,45 @@ SELECT line FROM (
 		JOIN issues i ON i.id = ic.issue_id
 		JOIN projects p ON p.id = i.project_id
 		WHERE p.id = (SELECT pid FROM params)
+		  AND ((SELECT ms FROM params) IS NULL OR i.sequence_id <= (SELECT ms FROM params))
+	)
+	UNION ALL
+	-- 5. states: the project's full state vocabulary, emitted 1:1. The loader
+	--    creates the statuses Windshift lacks; Plane's own group field decides
+	--    which category a created status lands under.
+	(
+		SELECT json_build_object(
+			'type', 'state',
+			'state', json_build_object(
+				'id', st.id::text,
+				'name', st.name,
+				'group', st."group",
+				'color', COALESCE(st.color, '')
+			)
+		)::text AS line,
+		4 AS k,
+		p.id::text AS pid
+		FROM states st
+		JOIN projects p ON p.id = st.project_id
+		WHERE p.id = (SELECT pid FROM params) AND st.deleted_at IS NULL
+	)
+	UNION ALL
+	-- 6. labels: the project's label catalog. Issue label_ids resolve through
+	--    these records, so the loader never reaches back into the source DB.
+	(
+		SELECT json_build_object(
+			'type', 'label',
+			'label', json_build_object(
+				'id', l.id::text,
+				'name', l.name,
+				'color', COALESCE(l.color, '')
+			)
+		)::text AS line,
+		5 AS k,
+		p.id::text AS pid
+		FROM labels l
+		JOIN projects p ON p.id = l.project_id
+		WHERE p.id = (SELECT pid FROM params) AND l.deleted_at IS NULL
 	)
 ) r
 ORDER BY r.k, r.pid,

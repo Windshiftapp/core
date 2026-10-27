@@ -13,8 +13,11 @@
 // target schema is already managed by the application deployment.
 //
 // The JSON report goes to stdout; progress lines to stderr. The run is
-// idempotent: reruns skip every source uuid already in plane_import_mappings
-// and fail loudly on any number collision the importer does not own.
+// idempotent and CONVERGING: rows already mapped since the previous run are
+// repaired onto the contract's state/priority/labels when nobody edited them
+// since import (proof: updated_at still equals the contract value), left
+// alone when someone did, and any number collision the importer does not own
+// fails loudly.
 package main
 
 import (

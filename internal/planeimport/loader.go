@@ -38,8 +38,10 @@ type Options struct {
 	DryRun bool
 	// BatchSize is the number of issues committed per transaction.
 	BatchSize int
-	// DefaultStatusMap maps Plane state names to Windshift status names.
-	// Empty selects DefaultPlaneStatusMap.
+	// DefaultStatusMap maps Plane state NAMES to status-category builtin keys.
+	// It is the fallback for contracts that carry no state_group; the group
+	// field always wins when present (PlaneStateGroupCategories). An empty
+	// map selects DefaultPlaneStatusMap.
 	DefaultStatusMap map[string]string
 }
 
@@ -60,27 +62,33 @@ type Report struct {
 	ParentsLinkedLate  int       `json:"parents_linked_in_second_pass"`
 	HTMLFallbacks      int       `json:"descriptions_html_fallback"`
 	UnmappedUsers      []string  `json:"unmapped_users,omitempty"`
-	MissingStatuses    []string  `json:"missing_statuses,omitempty"`
 	UnmappedStates     []string  `json:"unmapped_state_names,omitempty"`
 	UnmappedPriorities []string  `json:"unmapped_priorities,omitempty"`
+	CreatedCategories  []string  `json:"created_status_categories,omitempty"`
+	CreatedStatuses    []string  `json:"created_statuses,omitempty"`
+	CreatedPriorities  []string  `json:"created_priorities,omitempty"`
+	CreatedLabels      []string  `json:"created_labels,omitempty"`
+	TransitionsAdded   int       `json:"workflow_transitions_added"`
+	IssuesConverged    int       `json:"issues_converged_to_contract"`
+	IssuesLeftEdited   int       `json:"issues_left_alone_edited_since_import"`
+	LabelLinksAdded    int       `json:"label_links_added"`
 	Collisions         []string  `json:"collisions,omitempty"`
 	NumberGaps         []int     `json:"number_gaps_preserved,omitempty"`
 	MaxNumber          int       `json:"max_number_after_import"`
 	Batches            int       `json:"batches"`
 }
 
-// DefaultPlaneStatusMap maps Plane state names to Windshift status builtin
-// keys. The source's abandoned-work state maps to done: Windshift's default
-// workflow has no such category, and the report keeps the source state on
-// every row via plane_import_mappings.metadata_json, so the distinction
-// survives where it matters. Keys are builtin keys (stable across installs;
-// the user-visible names differ between fresh seeds and provisioned
-// workspaces), so a renamed default status still resolves. Unknown names map
-// onto the to_do bucket and are reported so provisioning can catch them.
+// DefaultPlaneStatusMap maps Plane state NAMES to Windshift status-category
+// builtin keys. It is the fallback for contracts that do not carry each
+// issue's state_group; a contract that does carry groups uses
+// PlaneStateGroupCategories, which is what Plane itself defines. Names are
+// used only when the group is absent, because Plane users rename states freely
+// while the group is fixed by Plane's own state model.
 var DefaultPlaneStatusMap = map[string]string{
 	"Todo":        "to_do",
 	"Backlog":     "to_do",
 	"Untriaged":   "to_do",
+	"Triage":      "to_do",
 	"Blocked":     "to_do",
 	"In Progress": "in_progress",
 	"Started":     "in_progress",
@@ -88,27 +96,50 @@ var DefaultPlaneStatusMap = map[string]string{
 	"Completed":   "done",
 	// The key is the source's own state name, not prose: Plane spells it with
 	// two l's, and renaming the key would silently unmap the state.
-	"Cancelled": "done", //nolint:misspell // Plane's state name is source data
+	"Cancelled": "cancelled", //nolint:misspell // Plane's state name is source data
+}
+
+// PlaneStateGroupCategories maps Plane's state GROUP (the field Plane itself
+// uses to drive board behavior) onto Windshift status-category builtin keys.
+// This is the mapping the fidelity contract runs on: a state lands in the
+// category its group implies, never in whatever bucket a name guess suggests.
+// Windshift seeds no category for Plane's cancel-outcome group; the vocabulary
+// pass creates it when the source needs it (is_completed=true: abandoned work
+// is finished work, the burndown must stop counting it).
+var PlaneStateGroupCategories = map[string]string{
+	"backlog":   "to_do",
+	"unstarted": "to_do",
+	"triage":    "to_do",
+	"started":   "in_progress",
+	"completed": "done",
+	"cancelled": "cancelled", //nolint:misspell // Plane's group name is source data
 }
 
 // Loader runs the import. One Loader holds one database handle and the
 // resolved mapping tables for its run.
 type Loader struct {
-	db          database.Database
-	workspaceID int
-	opts        Options
-	statusID    map[string]int // resolved Windshift status id by lowercased status name
-	prioID      map[string]int // resolved global priority id by Plane priority name
-	userID      map[string]int // resolved Windshift user id by Plane user uuid
-	meta        *Meta
-	issues      []*Issue
-	comments    []*Comment
-	users       []UserRow
-	typeID      map[string]int      // resolved item type id by builtin_key ("task"/"subtask")
-	prioSeen    map[string]struct{} // dedup for unmapped-priority report lines
-	stateSeen   map[string]struct{} // dedup for unmapped-state report lines (its own map: a state named like a priority must not hide either)
-	deferred    []planeID           // child/parent plane uuid pairs resolved after batching
-	report      Report
+	db               database.Database
+	workspaceID      int
+	opts             Options
+	statusID         map[string]int // Windshift status id by EXACT status name (1:1 with source state names)
+	statusIsNew      map[string]struct{}
+	categoryID       map[string]int    // status-category id by builtin_key (targets for created statuses)
+	labelID          map[string]int    // Windshift label id by lowercased name
+	labelByPlane     map[string]int    // Plane label uuid -> Windshift label id
+	labelNameByPlane map[string]string // Plane label uuid -> Windshift label name (mapping metadata)
+	prioID           map[string]int    // resolved global priority id by Plane priority name
+	userID           map[string]int    // resolved Windshift user id by Plane user uuid
+	meta             *Meta
+	issues           []*Issue
+	comments         []*Comment
+	users            []UserRow
+	states           []StateRow
+	labels           []LabelRow
+	typeID           map[string]int      // resolved item type id by builtin_key ("task"/"subtask")
+	prioSeen         map[string]struct{} // dedup for unmapped-priority report lines
+	stateSeen        map[string]struct{} // dedup for unmapped-state report lines (its own map: a state named like a priority must not hide either)
+	deferred         []planeID           // child/parent plane uuid pairs resolved after batching
+	report           Report
 }
 
 // planeID is a child/parent pair whose parent was not yet mapped when the
@@ -126,7 +157,12 @@ func NewLoader(db database.Database, opts Options) *Loader {
 	if opts.DefaultStatusMap == nil {
 		opts.DefaultStatusMap = DefaultPlaneStatusMap
 	}
-	return &Loader{db: db, opts: opts, prioSeen: map[string]struct{}{}, stateSeen: map[string]struct{}{}, report: Report{}}
+	return &Loader{db: db, opts: opts,
+		prioSeen: map[string]struct{}{}, stateSeen: map[string]struct{}{},
+		statusIsNew: map[string]struct{}{}, categoryID: map[string]int{},
+		labelID: map[string]int{}, labelByPlane: map[string]int{}, labelNameByPlane: map[string]string{},
+		report: Report{},
+	}
 }
 
 // LoadContract reads the JSONL contract and the users sidecar into memory.
@@ -179,6 +215,16 @@ func (l *Loader) LoadContract() error {
 				return fmt.Errorf("contract line %d: user record without payload", line)
 			}
 			l.users = append(l.users, *rec.User)
+		case "state":
+			if rec.State == nil {
+				return fmt.Errorf("contract line %d: state record without payload", line)
+			}
+			l.states = append(l.states, *rec.State)
+		case "label":
+			if rec.Label == nil {
+				return fmt.Errorf("contract line %d: label record without payload", line)
+			}
+			l.labels = append(l.labels, *rec.Label)
 		default:
 			// Unknown record types are future-proofing slots, not errors.
 			continue
@@ -224,44 +270,6 @@ func (l *Loader) Resolve() error {
 	}
 	l.workspaceID = wsID
 
-	// Statuses: resolve the builtin keys the contract needs. Statuses are
-	// global rows (workspace scoping lives in configuration sets /
-	// workflows), and builtin keys survive renamed defaults.
-	need := map[string]struct{}{}
-	for _, iss := range l.issues {
-		if iss.DeletedAt != nil || iss.IsDraft {
-			continue
-		}
-		need[l.mapStateName(iss.StateName)] = struct{}{}
-	}
-	l.statusID = map[string]int{}
-	for key := range need {
-		// Statuses are global rows (workspace scoping lives in configuration
-		// sets / workflows). Resolve through the status CATEGORY builtin key:
-		// the categories (to_do / in_progress / done) are stable across
-		// versions, while the status rows under them have been renamed
-		// between releases (Open -> To Do), so keying on the status row's own
-		// builtin_key is version-fragile.
-		var id int
-		err := l.db.QueryRow(`
-			SELECT s.id FROM statuses s
-			JOIN status_categories c ON c.id = s.category_id
-			WHERE c.builtin_key = ?
-			ORDER BY s.is_default DESC, s.id ASC LIMIT 1`, key).Scan(&id)
-		if err == sql.ErrNoRows {
-			l.report.MissingStatuses = append(l.report.MissingStatuses, key)
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("resolve status %q: %w", key, err)
-		}
-		l.statusID[key] = id
-	}
-	if len(l.report.MissingStatuses) > 0 {
-		sort.Strings(l.report.MissingStatuses)
-		return fmt.Errorf("destination lacks statuses (builtin keys): %s", strings.Join(l.report.MissingStatuses, ", "))
-	}
-
 	// Item types: Plane issues map onto the default task/subtask types so the
 	// hierarchy semantics survive (a child becomes a sub-task, as in Plane).
 	l.typeID = map[string]int{}
@@ -283,6 +291,15 @@ func (l *Loader) Resolve() error {
 		if err := l.db.QueryRow(`SELECT id FROM priorities WHERE builtin_key = ?`, pk).Scan(&id); err == nil {
 			l.prioID[pk] = id
 		}
+	}
+
+	// Vocabulary: whatever the source catalog names and the destination lacks
+	// gets created here — statuses 1:1 with the project's states, the
+	// canceled-outcome category when the project has that group, the urgent
+	// priority only when an issue carries it, labels — and new statuses are
+	// wired into the effective workflow so they are reachable, not islands.
+	if err := l.ensureVocabulary(); err != nil {
+		return err
 	}
 
 	// Users: Plane uuid -> Windshift user id, via email after aliasing.
@@ -405,7 +422,7 @@ func (l *Loader) Run(ctx context.Context) (*Report, error) {
 	// yet (measured: some Plane parents carry a HIGHER sequence_id than the
 	// child — the in-pass assumption does not hold universally).
 	if !l.opts.DryRun && len(l.deferred) > 0 {
-		if err := l.parentPass(existing, repo); err != nil {
+		if err := l.parentPass(existing); err != nil {
 			return nil, err
 		}
 	}
@@ -413,4 +430,363 @@ func (l *Loader) Run(ctx context.Context) (*Report, error) {
 	l.finalizeReport(takenNumbers)
 	l.report.FinishedAt = time.Now()
 	return &l.report, nil
+}
+
+// vocabularyState is one source state the destination must be able to place
+// issues in: the name arrives 1:1, the category is implied by Plane's own
+// group field.
+type vocabularyState struct {
+	name     string
+	category string // status-category builtin key
+}
+
+// ensureVocabulary makes the destination hold the source's catalog.
+//
+// Statuses and categories are global rows shared by every workspace —
+// creating the source project's own status rows is the product's own
+// custom-status feature (POST /statuses, POST /status-categories), not a
+// workaround; the Jira importer materializing whole workflows into these same
+// tables is the in-repo precedent. Windshift seeds three categories and four
+// priorities; Plane vocabularies routinely use more, and collapsing them onto
+// the seeded trio is exactly what a faithful migration must not do.
+//
+// Everything runs in ONE transaction. On a dry run the pass is rolled back
+// after the inserts succeeded: --dry-run still proves the writes land against
+// the live schema and reports precisely what the run would create.
+func (l *Loader) ensureVocabulary() error {
+	tx, err := l.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin vocabulary pass: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	l.statusID = map[string]int{}
+	vocab := map[string]vocabularyState{}
+	for _, s := range l.states {
+		vocab[s.Name] = vocabularyState{s.Name, l.stateCategory(s.Name, s.Group)}
+	}
+	for _, iss := range l.issues {
+		if iss.StateName == "" {
+			continue
+		}
+		if _, ok := vocab[iss.StateName]; !ok {
+			vocab[iss.StateName] = vocabularyState{iss.StateName, l.stateCategory(iss.StateName, iss.StateGroup)}
+		}
+	}
+	// A state whose GROUP neither map knows is created under to_do on a guess.
+	// That guess is a fact the operator must see, so it is reported by name —
+	// same field, same rule as everything else the importer drops or infers.
+	reportGuessedCategory := func(name, group string) {
+		if name == "" {
+			return
+		}
+		if _, ok := PlaneStateGroupCategories[strings.ToLower(strings.TrimSpace(group))]; ok {
+			return
+		}
+		if _, named := l.opts.DefaultStatusMap[name]; named {
+			return
+		}
+		if _, dup := l.stateSeen[name]; dup {
+			return
+		}
+		l.stateSeen[name] = struct{}{}
+		l.report.UnmappedStates = append(l.report.UnmappedStates, name)
+	}
+	for _, s := range l.states {
+		reportGuessedCategory(s.Name, s.Group)
+	}
+	for _, iss := range l.issues {
+		reportGuessedCategory(iss.StateName, iss.StateGroup)
+	}
+	names := make([]string, 0, len(vocab))
+	for n := range vocab {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	l.categoryID = map[string]int{}
+	for _, n := range names {
+		builtin := vocab[n].category
+		if _, have := l.categoryID[builtin]; have {
+			continue
+		}
+		id, err := l.resolveOrCreateCategory(tx, builtin)
+		if err != nil {
+			return err
+		}
+		l.categoryID[builtin] = id
+	}
+
+	// Statuses: 1:1 by name. An existing row of the same name is ADOPTED —
+	// statuses are global, whoever named that row first owns it — a missing
+	// one is created under its group's category.
+	for _, n := range names {
+		var id int
+		err := tx.QueryRow(`SELECT id FROM statuses WHERE name = ? ORDER BY is_default DESC, id LIMIT 1`, n).Scan(&id)
+		if err == nil {
+			l.statusID[n] = id
+			continue
+		}
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("look up status %q: %w", n, err)
+		}
+		cat := l.categoryID[vocab[n].category]
+		if err := tx.QueryRow(`
+			INSERT INTO statuses (name, description, category_id, is_default)
+			VALUES (?, NULL, ?, false) RETURNING id`, n, cat).Scan(&id); err != nil {
+			return fmt.Errorf("create status %q under category %s: %w", n, vocab[n].category, err)
+		}
+		l.statusID[n] = id
+		l.statusIsNew[n] = struct{}{}
+		l.report.CreatedStatuses = append(l.report.CreatedStatuses, n)
+	}
+
+	if err := l.ensureUrgentPriority(tx); err != nil {
+		return err
+	}
+	if err := l.ensureLabels(tx); err != nil {
+		return err
+	}
+	if err := l.ensureTransitions(tx); err != nil {
+		return err
+	}
+
+	if l.opts.DryRun {
+		return nil // the deferred Rollback IS the dry run: writes proven, nothing persists
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit vocabulary pass: %w", err)
+	}
+	return nil
+}
+
+// stateCategory names the status-category builtin key a source state belongs
+// in. Plane's group field decides; the name map is the fallback for contracts
+// that predate state_group. A state neither map knows is still created — under
+// to_do — and the guess is reported by name in ensureVocabulary, never folded
+// into done by guesswork.
+func (l *Loader) stateCategory(name, group string) string {
+	if builtin, ok := PlaneStateGroupCategories[strings.ToLower(strings.TrimSpace(group))]; ok {
+		return builtin
+	}
+	if builtin, ok := l.opts.DefaultStatusMap[name]; ok {
+		return builtin
+	}
+	return "to_do"
+}
+
+// categoryNames are the human labels Windshift seeds for its builtin category
+// keys. A deployment that renamed or pre-created a category is matched by
+// builtin key first, by seeded name second, before the importer creates one.
+var categoryNames = map[string]string{
+	"to_do": "To Do", "in_progress": "In Progress", "done": "Done",
+	"cancelled": "Cancelled", //nolint:misspell // Plane's group name spelled into a row label
+}
+
+func (l *Loader) resolveOrCreateCategory(tx database.Tx, builtin string) (int, error) {
+	hint := builtin
+	if named, ok := categoryNames[builtin]; ok {
+		hint = named
+	}
+	var id int
+	err := tx.QueryRow(`SELECT id FROM status_categories WHERE builtin_key = ? OR LOWER(name) = LOWER(?) ORDER BY id LIMIT 1`, builtin, hint).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("look up status category %q: %w", builtin, err)
+	}
+	completed := builtin == "done" || builtin == "cancelled" //nolint:misspell // Plane's group name is source data
+	if err := tx.QueryRow(`
+		INSERT INTO status_categories (builtin_key, name, color, description, is_default, is_completed)
+		VALUES (?, ?, ?, ?, false, ?) RETURNING id`,
+		builtin, hint, l.categoryColorFor(builtin),
+		"Created by the Plane importer: the source vocabulary names this state group.", completed).Scan(&id); err != nil {
+		return 0, fmt.Errorf("create status category %q: %w", builtin, err)
+	}
+	l.report.CreatedCategories = append(l.report.CreatedCategories, hint)
+	return id, nil
+}
+
+// categoryColorFor picks the color of a category the importer creates: the
+// source's own state color when the contract carries one for a state in that
+// group, otherwise neutral slate — stated, not invented per board.
+func (l *Loader) categoryColorFor(builtin string) string {
+	group := ""
+	for g, c := range PlaneStateGroupCategories {
+		if c == builtin {
+			group = g
+			break
+		}
+	}
+	for _, s := range l.states {
+		if s.Group == group && s.Color != "" {
+			return planeColorHex(s.Color)
+		}
+	}
+	return "#6B7280"
+}
+
+// ensureUrgentPriority gives Plane's `urgent` a row instead of a NULL.
+// Windshift seeds critical/high/medium/low; Plane's scale has a rung above
+// critical. Dropping urgent to NULL loses a fact the source states; mapping it
+// onto Critical asserts a severity nobody chose. The row is created ONLY when
+// the contract actually carries an urgent issue — the importer does not
+// decorate a deployment with vocabulary its sources never used.
+func (l *Loader) ensureUrgentPriority(tx database.Tx) error {
+	used := false
+	for _, iss := range l.issues {
+		if iss.Priority == "urgent" {
+			used = true
+			break
+		}
+	}
+	if !used {
+		return nil
+	}
+	if _, ok := l.prioID["urgent"]; ok {
+		return nil
+	}
+	var id int
+	err := tx.QueryRow(`SELECT id FROM priorities WHERE builtin_key = 'urgent' OR LOWER(name) = 'urgent' ORDER BY sort_order, id LIMIT 1`).Scan(&id)
+	if err == nil {
+		l.prioID["urgent"] = id
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("look up urgent priority: %w", err)
+	}
+	if err := tx.QueryRow(`
+		INSERT INTO priorities (builtin_key, name, description, is_default, sort_order)
+		VALUES ('urgent', 'Urgent', 'Created by the Plane importer: the source scale has a rung above Critical.', false, 0)
+		RETURNING id`).Scan(&id); err != nil {
+		return fmt.Errorf("create urgent priority: %w", err)
+	}
+	l.prioID["urgent"] = id
+	l.report.CreatedPriorities = append(l.report.CreatedPriorities, "urgent")
+	return nil
+}
+
+// ensureLabels materializes the project's label vocabulary. Labels are a
+// global catalog keyed case-insensitively on name; an existing label is
+// adopted, a missing one created with the source's color.
+func (l *Loader) ensureLabels(tx database.Tx) error {
+	l.labelID = map[string]int{}
+	l.labelByPlane = map[string]int{}
+	l.labelNameByPlane = map[string]string{}
+	for _, lb := range l.labels {
+		key := strings.ToLower(lb.Name)
+		id, ok := l.labelID[key]
+		if !ok {
+			var err error
+			id, err = l.resolveOrCreateLabel(tx, lb.Name, lb.Color)
+			if err != nil {
+				return err
+			}
+			l.labelID[key] = id
+		}
+		l.labelByPlane[lb.ID] = id
+		l.labelNameByPlane[lb.ID] = lb.Name
+	}
+	return nil
+}
+
+func (l *Loader) resolveOrCreateLabel(tx database.Tx, name, color string) (int, error) {
+	var id int
+	err := tx.QueryRow(`SELECT id FROM labels WHERE LOWER(name) = LOWER(?) ORDER BY id LIMIT 1`, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("look up label %q: %w", name, err)
+	}
+	if err := tx.QueryRow(`INSERT INTO labels (name, color) VALUES (?, ?) RETURNING id`, name, planeColorHex(color)).Scan(&id); err != nil {
+		return 0, fmt.Errorf("create label %q: %w", name, err)
+	}
+	l.report.CreatedLabels = append(l.report.CreatedLabels, name)
+	return id, nil
+}
+
+// planeColorHex normalizes the two color shapes the source stores ("#RRGGBB"
+// and bare hex) into the "#"-prefixed form the destination columns carry.
+func planeColorHex(c string) string {
+	c = strings.TrimSpace(c)
+	if c == "" {
+		return "#3B82F6"
+	}
+	if !strings.HasPrefix(c, "#") {
+		return "#" + c
+	}
+	return c
+}
+
+// ensureTransitions makes every newly created status reachable and exitable in
+// the workflow the workspace actually resolves (configuration set first, then
+// the global default). A status no transition reaches is an island: items land
+// on it, then nothing may move them off it. Plane's boards move issues between
+// states freely, so the added edges mirror the source rather than inventing a
+// stricter machine. Every edge is checked before insert — the table has no
+// unique constraint, and a rerun must converge, not accumulate.
+func (l *Loader) ensureTransitions(tx database.Tx) error {
+	if len(l.statusIsNew) == 0 {
+		return nil
+	}
+	var workflowID int
+	err := tx.QueryRow(`
+		SELECT COALESCE(
+			(SELECT cs.workflow_id FROM workspace_configuration_sets wcs
+				JOIN configuration_sets cs ON cs.id = wcs.configuration_set_id
+				WHERE wcs.workspace_id = ? AND cs.workflow_id IS NOT NULL LIMIT 1),
+			(SELECT id FROM workflows WHERE is_default = true ORDER BY id LIMIT 1))`,
+		l.workspaceID).Scan(&workflowID)
+	if err == sql.ErrNoRows {
+		return nil // no workflow configured: the app already allows every transition
+	}
+	if err != nil {
+		return fmt.Errorf("resolve effective workflow: %w", err)
+	}
+
+	universe := make([]int, 0, len(l.statusID))
+	seen := map[int]bool{}
+	for _, id := range l.statusID {
+		if !seen[id] {
+			seen[id] = true
+			universe = append(universe, id)
+		}
+	}
+	sort.Ints(universe)
+
+	for name := range l.statusIsNew {
+		id := l.statusID[name]
+		var reachable int
+		err := tx.QueryRow(`SELECT 1 FROM workflow_transitions WHERE workflow_id = ? AND to_status_id = ? AND from_all_statuses = true LIMIT 1`, workflowID, id).Scan(&reachable)
+		if err == sql.ErrNoRows {
+			if _, err := tx.ExecWrite(`
+				INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, from_all_statuses)
+				VALUES (?, NULL, ?, true)`, workflowID, id); err != nil {
+				return fmt.Errorf("allow entry to status %q: %w", name, err)
+			}
+			l.report.TransitionsAdded++
+		} else if err != nil {
+			return fmt.Errorf("check entry to status %q: %w", name, err)
+		}
+		for _, target := range universe {
+			if target == id {
+				continue
+			}
+			var edge int
+			err := tx.QueryRow(`SELECT 1 FROM workflow_transitions WHERE workflow_id = ? AND to_status_id = ? AND from_status_id = ? LIMIT 1`, workflowID, target, id).Scan(&edge)
+			if err == sql.ErrNoRows {
+				if _, err := tx.ExecWrite(`
+					INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, from_all_statuses)
+					VALUES (?, ?, ?, false)`, workflowID, id, target); err != nil {
+					return fmt.Errorf("allow exit from status %q to status %d: %w", name, target, err)
+				}
+				l.report.TransitionsAdded++
+			} else if err != nil {
+				return fmt.Errorf("check exit from status %q: %w", name, err)
+			}
+		}
+	}
+	return nil
 }

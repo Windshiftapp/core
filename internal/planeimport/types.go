@@ -13,6 +13,15 @@
 //     source numbering are gaps in Windshift too; the counter continues above
 //     the maximum),
 //   - creator_id and created_at are the source values, never import time,
+//   - every source state, priority, and label the contract names is present in
+//     Windshift after the run: a state whose name no status carries is created
+//     under the category its group implies, `urgent` gets its priority row,
+//     labels are created and linked — the importer does not collapse source
+//     vocabulary onto whatever rows happen to be seeded,
+//   - reruns converge: an imported row nobody edited since import is moved
+//     onto the state/priority/labels the contract says it has; a row that was
+//     edited after import is left alone and counted, because the operator's
+//     later decision outranks the import,
 //   - reruns are idempotent via plane_import_mappings keyed on the source uuid,
 //   - soft-deleted source issues are skipped but reported, so their numbers
 //     stay reserved as gaps rather than being reused by later creates.
@@ -22,19 +31,22 @@ import "time"
 
 // ContractSchemaVersion is the contract format this package reads. A producer
 // emits it in the meta record; the loader refuses a mismatch instead of
-// silently mis-parsing rows.
-const ContractSchemaVersion = 1
+// silently mis-parsing rows. Version 2 added state_group + label_ids on issues
+// and the state/label vocabulary records that carry them.
+const ContractSchemaVersion = 2
 
 // ContractRecord is one JSONL line of the import contract. Issue, comment,
-// and user records carry their payload in Issue/Comment/User; meta records
-// name the source project. All fields not relevant to a record type are zero
-// and omitted from the JSON.
+// user, state, and label records carry their payload in Issue/Comment/User/
+// State/Label; meta records name the source project. All fields not relevant
+// to a record type are zero and omitted from the JSON.
 type ContractRecord struct {
-	Type    string         `json:"type"` // "meta" | "issue" | "comment" | "user"
+	Type    string         `json:"type"` // "meta" | "issue" | "comment" | "user" | "state" | "label"
 	Meta    *Meta          `json:"meta,omitempty"`
 	Issue   *Issue         `json:"issue,omitempty"`
 	Comment *Comment       `json:"comment,omitempty"`
 	User    *UserRow       `json:"user,omitempty"`
+	State   *StateRow      `json:"state,omitempty"`
+	Label   *LabelRow      `json:"label,omitempty"`
 	Counts  map[string]int `json:"counts,omitempty"` // per-source-field drop counts reported by the producer
 }
 
@@ -58,8 +70,10 @@ type Issue struct {
 	DescriptionJSON string     `json:"description_json"`
 	DescriptionHTML string     `json:"description_html"`
 	StateID         string     `json:"state_id"`
-	StateName       string     `json:"state_name"` // Plane state name at dump time; mapped via StatusMap
+	StateName       string     `json:"state_name"`  // Plane state name; the loader maps it 1:1 onto a status of the same name, creating one when absent
+	StateGroup      string     `json:"state_group"` // Plane's own group enum (backlog, unstarted, triage, started, completed, and the cancel-outcome class) — decides which Windshift category a created status lands under
 	Priority        string     `json:"priority"`
+	LabelIDs        []string   `json:"label_ids,omitempty"`      // Plane label uuids applied to the issue; resolved through the contract's label records
 	EstimatePoint   *string    `json:"estimate_point,omitempty"` // raw Plane estimate value
 	StartDate       *time.Time `json:"start_date,omitempty"`
 	TargetDate      *time.Time `json:"target_date,omitempty"`
@@ -102,4 +116,22 @@ type UserRow struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+}
+
+// StateRow is one Plane project state, carried so the destination can hold
+// the project's full state vocabulary — including states no open issue sits
+// in, which a collapse onto seeded statuses would silently erase.
+type StateRow struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Group string `json:"group"`
+	Color string `json:"color,omitempty"`
+}
+
+// LabelRow is one Plane project label (name + color), carried so issue
+// label_ids resolve without reaching back into the source database.
+type LabelRow struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
 }

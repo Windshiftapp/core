@@ -2,6 +2,7 @@ package planeimport
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -14,11 +15,11 @@ import (
 	"windshift/internal/repository"
 )
 
-// fallbackStatusID is the status used when a source state maps to a name the
-// workspace does not have: whatever row carries is_default (measured on a
-// default-seeded deployment: Open), so an unmapped state never lands on a null
-// status. Resolve() normally refuses to run with missing statuses; this is the
-// belt for the post-resolve race where a status disappears mid-run.
+// fallbackStatusID is the status used when a source state has no status row
+// at write time — the belt for the post-resolve race where a status someone
+// created is deleted mid-run by hand. Resolve's vocabulary pass normally
+// guarantees every contract state has a row; this is what keeps a row from
+// landing on a null status when that guarantee is broken underneath it.
 func (l *Loader) fallbackStatusID() int {
 	var id int
 	if err := l.db.QueryRow(`SELECT id FROM statuses WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&id); err != nil {
@@ -78,16 +79,128 @@ func (l *Loader) loadTakenNumbers() (map[int]string, error) {
 	return out, nil
 }
 
-// mapStateName maps a Plane state name to the Windshift status builtin key
-// the run targets. Configured entries win; anything else lands on to_do and
-// is named in the report, because "start the work somewhere" beats "fail the
-// row" for a custom Plane workflow, and the mapping metadata preserves the
-// real state for whoever reconciles later.
-func (l *Loader) mapStateName(planeState string) string {
-	if mapped, ok := l.opts.DefaultStatusMap[planeState]; ok {
-		return mapped
+// rowQuerier is satisfied by both the database handle and an open
+// transaction: the read half of convergence runs through whichever is in hand.
+type rowQuerier interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// writer is the write half: a transaction in the live pass, nil on a dry run
+// (the comparison and the counts are still computed, nothing is written).
+type writer interface {
+	ExecWrite(query string, args ...any) (sql.Result, error)
+}
+
+// convergeIssue moves an already-imported row onto what the contract says it
+// should be — status per state, priority per source rung, labels linked. It
+// only touches rows nobody edited since the import: `updated_at == created_at`
+// is the proof, because every product write moves updated_at. A row the
+// operator has since edited is their decision, and the import defers to it
+// (counted in the report, not silently overwritten).
+func (l *Loader) convergeIssue(i *Issue, itemID int, q rowQuerier, w writer) error {
+	var curStatus, curPrio sql.NullInt64
+	var updatedAt time.Time
+	if err := q.QueryRow(`SELECT status_id, priority_id, updated_at FROM items WHERE id = ?`, itemID).Scan(&curStatus, &curPrio, &updatedAt); err != nil {
+		return fmt.Errorf("read item %d for convergence: %w", itemID, err)
 	}
-	return "to_do"
+	// The proof of "nobody edited since import": the import wrote the
+	// contract's updated_at into the row, and every product write moves
+	// updated_at. Equality against the CONTRACT value (not against
+	// created_at) is what distinguishes "Plane edited it before the import"
+	// — which the import faithfully carried over — from "someone edited it in
+	// Windshift after the import" — which the import must defer to.
+	if !updatedAt.Equal(i.UpdatedAt) {
+		l.report.IssuesLeftEdited++
+		return nil
+	}
+	wantStatus, known := l.statusID[i.StateName]
+	if !known {
+		l.reportUnmappedState(i.StateName)
+	}
+	var wantPriority *int
+	if id, ok := l.prioID[i.Priority]; ok && i.Priority != "" && i.Priority != "none" {
+		wantPriority = &id
+	}
+	if i.Priority != "" && i.Priority != "none" && wantPriority == nil {
+		// A priority the destination cannot name: the row keeps whatever it
+		// has and the name reaches the report — dedup'd with the insert
+		// path's lines so one value produces one line per run.
+		if _, seen := l.prioSeen[i.Priority]; !seen {
+			l.prioSeen[i.Priority] = struct{}{}
+			l.report.UnmappedPriorities = append(l.report.UnmappedPriorities, i.Priority)
+		}
+	}
+	statusDiffers := known && (!curStatus.Valid || curStatus.Int64 != int64(wantStatus))
+	priorityDiffers := (wantPriority == nil) != !curPrio.Valid ||
+		(wantPriority != nil && curPrio.Valid && curPrio.Int64 != int64(*wantPriority))
+	if statusDiffers || priorityDiffers {
+		if w != nil {
+			var newStatus any
+			if curStatus.Valid {
+				newStatus = curStatus.Int64
+			}
+			if known {
+				newStatus = wantStatus
+			}
+			newPriority := any(nil)
+			if wantPriority != nil {
+				newPriority = *wantPriority
+			}
+			if _, err := w.ExecWrite(`UPDATE items SET status_id = ?, priority_id = ? WHERE id = ?`, newStatus, newPriority, itemID); err != nil {
+				return fmt.Errorf("converge item %d to contract state %q: %w", itemID, i.StateName, err)
+			}
+		}
+		l.report.IssuesConverged++
+	}
+	return l.attachIssueLabels(i.LabelIDs, itemID, q, w)
+}
+
+// attachIssueLabels links every label the source applied and no link carries
+// yet. Existing links stay untouched — someone else's label on the row is
+// their call — and labels the contract never defined are reported, not
+// invented.
+func (l *Loader) attachIssueLabels(planeIDs []string, itemID int, q rowQuerier, w writer) error {
+	for _, planeID := range planeIDs {
+		labelID, ok := l.labelByPlane[planeID]
+		if !ok {
+			l.report.Collisions = append(l.report.Collisions,
+				fmt.Sprintf("item %d references source label %s the contract never carried", itemID, planeID))
+			continue
+		}
+		var have int
+		err := q.QueryRow(`SELECT 1 FROM item_labels WHERE item_id = ? AND label_id = ?`, itemID, labelID).Scan(&have)
+		if err == nil {
+			continue
+		}
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("check label %d on item %d: %w", labelID, itemID, err)
+		}
+		if w != nil {
+			if _, err := w.ExecWrite(`INSERT INTO item_labels (item_id, label_id) VALUES (?, ?)`, itemID, labelID); err != nil {
+				return fmt.Errorf("link label %d to item %d: %w", labelID, itemID, err)
+			}
+		}
+		l.report.LabelLinksAdded++
+	}
+	return nil
+}
+
+// labelNamesFor lists the destination label names a source issue's label ids
+// resolve to, for the mapping metadata. Unknown ids are carried verbatim —
+// provenance records what the source said, not what could be resolved.
+func (l *Loader) labelNamesFor(planeIDs []string) []string {
+	if len(planeIDs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(planeIDs))
+	for _, id := range planeIDs {
+		if name, ok := l.labelNameByPlane[id]; ok {
+			out = append(out, name)
+			continue
+		}
+		out = append(out, "unresolved:"+id)
+	}
+	return out
 }
 
 // issueDescription converts one issue body, falling back to Plane's HTML
@@ -123,11 +236,7 @@ func (l *Loader) reportUnmappedState(name string) {
 // or priority lands on the fallback with a report line, never on an error.
 func (l *Loader) buildItem(i *Issue, number, parentWindshiftID int) *models.Item {
 	creatorID := l.userID[i.CreatedByID]
-	if _, configured := l.opts.DefaultStatusMap[i.StateName]; !configured {
-		l.reportUnmappedState(i.StateName)
-	}
-	statusKey := l.mapStateName(i.StateName)
-	statusID, ok := l.statusID[statusKey]
+	statusID, ok := l.statusID[i.StateName]
 	if !ok {
 		l.reportUnmappedState(i.StateName)
 		statusID = l.fallbackStatusID()
@@ -183,6 +292,10 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 		_, alreadyMapped := existing["issue"][i.ID]
 		if alreadyMapped {
 			l.report.IssuesExisting++
+			// Dry-run convergence: read-only comparison, same counters the
+			// write pass would produce. A read error here is a broken handle
+			// the write pass will hit loudly too.
+			_ = l.convergeIssue(i, existing["issue"][i.ID], l.db, nil)
 			// Comments of an already-imported issue are re-skipped on a rerun;
 			// count them as existing so the dry-run mirrors what Run would do.
 			for _, c := range commentsByIssue[i.ID] {
@@ -210,6 +323,7 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 		if n := i.SequenceID; n > l.report.MaxNumber {
 			l.report.MaxNumber = n
 		}
+		_ = l.attachIssueLabels(i.LabelIDs, i.SequenceID, l.db, nil)
 		for _, c := range commentsByIssue[i.ID] {
 			if c.DeletedAt != nil {
 				continue
@@ -250,6 +364,13 @@ func (l *Loader) runBatch(
 		}
 		if _, done := existing["issue"][i.ID]; done {
 			l.report.IssuesExisting++
+			// A mapped row is not automatically a correct row: an import from
+			// an earlier build of this tool (or an interrupted run) can leave
+			// it on the collapsed status. Convergence repairs untouched rows
+			// and defers to edited ones.
+			if err := l.convergeIssue(i, existing["issue"][i.ID], tx, tx); err != nil {
+				return err
+			}
 			// An already-imported issue's comments still need counting: on a
 			// partial-replay rerun a mapped issue can own comments the previous
 			// run never reached.
@@ -293,8 +414,11 @@ func (l *Loader) runBatch(
 		item.ID = id
 		if err := l.recordMapping(tx, "issue", i.ID, id, map[string]any{
 			"plane_state": i.StateName, "plane_priority": i.Priority,
-			"sequence_id": i.SequenceID,
+			"sequence_id": i.SequenceID, "labels": l.labelNamesFor(i.LabelIDs),
 		}); err != nil {
+			return err
+		}
+		if err := l.attachIssueLabels(i.LabelIDs, id, tx, tx); err != nil {
 			return err
 		}
 		existing["issue"][i.ID] = id
@@ -340,7 +464,7 @@ func idOf(existing map[string]map[string]int, planeID string) int {
 // parentPass attaches parent links that the in-pass resolution could not
 // reach — the deferred pairs. Parents are resolved through the same mapping
 // map, so a rerun that re-imported the parent also fixes the child.
-func (l *Loader) parentPass(existing map[string]map[string]int, repo *repository.ItemRepository) error {
+func (l *Loader) parentPass(existing map[string]map[string]int) error {
 	for _, pair := range l.deferred {
 		childID, ok := existing["issue"][pair.child]
 		if !ok {
@@ -356,13 +480,12 @@ func (l *Loader) parentPass(existing map[string]map[string]int, repo *repository
 		if err != nil {
 			return fmt.Errorf("begin parent pass: %w", err)
 		}
-		item, err := repo.FindByIDForUpdate(tx, childID)
-		if err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("load child %d for parent pass: %w", childID, err)
-		}
-		item.ParentID = &parentID
-		if err := repo.Update(tx, item); err != nil {
+		// A targeted parent_id write, not repo.Update: the repository's
+		// Update stamps updated_at with import time, and this tool promises
+		// un-stamped history — a linked child would otherwise read as "edited
+		// at import" and every later convergence run would defer to a Windshift
+		// edit that never happened.
+		if _, err := tx.ExecWrite(`UPDATE items SET parent_id = ? WHERE id = ?`, parentID, childID); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("link child %d to parent %d: %w", childID, parentID, err)
 		}
