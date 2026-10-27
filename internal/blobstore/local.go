@@ -47,6 +47,13 @@ func (b *localBackend) put(ctx context.Context, storedPath string, r io.Reader, 
 		cleanup()
 		return fmt.Errorf("chmod attachment: %w", err)
 	}
+	// Flush before the rename so a crash cannot leave a committed row pointing
+	// at a zero-length or partial object.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("sync attachment: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		cleanup()
 		return fmt.Errorf("close attachment: %w", err)

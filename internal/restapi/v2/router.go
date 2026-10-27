@@ -365,10 +365,10 @@ type pageApplication interface {
 }
 
 type pageDiagramApplication interface {
-	Create(services.AuditActor, services.CreatePageDiagramInput) (*services.PageDiagram, error)
-	List(services.AuditActor, int) ([]services.PageDiagram, error)
-	Get(services.AuditActor, int, int) (*services.PageDiagram, error)
-	Update(services.AuditActor, services.UpdatePageDiagramInput) (*services.PageDiagram, error)
+	Create(context.Context, services.AuditActor, services.CreatePageDiagramInput) (*services.PageDiagram, error)
+	List(context.Context, services.AuditActor, int) ([]services.PageDiagram, error)
+	Get(context.Context, services.AuditActor, int, int) (*services.PageDiagram, error)
+	Update(context.Context, services.AuditActor, services.UpdatePageDiagramInput) (*services.PageDiagram, error)
 }
 
 type pageAccess interface {
@@ -465,13 +465,13 @@ type attachmentApplication interface {
 	UploadPolicy() (services.ItemAttachmentUploadPolicy, error)
 	ListItemAttachments(int, int, int, int) ([]models.Attachment, int, error)
 	GetItemAttachment(int, int) (*models.Attachment, error)
-	OpenItemAttachment(int, int, bool) (*services.ItemAttachmentBinary, error)
-	UploadItemAttachment(services.ItemAttachmentUploadInput) (models.AttachmentUploadResponse, error)
-	DeleteItemAttachment(int, int) error
+	OpenItemAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
+	UploadItemAttachment(context.Context, services.ItemAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	DeleteItemAttachment(context.Context, int, int) error
 }
 
 type pageAttachmentApplication interface {
-	UploadPageAttachment(services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	UploadPageAttachment(context.Context, services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
 }
 
 type collectionApplication interface {

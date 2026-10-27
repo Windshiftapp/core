@@ -74,7 +74,7 @@ func (h *PageAttachmentUploadHandler) Upload(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response, err := h.uploads.UploadPageAttachment(services.PageAttachmentUploadInput{
+	response, err := h.uploads.UploadPageAttachment(r.Context(), services.PageAttachmentUploadInput{
 		PageID:           pageID,
 		UploaderID:       user.ID,
 		OriginalFilename: fileHeader.Filename,

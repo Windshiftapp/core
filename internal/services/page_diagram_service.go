@@ -96,7 +96,7 @@ func NewPageDiagramService(
 	}
 }
 
-func (s *PageDiagramService) Create(actor AuditActor, in CreatePageDiagramInput) (*PageDiagram, error) {
+func (s *PageDiagramService) Create(ctx context.Context, actor AuditActor, in CreatePageDiagramInput) (*PageDiagram, error) {
 	name := sanitize.ShortIdentifier.Sanitize(in.Name)
 	if name == "" {
 		return nil, ErrPageDiagramNameRequired
@@ -112,7 +112,7 @@ func (s *PageDiagramService) Create(actor AuditActor, in CreatePageDiagramInput)
 	if err != nil {
 		return nil, err
 	}
-	uploaded, err := s.uploads.UploadPageAttachment(PageAttachmentUploadInput{
+	uploaded, err := s.uploads.UploadPageAttachment(ctx, PageAttachmentUploadInput{
 		PageID:           page.ID,
 		UploaderID:       actor.UserID,
 		OriginalFilename: "diagram.json",
@@ -130,7 +130,7 @@ func (s *PageDiagramService) Create(actor AuditActor, in CreatePageDiagramInput)
 		ExpectedContentHash: in.ExpectedContentHash,
 	})
 	if err != nil {
-		return nil, s.compensateFailedMutation(page.ID, attachmentID, err)
+		return nil, s.compensateFailedMutation(ctx, page.ID, attachmentID, err)
 	}
 	return &PageDiagram{
 		PageID:         page.ID,
@@ -143,7 +143,7 @@ func (s *PageDiagramService) Create(actor AuditActor, in CreatePageDiagramInput)
 	}, nil
 }
 
-func (s *PageDiagramService) List(actor AuditActor, pageID int) ([]PageDiagram, error) {
+func (s *PageDiagramService) List(ctx context.Context, actor AuditActor, pageID int) ([]PageDiagram, error) {
 	page, err := s.requirePage(actor.UserID, pageID, PageOpView)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (s *PageDiagramService) List(actor AuditActor, pageID int) ([]PageDiagram, 
 	blocks := parsePageDiagramBlocks(page.Content)
 	out := make([]PageDiagram, 0, len(blocks))
 	for _, block := range blocks {
-		rec, payload, kind, readErr := s.readPageDiagramPayload(page.ID, block.attachmentID)
+		rec, payload, kind, readErr := s.readPageDiagramPayload(ctx, page.ID, block.attachmentID)
 		if errors.Is(readErr, repository.ErrNotFound) || errors.Is(readErr, ErrPageDiagramNotFound) {
 			continue
 		}
@@ -171,7 +171,7 @@ func (s *PageDiagramService) List(actor AuditActor, pageID int) ([]PageDiagram, 
 	return out, nil
 }
 
-func (s *PageDiagramService) Get(actor AuditActor, pageID, attachmentID int) (*PageDiagram, error) {
+func (s *PageDiagramService) Get(ctx context.Context, actor AuditActor, pageID, attachmentID int) (*PageDiagram, error) {
 	page, err := s.requirePage(actor.UserID, pageID, PageOpView)
 	if err != nil {
 		return nil, err
@@ -183,7 +183,7 @@ func (s *PageDiagramService) Get(actor AuditActor, pageID, attachmentID int) (*P
 	if len(blocks) != 1 {
 		return nil, ErrPageDiagramReferenceConflict
 	}
-	rec, payload, kind, err := s.readPageDiagramPayload(page.ID, attachmentID)
+	rec, payload, kind, err := s.readPageDiagramPayload(ctx, page.ID, attachmentID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrPageDiagramNotFound
 	}
@@ -201,7 +201,7 @@ func (s *PageDiagramService) Get(actor AuditActor, pageID, attachmentID int) (*P
 	}, nil
 }
 
-func (s *PageDiagramService) Update(actor AuditActor, in UpdatePageDiagramInput) (*PageDiagram, error) {
+func (s *PageDiagramService) Update(ctx context.Context, actor AuditActor, in UpdatePageDiagramInput) (*PageDiagram, error) {
 	payload, kind, err := BuildDiagramPayload(in.Mermaid, in.Excalidraw)
 	if err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func (s *PageDiagramService) Update(actor AuditActor, in UpdatePageDiagramInput)
 		}
 		return nil, err
 	}
-	uploaded, err := s.uploads.UploadPageAttachment(PageAttachmentUploadInput{
+	uploaded, err := s.uploads.UploadPageAttachment(ctx, PageAttachmentUploadInput{
 		PageID:           page.ID,
 		UploaderID:       actor.UserID,
 		OriginalFilename: "diagram.json",
@@ -247,7 +247,7 @@ func (s *PageDiagramService) Update(actor AuditActor, in UpdatePageDiagramInput)
 		ExpectedContentHash: in.ExpectedContentHash,
 	})
 	if err != nil {
-		return nil, s.compensateFailedMutation(page.ID, attachmentID, err)
+		return nil, s.compensateFailedMutation(ctx, page.ID, attachmentID, err)
 	}
 	return &PageDiagram{
 		PageID:         page.ID,
@@ -278,12 +278,12 @@ func (s *PageDiagramService) requirePage(userID, pageID int, op string) (*models
 	return page, nil
 }
 
-func (s *PageDiagramService) readPageDiagramPayload(pageID, attachmentID int) (record *repository.PageAttachmentRecord, payload json.RawMessage, kind string, err error) {
+func (s *PageDiagramService) readPageDiagramPayload(ctx context.Context, pageID, attachmentID int) (record *repository.PageAttachmentRecord, payload json.RawMessage, kind string, err error) {
 	record, err = s.attachments.GetPageAttachmentRecord(pageID, attachmentID)
 	if err != nil {
 		return nil, nil, "", err
 	}
-	file, err := s.storage.Open(context.Background(), record.FilePath)
+	file, err := s.storage.Open(ctx, record.FilePath)
 	if err != nil {
 		return nil, nil, "", ErrPageDiagramNotFound
 	}
@@ -300,8 +300,8 @@ func (s *PageDiagramService) readPageDiagramPayload(pageID, attachmentID int) (r
 	return record, payload, kind, nil
 }
 
-func (s *PageDiagramService) compensateFailedMutation(pageID, attachmentID int, mutationErr error) error {
-	if cleanupErr := s.uploads.DeleteUploadedPageAttachment(pageID, attachmentID); cleanupErr != nil {
+func (s *PageDiagramService) compensateFailedMutation(ctx context.Context, pageID, attachmentID int, mutationErr error) error {
+	if cleanupErr := s.uploads.DeleteUploadedPageAttachment(ctx, pageID, attachmentID); cleanupErr != nil {
 		return errors.Join(mutationErr, fmt.Errorf("clean up failed page diagram attachment: %w", cleanupErr))
 	}
 	return mutationErr

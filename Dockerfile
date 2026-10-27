@@ -80,6 +80,9 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 # Copy binary
 COPY --from=builder /build/windshift /windshift
 
+# Copy third-party notices required by the Apache-2.0 dependencies (AWS SDK)
+COPY --from=builder /build/NOTICE /NOTICE
+
 # Copy data directory with correct ownership (65534:65534)
 # This ensures named volumes inherit proper permissions on first mount
 COPY --from=builder --chown=65534:65534 /data /data

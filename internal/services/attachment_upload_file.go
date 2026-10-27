@@ -68,7 +68,7 @@ func validateAttachmentUpload(db database.Database, enabled bool, input attachme
 	return detectedMimeType, nil
 }
 
-func storeAttachmentFile(store *blobstore.Store, collection, entityType string, entityID int, input attachmentFileInput, mimeType string) (storedAttachmentFile, error) {
+func storeAttachmentFile(ctx context.Context, store *blobstore.Store, collection, entityType string, entityID int, input attachmentFileInput, mimeType string) (storedAttachmentFile, error) {
 	filename, err := generateAttachmentFilename(input.originalFilename)
 	if err != nil {
 		return storedAttachmentFile{}, fmt.Errorf("generate filename: %w", err)
@@ -82,7 +82,6 @@ func storeAttachmentFile(store *blobstore.Store, collection, entityType string, 
 		size:     int64(len(input.data)),
 	}
 
-	ctx := context.Background()
 	if err := store.Put(ctx, storedPath, bytes.NewReader(input.data), int64(len(input.data)), mimeType); err != nil {
 		return storedAttachmentFile{}, fmt.Errorf("save file: %w", err)
 	}
@@ -112,8 +111,7 @@ func storeAttachmentFile(store *blobstore.Store, collection, entityType string, 
 	return stored, nil
 }
 
-func removeStoredAttachmentFile(store *blobstore.Store, stored storedAttachmentFile) {
-	ctx := context.Background()
+func removeStoredAttachmentFile(ctx context.Context, store *blobstore.Store, stored storedAttachmentFile) {
 	_ = store.Remove(ctx, stored.path)
 	if stored.thumbnailPath != "" {
 		_ = store.Remove(ctx, stored.thumbnailPath)

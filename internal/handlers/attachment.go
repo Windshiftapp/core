@@ -731,12 +731,12 @@ func (h *AttachmentHandler) uploadDomainAttachment(w http.ResponseWriter, r *htt
 	var response models.AttachmentUploadResponse
 	switch entityType {
 	case "item":
-		response, err = services.NewItemAttachmentService(h.db, h.storage, h.permissionService).UploadItemAttachment(services.ItemAttachmentUploadInput{
+		response, err = services.NewItemAttachmentService(h.db, h.storage, h.permissionService).UploadItemAttachment(r.Context(), services.ItemAttachmentUploadInput{
 			ItemID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
 			FileData: data, FileSize: int64(len(data)),
 		})
 	case "page":
-		response, err = services.NewPageAttachmentUploadService(h.db, h.storage, h.permissionService, h.pagePermissionService).UploadPageAttachment(services.PageAttachmentUploadInput{
+		response, err = services.NewPageAttachmentUploadService(h.db, h.storage, h.permissionService, h.pagePermissionService).UploadPageAttachment(r.Context(), services.PageAttachmentUploadInput{
 			PageID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
 			FileData: data, FileSize: int64(len(data)),
 		})
@@ -964,7 +964,7 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		itemAttachments := services.NewItemAttachmentService(h.db, h.storage, h.permissionService)
-		if err := itemAttachments.DeleteItemAttachment(attachmentID, currentUser.ID); err != nil {
+		if err := itemAttachments.DeleteItemAttachment(r.Context(), attachmentID, currentUser.ID); err != nil {
 			if errors.Is(err, services.ErrItemAttachmentNotFound) {
 				respondNotFound(w, r, "attachment")
 				return

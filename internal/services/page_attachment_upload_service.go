@@ -62,7 +62,7 @@ type PageAttachmentUploadInput struct {
 
 // UploadPageAttachment stores a new attachment for a page and returns the same
 // response model used by the legacy upload endpoint for regular attachments.
-func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUploadInput) (models.AttachmentUploadResponse, error) {
+func (s *PageAttachmentUploadService) UploadPageAttachment(ctx context.Context, in PageAttachmentUploadInput) (models.AttachmentUploadResponse, error) {
 	if !s.storage.Enabled() {
 		return models.AttachmentUploadResponse{}, ErrPageAttachmentUploadDisabled
 	}
@@ -92,7 +92,7 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 	if err != nil {
 		return models.AttachmentUploadResponse{}, err
 	}
-	stored, err := storeAttachmentFile(s.storage, "pages", "page", in.PageID, fileInput, detectedMimeType)
+	stored, err := storeAttachmentFile(ctx, s.storage, "pages", "page", in.PageID, fileInput, detectedMimeType)
 	if err != nil {
 		return models.AttachmentUploadResponse{}, err
 	}
@@ -112,7 +112,7 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 		Category:         "",
 	})
 	if err != nil {
-		removeStoredAttachmentFile(s.storage, stored)
+		removeStoredAttachmentFile(ctx, s.storage, stored)
 		return models.AttachmentUploadResponse{}, fmt.Errorf("save attachment record: %w", err)
 	}
 	return newAttachmentUploadResponse(attachmentID, in.PageID, in.OriginalFilename, &uploaderID, stored), nil
@@ -121,7 +121,7 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 // DeleteUploadedPageAttachment compensates a failed higher-level mutation.
 // It is intentionally not exposed as a user-facing delete operation: live and
 // historical Page revisions may still reference successful diagram uploads.
-func (s *PageAttachmentUploadService) DeleteUploadedPageAttachment(pageID, attachmentID int) error {
+func (s *PageAttachmentUploadService) DeleteUploadedPageAttachment(ctx context.Context, pageID, attachmentID int) error {
 	rec, err := repository.NewAttachmentRepository(s.db).GetPageAttachmentRecord(pageID, attachmentID)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (s *PageAttachmentUploadService) DeleteUploadedPageAttachment(pageID, attac
 		if path == "" {
 			continue
 		}
-		if err := s.storage.Remove(context.Background(), path); err != nil {
+		if err := s.storage.Remove(ctx, path); err != nil {
 			if errors.Is(err, blobstore.ErrOutsideRoot) {
 				continue
 			}

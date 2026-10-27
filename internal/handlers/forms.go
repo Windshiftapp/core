@@ -693,8 +693,8 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		if portalCustomerID != nil {
 			attachments[i].UploaderPortalCustomerID = portalCustomerID
 		}
-		if _, uploadErr := h.itemAttachments.UploadPublicFormAttachment(attachments[i]); uploadErr != nil {
-			if rollbackErr := h.itemAttachments.RollbackPublicFormItem(int(itemID)); rollbackErr != nil {
+		if _, uploadErr := h.itemAttachments.UploadPublicFormAttachment(r.Context(), attachments[i]); uploadErr != nil {
+			if rollbackErr := h.itemAttachments.RollbackPublicFormItem(r.Context(), int(itemID)); rollbackErr != nil {
 				respondInternalError(w, r, fmt.Errorf("upload public form attachment: %v; rollback item: %w", uploadErr, rollbackErr))
 				return
 			}
