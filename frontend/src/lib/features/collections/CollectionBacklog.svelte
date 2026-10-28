@@ -237,12 +237,12 @@
       const membership = await resolveCreatedItemMembership(newItem, {
         workspaceId,
         collectionId,
-        subFilterQL: collectionStore.subFilterQL ? collectionStore.effectiveSubFilterQL : '',
+        subFilterQL: collectionStore.effectiveBacklogSubFilterQL,
       });
       if (membership === 'member') {
-        // insertCreatedItem deduplicates by id so a repeated create event cannot
-        // append the same backlog row twice.
-        collectionStore.insertCreatedItem(newItem, { backlog: true });
+        // Backlog membership also depends on configured statuses, so let the
+        // authoritative backlog request decide whether the new item belongs.
+        scheduleCollectionReconciliation();
       } else if (membership === 'unknown') {
         scheduleCollectionReconciliation();
       }
@@ -395,7 +395,7 @@
       const boundaryItem = await items.getBacklogBoundary(
         workspaceId,
         collectionId,
-        collectionStore.effectiveSubFilterQL,
+        collectionStore.effectiveBacklogSubFilterQL,
         boundary,
       );
       if (!boundaryItem || boundaryItem.id === item.id) return;
