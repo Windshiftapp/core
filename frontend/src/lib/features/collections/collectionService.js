@@ -150,12 +150,19 @@ export async function fetchCollectionItems(
  * Fetches backlog items for a collection.
  * @param {string|number} workspaceId
  * @param {string|number|null} collectionId
- * @param {{ page?: number, limit?: number, sub_ql?: string, collection?: any, requestOptions?: object }} [options]
+ * @param {{ page?: number, limit?: number, sub_ql?: string, include_completed?: boolean, collection?: any, requestOptions?: object }} [options]
  */
 export async function fetchCollectionBacklog(
   workspaceId,
   collectionId,
-  { page, limit, sub_ql, collection: preloadedCollection, requestOptions = {} } = {}
+  {
+    page,
+    limit,
+    sub_ql,
+    include_completed,
+    collection: preloadedCollection,
+    requestOptions = {},
+  } = {}
 ) {
   let collectionName = 'Default';
 
@@ -173,6 +180,7 @@ export async function fetchCollectionBacklog(
     sub_ql,
     omit_descriptions: true,
     include_watermark: true,
+    include_completed,
     requestOptions,
   });
   const items = response?.data ?? [];

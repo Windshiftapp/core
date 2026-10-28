@@ -192,6 +192,7 @@ type ItemBacklogRequest struct {
 	Pagination                        PaginationParams
 	OmitDescriptions                  bool
 	IncludeWatermark                  bool
+	IncludeCompleted                  bool
 	ExcludePersonal                   bool
 }
 
@@ -332,6 +333,7 @@ func (s *ItemApplicationService) Backlog(ctx context.Context, request ItemBacklo
 		WorkspaceID: request.WorkspaceID, CollectionID: request.CollectionID,
 		QLQuery: request.QL, SubQLQuery: request.SubQL, WorkspaceIDs: workspaceIDs,
 		UserID: request.UserID, Pagination: request.Pagination, OmitDescriptions: request.OmitDescriptions,
+		IncludeCompleted: request.IncludeCompleted,
 	})
 	if err != nil {
 		return ItemListResult{}, err

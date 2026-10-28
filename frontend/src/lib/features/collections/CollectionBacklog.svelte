@@ -240,9 +240,10 @@
         subFilterQL: collectionStore.subFilterQL ? collectionStore.effectiveSubFilterQL : '',
       });
       if (membership === 'member') {
-        // insertCreatedItem deduplicates by id so a repeated create event cannot
-        // append the same backlog row twice.
-        collectionStore.insertCreatedItem(newItem, { backlog: true });
+        // Backlog membership also depends on configured statuses and the
+        // completed-visibility scope, so let the authoritative backlog request
+        // decide whether and where the new row belongs.
+        scheduleCollectionReconciliation();
       } else if (membership === 'unknown') {
         scheduleCollectionReconciliation();
       }
@@ -397,6 +398,7 @@
         collectionId,
         collectionStore.effectiveSubFilterQL,
         boundary,
+        collectionStore.showCompleted,
       );
       if (!boundaryItem || boundaryItem.id === item.id) return;
 
@@ -733,7 +735,7 @@
 
       <!-- Controls Bar -->
       <div class="flex items-center mb-6">
-        <SubFilterBar {workspaceId} {collectionId} showCompletionToggle={false} />
+        <SubFilterBar {workspaceId} {collectionId} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}

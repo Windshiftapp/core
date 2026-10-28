@@ -1166,6 +1166,7 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items from the change window. Values true and 1 enable exclusion.", false))
 	case "GET /items/backlog":
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals. Values true and 1 enable exclusion.", false))
+		upsertParameter(route, booleanQuery("include_completed", "Include statuses whose category is marked completed in addition to the configured backlog statuses. Omitted or false preserves the default backlog status scope.", false))
 	case "GET /items/search":
 		route.Tag = "Work items"
 		route.Summary = "Search items"

@@ -88,6 +88,7 @@ function fetchBacklog(
     sub_ql,
     omit_descriptions,
     include_watermark,
+    include_completed,
     requestOptions = {},
   } = {}
 ) {
@@ -101,17 +102,25 @@ function fetchBacklog(
   if (sub_ql) params.append('sub_ql', sub_ql);
   if (omit_descriptions) params.append('fields', 'summary');
   if (include_watermark) params.append('include_watermark', 'true');
+  if (include_completed) params.append('include_completed', 'true');
   if (page) params.append('page', String(page));
   if (limit) params.append('page_size', String(Math.min(Number(limit), 100)));
   return fetchAPIV2(`/items/backlog?${params}`, requestOptions);
 }
 
-async function fetchBacklogBoundary(workspaceId, collectionId, subQL, boundary) {
+async function fetchBacklogBoundary(
+  workspaceId,
+  collectionId,
+  subQL,
+  boundary,
+  includeCompleted = false
+) {
   const options = {
     page: 1,
     limit: 1,
     sub_ql: subQL || undefined,
     omit_descriptions: true,
+    include_completed: includeCompleted,
   };
 
   for (let attempt = 0; attempt < 2; attempt++) {

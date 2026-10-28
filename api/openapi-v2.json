@@ -107429,6 +107429,16 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "description": "Include statuses whose category is marked completed in addition to the configured backlog statuses. Omitted or false preserves the default backlog status scope.",
+            "in": "query",
+            "name": "include_completed",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

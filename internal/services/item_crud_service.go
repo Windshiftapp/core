@@ -587,9 +587,11 @@ type BacklogParams struct {
 	UserID           int    // Authenticated user ID for currentUser() resolution
 	Pagination       PaginationParams
 	OmitDescriptions bool
+	IncludeCompleted bool
 }
 
-// GetBacklogItems retrieves items with non-completed statuses for a workspace/collection
+// GetBacklogItems retrieves items in the configured backlog statuses for a workspace/collection.
+// Completed-category statuses are also eligible when IncludeCompleted is true.
 func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, int, error) {
 	return s.GetBacklogItemsContext(context.Background(), params)
 }
@@ -604,6 +606,13 @@ func (s *ItemCRUDService) GetBacklogItemsContext(ctx context.Context, params Bac
 	backlogStatusIDs, err := s.repo.GetBacklogStatusIDsContext(ctx, params.WorkspaceID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get backlog statuses: %w", err)
+	}
+	if params.IncludeCompleted {
+		completedStatusIDs, err := s.repo.GetCompletedStatusIDsContext(ctx)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get completed statuses: %w", err)
+		}
+		backlogStatusIDs = appendUniqueInts(backlogStatusIDs, completedStatusIDs...)
 	}
 	if len(backlogStatusIDs) == 0 {
 		return []models.Item{}, 0, nil
@@ -633,6 +642,21 @@ func (s *ItemCRUDService) GetBacklogItemsContext(ctx context.Context, params Bac
 		Pagination:       params.Pagination,
 		OmitDescriptions: params.OmitDescriptions,
 	})
+}
+
+func appendUniqueInts(values []int, additions ...int) []int {
+	seen := make(map[int]struct{}, len(values)+len(additions))
+	for _, value := range values {
+		seen[value] = struct{}{}
+	}
+	for _, value := range additions {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values
 }
 
 // ListWithQLParams contains parameters for listing items with QL support

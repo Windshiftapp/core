@@ -1124,3 +1124,29 @@ func (r *ItemRepository) GetBacklogStatusIDsContext(ctx context.Context, workspa
 
 	return statusIDs, rows.Err()
 }
+
+// GetCompletedStatusIDsContext returns every status whose category is marked
+// completed. Category metadata, rather than a conventional status name, is the
+// source of truth so custom completion workflows remain eligible.
+func (r *ItemRepository) GetCompletedStatusIDsContext(ctx context.Context) ([]int, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT s.id
+		FROM statuses s
+		JOIN status_categories sc ON s.category_id = sc.id
+		WHERE COALESCE(sc.is_completed, FALSE) = TRUE`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query completed statuses: %w", err)
+	}
+	defer rows.Close()
+
+	var statusIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan completed status: %w", err)
+		}
+		statusIDs = append(statusIDs, id)
+	}
+
+	return statusIDs, rows.Err()
+}

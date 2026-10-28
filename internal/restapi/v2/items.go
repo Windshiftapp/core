@@ -383,7 +383,8 @@ func registerItemSetRoutes(builder *routeBuilder, app *services.ItemApplicationS
 			QL: r.URL.Query().Get("ql"), SubQL: r.URL.Query().Get("sub_ql"),
 			Pagination:       services.PaginationParams{Page: page.Page, Limit: page.PageSize, Offset: page.Offset},
 			OmitDescriptions: r.URL.Query().Get("fields") == "summary", IncludeWatermark: r.URL.Query().Get("include_watermark") == "true",
-			ExcludePersonal: excludePersonal(r),
+			IncludeCompleted: itemQueryFlag(r, "include_completed"),
+			ExcludePersonal:  excludePersonal(r),
 		})
 		return result.Items, page, result.Total, itemListMeta{Watermark: result.Watermark, SortableFields: result.SortableFields}, itemError(err)
 	})
@@ -822,7 +823,11 @@ func invalidItemReference(message string) error {
 }
 
 func excludePersonal(r *http.Request) bool {
-	value := r.URL.Query().Get("exclude_personal")
+	return itemQueryFlag(r, "exclude_personal")
+}
+
+func itemQueryFlag(r *http.Request, name string) bool {
+	value := r.URL.Query().Get(name)
 	return value == "true" || value == "1"
 }
 

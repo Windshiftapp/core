@@ -372,6 +372,7 @@ class CollectionStore {
               page: 1,
               limit: DEFAULT_PAGE_SIZE,
               sub_ql: this.effectiveSubFilterQL || undefined,
+              include_completed: this.showCompleted,
               collection,
               requestOptions: FOREGROUND_READ,
             })
@@ -707,6 +708,7 @@ class CollectionStore {
       page: 1,
       limit,
       sub_ql: subQL,
+      include_completed: this.showCompleted,
       collection,
       requestOptions: FOREGROUND_READ,
     });
@@ -719,6 +721,7 @@ class CollectionStore {
         page,
         limit,
         sub_ql: subQL,
+        include_completed: this.showCompleted,
         collection,
         requestOptions: BACKGROUND_READ,
       });
@@ -977,6 +980,7 @@ class CollectionStore {
         page: nextPage,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveSubFilterQL || undefined,
+        include_completed: this.showCompleted,
         requestOptions: BACKGROUND_READ,
       });
 
