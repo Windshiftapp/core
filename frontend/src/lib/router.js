@@ -145,6 +145,7 @@ const routes = {
   '/teams/:id': 'team-detail',
   '/teams/:id/:section': 'team-detail',
   '/admin': 'admin',
+  '/plugins/:plugin/:extension': 'plugin-page',
   '/admin/permission-sets/:id': 'admin',
   '/admin/configuration-sets/:id': 'admin',
   '/admin/condition-sets/:id': 'admin',

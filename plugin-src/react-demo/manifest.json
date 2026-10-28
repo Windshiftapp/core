@@ -15,6 +15,16 @@
       "component": "index.html",
       "group": "Development",
       "order": 200
+    },
+    {
+      "point": "main.nav",
+      "id": "react-demo-page",
+      "label": "React Demo",
+      "description": "Demo plugin page in the main sidebar",
+      "icon": "code",
+      "displayMode": "iframe",
+      "component": "index.html",
+      "order": 100
     }
   ]
 }

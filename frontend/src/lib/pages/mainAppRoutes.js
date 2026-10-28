@@ -21,6 +21,7 @@ export const MAIN_APP_COMPONENT_LOADERS = {
   'oauth-authorize': () => import('./OAuthAuthorize.svelte'),
   404: () => import('./NotFound.svelte'),
   admin: () => import('./Admin.svelte'),
+  'plugin-page': () => import('./PluginPage.svelte'),
   time: () => import('../features/time/Time.svelte'),
   'test-cases': () => import('../features/testing/TestCases.svelte'),
   'test-sets': () => import('../features/testing/TestSets.svelte'),
@@ -174,6 +175,13 @@ export const MAIN_APP_ROUTE_CONFIG = {
   404: route('Loading...', 'Failed to load page', { wrapper: 'surface-padded' }),
   admin: route('Loading Admin Panel...', 'Failed to load Admin Panel', {
     requirePermission: 'systemAdmin',
+  }),
+  'plugin-page': route('Loading plugin...', 'Failed to load plugin', {
+    wrapper: 'surface-padded',
+    getProps: (currentRoute) => ({
+      pluginName: currentRoute.params.plugin,
+      extensionId: currentRoute.params.extension,
+    }),
   }),
   time: route('Loading Time & Projects...', 'Failed to load Time & Projects'),
   'test-cases': route('Loading Test Cases...', 'Failed to load Test Cases', {

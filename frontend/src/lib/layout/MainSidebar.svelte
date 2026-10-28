@@ -10,6 +10,10 @@
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspaceMenuItems } from '../navigation/workspaceMenu.js';
+  import { pluginNavItems } from '../navigation/pluginNavigation.js';
+  import { extensions, loadExtensions } from '../stores/extensions.svelte.js';
+  import { resolvePluginIcon } from '../utils/pluginIcons.js';
+  import IconPuzzle from '@tabler/icons-svelte-runes/icons/puzzle';
   import { isTauri as getIsTauri } from '../utils/isTauri.js';
   import DropdownMenu from './DropdownMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
@@ -85,7 +89,11 @@
   // recency order. onOpen still refreshes it so recent navigation is reflected.
   onMount(() => {
     void loadRecentWorkspaceOrder();
+    // Plugin `main.nav` entries; quiet because plugins may be disabled on this instance.
+    void loadExtensions({ quiet: true });
   });
+
+  const pluginNav = $derived(pluginNavItems(extensions.value));
 
   function onWorkspaceSearchInput(value) {
     workspaceSearchQuery = value;
@@ -209,6 +217,21 @@
         label={t(item.labelKey)}
         href={item.href}
         isActive={item.activeViews.includes($currentRoute.view)}
+        expanded={$uiStore.navExpanded}
+        onclick={closePopoverSurface}
+      />
+    {/each}
+
+    <!-- Plugin pages (`main.nav` extensions), after the built-in entries -->
+    {#each pluginNav as item (item.id)}
+      <NavLink
+        id="nav-{item.id}"
+        icon={resolvePluginIcon(item.icon, IconPuzzle)}
+        label={item.label}
+        href={item.href}
+        isActive={$currentRoute.view === 'plugin-page' &&
+          $currentRoute.params.plugin === item.pluginName &&
+          $currentRoute.params.extension === item.extensionId}
         expanded={$uiStore.navExpanded}
         onclick={closePopoverSurface}
       />

@@ -11,23 +11,25 @@ export const extensions = {
 
 /**
  * Load extensions from the API
+ * @param {{ quiet?: boolean }} [options] quiet: don't log failures, e.g. when every page
+ *   loads extensions for the sidebar and plugins are disabled on this instance.
  * @returns {Promise<any>}
  */
-export async function loadExtensions() {
+export async function loadExtensions({ quiet = false } = {}) {
   try {
     const response = await fetch('/api/plugins/extensions', {
       credentials: 'include',
     });
 
     if (!response.ok) {
-      console.error('Failed to load extensions:', response.statusText);
+      if (!quiet) console.error('Failed to load extensions:', response.statusText);
       return;
     }
 
     extensionsData = await response.json();
     return extensionsData;
   } catch (error) {
-    console.error('Error loading extensions:', error);
+    if (!quiet) console.error('Error loading extensions:', error);
   }
 }
 

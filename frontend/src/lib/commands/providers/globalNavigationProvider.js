@@ -1,4 +1,6 @@
 import { bottomNavItems, mainNavItems } from '../../navigation/mainNavigation.js';
+import { pluginNavItems } from '../../navigation/pluginNavigation.js';
+import { extensions } from '../../stores/extensions.svelte.js';
 import { BUCKET } from '../buckets.js';
 import { createCommand } from '../types.js';
 
@@ -43,6 +45,20 @@ export function globalNavigationProvider(ctx) {
         description: '',
         bucket: BUCKET.GLOBAL_NAVIGATION,
         keywords: [item.id],
+        url: item.href,
+      })
+    );
+  }
+
+  // Plugin pages from `main.nav` extensions (hydrated by the sidebar and CommandPalette)
+  for (const item of pluginNavItems(extensions.value)) {
+    out.push(
+      createCommand({
+        id: `nav-${item.id}`,
+        label: item.label,
+        description: item.description || '',
+        bucket: BUCKET.GLOBAL_NAVIGATION,
+        keywords: ['plugin', item.pluginName, item.extensionId],
         url: item.href,
       })
     );
