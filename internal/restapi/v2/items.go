@@ -26,13 +26,14 @@ type idBatchRequest struct {
 // workspace_id/collection_id/sub_ql mirror the list endpoint's scope; the
 // server resolves the QL so the caller cannot widen it.
 type itemHierarchyRequest struct {
-	RootIDs      []int  `json:"root_ids"`
-	WorkspaceID  *int   `json:"workspace_id"`
-	CollectionID *int   `json:"collection_id"`
-	QL           string `json:"ql"`
-	SubQL        string `json:"sub_ql"`
-	MaxDepth     int    `json:"max_depth"`
-	PerRootLimit int    `json:"per_root_limit"`
+	RootIDs       []int  `json:"root_ids"`
+	WorkspaceID   *int   `json:"workspace_id"`
+	CollectionID  *int   `json:"collection_id"`
+	QL            string `json:"ql"`
+	SubQL         string `json:"sub_ql"`
+	MaxDepth      int    `json:"max_depth"`
+	PerRootLimit  int    `json:"per_root_limit"`
+	PerRootOffset int    `json:"per_root_offset"`
 }
 
 type itemListMeta struct {
@@ -208,16 +209,17 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 		if err != nil {
 			return nil, err
 		}
-		if input.MaxDepth < 0 || input.PerRootLimit < 0 {
+		if input.MaxDepth < 0 || input.PerRootLimit < 0 || input.PerRootOffset < 0 {
 			return nil, invalidQuery("max_depth")
 		}
 		request := services.ItemHierarchyRequest{
-			UserID:       user.ID,
-			QL:           input.QL,
-			SubQL:        input.SubQL,
-			RootIDs:      rootIDs,
-			MaxDepth:     input.MaxDepth,
-			PerRootLimit: input.PerRootLimit,
+			UserID:        user.ID,
+			QL:            input.QL,
+			SubQL:         input.SubQL,
+			RootIDs:       rootIDs,
+			MaxDepth:      input.MaxDepth,
+			PerRootLimit:  input.PerRootLimit,
+			PerRootOffset: input.PerRootOffset,
 		}
 		if input.WorkspaceID != nil {
 			request.WorkspaceID = *input.WorkspaceID

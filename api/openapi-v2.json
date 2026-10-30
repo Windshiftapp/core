@@ -74976,6 +74976,10 @@
             "description": "The per root limit value.",
             "type": "integer"
           },
+          "per_root_offset": {
+            "description": "The per root offset value.",
+            "type": "integer"
+          },
           "ql": {
             "description": "The ql value.",
             "type": "string"
@@ -75000,6 +75004,7 @@
         "required": [
           "max_depth",
           "per_root_limit",
+          "per_root_offset",
           "ql",
           "root_ids",
           "sub_ql"

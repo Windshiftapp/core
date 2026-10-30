@@ -763,6 +763,7 @@ type HierarchyListParams struct {
 	RootIDs          []int
 	MaxDepth         int
 	PerRootLimit     int
+	PerRootOffset    int
 	OmitDescriptions bool
 }
 
@@ -790,6 +791,7 @@ func (s *ItemCRUDService) HierarchyDescendantsContext(ctx context.Context, param
 		Filters:          filters,
 		MaxDepth:         params.MaxDepth,
 		PerRootLimit:     params.PerRootLimit,
+		PerRootOffset:    params.PerRootOffset,
 		OmitDescriptions: params.OmitDescriptions,
 	})
 }

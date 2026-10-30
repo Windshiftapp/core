@@ -320,14 +320,15 @@ func (s *ItemApplicationService) decorateHasChildren(ctx context.Context, worksp
 // level-scoped base page. The collection/QL scope is resolved server-side, so
 // the caller cannot widen it.
 type ItemHierarchyRequest struct {
-	UserID       int
-	WorkspaceID  int
-	CollectionID int
-	QL           string
-	SubQL        string
-	RootIDs      []int
-	MaxDepth     int
-	PerRootLimit int
+	UserID        int
+	WorkspaceID   int
+	CollectionID  int
+	QL            string
+	SubQL         string
+	RootIDs       []int
+	MaxDepth      int
+	PerRootLimit  int
+	PerRootOffset int
 }
 
 // Hierarchy returns the matching descendants of each requested root, grouped by
@@ -355,6 +356,7 @@ func (s *ItemApplicationService) Hierarchy(ctx context.Context, request ItemHier
 		RootIDs:          request.RootIDs,
 		MaxDepth:         request.MaxDepth,
 		PerRootLimit:     request.PerRootLimit,
+		PerRootOffset:    request.PerRootOffset,
 		OmitDescriptions: true,
 	})
 	if err != nil {

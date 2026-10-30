@@ -25,6 +25,7 @@ type HierarchyReadParams struct {
 	Filters          ItemFilters
 	MaxDepth         int // 0 = unlimited
 	PerRootLimit     int // <=0 = default 100
+	PerRootOffset    int // skip this many matching descendants per root
 	OmitDescriptions bool
 }
 
@@ -139,6 +140,10 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 	if perRoot > 1000 {
 		perRoot = 1000
 	}
+	perRootOffset := params.PerRootOffset
+	if perRootOffset < 0 {
+		perRootOffset = 0
+	}
 
 	rootPlaceholders := strings.TrimSuffix(strings.Repeat("?,", len(params.RootIDs)), ",")
 	wsPlaceholders := strings.TrimSuffix(strings.Repeat("?,", len(params.WorkspaceIDs)), ",")
@@ -164,7 +169,7 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		qlClause = " AND (" + ql + ")"
 		args = append(args, params.Filters.QLArgs...)
 	}
-	args = append(args, perRoot)
+	args = append(args, perRootOffset, perRootOffset+perRoot)
 
 	query := "WITH RECURSIVE tree(root_id, id, depth) AS (" +
 		" SELECT i.id, i.id, 0 FROM items i WHERE i.id IN (" + rootPlaceholders +
@@ -179,7 +184,7 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		" FROM tree t JOIN items i ON i.id = t.id" +
 		" WHERE t.depth > 0 AND i.workspace_id IN (" + wsPlaceholders + ")" + qlClause +
 		"), page AS (" +
-		" SELECT root_id, id, depth, root_total FROM ranked WHERE rn <= ?" +
+		" SELECT root_id, id, depth, root_total FROM ranked WHERE rn > ? AND rn <= ?" +
 		") " +
 		itemListSelectClause(params.OmitDescriptions) +
 		", page.root_id AS hierarchy_root_id, page.depth AS hierarchy_depth, page.root_total AS hierarchy_root_total " +
