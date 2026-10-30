@@ -9,7 +9,7 @@ import (
 
 // ApplyForegroundGrad colors each visible rune of s with a linearly
 // interpolated color between from and to. Whitespace and ANSI sequences are
-// passed through. Good for short labels (logo wordmark, header) — for body
+// passed through. Good for short labels (splash wordmark, header) — for body
 // text the per-rune render cost adds up.
 func ApplyForegroundGrad(base lipgloss.Style, s string, from, to color.Color) string {
 	runes := []rune(s)
