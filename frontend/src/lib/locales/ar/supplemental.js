@@ -346,11 +346,6 @@ export default {
     }
   },
   "testing": {
-    "generateWithAI": "الإنشاء باستخدام الذكاء الاصطناعي",
-    "overwriteDescriptionTitle": "هل تريد الكتابة فوق الوصف؟",
-    "overwriteDescriptionConfirm": "هل تريد استبدال الوصف الحالي بملخص تم إنشاؤه بواسطة الذكاء الاصطناعي؟",
-    "overwrite": "الكتابة فوق",
-    "generateFailed": "فشل إنشاء الوصف.",
     "actualResult": "النتيجة الفعلية",
     "editTestPlan": "تحرير خطة الاختبار",
     "execute": "تنفيذ",

@@ -348,11 +348,6 @@ export default {
     }
   },
   "testing": {
-    "generateWithAI": "使用 AI 生成",
-    "overwriteDescriptionTitle": "覆盖描述？",
-    "overwriteDescriptionConfirm": "用 AI 生成的摘要替换现有描述？",
-    "overwrite": "覆盖",
-    "generateFailed": "无法生成描述。",
     "actualResult": "实际结果",
     "editTestPlan": "编辑测试计划",
     "execute": "执行",
