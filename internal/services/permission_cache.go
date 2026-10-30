@@ -819,17 +819,17 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	if err != nil {
 		return nil, err
 	}
-	// Memberships and role assignments are still loaded for system admins so
-	// user_in_group and user_in_role conditions resolve against real data.
-	// Admins bypass permission checks, so the remaining permission grants are
-	// only loaded for non-admins.
-	if err := builder.loadGroupMemberships(); err != nil {
-		return nil, err
-	}
-	if err := builder.loadUserRoleAssignments(); err != nil {
-		return nil, err
-	}
+	// Admins bypass permission checks and return early, but their snapshot still
+	// carries group memberships and role assignments so user_in_group and
+	// user_in_role conditions resolve against real data. Non-admins load the
+	// same data once below, alongside the rest of their grants.
 	if isAdmin {
+		if err := builder.loadGroupMemberships(); err != nil {
+			return nil, err
+		}
+		if err := builder.loadUserRoleAssignments(); err != nil {
+			return nil, err
+		}
 		return builder.cached, nil
 	}
 	// The Everyone fallback is shared across users. Rebuild it here so a workspace
