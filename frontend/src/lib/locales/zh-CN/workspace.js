@@ -410,6 +410,12 @@ export default {
     rangeNone: '无',
   },
 
+  collectionHierarchy: {
+    selectLevel: '选择层级',
+    levelN: '层级 {level}',
+    itemsCount: '{count} 项',
+  },
+
   collectionTree: {
     loading: '加载中...',
     tree: '树形',

@@ -1,5 +1,5 @@
 import { items as itemsApi } from '../api/items.js';
-import { collectionStore } from '../stores/collectionContext.svelte.js';
+import { collectionStore } from '../stores/collectionContext.js';
 
 const DEFAULT_PER_ROOT_LIMIT = 100;
 
@@ -177,6 +177,7 @@ export function useCollectionHierarchy({
         perRootOffset: 0,
       });
       const next = { ...overlayByRoot };
+      const nextLoaded = new Set(loadedRoots);
       for (const group of groups) {
         const offset = offsetByRoot[group.root_id];
         const existing = offset != null ? (next[group.root_id]?.items ?? []) : [];
@@ -185,9 +186,15 @@ export function useCollectionHierarchy({
           total: group.total ?? 0,
           hasMore: group.has_more === true,
         };
+        nextLoaded.add(group.root_id);
+        // A complete unlimited-depth fetch contains every descendant subtree,
+        // so those nodes are already loaded and must not refetch on expand.
+        if (!group.has_more && getMaxDepth() === 0) {
+          for (const entry of group.items ?? []) nextLoaded.add(entry.id);
+        }
       }
       overlayByRoot = next;
-      loadedRoots = new Set([...loadedRoots, ...ids]);
+      loadedRoots = nextLoaded;
     } catch (error) {
       console.error('[useCollectionHierarchy] failed to load descendants:', error);
     } finally {
@@ -313,6 +320,9 @@ export function useCollectionHierarchy({
     },
     get baseItems() {
       return baseItems;
+    },
+    get expandedCount() {
+      return expanded.size;
     },
     getChildren,
     hasChildren,

@@ -505,6 +505,12 @@ export default {
     rangeNone: 'Aucun',
   },
 
+  collectionHierarchy: {
+    selectLevel: 'Sélectionner le niveau hiérarchique',
+    levelN: 'Niveau {level}',
+    itemsCount: '{count} éléments',
+  },
+
   collectionTree: {
     loading: 'Chargement...',
     tree: 'Arborescence',

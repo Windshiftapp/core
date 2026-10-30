@@ -633,6 +633,12 @@ export default {
     rangeNone: 'None',
   },
 
+  collectionHierarchy: {
+    selectLevel: 'Select hierarchy level',
+    levelN: 'Level {level}',
+    itemsCount: '{count} items',
+  },
+
   collectionTree: {
     loading: 'Loading...',
     tree: 'Tree',

@@ -71,6 +71,12 @@ export default {
     itemCount: '{count} элементов',
     itemCount_one: '{count} элемент', itemCount_few: '{count} элемента', itemCount_many: '{count} элементов', itemCount_other: '{count} элемента', assignedToMe: 'Назначено мне', noAssignedWork: 'Назначенной работы нет', assignedItemsWillAppear: 'Назначенные вам рабочие элементы появятся здесь.', ofAssignedItemsRemaining: 'Осталось назначенных элементов: {count} из {total}', task: 'Задача', dueDate: 'Срок', progress: 'Ход выполнения', doneFilterLabel: 'История завершённых задач', completedHistoryHint: 'Открытые задачи показываются всегда.', customDateLabel: 'Начиная с', customDateAriaLabel: 'Показывать задачи, завершённые после даты', range7d: 'Последние 7 дней', range30d: 'Последние 30 дней', range90d: 'Последние 90 дней', rangeAll: 'За всё время', rangeNone: 'Нет',
   },
+  collectionHierarchy: {
+    selectLevel: 'Выберите уровень иерархии',
+    levelN: 'Уровень {level}',
+    itemsCount: '{count} элементов',
+  },
+
   collectionTree: {
     loading: 'Загрузка…', tree: 'Дерево', noWorkItemsYet: 'Рабочих элементов пока нет', createFirstWorkItem: 'Создайте первый рабочий элемент, чтобы увидеть дерево иерархии.', expandAll: 'Развернуть всё', collapseAll: 'Свернуть всё', showTests: 'Показать тесты', hideTests: 'Скрыть тесты', showingRootItems: 'Элементы верхнего уровня: {start}–{end} из {total}', page: 'Страница', pageOfTotal: 'Страница {current} из {total}', itemKey: 'Ключ элемента', noStatus: 'Без статуса', workspaceNotFound: 'Рабочее пространство не найдено.',
   },

@@ -1,6 +1,5 @@
 <script>
   import { onMount, untrack } from 'svelte';
-  import { items as itemsApi } from '../../api/items.js';
   import {
     applyCollectionItem,
     collectionStore,
@@ -35,24 +34,14 @@
   } from '../../utils/workItemListColumns.js';
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
-  import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
+  import CollectionLevelFilter from './CollectionLevelFilter.svelte';
+  import ItemKey from '../../components/ItemKey.svelte';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
-  import {
-    findOrphansByMissingParent,
-    indexCollectionHierarchy,
-    mergeAncestorContext,
-  } from './collectionHierarchy.js';
+  import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
 
   let workspace = $derived(workspaceDataStore.workspace);
-  // Items as loaded from the collection store, plus fetched ancestor context.
-  let storeItems = $state([]);
-  // Missing parent id -> ancestor chain (root -> parent). Fills gaps left by
-  // pagination and the completed filter so hierarchies stay whole.
-  let ancestorsByParent = $state({});
-  let ancestorsRequestInFlight = false;
-  let ancestorsRerunPending = false;
   let itemTypes = $derived(workspaceDataStore.itemTypes);
   let statuses = $derived(workspaceDataStore.statuses);
   let statusCategories = $derived(workspaceDataStore.statusCategories);
@@ -66,15 +55,20 @@
   // Shown fields come from the same list-column configuration as the list view.
   const columnConfig = useListColumnConfig(() => ({ workspaceId, collectionId }));
   let listColumns = $derived(columnConfig.columns);
+  // Shared lazy hierarchy: the store owns the level-scoped base page and this
+  // owns the subtrees below it.
+  const hierarchy = useCollectionHierarchy({
+    getWorkspaceId: () => workspaceId ?? null,
+    getCollectionId: () => collectionId ?? null,
+    getMaxDepth: () => 0,
+    getSubFilterQL: () => collectionStore.effectiveSubFilterQL,
+  });
+  let allItems = $derived(hierarchy.allItems);
+  let hierarchyIndex = $derived(hierarchy.hierarchyIndex);
+  let loadedItemIds = $derived(new Set(allItems.map((item) => item.id)));
+
   let loading = $state(true);
   let currentCollectionName = $state('Default');
-  let expandedItems = $state(new Set()); // Track which items are expanded
-  let allItems = $derived(
-    [...mergeAncestorContext(storeItems, ancestorsByParent)].sort(
-      (a, b) => a.level - b.level || a.id - b.id
-    )
-  );
-  let hierarchyIndex = $derived(indexCollectionHierarchy(allItems));
   // Filter-scoped item total from the server: everything the tree contains
   // across all pages, independent of expansion state or the loaded page.
   // Drives the header's "N shown" so it cannot be misread as per-page count.
@@ -124,24 +118,8 @@
     await loadData();
   });
 
-  // Sync items from central store, then reset expansion to the all-roots
-  // default for the new page. Ancestors fetched later expand themselves in
-  // syncAncestorContext so their children stay visible.
-  // Inline edits patch single rows; those keep the current expansion.
-  let loadedItemIdsSignature = null;
   $effect(() => {
-    if (!collectionStore.loading && collectionStore.items.length >= 0) {
-      currentCollectionName = collectionStore.collectionName;
-      const items = [...collectionStore.items].sort((a, b) => a.level - b.level || a.id - b.id);
-      storeItems = items;
-      const signature = items.map((item) => item.id).join(',');
-      if (signature === loadedItemIdsSignature) return;
-      loadedItemIdsSignature = signature;
-      untrack(() => {
-        const rootItems = getRootItems();
-        expandedItems = new Set(rootItems.filter(i => hasChildren(i.id)).map(i => i.id));
-      });
-    }
+    currentCollectionName = collectionStore.collectionName;
   });
 
   // Prime the row-editor cache from the shared workspace store so opening a
@@ -199,68 +177,6 @@
     errorToast(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
   }
 
-  // Load ancestor chains for items whose parent is not on the loaded page so
-  // filtered or paginated children do not render as stray roots.
-  $effect(() => {
-    const items = storeItems;
-    untrack(() => void syncAncestorContext(items));
-  });
-
-  async function syncAncestorContext(items) {
-    const orphansByParent = findOrphansByMissingParent(items);
-    const neededParents = new Set(orphansByParent.keys());
-
-    // Drop cached chains whose gap the store has since filled itself.
-    const kept = {};
-    let pruned = false;
-    for (const [parentId, chain] of Object.entries(ancestorsByParent)) {
-      if (neededParents.has(Number(parentId))) {
-        kept[parentId] = chain;
-      } else {
-        pruned = true;
-      }
-    }
-    if (pruned) ancestorsByParent = kept;
-
-    const parentByOrphanId = new Map();
-    for (const [parentId, orphans] of orphansByParent) {
-      parentByOrphanId.set(orphans[0].id, parentId);
-    }
-    const orphanIds = [...parentByOrphanId.keys()].filter(
-      (orphanId) => !kept[String(parentByOrphanId.get(orphanId))]
-    );
-    if (orphanIds.length === 0) return;
-    if (ancestorsRequestInFlight) {
-      // A newer page may need different chains; rerun when the current
-      // request settles.
-      ancestorsRerunPending = true;
-      return;
-    }
-    ancestorsRequestInFlight = true;
-    try {
-      const entries = await itemsApi.getManyAncestors(orphanIds);
-      for (const { item_id: orphanId, ancestors } of entries) {
-        // The gap may have closed while the request was in flight.
-        const parentId = parentByOrphanId.get(orphanId);
-        if (!ancestors?.length || parentId == null || !neededParents.has(parentId)) continue;
-        ancestorsByParent = { ...ancestorsByParent, [String(parentId)]: ancestors };
-        // Keep previously visible children visible under their new parents.
-        for (const ancestor of ancestors) {
-          expandedItems.add(ancestor.id);
-        }
-      }
-      expandedItems = new Set(expandedItems);
-    } catch (error) {
-      console.error('[CollectionTree] Failed to load ancestor context:', error);
-    } finally {
-      ancestorsRequestInFlight = false;
-    }
-    if (ancestorsRerunPending) {
-      ancestorsRerunPending = false;
-      await syncAncestorContext(storeItems);
-    }
-  }
-
   async function loadData() {
     loading = true;
     if (workspaceId) {
@@ -282,48 +198,30 @@
     }
   });
 
-  function getItemsByParent(parentId) {
-    return hierarchyIndex.childrenByParent.get(parentId) || [];
-  }
+  const getItemsByParent = (parentId) => hierarchy.getChildren(parentId);
+  const getRootItems = () => hierarchy.roots;
+  const hasChildren = (itemId) => hierarchy.hasChildren(itemId);
+  const toggleExpanded = (itemId) => hierarchy.toggleExpanded(itemId);
+  const isExpanded = (itemId) => hierarchy.isExpanded(itemId);
+  const collapseAll = () => hierarchy.collapseAll();
+  const expandAll = () => hierarchy.expandAll();
 
-  function getRootItems() {
-    return hierarchyIndex.roots;
-  }
-
-  function hasChildren(itemId) {
-    return hierarchyIndex.childrenByParent.has(itemId);
-  }
-
-  function toggleExpanded(itemId) {
-    if (expandedItems.has(itemId)) {
-      expandedItems.delete(itemId);
-    } else {
-      expandedItems.add(itemId);
-    }
-    expandedItems = new Set(expandedItems);
-  }
-
-  function isExpanded(itemId) {
-    return expandedItems.has(itemId);
-  }
-
-  function collapseAll() {
-    expandedItems.clear();
-    expandedItems = new Set(expandedItems);
-  }
-
-  function expandAll() {
-    // Expand all items that have children
-    allItems.forEach(item => {
-      if (hasChildren(item.id)) {
-        expandedItems.add(item.id);
-      }
-    });
-    expandedItems = new Set(expandedItems);
+  // A row shows a parent reference when its real parent is not drawn in the
+  // tree: base-level rows (parent above the picked level) and flattened rows
+  // (parent filtered out). Replaces the old synthetic ancestor row (GH #271).
+  function parentReference(item) {
+    if (item.parent_id == null || loadedItemIds.has(item.parent_id)) return null;
+    return {
+      id: item.parent_id,
+      workspace_id: item.workspace_id,
+      workspace_key: item.workspace_key,
+      workspace_item_number: item.parent_workspace_item_number,
+      title: item.parent_title,
+    };
   }
 
   function toggleExpandCollapse() {
-    if (expandedItems.size === 0) {
+    if (hierarchy.expandedCount === 0) {
       expandAll();
     } else {
       collapseAll();
@@ -405,9 +303,20 @@
         });
       }
 
-      // Show children if the current item is expanded
+      // Show children if the current item is expanded, then a per-root
+      // continuation when the subtree exceeded the per-root cap.
       if (isExpanded(item.id)) {
         renderTreeItems(item.id, level + 1, result);
+        if (hierarchy.hasMore(item.id)) {
+          result.push({
+            id: `more-${item.id}`,
+            level: level + 1,
+            isLoadMore: true,
+            loadMoreFor: item.id,
+            remaining: hierarchy.remaining(item.id),
+            loading: hierarchy.isLoading(item.id),
+          });
+        }
       }
     }
 
@@ -433,6 +342,21 @@
   let gridTemplateColumns = $derived(`${hierarchyWidth}rem ${listGridTemplateColumns(listColumns)}`);
   let gridMinWidth = $derived(`calc(${listGridMinWidth(listColumns)} + ${hierarchyWidth + 1}rem)`);
 </script>
+
+{#snippet parentChip({ item })}
+  {@const parent = parentReference(item)}
+  {#if parent}
+    <span class="inline-flex items-center gap-0.5 flex-shrink-0" title={parent.title || ''}>
+      <ItemKey
+        item={parent}
+        variant="badge"
+        size="compact"
+        dataTestid={`tree-parent-${item.id}`}
+      />
+      <span class="text-xs" style="color: var(--ds-text-subtle);">›</span>
+    </span>
+  {/if}
+{/snippet}
 
 {#if loading}
   <div class="p-6">
@@ -460,6 +384,7 @@
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
           <SubFilterBar {workspaceId} {collectionId} />
+          <CollectionLevelFilter {workspaceId} {collectionId} view="tree" />
         </div>
         <div class="flex items-center gap-2">
           <ColumnSelector
@@ -487,7 +412,7 @@
               style="{styles.glassStyle(12)} {styles.glassTextStyle}"
               onclick={toggleExpandCollapse}
             >
-              {#if expandedItems.size === 0}
+              {#if hierarchy.expandedCount === 0}
                 <ChevronDown class="w-4 h-4" />
                 {t('collectionTree.expandAll')}
               {:else}
@@ -529,8 +454,40 @@
 
           <!-- Tree Items -->
           <div style="--divide-color: var(--ds-border);">
-            {#each treeData as item, idx (item.isTestCase ? `tc-${item.id}` : `item-${item.id}`)}
-            {#if item.isTestCase}
+            {#each treeData as item, idx (item.isLoadMore ? item.id : item.isTestCase ? `tc-${item.id}` : `item-${item.id}`)}
+            {#if item.isLoadMore}
+              <!-- Per-root continuation when a subtree exceeded the cap -->
+              <div
+                class="grid gap-4 items-center px-4 py-2.5"
+                style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
+                data-testid={`tree-load-more-${item.loadMoreFor}`}
+              >
+                <div></div>
+                {#each listColumns as column (column.field_identifier)}
+                  <div
+                    class="min-w-0 overflow-hidden"
+                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                  >
+                    {#if column.field_identifier === indentColumnId}
+                      <button
+                        type="button"
+                        class="text-sm transition-colors cursor-pointer"
+                        style="color: var(--ds-interactive);"
+                        disabled={item.loading}
+                        data-testid={`tree-load-more-button-${item.loadMoreFor}`}
+                        onclick={() => hierarchy.loadMore(item.loadMoreFor)}
+                      >
+                        {item.loading ? t('common.loading') : t('common.loadMore')}
+                        {#if item.remaining > 0}
+                          ({item.remaining} {t('common.remaining')})
+                        {/if}
+                      </button>
+                    {/if}
+                  </div>
+                {/each}
+                <div></div>
+              </div>
+            {:else if item.isTestCase}
               <!-- Test Case Row -->
               <div
                 class="grid gap-4 items-center px-4 py-2.5 transition-colors group bg-ds-success-subtle/30 hover:bg-ds-success-subtle/50"
@@ -616,6 +573,7 @@
                       {item}
                       {column}
                       {workspace}
+                      titleLeading={parentChip}
                       canEdit={workspacePermissions.canEdit(item.workspace_id)}
                       {statuses}
                       {statusCategories}
@@ -639,8 +597,6 @@
       </div>
 
       {/if}
-
-      <CollectionHierarchyLoadMore testid="tree-load-more" />
   </StaticViewBackground>
 {:else}
   <div class="p-6">

@@ -44,6 +44,7 @@
     customFieldDefinitions = [],
     onitemUpdated = undefined,
     onupdateError = undefined,
+    titleLeading = null,
   } = $props();
 
   // Get the field definition for custom fields
@@ -132,6 +133,7 @@
   {:else if column.field_identifier === 'title'}
     <!-- Title with type icon -->
     <div class="flex items-center gap-2 min-w-0">
+      {#if titleLeading}{@render titleLeading({ item })}{/if}
       {#if item.item_type_icon || item.item_type_id}
         {@const itemType = item.item_type_id
           ? itemTypes.find((type) => type.id === item.item_type_id) ?? null

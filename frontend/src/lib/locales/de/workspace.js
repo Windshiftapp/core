@@ -410,6 +410,12 @@ export default {
     deleteTask: 'Aufgabe löschen',
     failedToDelete: 'Aufgabe konnte nicht gelöscht werden',
   },
+  collectionHierarchy: {
+    selectLevel: 'Hierarchieebene auswählen',
+    levelN: 'Ebene {level}',
+    itemsCount: '{count} Einträge',
+  },
+
   collectionTree: {
     loading: 'Wird geladen...',
     tree: 'Hierarchie',
