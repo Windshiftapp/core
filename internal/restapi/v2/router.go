@@ -1257,6 +1257,15 @@ func applyParameterCorrections(route *Route) {
 	case "GET /items":
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
+		upsertParameter(route, booleanQuery("include_has_children", "Attach has_children to each row, true when the caller can view at least one child. Values true and 1 enable; omitted or other values leave the payload unchanged.", false))
+	case "GET /items/level-counts":
+		route.Tag = "Work items"
+		route.Summary = "Count visible items per hierarchy level"
+		route.Description = "Returns the filtered item count for each item-type hierarchy level, applying the same collection, sub-filter, and workspace scope as the item list. Sub-task (-1) is reported but is not a valid level-picker root."
+	case "POST /items/hierarchy":
+		route.Tag = "Work items"
+		route.Summary = "Read the hierarchy below a set of roots"
+		route.Description = "Returns the matching descendants of up to 500 root items, grouped by root and capped per root. The collection and sub-filter apply to the descendants; the recursive walk is not pruned by the filter, so a matching descendant under a filtered-out intermediate is still returned. Rows are ordered breadth-first so a truncated root keeps complete shallow levels. Inaccessible items and cross-workspace descendants the caller cannot view are omitted."
 	case "POST /milestones/{milestone_id}/release":
 		upsertParameter(route, ParameterMetadata{Name: "Idempotency-Key", In: "header", Description: "Caller-generated key that makes retries return the original release result.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /openapi.json":

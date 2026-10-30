@@ -33,19 +33,20 @@ type ItemIssueSync interface {
 }
 
 type ItemListRequest struct {
-	WorkspaceIDs     []int
-	UserID           int
-	WorkspaceID      int
-	CollectionID     int
-	QL               string
-	SubQL            string
-	Filters          ItemFilters
-	Pagination       PaginationParams
-	SortBy           string
-	SortAsc          bool
-	OmitDescriptions bool
-	IncludeWatermark bool
-	ExcludePersonal  bool
+	WorkspaceIDs       []int
+	UserID             int
+	WorkspaceID        int
+	CollectionID       int
+	QL                 string
+	SubQL              string
+	Filters            ItemFilters
+	Pagination         PaginationParams
+	SortBy             string
+	SortAsc            bool
+	OmitDescriptions   bool
+	IncludeWatermark   bool
+	IncludeHasChildren bool
+	ExcludePersonal    bool
 }
 
 type ItemListResult struct {
@@ -273,6 +274,11 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 	if err := s.enrich(ctx, request.UserID, page.Items); err != nil {
 		return ItemListResult{}, err
 	}
+	if request.IncludeHasChildren {
+		if err := s.decorateHasChildren(ctx, workspaceIDs, page.Items); err != nil {
+			return ItemListResult{}, err
+		}
+	}
 
 	var watermark int64
 	if request.IncludeWatermark {
@@ -285,6 +291,137 @@ func (s *ItemApplicationService) List(ctx context.Context, request ItemListReque
 		Items: page.Items, Total: page.Total, NextCursor: page.NextCursor,
 		Watermark: watermark, SortableFields: repository.SystemSortableFieldKeys(),
 	}, nil
+}
+
+// decorateHasChildren sets HasChildren on the page rows from one batched,
+// permission-scoped lookup so a hierarchy view can render expanders before it
+// loads any subtree.
+func (s *ItemApplicationService) decorateHasChildren(ctx context.Context, workspaceIDs []int, items []models.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	withChildren, err := s.items.HasChildrenByItemIDContext(ctx, ids, workspaceIDs)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if _, ok := withChildren[items[i].ID]; ok {
+			items[i].HasChildren = true
+		}
+	}
+	return nil
+}
+
+// ItemHierarchyRequest describes an ancestor-scoped hierarchy read for one
+// level-scoped base page. The collection/QL scope is resolved server-side, so
+// the caller cannot widen it.
+type ItemHierarchyRequest struct {
+	UserID       int
+	WorkspaceID  int
+	CollectionID int
+	QL           string
+	SubQL        string
+	RootIDs      []int
+	MaxDepth     int
+	PerRootLimit int
+}
+
+// Hierarchy returns the matching descendants of each requested root, grouped by
+// root. Items the caller cannot view are excluded by the repository scope.
+func (s *ItemApplicationService) Hierarchy(ctx context.Context, request ItemHierarchyRequest) ([]repository.HierarchyRootGroup, error) {
+	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if request.WorkspaceID > 0 {
+		workspaceIDs = slices.DeleteFunc(workspaceIDs, func(id int) bool {
+			return id != request.WorkspaceID
+		})
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
+		return nil, err
+	}
+	groups, err := s.crud.HierarchyDescendantsContext(ctx, HierarchyListParams{
+		WorkspaceID:      request.WorkspaceID,
+		CollectionID:     request.CollectionID,
+		QLQuery:          request.QL,
+		SubQLQuery:       request.SubQL,
+		WorkspaceIDs:     workspaceIDs,
+		UserID:           request.UserID,
+		RootIDs:          request.RootIDs,
+		MaxDepth:         request.MaxDepth,
+		PerRootLimit:     request.PerRootLimit,
+		OmitDescriptions: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.decorateHierarchyGroups(ctx, request.UserID, workspaceIDs, groups)
+}
+
+// decorateHierarchyGroups enriches every returned descendant and marks
+// HasChildren so deeper expanders render without another round trip.
+func (s *ItemApplicationService) decorateHierarchyGroups(ctx context.Context, userID int, workspaceIDs []int, groups []repository.HierarchyRootGroup) ([]repository.HierarchyRootGroup, error) {
+	flat := make([]models.Item, 0)
+	for _, group := range groups {
+		for _, entry := range group.Items {
+			flat = append(flat, entry.Item)
+		}
+	}
+	if len(flat) == 0 {
+		return groups, nil
+	}
+	if err := s.enrich(ctx, userID, flat); err != nil {
+		return nil, err
+	}
+	if err := s.decorateHasChildren(ctx, workspaceIDs, flat); err != nil {
+		return nil, err
+	}
+	enriched := make(map[int]models.Item, len(flat))
+	for _, item := range flat {
+		enriched[item.ID] = item
+	}
+	for gi := range groups {
+		for ii := range groups[gi].Items {
+			if item, ok := enriched[groups[gi].Items[ii].ID]; ok {
+				groups[gi].Items[ii].Item = item
+			}
+		}
+	}
+	return groups, nil
+}
+
+// LevelCounts returns the filtered item count per item-type hierarchy level,
+// backing the level picker's counts and default selection.
+func (s *ItemApplicationService) LevelCounts(ctx context.Context, request ItemListRequest) ([]repository.HierarchyLevelCount, error) {
+	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(request.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if request.WorkspaceID > 0 {
+		workspaceIDs = slices.DeleteFunc(workspaceIDs, func(id int) bool {
+			return id != request.WorkspaceID
+		})
+	}
+	if err := s.requireCollectionRead(request.UserID, request.CollectionID, workspaceIDs); err != nil {
+		return nil, err
+	}
+	if len(workspaceIDs) == 0 {
+		return []repository.HierarchyLevelCount{}, nil
+	}
+	return s.crud.LevelCountsContext(ctx, ListWithQLParams{
+		WorkspaceID:  request.WorkspaceID,
+		CollectionID: request.CollectionID,
+		QLQuery:      request.QL,
+		SubQLQuery:   request.SubQL,
+		WorkspaceIDs: workspaceIDs,
+		UserID:       request.UserID,
+		Filters:      request.Filters,
+	})
 }
 
 func (s *ItemApplicationService) requireCollectionRead(userID, collectionID int, workspaceIDs []int) error {

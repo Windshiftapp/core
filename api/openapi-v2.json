@@ -10367,6 +10367,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -11669,6 +11673,10 @@
                   "description": "The frac index value.",
                   "nullable": true,
                   "type": "string"
+                },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
                 },
                 "id": {
                   "description": "The id value.",
@@ -13106,6 +13114,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -14312,6 +14324,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -15312,6 +15328,10 @@
                       "description": "The frac index value.",
                       "nullable": true,
                       "type": "string"
+                    },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
                     },
                     "id": {
                       "description": "The id value.",
@@ -16357,6 +16377,10 @@
                       "description": "The frac index value.",
                       "nullable": true,
                       "type": "string"
+                    },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
                     },
                     "id": {
                       "description": "The id value.",
@@ -17459,6 +17483,10 @@
                     "description": "The frac index value.",
                     "nullable": true,
                     "type": "string"
+                  },
+                  "has_children": {
+                    "description": "The has children value.",
+                    "type": "boolean"
                   },
                   "id": {
                     "description": "The id value.",
@@ -20582,6 +20610,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -21794,6 +21826,10 @@
                 "description": "The frac index value.",
                 "nullable": true,
                 "type": "string"
+              },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
               },
               "id": {
                 "description": "The id value.",
@@ -23393,6 +23429,41 @@
         ],
         "type": "object"
       },
+      "GetItemsLevelCountsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "description": "The level value.",
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "total": {
+                  "description": "The total value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "level",
+                "name",
+                "total"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetItemsResult": {
         "additionalProperties": false,
         "properties": {
@@ -23569,6 +23640,10 @@
                   "description": "The frac index value.",
                   "nullable": true,
                   "type": "string"
+                },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
                 },
                 "id": {
                   "description": "The id value.",
@@ -24595,6 +24670,10 @@
                   "description": "The frac index value.",
                   "nullable": true,
                   "type": "string"
+                },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
                 },
                 "id": {
                   "description": "The id value.",
@@ -42350,6 +42429,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -44927,6 +45010,10 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
+                    },
                     "id": {
                       "description": "The id value.",
                       "type": "integer"
@@ -45971,6 +46058,10 @@
                       "description": "The frac index value.",
                       "nullable": true,
                       "type": "string"
+                    },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
                     },
                     "id": {
                       "description": "The id value.",
@@ -47073,6 +47164,10 @@
                     "description": "The frac index value.",
                     "nullable": true,
                     "type": "string"
+                  },
+                  "has_children": {
+                    "description": "The has children value.",
+                    "type": "boolean"
                   },
                   "id": {
                     "description": "The id value.",
@@ -49242,6 +49337,10 @@
                 "description": "The frac index value.",
                 "nullable": true,
                 "type": "string"
+              },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
               },
               "id": {
                 "description": "The id value.",
@@ -54636,6 +54735,10 @@
                 "nullable": true,
                 "type": "string"
               },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
+              },
               "id": {
                 "description": "The id value.",
                 "type": "integer"
@@ -55840,6 +55943,10 @@
                 "description": "The frac index value.",
                 "nullable": true,
                 "type": "string"
+              },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
               },
               "id": {
                 "description": "The id value.",
@@ -70612,6 +70719,10 @@
                         "nullable": true,
                         "type": "string"
                       },
+                      "has_children": {
+                        "description": "The has children value.",
+                        "type": "boolean"
+                      },
                       "id": {
                         "description": "The id value.",
                         "type": "integer"
@@ -71637,6 +71748,10 @@
                   "description": "The frac index value.",
                   "nullable": true,
                   "type": "string"
+                },
+                "has_children": {
+                  "description": "The has children value.",
+                  "type": "boolean"
                 },
                 "id": {
                   "description": "The id value.",
@@ -72857,6 +72972,10 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
+                    },
                     "id": {
                       "description": "The id value.",
                       "type": "integer"
@@ -73995,6 +74114,10 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
+                    },
                     "id": {
                       "description": "The id value.",
                       "type": "integer"
@@ -74837,6 +74960,1086 @@
         ],
         "type": "object"
       },
+      "PostItemsHierarchyPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "collection_id": {
+            "description": "The collection id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "max_depth": {
+            "description": "The max depth value.",
+            "type": "integer"
+          },
+          "per_root_limit": {
+            "description": "The per root limit value.",
+            "type": "integer"
+          },
+          "ql": {
+            "description": "The ql value.",
+            "type": "string"
+          },
+          "root_ids": {
+            "description": "The root ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "sub_ql": {
+            "description": "The sub ql value.",
+            "type": "string"
+          },
+          "workspace_id": {
+            "description": "The workspace id value.",
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_depth",
+          "per_root_limit",
+          "ql",
+          "root_ids",
+          "sub_ql"
+        ],
+        "type": "object"
+      },
+      "PostItemsHierarchyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "has_more": {
+                  "description": "The has more value.",
+                  "type": "boolean"
+                },
+                "items": {
+                  "description": "The items value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "assignee_avatar": {
+                        "description": "The assignee avatar value.",
+                        "type": "string"
+                      },
+                      "assignee_email": {
+                        "description": "The assignee email value.",
+                        "type": "string"
+                      },
+                      "assignee_id": {
+                        "description": "The assignee id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "assignee_name": {
+                        "description": "The assignee name value.",
+                        "type": "string"
+                      },
+                      "calendar_data": {
+                        "description": "The calendar data value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "created_at": {
+                              "description": "The created at value.",
+                              "type": "string"
+                            },
+                            "duration_minutes": {
+                              "description": "The duration minutes value.",
+                              "type": "integer"
+                            },
+                            "notes": {
+                              "description": "The notes value.",
+                              "type": "string"
+                            },
+                            "scheduled_date": {
+                              "description": "The scheduled date value.",
+                              "type": "string"
+                            },
+                            "scheduled_time": {
+                              "description": "The scheduled time value.",
+                              "type": "string"
+                            },
+                            "user_id": {
+                              "description": "The user id value.",
+                              "type": "integer"
+                            },
+                            "workspace_id": {
+                              "description": "The workspace id value.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "created_at",
+                            "scheduled_date",
+                            "user_id",
+                            "workspace_id"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "channel_id": {
+                        "description": "The channel id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "channel_name": {
+                        "description": "The channel name value.",
+                        "type": "string"
+                      },
+                      "children": {
+                        "description": "The children value.",
+                        "items": {
+                          "description": "Nested resource reference.",
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "completed_at": {
+                        "description": "The completed at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "description": "The created at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "creator_customer_organisation_id": {
+                        "description": "The creator customer organisation id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "creator_customer_organisation_name": {
+                        "description": "The creator customer organisation name value.",
+                        "type": "string"
+                      },
+                      "creator_email": {
+                        "description": "The creator email value.",
+                        "type": "string"
+                      },
+                      "creator_id": {
+                        "description": "The creator id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "creator_name": {
+                        "description": "The creator name value.",
+                        "type": "string"
+                      },
+                      "creator_portal_customer_email": {
+                        "description": "The creator portal customer email value.",
+                        "type": "string"
+                      },
+                      "creator_portal_customer_id": {
+                        "description": "The creator portal customer id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "creator_portal_customer_name": {
+                        "description": "The creator portal customer name value.",
+                        "type": "string"
+                      },
+                      "custom_field_values": {
+                        "additionalProperties": {
+                          "description": "Arbitrary JSON extension value."
+                        },
+                        "description": "The custom field values value.",
+                        "type": "object"
+                      },
+                      "depth": {
+                        "description": "The depth value.",
+                        "type": "integer"
+                      },
+                      "description": {
+                        "description": "The description value.",
+                        "type": "string"
+                      },
+                      "description_html": {
+                        "description": "The description html value.",
+                        "type": "string"
+                      },
+                      "due_date": {
+                        "description": "The due date value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "effective_project_id": {
+                        "description": "The effective project id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "effective_project_name": {
+                        "description": "The effective project name value.",
+                        "type": "string"
+                      },
+                      "end_date": {
+                        "description": "The end date value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "estimate_minutes": {
+                        "description": "The estimate minutes value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "frac_index": {
+                        "description": "The frac index value.",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "has_children": {
+                        "description": "The has children value.",
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "incident": {
+                        "additionalProperties": false,
+                        "description": "The incident value.",
+                        "nullable": true,
+                        "properties": {
+                          "acknowledged_at": {
+                            "description": "The acknowledged at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "acknowledged_by": {
+                            "description": "The acknowledged by value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "acknowledged_by_name": {
+                            "description": "The acknowledged by name value.",
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "description": "The created at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "escalation_policy_id": {
+                            "description": "The escalation policy id value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "escalation_repeat_count": {
+                            "description": "The escalation repeat count value.",
+                            "type": "integer"
+                          },
+                          "escalation_step": {
+                            "description": "The escalation step value.",
+                            "type": "integer"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "item_id": {
+                            "description": "The item id value.",
+                            "type": "integer"
+                          },
+                          "item_key": {
+                            "description": "The item key value.",
+                            "type": "string"
+                          },
+                          "item_title": {
+                            "description": "The item title value.",
+                            "type": "string"
+                          },
+                          "next_escalation_at": {
+                            "description": "The next escalation at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "policy_name": {
+                            "description": "The policy name value.",
+                            "type": "string"
+                          },
+                          "resolved_at": {
+                            "description": "The resolved at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "resolved_by": {
+                            "description": "The resolved by value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "resolved_by_name": {
+                            "description": "The resolved by name value.",
+                            "type": "string"
+                          },
+                          "source": {
+                            "description": "The source value.",
+                            "type": "string"
+                          },
+                          "status": {
+                            "description": "The status value.",
+                            "type": "string"
+                          },
+                          "team_id": {
+                            "description": "The team id value.",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "team_name": {
+                            "description": "The team name value.",
+                            "type": "string"
+                          },
+                          "triggered_at": {
+                            "description": "The triggered at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "description": "The updated at value.",
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "urgency": {
+                            "description": "The urgency value.",
+                            "type": "string"
+                          },
+                          "workspace_id": {
+                            "description": "The workspace id value.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "created_at",
+                          "escalation_repeat_count",
+                          "escalation_step",
+                          "id",
+                          "item_id",
+                          "source",
+                          "status",
+                          "triggered_at",
+                          "updated_at",
+                          "urgency"
+                        ],
+                        "type": "object"
+                      },
+                      "incident_id": {
+                        "description": "The incident id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "inherit_project": {
+                        "description": "The inherit project value.",
+                        "type": "boolean"
+                      },
+                      "intake_id": {
+                        "description": "The intake id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "is_task": {
+                        "description": "Whether the item is a personal task. True is valid only in the authenticated caller's personal workspace and only with the Open or Done system status.",
+                        "type": "boolean"
+                      },
+                      "item_type_builtin_key": {
+                        "description": "The item type builtin key value.",
+                        "type": "string"
+                      },
+                      "item_type_color": {
+                        "description": "The item type color value.",
+                        "type": "string"
+                      },
+                      "item_type_icon": {
+                        "description": "The item type icon value.",
+                        "type": "string"
+                      },
+                      "item_type_id": {
+                        "description": "The item type id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "item_type_name": {
+                        "description": "The item type name value.",
+                        "type": "string"
+                      },
+                      "iteration_end_date": {
+                        "description": "The iteration end date value.",
+                        "type": "string"
+                      },
+                      "iteration_id": {
+                        "description": "The iteration id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "iteration_name": {
+                        "description": "The iteration name value.",
+                        "type": "string"
+                      },
+                      "key": {
+                        "description": "The key value.",
+                        "type": "string"
+                      },
+                      "labels": {
+                        "description": "The labels value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "color": {
+                              "description": "The color value.",
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "description": "The created at value.",
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "description": "The updated at value.",
+                              "format": "date-time",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "color",
+                            "created_at",
+                            "id",
+                            "name",
+                            "updated_at"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "last_active_at": {
+                        "description": "The last active at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "milestones": {
+                        "description": "The milestones value.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "category_color": {
+                              "description": "The category color value.",
+                              "type": "string"
+                            },
+                            "category_id": {
+                              "description": "The category id value.",
+                              "nullable": true,
+                              "type": "integer"
+                            },
+                            "category_name": {
+                              "description": "The category name value.",
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "description": "The created at value.",
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "description": {
+                              "description": "The description value.",
+                              "type": "string"
+                            },
+                            "external_key": {
+                              "description": "The external key value.",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "is_global": {
+                              "description": "The is global value.",
+                              "type": "boolean"
+                            },
+                            "latest_release": {
+                              "additionalProperties": false,
+                              "description": "The latest release value.",
+                              "nullable": true,
+                              "properties": {
+                                "assets": {
+                                  "description": "The assets value.",
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "direct_url": {
+                                        "description": "The direct url value.",
+                                        "type": "string"
+                                      },
+                                      "format": {
+                                        "description": "The format value.",
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "description": "The kind value.",
+                                        "type": "string"
+                                      },
+                                      "link_type": {
+                                        "description": "The link type value.",
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "description": "The name value.",
+                                        "type": "string"
+                                      },
+                                      "url": {
+                                        "description": "The url value.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "name",
+                                      "url"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "body": {
+                                  "description": "The body value.",
+                                  "type": "string"
+                                },
+                                "created_at": {
+                                  "description": "The created at value.",
+                                  "type": "string"
+                                },
+                                "created_by": {
+                                  "description": "The created by value.",
+                                  "nullable": true,
+                                  "type": "integer"
+                                },
+                                "id": {
+                                  "description": "The id value.",
+                                  "type": "integer"
+                                },
+                                "is_draft": {
+                                  "description": "The is draft value.",
+                                  "type": "boolean"
+                                },
+                                "is_prerelease": {
+                                  "description": "The is prerelease value.",
+                                  "type": "boolean"
+                                },
+                                "last_synced_at": {
+                                  "description": "The last synced at value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "milestone_id": {
+                                  "description": "The milestone id value.",
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "description": "The name value.",
+                                  "type": "string"
+                                },
+                                "release_status": {
+                                  "description": "The release status value.",
+                                  "type": "string"
+                                },
+                                "released_at": {
+                                  "description": "The released at value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "scm_connection_id": {
+                                  "description": "The scm connection id value.",
+                                  "nullable": true,
+                                  "type": "integer"
+                                },
+                                "scm_release_id": {
+                                  "description": "The scm release id value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "scm_release_url": {
+                                  "description": "The scm release url value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "scm_repository": {
+                                  "description": "The scm repository value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "tag_name": {
+                                  "description": "The tag name value.",
+                                  "type": "string"
+                                },
+                                "tag_url": {
+                                  "description": "The tag url value.",
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "target_commitish": {
+                                  "description": "The target commitish value.",
+                                  "type": "string"
+                                },
+                                "workspace_repository_id": {
+                                  "description": "The workspace repository id value.",
+                                  "nullable": true,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "created_at",
+                                "id",
+                                "is_draft",
+                                "is_prerelease",
+                                "milestone_id",
+                                "tag_name"
+                              ],
+                              "type": "object"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "position": {
+                              "description": "The position value.",
+                              "type": "integer"
+                            },
+                            "releases": {
+                              "description": "The releases value.",
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "assets": {
+                                    "description": "The assets value.",
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "direct_url": {
+                                          "description": "The direct url value.",
+                                          "type": "string"
+                                        },
+                                        "format": {
+                                          "description": "The format value.",
+                                          "type": "string"
+                                        },
+                                        "kind": {
+                                          "description": "The kind value.",
+                                          "type": "string"
+                                        },
+                                        "link_type": {
+                                          "description": "The link type value.",
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "description": "The name value.",
+                                          "type": "string"
+                                        },
+                                        "url": {
+                                          "description": "The url value.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "url"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "body": {
+                                    "description": "The body value.",
+                                    "type": "string"
+                                  },
+                                  "created_at": {
+                                    "description": "The created at value.",
+                                    "type": "string"
+                                  },
+                                  "created_by": {
+                                    "description": "The created by value.",
+                                    "nullable": true,
+                                    "type": "integer"
+                                  },
+                                  "id": {
+                                    "description": "The id value.",
+                                    "type": "integer"
+                                  },
+                                  "is_draft": {
+                                    "description": "The is draft value.",
+                                    "type": "boolean"
+                                  },
+                                  "is_prerelease": {
+                                    "description": "The is prerelease value.",
+                                    "type": "boolean"
+                                  },
+                                  "last_synced_at": {
+                                    "description": "The last synced at value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "milestone_id": {
+                                    "description": "The milestone id value.",
+                                    "type": "integer"
+                                  },
+                                  "name": {
+                                    "description": "The name value.",
+                                    "type": "string"
+                                  },
+                                  "release_status": {
+                                    "description": "The release status value.",
+                                    "type": "string"
+                                  },
+                                  "released_at": {
+                                    "description": "The released at value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "scm_connection_id": {
+                                    "description": "The scm connection id value.",
+                                    "nullable": true,
+                                    "type": "integer"
+                                  },
+                                  "scm_release_id": {
+                                    "description": "The scm release id value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "scm_release_url": {
+                                    "description": "The scm release url value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "scm_repository": {
+                                    "description": "The scm repository value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "tag_name": {
+                                    "description": "The tag name value.",
+                                    "type": "string"
+                                  },
+                                  "tag_url": {
+                                    "description": "The tag url value.",
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "target_commitish": {
+                                    "description": "The target commitish value.",
+                                    "type": "string"
+                                  },
+                                  "workspace_repository_id": {
+                                    "description": "The workspace repository id value.",
+                                    "nullable": true,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "created_at",
+                                  "id",
+                                  "is_draft",
+                                  "is_prerelease",
+                                  "milestone_id",
+                                  "tag_name"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "status": {
+                              "description": "The status value.",
+                              "type": "string"
+                            },
+                            "target_date": {
+                              "description": "The target date value.",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "description": "The updated at value.",
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "workspace_id": {
+                              "description": "The workspace id value.",
+                              "nullable": true,
+                              "type": "integer"
+                            },
+                            "workspace_name": {
+                              "description": "The workspace name value.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "created_at",
+                            "description",
+                            "id",
+                            "is_global",
+                            "name",
+                            "position",
+                            "status",
+                            "updated_at"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "parent_id": {
+                        "description": "The parent id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "parent_key": {
+                        "description": "The parent key value.",
+                        "type": "string"
+                      },
+                      "parent_title": {
+                        "description": "The parent title value.",
+                        "type": "string"
+                      },
+                      "parent_workspace_item_number": {
+                        "description": "The parent workspace item number value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "portal_org_shared": {
+                        "description": "The portal org shared value.",
+                        "type": "boolean"
+                      },
+                      "priority_builtin_key": {
+                        "description": "The priority builtin key value.",
+                        "type": "string"
+                      },
+                      "priority_color": {
+                        "description": "The priority color value.",
+                        "type": "string"
+                      },
+                      "priority_icon": {
+                        "description": "The priority icon value.",
+                        "type": "string"
+                      },
+                      "priority_id": {
+                        "description": "The priority id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "priority_name": {
+                        "description": "The priority name value.",
+                        "type": "string"
+                      },
+                      "project_id": {
+                        "description": "The project id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "project_inheritance_mode": {
+                        "description": "The project inheritance mode value.",
+                        "type": "string"
+                      },
+                      "project_name": {
+                        "description": "The project name value.",
+                        "type": "string"
+                      },
+                      "related_work_item_id": {
+                        "description": "The related work item id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "related_work_item_number": {
+                        "description": "The related work item number value.",
+                        "type": "integer"
+                      },
+                      "related_work_item_title": {
+                        "description": "The related work item title value.",
+                        "type": "string"
+                      },
+                      "related_work_item_workspace_id": {
+                        "description": "The related work item workspace id value.",
+                        "type": "integer"
+                      },
+                      "related_work_item_workspace_key": {
+                        "description": "The related work item workspace key value.",
+                        "type": "string"
+                      },
+                      "reporter_avatar": {
+                        "description": "The reporter avatar value.",
+                        "type": "string"
+                      },
+                      "reporter_email": {
+                        "description": "The reporter email value.",
+                        "type": "string"
+                      },
+                      "reporter_id": {
+                        "description": "The reporter id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "reporter_name": {
+                        "description": "The reporter name value.",
+                        "type": "string"
+                      },
+                      "request_type_id": {
+                        "description": "The request type id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "request_type_name": {
+                        "description": "The request type name value.",
+                        "type": "string"
+                      },
+                      "start_date": {
+                        "description": "The start date value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "status_builtin_key": {
+                        "description": "The status builtin key value.",
+                        "type": "string"
+                      },
+                      "status_color": {
+                        "description": "The status color value.",
+                        "type": "string"
+                      },
+                      "status_id": {
+                        "description": "The status id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "status_name": {
+                        "description": "The status name value.",
+                        "type": "string"
+                      },
+                      "status_since": {
+                        "description": "The status since value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "story_points": {
+                        "description": "The story points value.",
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "team_avatar_url": {
+                        "description": "The team avatar url value.",
+                        "type": "string"
+                      },
+                      "team_color": {
+                        "description": "The team color value.",
+                        "type": "string"
+                      },
+                      "team_id": {
+                        "description": "The team id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "team_name": {
+                        "description": "The team name value.",
+                        "type": "string"
+                      },
+                      "time_project_id": {
+                        "description": "The time project id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "time_project_name": {
+                        "description": "The time project name value.",
+                        "type": "string"
+                      },
+                      "title": {
+                        "description": "The title value.",
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "description": "The updated at value.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "virtual_field_data": {
+                        "additionalProperties": {
+                          "description": "Arbitrary JSON extension value."
+                        },
+                        "description": "The virtual field data value.",
+                        "type": "object"
+                      },
+                      "workspace_id": {
+                        "description": "The workspace id value.",
+                        "type": "integer"
+                      },
+                      "workspace_item_number": {
+                        "description": "The workspace item number value.",
+                        "type": "integer"
+                      },
+                      "workspace_key": {
+                        "description": "The workspace key value.",
+                        "type": "string"
+                      },
+                      "workspace_name": {
+                        "description": "The workspace name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "created_at",
+                      "depth",
+                      "description",
+                      "id",
+                      "inherit_project",
+                      "is_task",
+                      "last_active_at",
+                      "portal_org_shared",
+                      "title",
+                      "updated_at",
+                      "workspace_id",
+                      "workspace_item_number"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "root_id": {
+                  "description": "The root id value.",
+                  "type": "integer"
+                },
+                "total": {
+                  "description": "The total value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "has_more",
+                "items",
+                "root_id",
+                "total"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostItemsItemIdAgentRunsResult": {
         "additionalProperties": false,
         "properties": {
@@ -75152,6 +76355,10 @@
                 "description": "The frac index value.",
                 "nullable": true,
                 "type": "string"
+              },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
               },
               "id": {
                 "description": "The id value.",
@@ -76291,6 +77498,10 @@
                 "description": "The frac index value.",
                 "nullable": true,
                 "type": "string"
+              },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
               },
               "id": {
                 "description": "The id value.",
@@ -77820,6 +79031,10 @@
                     "description": "The frac index value.",
                     "nullable": true,
                     "type": "string"
+                  },
+                  "has_children": {
+                    "description": "The has children value.",
+                    "type": "boolean"
                   },
                   "id": {
                     "description": "The id value.",
@@ -79506,6 +80721,10 @@
                     "nullable": true,
                     "type": "string"
                   },
+                  "has_children": {
+                    "description": "The has children value.",
+                    "type": "boolean"
+                  },
                   "id": {
                     "description": "The id value.",
                     "type": "integer"
@@ -80656,6 +81875,10 @@
                 "nullable": true,
                 "type": "string"
               },
+              "has_children": {
+                "description": "The has children value.",
+                "type": "boolean"
+              },
               "id": {
                 "description": "The id value.",
                 "type": "integer"
@@ -81749,6 +82972,10 @@
                       "description": "The frac index value.",
                       "nullable": true,
                       "type": "string"
+                    },
+                    "has_children": {
+                      "description": "The has children value.",
+                      "type": "boolean"
                     },
                     "id": {
                       "description": "The id value.",
@@ -106218,6 +107445,16 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "description": "Attach has_children to each row, true when the caller can view at least one child. Values true and 1 enable; omitted or other values leave the payload unchanged.",
+            "in": "query",
+            "name": "include_has_children",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -107010,6 +108247,111 @@
           }
         ],
         "summary": "Get item changes",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/items/hierarchy": {
+      "post": {
+        "description": "Returns the matching descendants of up to 500 root items, grouped by root and capped per root. The collection and sub-filter apply to the descendants; the recursive walk is not pruned by the filter, so a matching descendant under a filtered-out intermediate is still returned. Rows are ordered breadth-first so a truncated root keeps complete shallow levels. Inaccessible items and cross-workspace descendants the caller cannot view are omitted.",
+        "operationId": "postItemsHierarchy",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostItemsHierarchyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostItemsHierarchyResult"
+                }
+              }
+            },
+            "description": "Read the hierarchy below a set of roots response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read the hierarchy below a set of roots",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:read"
+        ]
+      }
+    },
+    "/items/level-counts": {
+      "get": {
+        "description": "Returns the filtered item count for each item-type hierarchy level, applying the same collection, sub-filter, and workspace scope as the item list. Sub-task (-1) is reported but is not a valid level-picker root.",
+        "operationId": "getItemsLevelCounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetItemsLevelCountsResult"
+                }
+              }
+            },
+            "description": "Count visible items per hierarchy level response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Count visible items per hierarchy level",
         "tags": [
           "Work items"
         ],

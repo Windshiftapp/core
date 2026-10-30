@@ -5081,6 +5081,16 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "Name": "include_has_children",
+            "In": "query",
+            "Description": "Attach has_children to each row, true when the caller can view at least one child. Values true and 1 enable; omitted or other values leave the payload unchanged.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5446,6 +5456,41 @@
           "500": {}
         },
         "summary": "Get item changes",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/hierarchy": {
+      "post": {
+        "description": "Returns the matching descendants of up to 500 root items, grouped by root and capped per root. The collection and sub-filter apply to the descendants; the recursive walk is not pruned by the filter, so a matching descendant under a filtered-out intermediate is still returned. Rows are ordered breadth-first so a truncated root keeps complete shallow levels. Inaccessible items and cross-workspace descendants the caller cannot view are omitted.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read the hierarchy below a set of roots",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/level-counts": {
+      "get": {
+        "description": "Returns the filtered item count for each item-type hierarchy level, applying the same collection, sub-filter, and workspace scope as the item list. Sub-task (-1) is reported but is not a valid level-picker root.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Count visible items per hierarchy level",
         "tags": [
           "Work items"
         ]

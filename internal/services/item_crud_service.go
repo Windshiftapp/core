@@ -752,6 +752,72 @@ func (s *ItemCRUDService) ListDistinctWorkspaceIDsWithQLContext(
 	})
 }
 
+// HierarchyListParams contains parameters for an ancestor-scoped hierarchy read.
+type HierarchyListParams struct {
+	WorkspaceID      int
+	CollectionID     int
+	QLQuery          string
+	SubQLQuery       string
+	WorkspaceIDs     []int
+	UserID           int
+	RootIDs          []int
+	MaxDepth         int
+	PerRootLimit     int
+	OmitDescriptions bool
+}
+
+// HierarchyDescendantsContext resolves the collection/QL once and returns the
+// matching descendants of each root, grouped and capped per root.
+func (s *ItemCRUDService) HierarchyDescendantsContext(ctx context.Context, params HierarchyListParams) ([]repository.HierarchyRootGroup, error) {
+	if len(params.WorkspaceIDs) == 0 || len(params.RootIDs) == 0 {
+		return []repository.HierarchyRootGroup{}, nil
+	}
+	resolvedQL, err := s.resolveItemListQLContext(ctx, params.QLQuery, params.CollectionID, params.SubQLQuery, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+	filters := ItemFilters{}
+	if resolvedQL.sql != "" {
+		filters.QLQuery = resolvedQL.sql
+		filters.QLArgs = resolvedQL.args
+	}
+	if !resolvedQL.collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+	return s.repo.HierarchyDescendantsContext(ctx, repository.HierarchyReadParams{
+		RootIDs:          params.RootIDs,
+		WorkspaceIDs:     params.WorkspaceIDs,
+		Filters:          filters,
+		MaxDepth:         params.MaxDepth,
+		PerRootLimit:     params.PerRootLimit,
+		OmitDescriptions: params.OmitDescriptions,
+	})
+}
+
+// LevelCountsContext resolves the collection/QL once and returns the filtered
+// item count per item-type hierarchy level.
+func (s *ItemCRUDService) LevelCountsContext(ctx context.Context, params ListWithQLParams) ([]repository.HierarchyLevelCount, error) {
+	if len(params.WorkspaceIDs) == 0 {
+		return []repository.HierarchyLevelCount{}, nil
+	}
+	resolvedQL, err := s.resolveItemListQLContext(ctx, params.QLQuery, params.CollectionID, params.SubQLQuery, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+	filters := params.Filters
+	if resolvedQL.sql != "" {
+		filters.QLQuery = resolvedQL.sql
+		filters.QLArgs = resolvedQL.args
+	}
+	if !resolvedQL.collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+	return s.repo.CountByHierarchyLevelContext(ctx, ItemListParams{
+		WorkspaceIDs: params.WorkspaceIDs,
+		Filters:      filters,
+	})
+}
+
 // GetWithEffectiveProject retrieves an item with effective project calculated
 // This is the most comprehensive Get method, used by the handler
 // deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go

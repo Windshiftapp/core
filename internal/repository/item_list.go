@@ -250,6 +250,38 @@ func (r *ItemRepository) FindAllWithDetailsContext(ctx context.Context, params I
 // query. Cursor mode is deliberately limited to the direct, unfiltered
 // workspace path; collection and filtered lists continue through the same
 // joined page plan and offset semantics as before.
+// itemListSelectClause is the hydrated projection for an item row. List and
+// hierarchy reads share it so their column sets cannot drift.
+func itemListSelectClause(omitDescriptions bool) string {
+	descriptionExpr := "i.description"
+	if omitDescriptions {
+		descriptionExpr = "''"
+	}
+	return fmt.Sprintf(`SELECT
+		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
+		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
+		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
+		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
+		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
+		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
+		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
+		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
+		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
+		COALESCE(%s, i.created_at) as status_since,
+		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar
+	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
+}
+
+// itemListFromClause is the display join set for a hydrated item row.
+func itemListFromClause() string {
+	return ItemListFilterFromClause() + `
+		LEFT JOIN items p ON i.parent_id = p.id
+		LEFT JOIN users assignee ON i.assignee_id = assignee.id
+		LEFT JOIN users creator ON i.creator_id = creator.id
+		LEFT JOIN teams team ON i.team_id = team.id
+	`
+}
+
 func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, params ItemListParams) (ItemListPage, error) {
 	cursorMode := itemListCursorEligible(params) &&
 		(params.Pagination.CursorMode || params.Pagination.Cursor != "")
@@ -264,30 +296,9 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 
 	// Build the SELECT clause. Collection/list surfaces can opt out of the
 	// heavy description payload; detail endpoints still fetch full descriptions.
-	descriptionExpr := "i.description"
-	if params.OmitDescriptions {
-		descriptionExpr = "''"
-	}
-	selectClause := fmt.Sprintf(`SELECT
-		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
-		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
-		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
-		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
-		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
-		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
-		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
-		COALESCE(%s, i.created_at) as status_since,
-		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar
-	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
+	selectClause := itemListSelectClause(params.OmitDescriptions)
 
-	fromClause := ItemListFilterFromClause() + `
-		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN users assignee ON i.assignee_id = assignee.id
-		LEFT JOIN users creator ON i.creator_id = creator.id
-		LEFT JOIN teams team ON i.team_id = team.id
-	`
+	fromClause := itemListFromClause()
 
 	whereClause, args := r.buildWhereClause(params)
 
@@ -983,132 +994,141 @@ func (r *ItemRepository) defaultOrderBy() string {
 	return ` ORDER BY i.frac_index ASC`
 }
 
-// scanItemList scans rows into a slice of items
-func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
-	var items []models.Item
+// scanItemRow scans one hydrated item row, plus any trailing projection
+// columns the caller appended (e.g. hierarchy depth). List and hierarchy reads
+// share it so their column handling cannot drift.
+func scanItemRow(scanner interface{ Scan(dest ...any) error }, extra ...any) (models.Item, error) {
+	var item models.Item
+	var customFieldValuesJSON, calendarDataJSON sql.NullString
+	var itemTypeID, parentID, parentWorkspaceItemNumber, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
+	var dueDate, startDate, endDate sql.NullTime
+	var statusSince sql.NullString
+	var teamID, incidentID sql.NullInt64
+	var itemTypeName, itemTypeBuiltinKey, itemTypeIcon, itemTypeColor, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
+	var teamName, teamColor, teamAvatar sql.NullString
+	var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName, statusColor sql.NullString
+	var statusBuiltinKey, priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
+	var fracIndex sql.NullString
+	var storyPoints sql.NullFloat64
+	var estimateMinutes sql.NullInt64
+	var inheritProject bool
+	// last_active_at can be NULL on rows created before it was consistently
+	// populated, so scan through a nullable and fall back to updated_at.
+	var lastActiveAt sql.NullTime
 
-	for rows.Next() {
-		var item models.Item
-		var customFieldValuesJSON, calendarDataJSON sql.NullString
-		var itemTypeID, parentID, parentWorkspaceItemNumber, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
-		var dueDate, startDate, endDate sql.NullTime
-		var statusSince sql.NullString
-		var teamID, incidentID sql.NullInt64
-		var itemTypeName, itemTypeBuiltinKey, itemTypeIcon, itemTypeColor, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
-		var teamName, teamColor, teamAvatar sql.NullString
-		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName, statusColor sql.NullString
-		var statusBuiltinKey, priorityName, priorityBuiltinKey, priorityIcon, priorityColor sql.NullString
-		var fracIndex sql.NullString
-		var storyPoints sql.NullFloat64
-		var estimateMinutes sql.NullInt64
-		var inheritProject bool
-		// last_active_at can be NULL on rows created before it was consistently
-		// populated, so scan through a nullable and fall back to updated_at.
-		var lastActiveAt sql.NullTime
-
-		err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &itemTypeIcon, &itemTypeColor, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
-			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
-			&statusSince,
-			&teamID, &incidentID, &teamName, &teamColor, &teamAvatar,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan item: %w", err)
-		}
-
-		if lastActiveAt.Valid {
-			item.LastActiveAt = lastActiveAt.Time
-		} else {
-			item.LastActiveAt = item.UpdatedAt
-		}
-
-		assignNullableInt(&item.ItemTypeID, itemTypeID)
-		assignNullableInt(&item.ParentID, parentID)
-		assignNullableInt(&item.ParentWorkspaceItemNumber, parentWorkspaceItemNumber)
-		assignNullableInt(&item.IterationID, iterationID)
-		assignNullableInt(&item.StatusID, statusID)
-		assignNullableInt(&item.ProjectID, projectID)
-		assignNullableInt(&item.TimeProjectID, timeProjectID)
-		assignNullableInt(&item.PriorityID, priorityID)
-		assignNullableInt(&item.AssigneeID, assigneeID)
-		assignNullableInt(&item.TeamID, teamID)
-		assignNullableInt(&item.IncidentID, incidentID)
-		assignNullableInt(&item.CreatorID, creatorID)
-
-		if dueDate.Valid {
-			item.DueDate = &dueDate.Time
-		}
-		if startDate.Valid {
-			item.StartDate = &startDate.Time
-		}
-		if endDate.Valid {
-			item.EndDate = &endDate.Time
-		}
-		if statusSince.Valid {
-			if t, ok := parseDBTime(statusSince.String); ok {
-				item.StatusSince = &t
-			}
-		}
-		if storyPoints.Valid {
-			item.StoryPoints = &storyPoints.Float64
-		}
-		assignNullableInt(&item.EstimateMinutes, estimateMinutes)
-
-		item.InheritProject = inheritProject
-		assignNullableString(&item.ItemTypeName, itemTypeName)
-		assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
-		assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
-		assignNullableString(&item.ItemTypeColor, itemTypeColor)
-		assignNullableString(&item.ParentTitle, parentTitle)
-		assignNullableString(&item.IterationName, iterationName)
-		assignNullableString(&item.IterationEndDate, iterationEndDate)
-		assignNullableString(&item.StatusName, statusName)
-		assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
-		assignNullableString(&item.StatusColor, statusColor)
-		assignNullableString(&item.ProjectName, projectName)
-		assignNullableString(&item.TimeProjectName, timeProjectName)
-		assignNullableString(&item.PriorityName, priorityName)
-		assignNullableString(&item.PriorityBuiltinKey, priorityBuiltinKey)
-		assignNullableString(&item.PriorityIcon, priorityIcon)
-		assignNullableString(&item.PriorityColor, priorityColor)
-		assignNullableString(&item.AssigneeName, assigneeName)
-		assignNullableString(&item.AssigneeEmail, assigneeEmail)
-		assignNullableString(&item.AssigneeAvatar, assigneeAvatar)
-		assignNullableString(&item.CreatorName, creatorName)
-		assignNullableString(&item.CreatorEmail, creatorEmail)
-		assignNullableString(&item.TeamName, teamName)
-		assignNullableString(&item.TeamColor, teamColor)
-		assignNullableString(&item.TeamAvatarURL, teamAvatar)
-
-		if fracIndex.Valid {
-			item.FracIndex = &fracIndex.String
-		}
-
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-				item.CustomFieldValues = make(map[string]any)
-			}
-		} else {
-			item.CustomFieldValues = make(map[string]any)
-		}
-
-		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
-				item.CalendarData = []models.CalendarScheduleEntry{}
-			}
-		} else {
-			item.CalendarData = []models.CalendarScheduleEntry{}
-		}
-
-		items = append(items, item)
+	dest := make([]any, 0, 57+len(extra))
+	dest = append(dest,
+		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
+		&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &itemTypeIcon, &itemTypeColor, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
+		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
+		&statusSince,
+		&teamID, &incidentID, &teamName, &teamColor, &teamAvatar,
+	)
+	if err := scanner.Scan(append(dest, extra...)...); err != nil {
+		return models.Item{}, fmt.Errorf("failed to scan item: %w", err)
 	}
 
+	if lastActiveAt.Valid {
+		item.LastActiveAt = lastActiveAt.Time
+	} else {
+		item.LastActiveAt = item.UpdatedAt
+	}
+
+	assignNullableInt(&item.ItemTypeID, itemTypeID)
+	assignNullableInt(&item.ParentID, parentID)
+	assignNullableInt(&item.ParentWorkspaceItemNumber, parentWorkspaceItemNumber)
+	assignNullableInt(&item.IterationID, iterationID)
+	assignNullableInt(&item.StatusID, statusID)
+	assignNullableInt(&item.ProjectID, projectID)
+	assignNullableInt(&item.TimeProjectID, timeProjectID)
+	assignNullableInt(&item.PriorityID, priorityID)
+	assignNullableInt(&item.AssigneeID, assigneeID)
+	assignNullableInt(&item.TeamID, teamID)
+	assignNullableInt(&item.IncidentID, incidentID)
+	assignNullableInt(&item.CreatorID, creatorID)
+
+	if dueDate.Valid {
+		item.DueDate = &dueDate.Time
+	}
+	if startDate.Valid {
+		item.StartDate = &startDate.Time
+	}
+	if endDate.Valid {
+		item.EndDate = &endDate.Time
+	}
+	if statusSince.Valid {
+		if t, ok := parseDBTime(statusSince.String); ok {
+			item.StatusSince = &t
+		}
+	}
+	if storyPoints.Valid {
+		item.StoryPoints = &storyPoints.Float64
+	}
+	assignNullableInt(&item.EstimateMinutes, estimateMinutes)
+
+	item.InheritProject = inheritProject
+	assignNullableString(&item.ItemTypeName, itemTypeName)
+	assignNullableString(&item.ItemTypeBuiltinKey, itemTypeBuiltinKey)
+	assignNullableString(&item.ItemTypeIcon, itemTypeIcon)
+	assignNullableString(&item.ItemTypeColor, itemTypeColor)
+	assignNullableString(&item.ParentTitle, parentTitle)
+	assignNullableString(&item.IterationName, iterationName)
+	assignNullableString(&item.IterationEndDate, iterationEndDate)
+	assignNullableString(&item.StatusName, statusName)
+	assignNullableString(&item.StatusBuiltinKey, statusBuiltinKey)
+	assignNullableString(&item.StatusColor, statusColor)
+	assignNullableString(&item.ProjectName, projectName)
+	assignNullableString(&item.TimeProjectName, timeProjectName)
+	assignNullableString(&item.PriorityName, priorityName)
+	assignNullableString(&item.PriorityBuiltinKey, priorityBuiltinKey)
+	assignNullableString(&item.PriorityIcon, priorityIcon)
+	assignNullableString(&item.PriorityColor, priorityColor)
+	assignNullableString(&item.AssigneeName, assigneeName)
+	assignNullableString(&item.AssigneeEmail, assigneeEmail)
+	assignNullableString(&item.AssigneeAvatar, assigneeAvatar)
+	assignNullableString(&item.CreatorName, creatorName)
+	assignNullableString(&item.CreatorEmail, creatorEmail)
+	assignNullableString(&item.TeamName, teamName)
+	assignNullableString(&item.TeamColor, teamColor)
+	assignNullableString(&item.TeamAvatarURL, teamAvatar)
+
+	if fracIndex.Valid {
+		item.FracIndex = &fracIndex.String
+	}
+
+	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
+		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
+			item.CustomFieldValues = make(map[string]any)
+		}
+	} else {
+		item.CustomFieldValues = make(map[string]any)
+	}
+
+	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
+		if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
+			item.CalendarData = []models.CalendarScheduleEntry{}
+		}
+	} else {
+		item.CalendarData = []models.CalendarScheduleEntry{}
+	}
+
+	return item, nil
+}
+
+// scanItemList scans rows into a slice of items.
+func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
+	var items []models.Item
+	for rows.Next() {
+		item, err := scanItemRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
 	if items == nil {
 		items = []models.Item{}
 	}
-
 	return items, nil
 }
 
