@@ -8282,12 +8282,12 @@
       "ecosystem": "npm",
       "project": "App frontend",
       "name": "deepmerge",
-      "version": "4.3.1",
+      "version": "4.3.2",
       "license": "MIT",
       "scope": "transitive",
-      "licenseFile": "frontend/node_modules/deepmerge/license.txt",
-      "homepage": "https://github.com/TehShrike/deepmerge",
-      "repository": "git://github.com/TehShrike/deepmerge.git"
+      "licenseFile": "frontend/node_modules/@sveltejs/vite-plugin-svelte/node_modules/deepmerge/license.txt",
+      "homepage": "https://github.com/oss-cve-patches/deepmerge",
+      "repository": "git+https://github.com/oss-cve-patches/deepmerge.git"
     },
     {
       "ecosystem": "npm",
