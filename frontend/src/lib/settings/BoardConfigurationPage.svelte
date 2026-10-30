@@ -609,7 +609,7 @@
   let completedVisibilityOptions = $derived(
     COMPLETED_VISIBILITY_OPTIONS.map((option) => ({
       value: option.value,
-      label: t(`settings.boardConfig.${option.labelKey}`),
+      label: t(`boardControls.${option.labelKey}`),
     }))
   );
 
