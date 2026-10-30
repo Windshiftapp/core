@@ -6534,6 +6534,11 @@
                     "description": "The view settings value.",
                     "nullable": true,
                     "properties": {
+                      "completed_limit": {
+                        "description": "The completed limit value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
                       "completed_visibility": {
                         "description": "The completed visibility value.",
                         "nullable": true,
@@ -6947,6 +6952,11 @@
                 "description": "The view settings value.",
                 "nullable": true,
                 "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "completed_visibility": {
                     "description": "The completed visibility value.",
                     "nullable": true,
@@ -33733,6 +33743,11 @@
                     "description": "The view settings value.",
                     "nullable": true,
                     "properties": {
+                      "completed_limit": {
+                        "description": "The completed limit value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
                       "completed_visibility": {
                         "description": "The completed visibility value.",
                         "nullable": true,
@@ -34146,6 +34161,11 @@
                 "description": "The view settings value.",
                 "nullable": true,
                 "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "completed_visibility": {
                     "description": "The completed visibility value.",
                     "nullable": true,
@@ -94381,6 +94401,11 @@
             "description": "The view settings value.",
             "nullable": true,
             "properties": {
+              "completed_limit": {
+                "description": "The completed limit value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "completed_visibility": {
                 "description": "The completed visibility value.",
                 "nullable": true,
@@ -94627,6 +94652,11 @@
                 "description": "The view settings value.",
                 "nullable": true,
                 "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "completed_visibility": {
                     "description": "The completed visibility value.",
                     "nullable": true,
@@ -95875,6 +95905,11 @@
             "description": "The view settings value.",
             "nullable": true,
             "properties": {
+              "completed_limit": {
+                "description": "The completed limit value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "completed_visibility": {
                 "description": "The completed visibility value.",
                 "nullable": true,
@@ -96121,6 +96156,11 @@
                 "description": "The view settings value.",
                 "nullable": true,
                 "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
                   "completed_visibility": {
                     "description": "The completed visibility value.",
                     "nullable": true,

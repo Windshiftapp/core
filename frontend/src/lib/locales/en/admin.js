@@ -1139,6 +1139,8 @@ export default {
       completedVisibility: 'Completed work',
       completedVisibilityCustom: 'Custom (use the options below)',
       completedVisibilityHint: 'Choose how much completed work this board loads. Applies to every viewer.',
+      completedLimit: 'Number of completed items',
+      completedLimitHint: 'Show at most this many completed items on the board (1–{max}).',
       backlogSelected: '{count} statuses selected for the backlog',
       backlogSelected_one: '{count} status selected for the backlog',
       backlogSelected_other: '{count} statuses selected for the backlog',

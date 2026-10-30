@@ -1179,6 +1179,8 @@ export default {
       completedVisibility: 'Завершённая работа',
       completedVisibilityCustom: 'Настраиваемый (используйте параметры ниже)',
       completedVisibilityHint: 'Определяет, сколько завершённой работы загружает эта доска. Действует для всех зрителей.',
+      completedLimit: 'Количество завершённых элементов',
+      completedLimitHint: 'Показывать на доске не более этого числа завершённых элементов (1–{max}).',
       backlogSelected: 'Для бэклога выбрано статусов: {count}',
       backlogSelected_one: 'Для бэклога выбран {count} статус',
       backlogSelected_few: 'Для бэклога выбрано {count} статуса',

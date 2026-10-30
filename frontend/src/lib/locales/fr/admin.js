@@ -1076,6 +1076,8 @@ export default {
       completedVisibility: 'Travail terminé',
       completedVisibilityCustom: 'Personnalisé (utilisez les options ci-dessous)',
       completedVisibilityHint: 'Définit la quantité de travail terminé chargée par ce tableau. S’applique à tous les lecteurs.',
+      completedLimit: 'Nombre d’éléments terminés',
+      completedLimitHint: 'Afficher au maximum ce nombre d’éléments terminés sur le tableau (1–{max}).',
       backlogSelected: '{count} statuts sélectionnés pour le backlog',
       backlogSelected_one: '{count} statut sélectionné pour le backlog',
       backlogSelected_other: '{count} statuts sélectionnés pour le backlog',

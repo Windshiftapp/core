@@ -138,8 +138,6 @@ export default {
   "boardControls": {
     "completedAll": "Alle anzeigen",
     "completedAllDescription": "Alle abgeschlossenen Vorgänge laden",
-    "completedCurrentIteration": "Aktuelle Iteration",
-    "completedCurrentIterationDescription": "Abgeschlossene Vorgänge der aktiven Iteration",
     "completedCustom": "Benutzerdefiniert",
     "completedLabel": "Abgeschlossen: {value}",
     "completedLastDay": "Letzter Tag",
@@ -147,6 +145,8 @@ export default {
     "completedLastWeek": "Letzte Woche",
     "completedLastWeekDescription": "Abgeschlossene Vorgänge mit Aktivität in den letzten 7 Tagen",
     "completedLatestFifty": "Letzte 50",
+    "completedLimit": "Begrenzen auf",
+    "completedLimitDescription": "Nur die neuesten abgeschlossenen Vorgänge laden",
     "completedNone": "Abgeschlossene ausblenden",
     "completedNoneDescription": "Abgeschlossene Arbeit auf diesem Board nicht laden",
     "completedVisibilitySaved": "Sichtbarkeit abgeschlossener Arbeit gespeichert",
@@ -655,6 +655,8 @@ export default {
       "completedVisibility": "Abgeschlossene Arbeit",
       "completedVisibilityCustom": "Benutzerdefiniert (Optionen unten verwenden)",
       "completedVisibilityHint": "Legt fest, wie viele abgeschlossene Vorgänge dieses Board lädt. Gilt für alle Betrachter.",
+      "completedLimit": "Anzahl abgeschlossener Vorgänge",
+      "completedLimitHint": "Höchstens so viele abgeschlossene Vorgänge auf dem Board anzeigen (1–{max}).",
       "retentionWindowHint": "Abgeschlossene Vorgänge ohne Aktivität in diesem Zeitraum werden ausgeblendet.",
       "systemFieldNames": {
         "created_at": "Erstellt",

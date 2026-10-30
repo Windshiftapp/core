@@ -1,6 +1,7 @@
 import { collections } from '../api/collections.js';
 import { items as itemsApi } from '../api/items.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
+import { normalizeCompletedLimit } from '../features/collections/boardConfigPayload.js';
 import {
   fetchCollectionBacklog,
   fetchCollectionItemChanges,
@@ -113,9 +114,6 @@ class CollectionStore {
 
   // Board views load every unfinished item separately from completed work.
   boardDeferred = $state(null);
-  // Iteration that the "current_iteration" completed-visibility preset scopes
-  // completed work to. The board sets it once its iteration catalog loads.
-  boardCompletedIterationId = $state(null);
 
   // View search is a separate server-scoped result set, shared by the board
   // and list views. Keeping it apart prevents a search from changing the
@@ -175,20 +173,6 @@ class CollectionStore {
     this.clearSearch();
     if (this.#wsId || this.#colId) {
       await this.load(this.#wsId, this.#colId, this.#currentView);
-    }
-  }
-
-  /**
-   * Scopes the "current_iteration" completed-visibility preset to an
-   * iteration. The board calls this once its iteration catalog resolves; a
-   * change re-runs the partition fetch so completed work matches the preset.
-   */
-  setBoardCompletedIteration(id) {
-    const next = id == null ? null : Number(id);
-    if (next === this.boardCompletedIterationId) return;
-    this.boardCompletedIterationId = next;
-    if (BOARD_VIEWS.has(this.#currentView) && (this.#wsId || this.#colId)) {
-      this.load(this.#wsId, this.#colId, this.#currentView);
     }
   }
 
@@ -310,7 +294,6 @@ class CollectionStore {
       this.itemsLoadingMore = false;
       this.boardBackgroundLoading = false;
       this.boardDeferred = null;
-      this.boardCompletedIterationId = null;
       this.backlogPagination = null;
       this.backlogHasMore = false;
       this.backlogLoadingMore = false;
@@ -534,19 +517,22 @@ class CollectionStore {
           ? { statusIds: completedStatusIds, limit: 0, hidden: true }
           : null;
       }
-      if (
-        visibility === 'all' ||
-        visibility === 'last_day' ||
-        visibility === 'last_week' ||
-        visibility === 'current_iteration'
-      ) {
+      if (visibility === 'limit') {
+        if (completedStatusIds.length === 0) return null;
+        // The cap is the whole completed set: one page, no further paging.
+        return {
+          statusIds: completedStatusIds,
+          limit: normalizeCompletedLimit(config?.view_settings?.completed_limit),
+          capped: true,
+        };
+      }
+      if (visibility === 'all' || visibility === 'last_day' || visibility === 'last_week') {
         if (completedStatusIds.length === 0) return null;
         const activityDays = visibility === 'last_day' ? 1 : visibility === 'last_week' ? 7 : null;
         return {
           statusIds: completedStatusIds,
           limit: DEFAULT_PAGE_SIZE,
           completedActivityDays: activityDays,
-          iterationId: visibility === 'current_iteration' ? this.boardCompletedIterationId : null,
         };
       }
 
@@ -786,7 +772,15 @@ class CollectionStore {
 
   #fetchBoardDeferredItems(wsId, colId, boardPartition, collection, limitOverride = null) {
     if (!boardPartition?.statusIds?.length || boardPartition.hidden) return Promise.resolve(null);
-    const limit = Math.max(DEFAULT_PAGE_SIZE, limitOverride ?? boardPartition.limit ?? 0);
+    const requested = limitOverride ?? boardPartition.limit ?? 0;
+    // A capped preset fixes the completed set at the configured limit; a
+    // refresh reloads at most what is already loaded. Uncapped presets keep
+    // at least one full page so paging still works.
+    const limit = boardPartition.capped
+      ? requested > 0
+        ? Math.min(requested, boardPartition.limit)
+        : boardPartition.limit
+      : Math.max(DEFAULT_PAGE_SIZE, requested);
     return fetchCollectionItems(wsId, colId, {
       page: 1,
       limit,
@@ -795,7 +789,6 @@ class CollectionStore {
       requestOptions: FOREGROUND_READ,
       status_id: boardPartition.statusIds.join(','),
       completed_activity_days: boardPartition.completedActivityDays || undefined,
-      iteration_id: boardPartition.iterationId || undefined,
       ...this.#itemSortOptions(),
     });
   }
@@ -911,6 +904,7 @@ class CollectionStore {
 
   #hasMoreItems() {
     if (this.boardDeferred) {
+      if (this.boardDeferred.capped) return false;
       return calcHasMore(this.boardDeferred.pagination);
     }
     return calcHasMore(this.itemsPagination);
@@ -945,7 +939,6 @@ class CollectionStore {
           ? {
               status_id: deferred.statusIds.join(','),
               completed_activity_days: deferred.completedActivityDays || undefined,
-              iteration_id: deferred.iterationId || undefined,
             }
           : this.#boardExclusionFilter()),
       });

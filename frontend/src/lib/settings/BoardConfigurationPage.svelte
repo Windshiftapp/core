@@ -14,6 +14,12 @@
   import { collectionStore } from '../stores/collectionContext.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { loadBoardConfigurationPageData } from './boardConfigurationData.js';
+  import {
+    DEFAULT_COMPLETED_LIMIT,
+    MIN_COMPLETED_LIMIT,
+    MAX_COMPLETED_LIMIT,
+    normalizeCompletedLimit,
+  } from '../features/collections/boardConfigPayload.js';
   import Plus from '@lucide/svelte/icons/plus';
   import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import X from '@lucide/svelte/icons/x';
@@ -57,6 +63,9 @@
   // Completed-work preset (WI-100) — the board's single display control.
   let completedVisibility = $state('all');
   let completedVisibilityDirty = $state(false);
+  // Cap used by the "limit" preset; only meaningful while that preset is on.
+  let completedLimit = $state(DEFAULT_COMPLETED_LIMIT);
+  let completedLimitDirty = $state(false);
   let customFieldDefinitions = $state([]);
   let enabledViews = $state([]);
   // Collection scopes may only toggle collection-scoped views; the workspace
@@ -219,14 +228,18 @@
         );
         const storedVisibility = boardConfig.view_settings?.completed_visibility ?? '';
         completedVisibility = storedVisibility || legacyCompletedPreset(boardConfig);
+        completedLimit = normalizeCompletedLimit(boardConfig.view_settings?.completed_limit);
         // A board saved before presets existed migrates on the next save.
         completedVisibilityDirty = storedVisibility === '';
+        completedLimitDirty = false;
       } else {
         columns = [];
         backlogStatusIDs = statuses.filter(s => !s.is_default && !s.is_completed).map(s => s.id);
         cardFields = [];
         completedVisibility = 'all';
         completedVisibilityDirty = false;
+        completedLimit = DEFAULT_COMPLETED_LIMIT;
+        completedLimitDirty = false;
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -603,7 +616,7 @@
     { value: 'all', labelKey: 'completedAll' },
     { value: 'last_day', labelKey: 'completedLastDay' },
     { value: 'last_week', labelKey: 'completedLastWeek' },
-    { value: 'current_iteration', labelKey: 'completedCurrentIteration' },
+    { value: 'limit', labelKey: 'completedLimit' },
     { value: 'none', labelKey: 'completedNone' },
   ];
   let completedVisibilityOptions = $derived(
@@ -624,6 +637,12 @@
   function setCompletedVisibility(value) {
     completedVisibility = value;
     completedVisibilityDirty = true;
+    hasChanges = true;
+  }
+
+  function setCompletedLimit(value) {
+    completedLimit = value;
+    completedLimitDirty = true;
     hasChanges = true;
   }
 
@@ -758,6 +777,9 @@
       if (completedVisibilityDirty) {
         viewSettings.completed_visibility = completedVisibility;
       }
+      if (completedVisibility === 'limit' && (completedVisibilityDirty || completedLimitDirty)) {
+        viewSettings.completed_limit = normalizeCompletedLimit(completedLimit);
+      }
       if (Object.keys(viewSettings).length > 0) {
         payload.view_settings = viewSettings;
       }
@@ -806,6 +828,8 @@
         cardFields = [];
         completedVisibility = 'all';
         completedVisibilityDirty = false;
+        completedLimit = DEFAULT_COMPLETED_LIMIT;
+        completedLimitDirty = false;
         hasChanges = false;
         goToBoard();
       } catch (error) {
@@ -818,6 +842,8 @@
       cardFields = [];
       completedVisibility = 'all';
       completedVisibilityDirty = false;
+      completedLimit = DEFAULT_COMPLETED_LIMIT;
+      completedLimitDirty = false;
       hasChanges = false;
     }
   }
@@ -912,6 +938,31 @@
             <p class="mt-1.5 text-xs" style="color: var(--ds-text-subtlest);">
               {t('settings.boardConfig.completedVisibilityHint')}
             </p>
+            {#if completedVisibility === 'limit'}
+              <div class="mt-3">
+                <label
+                  for="board-completed-limit"
+                  class="mb-1.5 block text-xs font-medium"
+                  style="color: var(--ds-text-subtle);"
+                >
+                  {t('settings.boardConfig.completedLimit')}
+                </label>
+                <Input
+                  id="board-completed-limit"
+                  type="number"
+                  value={completedLimit}
+                  oninput={(e) => setCompletedLimit(e.currentTarget.value)}
+                  disabled={!canConfigure}
+                  size="small"
+                  min={MIN_COMPLETED_LIMIT}
+                  max={MAX_COMPLETED_LIMIT}
+                  dataTestid="board-completed-limit"
+                />
+                <p class="mt-1.5 text-xs" style="color: var(--ds-text-subtlest);">
+                  {t('settings.boardConfig.completedLimitHint', { max: MAX_COMPLETED_LIMIT })}
+                </p>
+              </div>
+            {/if}
           </div>
         </div>
 
