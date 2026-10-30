@@ -206,6 +206,7 @@ type Server struct {
 	portalAuthLimiter     *ratelimit.Limiter
 	oauthTokenLimiter     *ratelimit.Limiter
 	aiRateLimiter         *ratelimit.Limiter
+	widgetGenerateLimiter *ratelimit.Limiter
 	uploadLimiter         *ratelimit.Limiter
 	webhookLimiter        *ratelimit.Limiter
 	searchLimiter         *ratelimit.Limiter
@@ -436,6 +437,9 @@ func (s *Server) initialize() error {
 	s.oauthTokenLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
 	s.authRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
 	s.aiRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
+	// Widget generation is a much heavier call than a chat turn and users create
+	// widgets rarely, so it gets its own tighter per-user bucket: 20/hour.
+	s.widgetGenerateLimiter = ratelimit.New(20.0/3600.0, 20, userKey)
 	s.uploadLimiter = ratelimit.New(10.0/60.0, 15, userKey)
 	s.webhookLimiter = ratelimit.New(10.0/60.0, 15, userKey)
 	s.searchLimiter = ratelimit.New(20.0/60.0, 30, userKey)
@@ -1691,6 +1695,7 @@ func (s *Server) initialize() error {
 		EmailVerifyLimiter:    s.emailVerifyLimiter,
 		SetupLimiter:          s.setupLimiter,
 		AIRateLimiter:         s.aiRateLimiter,
+		WidgetGenerateLimiter: s.widgetGenerateLimiter,
 		UploadLimiter:         s.uploadLimiter,
 		WebhookLimiter:        s.webhookLimiter,
 		CalendarFeedLimiter:   s.calendarFeedLimiter,
@@ -2615,6 +2620,9 @@ func (s *Server) cleanup() {
 	}
 	if s.aiRateLimiter != nil {
 		s.aiRateLimiter.Stop()
+	}
+	if s.widgetGenerateLimiter != nil {
+		s.widgetGenerateLimiter.Stop()
 	}
 	if s.uploadLimiter != nil {
 		s.uploadLimiter.Stop()
