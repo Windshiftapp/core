@@ -1,6 +1,7 @@
 import { collections } from '../api/collections.js';
 import { items as itemsApi } from '../api/items.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
+import { collectionSubFilterQL } from '../features/collections/collectionFilters.js';
 import {
   fetchCollectionBacklog,
   fetchCollectionItemChanges,
@@ -139,10 +140,11 @@ class CollectionStore {
   showCompleted = $state(false);
 
   get effectiveSubFilterQL() {
-    if (this.showCompleted) return this.subFilterQL;
-    return this.subFilterQL
-      ? `(${this.subFilterQL}) AND status_completed = false`
-      : 'status_completed = false';
+    return collectionSubFilterQL(this.subFilterQL, { hideCompleted: !this.showCompleted });
+  }
+
+  get effectiveBacklogSubFilterQL() {
+    return collectionSubFilterQL(this.subFilterQL, { hideCompleted: false });
   }
 
   #completionPreferenceKey(wsId, colId, view) {
@@ -371,7 +373,7 @@ class CollectionStore {
           ? fetchCollectionBacklog(wsId, colId, {
               page: 1,
               limit: DEFAULT_PAGE_SIZE,
-              sub_ql: this.effectiveSubFilterQL || undefined,
+              sub_ql: this.effectiveBacklogSubFilterQL || undefined,
               collection,
               requestOptions: FOREGROUND_READ,
             })
@@ -986,7 +988,7 @@ class CollectionStore {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.effectiveSubFilterQL || undefined,
+        sub_ql: this.effectiveBacklogSubFilterQL || undefined,
         requestOptions: BACKGROUND_READ,
       });
 
@@ -1097,7 +1099,7 @@ class CollectionStore {
               this.#wsId,
               this.#colId,
               backlogLimit,
-              this.effectiveSubFilterQL || undefined,
+              this.effectiveBacklogSubFilterQL || undefined,
               collection,
               loadId
             )
@@ -1322,7 +1324,10 @@ class CollectionStore {
 
       const changes = await fetchCollectionItemChanges(this.#wsId, this.#colId, {
         since: this.#changesWatermark,
-        sub_ql: this.effectiveSubFilterQL || undefined,
+        sub_ql:
+          (BACKLOG_VIEWS.has(this.#currentView)
+            ? this.effectiveBacklogSubFilterQL
+            : this.effectiveSubFilterQL) || undefined,
       });
       if (loadId !== this.#loadId) return false;
       const nextWatermark = changes?.watermark ?? this.#changesWatermark;
@@ -1401,7 +1406,10 @@ class CollectionStore {
     const wsId = this.#wsId;
     const colId = this.#colId;
     const changes = await fetchCollectionItemChanges(wsId, colId, {
-      sub_ql: this.effectiveSubFilterQL || undefined,
+      sub_ql:
+        (BACKLOG_VIEWS.has(this.#currentView)
+          ? this.effectiveBacklogSubFilterQL
+          : this.effectiveSubFilterQL) || undefined,
     });
     if (loadId !== this.#loadId || wsId !== this.#wsId || colId !== this.#colId) return;
     this.#changesWatermark = changes?.watermark ?? 0;
@@ -1418,6 +1426,9 @@ class CollectionStore {
   }
 
   #hideCompletedItem(item) {
+    // Backlog membership is defined by the configured status IDs, which may
+    // intentionally include completed statuses.
+    if (BACKLOG_VIEWS.has(this.#currentView)) return false;
     if (this.showCompleted) return false;
     const status =
       workspaceDataStore.statuses.find((candidate) => candidate.id === item.status_id) ??
