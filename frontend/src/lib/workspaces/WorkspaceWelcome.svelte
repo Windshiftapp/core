@@ -672,6 +672,7 @@
             variant={isCustomizeMode ? 'primary' : 'default'}
             icon={isCustomizeMode ? X : LayoutGrid}
             onclick={toggleCustomizeMode}
+            dataTestid="workspace-dashboard-customize"
           >
             {isCustomizeMode ? t('common.done') : t('workspaceDashboard.customize')}
           </Button>
