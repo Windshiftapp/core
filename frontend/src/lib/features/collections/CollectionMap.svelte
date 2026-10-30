@@ -32,7 +32,7 @@
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
-  import { infoToast, errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import ItemKey from '../../components/ItemKey.svelte';
   import ItemCard from '../items/ItemCard.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -41,6 +41,7 @@
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
   import { childItemTypesForParent } from '../../utils/hierarchy.js';
+  import { showCreatedItemOutsideViewToast } from '../../utils/createdItemToast.js';
   import { indexCollectionHierarchy } from './collectionHierarchy.js';
   import {
     buildSwimlanes,
@@ -619,8 +620,14 @@
       } else if (membership === 'nonmember') {
         // Show toast notification if item won't be visible
         const selectedWorkspace = workspaces.find(w => w.id === state.workspaceId);
-        const workspaceName = selectedWorkspace?.name || 'another workspace';
-        infoToast(`Card created in ${workspaceName} but won't appear here due to collection filters`, 'Card created successfully');
+        const workspaceName = selectedWorkspace?.name || t('collections.anotherWorkspace');
+        const reason = collectionId
+          ? t('collections.collectionFiltersReason')
+          : t('collections.workspaceFilterReason');
+        showCreatedItemOutsideViewToast(newItem, {
+          message: t('collections.cardCreatedOutsideView', { workspace: workspaceName, reason }),
+          onOpen: () => openItem(newItem),
+        });
       }
 
       // Reset state and reload

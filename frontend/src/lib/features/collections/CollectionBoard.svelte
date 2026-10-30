@@ -91,7 +91,7 @@
   import { agentRuns } from '../../stores/agentRuns.svelte.js';
   import { getVisibleColor, hexToRgb } from '../../utils/colorUtils.js';
   import { formatDateOnly } from '../../utils/dateFormatter.js';
-  import { showCreatedItemToast } from '../../utils/createdItemToast.js';
+  import { showCreatedItemToast, showCreatedItemOutsideViewToast } from '../../utils/createdItemToast.js';
   import {
     childItemTypesForParent,
     isGenericSubtaskType,
@@ -476,10 +476,10 @@
         const reason = collectionId
           ? t('collections.collectionFiltersReason')
           : t('collections.workspaceFilterReason');
-        infoToast(
-          t('collections.cardCreatedOutsideView', { workspace: workspaceName, reason }),
-          t('collections.cardCreatedSuccess')
-        );
+        showCreatedItemOutsideViewToast(newItem, {
+          message: t('collections.cardCreatedOutsideView', { workspace: workspaceName, reason }),
+          onOpen: () => openItemById(newItem.id, newItem),
+        });
       }
 
       try {
@@ -753,14 +753,6 @@
 
   // Iteration filter derived values
   let activeLocalIteration = $derived(allIterations.find(i => !i.is_global && i.status === 'active'));
-
-  // The "current_iteration" completed preset scopes the deferred completed
-  // fetch to the board's active iteration once the catalog resolves.
-  $effect(() => {
-    const visibility = boardConfig?.view_settings?.completed_visibility ?? '';
-    if (visibility !== 'current_iteration') return;
-    collectionStore.setBoardCompletedIteration(activeLocalIteration?.id ?? null);
-  });
 
   let iterationFilterOptions = $derived.by(() => {
     const seen = new Set();
@@ -1799,16 +1791,20 @@
     return colorMap[categoryColor] || 'text-ds-text';
   }
 
-  function openItem(itemId, event) {
-    // Prevent event bubbling to avoid triggering drag
-    event.stopPropagation();
-    const item = itemsById.get(itemId);
+  function openItemById(itemId, knownItem = null) {
+    const item = knownItem ?? itemsById.get(itemId);
     if (item && personalWorkspaceIds.has(Number(item.workspace_id))) {
       selectedItemId = itemId;
       showItemModal = true;
       return;
     }
     itemModalStore.open(itemId, item?.workspace_id ?? workspaceId);
+  }
+
+  function openItem(itemId, event) {
+    // Prevent event bubbling to avoid triggering drag
+    event.stopPropagation();
+    openItemById(itemId);
   }
 
   function getMoveMenuItems(item) {
