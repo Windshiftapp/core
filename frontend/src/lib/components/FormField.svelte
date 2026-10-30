@@ -8,6 +8,8 @@
     helper = '',
     error = '',
     id = null,
+    /** Keeps the label in the layout (as a spacer) without showing it. */
+    labelHidden = false,
     children,
     class: className = ''
   } = $props();
@@ -15,7 +17,7 @@
 
 <div class="mb-4 {className}">
   {#if label}
-    <Label for={id} {required} color="default" class="mb-1.5">
+    <Label for={id} {required} color="default" class="mb-1.5 {labelHidden ? 'invisible' : ''}">
       {label}
     </Label>
   {/if}
