@@ -507,7 +507,6 @@ export const MAIN_APP_FOOTER_VIEWS = new Set([
   'approvals-inbox',
   'search',
   'about',
-  'api-docs',
   'licenses',
   '404',
   'workspace-detail',
