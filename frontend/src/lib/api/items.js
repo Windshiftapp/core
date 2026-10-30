@@ -368,6 +368,57 @@ export const items = {
     const params = maxDepth ? `?max_depth=${maxDepth}` : '';
     return fetchV2Data(`/items/${itemId}/descendants${params}`);
   },
+  /**
+   * Filtered item count per item-type hierarchy level, backing the level
+   * picker. `scope` mirrors the item list: workspace_id or collection_id, plus
+   * an optional sub_ql/ql filter.
+   */
+  getLevelCounts: (scope = {}, requestOptions = {}) =>
+    fetchV2Data(`/items/level-counts${buildQueryString(scope)}`, requestOptions),
+  /**
+   * Ancestor-scoped descendants of a set of roots, grouped by root. Returns
+   * [{ root_id, total, has_more, items: [{ ...item, depth, has_children }] }].
+   * Root ids are chunked under the server's 500-id cap.
+   */
+  getHierarchy: async (
+    {
+      rootIds = [],
+      workspaceId = null,
+      collectionId = null,
+      subQl = null,
+      ql = null,
+      maxDepth = 0,
+      perRootLimit = 100,
+      perRootOffset = 0,
+    } = {},
+    requestOptions = {}
+  ) => {
+    const unique = [...new Set(rootIds)].filter((id) => id != null);
+    if (unique.length === 0) return [];
+    const chunks = [];
+    for (let i = 0; i < unique.length; i += ITEM_BATCH_CHUNK) {
+      chunks.push(unique.slice(i, i + ITEM_BATCH_CHUNK));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        fetchV2Data('/items/hierarchy', {
+          method: 'POST',
+          body: JSON.stringify({
+            root_ids: chunk,
+            workspace_id: workspaceId,
+            collection_id: collectionId,
+            sub_ql: subQl,
+            ql: ql,
+            max_depth: maxDepth,
+            per_root_limit: perRootLimit,
+            per_root_offset: perRootOffset,
+          }),
+          ...requestOptions,
+        })
+      )
+    );
+    return results.flat();
+  },
   getTimeRollup: (itemId, { maxDepth = 10 } = {}) =>
     fetchV2Data(`/items/${itemId}/time-rollup?max_depth=${maxDepth}`),
   // Get available status transitions for a specific item based on workflow configuration

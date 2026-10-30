@@ -28,6 +28,16 @@ const COLLECTION_VIEWS = new Set([
 const BOARD_VIEWS = new Set(['workspace-board', 'collection-board']);
 const LIST_VIEWS = new Set(['workspace-list', 'collection-list']);
 const BACKLOG_VIEWS = new Set(['workspace-backlog', 'collection-backlog']);
+// Tree/map/roadmap build a hierarchy from the loaded set. They are rooted at one
+// item-type level (see docs/400-tree-hierarchy-level-design.md).
+const HIERARCHY_VIEWS = new Set([
+  'workspace-tree',
+  'collection-tree',
+  'workspace-map',
+  'collection-map',
+  'workspace-roadmap',
+  'collection-roadmap',
+]);
 
 const DEFAULT_PAGE_SIZE = 100;
 const LIST_INITIAL_PAGE_SIZE = 50;
@@ -176,6 +186,30 @@ class CollectionStore {
     }
   }
 
+  // Persisted hierarchy level for a scope/view, or null when none is stored.
+  #persistedHierarchyLevel(wsId, colId, view) {
+    const stored = collectionPreferences.getViewState(
+      wsId,
+      colId,
+      view?.split('-').at(-1)
+    )?.hierarchy_level;
+    const value = Number(stored);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  /**
+   * Select the item-type hierarchy level for a hierarchy view and reload the
+   * level-scoped base page. The picker persists the choice per scope.
+   */
+  setHierarchyLevel(level) {
+    const normalized = Number.isFinite(Number(level)) ? Number(level) : null;
+    if (normalized === this.hierarchyLevel) return;
+    this.hierarchyLevel = normalized;
+    if (this.#wsId || this.#colId) {
+      this.load(this.#wsId, this.#colId, this.#currentView);
+    }
+  }
+
   // Server-side sort state
   sortableFields = $state([]);
   boardConfiguration = $state(null);
@@ -186,6 +220,10 @@ class CollectionStore {
   #sortBy = null;
   #sortDirection = null;
   #boardSortMode = 'rank';
+  // Selected item-type hierarchy level for tree/map/roadmap. Null until the
+  // view resolves a persisted or default level; hierarchy item fetches are
+  // level-scoped and opt into has_children while it is set.
+  hierarchyLevel = $state(null);
 
   // Internal tracking
   #wsId = null;
@@ -254,6 +292,13 @@ class CollectionStore {
       this.showCompleted = this.#showCompletedFor(wsId, colId, view);
     }
 
+    // Hierarchy views always carry a level. Reuse a persisted choice so the
+    // first fetch is already level-scoped; otherwise the picker resolves the
+    // default from the level counts and calls setHierarchyLevel.
+    if (HIERARCHY_VIEWS.has(view) && (!sameCollection || viewChanged)) {
+      this.hierarchyLevel = this.#persistedHierarchyLevel(wsId, colId, view);
+    }
+
     // Switching between passive collection views does not need another network
     // roundtrip when the already-loaded item page is large enough and there is
     // no active server-side sort/filter. Board views fetch completed work
@@ -274,7 +319,8 @@ class CollectionStore {
       !this.subFilterQL &&
       !this.#sortBy &&
       !this.#sortDirection &&
-      !BOARD_VIEWS.has(view)
+      !BOARD_VIEWS.has(view) &&
+      !HIERARCHY_VIEWS.has(view)
     ) {
       this.#currentView = view;
       return;
@@ -636,6 +682,7 @@ class CollectionStore {
         sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
         requestOptions: FOREGROUND_READ,
+        ...this.#hierarchyFilters(),
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds ?? null),
       });
@@ -934,6 +981,7 @@ class CollectionStore {
         limit: pagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveSubFilterQL || undefined,
         requestOptions: BACKGROUND_READ,
+        ...this.#hierarchyFilters(),
         ...this.#itemSortOptions(),
         ...(deferred
           ? {
@@ -1485,6 +1533,16 @@ class CollectionStore {
       return opts;
     }
 
+    return {};
+  }
+
+  // Level scope for hierarchy item reads. Only applied once a level is
+  // resolved; has_children rides along so expanders render before any subtree
+  // load.
+  #hierarchyFilters() {
+    if (HIERARCHY_VIEWS.has(this.#currentView) && this.hierarchyLevel != null) {
+      return { level: this.hierarchyLevel, include_has_children: true };
+    }
     return {};
   }
 
