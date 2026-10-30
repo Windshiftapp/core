@@ -28,17 +28,46 @@ var (
 	classPattern        = regexp.MustCompile(`^(?:language-[A-Za-z0-9_+-]+)$`)
 	pageIDPattern       = regexp.MustCompile(`^\d+$`)
 	rasterDataPrefix    = regexp.MustCompile(`(?i)^image/(?:png|jpeg|gif|webp);base64,`)
+	mentionTokenPattern = regexp.MustCompile(`@\{([^}\n]*)#\d+\}`)
 	markdownHTML        = goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithASTTransformers(
-			util.Prioritized(linkPolicyTransformer{}, 500),
-		)),
+		goldmark.WithParserOptions(
+			parser.WithInlineParsers(util.Prioritized(mentionInlineParser{}, 500)),
+			parser.WithASTTransformers(util.Prioritized(linkPolicyTransformer{}, 500)),
+		),
 		goldmark.WithRendererOptions(renderer.WithNodeRenderers(
 			util.Prioritized(literalHTMLRenderer{}, 500),
 		)),
 	)
 	markdownPolicy = newPolicy()
 )
+
+// mentionInlineParser renders the stored @{Display Name#123} token as its
+// display text. Inline parsers do not run inside code spans or fenced blocks,
+// so literal examples survive unchanged.
+type mentionInlineParser struct{}
+
+func (mentionInlineParser) Trigger() []byte { return []byte{'@'} }
+
+func (mentionInlineParser) Parse(parent ast.Node, block text.Reader, _ parser.Context) ast.Node {
+	line, segment := block.PeekLine()
+	match := mentionTokenPattern.FindSubmatchIndex(line)
+	if len(match) == 0 || match[0] != 0 {
+		return nil
+	}
+	// Mirror the mention parser's word boundary so a token glued to a word
+	// (for example "foo@{A#1}") is not rewritten as a mention.
+	if segment.Start > 0 && isMentionBoundaryChar(block.Source()[segment.Start-1]) {
+		return nil
+	}
+	name := line[match[2]:match[3]]
+	block.Advance(match[1])
+	return ast.NewString(append([]byte("@"), name...))
+}
+
+func isMentionBoundaryChar(c byte) bool {
+	return c == '.' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
 
 type linkPolicyTransformer struct{}
 
@@ -110,6 +139,13 @@ func validDestination(destination string, image bool) bool {
 
 func unicodeURLControl(r rune) bool {
 	return unicode.IsControl(r) || unicode.IsSpace(r)
+}
+
+// StripMentionIDs rewrites @{Display Name#123} tokens to their display text.
+// Callers that cannot run the Markdown renderer (plain-text email bodies) use
+// it so the embedded id is never exposed.
+func StripMentionIDs(source string) string {
+	return mentionTokenPattern.ReplaceAllString(source, "@$1")
 }
 
 // Render converts Markdown source to sanitized HTML. Source is never changed.

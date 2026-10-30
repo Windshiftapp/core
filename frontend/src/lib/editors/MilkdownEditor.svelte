@@ -205,9 +205,9 @@
     if (!editor || !mentionRange) return;
     const range = mentionRange;
 
-    // The picker supplies the identifier from the full roster so a duplicated
-    // display name becomes @username instead of an ambiguous @"Name".
-    const mentionText = user.mentionText || mentionTextFor(user, [user]);
+    // The picker supplies the token, which embeds the user id so the mention
+    // resolves without depending on a display name being unique.
+    const mentionText = user.mentionText || mentionTextFor(user);
 
     // Get the editor view and replace the mention range with the formatted mention
     editor.action((ctx) => {
@@ -258,10 +258,11 @@
     return mentionRosterPromise;
   }
 
-  // Resolve the hovered mention against the same roster the picker offers, so
-  // the card shows the person the mention refers to. A display-name mention
-  // that matches several people shows every candidate instead of guessing.
-  async function loadUserForHoverCard(identifier) {
+  // Resolve the hovered mention to a single user. Id-embedded mentions resolve
+  // by id; legacy mentions resolve against the same roster the picker offers, so
+  // a display name that matches several people shows every candidate instead of
+  // guessing.
+  async function loadUserForHoverCard(target) {
     const request = ++hoverCardRequest;
     hoverCardLoading = true;
     hoverCardUser = null;
@@ -269,9 +270,13 @@
     try {
       const roster = await ensureMentionRoster();
       if (request !== hoverCardRequest) return;
-      const resolved = resolveMentionUser(roster, identifier);
-      hoverCardUser = resolved.user;
-      hoverCardMatches = resolved.user ? [] : resolved.matches;
+      if (target.userId) {
+        hoverCardUser = (roster || []).find((user) => user.id === target.userId) || null;
+      } else {
+        const resolved = resolveMentionUser(roster, target.identifier);
+        hoverCardUser = resolved.user;
+        hoverCardMatches = resolved.user ? [] : resolved.matches;
+      }
     } catch (e) {
       if (request !== hoverCardRequest) return;
       console.error('Failed to load users for hover card:', e);
@@ -279,7 +284,7 @@
     if (request === hoverCardRequest) hoverCardLoading = false;
   }
 
-  function showHoverCard(element, identifier) {
+  function showHoverCard(element, target) {
     if (hideCardTimeout) {
       clearTimeout(hideCardTimeout);
       hideCardTimeout = null;
@@ -294,7 +299,7 @@
       hoverCardVisible = true;
       hoverCardUser = null;
       hoverCardMatches = [];
-      loadUserForHoverCard(identifier);
+      loadUserForHoverCard(target);
     }, 300);
   }
 
@@ -330,11 +335,15 @@
   // Event delegation handlers for mention hover (more efficient than MutationObserver)
   function handleMentionMouseOver(e) {
     const chip = e.target.closest('.mention-chip');
-    if (chip) {
-      const identifier = chip.dataset.mention;
-      if (identifier) {
-        showHoverCard(chip, identifier);
-      }
+    if (!chip) return;
+    const userId = Number(chip.dataset.mentionUserId);
+    if (Number.isInteger(userId) && userId > 0) {
+      showHoverCard(chip, { userId });
+      return;
+    }
+    const identifier = chip.dataset.mention;
+    if (identifier) {
+      showHoverCard(chip, { identifier });
     }
   }
 

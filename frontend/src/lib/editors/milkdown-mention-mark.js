@@ -4,8 +4,10 @@ import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 
-// Regex to find mentions in text: @username or @"Display Name"
-const MENTION_REGEX = /(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?<![a-zA-Z0-9.])@"([^"]+)"/g;
+// Mentions in text: @{Display Name#123} (id-embedded), @username, or
+// @"Display Name".
+const MENTION_REGEX =
+  /(?<![a-zA-Z0-9.])@\{([^}\n]*)#(\d+)\}|(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?<![a-zA-Z0-9.])@"([^"]+)"/g;
 
 /**
  * Creates decorations for all mentions found in the document
@@ -26,9 +28,39 @@ function createMentionDecorations(doc) {
         const fullMatch = match[0];
         const from = pos + match.index;
         const to = from + fullMatch.length;
-        // Extract the identifier (username or display name without quotes)
-        const identifier = match[1] || match[2];
-        const isQuoted = match[2] !== undefined;
+
+        if (match[2] !== undefined) {
+          // @{Display Name#123}: hide the @"{" prefix and the "#123}" suffix so
+          // only the display name shows as a chip. The embedded id drives the
+          // hover card and never depends on the name being unique.
+          const name = match[1];
+          const suffix = `#${match[2]}}`;
+          const nameStart = from + 2;
+          const nameEnd = to - suffix.length;
+
+          decorations.push(
+            Decoration.inline(from, nameStart, {
+              class: 'mention-chip-hidden',
+            })
+          );
+          decorations.push(
+            Decoration.inline(nameStart, nameEnd, {
+              class: 'mention-chip mention-chip-name',
+              'data-mention': name,
+              'data-mention-user-id': match[2],
+              'data-testid': `mention-chip-${name}`,
+            })
+          );
+          decorations.push(
+            Decoration.inline(nameEnd, to, {
+              class: 'mention-chip-hidden',
+            })
+          );
+          continue;
+        }
+
+        const identifier = match[3] !== undefined ? match[3] : match[4];
+        const isQuoted = match[4] !== undefined;
 
         if (isQuoted) {
           // For quoted mentions like @"Display Name", create three decorations:
