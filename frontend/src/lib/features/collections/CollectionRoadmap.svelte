@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { items as itemsApi } from '../../api/items.js';
   import { collections } from '../../api/collections.js';
@@ -387,7 +387,8 @@
   let headerLabels = $derived.by(() => {
     if (zoom === 'week') {
       return columns.map(d => ({
-        label: d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }),
+        label: String(d.getDate()),
+        weekday: d.toLocaleDateString(undefined, { weekday: 'short' }),
         sublabel: '',
         date: d
       }));
@@ -395,12 +396,14 @@
     if (zoom === 'month') {
       return columns.map(d => ({
         label: `${d.getDate()}`,
+        weekday: '',
         sublabel: d.toLocaleDateString(undefined, { month: 'short' }),
         date: d
       }));
     }
     return columns.map(d => ({
       label: d.toLocaleDateString(undefined, { month: 'short' }),
+      weekday: '',
       sublabel: String(d.getFullYear()),
       date: d
     }));
@@ -865,10 +868,15 @@
     scrollOffset += zoomConfig.navigationColumns;
   }
 
-  function goToToday() {
+  // "Today" resets the offset and scrolls to the reference column, which is
+  // today's week/month. Items scheduled before today prepend columns, so
+  // scrollLeft 0 points into the past and the anchor must be computed.
+  async function goToToday() {
     scrollOffset = 0;
-    timelineScrollLeft = 0;
-    if (timelineScrollContainer) timelineScrollContainer.scrollLeft = 0;
+    await tick();
+    const target = gridOffset * colWidth;
+    timelineScrollLeft = target;
+    if (timelineScrollContainer) timelineScrollContainer.scrollLeft = target;
   }
 
   // Item click
@@ -1133,7 +1141,12 @@
     }
   }
 
-  let isAwayFromToday = $derived(scrollOffset !== 0 || timelineScrollLeft > 0);
+  // The today anchor is the reference column's left edge; prepended past
+  // columns make scrollLeft 0 point at the past, not at today.
+  let todayScrollLeft = $derived(gridOffset * colWidth);
+  let isAwayFromToday = $derived(
+    scrollOffset !== 0 || Math.abs(timelineScrollLeft - todayScrollLeft) > 1
+  );
 
   useResizeObserver(() => timelineScrollContainer, (entries) => {
     const entry = entries[0];
@@ -1330,6 +1343,7 @@
             <ChevronLeft class="w-4 h-4" />
           </button>
           <button
+            data-testid="roadmap-today"
             class="px-2 py-1 text-xs font-medium rounded transition-colors"
             style="color: var(--ctx-text-subtle, var(--ds-text-subtle)); border: 1px solid var(--ctx-border, var(--ds-border));"
             onclick={goToToday}
@@ -1509,13 +1523,18 @@
                 </div>
 
                 <!-- Header row: column labels -->
-                <div class="flex sticky top-[29px] z-30" style="border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
+                <div class="flex sticky top-[29px] z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
                   {#each headerLabels as col, i}
                     <div
-                      class="text-center py-1.5 text-xs shrink-0"
+                      class="flex flex-col items-center justify-center text-center shrink-0"
                       style="width: {colWidth}px; color: var(--ds-text-subtlest); border-left: 1px solid var(--ds-border-subtle, var(--ds-border));"
                     >
-                      {col.label}
+                      {#if zoom === 'week'}
+                        <span class="text-[10px] leading-none">{col.weekday}</span>
+                        <span class="mt-0.5 text-[11px] font-medium leading-none">{col.label}</span>
+                      {:else}
+                        <span class="text-xs leading-none">{col.label}</span>
+                      {/if}
                     </div>
                   {/each}
                 </div>
@@ -1549,6 +1568,7 @@
                           <!-- Today line -->
                           {#if (todayColumnIndex + gridOffset) >= 0 && (todayColumnIndex + gridOffset) < columns.length}
                             <div
+                              data-testid="roadmap-today-line"
                               class="absolute top-0 bottom-0"
                               style="left: {(todayColumnIndex + gridOffset) * colWidth}px; width: 2px; background-color: var(--ds-accent-red); opacity: 0.6; z-index: 5;"
                             ></div>
