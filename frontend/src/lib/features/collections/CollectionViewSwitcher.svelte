@@ -61,13 +61,6 @@
       : `/collections/${collectionId}/board/configure`;
     navigate(url);
   }
-
-  function goToNavConfig() {
-    const url = workspaceId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/nav-config`
-      : `/collections/${collectionId}/nav-config`;
-    navigate(url);
-  }
 </script>
 
 <ButtonGroup testid="board-view-switcher">
@@ -110,20 +103,6 @@
       >
         <Settings class="w-4 h-4" />
         {t('collections.configure')}
-      </button>
-    {/if}
-
-    <!-- Navigation visibility entry point for collection scopes. -->
-    {#if collectionId && canConfigure}
-      <button
-        class={segment}
-        title={t('navConfig.configureTitle')}
-        aria-label={t('navConfig.configureTitle')}
-        data-testid="collection-nav-config-button"
-        onclick={goToNavConfig}
-      >
-        <Settings class="w-4 h-4" />
-        <span class="sr-only">{t('navConfig.configureTitle')}</span>
       </button>
     {/if}
 

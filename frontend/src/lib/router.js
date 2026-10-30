@@ -419,6 +419,7 @@ export function initRouter() {
 export const GLOBAL_COLLECTION_VIEWS = new Set([
   'collection-board',
   'collection-board-config',
+  'collection-nav-config',
   'collection-backlog',
   'collection-list',
   'collection-tree',

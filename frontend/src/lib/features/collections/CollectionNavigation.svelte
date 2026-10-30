@@ -3,13 +3,16 @@
   import List from '@tabler/icons-svelte-runes/icons/list';
   import MapPin from '@tabler/icons-svelte-runes/icons/map-pin';
   import Pencil from '@tabler/icons-svelte-runes/icons/pencil';
+  import Settings from '@tabler/icons-svelte-runes/icons/settings';
   import Rows_3 from '@tabler/icons-svelte-runes/icons/layout-rows';
   import ListTree from '@tabler/icons-svelte-runes/icons/list-tree';
   import FolderOpen from '@tabler/icons-svelte-runes/icons/folder-open';
   import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
   import GanttChart from '@lucide/svelte/icons/gantt-chart';
   import { t } from '../../stores/i18n.svelte.js';
-  import { navigate, currentRoute } from '../../router.js';
+  import { currentRoute } from '../../router.js';
+  import { viewSettingsStore } from '../../stores/viewSettings.svelte.js';
+  import { authStore } from '../../stores/auth.svelte.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Button from '../../components/Button.svelte';
   import { uiStore, WS_SIDEBAR_DEFAULT_WIDTH } from '../../stores/ui.svelte.js';
@@ -39,8 +42,33 @@
     return `/collections/${collectionId}/${viewId}`;
   }
 
-  let collectionName = $derived(collectionStore.collectionName);
+  let collectionName = $derived(collectionStore.boardCollection?.name || collectionStore.collectionName);
   let itemCount = $derived(collectionStore.collectionTotal);
+
+  // Keep the scope's enabled views warm and mirror them in the sidebar so
+  // nav-config toggles apply here too.
+  $effect(() => {
+    if (collectionId) viewSettingsStore.load(null, collectionId);
+  });
+  let enabledViewIds = $derived(
+    new Set(viewSettingsStore.enabledViewIds(null, collectionId))
+  );
+  let visibleCollectionViewItems = $derived(
+    collectionViewItems.filter((view) => enabledViewIds.has(view.id))
+  );
+
+  // Collection views are creator-owned (backend gate), so only the creator
+  // gets the navigation-config entry point.
+  let canConfigureNav = $derived(
+    Boolean(
+      collectionId &&
+        collectionStore.boardCollection &&
+        authStore.currentUser?.id != null &&
+        String(collectionStore.boardCollection.created_by) === String(authStore.currentUser.id)
+    )
+  );
+  let navConfigUrl = $derived(`/collections/${collectionId}/nav-config`);
+  let isNavConfigActive = $derived($currentRoute.view === 'collection-nav-config');
 
   const sidebarBgStyle =
     'background-color: var(--ds-surface); border-color: var(--ds-border); --scrollable-sidebar-fade-color: var(--ds-surface);';
@@ -122,7 +150,7 @@
     scrollClass="w-full"
   >
     <div class="flex flex-col items-center space-y-1 mt-2">
-      {#each collectionViewItems as view (view.id)}
+      {#each visibleCollectionViewItems as view (view.id)}
         {@const isActive = $currentRoute.view === view.routeView}
         {@const ViewIcon = view.icon}
         <Tooltip content={view.label} placement="right">
@@ -150,6 +178,19 @@
           <Pencil size={20} />
         </a>
       </Tooltip>
+
+      {#if canConfigureNav}
+        <Tooltip content={t('navConfig.configureTitle')} placement="right">
+          <a
+            href={navConfigUrl}
+            data-testid="collection-nav-config-link"
+            class="nav-link w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
+            class:active={isNavConfigActive}
+          >
+            <Settings size={20} />
+          </a>
+        </Tooltip>
+      {/if}
     </div>
   </ScrollableSidebar>
 {:else}
@@ -164,7 +205,7 @@
   >
     <nav class="space-y-2 pb-2">
       <!-- View Items -->
-      {#each collectionViewItems as view (view.id)}
+      {#each visibleCollectionViewItems as view (view.id)}
         {@const isActive = $currentRoute.view === view.routeView}
         {@const ViewIcon = view.icon}
         <Tooltip content={view.tooltip} placement="right">
@@ -196,6 +237,20 @@
             Edit Collection
           </a>
         </Tooltip>
+
+        {#if canConfigureNav}
+          <Tooltip content={t('navConfig.configureTitle')} placement="right">
+            <a
+              href={navConfigUrl}
+              data-testid="collection-nav-config-link"
+              class="nav-link w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item mt-2 no-underline"
+              class:active={isNavConfigActive}
+            >
+              <Settings class="w-4 h-4" />
+              {t('navConfig.configureTitle')}
+            </a>
+          </Tooltip>
+        {/if}
       </div>
     </nav>
   </ScrollableSidebar>
