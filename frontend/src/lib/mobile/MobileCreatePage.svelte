@@ -5,7 +5,9 @@
   import { iterations as iterationsApi, milestones as milestonesApi } from '../api/milestones.js';
   import { time } from '../api/time.js';
   import { items } from '../api/items.js';
-  import { currentRoute, navigate, setNavigationInterceptor } from '../router.js';
+  import { currentRoute, navigate } from '../router.js';
+  import { useMobileDraft } from './useMobileDraft.svelte.js';
+  import './mobileHeroFields.css';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import FileText from '@lucide/svelte/icons/file-text';
@@ -132,69 +134,26 @@
   // Personal workspace is loaded on-demand; the store keeps it once fetched.
   const personalWorkspace = $derived($workspacesStore.personalWorkspace ?? null);
 
-  // Unsaved-input guard: leaving with a draft title asks for confirmation —
-  // via the header Cancel and via the back gesture (router interceptor).
-  let confirmDiscardOpen = $state(false);
+  // Unsaved-input guard and draft persistence: a draft title asks for
+  // confirmation before leaving, and title/description survive a reload or app
+  // kill until the item is created or the draft is discarded.
   const isDirty = $derived(title.trim() !== '');
-
-  $effect(() => {
-    setNavigationInterceptor(() => {
-      if (!isDirty) return false;
-      confirmDiscardOpen = true;
-      return true;
-    });
-    return () => setNavigationInterceptor(null);
+  const draft = useMobileDraft({
+    draftKey: () =>
+      isPersonal
+        ? 'ws-draft:m-create:personal'
+        : parentId != null
+          ? `ws-draft:m-create:child-${parentId}`
+          : 'ws-draft:m-create:work',
+    isDirty: () => isDirty,
+    isSaving: () => saving,
+    values: () => ({ title, description }),
+    applyDraft: (saved) => {
+      if (!title && typeof saved?.title === 'string') title = saved.title;
+      if (!description && typeof saved?.description === 'string') description = saved.description;
+    },
+    shouldWrite: () => Boolean(title || description),
   });
-
-  // Draft persistence (sessionStorage): title/description survive a reload
-  // or app kill; cleared on successful create and on explicit discard.
-  const draftKey = $derived(
-    isPersonal
-      ? 'ws-draft:m-create:personal'
-      : parentId != null
-        ? `ws-draft:m-create:child-${parentId}`
-        : 'ws-draft:m-create:work'
-  );
-  let hydratedDraftKey = $state(null);
-  let draftRetired = false;
-  $effect(() => {
-    const key = draftKey;
-    if (hydratedDraftKey === key) return;
-    hydratedDraftKey = key;
-    try {
-      const raw = sessionStorage.getItem(key);
-      if (!raw) return;
-      const draft = JSON.parse(raw);
-      if (!title && typeof draft?.title === 'string') title = draft.title;
-      if (!description && typeof draft?.description === 'string') description = draft.description;
-    } catch {
-      /* corrupt draft — start clean */
-    }
-  });
-  $effect(() => {
-    if (!hydratedDraftKey || saving || draftRetired) return;
-    try {
-      if (title || description) {
-        sessionStorage.setItem(draftKey, JSON.stringify({ title, description }));
-      } else {
-        sessionStorage.removeItem(draftKey);
-      }
-    } catch {
-      /* storage unavailable — drafts are best-effort */
-    }
-  });
-
-  function clearDraft() {
-    // Retire the write-back effect first: when `saving` flips to false in
-    // submit's finally, the effect must not resurrect the draft before the
-    // page unmounts.
-    draftRetired = true;
-    try {
-      sessionStorage.removeItem(draftKey);
-    } catch {
-      /* ignore */
-    }
-  }
 
   const customFieldsById = $derived.by(() => {
     const map = new Map();
@@ -715,7 +674,7 @@
       if (!isPersonal && !validateConfiguredFields()) return;
 
       const result = await items.create(createPayload());
-      clearDraft();
+      draft.clearDraft();
       if (isPersonal) {
         // Back to the Personal checklist; the tab remounts and loads the new
         // task, matching the desktop PersonalTasksPanel behavior of staying
@@ -741,7 +700,7 @@
   // Cancel / back: a draft title asks for confirmation before being discarded.
   function requestCancel() {
     if (isDirty) {
-      confirmDiscardOpen = true;
+      draft.confirmDiscardOpen = true;
       return;
     }
     leave();
@@ -751,9 +710,8 @@
   // this page (the navigation interceptor owns the back gesture), so the
   // deterministic replace from leave() is safe — including via deep link.
   function discardAndLeave() {
-    clearDraft();
-    setNavigationInterceptor(null);
-    confirmDiscardOpen = false;
+    draft.clearDraft();
+    draft.confirmDiscardOpen = false;
     leave();
   }
 
@@ -926,7 +884,7 @@
      title. The sheet pushes no history sentinel: the navigation interceptor
      owns the back gesture on this page. -->
 <MobileConfirmSheet
-  bind:isOpen={confirmDiscardOpen}
+  bind:isOpen={draft.confirmDiscardOpen}
   title={t('mobile.create.discardTitle')}
   message={t('mobile.create.discardMessage')}
   confirmLabel={t('common.discard')}
@@ -1106,38 +1064,12 @@
   .create { display: flex; flex-direction: column; gap: 0.5rem; }
   .parent { margin: 0 0 0.25rem; font-size: 0.8125rem; color: var(--ds-text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Linear-style borderless hero fields. The title textarea wraps and grows
-     with its content (autoGrow action) so long titles stay fully visible. */
-  .hero-title {
-    width: 100%;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--ds-text);
-    font-family: inherit;
-    font-size: 1.35rem;
-    font-weight: var(--font-semibold, 600);
-    line-height: 1.25;
-    overflow: hidden;
-    resize: none;
-  }
-  .hero-title::placeholder { color: var(--ds-text-subtlest, var(--ds-text-subtle)); font-weight: var(--font-semibold, 600); }
+  /* The borderless hero field styles are shared via mobileHeroFields.css;
+     only the create page's description height differs. */
   .hero-desc {
-    width: 100%;
     min-height: 5.5rem;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--ds-text);
-    font-family: inherit;
-    font-size: max(1rem, 16px);
-    line-height: 1.5;
     resize: none;
   }
-  .hero-desc::placeholder { color: var(--ds-text-subtlest, var(--ds-text-subtle)); }
-  .hero-title:focus,
-  .hero-desc:focus { outline: none; }
 
   /* In-flow secondary controls (template picker, custom fields) — minimal,
      borderless: a small label plus the control, no boxes. */
