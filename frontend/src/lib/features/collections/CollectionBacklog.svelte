@@ -28,6 +28,7 @@
   import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
+  import { useCollectionDragDrop } from '../../composables/useCollectionDragDrop.js';
   import { errorToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
@@ -46,7 +47,6 @@
   let backlogItemsById = $derived(new Map(backlogItems.map((item) => [item.id, item])));
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
-  let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
 
   // Edge-based drag state (must use $state for Svelte 5 reactivity)
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
@@ -507,12 +507,9 @@
         const item = backlogItemsById.get(itemId);
         const closestEdge = extractClosestEdge(self.data);
         if (item && data.type === 'work-item' && closestEdge) {
-          handleEdgeBasedDrop(
-            data.item,
-            item,
-            closestEdge,
-            element.dataset.sectionId || 'unassigned'
-          );
+          handleEdgeBasedDrop(data.item, item, closestEdge, {
+            sectionId: element.dataset.sectionId || 'unassigned',
+          });
         }
       }
     });
@@ -561,24 +558,21 @@
     };
   }
 
-  async function handleEdgeBasedDrop(draggedItem, targetItem, closestEdge, targetSectionId) {
-    // Create a unique identifier for this drop operation
-    const dropId = `${draggedItem.id}-edge-${targetItem.id}-${closestEdge}`;
-
-    try {
-      // Prevent duplicate drops
-      if (pendingDrops.has(dropId)) {
-        return;
-      }
-
-      pendingDrops.add(dropId);
-
-      // Determine target iteration_id from the section the target item lives in
-      const targetIterationId = targetSectionId === 'unassigned' ? null : (typeof targetSectionId === 'string' ? parseInt(targetSectionId) : targetSectionId);
+  // Cross-section moves update the iteration first; the shared composable then
+  // ranks the item within its target section.
+  const { pendingDrops, handleEdgeBasedDrop } = useCollectionDragDrop({
+    reload: () => reloadCollection(),
+    getSiblingItems: ({ target }) => getSectionItems(target.sectionId),
+    beforeReorder: async ({ draggedItem, target }) => {
+      const targetIterationId =
+        target.sectionId === 'unassigned'
+          ? null
+          : typeof target.sectionId === 'string'
+            ? parseInt(target.sectionId)
+            : target.sectionId;
       const sourceSectionId = draggedItem.iteration_id || null;
 
-      // Cross-section move: update iteration_id
-      const crossSection = (sourceSectionId !== targetIterationId);
+      const crossSection = sourceSectionId !== targetIterationId;
       if (crossSection) {
         // Warn if target iteration is active
         const targetIteration = allIterations.find(i => i.id === targetIterationId);
@@ -589,64 +583,12 @@
         collectionStore.patchItem(draggedItem.id, { iteration_id: targetIterationId });
       }
 
-      // Compute prev/next within the target section
-      const sectionItems = getSectionItems(targetSectionId).filter(i => i.id !== draggedItem.id);
-      const targetIndex = sectionItems.findIndex(i => i.id === targetItem.id);
-
-      // Check if we're trying to drop in the same position (only matters for within-section)
-      if (!crossSection) {
-        const fullSectionItems = getSectionItems(targetSectionId);
-        const draggedIndex = fullSectionItems.findIndex(i => i.id === draggedItem.id);
-        const origTargetIndex = fullSectionItems.findIndex(i => i.id === targetItem.id);
-        const isDroppingSamePosition = (
-          (closestEdge === 'top' && draggedIndex === origTargetIndex - 1) ||
-          (closestEdge === 'bottom' && draggedIndex === origTargetIndex + 1)
-        );
-        if (isDroppingSamePosition) return;
-      }
-
-      let prevItemId = null;
-      let nextItemId = null;
-
-      if (closestEdge === 'top') {
-        if (targetIndex > 0) {
-          const prevItem = sectionItems[targetIndex - 1];
-          if (prevItem) prevItemId = prevItem.id;
-        }
-        nextItemId = targetItem.id;
-      } else if (closestEdge === 'bottom') {
-        prevItemId = targetItem.id;
-        if (targetIndex < sectionItems.length - 1) {
-          const nextItem = sectionItems[targetIndex + 1];
-          if (nextItem) nextItemId = nextItem.id;
-        }
-      }
-
-      // Update the frac_index using item IDs
-      const indexData = {
-        previous_item_id: prevItemId,
-        next_item_id: nextItemId
+      return {
+        item: { ...draggedItem, iteration_id: targetIterationId },
+        checkSamePosition: !crossSection,
       };
-      await items.updateFracIndex(draggedItem.id, indexData);
-
-      // Reload data from central store to get the correct ordering
-      reloadCollection();
-
-    } catch (error) {
-      console.error('Failed to handle edge-based drop:', error);
-      console.error('Error details:', error.message);
-
-      // If we get a rank ordering error, reload fresh data
-      if (error.status === 500) {
-        reloadCollection();
-      }
-    } finally {
-      // Always remove from pending drops
-      setTimeout(() => {
-        pendingDrops.delete(dropId);
-      }, 500); // Small delay to prevent rapid re-triggering
-    }
-  }
+    },
+  });
 
   async function handleSectionDrop(draggedItem, targetIterationId) {
     const dropId = `${draggedItem.id}-section-${targetIterationId}`;

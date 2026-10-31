@@ -84,6 +84,7 @@
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
+  import { useCollectionDragDrop } from '../../composables/useCollectionDragDrop.js';
   import { createDependencyLoader } from './dependencyLoader.svelte.js';
   import { loadedVisibleItemIDs, visibleAssigneeIDs } from './boardHydration.js';
   import { useCollectionSearch } from '../../composables/useCollectionSearch.svelte.js';
@@ -169,7 +170,6 @@
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
   const boardColumnElements = new Set();
-  let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
 
@@ -1927,13 +1927,10 @@
         const item = itemsById.get(itemId);
         const targetStatus = getStatusByItemId(itemId);
         if (item && data.type === 'work-item' && closestEdge && targetStatus) {
-          handleEdgeBasedDrop(
-            data.item,
-            item,
-            closestEdge,
-            targetStatus,
-            parseLaneTarget(element)
-          );
+          handleEdgeBasedDrop(data.item, item, closestEdge, {
+            status: targetStatus,
+            laneTarget: parseLaneTarget(element),
+          });
         }
       }
     });
@@ -2062,17 +2059,17 @@
     collectionStore.patchItem(itemId, updatedItem);
   }
 
-  async function handleEdgeBasedDrop(draggedItem, targetItem, closestEdge, targetStatus, laneTarget = null) {
-    // Create a unique identifier for this drop operation
-    const dropId = `${draggedItem.id}-edge-${targetItem.id}-${closestEdge}`;
-
-    try {
-      // Prevent duplicate drops
-      if (pendingDrops.has(dropId)) {
-        return;
-      }
-
-      pendingDrops.add(dropId);
+  // The board prepares a drop by resolving the target column, transitioning
+  // status and applying the lane target; the shared composable then ranks the
+  // card within the resolved lane.
+  const { handleEdgeBasedDrop } = useCollectionDragDrop({
+    reload: () => reloadCollection(),
+    getSiblingItems: ({ target }) => {
+      const laneItems = boardGroupingActive ? getItemsForBoardLane(target.laneTarget) : filteredItems;
+      return getItemsByStatus(target.status.id, laneItems);
+    },
+    beforeReorder: async ({ draggedItem, target }) => {
+      const { status: targetStatus, laneTarget } = target;
 
       // Reset all column border styles immediately
       resetAllColumnStyles();
@@ -2089,7 +2086,7 @@
         : null;
       if (targetStatusId == null) {
         reloadCollection();
-        return;
+        return null;
       }
 
       // Check if we need to update status
@@ -2102,113 +2099,51 @@
       ) {
         warnUnsupportedCombinedBoardMove();
         reloadCollection();
-        return;
+        return null;
       }
 
       if (!(await confirmMilestoneLaneDrop(draggedItem, laneTarget))) {
-        return;
+        return null;
       }
+
+      let preparedItem = draggedItem;
 
       // If changing status, update the status first
       if (!isSameStatus) {
-        updateLocalItemStatus(draggedItem.id, targetStatusId);
+        updateLocalItemStatus(preparedItem.id, targetStatusId);
         try {
-          const transitionedItem = await itemsApi.transition(draggedItem.id, targetStatusId);
-          draggedItem = { ...draggedItem, ...transitionedItem, status_id: targetStatusId };
-          mergeLocalItem(draggedItem.id, draggedItem);
+          const transitionedItem = await itemsApi.transition(preparedItem.id, targetStatusId);
+          preparedItem = { ...preparedItem, ...transitionedItem, status_id: targetStatusId };
+          mergeLocalItem(preparedItem.id, preparedItem);
         } catch (err) {
-          updateLocalItemStatus(draggedItem.id, currentStatusId);
+          updateLocalItemStatus(preparedItem.id, currentStatusId);
           console.error('Status transition failed:', err);
           warningToast(err?.message || t('collections.transition_failed'));
           reloadCollection();
-          return;
+          return null;
         }
       }
 
-      draggedItem = await applyLaneTarget(draggedItem, laneTarget);
+      preparedItem = await applyLaneTarget(preparedItem, laneTarget);
 
       // Bubble Mode disables manual rank ordering. Cross-column drags above have
       // already transitioned status (which bumps the card to the top via
       // last_active_at); a same-column drag is a no-op. Either way, skip the
       // frac_index reorder and just refresh.
       if (sortMode === 'bubble') {
-        if (isSameStatus && !wouldChangeBoardLane(draggedItem, laneTarget)) {
+        if (isSameStatus && !wouldChangeBoardLane(preparedItem, laneTarget)) {
           infoToast(
             t('collections.manual_sort_unavailable'),
             t('collections.manual_sort_unavailable_title')
           );
         }
         reloadCollection();
-        return;
+        return null;
       }
 
-      // Get items in the target status for position calculation
-      const laneItems = boardGroupingActive ? getItemsForBoardLane(laneTarget) : filteredItems;
-      const statusItems = getItemsByStatus(targetStatus.id, laneItems);
-
-      // Find the target item's position in the sorted status items
-      const targetIndex = statusItems.findIndex(item => item.id === targetItem.id);
-      const draggedIndex = statusItems.findIndex(item => item.id === draggedItem.id);
-
-      // Remove the dragged item from consideration to get accurate neighboring items
-      const otherItems = statusItems.filter(item => item.id !== draggedItem.id);
-      const adjustedTargetIndex = otherItems.findIndex(item => item.id === targetItem.id);
-
-      // Check if we're trying to drop in the same position
-      const isDroppingSamePosition = (
-        (closestEdge === 'top' && draggedIndex === targetIndex - 1) ||
-        (closestEdge === 'bottom' && draggedIndex === targetIndex + 1)
-      );
-
-      if (isDroppingSamePosition && isSameStatus) {
-        return;
-      }
-
-      // Calculate item IDs based on edge (backend will determine actual global ranks)
-      let prevItemId = null;
-      let nextItemId = null;
-
-      if (closestEdge === 'top') {
-        // Insert before target item
-        if (adjustedTargetIndex > 0) {
-          const prevItem = otherItems[adjustedTargetIndex - 1];
-          if (prevItem) prevItemId = prevItem.id;
-        }
-        if (targetItem) nextItemId = targetItem.id;
-      } else if (closestEdge === 'bottom') {
-        // Insert after target item
-        if (targetItem) prevItemId = targetItem.id;
-        if (adjustedTargetIndex < otherItems.length - 1) {
-          const nextItem = otherItems[adjustedTargetIndex + 1];
-          if (nextItem) nextItemId = nextItem.id;
-        }
-      }
-
-      // Update the frac_index using item IDs
-      const indexData = {
-        previous_item_id: prevItemId,
-        next_item_id: nextItemId
-      };
-      const updatedItem = await itemsApi.updateFracIndex(draggedItem.id, indexData);
-
-      // Reload data from central store to get the correct ordering
-      reloadCollection();
-
-    } catch (error) {
-      console.error('Failed to handle edge-based drop:', error);
-      console.error('Error details:', error.message);
-
-      // If we get a rank ordering error, reload fresh data
-      if (error.status === 500) {
-        reloadCollection();
-      }
-    } finally {
-      // Always remove from pending drops
-      setTimeout(() => {
-        pendingDrops.delete(dropId);
-      }, 500); // Small delay to prevent rapid re-triggering
-    }
-  }
+      return { item: preparedItem, checkSamePosition: isSameStatus };
+    },
+  });
 
 
 </script>
