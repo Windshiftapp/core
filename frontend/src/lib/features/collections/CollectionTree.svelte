@@ -276,18 +276,36 @@
   }
 
   // Depth indent for the tree column: the padding creates the offset and a
-  // repeating gradient draws one guide line per ancestor level so nesting is
-  // visible even when the row is otherwise flat. The background is clipped to
-  // the indent width, so it never runs under the row's content.
-  function getIndentStyle(level) {
-    if (!level) return undefined;
-    const width = getIndentLevel(level);
-    return [
-      `padding-left: ${width}`,
-      'background-image: repeating-linear-gradient(to right, transparent 0 0.75rem, var(--ds-border) 0.75rem 0.8125rem, transparent 0.8125rem 1.5rem)',
-      `background-size: ${width} 100%`,
-      'background-repeat: no-repeat',
-    ].join('; ');
+  // repeating gradient draws one guide line per ancestor level. An expanded
+  // parent additionally draws a short branch from its chevron to the bottom of
+  // the row, so the child guide line connects to the chevron instead of
+  // starting in mid-air. The background is clipped to the indent width, so it
+  // never runs under the row's content.
+  function getIndentStyle(level, branch = false) {
+    const layers = [];
+    const sizes = [];
+    const positions = [];
+    if (level) {
+      const width = getIndentLevel(level);
+      layers.push(
+        'repeating-linear-gradient(to right, transparent 0 0.75rem, var(--ds-border) 0.75rem 0.8125rem, transparent 0.8125rem 1.5rem)',
+      );
+      sizes.push(`${width} 100%`);
+      positions.push('0 0');
+    }
+    if (branch) {
+      layers.push('linear-gradient(var(--ds-border), var(--ds-border))');
+      sizes.push('0.0625rem 50%');
+      positions.push(`${level * 1.5 + 0.75}rem 100%`);
+    }
+    if (layers.length === 0) return undefined;
+    const style = [];
+    if (level) style.push(`padding-left: ${getIndentLevel(level)}`);
+    style.push(`background-image: ${layers.join(', ')}`);
+    style.push(`background-size: ${sizes.join(', ')}`);
+    style.push(`background-position: ${positions.join(', ')}`);
+    style.push('background-repeat: no-repeat');
+    return style.join('; ');
   }
 
   function renderTreeItems(parentId = null, level = 0, result = [], rootItems = null) {
@@ -346,16 +364,16 @@
       : []
   );
 
-  // Leading hierarchy track holds the expander (+ test case badge); the depth
-  // indent is applied to the title cell so every child row shows its nesting.
-  let hierarchyWidth = $derived(1.5 + (showTestCases ? 3 : 0));
+  // The expander lives at the start of the indent column, after the depth
+  // padding, so it sits directly against the guide lines and every child row
+  // reads as nested content rather than a separate expander gutter.
   let indentColumnId = $derived(
     listColumns.some((column) => column.field_identifier === 'title')
       ? 'title'
       : listColumns[0]?.field_identifier
   );
-  let gridTemplateColumns = $derived(`${hierarchyWidth}rem ${listGridTemplateColumns(listColumns)}`);
-  let gridMinWidth = $derived(`calc(${listGridMinWidth(listColumns)} + ${hierarchyWidth + 1}rem)`);
+  let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns));
+  let gridMinWidth = $derived(listGridMinWidth(listColumns));
 </script>
 
 {#snippet parentChip({ item })}
@@ -370,6 +388,54 @@
       />
       <span class="text-xs" style="color: var(--ds-text-subtle);">›</span>
     </span>
+  {/if}
+{/snippet}
+
+{#snippet treeLeading({ item, testCaseCount = 0 })}
+  {#if item.hasChildren}
+    <button
+      data-testid={`tree-expand-${item.id}`}
+      class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded transition-colors cursor-pointer expand-btn"
+      onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
+      aria-label={isExpanded(item.id) ? 'Collapse' : 'Expand'}
+    >
+      {#if isExpanded(item.id)}
+        <ChevronDown class="w-4 h-4" style={styles.glassTextStyle} />
+      {:else}
+        <ChevronRight class="w-4 h-4" style={styles.glassTextStyle} />
+      {/if}
+    </button>
+  {:else}
+    <div class="w-6 h-6 flex-shrink-0"></div>
+  {/if}
+
+  {#if showTestCases && testCaseCount > 0}
+    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium rounded-full flex-shrink-0" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
+      <FileCheck class="w-3 h-3" />
+      {testCaseCount}
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet testCaseCell({ item, column })}
+  {#if column.field_identifier === 'key'}
+    <LinkComponent
+      href="#view-test-case"
+      onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
+      class="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors text-ds-text-accent-green bg-ds-accent-green-subtle hover:opacity-80"
+    >
+      TC-{item.id}
+    </LinkComponent>
+  {:else if column.field_identifier === 'title'}
+    <LinkComponent
+      href="#view-test-case"
+      onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
+      class="block text-left w-full text-sm transition-colors truncate cursor-pointer text-ds-text-accent-green hover:opacity-80"
+    >
+      {item.title}
+    </LinkComponent>
+  {:else if column.field_identifier === 'status'}
+    <span class="text-sm text-ds-text-success">{t('testing.testCase')}</span>
   {/if}
 {/snippet}
 
@@ -460,7 +526,6 @@
         <div class="rounded-xl border shadow-sm overflow-x-auto" style="{styles.glassStyle(12)}">
           <!-- Table Header -->
           <TableHeaderBar columns={gridTemplateColumns} minWidth={gridMinWidth}>
-            <div></div>
             {#each listColumns as column (column.field_identifier)}
               <div>{getListColumnLabel(column, customFieldDefinitions)}</div>
             {/each}
@@ -477,10 +542,9 @@
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
                 data-testid={`tree-load-more-${item.loadMoreFor}`}
               >
-                <div></div>
                 {#each listColumns as column (column.field_identifier)}
                   <div
-                    class="min-w-0 overflow-hidden"
+                    class={column.field_identifier === indentColumnId ? 'min-w-0 overflow-hidden self-stretch -my-2.5 flex items-center' : 'min-w-0 overflow-hidden'}
                     style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
                   >
                     {#if column.field_identifier === indentColumnId}
@@ -508,36 +572,24 @@
                 class="grid gap-4 items-center px-4 py-2.5 transition-colors group bg-ds-success-subtle/30 hover:bg-ds-success-subtle/50"
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
               >
-                <!-- Hierarchy Indent + Icon -->
-                <div class="flex items-center gap-1">
-                  <div class="w-4 h-4 rounded flex items-center justify-center bg-ds-accent-green">
-                    <FileCheck class="w-2.5 h-2.5 text-white" />
-                  </div>
-                </div>
-
                 {#each listColumns as column (column.field_identifier)}
                   <div
-                    class="min-w-0 overflow-hidden"
+                    class={column.field_identifier === indentColumnId ? 'min-w-0 overflow-hidden self-stretch -my-2.5' : 'min-w-0 overflow-hidden'}
                     style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
                   >
-                    {#if column.field_identifier === 'key'}
-                      <LinkComponent
-                        href="#view-test-case"
-                        onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
-                        class="text-xs font-mono px-1.5 py-0.5 rounded cursor-pointer transition-colors text-ds-text-accent-green bg-ds-accent-green-subtle hover:opacity-80"
-                      >
-                        TC-{item.id}
-                      </LinkComponent>
-                    {:else if column.field_identifier === 'title'}
-                      <LinkComponent
-                        href="#view-test-case"
-                        onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
-                        class="block text-left w-full text-sm transition-colors truncate cursor-pointer text-ds-text-accent-green hover:opacity-80"
-                      >
-                        {item.title}
-                      </LinkComponent>
-                    {:else if column.field_identifier === 'status'}
-                      <span class="text-sm text-ds-text-success">{t('testing.testCase')}</span>
+                    {#if column.field_identifier === indentColumnId}
+                      <div class="h-full flex items-center gap-2">
+                        <div class="w-6 h-6 flex-shrink-0 flex items-center justify-center">
+                          <div class="w-4 h-4 rounded flex items-center justify-center bg-ds-accent-green">
+                            <FileCheck class="w-2.5 h-2.5 text-white" />
+                          </div>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          {@render testCaseCell({ item, column })}
+                        </div>
+                      </div>
+                    {:else}
+                      {@render testCaseCell({ item, column })}
                     {/if}
                   </div>
                 {/each}
@@ -551,57 +603,56 @@
                 class="grid gap-4 items-center px-4 py-3 transition-colors group tree-row"
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));{idx === 0 ? 'border-top: none;' : ''}"
               >
-                <!-- Hierarchy Indent + Expand/Collapse + Test Case Count -->
-                <div class="flex items-center gap-1">
-                  {#if item.hasChildren}
-                    <button
-                      data-testid={`tree-expand-${item.id}`}
-                      class="w-6 h-6 flex items-center justify-center rounded transition-colors cursor-pointer expand-btn"
-                      onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
-                      aria-label={isExpanded(item.id) ? 'Collapse' : 'Expand'}
-                    >
-                      {#if isExpanded(item.id)}
-                        <ChevronDown class="w-4 h-4" style={styles.glassTextStyle} />
-                      {:else}
-                        <ChevronRight class="w-4 h-4" style={styles.glassTextStyle} />
-                      {/if}
-                    </button>
-                  {:else}
-                    <div class="w-6 h-6"></div> <!-- Spacer for alignment -->
-                  {/if}
-
-                  {#if showTestCases && testCaseCount > 0}
-                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium rounded-full" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
-                      <FileCheck class="w-3 h-3" />
-                      {testCaseCount}
-                    </span>
-                  {/if}
-                </div>
-
                 {#each listColumns as column (column.field_identifier)}
                   <div
-                    class="min-w-0 overflow-hidden"
+                    class={column.field_identifier === indentColumnId ? 'min-w-0 overflow-hidden self-stretch -my-3' : 'min-w-0 overflow-hidden'}
                     data-testid={column.field_identifier === indentColumnId ? `tree-indent-${item.id}` : undefined}
-                    style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
+                    style={column.field_identifier === indentColumnId ? getIndentStyle(item.level, item.hasChildren && isExpanded(item.id)) : undefined}
                   >
-                    <ListCellRenderer
-                      {item}
-                      {column}
-                      {workspace}
-                      titleAfterIcon={parentChip}
-                      canEdit={workspacePermissions.canEdit(item.workspace_id)}
-                      {statuses}
-                      {statusCategories}
-                      {priorities}
-                      {milestones}
-                      {iterations}
-                      {users}
-                      {projects}
-                      {itemTypes}
-                      {customFieldDefinitions}
-                      onitemUpdated={handleItemUpdated}
-                      onupdateError={handleUpdateError}
-                    />
+                    {#if column.field_identifier === indentColumnId}
+                      <div class="h-full flex items-center gap-2 min-w-0">
+                        {@render treeLeading({ item, testCaseCount })}
+                        <div class="min-w-0 flex-1">
+                          <ListCellRenderer
+                            {item}
+                            {column}
+                            {workspace}
+                            titleAfterIcon={parentChip}
+                            canEdit={workspacePermissions.canEdit(item.workspace_id)}
+                            {statuses}
+                            {statusCategories}
+                            {priorities}
+                            {milestones}
+                            {iterations}
+                            {users}
+                            {projects}
+                            {itemTypes}
+                            {customFieldDefinitions}
+                            onitemUpdated={handleItemUpdated}
+                            onupdateError={handleUpdateError}
+                          />
+                        </div>
+                      </div>
+                    {:else}
+                      <ListCellRenderer
+                        {item}
+                        {column}
+                        {workspace}
+                        titleAfterIcon={parentChip}
+                        canEdit={workspacePermissions.canEdit(item.workspace_id)}
+                        {statuses}
+                        {statusCategories}
+                        {priorities}
+                        {milestones}
+                        {iterations}
+                        {users}
+                        {projects}
+                        {itemTypes}
+                        {customFieldDefinitions}
+                        onitemUpdated={handleItemUpdated}
+                        onupdateError={handleUpdateError}
+                      />
+                    {/if}
                   </div>
                 {/each}
                 <div></div>
