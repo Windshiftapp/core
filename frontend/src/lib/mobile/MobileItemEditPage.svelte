@@ -1,6 +1,8 @@
 <script>
   import { items } from '../api/items.js';
-  import { currentRoute, navigate, setNavigationInterceptor } from '../router.js';
+  import { currentRoute, navigate } from '../router.js';
+  import { useMobileDraft } from './useMobileDraft.svelte.js';
+  import './mobileHeroFields.css';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { formatItemKey } from '../utils/itemKey.js';
   import MobileEditorPage from './MobileEditorPage.svelte';
@@ -27,62 +29,23 @@
   let saving = $state(false);
   let error = $state('');
 
-  // Unsaved-input guard: leaving with changes asks for confirmation — via
-  // the header Cancel and via the back gesture (router interceptor).
-  let confirmDiscardOpen = $state(false);
+  // Unsaved-input guard and draft persistence: edits ask for confirmation
+  // before leaving and survive a reload or app kill until saved or discarded.
   const isDirty = $derived(
     !!item && (title !== (item.title ?? '') || description !== (item.description ?? ''))
   );
-
-  $effect(() => {
-    setNavigationInterceptor(() => {
-      if (!isDirty) return false;
-      confirmDiscardOpen = true;
-      return true;
-    });
-    return () => setNavigationInterceptor(null);
+  const draft = useMobileDraft({
+    draftKey: () => `ws-draft:m-edit:${itemId}`,
+    isDirty: () => isDirty,
+    isSaving: () => saving,
+    values: () => ({ title, description }),
+    applyDraft: (saved) => {
+      if (typeof saved?.title === 'string') title = saved.title;
+      if (typeof saved?.description === 'string') description = saved.description;
+    },
+    shouldWrite: () => isDirty,
+    canHydrate: () => !!item,
   });
-
-  // Draft persistence (sessionStorage): edits survive a reload or app kill;
-  // cleared on save and on explicit discard.
-  const draftKey = $derived(`ws-draft:m-edit:${itemId}`);
-  let draftRetired = false;
-  $effect(() => {
-    if (!item) return;
-    try {
-      const raw = sessionStorage.getItem(draftKey);
-      if (!raw) return;
-      const draft = JSON.parse(raw);
-      if (typeof draft?.title === 'string') title = draft.title;
-      if (typeof draft?.description === 'string') description = draft.description;
-    } catch {
-      /* corrupt draft — use server values */
-    }
-  });
-  $effect(() => {
-    if (!item || saving || draftRetired) return;
-    try {
-      if (isDirty) {
-        sessionStorage.setItem(draftKey, JSON.stringify({ title, description }));
-      } else {
-        sessionStorage.removeItem(draftKey);
-      }
-    } catch {
-      /* storage unavailable — drafts are best-effort */
-    }
-  });
-
-  function clearDraft() {
-    // Retire the write-back effect first: when `saving` flips to false in
-    // save's finally, the effect must not resurrect the draft before the
-    // page unmounts.
-    draftRetired = true;
-    try {
-      sessionStorage.removeItem(draftKey);
-    } catch {
-      /* ignore */
-    }
-  }
 
   const pageTitle = $derived(formatItemKey(item) || t('mobile.item.edit'));
   const canSave = $derived(title.trim() !== '' && !saving && isDirty);
@@ -123,7 +86,7 @@
         title: title.trim(),
         description: description.trim(),
       });
-      clearDraft();
+      draft.clearDraft();
       successToast(t('mobile.item.updated'));
       // Replace so back from the detail doesn't return to the editor.
       navigate(`/m/items/${itemId}`, { replace: true });
@@ -140,15 +103,14 @@
   // plain replace is deterministic — including when the editor was reached
   // via deep link and has no sensible entry to pop back to.
   function discardAndLeave() {
-    clearDraft();
-    setNavigationInterceptor(null);
-    confirmDiscardOpen = false;
+    draft.clearDraft();
+    draft.confirmDiscardOpen = false;
     navigate(`/m/items/${itemId}`, { replace: true });
   }
 
   function requestCancel() {
     if (isDirty) {
-      confirmDiscardOpen = true;
+      draft.confirmDiscardOpen = true;
       return;
     }
     leave();
@@ -209,7 +171,7 @@
      unsaved edits. The sheet pushes no history sentinel: the navigation
      interceptor owns the back gesture on this page. -->
 <MobileConfirmSheet
-  bind:isOpen={confirmDiscardOpen}
+  bind:isOpen={draft.confirmDiscardOpen}
   title={t('mobile.item.discardChanges')}
   message={t('mobile.item.unsavedChanges')}
   confirmLabel={t('common.discard')}
@@ -245,36 +207,10 @@
     gap: 0.5rem;
   }
 
-  /* Linear-style borderless hero fields. The title textarea wraps and grows
-     with its content (autoGrow action) so long titles stay fully visible. */
-  .hero-title {
-    width: 100%;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--ds-text);
-    font-family: inherit;
-    font-size: 1.35rem;
-    font-weight: var(--font-semibold, 600);
-    line-height: 1.25;
-    overflow: hidden;
-    resize: none;
-  }
-  .hero-title::placeholder { color: var(--ds-text-subtlest, var(--ds-text-subtle)); font-weight: var(--font-semibold, 600); }
+  /* The borderless hero field styles are shared via mobileHeroFields.css;
+     only the edit page's description height differs. */
   .hero-desc {
-    width: 100%;
     min-height: 14rem;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--ds-text);
-    font-family: inherit;
-    font-size: max(1rem, 16px);
-    line-height: 1.5;
     resize: vertical;
   }
-  .hero-desc::placeholder { color: var(--ds-text-subtlest, var(--ds-text-subtle)); }
-  .hero-title:focus,
-  .hero-desc:focus { outline: none; }
 </style>
