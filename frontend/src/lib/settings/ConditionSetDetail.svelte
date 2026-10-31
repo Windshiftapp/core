@@ -14,7 +14,7 @@
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import HelpCircle from '@lucide/svelte/icons/help-circle';
   import Button from '../components/Button.svelte';
-  import BackButton from '../components/BackButton.svelte';
+  import SetDetailShell from './SetDetailShell.svelte';
   import Input from '../components/Input.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -59,6 +59,9 @@
 
   let originalFormData = $state('{}');
   const hasUnsavedChanges = $derived(JSON.stringify(formData) !== originalFormData);
+  const displayTitle = $derived(
+    loading ? t('common.loading') : isNewMode ? t('conditionSets.new') : formData.name || t('conditionSets.title')
+  );
 
   // Expanded transition editors
   let expandedTransitions = $state(new Set());
@@ -420,49 +423,52 @@
   }
 </script>
 
-<div class="flex flex-col h-full" style="background-color: var(--ds-surface);">
-  <!-- Header -->
-  <div class="border-b px-6 py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <BackButton onclick={goBack} tooltip={t('conditionSets.backToList')} class="p-1" />
-        <div>
-          <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-            {#if loading}
-              {t('common.loading')}
-            {:else if isNewMode}
-              {t('conditionSets.new')}
-            {:else}
-              {formData.name || t('conditionSets.title')}
-            {/if}
-          </h1>
-          <p class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">
-            {t('conditionSets.detailDesc')}
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        {#if hasUnsavedChanges}
-          <span class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.configSets.unsavedChanges')}</span>
-        {/if}
-        <Button variant="ghost" onclick={goBack}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="primary" onclick={save} disabled={saving || !hasUnsavedChanges}>
-          {saving ? t('common.saving') : t('common.save')}
-        </Button>
-      </div>
-    </div>
+{#snippet conditionUserSource(cond, transitionId, condIdx)}
+  <div>
+    <Label color="default" class="text-xs mb-1">{t('conditionSets.userEvaluated')}</Label>
+    <NativeSelect
+      value={cond.config?.source || 'current_user'}
+      options={userSourceOptions.map((option) => ({ value: option.id, label: option.name }))}
+      onchange={(value) => {
+        updateConditionConfig(transitionId, condIdx, 'source', value);
+        if (value !== 'custom_field') {
+          updateConditionConfig(transitionId, condIdx, 'field_id', null);
+        }
+      }}
+      size="small"
+    />
   </div>
+{/snippet}
 
-  <!-- Content -->
-  <div class="flex-1 overflow-y-auto p-6" style="background-color: var(--ds-surface);">
-    {#if loading}
-      <div class="flex items-center justify-center h-64">
-        <div style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
-      </div>
-    {:else}
-      <div class="max-w-4xl mx-auto space-y-8">
+{#snippet conditionUserField(cond, transitionId, condIdx)}
+  {#if cond.config?.source === 'custom_field'}
+    <div>
+      <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
+      <BasePicker
+        value={cond.config?.field_id}
+        items={userFieldOptions}
+        placeholder={t('conditionSets.selectUserField')}
+        getValue={(f) => f.id}
+        getLabel={(f) => f.name}
+        onSelect={(f) => updateConditionConfig(transitionId, condIdx, 'field_id', f?.id || null)}
+      />
+    </div>
+  {/if}
+{/snippet}
+
+<SetDetailShell
+  {loading}
+  title={displayTitle}
+  description={t('conditionSets.detailDesc')}
+  backTooltip={t('conditionSets.backToList')}
+  onBack={goBack}
+  {hasUnsavedChanges}
+  {saving}
+  onSave={save}
+  loadingLabel={t('common.loading')}
+  contentClass="max-w-4xl mx-auto space-y-8"
+>
+  {#snippet children()}
 
         <!-- General Section -->
         <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -646,20 +652,7 @@
                             <!-- Type-specific config -->
                             {#if cond.condition_type === 'user_in_role'}
                               <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.userEvaluated')}</Label>
-                                  <NativeSelect
-                                    value={cond.config?.source || 'current_user'}
-                                    options={userSourceOptions.map((option) => ({ value: option.id, label: option.name }))}
-                                    onchange={(value) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'source', value);
-                                      if (value !== 'custom_field') {
-                                        updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
-                                      }
-                                    }}
-                                    size="small"
-                                  />
-                                </div>
+                                {@render conditionUserSource(cond, tc.transition_id, condIdx)}
                                 <div>
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.againstRole')}</Label>
                                   <RolePicker
@@ -669,36 +662,11 @@
                                   />
                                 </div>
                               </div>
-                              {#if cond.config?.source === 'custom_field'}
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
-                                  <BasePicker
-                                    value={cond.config?.field_id}
-                                    items={userFieldOptions}
-                                    placeholder={t('conditionSets.selectUserField')}
-                                    getValue={(f) => f.id}
-                                    getLabel={(f) => f.name}
-                                    onSelect={(f) => updateConditionConfig(tc.transition_id, condIdx, 'field_id', f?.id || null)}
-                                  />
-                                </div>
-                              {/if}
+                              {@render conditionUserField(cond, tc.transition_id, condIdx)}
 
                             {:else if cond.condition_type === 'user_in_group'}
                               <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.userEvaluated')}</Label>
-                                  <NativeSelect
-                                    value={cond.config?.source || 'current_user'}
-                                    options={userSourceOptions.map((option) => ({ value: option.id, label: option.name }))}
-                                    onchange={(value) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'source', value);
-                                      if (value !== 'custom_field') {
-                                        updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
-                                      }
-                                    }}
-                                    size="small"
-                                  />
-                                </div>
+                                {@render conditionUserSource(cond, tc.transition_id, condIdx)}
                                 <div>
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.againstGroup')}</Label>
                                   <BasePicker
@@ -711,19 +679,7 @@
                                   />
                                 </div>
                               </div>
-                              {#if cond.config?.source === 'custom_field'}
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
-                                  <BasePicker
-                                    value={cond.config?.field_id}
-                                    items={userFieldOptions}
-                                    placeholder={t('conditionSets.selectUserField')}
-                                    getValue={(f) => f.id}
-                                    getLabel={(f) => f.name}
-                                    onSelect={(f) => updateConditionConfig(tc.transition_id, condIdx, 'field_id', f?.id || null)}
-                                  />
-                                </div>
-                              {/if}
+                              {@render conditionUserField(cond, tc.transition_id, condIdx)}
 
                             {:else if cond.condition_type === 'field_value'}
                               <div class="grid grid-cols-2 gap-3">
@@ -849,10 +805,8 @@
             <p class="text-sm" style="color: var(--ds-text-subtle);">{t('conditionSets.noTransitions')}</p>
           </div>
         {/if}
-      </div>
-    {/if}
-  </div>
-</div>
+  {/snippet}
+</SetDetailShell>
 
 <!-- Script Reference Modal -->
 <Modal bind:isOpen={showScriptHelp} maxWidth="max-w-md">
