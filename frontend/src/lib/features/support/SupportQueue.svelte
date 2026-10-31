@@ -46,9 +46,8 @@
   import SearchInput from '../../components/SearchInput.svelte';
   import TableHeaderBar from '../../components/TableHeaderBar.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
-  import LazyRender from '../../components/LazyRender.svelte';
-  import Pagination from '../../components/Pagination.svelte';
-  import ListCellRenderer from '../collections/ListCellRenderer.svelte';
+  import WorkItemListRow from '../collections/WorkItemListRow.svelte';
+  import WorkItemListFooter from '../collections/WorkItemListFooter.svelte';
   import ColumnSelector from '../collections/ColumnSelector.svelte';
   import QlFilterBuilder from '../shared/QlFilterBuilder.svelte';
 
@@ -866,76 +865,48 @@
 
           <div>
             {#each items as item (item.id)}
-              <div
-                class="px-4 py-3 list-row transition-colors"
-                style="border-top: 1px solid var(--ds-border);"
-                data-item-row
-                data-item-id={item.id}
-                data-testid={`support-queue-row-${item.id}`}
+              <WorkItemListRow
+                {item}
+                columns={listColumns}
+                {gridTemplateColumns}
+                {gridMinWidth}
+                {workspace}
+                canEdit={canEdit && item.workspace_id === Number(workspaceId)}
+                {statuses}
+                {statusCategories}
+                {priorities}
+                {milestones}
+                {iterations}
+                {users}
+                {projects}
+                {itemTypes}
+                {customFieldDefinitions}
+                actions={buildItemActions(item)}
+                onitemUpdated={handleItemUpdated}
+                onupdateError={handleUpdateError}
+                rowTestid={`support-queue-row-${item.id}`}
               >
-                <LazyRender>
-                  {#snippet children()}
-                    <div
-                      class="grid gap-4 items-center"
-                      style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.id)}
-                        aria-label={t('supportQueue.selectAll')}
-                        data-testid={`support-queue-item-checkbox-${item.id}`}
-                        onchange={() => toggleItem(item.id)}
-                      />
-                      {#each listColumns as column (column.field_identifier)}
-                        <div class="min-w-0 overflow-hidden">
-                          <ListCellRenderer
-                            {item}
-                            {column}
-                            {workspace}
-                            canEdit={canEdit && item.workspace_id === Number(workspaceId)}
-                            {statuses}
-                            {statusCategories}
-                            {priorities}
-                            {milestones}
-                            {iterations}
-                            {users}
-                            {projects}
-                            {itemTypes}
-                            {customFieldDefinitions}
-                            onitemUpdated={handleItemUpdated}
-                            onupdateError={handleUpdateError}
-                          />
-                        </div>
-                      {/each}
-
-                      <!-- Actions -->
-                      <div>
-                        <DropdownMenu
-                          triggerText=""
-                          triggerIcon={MoreHorizontal}
-                          triggerClass="p-2 rounded action-btn transition-colors"
-                          items={buildItemActions(item)}
-                        />
-                      </div>
-                    </div>
-                  {/snippet}
-                </LazyRender>
-              </div>
+                {#snippet leading(row)}
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(row.id)}
+                    aria-label={t('supportQueue.selectAll')}
+                    data-testid={`support-queue-item-checkbox-${row.id}`}
+                    onchange={() => toggleItem(row.id)}
+                  />
+                {/snippet}
+              </WorkItemListRow>
             {/each}
           </div>
         </div>
 
         {#if itemsPagination && itemsPagination.total_items > 0 && items.length > 0}
-          <div class="mt-6">
-            <Pagination
-              currentPage={itemsPagination.page}
-              totalItems={itemsPagination.total_items}
-              itemsPerPage={itemsPagination.limit}
-              maxItems={10000}
-              onpageChange={handlePageChange}
-              onpageSizeChange={handlePageSizeChange}
-            />
-          </div>
+          <WorkItemListFooter
+            pagination={itemsPagination}
+            itemCount={items.length}
+            onpageChange={handlePageChange}
+            onpageSizeChange={handlePageSizeChange}
+          />
         {/if}
       {/if}
     </div>
@@ -984,9 +955,3 @@
     />
   </div>
 </Modal>
-
-<style>
-  .list-row:hover {
-    background-color: var(--ctx-background-neutral-hovered, var(--ds-background-neutral-hovered));
-  }
-</style>
