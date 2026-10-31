@@ -181,7 +181,7 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		" SELECT t.root_id, t.id, t.depth," +
 		" ROW_NUMBER() OVER (PARTITION BY t.root_id ORDER BY t.depth, i.frac_index) AS rn," +
 		" COUNT(*) OVER (PARTITION BY t.root_id) AS root_total" +
-		" FROM tree t JOIN items i ON i.id = t.id" +
+		" FROM tree t JOIN items i ON i.id = t.id" + ItemListFilterJoins() +
 		" WHERE t.depth > 0 AND i.workspace_id IN (" + wsPlaceholders + ")" + qlClause +
 		"), page AS (" +
 		" SELECT root_id, id, depth, root_total FROM ranked WHERE rn > ? AND rn <= ?" +

@@ -405,8 +405,8 @@ export const items = {
           method: 'POST',
           body: JSON.stringify({
             root_ids: chunk,
-            workspace_id: workspaceId,
-            collection_id: collectionId,
+            workspace_id: workspaceId != null ? Number(workspaceId) : null,
+            collection_id: collectionId != null ? Number(collectionId) : null,
             sub_ql: subQl,
             ql: ql,
             max_depth: maxDepth,

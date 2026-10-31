@@ -22,6 +22,7 @@
   const selected = $derived(levels.find((entry) => entry.level === value) ?? null);
 
   function labelFor(entry) {
+    if (entry?.label) return entry.label;
     return (entry?.types ?? []).map((type) => type.name).join(', ');
   }
 </script>

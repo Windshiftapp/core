@@ -154,7 +154,14 @@ type itemListCursor struct {
 // shared by item-list and analytics queries so a valid filter cannot succeed
 // in one path and fail in another.
 func ItemListFilterFromClause() string {
-	return `FROM items i
+	return "FROM items i" + ItemListFilterJoins()
+}
+
+// ItemListFilterJoins is the join set a generated QL may reference. The
+// hierarchy read reuses it inside its ranked CTE so a filter that mentions
+// status categories, iterations, or projects resolves there too.
+func ItemListFilterJoins() string {
+	return `
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
 		LEFT JOIN iterations iter ON i.iteration_id = iter.id

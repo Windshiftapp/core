@@ -22,6 +22,9 @@
   let counts = $state([]);
   let loadingCounts = $state(false);
   let requestId = 0;
+  // Resolve the default level once per scope, after the counts have loaded, so
+  // a premature all-zero snapshot cannot pin the shallowest level.
+  let resolvedScope = null;
 
   const itemTypes = $derived(workspaceDataStore.itemTypes);
 
@@ -30,12 +33,27 @@
     for (const type of itemTypes) {
       const level = Number(type.hierarchy_level ?? 0);
       if (level === GENERIC_SUBTASK_HIERARCHY_LEVEL) continue;
-      if (!byLevel.has(level)) byLevel.set(level, []);
-      byLevel.get(level).push(type);
+      if (!byLevel.has(level)) byLevel.set(level, { level, types: [], name: '', total: 0 });
+      byLevel.get(level).types.push(type);
     }
-    const countByLevel = new Map(counts.map((entry) => [Number(entry.level), entry.total]));
-    return [...byLevel.entries()]
-      .map(([level, types]) => ({ level, types, total: countByLevel.get(level) ?? 0 }))
+    // The counts also cover levels with no configured item type (for example an
+    // item with no type, which counts at level 0). Include them so those items
+    // are reachable.
+    for (const entry of counts) {
+      const level = Number(entry.level);
+      if (level === GENERIC_SUBTASK_HIERARCHY_LEVEL) continue;
+      if (!byLevel.has(level)) byLevel.set(level, { level, types: [], name: '', total: 0 });
+      const bucket = byLevel.get(level);
+      bucket.total = entry.total ?? 0;
+      if (!bucket.name) bucket.name = entry.name ?? '';
+    }
+    return [...byLevel.values()]
+      .map((entry) => ({
+        ...entry,
+        label: entry.types.length
+          ? entry.types.map((type) => type.name).join(', ')
+          : entry.name || `Level ${entry.level}`,
+      }))
       .sort((a, b) => a.level - b.level);
   });
 
@@ -70,15 +88,18 @@
       });
   });
 
-  // Keep the store's level when it still exists; otherwise use the shallowest
+  // Keep a persisted level that still has data; otherwise use the shallowest
   // level with matches, falling back to the shallowest level present.
   $effect(() => {
-    if (levels.length === 0) return;
+    const scope = `${workspaceId}|${collectionId}|${view}`;
+    if (levels.length === 0 || loadingCounts) return;
+    if (resolvedScope === scope) return;
+    resolvedScope = scope;
     const current = collectionStore.hierarchyLevel;
-    if (levels.some((entry) => entry.level === current)) return;
+    const currentEntry = levels.find((entry) => entry.level === current);
+    if (currentEntry && currentEntry.total > 0) return;
     const withMatches = levels.find((entry) => entry.total > 0);
-    const next = (withMatches ?? levels[0]).level;
-    if (next !== current) collectionStore.setHierarchyLevel(next);
+    collectionStore.setHierarchyLevel((withMatches ?? levels[0]).level);
   });
 
   function handleChange(level) {
