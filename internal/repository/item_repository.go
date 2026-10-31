@@ -533,6 +533,35 @@ func (r *ItemRepository) GetWorkspaceIDCtx(ctx context.Context, itemID int) (int
 	return workspaceID, nil
 }
 
+// GetWorkspaceIDs resolves the owning workspace of many items in one query.
+// Items that do not exist are absent from the returned map, so callers can
+// treat a missing entry as "not found".
+func (r *ItemRepository) GetWorkspaceIDs(itemIDs []int) (map[int]int, error) {
+	resolved := make(map[int]int, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return resolved, nil
+	}
+
+	clause, args := inPlaceholders(itemIDs)
+	rows, err := r.db.Query("SELECT id, workspace_id FROM items WHERE id IN ("+clause+")", args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query item workspace ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var itemID, workspaceID int
+		if err := rows.Scan(&itemID, &workspaceID); err != nil {
+			return nil, fmt.Errorf("failed to scan item workspace id: %w", err)
+		}
+		resolved[itemID] = workspaceID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item workspace ids: %w", err)
+	}
+	return resolved, nil
+}
+
 // ChildItemSummary is the projection used by item briefings. It carries
 // descriptions but not attachments, so a parent briefing can include children
 // without pulling in attachment data.
@@ -1272,26 +1301,6 @@ func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 	return nullIntPtr(parentID), nil
 }
 
-// GetParentIDAndHierarchyLevel returns the stored parent and hierarchy level.
-func (r *ItemRepository) GetParentIDAndHierarchyLevel(itemID int) (parentID, hierarchyLevel *int, err error) {
-	var parent, level sql.NullInt64
-	err = r.db.QueryRow(`
-		SELECT i.parent_id, it.hierarchy_level
-		FROM items i
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE i.id = ?
-	`, itemID).Scan(&parent, &level)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("get parent and hierarchy level: %w", err)
-	}
-	assignNullableInt(&parentID, parent)
-	assignNullableInt(&hierarchyLevel, level)
-	return parentID, hierarchyLevel, nil
-}
-
 // GetParentIDTx locks and reads the parent inside the supplied transaction.
 func (r *ItemRepository) GetParentIDTx(tx database.Tx, itemID int) (*int, error) {
 	query := `SELECT parent_id FROM items WHERE id = ?`
@@ -1363,6 +1372,44 @@ func (r *ItemRepository) CountByField(column string, value any) (int, error) {
 		return 0, fmt.Errorf("failed to count items by %s: %w", column, err)
 	}
 	return count, nil
+}
+
+// CountByFieldIn counts items grouped by an allowlisted column across many
+// values in one query. Values with no matching items are absent from the
+// returned map.
+func (r *ItemRepository) CountByFieldIn(column string, values []int) (map[int]int, error) {
+	if !itemCountableColumns[column] {
+		return nil, fmt.Errorf("CountByFieldIn: column %q is not in the allow-list", column)
+	}
+	counts := make(map[int]int, len(values))
+	if len(values) == 0 {
+		return counts, nil
+	}
+
+	clause, args := inPlaceholders(values)
+	// The column name is validated against a fixed allow-list above, so the
+	// fmt.Sprintf here cannot splice attacker-controlled input.
+	query := fmt.Sprintf(
+		"SELECT %s, COUNT(*) FROM items WHERE %s IN (%s) GROUP BY %s",
+		column, column, clause, column,
+	)
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count items by %s: %w", column, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var value, count int
+		if err := rows.Scan(&value, &count); err != nil {
+			return nil, fmt.Errorf("failed to scan item count by %s: %w", column, err)
+		}
+		counts[value] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item counts by %s: %w", column, err)
+	}
+	return counts, nil
 }
 
 // FindIDByKeyAndNumber resolves a case-insensitive KEY-NUMBER reference.

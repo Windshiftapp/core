@@ -464,10 +464,23 @@ func (h *AIHandler) AcceptDependencies(w http.ResponseWriter, r *http.Request) {
 	created := 0
 	skipped := 0
 
+	// Resolve every referenced item's workspace in one query rather than two
+	// lookups per suggestion. Items that do not exist are absent from the map
+	// and count as skipped.
+	lookupIDs := make([]int, 0, len(req.Suggestions)*2)
+	for _, s := range req.Suggestions {
+		lookupIDs = append(lookupIDs, s.SourceItemID, s.TargetItemID)
+	}
+	workspaceByItem, err := itemRepo.GetWorkspaceIDs(lookupIDs)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	for _, s := range req.Suggestions {
 		// Verify user has edit permission on the source item's workspace
-		srcWorkspaceID, err := itemRepo.GetWorkspaceID(s.SourceItemID)
-		if err != nil {
+		srcWorkspaceID, ok := workspaceByItem[s.SourceItemID]
+		if !ok {
 			skipped++
 			continue
 		}
@@ -478,8 +491,8 @@ func (h *AIHandler) AcceptDependencies(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Verify user has view permission on target item's workspace
-		tgtWorkspaceID, err := itemRepo.GetWorkspaceID(s.TargetItemID)
-		if err != nil {
+		tgtWorkspaceID, ok := workspaceByItem[s.TargetItemID]
+		if !ok {
 			skipped++
 			continue
 		}

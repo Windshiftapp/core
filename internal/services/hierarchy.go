@@ -161,32 +161,21 @@ func (h *HierarchyService) GetChildrenInWorkspacesContext(ctx context.Context, i
 	return itemPtrsToValues(items), nil
 }
 
-// GetRoot returns the root item for a given item (walks up to top level).
-// The walk is capped at maxHierarchyDepth so a stored cycle can't loop the
-// DB; exhaustion surfaces as an error rather than a silent nil so callers
-// can't confuse it with "no parent". A non-existent input id returns
-// (nil, nil) — the recursive query alone cannot distinguish that case from a
-// cap-hit, so a cheap existence probe runs first.
+// GetRoot returns the root item for a given item by walking to the top level in
+// a single recursive query. The walk is capped at maxHierarchyDepth so a stored
+// cycle can't loop the DB; exhaustion surfaces as an error rather than a silent
+// nil so callers can't confuse it with "no parent". A non-existent input id
+// returns (nil, nil).
 func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 	repo := repository.NewItemRepository(h.db)
-	current := itemID
-	for depth := 0; depth < maxHierarchyDepth; depth++ {
-		parentID, hierarchyLevel, err := repo.GetParentIDAndHierarchyLevel(current)
-		if errors.Is(err, repository.ErrNotFound) {
-			if depth == 0 {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("hierarchy parent %d referenced by item %d was not found", current, itemID)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to walk hierarchy: %w", err)
-		}
-		if parentID == nil || (hierarchyLevel != nil && *hierarchyLevel == 0) {
-			return repo.FindByIDWithDetails(current)
-		}
-		current = *parentID
+	rootID, err := repo.FindRootIDForItemContext(context.Background(), itemID, maxHierarchyDepth)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("hierarchy walk exceeded %d levels without finding a root (item %d, likely cyclic)", maxHierarchyDepth, itemID)
+	if rootID == nil {
+		return nil, nil
+	}
+	return repo.FindByIDWithDetails(*rootID)
 }
 
 // GetEffectiveProject returns the effective project_id for an item by walking
