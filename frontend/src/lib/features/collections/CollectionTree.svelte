@@ -366,27 +366,29 @@
 
   // The expander lives at the start of the indent column, after the depth
   // padding, so it sits directly against the guide lines and every child row
-  // reads as nested content rather than a separate expander gutter.
+  // reads as nested content rather than a separate expander gutter. The tree
+  // also asks for a wider title track so rows fit in the two-line clamp.
   let indentColumnId = $derived(
     listColumns.some((column) => column.field_identifier === 'title')
       ? 'title'
       : listColumns[0]?.field_identifier
   );
-  let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns));
-  let gridMinWidth = $derived(listGridMinWidth(listColumns));
+  const treeGridOptions = { titleMinWidth: 24 };
+  let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns, treeGridOptions));
+  let gridMinWidth = $derived(listGridMinWidth(listColumns, treeGridOptions));
 </script>
 
 {#snippet parentChip({ item })}
   {@const parent = parentReference(item)}
   {#if parent}
-    <span class="inline-flex items-center gap-0.5 flex-shrink-0" title={parent.title || ''}>
+    <span class="inline-flex items-center gap-0.5 min-w-0" title={parent.title || ''}>
+      <span class="text-xs" style="color: var(--ds-text-subtle);">↳</span>
       <ItemKey
         item={parent}
         variant="badge"
         size="compact"
         dataTestid={`tree-parent-${item.id}`}
       />
-      <span class="text-xs" style="color: var(--ds-text-subtle);">›</span>
     </span>
   {/if}
 {/snippet}
@@ -617,7 +619,7 @@
                             {item}
                             {column}
                             {workspace}
-                            titleAfterIcon={parentChip}
+                            keyAfter={parentChip}
                             canEdit={workspacePermissions.canEdit(item.workspace_id)}
                             {statuses}
                             {statusCategories}
@@ -638,7 +640,7 @@
                         {item}
                         {column}
                         {workspace}
-                        titleAfterIcon={parentChip}
+                        keyAfter={parentChip}
                         canEdit={workspacePermissions.canEdit(item.workspace_id)}
                         {statuses}
                         {statusCategories}

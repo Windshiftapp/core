@@ -7,8 +7,9 @@
   let {
     value = '', placeholder = '', disabled = false, required = false,
     maxLength = 255, className = '', editingClass = 'editing-input',
-    displayClass = 'display-text cursor-text', enableSingleClick = false,
-    enableDoubleClick = false, onsave = null, onclick: onclickProp = null
+    displayClass = 'display-text cursor-text', maxLines = null,
+    enableSingleClick = false, enableDoubleClick = false,
+    onsave = null, onclick: onclickProp = null
   } = $props();
 
   const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
@@ -80,7 +81,7 @@
     <span
       class="block text-left w-full px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
       class:placeholder-text={!value}
-      style="color: var(--ds-text);"
+      style="color: var(--ds-text);{maxLines ? ` display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${maxLines}; line-clamp: ${maxLines}; overflow: hidden;` : ''}"
     >
       {value || effectivePlaceholder}
     </span>

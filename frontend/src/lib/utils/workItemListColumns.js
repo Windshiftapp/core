@@ -103,7 +103,7 @@ const GRID_MIN_FLEXIBLE_WIDTH = 10;
 const GRID_KEY_WIDTH = 5;
 const GRID_ACTIONS_WIDTH = 4;
 
-function gridColumnTrack(col) {
+function gridColumnTrack(col, options = {}) {
   if (col.field_identifier === 'key') return `${GRID_KEY_WIDTH}rem`;
 
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
@@ -113,28 +113,33 @@ function gridColumnTrack(col) {
     return max > min ? `minmax(${min}rem, ${max}rem)` : `${min}rem`;
   }
 
-  const min = col.field_identifier === 'title' ? GRID_MIN_TITLE_WIDTH : GRID_MIN_FLEXIBLE_WIDTH;
+  const min =
+    col.field_identifier === 'title'
+      ? (options.titleMinWidth ?? GRID_MIN_TITLE_WIDTH)
+      : GRID_MIN_FLEXIBLE_WIDTH;
   const fr = Number(col.width) || 2;
   return `minmax(${min}rem, ${fr}fr)`;
 }
 
 // Floor for the whole row. When it exceeds the viewport the list scrolls
 // horizontally instead of letting columns collapse into each other.
-function gridColumnMinWidth(col) {
+function gridColumnMinWidth(col, options = {}) {
   if (col.field_identifier === 'key') return GRID_KEY_WIDTH;
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
   if (base !== undefined) return base * GRID_MIN_FIXED_SCALE;
-  return col.field_identifier === 'title' ? GRID_MIN_TITLE_WIDTH : GRID_MIN_FLEXIBLE_WIDTH;
+  return col.field_identifier === 'title'
+    ? (options.titleMinWidth ?? GRID_MIN_TITLE_WIDTH)
+    : GRID_MIN_FLEXIBLE_WIDTH;
 }
 
 /** CSS grid-template-columns for a list-shaped row of columns. */
-export function listGridTemplateColumns(columns) {
-  return `${columns.map(gridColumnTrack).join(' ')} ${GRID_ACTIONS_WIDTH}rem`;
+export function listGridTemplateColumns(columns, options = {}) {
+  return `${columns.map((col) => gridColumnTrack(col, options)).join(' ')} ${GRID_ACTIONS_WIDTH}rem`;
 }
 
 /** Row min-width matching listGridTemplateColumns; the actions track is fixed
  * and `columns.length` covers the gap between every track. */
-export function listGridMinWidth(columns) {
-  const total = columns.reduce((sum, col) => sum + gridColumnMinWidth(col), 0);
+export function listGridMinWidth(columns, options = {}) {
+  const total = columns.reduce((sum, col) => sum + gridColumnMinWidth(col, options), 0);
   return `${total + GRID_ACTIONS_WIDTH + columns.length}rem`;
 }
