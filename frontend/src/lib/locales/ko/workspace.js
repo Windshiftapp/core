@@ -367,6 +367,7 @@ export default {
     "clickToAddDescription": "클릭하여 설명 추가",
     "noDescriptionProvided": "설명이 없습니다 — 클릭하여 추가",
     "addLink": "연결 추가",
+    "addPage": "페이지 추가",
     "createChild": "하위 작업 만들기",
     "child": "하위 작업",
     "attachFile": "파일 첨부",

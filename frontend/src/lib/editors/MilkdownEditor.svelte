@@ -31,6 +31,7 @@
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
   import { mentionTextFor, resolveMentionUser } from './mentionResolver.js';
   import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
+  import { imageBlockerPlugin } from './milkdown-image-blocker.js';
   import { rewriteBreakHTML } from './milkdown-hardbreak.js';
   import { excalidrawBlock } from './milkdown-excalidraw-block.svelte.js';
   import PageDiagramModal from '../features/pages/PageDiagramModal.svelte';
@@ -45,6 +46,7 @@
     entityId = null, onImageInsert = null, onContentChange = null, isPersonalWorkspace = false, compact = false,
     customUploadFn = null, downloadUrlBase = '/api/attachments', deferImageUploads = false,
     onDeferredImageUpload = null,
+    allowImageUpload = true,
     enableDiagrams = false,
     workspaceId = null,
     enablePageLinks = false,
@@ -70,8 +72,9 @@
   // Derive attachments enabled from store (falls back to true if not yet loaded to avoid flash)
   const attachmentsEnabled = $derived(attachmentStatus.loaded ? attachmentStatus.enabled : true);
 
-  // Allow uploads when either the main attachment system is enabled OR a custom upload function is provided
-  const canUploadImages = $derived(attachmentsEnabled || !!customUploadFn);
+  // Allow uploads when either the main attachment system is enabled OR a custom upload function is provided.
+  // `allowImageUpload={false}` turns uploads off for content that has no attachment support (e.g. milestones).
+  const canUploadImages = $derived(allowImageUpload && (attachmentsEnabled || !!customUploadFn));
 
   // Compute effective entity info (supports both old itemId and new entityType/entityId)
   const effectiveEntityType = $derived(entityType || (itemId ? 'item' : null));
@@ -613,6 +616,16 @@
               uploader,
             }));
           }
+          // With uploads explicitly off, swallow pasted/dropped files instead of
+          // letting the plugin's default uploader embed them as base64 images.
+          // (imageBlockerPlugin would reject the insert anyway, but it would also
+          // drop the upload plugin's placeholder cleanup in the same transaction.)
+          if (!readonly && !allowImageUpload) {
+            ctx.update(uploadConfig.key, (prev) => ({
+              ...prev,
+              uploader: async () => [],
+            }));
+          }
         })
         .config(nord)
         .use(commonmark)
@@ -626,6 +639,9 @@
 
       if (enableDiagrams) {
         builder.use(excalidrawBlock);
+      }
+      if (!readonly && !allowImageUpload) {
+        builder.use(imageBlockerPlugin);
       }
 
       const created = await builder.create();

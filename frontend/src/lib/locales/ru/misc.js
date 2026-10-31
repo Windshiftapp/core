@@ -100,9 +100,30 @@ export default {
   },
 
   milestones: {
-    title: 'Этапы', milestone: 'Этап', subtitle: 'Отслеживание выпусков и сроков', addMilestone: 'Добавить этап', noMilestones: 'Этапов пока нет', noMilestonesDescription: 'Создайте первый этап, чтобы отслеживать выпуски и сроки.', noMilestonesInCategory: 'В этой категории нет этапов', allCategories: 'Все категории', manageCategories: 'Управление категориями', allMilestones: 'Все этапы', workspaceMilestones: 'Этапы рабочего пространства', columnStatus: 'Статус', columnMilestone: 'Этап', columnTargetDate: 'Целевая дата', columnTimeline: 'Сроки', columnTests: 'Тесты', visibleCount: '{count} этапов', visibleCount_one: '{count} этап', visibleCount_few: '{count} этапа', visibleCount_many: '{count} этапов', visibleCount_other: '{count} этапа', visibleInCategory: '{count} этапов в этой категории', visibleInCategory_one: '{count} этап в этой категории', visibleInCategory_few: '{count} этапа в этой категории', visibleInCategory_many: '{count} этапов в этой категории', visibleInCategory_other: '{count} этапа в этой категории',
+    title: 'Этапы', milestone: 'Этап', subtitle: 'Отслеживание выпусков и сроков', addMilestone: 'Добавить этап', noMilestones: 'Этапов пока нет', noMilestonesDescription: 'Создайте первый этап, чтобы отслеживать выпуски и сроки.', noMilestonesInCategory: 'В этой категории нет этапов', allCategories: 'Все категории', manageCategories: 'Управление категориями', allMilestones: 'Все этапы', workspaceMilestones: 'Этапы рабочего пространства', columnStatus: 'Статус', columnMilestone: 'Этап', columnTargetDate: 'Целевая дата', columnTimeline: 'Сроки', columnTests: 'Тесты', columnCreated: 'Создан', columnUpdated: 'Обновлён', visibleCount: '{count} этапов', visibleCount_one: '{count} этап', visibleCount_few: '{count} этапа', visibleCount_many: '{count} этапов', visibleCount_other: '{count} этапа', visibleInCategory: '{count} этапов в этой категории', visibleInCategory_one: '{count} этап в этой категории', visibleInCategory_few: '{count} этапа в этой категории', visibleInCategory_many: '{count} этапов в этой категории', visibleInCategory_other: '{count} этапа в этой категории',
     status: { planning: 'Планирование', inProgress: 'В работе', completed: 'Завершён', cancelled: 'Отменён' },
-    daysOverdue: 'Просрочено на {count} дн.', dueToday: 'Срок сегодня', oneDayRemaining: 'Остался 1 день', daysRemaining: 'Осталось дней: {count}', confirmDelete: 'Удалить этап «{name}»?', complete: 'завершено', noItems: 'Нет элементов', byStatusCategory: 'По категории статуса', noStatusData: 'Нет данных о статусах', workItems: 'Рабочие элементы', noItemsAssigned: 'Элементы не назначены', assignItemsHint: 'Назначьте рабочие элементы этому этапу, чтобы отслеживать ход работы', milestoneName: 'Название этапа', milestoneNamePlaceholder: 'Например, выпуск Q1 или запуск бета-версии', targetDate: 'Целевая дата', selectStatus: 'Выберите статус…', descriptionPlaceholder: 'Описание этапа (необязательно)', noCategory: 'Без категории', overdue: 'Просрочен', openEnded: 'Без срока', scope: 'Область', global: 'Глобальный', local: 'Локальный', globalMilestone: 'Глобальный этап', globalMilestones: 'Глобальные этапы', globalMilestoneDescription: 'Виден во всех рабочих пространствах', localMilestone: 'Локальный этап', localMilestones: 'Локальные этапы', localMilestoneDescription: 'Виден только в этом рабочем пространстве', switchTo: 'Переключиться на область «{scope}»', workspace: 'Рабочее пространство', selectWorkspace: 'Выберите рабочее пространство', manageMilestoneCategories: 'Управление категориями этапов', hideCompleted: 'Скрывать завершённые', hideCompletedHelp: 'Не показывать завершённые этапы в списке', noVisibleMilestones: 'Нет видимых этапов', dragToReorder: 'Перетащите, чтобы изменить порядок',
+    daysOverdue: 'Просрочено на {count} дн.', dueToday: 'Срок сегодня', oneDayRemaining: 'Остался 1 день', daysRemaining: 'Осталось дней: {count}', confirmDelete: 'Удалить этап «{name}»?', complete: 'завершено', noItems: 'Нет элементов', byStatusCategory: 'По категории статуса', noStatusData: 'Нет данных о статусах', workItems: 'Рабочие элементы', noItemsAssigned: 'Элементы не назначены', assignItemsHint: 'Назначьте рабочие элементы этому этапу, чтобы отслеживать ход работы', milestoneName: 'Название этапа', milestoneNamePlaceholder: 'Например, выпуск Q1 или запуск бета-версии', targetDate: 'Целевая дата', selectStatus: 'Выберите статус…', descriptionPlaceholder: 'Описание этапа (необязательно)', noCategory: 'Без категории', overdue: 'Просрочен', openEnded: 'Без срока', scope: 'Область', global: 'Глобальный', local: 'Локальный', globalMilestone: 'Глобальный этап', globalMilestones: 'Глобальные этапы', globalMilestoneDescription: 'Виден во всех рабочих пространствах', localMilestone: 'Локальный этап', localMilestones: 'Локальные этапы', localMilestoneDescription: 'Виден только в этом рабочем пространстве', switchTo: 'Переключиться на область «{scope}»', workspace: 'Рабочее пространство', selectWorkspace: 'Выберите рабочее пространство', manageMilestoneCategories: 'Управление категориями этапов', hideCompleted: 'Скрывать завершённые', hideCompletedHelp: 'Не показывать завершённые этапы в списке', noVisibleMilestones: 'Нет видимых этапов', dragToReorder: 'Перетащите, чтобы изменить порядок', searchMilestones: 'Поиск этапов…', allWorkspaces: 'Все рабочие пространства', workspaceFilterCount: 'Рабочие пространства: {count}', allStatuses: 'Все статусы', statusFilterCount: 'Статусы: {count}', noMatchingMilestones: 'Нет этапов, соответствующих фильтрам', noMatchingMilestonesDescription: 'Измените фильтры, чтобы увидеть другие этапы.', clearFilters: 'Сбросить фильтры',
+    activity: {
+      tabOverview: 'Обзор',
+      tabActivity: 'Активность',
+      empty: 'Активности пока нет',
+      system: 'Система',
+      someone: 'Кто-то',
+      none: 'нет',
+      commentedOnMilestone: 'прокомментировал(а) этап',
+      changedDescription: 'изменил(а) описание',
+      changedStatus: 'изменил(а) статус с «{from}» на «{to}»',
+      changedTargetDate: 'изменил(а) целевую дату с {from} на {to}',
+      linkedPage: 'связал(а) страницу',
+      unlinkedPage: 'отвязал(а) страницу',
+      commentedOn: 'прокомментировал(а)',
+      changedItemStatus: 'изменил(а) статус',
+      fromTo: 'с «{from}» на «{to}»',
+      added: 'добавил(а)',
+      toMilestone: 'в этап',
+      removed: 'убрал(а)',
+      fromMilestone: 'из этапа',
+    },
   },
 
   assets: {

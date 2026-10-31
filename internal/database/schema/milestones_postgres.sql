@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS milestones (
 	position INTEGER NOT NULL DEFAULT 0,  -- Manual sort order, scoped per (is_global, workspace_id, category_id). Backfilled from target_date,name on upgrade.
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	last_activity_at TIMESTAMPTZ,  -- Newest milestone Activity entry; NULL until the first activity.
 	FOREIGN KEY (category_id) REFERENCES milestone_categories(id) ON DELETE SET NULL,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	CONSTRAINT milestones_scope_check CHECK (

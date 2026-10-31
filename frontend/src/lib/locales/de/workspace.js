@@ -304,6 +304,7 @@ export default {
     clickToAddDescription: 'Klicken, um Beschreibung hinzuzufügen',
     noDescriptionProvided: 'Keine Beschreibung vorhanden - Klicken, um eine hinzuzufügen',
     addLink: 'Verknüpfung hinzufügen',
+    addPage: 'Seite hinzufügen',
     createChild: 'Untergeordnet erstellen',
     child: 'Untergeordnet',
     attachFile: 'Datei anhängen',

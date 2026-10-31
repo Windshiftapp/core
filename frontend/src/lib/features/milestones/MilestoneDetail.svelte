@@ -31,7 +31,14 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
 	import TextField from '../../components/TextField.svelte';
-	import TextareaField from '../../components/TextareaField.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import MilestoneComments from './MilestoneComments.svelte';
+  import MilestonePages from './MilestonePages.svelte';
+  import MilestoneActivity from './MilestoneActivity.svelte';
+  import TabStrip from '../../components/TabStrip.svelte';
+  import { canManageMilestone, milestoneWorkspaceId } from './milestoneScope.js';
+  import { milestoneEditForm } from './milestoneEditForm.js';
+  import { categoriesStore } from '../../stores/categories.js';
 
   let { milestoneId, workspaceId = null } = $props();
 
@@ -41,6 +48,16 @@
   let milestone = $state(null); // full milestone record (includes latest_release)
   let expandedCategories = $state({});
   let showEditModal = $state(false);
+  // Tabs: Overview keeps the progress and comments (pages sit in
+  // the header card above the tabs);
+  // Activity shows the shared milestone feed.
+  let activeTab = $state('overview');
+  // Bumped after each reload so an open Activity tab shows the new entries.
+  let activityReloadToken = $state(0);
+  const detailTabs = $derived([
+    { id: 'overview', label: t('milestones.activity.tabOverview'), testid: 'milestone-tab-overview' },
+    { id: 'activity', label: t('milestones.activity.tabActivity'), testid: 'milestone-tab-activity' }
+  ]);
   let showReleaseModal = $state(false);
   /** @type {{ name: string, description: string, target_date: string, status: string, category_id: any, is_global?: boolean, workspace_id?: number | null }} */
   let formData = $state({
@@ -51,18 +68,17 @@
     category_id: null
   });
 
-  const canManage = $derived.by(() => {
-    if (!progress) return false;
-    if ($isSystemAdmin) return true;
-    if (progress.is_global) {
-      return $permissionStore.userPermissionKeys?.has('milestone.create');
-    } else {
-      const wsId = progress.workspace_id || workspaceId;
-      if (!wsId) return false;
-      return workspacePermissions.canAdminWorkspace(wsId) || 
-             workspacePermissions.hasPermission(wsId, 'item.edit');
-    }
-  });
+  // Scope comes from the milestone record: the progress response has no
+  // is_global or workspace_id.
+  const milestoneWsId = $derived(milestoneWorkspaceId(milestone));
+
+  const canManage = $derived(
+    canManageMilestone(milestone, {
+      isSystemAdmin: $isSystemAdmin,
+      hasGlobalPermission: (key) => $permissionStore.userPermissionKeys?.has(key) ?? false,
+      hasWorkspacePermission: (wsId, key) => workspacePermissions.hasPermission(wsId, key)
+    })
+  );
 
   let statusOptions = $derived([
     { value: 'planning', label: t('milestones.status.planning'), lozengeColor: 'grey' },
@@ -73,6 +89,8 @@
 
 
   onMount(async () => {
+    // Options for the edit dialog's category picker.
+    categoriesStore.init();
     await loadProgress();
   });
 
@@ -95,6 +113,7 @@
       error = err.message || t('dialogs.alerts.failedToLoad', { error: 'milestone progress' });
     } finally {
       loading = false;
+      activityReloadToken += 1;
     }
   }
 
@@ -116,15 +135,7 @@
 
   function startEdit() {
     if (progress) {
-      formData = {
-        name: progress.milestone_name,
-        description: progress.description || '',
-        target_date: progress.target_date ? progress.target_date.split('T')[0] : '',
-        status: progress.status,
-        category_id: null, // We don't have this in progress response, but it's optional
-        is_global: progress.is_global ?? !workspaceId,
-        workspace_id: progress.workspace_id ?? (workspaceId ? parseInt(workspaceId, 10) : null)
-      };
+      formData = milestoneEditForm({ progress, milestone, workspaceId });
       showEditModal = true;
     }
   }
@@ -239,10 +250,12 @@
       <!-- Milestone Header Card -->
       <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-start justify-between mb-4">
-          <div>
+          <div class="min-w-0 flex-1">
             <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">{progress.milestone_name}</h1>
             {#if progress.description}
-              <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{progress.description}</p>
+              <div class="mt-1" data-testid="milestone-description-display">
+                <MilkdownEditor content={progress.description} readonly={true} showToolbar={false} />
+              </div>
             {/if}
           </div>
           {#if progress.status}
@@ -318,32 +331,65 @@
             </a>
           </div>
         {/if}
+
+        <!-- Pages list: workspace milestones only; global
+             milestones have no workspace. Part of the header card, so it shows
+             on both tabs. -->
+        {#if milestoneWsId != null}
+          <MilestonePages
+            {milestoneId}
+            workspaceId={milestoneWsId}
+            canEdit={canManage}
+          />
+        {/if}
+      </div>
+    {/if}
+
+    {#if progress && !error}
+      <TabStrip tabs={detailTabs} bind:activeTab ariaLabel={progress.milestone_name} class="mb-6" />
+
+      <!-- Overview stays mounted while the Activity tab is open so a comment
+           draft survives switching tabs. -->
+      <div class:hidden={activeTab !== 'overview'} data-testid="milestone-overview">
+        {#if !loading}
+          <ProgressSummary
+            {progress}
+            ariaLabel="Milestone progress"
+            completeLabel={t('milestones.complete')}
+            noItemsLabel={t('milestones.noItems')}
+            summaryLabel={t('common.summary')}
+            totalLabel={t('common.total')}
+            completedLabel={t('common.done')}
+            remainingLabel={t('time.remaining')}
+            statusLabel={t('milestones.byStatusCategory')}
+            noStatusDataLabel={t('milestones.noStatusData')}
+          />
+
+          <!-- Items Grouped by Category -->
+          <ItemsByStatusCategory
+            statusBreakdown={progress.status_breakdown}
+            itemsByCategory={progress.items_by_category}
+            {expandedCategories}
+            title={t('milestones.workItems')}
+            emptyIcon={Flag}
+            emptyTitle={t('milestones.noItemsAssigned')}
+            emptyDescription={t('milestones.assignItemsHint')}
+            ontoggle={toggleCategory}
+          />
+        {/if}
+
+        <!-- Comments (global and local milestones; no notifications). Kept
+             outside the loading branch so a reload after editing the
+             milestone keeps the thread and any draft mounted. -->
+        <MilestoneComments
+          {milestoneId}
+          workspaceId={milestoneWsId}
+        />
       </div>
 
-      <ProgressSummary
-        {progress}
-        ariaLabel="Milestone progress"
-        completeLabel={t('milestones.complete')}
-        noItemsLabel={t('milestones.noItems')}
-        summaryLabel={t('common.summary')}
-        totalLabel={t('common.total')}
-        completedLabel={t('common.done')}
-        remainingLabel={t('time.remaining')}
-        statusLabel={t('milestones.byStatusCategory')}
-        noStatusDataLabel={t('milestones.noStatusData')}
-      />
-
-      <!-- Items Grouped by Category -->
-      <ItemsByStatusCategory
-        statusBreakdown={progress.status_breakdown}
-        itemsByCategory={progress.items_by_category}
-        {expandedCategories}
-        title={t('milestones.workItems')}
-        emptyIcon={Flag}
-        emptyTitle={t('milestones.noItemsAssigned')}
-        emptyDescription={t('milestones.assignItemsHint')}
-        ontoggle={toggleCategory}
-      />
+      {#if activeTab === 'activity'}
+        <MilestoneActivity {milestoneId} reloadToken={activityReloadToken} />
+      {/if}
     {/if}
   </div>
 </div>
@@ -401,6 +447,19 @@
         </div>
 
         <div>
+          <Label for="milestone-category" class="mb-2">{t('common.category')}</Label>
+          <BasePicker
+            bind:value={formData.category_id}
+            items={$categoriesStore}
+            placeholder={t('milestones.noCategory')}
+            showUnassigned={true}
+            unassignedLabel={t('milestones.noCategory')}
+            getValue={(item) => item.id}
+            getLabel={(item) => item.name}
+          />
+        </div>
+
+        <div>
           <Label for="milestone-status" class="mb-2">{t('common.status')}</Label>
           <BasePicker
             bind:value={formData.status}
@@ -412,12 +471,14 @@
         </div>
 
         <div class="md:col-span-2">
-          <TextareaField
-            label={t('common.description')}
-            id="milestone-description"
-            rows={3}
+          <Label class="mb-2">{t('common.description')}</Label>
+          <MilkdownEditor
+            bind:content={formData.description}
             placeholder={t('milestones.descriptionPlaceholder')}
-            bind:value={formData.description}
+            showToolbar={true}
+            compact={true}
+            allowImageUpload={false}
+            testId="milestone-description-editor"
           />
         </div>
       </div>

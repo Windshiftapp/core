@@ -101,6 +101,7 @@
       showToolbar={false}
       readonly={false}
       itemId={null}
+      allowImageUpload={false}
     />
   </div>
 

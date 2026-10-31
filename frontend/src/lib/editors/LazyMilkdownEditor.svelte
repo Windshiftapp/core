@@ -8,6 +8,7 @@
     entityId = null, onImageInsert = null, onContentChange = null, isPersonalWorkspace = false, compact = false,
     customUploadFn = null, downloadUrlBase = '/api/attachments', deferImageUploads = false,
     onDeferredImageUpload = null,
+    allowImageUpload = true,
     enableDiagrams = false,
     workspaceId = null,
     enablePageLinks = false,
@@ -115,6 +116,7 @@
       {downloadUrlBase}
       {deferImageUploads}
       {onDeferredImageUpload}
+      {allowImageUpload}
       {enableDiagrams}
       {workspaceId}
       {enablePageLinks}

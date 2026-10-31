@@ -309,6 +309,9 @@ func (c *itemCreation) recordCreation(tx database.Tx, itemID, itemNumber int) er
 	if err := RecordItemCreationHistory(c.db, tx, item, creatorUserID, c.params.CreatorPortalCustomerID, metadata); err != nil {
 		return fmt.Errorf("record item creation history: %w", err)
 	}
+	if err := RecordItemCreationMilestonesHistory(c.db, tx, itemID, c.params.MilestoneIDs, creatorUserID, c.params.CreatorPortalCustomerID, metadata); err != nil {
+		return fmt.Errorf("record item creation milestones history: %w", err)
+	}
 	_, err = itemevents.NewRecorder(c.db).Created(c.ctx, tx, item, c.params.MilestoneIDs, metadata)
 	return err
 }

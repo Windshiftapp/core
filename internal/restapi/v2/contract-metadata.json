@@ -8476,6 +8476,310 @@
         ]
       }
     },
+    "/milestones/{milestone_id}/activity": {
+      "get": {
+        "description": "List milestone activity, newest first. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List milestone activity, newest first",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/comments": {
+      "get": {
+        "description": "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "cursor",
+            "In": "query",
+            "Description": "Opaque continuation cursor returned by the preceding response. Cursors are operation-specific and cannot be combined with removed timestamp or ID boundaries.",
+            "Required": false,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List milestone comments",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "post": {
+        "description": "Create milestone comment. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Create milestone comment",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/comments/{comment_id}": {
+      "delete": {
+        "description": "Delete milestone comment. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "comment_id",
+            "In": "path",
+            "Description": "The milestone comment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Delete milestone comment",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "patch": {
+        "description": "Update milestone comment. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "comment_id",
+            "In": "path",
+            "Description": "The milestone comment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update milestone comment",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/page-links": {
+      "get": {
+        "description": "List milestone page links. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List milestone page links",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "post": {
+        "description": "Link page to milestone. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Link page to milestone",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/page-links/{link_id}": {
+      "delete": {
+        "description": "Unlink page from milestone. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "milestone_id",
+            "In": "path",
+            "Description": "The milestone identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "link_id",
+            "In": "path",
+            "Description": "The milestone page link identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Unlink page from milestone",
+        "tags": [
+          "Planning"
+        ]
+      }
+    },
     "/milestones/{milestone_id}/progress": {
       "get": {
         "description": "Get milestone progress. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

@@ -10644,6 +10644,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -11950,6 +11956,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -13391,6 +13403,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -14601,6 +14619,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -15605,6 +15629,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -16654,6 +16684,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -17760,6 +17796,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -20887,6 +20929,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -22103,6 +22151,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -23918,6 +23972,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -24947,6 +25007,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -26663,6 +26729,297 @@
         ],
         "type": "object"
       },
+      "GetMilestonesMilestoneIdActivityResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "entries": {
+                "description": "The entries value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actor_id": {
+                      "description": "The actor id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "actor_kind": {
+                      "description": "The actor kind value.",
+                      "type": "string"
+                    },
+                    "actor_name": {
+                      "description": "The actor name value.",
+                      "type": "string"
+                    },
+                    "comment_id": {
+                      "description": "The comment id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "string"
+                    },
+                    "item": {
+                      "additionalProperties": false,
+                      "description": "The item value.",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "key": {
+                          "description": "The key value.",
+                          "type": "string"
+                        },
+                        "title": {
+                          "description": "The title value.",
+                          "type": "string"
+                        },
+                        "workspace_id": {
+                          "description": "The workspace id value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "key",
+                        "title",
+                        "workspace_id"
+                      ],
+                      "type": "object"
+                    },
+                    "new_value": {
+                      "description": "The new value value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "occurred_at": {
+                      "description": "The occurred at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "old_value": {
+                      "description": "The old value value.",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "page": {
+                      "additionalProperties": false,
+                      "description": "The page value.",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "title": {
+                          "description": "The title value.",
+                          "type": "string"
+                        },
+                        "workspace_id": {
+                          "description": "The workspace id value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "workspace_id"
+                      ],
+                      "type": "object"
+                    },
+                    "type": {
+                      "description": "The type value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actor_kind",
+                    "id",
+                    "occurred_at",
+                    "type"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "has_more": {
+                "description": "The has more value.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "entries",
+              "has_more"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetMilestonesMilestoneIdCommentsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "comments": {
+                "description": "The comments value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "author_avatar": {
+                      "description": "The author avatar value.",
+                      "type": "string"
+                    },
+                    "author_id": {
+                      "description": "The author id value.",
+                      "type": "integer"
+                    },
+                    "author_name": {
+                      "description": "The author name value.",
+                      "type": "string"
+                    },
+                    "content": {
+                      "description": "The content value.",
+                      "type": "string"
+                    },
+                    "content_html": {
+                      "description": "The content html value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "is_agent": {
+                      "description": "The is agent value.",
+                      "type": "boolean"
+                    },
+                    "milestone_id": {
+                      "description": "The milestone id value.",
+                      "type": "integer"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "author_id",
+                    "content",
+                    "created_at",
+                    "id",
+                    "milestone_id",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "has_more": {
+                "description": "The has more value.",
+                "type": "boolean"
+              },
+              "next_cursor": {
+                "description": "The next cursor value.",
+                "type": "string"
+              },
+              "refresh_cursor": {
+                "description": "The refresh cursor value.",
+                "type": "string"
+              },
+              "total": {
+                "description": "The total value.",
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "comments",
+              "has_more"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetMilestonesMilestoneIdPageLinksResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "description": "The created by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "created_by_name": {
+                  "description": "The created by name value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "milestone_id": {
+                  "description": "The milestone id value.",
+                  "type": "integer"
+                },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "page_title": {
+                  "description": "The page title value.",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "created_at",
+                "id",
+                "milestone_id",
+                "page_id",
+                "page_title",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetMilestonesMilestoneIdProgressResult": {
         "additionalProperties": false,
         "properties": {
@@ -26873,6 +27230,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -27295,6 +27658,12 @@
                 "is_global": {
                   "description": "The is global value.",
                   "type": "boolean"
+                },
+                "last_activity_at": {
+                  "description": "The last activity at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
                 },
                 "latest_release": {
                   "additionalProperties": false,
@@ -36917,6 +37286,12 @@
                 "description": "The is global value.",
                 "type": "boolean"
               },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
               "latest_release": {
                 "additionalProperties": false,
                 "description": "The latest release value.",
@@ -37290,6 +37665,12 @@
                 "is_global": {
                   "description": "The is global value.",
                   "type": "boolean"
+                },
+                "last_activity_at": {
+                  "description": "The last activity at value.",
+                  "format": "date-time",
+                  "nullable": true,
+                  "type": "string"
                 },
                 "latest_release": {
                   "additionalProperties": false,
@@ -42706,6 +43087,12 @@
                         "description": "The is global value.",
                         "type": "boolean"
                       },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "latest_release": {
                         "additionalProperties": false,
                         "description": "The latest release value.",
@@ -45287,6 +45674,12 @@
                             "description": "The is global value.",
                             "type": "boolean"
                           },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "latest_release": {
                             "additionalProperties": false,
                             "description": "The latest release value.",
@@ -46335,6 +46728,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -47441,6 +47840,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -49614,6 +50019,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -55012,6 +55423,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -56221,6 +56638,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -57036,6 +57459,82 @@
         ],
         "type": "object"
       },
+      "PatchMilestonesMilestoneIdCommentsCommentIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "description": "The content value.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchMilestonesMilestoneIdCommentsCommentIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "author_avatar": {
+                "description": "The author avatar value.",
+                "type": "string"
+              },
+              "author_id": {
+                "description": "The author id value.",
+                "type": "integer"
+              },
+              "author_name": {
+                "description": "The author name value.",
+                "type": "string"
+              },
+              "content": {
+                "description": "The content value.",
+                "type": "string"
+              },
+              "content_html": {
+                "description": "The content html value.",
+                "type": "string"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_agent": {
+                "description": "The is agent value.",
+                "type": "boolean"
+              },
+              "milestone_id": {
+                "description": "The milestone id value.",
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "author_id",
+              "content",
+              "created_at",
+              "id",
+              "milestone_id",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PatchMilestonesMilestoneIdPayload": {
         "additionalProperties": false,
         "properties": {
@@ -57135,6 +57634,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -59811,6 +60316,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -70996,6 +71507,12 @@
                               "description": "The is global value.",
                               "type": "boolean"
                             },
+                            "last_activity_at": {
+                              "description": "The last activity at value.",
+                              "format": "date-time",
+                              "nullable": true,
+                              "type": "string"
+                            },
                             "latest_release": {
                               "additionalProperties": false,
                               "description": "The latest release value.",
@@ -72025,6 +72542,12 @@
                       "is_global": {
                         "description": "The is global value.",
                         "type": "boolean"
+                      },
+                      "last_activity_at": {
+                        "description": "The last activity at value.",
+                        "format": "date-time",
+                        "nullable": true,
+                        "type": "string"
                       },
                       "latest_release": {
                         "additionalProperties": false,
@@ -73249,6 +73772,12 @@
                             "description": "The is global value.",
                             "type": "boolean"
                           },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "latest_release": {
                             "additionalProperties": false,
                             "description": "The latest release value.",
@@ -74390,6 +74919,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -76638,6 +77173,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -77780,6 +78321,12 @@
                     "is_global": {
                       "description": "The is global value.",
                       "type": "boolean"
+                    },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
                     },
                     "latest_release": {
                       "additionalProperties": false,
@@ -79313,6 +79860,12 @@
                         "is_global": {
                           "description": "The is global value.",
                           "type": "boolean"
+                        },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
                         },
                         "latest_release": {
                           "additionalProperties": false,
@@ -81003,6 +81556,12 @@
                           "description": "The is global value.",
                           "type": "boolean"
                         },
+                        "last_activity_at": {
+                          "description": "The last activity at value.",
+                          "format": "date-time",
+                          "nullable": true,
+                          "type": "string"
+                        },
                         "latest_release": {
                           "additionalProperties": false,
                           "description": "The latest release value.",
@@ -82157,6 +82716,12 @@
                       "description": "The is global value.",
                       "type": "boolean"
                     },
+                    "last_activity_at": {
+                      "description": "The last activity at value.",
+                      "format": "date-time",
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "latest_release": {
                       "additionalProperties": false,
                       "description": "The latest release value.",
@@ -83254,6 +83819,12 @@
                           "is_global": {
                             "description": "The is global value.",
                             "type": "boolean"
+                          },
+                          "last_activity_at": {
+                            "description": "The last activity at value.",
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
                           },
                           "latest_release": {
                             "additionalProperties": false,
@@ -84695,6 +85266,154 @@
         ],
         "type": "object"
       },
+      "PostMilestonesMilestoneIdCommentsPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "description": "The content value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "PostMilestonesMilestoneIdCommentsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "author_avatar": {
+                "description": "The author avatar value.",
+                "type": "string"
+              },
+              "author_id": {
+                "description": "The author id value.",
+                "type": "integer"
+              },
+              "author_name": {
+                "description": "The author name value.",
+                "type": "string"
+              },
+              "content": {
+                "description": "The content value.",
+                "type": "string"
+              },
+              "content_html": {
+                "description": "The content html value.",
+                "type": "string"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_agent": {
+                "description": "The is agent value.",
+                "type": "boolean"
+              },
+              "milestone_id": {
+                "description": "The milestone id value.",
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "author_id",
+              "content",
+              "created_at",
+              "id",
+              "milestone_id",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostMilestonesMilestoneIdPageLinksPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "page_id": {
+            "description": "The page id value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page_id"
+        ],
+        "type": "object"
+      },
+      "PostMilestonesMilestoneIdPageLinksResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "description": "The created by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "created_by_name": {
+                "description": "The created by name value.",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "milestone_id": {
+                "description": "The milestone id value.",
+                "type": "integer"
+              },
+              "page_id": {
+                "description": "The page id value.",
+                "type": "integer"
+              },
+              "page_title": {
+                "description": "The page title value.",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "milestone_id",
+              "page_id",
+              "page_title",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostMilestonesMilestoneIdReleasePayload": {
         "additionalProperties": false,
         "properties": {
@@ -84793,6 +85512,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -85242,6 +85967,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -91101,6 +91832,12 @@
               "is_global": {
                 "description": "The is global value.",
                 "type": "boolean"
+              },
+              "last_activity_at": {
+                "description": "The last activity at value.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
               },
               "latest_release": {
                 "additionalProperties": false,
@@ -114252,6 +114989,589 @@
           }
         ],
         "summary": "Update milestone",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:write"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/activity": {
+      "get": {
+        "description": "List milestone activity, newest first. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getMilestonesMilestoneIdActivity",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMilestonesMilestoneIdActivityResult"
+                }
+              }
+            },
+            "description": "List milestone activity, newest first response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List milestone activity, newest first",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:read"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/comments": {
+      "get": {
+        "description": "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only.",
+        "operationId": "getMilestonesMilestoneIdComments",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque continuation cursor returned by the preceding response. Cursors are operation-specific and cannot be combined with removed timestamp or ID boundaries.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMilestonesMilestoneIdCommentsResult"
+                }
+              }
+            },
+            "description": "List milestone comments response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List milestone comments",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:read"
+        ]
+      },
+      "post": {
+        "description": "Create milestone comment. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postMilestonesMilestoneIdComments",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMilestonesMilestoneIdCommentsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostMilestonesMilestoneIdCommentsResult"
+                }
+              }
+            },
+            "description": "Create milestone comment response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create milestone comment",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:write"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/comments/{comment_id}": {
+      "delete": {
+        "description": "Delete milestone comment. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteMilestonesMilestoneIdCommentsCommentId",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone comment identifier.",
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete milestone comment",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:delete"
+        ]
+      },
+      "patch": {
+        "description": "Update milestone comment. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchMilestonesMilestoneIdCommentsCommentId",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone comment identifier.",
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchMilestonesMilestoneIdCommentsCommentIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchMilestonesMilestoneIdCommentsCommentIdResult"
+                }
+              }
+            },
+            "description": "Update milestone comment response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update milestone comment",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:write"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/page-links": {
+      "get": {
+        "description": "List milestone page links. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getMilestonesMilestoneIdPageLinks",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetMilestonesMilestoneIdPageLinksResult"
+                }
+              }
+            },
+            "description": "List milestone page links response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List milestone page links",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:read"
+        ]
+      },
+      "post": {
+        "description": "Link page to milestone. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postMilestonesMilestoneIdPageLinks",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMilestonesMilestoneIdPageLinksPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostMilestonesMilestoneIdPageLinksResult"
+                }
+              }
+            },
+            "description": "Link page to milestone response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Link page to milestone",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "milestones:write"
+        ]
+      }
+    },
+    "/milestones/{milestone_id}/page-links/{link_id}": {
+      "delete": {
+        "description": "Unlink page from milestone. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteMilestonesMilestoneIdPageLinksLinkId",
+        "parameters": [
+          {
+            "description": "The milestone identifier.",
+            "in": "path",
+            "name": "milestone_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The milestone page link identifier.",
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Unlink page from milestone",
         "tags": [
           "Planning"
         ],

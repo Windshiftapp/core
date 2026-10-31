@@ -21,7 +21,7 @@ const milestoneSelectQuery = `
 	       CAST(mr.released_at AS TEXT), CAST(mr.assets_json AS TEXT), CAST(mr.last_synced_at AS TEXT),
 	       mr.scm_connection_id, mr.scm_repository,
 	       mr.scm_release_id, mr.scm_release_url, mr.created_by, mr.created_at,
-	       m.created_at, m.updated_at
+	       m.created_at, m.updated_at, m.last_activity_at
 	FROM milestones m
 	LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 	LEFT JOIN workspaces w ON m.workspace_id = w.id

@@ -2954,6 +2954,90 @@ var Catalog = []Migration{
 		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;`,
 	},
 	{
+		Version:       "20261109_milestone_comments",
+		Name:          "Markdown comments on milestones",
+		CheckSQLite:   sqliteTableCheck("milestone_comments"),
+		CheckPostgres: pgTableCheck("milestone_comments"),
+		SQLite: `
+			CREATE TABLE milestone_comments (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				milestone_id INTEGER NOT NULL,
+				author_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_milestone_comments_milestone ON milestone_comments(milestone_id, created_at, id);
+			CREATE INDEX idx_milestone_comments_author ON milestone_comments(author_id);
+		`,
+		Postgres: `
+			CREATE TABLE milestone_comments (
+				id SERIAL PRIMARY KEY,
+				milestone_id INTEGER NOT NULL,
+				author_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_milestone_comments_milestone ON milestone_comments(milestone_id, created_at, id);
+			CREATE INDEX IF NOT EXISTS idx_milestone_comments_author ON milestone_comments(author_id);
+		`,
+	},
+	{
+		Version:       "20261109_milestone_activity",
+		Name:          "Milestone history and item milestone-change index for the milestone Activity tab",
+		CheckSQLite:   sqliteTableCheck("milestone_history"),
+		CheckPostgres: pgTableCheck("milestone_history"),
+		SQLite: `
+			CREATE TABLE milestone_history (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				milestone_id INTEGER NOT NULL,
+				user_id INTEGER,
+				field_name TEXT NOT NULL,
+				old_value TEXT,
+				new_value TEXT,
+				changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+			);
+			CREATE INDEX idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
+			CREATE INDEX idx_milestone_history_user ON milestone_history(user_id);
+			CREATE INDEX IF NOT EXISTS idx_item_history_milestones
+				ON item_history(changed_at DESC, id DESC)
+				WHERE field_name = 'milestones';
+		`,
+		Postgres: `
+			CREATE TABLE milestone_history (
+				id SERIAL PRIMARY KEY,
+				milestone_id INTEGER NOT NULL,
+				user_id INTEGER,
+				field_name TEXT NOT NULL,
+				old_value TEXT,
+				new_value TEXT,
+				changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+			);
+			CREATE INDEX IF NOT EXISTS idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
+			CREATE INDEX IF NOT EXISTS idx_milestone_history_user ON milestone_history(user_id);
+			CREATE INDEX IF NOT EXISTS idx_item_history_milestones
+				ON item_history(changed_at DESC, id DESC)
+				WHERE field_name = 'milestones';
+		`,
+	},
+	{
+		Version:       "20261109_milestone_last_activity",
+		Name:          "Store the time of each milestone's newest Activity entry",
+		CheckSQLite:   sqliteColumnCheck("milestones", "last_activity_at"),
+		CheckPostgres: pgColumnCheck("milestones", "last_activity_at"),
+		SQLite:        `ALTER TABLE milestones ADD COLUMN last_activity_at DATETIME;`,
+		Postgres:      `ALTER TABLE milestones ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;`,
+	},
+	{
 		Version:       "20261110_intake_import_existing_mail",
 		Name:          "Let a new email intake start from new mail instead of importing the mailbox history (WI-1775)",
 		CheckSQLite:   sqliteColumnCheck("intakes", "import_existing_mail"),

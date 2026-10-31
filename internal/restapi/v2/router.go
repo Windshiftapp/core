@@ -567,6 +567,24 @@ type planningApplication interface {
 	GetIterationProgressBatch(int, []int) (map[int]*services.IterationProgressReport, error)
 }
 
+type milestoneCommentApplication interface {
+	GetFeed(userID, milestoneID int, options services.CommentFeedOptions) (*services.MilestoneCommentFeedPage, error)
+	CountFeed(milestoneID int) (int, error)
+	Create(userID, milestoneID int, content string) (*models.MilestoneComment, error)
+	Update(userID, milestoneID, commentID int, content string) (*models.MilestoneComment, error)
+	Delete(userID, milestoneID, commentID int) error
+}
+
+type milestonePageLinkApplication interface {
+	List(userID, milestoneID int) ([]models.MilestonePageLink, error)
+	Create(userID, milestoneID, pageID int) (*models.MilestonePageLink, error)
+	Delete(userID, milestoneID, linkID int) error
+}
+
+type milestoneActivityApplication interface {
+	List(userID, milestoneID int, params services.MilestoneActivityListParams) ([]models.MilestoneActivity, bool, error)
+}
+
 type linkApplication interface {
 	ListLinkTypes(bool) ([]models.LinkType, error)
 	ListLinksForEntityWithChecks(int, string, int) ([]models.ItemLink, []models.ItemLink, error)
@@ -658,6 +676,9 @@ type Deps struct {
 	PageAttachments              pageAttachmentApplication
 	Collections                  collectionApplication
 	Planning                     planningApplication
+	MilestoneComments            milestoneCommentApplication
+	MilestonePageLinks           milestonePageLinkApplication
+	MilestoneActivity            milestoneActivityApplication
 	Links                        linkApplication
 	AgentRuns                    agentRunApplication
 	AgentSkills                  agentSkillReader
@@ -821,6 +842,15 @@ func RegisterRoutes(deps Deps) error {
 	if deps.Planning == nil {
 		return errors.New("v2: Planning is required")
 	}
+	if deps.MilestoneComments == nil {
+		return errors.New("v2: MilestoneComments is required")
+	}
+	if deps.MilestonePageLinks == nil {
+		return errors.New("v2: MilestonePageLinks is required")
+	}
+	if deps.MilestoneActivity == nil {
+		return errors.New("v2: MilestoneActivity is required")
+	}
 	if deps.Links == nil {
 		return errors.New("v2: Links is required")
 	}
@@ -924,6 +954,9 @@ func buildRoutes(deps Deps) []route {
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
 	registerPlanningRoutes(&builder, deps.Planning)
+	registerMilestoneCommentRoutes(&builder, deps)
+	registerMilestonePageLinkRoutes(&builder, deps)
+	registerMilestoneActivityRoutes(&builder, deps)
 	registerLinkRoutes(&builder, deps.Links, deps.CatalogMutations)
 	registerAgentRunRoutes(&builder, deps.AgentRuns)
 	registerAgentSkillRoutes(&builder, deps.AgentSkills)
@@ -1078,7 +1111,7 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, ParameterMetadata{Name: "since", In: "query", Description: "Exclusive change cursor. Omit to obtain a stable watermark before a full load.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
 		upsertParameter(route, ParameterMetadata{Name: "through", In: "query", Description: "Inclusive fixed watermark from the first page. Must be greater than or equal to since.", Schema: map[string]any{"type": "integer", "format": "int64", "minimum": 0}})
 		upsertParameter(route, integerQuery("limit", "Maximum log events per page. Supply explicitly to enable incremental pagination; omitted limits preserve the full-reload fallback on overflow.", 500, 500))
-	case "GET /items/{item_id}/comments", "GET /workspaces/{workspace_id}/agent-runs", "GET /items/{item_id}/agent-runs", "GET /agent-runs/{run_id}/events":
+	case "GET /items/{item_id}/comments", "GET /milestones/{milestone_id}/comments", "GET /workspaces/{workspace_id}/agent-runs", "GET /items/{item_id}/agent-runs", "GET /agent-runs/{run_id}/events":
 		filtered := route.Parameters[:0]
 		for _, parameter := range route.Parameters {
 			if parameter.In != "query" || (parameter.Name != "before" && parameter.Name != "before_id" && parameter.Name != "since" && parameter.Name != "since_id" && parameter.Name != "after_id") {
@@ -1285,6 +1318,8 @@ func applyParameterCorrections(route *Route) {
 		}
 	case "GET /links/batch":
 		route.Description = "Returns one-hop links for at most 100 explicit item IDs, or for one paged query-language selection. Explicit IDs retain first-occurrence order. Each item is capped independently and exposes an operation-bound next_cursor when more links exist; inaccessible links are omitted."
+	case "GET /milestones/{milestone_id}/comments":
+		route.Description = "Returns the milestone's comment feed, newest first, with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; total is returned on the first page only."
 	case "GET /items/{item_id}/comments":
 		route.Description = "Returns an authorization-filtered comment feed with at most 200 entries. Opaque next_cursor and refresh_cursor values preserve the exclusive timestamp-and-ID boundary without exposing its representation; partial comment pages are never returned on failure. Grouped reactions are attached only when include_reactions is true."
 	case "GET /agent-runs/{run_id}/events":

@@ -176,6 +176,12 @@ var itemSupportEventsSchema string
 //go:embed schema/action_trigger_marks.sql
 var actionTriggerMarksSchema string
 
+//go:embed schema/milestone_comments.sql
+var milestoneCommentsSchema string
+
+//go:embed schema/milestone_history.sql
+var milestoneHistorySchema string
+
 //go:embed schema/agents.sql
 var agentsSchema string
 
