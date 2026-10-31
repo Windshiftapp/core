@@ -842,6 +842,9 @@ export default {
       changeManifest: 'Changer le fichier manifest.json',
       manifestSelected: 'Manifeste sélectionné : {name}',
       registeredRoutes: 'Routes enregistrées',
+      routeAuth_session: 'Session',
+      routeAuth_admin: 'Administrateur',
+      routeAuth_none: 'Public',
       moduleSettingsNote:
         'Les modifications des paramètres de module prennent effet immédiatement. Désactiver un module le masquera de la navigation.',
       failedToUpload: 'Échec du téléversement : {error}',

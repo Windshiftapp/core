@@ -527,9 +527,21 @@
                       <div class="mt-3">
                         <p class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.modules.registeredRoutes')}:</p>
                         <div class="space-y-1">
-                          {#each plugin.routes as route}
+                          {#each plugin.routes as route, routeIndex}
                             <div class="text-xs font-mono rounded px-2 py-1" style="background-color: var(--ds-interactive-subtle); color: var(--ds-text);">
                               <span class="font-semibold">{route.method || 'ANY'}</span> /api/plugins/{plugin.name}{route.path}
+                              {#if route.auth}
+                                <span
+                                  class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium uppercase align-middle"
+                                  data-testid={`plugin-route-auth-${plugin.name}-${routeIndex}`}
+                                  data-auth={route.auth}
+                                  style={route.auth === 'none'
+                                    ? 'background-color: var(--ds-accent-red-subtle); color: var(--ds-accent-red);'
+                                    : 'background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);'}
+                                >
+                                  {t(`settings.modules.routeAuth_${route.auth}`)}
+                                </span>
+                              {/if}
                               {#if route.description}
                                 <span class="ml-2" style="color: var(--ds-text-subtle);">- {route.description}</span>
                               {/if}

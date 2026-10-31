@@ -58,8 +58,10 @@ type Manager struct {
 	pluginTimeout   time.Duration
 	memoryLimit     uint64
 	licenseVerifier LicenseVerifier
-	hostFuncs       []extism.HostFunction
-	db              database.Database
+	// allowPublicRoutes permits plugin routes that declare auth "none".
+	allowPublicRoutes bool
+	hostFuncs         []extism.HostFunction
+	db                database.Database
 
 	// Plugin-declared periodic invocations, keyed by plugin name. Guarded by
 	// its own mutex so DueSchedules from the scheduler tick doesn't contend
@@ -110,18 +112,19 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
 
 	m := &Manager{
-		plugins:         make(map[string]*LoadedPlugin),
-		schedules:       make(map[string][]*scheduledPlugin),
-		pluginDirs:      pluginDirs,
-		httpClient:      options.HTTPClient,
-		smtpSender:      options.SMTPSender,
-		scmService:      options.SCMService,
-		commentService:  options.CommentService,
-		logger:          options.Logger,
-		pluginTimeout:   options.PluginTimeout,
-		memoryLimit:     options.MemoryLimit,
-		licenseVerifier: options.LicenseVerifier,
-		db:              options.Database,
+		plugins:           make(map[string]*LoadedPlugin),
+		schedules:         make(map[string][]*scheduledPlugin),
+		pluginDirs:        pluginDirs,
+		httpClient:        options.HTTPClient,
+		smtpSender:        options.SMTPSender,
+		scmService:        options.SCMService,
+		commentService:    options.CommentService,
+		logger:            options.Logger,
+		pluginTimeout:     options.PluginTimeout,
+		memoryLimit:       options.MemoryLimit,
+		licenseVerifier:   options.LicenseVerifier,
+		allowPublicRoutes: options.AllowPublicRoutes,
+		db:                options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
 	return m
@@ -238,6 +241,20 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		m.logger.Warn("failed to fetch plugin metadata", "name", manifest.Name, "error", err)
 		// Fallback: use manifest extensions even if metadata fetch fails
 		plugin.Extensions = attachPluginName(manifest.Name, manifest.Extensions, nil)
+	}
+
+	// Route auth defaults to session and is validated here so a malformed or
+	// ambiguous manifest fails the load before the plugin is registered.
+	normalizedRoutes, err := normalizePluginRoutes(plugin.Routes, m.allowPublicRoutes)
+	if err != nil {
+		return fmt.Errorf("invalid plugin routes: %w", err)
+	}
+	plugin.Routes = normalizedRoutes
+
+	for _, route := range plugin.Routes {
+		if route.Auth == RouteAuthNone {
+			m.logger.Warn("plugin route is public", "plugin", manifest.Name, "method", route.Method, "path", route.Path)
+		}
 	}
 
 	m.mu.Lock()
@@ -812,6 +829,74 @@ func (m *Manager) pluginConfig() extism.PluginConfig {
 		// access should go through explicit host functions (KV/HTTP/etc.) rather
 		// than ambient access to the Windshift process filesystem.
 		EnableWasi: true,
+	}
+}
+
+// normalizePluginRoutes defaults an unset route auth to session and rejects an
+// unknown value. It also rejects two routes that can match the same request
+// while declaring different auth, so a request's required credential is
+// unambiguous. Called after metadata resolution so manifest, get_routes, and
+// get_metadata routes are all covered.
+func normalizePluginRoutes(routes []Route, allowPublic bool) ([]Route, error) {
+	normalized := make([]Route, len(routes))
+	for i, route := range routes {
+		switch route.Auth {
+		case "":
+			route.Auth = RouteAuthSession
+		case RouteAuthNone:
+			if !allowPublic {
+				return nil, fmt.Errorf("route %s %s declares auth %q but public plugin routes are disabled (set PLUGIN_PUBLIC_ROUTES=true to allow)", route.Method, route.Path, RouteAuthNone)
+			}
+		case RouteAuthSession, RouteAuthAdmin:
+		default:
+			return nil, fmt.Errorf("route %s %s declares unknown auth %q", route.Method, route.Path, route.Auth)
+		}
+		normalized[i] = route
+	}
+	for i := range normalized {
+		for j := i + 1; j < len(normalized); j++ {
+			if normalized[i].Auth == normalized[j].Auth {
+				continue
+			}
+			if routesOverlap(normalized[i], normalized[j]) {
+				return nil, fmt.Errorf(
+					"routes %s %s (%s) and %s %s (%s) can match the same request with different auth",
+					normalized[i].Method, normalized[i].Path, normalized[i].Auth,
+					normalized[j].Method, normalized[j].Path, normalized[j].Auth)
+			}
+		}
+	}
+	return normalized, nil
+}
+
+// routesOverlap reports whether two routes can match the same request. Methods
+// overlap when either is empty (any) or they are equal.
+func routesOverlap(a, b Route) bool {
+	if a.Method != "" && b.Method != "" && a.Method != b.Method {
+		return false
+	}
+	return routePatternsOverlap(a.Path, b.Path)
+}
+
+// routePatternsOverlap reports whether two path patterns can match the same
+// path. A trailing star matches a prefix.
+func routePatternsOverlap(a, b string) bool {
+	if a == b {
+		return true
+	}
+	aStar := strings.HasSuffix(a, "*")
+	bStar := strings.HasSuffix(b, "*")
+	aPrefix := strings.TrimSuffix(a, "*")
+	bPrefix := strings.TrimSuffix(b, "*")
+	switch {
+	case aStar && bStar:
+		return strings.HasPrefix(aPrefix, bPrefix) || strings.HasPrefix(bPrefix, aPrefix)
+	case aStar:
+		return strings.HasPrefix(bPrefix, aPrefix)
+	case bStar:
+		return strings.HasPrefix(aPrefix, bPrefix)
+	default:
+		return false
 	}
 }
 

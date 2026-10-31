@@ -200,6 +200,9 @@ type PluginsConfig struct {
 	// LicensePubKey is the base64 Ed25519 public key that plugin license
 	// tokens must verify against. Empty disables license enforcement.
 	LicensePubKey string
+	// AllowPublicRoutes permits plugin routes that declare auth "none". Off by
+	// default: a public route is a deliberate operator opt-in.
+	AllowPublicRoutes bool
 }
 
 // LLMConfig holds LLM-related configuration.

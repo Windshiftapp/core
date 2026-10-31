@@ -212,6 +212,7 @@ type Server struct {
 	searchLimiter         *ratelimit.Limiter
 	calendarFeedLimiter   *ratelimit.Limiter
 	publicBoardLimiter    *ratelimit.Limiter
+	pluginPublicLimiter   *ratelimit.Limiter
 	v2RateLimiter         *ratelimit.Limiter
 	loginLockout          *middleware.LoginLockout
 	userConcurrency       *middleware.UserConcurrencyLimiter
@@ -434,6 +435,7 @@ func (s *Server) initialize() error {
 	s.portalAuthLimiter = ratelimit.New(3.0/60.0, 3, ipKey)
 	s.calendarFeedLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
 	s.publicBoardLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
+	s.pluginPublicLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
 	s.oauthTokenLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
 	s.authRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
 	s.aiRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
@@ -1432,12 +1434,27 @@ func (s *Server) initialize() error {
 
 	itemDiagramService := services.NewItemDiagramService(repository.NewDiagramRepository(s.db))
 
+	// CSRF origins are shared by the /api middleware chain and the plugin
+	// router, which mounts on the raw mux outside that chain. Derive the scheme
+	// from BASE_URL for origin construction.
+	corsScheme := ""
+	if cfg.BaseURL != "" {
+		if parsed, err := url.Parse(cfg.BaseURL); err == nil {
+			corsScheme = parsed.Scheme
+		}
+	}
+	csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
+	csrfValidator := middleware.NewDisabledCSRFValidator()
+	if !cfg.DisableCSRF {
+		csrfValidator = middleware.NewCSRFValidator(csrfOrigins)
+	}
+
 	var pluginRouter *plugins.Router
 	var pluginLicenseVerifier plugins.LicenseVerifier
 	var instanceService *services.InstanceService
 	if !cfg.Plugins.Disabled {
 		var pluginOpts []plugins.Option
-		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService))
+		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService), plugins.WithAllowPublicRoutes(cfg.Plugins.AllowPublicRoutes))
 
 		// License enforcement: when a license public key is configured, a
 		// plugin only contributes capabilities if its license verifies against
@@ -1496,7 +1513,14 @@ func (s *Server) initialize() error {
 		}
 		cancel()
 
-		pluginRouter = plugins.NewRouter(s.pluginManager)
+		pluginRouter = plugins.NewRouter(s.pluginManager, plugins.RouterDeps{
+			RequireAuth:  authMiddleware.RequireAuth,
+			RequireAdmin: permissionMiddleware.RequireSystemAdmin(),
+			CSRF:         csrfValidator,
+			PublicLimit:  s.pluginPublicLimiter.Limit,
+			Permissions:  permService,
+			Logger:       logger.Get(),
+		})
 
 		// Plugin schedule scheduler — invokes plugin handlers on their declared
 		// interval (manifest `schedules:` field). Must start after LoadPlugins
@@ -1614,14 +1638,6 @@ func (s *Server) initialize() error {
 	}
 
 	// Build API middleware chain
-	// Derive scheme from BASE_URL for CORS origin construction
-	corsScheme := ""
-	if cfg.BaseURL != "" {
-		if parsed, err := url.Parse(cfg.BaseURL); err == nil {
-			corsScheme = parsed.Scheme
-		}
-	}
-	csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy, cfg.AllowInsecureHTTP)
 	apiCORSMiddleware := createFormEmbedCORSMiddleware(cfg.FormEmbedOrigins, csrfOrigins, corsMiddleware)
 	apiMiddleware := router.MiddlewareChain{
@@ -2638,6 +2654,9 @@ func (s *Server) cleanup() {
 	}
 	if s.publicBoardLimiter != nil {
 		s.publicBoardLimiter.Stop()
+	}
+	if s.pluginPublicLimiter != nil {
+		s.pluginPublicLimiter.Stop()
 	}
 	if s.v2RateLimiter != nil {
 		s.v2RateLimiter.Stop()

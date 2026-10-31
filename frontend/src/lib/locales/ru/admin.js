@@ -939,6 +939,9 @@ export default {
       changeManifest: 'Заменить manifest.json',
       manifestSelected: 'Выбран манифест: {name}',
       registeredRoutes: 'Зарегистрированные маршруты',
+      routeAuth_session: 'Сессия',
+      routeAuth_admin: 'Администратор',
+      routeAuth_none: 'Публичный',
       moduleSettingsNote:
         'Изменения настроек модулей применяются сразу. Отключённый модуль будет скрыт из навигации.',
       failedToUpload: 'Не удалось загрузить: {error}',

@@ -900,6 +900,9 @@ export default {
       changeManifest: 'Change manifest.json',
       manifestSelected: 'Manifest selected: {name}',
       registeredRoutes: 'Registered Routes',
+      routeAuth_session: 'Session',
+      routeAuth_admin: 'Admin',
+      routeAuth_none: 'Public',
       moduleSettingsNote:
         'Changes to module settings take effect immediately. Disabling a module will hide it from the navigation.',
       failedToUpload: 'Upload failed: {error}',
