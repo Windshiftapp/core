@@ -44,7 +44,10 @@
     customFieldDefinitions = [],
     onitemUpdated = undefined,
     onupdateError = undefined,
-    titleLeading = null,
+    // Rendered after the type icon, before the title text. The tree view uses
+    // it for the parent-reference chip so the chip cannot push a parent's
+    // title past its children's titles.
+    titleAfterIcon = null,
   } = $props();
 
   // Get the field definition for custom fields
@@ -133,7 +136,6 @@
   {:else if column.field_identifier === 'title'}
     <!-- Title with type icon -->
     <div class="flex items-center gap-2 min-w-0">
-      {#if titleLeading}{@render titleLeading({ item })}{/if}
       {#if item.item_type_icon || item.item_type_id}
         {@const itemType = item.item_type_id
           ? itemTypes.find((type) => type.id === item.item_type_id) ?? null
@@ -148,6 +150,7 @@
           />
         {/if}
       {/if}
+      {#if titleAfterIcon}{@render titleAfterIcon({ item })}{/if}
       <div class="flex-1 min-w-0" data-testid={`workspace-item-title-${item.id}`}>
         {#if canEdit}
           <InlineFieldEditor

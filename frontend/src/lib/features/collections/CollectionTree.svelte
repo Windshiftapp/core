@@ -275,6 +275,21 @@
     return `${level * 1.5}rem`;
   }
 
+  // Depth indent for the tree column: the padding creates the offset and a
+  // repeating gradient draws one guide line per ancestor level so nesting is
+  // visible even when the row is otherwise flat. The background is clipped to
+  // the indent width, so it never runs under the row's content.
+  function getIndentStyle(level) {
+    if (!level) return undefined;
+    const width = getIndentLevel(level);
+    return [
+      `padding-left: ${width}`,
+      'background-image: repeating-linear-gradient(to right, transparent 0 0.75rem, var(--ds-border) 0.75rem 0.8125rem, transparent 0.8125rem 1.5rem)',
+      `background-size: ${width} 100%`,
+      'background-repeat: no-repeat',
+    ].join('; ');
+  }
+
   function renderTreeItems(parentId = null, level = 0, result = [], rootItems = null) {
     // The root level renders every loaded root; children follow the loaded set.
     const items = parentId === null ? (rootItems || getRootItems()) : getItemsByParent(parentId);
@@ -466,7 +481,7 @@
                 {#each listColumns as column (column.field_identifier)}
                   <div
                     class="min-w-0 overflow-hidden"
-                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                    style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
                   >
                     {#if column.field_identifier === indentColumnId}
                       <button
@@ -503,7 +518,7 @@
                 {#each listColumns as column (column.field_identifier)}
                   <div
                     class="min-w-0 overflow-hidden"
-                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                    style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
                   >
                     {#if column.field_identifier === 'key'}
                       <LinkComponent
@@ -567,13 +582,13 @@
                   <div
                     class="min-w-0 overflow-hidden"
                     data-testid={column.field_identifier === indentColumnId ? `tree-indent-${item.id}` : undefined}
-                    style={column.field_identifier === indentColumnId ? `padding-left: ${getIndentLevel(item.level)}` : undefined}
+                    style={column.field_identifier === indentColumnId ? getIndentStyle(item.level) : undefined}
                   >
                     <ListCellRenderer
                       {item}
                       {column}
                       {workspace}
-                      titleLeading={parentChip}
+                      titleAfterIcon={parentChip}
                       canEdit={workspacePermissions.canEdit(item.workspace_id)}
                       {statuses}
                       {statusCategories}
