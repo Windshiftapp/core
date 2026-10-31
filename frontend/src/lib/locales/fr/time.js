@@ -213,6 +213,7 @@ export default {
       emailOptional: 'E-mail (optionnel)',
       contactPersonOptional: 'Personne de contact (facultative)',
       failedToSave: 'Échec de l’enregistrement de l’organisation',
+      failedToDelete: 'Échec de la suppression de l’organisation',
       deleteOrganization: 'Supprimer l’organisation',
       confirmDelete: 'Voulez-vous vraiment supprimer « {name} » ?',
     },

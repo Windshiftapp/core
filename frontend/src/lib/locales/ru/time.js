@@ -230,6 +230,7 @@ export default {
       emailOptional: 'Электронная почта (необязательно)',
       contactPersonOptional: 'Контактное лицо (необязательно)',
       failedToSave: 'Не удалось сохранить организацию',
+      failedToDelete: 'Не удалось удалить организацию',
       deleteOrganization: 'Удалить организацию',
       confirmDelete: 'Удалить организацию «{name}»?',
     },

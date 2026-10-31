@@ -215,6 +215,7 @@ export default {
       emailOptional: 'E-Mail (Optional)',
       contactPersonOptional: 'Kontaktperson (Optional)',
       failedToSave: 'Organisation konnte nicht gespeichert werden',
+      failedToDelete: 'Organisation konnte nicht gelöscht werden',
       deleteOrganization: 'Organisation löschen',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?',
     },

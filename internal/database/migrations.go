@@ -3059,6 +3059,114 @@ var Catalog = []Migration{
 		ApplySQLite:   applyItemSearchFTS,
 		ApplyPostgres: applyItemSearchIndexPostgres,
 	},
+	{
+		Version: "20261117_time_project_customer_backfill",
+		Name:    "Backfill NULL time-project customers to the no-customer placeholder",
+		// Effect present when no project lacks a customer. Projects written before
+		// the no-customer placeholder existed can still carry NULL; the worklog
+		// customer is now derived from the project, so the invariant must hold.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+		Postgres: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+	},
+	{
+		Version: "20261118_drop_time_worklog_customer",
+		Name:    "Drop the denormalised customer reference from time worklogs",
+		// Effect present when the column is gone. Worklogs derive their customer
+		// from the project (customer -> project -> worklog), so deleting an
+		// organisation can no longer cascade into worklog data.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('time_worklogs') WHERE name='customer_id') = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='time_worklogs' AND column_name='customer_id') = 0 THEN 1 ELSE 0 END",
+		// SQLite cannot drop a column used in a foreign key in place; the
+		// ApplySQLite rebuild handles it. The SQL field is the checksum marker.
+		SQLite:      "drop-time-worklog-customer:v1",
+		ApplySQLite: dropTimeWorklogCustomerSQLite,
+		Postgres: `
+			ALTER TABLE time_worklogs DROP COLUMN IF EXISTS customer_id;
+			DROP INDEX IF EXISTS idx_time_worklogs_customer_id;
+		`,
+	},
+}
+
+// dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id
+// column and its foreign key for SQLite, which cannot drop a column referenced
+// by a foreign key in place.
+func dropTimeWorklogCustomerSQLite(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin time_worklogs rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE time_worklogs_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+			description TEXT NOT NULL,
+			date INTEGER NOT NULL,
+			start_time INTEGER NOT NULL,
+			end_time INTEGER NOT NULL,
+			duration_minutes INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
+		)`,
+		`INSERT INTO time_worklogs_migration (id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+			SELECT id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at FROM time_worklogs`,
+		`DROP TABLE time_worklogs`,
+		`ALTER TABLE time_worklogs_migration RENAME TO time_worklogs`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild time_worklogs: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit time_worklogs rebuild: %w", err)
+	}
+	return nil
 }
 
 // itemSearchIndexName is the PostgreSQL GIN index backing token-prefix item

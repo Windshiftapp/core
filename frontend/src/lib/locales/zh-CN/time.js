@@ -182,6 +182,7 @@ export default {
       emailOptional: '电子邮件（可选）',
       contactPersonOptional: '联系人（可选）',
       failedToSave: '保存组织失败',
+      failedToDelete: '删除组织失败',
       deleteOrganization: '删除组织',
       confirmDelete: '确定要删除「{name}」吗？',
     },

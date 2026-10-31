@@ -240,6 +240,7 @@ export default {
       emailOptional: 'Email (Optional)',
       contactPersonOptional: 'Contact Person (Optional)',
       failedToSave: 'Failed to save organization',
+      failedToDelete: 'Failed to delete organization',
       deleteOrganization: 'Delete Organization',
       confirmDelete: 'Are you sure you want to delete "{name}"?',
     },

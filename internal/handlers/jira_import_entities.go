@@ -1970,16 +1970,6 @@ func (h *JiraImportHandler) importWorklogs(jobID string, itemID int, issue *jira
 			slog.Int("total", issue.Fields.Worklog.Total))
 	}
 
-	customerID, err := h.imports.TimeProjectCustomerID(*timeProjectID)
-	if err != nil {
-		slog.Error("Failed to resolve time project customer for Jira worklogs",
-			slog.String("component", "jira"),
-			slog.String("issue", issue.Key),
-			slog.Int("timeProjectID", *timeProjectID),
-			slog.Any("error", err))
-		return nil
-	}
-
 	for _, worklog := range issue.Fields.Worklog.Worklogs {
 		if progress != nil {
 			progress.TotalWorklogs++
@@ -2038,7 +2028,6 @@ func (h *JiraImportHandler) importWorklogs(jobID string, itemID int, issue *jira
 		}
 		worklogID, err := h.imports.UpsertImportedWorklog(repository.ImportedWorklog{
 			ProjectID:       *timeProjectID,
-			CustomerID:      customerID,
 			UserID:          userID,
 			ItemID:          itemID,
 			Description:     description,

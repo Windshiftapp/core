@@ -366,7 +366,7 @@ func (h *TimeWorklogHandler) respondMutationError(w http.ResponseWriter, r *http
 	switch {
 	case errors.Is(err, services.ErrWorklogProjectNotFound):
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "project not found"))
-	case errors.Is(err, services.ErrWorklogProjectInactive), errors.Is(err, services.ErrWorklogCustomerMissing), errors.Is(err, services.ErrWorklogInvalidInput):
+	case errors.Is(err, services.ErrWorklogProjectInactive), errors.Is(err, services.ErrWorklogInvalidInput):
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
 	default:
 		h.RespondInternalError(w, r)
