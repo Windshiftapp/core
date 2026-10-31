@@ -1325,12 +1325,21 @@
           >
             <!-- Tree header row 1 (month groups height) -->
             <div
-              class="flex items-center px-3 shrink-0"
+              class="flex items-center justify-between px-3 shrink-0"
               style="height: 29px; border-bottom: 1px solid var(--ds-border);"
             >
               <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">
                 {t('collections.roadmapItems', { count: treeData.length })}
               </span>
+              <button
+                type="button"
+                data-testid="roadmap-expand-toggle"
+                class="text-xs transition-colors cursor-pointer"
+                style="color: var(--ds-interactive);"
+                onclick={() => (hierarchy.expandedCount === 0 ? hierarchy.expandAll() : hierarchy.collapseAll())}
+              >
+                {hierarchy.expandedCount === 0 ? t('collectionTree.expandAll') : t('collectionTree.collapseAll')}
+              </button>
             </div>
             <!-- Tree header row 2 (column labels height) -->
             <div
