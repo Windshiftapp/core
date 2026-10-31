@@ -44,10 +44,10 @@
     customFieldDefinitions = [],
     onitemUpdated = undefined,
     onupdateError = undefined,
-    // Rendered under the item key in the Key column. The tree view uses it for
+    // Rendered before the item key in the Key column. The tree view uses it for
     // the parent-reference chip so the parent context cannot push a row's
     // leading type icon and title past its children's.
-    keyAfter = null,
+    keyBefore = null,
   } = $props();
 
   // Get the field definition for custom fields
@@ -124,14 +124,14 @@
 
 {:else if column.field_type === 'system'}
   {#if column.field_identifier === 'key'}
-    <!-- Item Key, with the tree's parent reference underneath when present -->
-    <div class="flex flex-col items-start gap-0.5 min-w-0">
+    <!-- Item Key, with the tree's parent reference in front when present -->
+    <div class="flex items-center gap-1.5 min-w-0">
+      {#if keyBefore}{@render keyBefore({ item })}{/if}
       <ItemKey
         {item}
         {workspace}
         dataTestid={`list-cell-key-${item.id}`}
       />
-      {#if keyAfter}{@render keyAfter({ item })}{/if}
     </div>
 
   {:else if column.field_identifier === 'title'}

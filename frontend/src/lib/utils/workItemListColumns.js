@@ -104,7 +104,7 @@ const GRID_KEY_WIDTH = 5;
 const GRID_ACTIONS_WIDTH = 4;
 
 function gridColumnTrack(col, options = {}) {
-  if (col.field_identifier === 'key') return `${GRID_KEY_WIDTH}rem`;
+  if (col.field_identifier === 'key') return `${options.keyWidth ?? GRID_KEY_WIDTH}rem`;
 
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
   if (base !== undefined) {
@@ -124,7 +124,7 @@ function gridColumnTrack(col, options = {}) {
 // Floor for the whole row. When it exceeds the viewport the list scrolls
 // horizontally instead of letting columns collapse into each other.
 function gridColumnMinWidth(col, options = {}) {
-  if (col.field_identifier === 'key') return GRID_KEY_WIDTH;
+  if (col.field_identifier === 'key') return options.keyWidth ?? GRID_KEY_WIDTH;
   const base = GRID_BASE_FIXED_WIDTHS[col.field_identifier];
   if (base !== undefined) return base * GRID_MIN_FIXED_SCALE;
   return col.field_identifier === 'title'

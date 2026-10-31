@@ -295,7 +295,8 @@
     }
     if (branch) {
       layers.push('linear-gradient(var(--ds-border), var(--ds-border))');
-      sizes.push('0.0625rem 50%');
+      // Stop short of the chevron so the branch does not touch it.
+      sizes.push('0.0625rem calc(50% - 0.375rem)');
       positions.push(`${level * 1.5 + 0.75}rem 100%`);
     }
     if (layers.length === 0) return undefined;
@@ -367,13 +368,14 @@
   // The expander lives at the start of the indent column, after the depth
   // padding, so it sits directly against the guide lines and every child row
   // reads as nested content rather than a separate expander gutter. The tree
-  // also asks for a wider title track so rows fit in the two-line clamp.
+  // also widens the key track for the parent reference and asks for a wider
+  // title track so rows fit in the two-line clamp.
   let indentColumnId = $derived(
     listColumns.some((column) => column.field_identifier === 'title')
       ? 'title'
       : listColumns[0]?.field_identifier
   );
-  const treeGridOptions = { titleMinWidth: 24 };
+  const treeGridOptions = { titleMinWidth: 24, keyWidth: 10 };
   let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns, treeGridOptions));
   let gridMinWidth = $derived(listGridMinWidth(listColumns, treeGridOptions));
 </script>
@@ -382,13 +384,13 @@
   {@const parent = parentReference(item)}
   {#if parent}
     <span class="inline-flex items-center gap-0.5 min-w-0" title={parent.title || ''}>
-      <span class="text-xs" style="color: var(--ds-text-subtle);">↳</span>
       <ItemKey
         item={parent}
         variant="badge"
         size="compact"
         dataTestid={`tree-parent-${item.id}`}
       />
+      <span class="text-xs" style="color: var(--ds-text-subtle);">›</span>
     </span>
   {/if}
 {/snippet}
@@ -619,7 +621,7 @@
                             {item}
                             {column}
                             {workspace}
-                            keyAfter={parentChip}
+                            keyBefore={parentChip}
                             canEdit={workspacePermissions.canEdit(item.workspace_id)}
                             {statuses}
                             {statusCategories}
@@ -640,7 +642,7 @@
                         {item}
                         {column}
                         {workspace}
-                        keyAfter={parentChip}
+                        keyBefore={parentChip}
                         canEdit={workspacePermissions.canEdit(item.workspace_id)}
                         {statuses}
                         {statusCategories}
