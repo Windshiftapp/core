@@ -15,6 +15,7 @@
   import { tests } from '../../api/tests/index.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import Input from '../../components/Input.svelte';
+  import TextField from '../../components/TextField.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Select from '../../components/Select.svelte';
   import LabelCombobox from '../../pickers/LabelCombobox.svelte';
@@ -1359,10 +1360,11 @@
         <div class="space-y-4">
           <!-- Search and create new label -->
           <div class="mb-6 space-y-2">
-            <Label class="block text-xs font-medium" color="subtle">
-              {t('testing.searchExistingLabels')}
-            </Label>
-            <Input
+            <TextField
+              label={t('testing.searchExistingLabels')}
+              labelSize="xs"
+              labelClass=""
+              labelColor="subtle"
               placeholder={t('testing.searchLabelsPlaceholder')}
               bind:value={labelSearchQuery}
               size="small"
@@ -1386,15 +1388,15 @@
             <Panel padding="default" rounded="md">
               <h4 class="font-medium mb-3" style="color: var(--ds-text);">{t('testing.createNewLabel')}</h4>
               <form onsubmit={(e) => { e.preventDefault(); handleCreateLabel(); }} class="space-y-3">
-                <div>
-                  <Label class="block text-xs font-medium mb-1">{t('common.name')}</Label>
-                  <Input
-                    bind:value={newLabelData.name}
-                    required
-                    placeholder={t('testing.enterLabelName')}
-                    size="small"
-                  />
-                </div>
+                <TextField
+                  label={t('common.name')}
+                  labelSize="xs"
+                  labelClass="mb-1"
+                  bind:value={newLabelData.name}
+                  required
+                  placeholder={t('testing.enterLabelName')}
+                  size="small"
+                />
                 <div class="flex gap-3">
                   <div class="flex-1">
                     <Label class="block text-xs font-medium mb-1">{t('common.color')}</Label>
@@ -1433,14 +1435,15 @@
                       </div>
                     </div>
                   </div>
-                  <div class="flex-2">
-                    <Label class="block text-xs font-medium mb-1">{t('common.description')}</Label>
-                    <Input
-                      bind:value={newLabelData.description}
-                      placeholder={t('testing.optionalDescription')}
-                      size="small"
-                    />
-                  </div>
+                  <TextField
+                    class="flex-2"
+                    label={t('common.description')}
+                    labelSize="xs"
+                    labelClass="mb-1"
+                    bind:value={newLabelData.description}
+                    placeholder={t('testing.optionalDescription')}
+                    size="small"
+                  />
                 </div>
                 <div class="flex gap-2 pt-2">
                   <Button
