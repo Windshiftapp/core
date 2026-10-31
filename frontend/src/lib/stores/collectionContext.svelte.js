@@ -121,6 +121,10 @@ class CollectionStore {
   itemsHasMore = $state(false);
   itemsLoadingMore = $state(false);
   boardBackgroundLoading = $state(false);
+  // Bumped whenever an authoritative read replaces the base item page, so
+  // hierarchy consumers can re-fetch their loaded subtrees (a refresh with the
+  // same base rows still picks up newly created descendants).
+  dataGeneration = $state(0);
 
   // Board views load every unfinished item separately from completed work.
   boardDeferred = $state(null);
@@ -419,6 +423,7 @@ class CollectionStore {
         boardPartition,
         collection,
       });
+      this.dataGeneration += 1;
       // The count is not needed to paint rows; fetch it after they are visible.
       void this.#requestCollectionTotal();
       if (itemsResult && BOARD_VIEWS.has(view)) {
@@ -1162,6 +1167,7 @@ class CollectionStore {
         boardPartition,
         collection,
       });
+      this.dataGeneration += 1;
       void this.#requestCollectionTotal();
       return true;
     } catch (error) {

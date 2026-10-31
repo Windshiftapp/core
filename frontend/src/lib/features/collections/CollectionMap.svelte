@@ -38,11 +38,12 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
+  import CollectionLevelFilter from './CollectionLevelFilter.svelte';
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
   import { childItemTypesForParent } from '../../utils/hierarchy.js';
   import { showCreatedItemOutsideViewToast } from '../../utils/createdItemToast.js';
-  import { indexCollectionHierarchy } from './collectionHierarchy.js';
+  import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
   import {
     buildSwimlanes,
     childrenForLane,
@@ -55,6 +56,13 @@
 
   let workspace = $derived(workspaceDataStore.workspace);
   let loading = $state(true);
+  // Level-scoped base page plus lazily loaded subtrees.
+  const hierarchy = useCollectionHierarchy({
+    getWorkspaceId: () => workspaceId ?? null,
+    getCollectionId: () => collectionId ?? null,
+    getMaxDepth: () => 0,
+    getSubFilterQL: () => collectionStore.effectiveSubFilterQL,
+  });
   let backboneItems = $state([]); // Current backbone items (horizontal)
   let childItemsByParent = $state({}); // Child items grouped by parent ID
   let itemTypes = $derived(workspaceDataStore.itemTypes);
@@ -200,12 +208,12 @@
     await loadAllData();
   });
 
-  // Sync items from central store
+  // Sync the backbone and child row from the shared hierarchy loader.
   $effect(() => {
     if (!collectionStore.loading) {
       currentCollectionName = collectionStore.collectionName;
-      const currentItems = collectionStore.items;
-      untrack(() => processMapItems(currentItems));
+      hierarchy.allItems;
+      untrack(() => processMapItems());
     }
   });
 
@@ -309,26 +317,19 @@
     hierarchyBreadcrumbs = newBreadcrumbs;
   }
 
-  function processMapItems(items) {
+  function processMapItems() {
     const parentId = currentParentId;
-
-    // Compute into local variables to avoid read-after-write on $state
-    const hierarchyIndex = indexCollectionHierarchy(items);
+    const index = hierarchy.hierarchyIndex;
     const newBackbone = parentId === null
-      ? [...hierarchyIndex.roots].sort((a, b) => a.id - b.id)
-      : [...(hierarchyIndex.childrenByParent.get(parentId) || [])].sort((a, b) => a.id - b.id);
+      ? [...index.roots]
+      : [...hierarchy.getChildren(parentId)];
 
     // Group child items by their parent ID (children of current backbone items)
     const newChildren = {};
     for (const backbone of newBackbone) {
-      const children = hierarchyIndex.childrenByParent.get(backbone.id);
+      const children = hierarchy.getChildren(backbone.id);
       if (children?.length) newChildren[backbone.id] = [...children];
     }
-
-    // Sort child items within each parent group
-    Object.keys(newChildren).forEach(pid => {
-      newChildren[pid].sort((a, b) => a.id - b.id);
-    });
 
     // Batch-assign to $state at the end
     backboneItems = newBackbone;
@@ -340,7 +341,7 @@
 
   function loadStoryMapData(parentId = null) {
     currentParentId = parentId;
-    processMapItems(collectionStore.items);
+    processMapItems();
   }
 
   function updateURL(parentId) {
@@ -758,8 +759,9 @@
       </ViewHeader>
 
       <!-- Controls Bar -->
-      <div class="flex items-center mt-4">
+      <div class="flex items-center gap-4 mt-4">
         <SubFilterBar {workspaceId} {collectionId} />
+        <CollectionLevelFilter {workspaceId} {collectionId} view="map" />
       </div>
 
       <!-- Hierarchy Breadcrumbs -->

@@ -13,7 +13,8 @@
     refreshCollectionItem,
     scheduleCollectionReconciliation,
   } from '../../stores/collectionContext.js';
-  import { findOrphansByMissingParent, indexCollectionHierarchy, mergeAncestorContext } from './collectionHierarchy.js';
+  import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
+  import CollectionLevelFilter from './CollectionLevelFilter.svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
@@ -67,12 +68,15 @@
   let loading = $state(true);
   let currentCollectionName = $state('Default');
 
-  // Ancestor context for hierarchy gaps: with "hide completed" enabled a
-  // finished parent is filtered out of the loaded page, but its active
-  // children still need it visible above them. Mirrors CollectionTree.
-  let ancestorsByParent = $state({});
-  let ancestorsRequestInFlight = false;
-  let ancestorsRerunPending = false;
+  // Level-scoped base page plus lazily loaded subtrees.
+  const hierarchy = useCollectionHierarchy({
+    getWorkspaceId: () => workspaceId ?? null,
+    getCollectionId: () => collectionId ?? null,
+    getMaxDepth: () => 0,
+    getSubFilterQL: () => collectionStore.effectiveSubFilterQL,
+  });
+  let allItemsSorted = $derived(hierarchy.allItems);
+  let hierarchyIndex = $derived(hierarchy.hierarchyIndex);
 
   // Settings panel toggle
   let settingsOpen = $state(false);
@@ -210,7 +214,6 @@
   let isResizingPanel = $state(false);
   let resizeStartX = $state(0);
   let resizeStartWidth = $state(0);
-  let expandedItems = $state(new Set());
   let schedulePreview = $state(null);
   let schedulingItemIds = $state(new Set());
   let treeScrollContainer = $state(null);
@@ -458,95 +461,13 @@
   });
 
   // --- Tree helpers ---
-  let allItemsSorted = $derived.by(() => {
-    if (collectionStore.loading) return [];
-    return [...mergeAncestorContext(collectionStore.items, ancestorsByParent)].sort(
-      (a, b) => (a.level || 0) - (b.level || 0) || a.id - b.id
-    );
-  });
-  let hierarchyIndex = $derived(indexCollectionHierarchy(allItemsSorted));
-
-  // Load ancestor chains for items whose parent is not in the loaded page so
-  // filtered or paginated children do not render as stray roots.
-  $effect(() => {
-    const items = collectionStore.items;
-    untrack(() => void syncAncestorContext(items));
-  });
-
-  async function syncAncestorContext(items) {
-    const orphansByParent = findOrphansByMissingParent(items);
-    const neededParents = new Set(orphansByParent.keys());
-
-    // Drop cached chains whose gap the store has since filled itself.
-    const kept = {};
-    let pruned = false;
-    for (const [parentId, chain] of Object.entries(ancestorsByParent)) {
-      if (neededParents.has(Number(parentId))) {
-        kept[parentId] = chain;
-      } else {
-        pruned = true;
-      }
-    }
-    if (pruned) ancestorsByParent = kept;
-
-    const parentByOrphanId = new Map();
-    for (const [parentId, orphans] of orphansByParent) {
-      parentByOrphanId.set(orphans[0].id, parentId);
-    }
-    const orphanIds = [...parentByOrphanId.keys()].filter(
-      (orphanId) => !kept[String(parentByOrphanId.get(orphanId))]
-    );
-    if (orphanIds.length === 0) return;
-    if (ancestorsRequestInFlight) {
-      // A newer page may need different chains; rerun when the current
-      // request settles.
-      ancestorsRerunPending = true;
-      return;
-    }
-    ancestorsRequestInFlight = true;
-    try {
-      const entries = await itemsApi.getManyAncestors(orphanIds);
-      for (const { item_id: orphanId, ancestors } of entries) {
-        // The gap may have closed while the request was in flight.
-        const parentId = parentByOrphanId.get(orphanId);
-        if (!ancestors?.length || parentId == null || !neededParents.has(parentId)) continue;
-        ancestorsByParent = { ...ancestorsByParent, [String(parentId)]: ancestors };
-        for (const ancestor of ancestors) {
-          expandedItems.add(ancestor.id);
-        }
-      }
-      expandedItems = new Set(expandedItems);
-    } catch (error) {
-      console.error('[CollectionRoadmap] Failed to load ancestor context:', error);
-    } finally {
-      ancestorsRequestInFlight = false;
-    }
-    if (ancestorsRerunPending) {
-      ancestorsRerunPending = false;
-      await syncAncestorContext(collectionStore.items);
-    }
-  }
-
   function getRootItems() {
-    return hierarchyIndex.roots;
+    return hierarchy.roots;
   }
 
-  function getItemsByParent(parentId) {
-    return hierarchyIndex.childrenByParent.get(parentId) || [];
-  }
-
-  function hasChildren(itemId) {
-    return hierarchyIndex.childrenByParent.has(itemId);
-  }
-
-  function toggleExpanded(itemId) {
-    if (expandedItems.has(itemId)) {
-      expandedItems.delete(itemId);
-    } else {
-      expandedItems.add(itemId);
-    }
-    expandedItems = new Set(expandedItems);
-  }
+  const getItemsByParent = (parentId) => hierarchy.getChildren(parentId);
+  const hasChildren = (itemId) => hierarchy.hasChildren(itemId);
+  const toggleExpanded = (itemId) => hierarchy.toggleExpanded(itemId);
 
   function getIndentLevel(level) {
     return `${level * 20}px`;
@@ -584,7 +505,7 @@
         treeLevel: level,
         hasChildren: hasChildren(item.id),
       });
-      if (expandedItems.has(item.id)) {
+      if (hierarchy.isExpanded(item.id)) {
         renderTreeItems(item.id, level + 1, result);
       }
     }
@@ -605,21 +526,7 @@
     collectionStore.loading ? 0 : allItemsSorted.filter((item) => !itemHasDate(item)).length,
   );
 
-  // Auto-expand root items with children on first load
-  $effect(() => {
-    if (!collectionStore.loading && allItemsSorted.length > 0) {
-      untrack(() => {
-        if (expandedItems.size === 0) {
-          const roots = getRootItems();
-          const newExpanded = new Set();
-          for (const r of roots) {
-            if (hasChildren(r.id)) newExpanded.add(r.id);
-          }
-          if (newExpanded.size > 0) expandedItems = newExpanded;
-        }
-      });
-    }
-  });
+  // The shared loader auto-expands base roots with children on load.
 
   // Items with computed bar positions
   let roadmapItems = $derived.by(() => {
@@ -1313,7 +1220,10 @@
 
       <!-- Controls Bar -->
       <div class="relative z-40 flex items-center mb-4">
+      <div class="flex items-center gap-4">
         <SubFilterBar {workspaceId} {collectionId} />
+        <CollectionLevelFilter {workspaceId} {collectionId} view="roadmap" />
+      </div>
       </div>
 
       <!-- Toolbar: Zoom + Navigation + Settings toggle -->
@@ -1455,7 +1365,7 @@
                           onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
                           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleExpanded(item.id); } }}
                         >
-                          {#if expandedItems.has(item.id)}
+                          {#if hierarchy.isExpanded(item.id)}
                             <ChevronDown class="w-3 h-3" />
                           {:else}
                             <ChevronRight class="w-3 h-3" />

@@ -160,9 +160,9 @@ export function useCollectionHierarchy({
     return loadedRoots.has(itemId);
   }
 
-  async function fetchRoots(rootIds, { offsetByRoot = {} } = {}) {
+  async function fetchRoots(rootIds, { offsetByRoot = {}, force = false } = {}) {
     const ids = [...new Set(rootIds)].filter(
-      (id) => !loadingRoots.has(id) && (offsetByRoot[id] != null || !loadedRoots.has(id))
+      (id) => !loadingRoots.has(id) && (force || offsetByRoot[id] != null || !loadedRoots.has(id))
     );
     if (ids.length === 0) return;
     loadingRoots = new Set([...loadingRoots, ...ids]);
@@ -279,10 +279,28 @@ export function useCollectionHierarchy({
 
   // Reset the overlay when the base set is replaced (level or scope change) and
   // eager-load the base items' subtrees. Appending a base page keeps the
-  // already-loaded subtrees.
+  // already-loaded subtrees. A store refresh that leaves the base rows
+  // unchanged still re-fetches the loaded subtrees so new descendants appear.
+  let lastGeneration = null;
   $effect(() => {
     const signature = baseItems.map((item) => item.id).join(',');
-    if (signature === baseSignature) return;
+    const generation = collectionStore.dataGeneration;
+    const generationChanged = lastGeneration !== null && lastGeneration !== generation;
+    lastGeneration = generation;
+
+    if (signature === baseSignature) {
+      // An authoritative refresh with the same base rows can still change
+      // has_children or add descendants, so re-fetch every known root plus any
+      // base row that now reports children.
+      if (generationChanged) {
+        const roots = new Set(loadedRoots);
+        for (const item of baseItems) {
+          if (item.has_children) roots.add(item.id);
+        }
+        if (roots.size > 0) void fetchRoots([...roots], { force: true });
+      }
+      return;
+    }
     const nextIds = new Set(baseItems.map((item) => item.id));
     const isAppend =
       previousBaseIds !== null && [...previousBaseIds].every((id) => nextIds.has(id));
