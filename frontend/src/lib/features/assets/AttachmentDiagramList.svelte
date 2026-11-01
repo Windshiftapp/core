@@ -6,6 +6,7 @@
   import IconDownload from '@tabler/icons-svelte-runes/icons/download';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
+  import ModalBackdrop from '../../components/ModalBackdrop.svelte';
   import { portal } from '../../actions/portal.js';
   import { attachments as attachmentsApi } from '../../api/misc.js';
 
@@ -44,10 +45,6 @@
 
   function closeLightbox() {
     lightbox = null;
-  }
-
-  function handleLightboxKeydown(e) {
-    if (e.key === 'Escape') closeLightbox();
   }
 
   function thumbUrl(att) {
@@ -197,21 +194,11 @@
 {/if}
 
 {#if lightbox}
-  <!-- Fullscreen lightbox overlay. Backdrop click + Escape both close. PDFs
-       render in an iframe; images render at their native size, capped to the
-       viewport. -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    use:portal
-    class="fixed inset-0 z-50 flex items-center justify-center p-6"
-    style="background-color: rgba(0,0,0,0.85);"
-    onclick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
-    onkeydown={handleLightboxKeydown}
-    role="dialog"
-    aria-modal="true"
-    tabindex="-1"
-  >
+  <!-- Fullscreen lightbox. ModalBackdrop owns Escape, click-outside and focus
+       restore. PDFs render in an iframe; images render at their native size,
+       capped to the viewport. -->
+  <div use:portal>
+  <ModalBackdrop show={true} onclose={closeLightbox} zIndex={50} opacity={0.85} blur={0}>
     <div class="absolute top-4 right-4 flex items-center gap-3">
       <button
         type="button"
@@ -251,5 +238,6 @@
         {lightbox.original_filename}
       </div>
     </div>
+  </ModalBackdrop>
   </div>
 {/if}
