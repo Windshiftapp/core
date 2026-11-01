@@ -1,199 +1,109 @@
 <script>
-  import { onMount } from 'svelte';
   import { hierarchyLevels as hierarchyLevelsApi } from '../api/configuration.js';
   import { t } from '../stores/i18n.svelte.js';
-  import Plus from '@lucide/svelte/icons/plus';
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Circle from '@lucide/svelte/icons/circle';
   import Network from '@lucide/svelte/icons/network';
-  import AlertBox from '../components/AlertBox.svelte';
-  import Button from '../components/Button.svelte';
-  import DataTable from '../components/DataTable.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
-  import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { errorToast } from '../stores/toasts.svelte.js';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import { confirm } from '../composables/useConfirm.js';
-  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { objectDisplayValue } from '../utils/systemLabels.js';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
 
-  let hierarchyLevels = $state([]);
-  let isLoading = $state(true);
-  let error = $state(null);
+  let formData = $state({ level: 0, name: '', description: '' });
   let editingId = $state(null);
-  let showCreateForm = $state(false);
   let editingObject = $state(null);
   let translationEditor = $state(null);
-
-  // Form data
-  let formData = $state({
-    level: 0,
-    name: '',
-    description: ''
-  });
 
   function getDisplayValue(hierarchyLevel, field) {
     return objectDisplayValue(hierarchyLevel, field);
   }
 
-
-  onMount(() => {
-    loadHierarchyLevels();
-  });
-
   async function loadHierarchyLevels() {
-    try {
-      isLoading = true;
-      error = null;
-      const data = await hierarchyLevelsApi.getAll();
-      hierarchyLevels = data.sort((a, b) => a.level - b.level);
-    } catch (err) {
-      error = t('settings.hierarchyLevels.failedToLoad');
-    } finally {
-      isLoading = false;
-    }
+    const data = await hierarchyLevelsApi.getAll();
+    return data.sort((a, b) => a.level - b.level);
   }
 
-  function startCreate() {
+  function openCreate(levels) {
     formData = {
-      level: hierarchyLevels.length > 0 ? Math.max(...hierarchyLevels.map(h => h.level)) + 1 : 0,
+      level: levels.length > 0 ? Math.max(...levels.map((h) => h.level)) + 1 : 0,
       name: '',
-      description: ''
+      description: '',
     };
     editingId = null;
     editingObject = null;
-    showCreateForm = true;
   }
 
-  function startEdit(hierarchyLevel) {
+  function openEdit(hierarchyLevel) {
     editingObject = hierarchyLevel;
     formData = {
       level: hierarchyLevel.level,
       name: hierarchyLevel.name,
-      description: hierarchyLevel.description
+      description: hierarchyLevel.description,
     };
     editingId = hierarchyLevel.id;
-    showCreateForm = true;
   }
 
-  function cancelEdit() {
-    showCreateForm = false;
-    editingId = null;
-    editingObject = null;
-    formData = { level: 0, name: '', description: '' };
-  }
-
-  async function saveHierarchyLevel(event) {
-    event.preventDefault();
-    try {
-      if (!formData.name.trim()) {
-        error = t('settings.hierarchyLevels.nameRequired');
-        return;
-      }
-
-      if (editingId) {
-        translationEditor?.validate();
-        await hierarchyLevelsApi.update(editingId, formData);
-        await translationEditor?.save();
-      } else {
-        await hierarchyLevelsApi.create(formData);
-      }
-
-      await loadHierarchyLevels();
-      cancelEdit();
-      error = null;
-    } catch (err) {
-      error = t('settings.hierarchyLevels.failedToSave');
+  async function saveHierarchyLevel() {
+    if (editingId) {
+      translationEditor?.validate();
+      await hierarchyLevelsApi.update(editingId, formData);
+      await translationEditor?.save();
+    } else {
+      await hierarchyLevelsApi.create(formData);
     }
   }
 
-  async function deleteHierarchyLevel(id, name) {
-    const confirmed = await confirm({
-      title: t('common.delete'),
-      message: t('settings.hierarchyLevels.confirmDelete', { name }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      variant: 'danger',
-      icon: Trash2
-    });
-
-    if (!confirmed) return;
-
-    try {
-      await hierarchyLevelsApi.delete(id);
-      await loadHierarchyLevels();
-    } catch (err) {
-      errorToast(
-        t('settings.hierarchyLevels.deleteFailed'),
-        t('settings.hierarchyLevels.cannotDeleteTitle')
-      );
-    }
+  async function deleteHierarchyLevel(hierarchyLevel) {
+    await hierarchyLevelsApi.delete(hierarchyLevel.id);
   }
 
-  async function moveLevel(id, direction) {
-    const currentLevel = hierarchyLevels.find(h => h.id === id);
-    if (!currentLevel) return;
+  async function moveLevel(hierarchyLevel, direction, levels, reload) {
+    const newLevel = direction === 'up' ? hierarchyLevel.level - 1 : hierarchyLevel.level + 1;
 
-    const newLevel = direction === 'up' ? currentLevel.level - 1 : currentLevel.level + 1;
-
-    // Check if the new level already exists
-    const conflictLevel = hierarchyLevels.find(h => h.level === newLevel);
+    const conflictLevel = levels.find((h) => h.level === newLevel);
     if (conflictLevel) {
-      error = t('settings.hierarchyLevels.levelOccupied', {
-        level: newLevel,
-        name: getDisplayValue(conflictLevel, 'name')
-      });
+      errorToast(
+        t('settings.hierarchyLevels.levelOccupied', {
+          level: newLevel,
+          name: getDisplayValue(conflictLevel, 'name'),
+        })
+      );
       return;
     }
 
     if (newLevel < 0) {
-      error = t('settings.hierarchyLevels.negativeLevel');
+      errorToast(t('settings.hierarchyLevels.negativeLevel'));
       return;
     }
 
-    try {
-      await hierarchyLevelsApi.update(id, {
-        ...currentLevel,
-        level: newLevel
-      });
-      await loadHierarchyLevels();
-      error = null;
-    } catch (err) {
-      error = t('settings.hierarchyLevels.failedToSave');
-    }
+    await hierarchyLevelsApi.update(hierarchyLevel.id, {
+      ...hierarchyLevel,
+      level: newLevel,
+    });
+    reload();
   }
 
-  // Column definitions for DataTable
-  const hierarchyColumns = $derived([
-    {
-      key: 'level',
-      label: t('settings.hierarchyLevels.level'),
-      width: '60px'
-    },
+  const hierarchyColumns = [
+    { key: 'level', label: t('settings.hierarchyLevels.level'), width: '60px' },
     {
       key: 'name',
       label: t('settings.hierarchyLevels.name'),
-      render: hierarchyLevel => getDisplayValue(hierarchyLevel, 'name')
+      render: (hierarchyLevel) => getDisplayValue(hierarchyLevel, 'name'),
     },
     {
       key: 'description',
       label: t('settings.hierarchyLevels.description'),
-      render: hierarchyLevel => getDisplayValue(hierarchyLevel, 'description')
+      render: (hierarchyLevel) => getDisplayValue(hierarchyLevel, 'description'),
     },
-    {
-      key: 'actions',
-      label: t('common.actions')
-    }
-  ]);
+    { key: 'actions', label: t('common.actions') },
+  ];
 
-  function buildHierarchyDropdownItems(hierarchyLevel) {
+  function buildHierarchyDropdownItems(hierarchyLevel, { edit, remove, items, reload }) {
     return [
       {
         id: 'edit',
@@ -201,7 +111,7 @@
         icon: Edit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
-        onClick: () => startEdit(hierarchyLevel)
+        onClick: () => edit(hierarchyLevel),
       },
       {
         id: 'move-up',
@@ -210,7 +120,7 @@
         title: t('common.moveUp'),
         hoverClass: 'hover-bg',
         disabled: hierarchyLevel.level === 0,
-        onClick: () => moveLevel(hierarchyLevel.id, 'up')
+        onClick: () => moveLevel(hierarchyLevel, 'up', items, reload),
       },
       {
         id: 'move-down',
@@ -218,7 +128,7 @@
         icon: ChevronDown,
         title: t('common.moveDown'),
         hoverClass: 'hover-bg',
-        onClick: () => moveLevel(hierarchyLevel.id, 'down')
+        onClick: () => moveLevel(hierarchyLevel, 'down', items, reload),
       },
       {
         id: 'delete',
@@ -227,136 +137,83 @@
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
-        onClick: () => deleteHierarchyLevel(
-          hierarchyLevel.id,
-          getDisplayValue(hierarchyLevel, 'name')
-        )
-      }
+        onClick: () => remove(hierarchyLevel),
+      },
     ];
   }
 </script>
 
-<PageHeader
+<EntityManagerPage
   icon={Network}
   title={t('settings.hierarchyLevels.title')}
   subtitle={t('settings.hierarchyLevels.subtitle')}
->
-  {#snippet actions()}
-    <Button
-      variant="primary"
-      icon={Plus}
-      onclick={startCreate}
-      disabled={isLoading}
-      keyboardHint="A"
-      hotkeyConfig={{ key: toHotkeyString('hierarchyLevels', 'add'), guard: () => !showCreateForm }}
-    >
-      {t('settings.hierarchyLevels.addHierarchyLevel')}
-    </Button>
-  {/snippet}
-</PageHeader>
-
-{#if error}
-  <AlertBox variant="error" message={error} class="mb-4" />
-{/if}
-
-<DataTable
-  columns={hierarchyColumns}
-  data={hierarchyLevels}
-  keyField="id"
+  addLabel={t('settings.hierarchyLevels.addHierarchyLevel')}
+  hotkeyScope="hierarchyLevels"
   emptyMessage={t('settings.hierarchyLevels.empty')}
   emptyIcon={Circle}
+  columns={hierarchyColumns}
+  load={loadHierarchyLevels}
+  create={saveHierarchyLevel}
+  update={saveHierarchyLevel}
+  remove={deleteHierarchyLevel}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={(hierarchyLevel) =>
+    t('settings.hierarchyLevels.confirmDelete', {
+      name: getDisplayValue(hierarchyLevel, 'name'),
+    })}
+  createTitle={t('settings.hierarchyLevels.createTitle')}
+  editTitle={t('settings.hierarchyLevels.editTitle')}
+  onValidate={() => (formData.name.trim() ? null : t('settings.hierarchyLevels.nameRequired'))}
+  errorLabels={{
+    load: t('settings.hierarchyLevels.failedToLoad'),
+    save: t('settings.hierarchyLevels.failedToSave'),
+    delete: t('settings.hierarchyLevels.deleteFailed'),
+  }}
   actionItems={buildHierarchyDropdownItems}
-/>
+  formFields={hierarchyLevelForm}
+>
+</EntityManagerPage>
 
-<Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-lg" onSubmit={saveHierarchyLevel}>
-  {#snippet children(submitHint)}
-  <!-- Modal header -->
-  <ModalHeader
-    title={editingId ? t('settings.hierarchyLevels.editTitle') : t('settings.hierarchyLevels.createTitle')}
-    showCloseButton={false}
-  />
-
-  <!-- Modal content -->
-  <div class="px-6 py-4">
-    <form onsubmit={saveHierarchyLevel}>
-      <div class="form-group">
-        <label for="level">{t('settings.hierarchyLevels.level')}</label>
-        <Input
-          type="number"
-          id="level"
-          min="0"
-          max="10"
-          bind:value={formData.level}
-          required
-        />
-        <small>{t('settings.hierarchyLevels.numericHint')}</small>
-      </div>
-
-      {#if editingId}
-        {#key editingId}
-          <LocalizedObjectFields
-            bind:this={translationEditor}
-            objectType="hierarchy_level"
-            objectId={editingId}
-            bind:canonicalName={formData.name}
-            bind:canonicalDescription={formData.description}
-            displayName={editingObject?.display_name || editingObject?.name}
-            displayDescription={editingObject?.display_description || editingObject?.description}
-          />
-        {/key}
-      {:else}
-        <div class="form-group">
-          <label for="name">{t('settings.hierarchyLevels.name')}</label>
-          <Input
-            type="text"
-            id="name"
-            placeholder={t('settings.hierarchyLevels.namePlaceholder')}
-            bind:value={formData.name}
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="description">{t('settings.hierarchyLevels.description')}</label>
-          <Textarea
-            id="description"
-            placeholder={t('settings.hierarchyLevels.descriptionPlaceholder')}
-            bind:value={formData.description}
-            rows={3}
-          />
-        </div>
-      {/if}
-
-    </form>
+{#snippet hierarchyLevelForm()}
+  <div class="form-group">
+    <label for="level">{t('settings.hierarchyLevels.level')}</label>
+    <Input type="number" id="level" min="0" max="10" bind:value={formData.level} required />
+    <small>{t('settings.hierarchyLevels.numericHint')}</small>
   </div>
 
-  <DialogFooter
-    onCancel={cancelEdit}
-    onConfirm={saveHierarchyLevel}
-    confirmLabel={editingId ? t('common.update') : t('common.create')}
-    showKeyboardHint={true}
-    confirmKeyboardHint={submitHint}
-  />
-  {/snippet}
-</Modal>
+  {#if editingId}
+    {#key editingId}
+      <LocalizedObjectFields
+        bind:this={translationEditor}
+        objectType="hierarchy_level"
+        objectId={editingId}
+        bind:canonicalName={formData.name}
+        bind:canonicalDescription={formData.description}
+        displayName={editingObject?.display_name || editingObject?.name}
+        displayDescription={editingObject?.display_description || editingObject?.description}
+      />
+    {/key}
+  {:else}
+    <div class="form-group">
+      <label for="name">{t('settings.hierarchyLevels.name')}</label>
+      <Input
+        type="text"
+        id="name"
+        placeholder={t('settings.hierarchyLevels.namePlaceholder')}
+        bind:value={formData.name}
+        required
+      />
+    </div>
 
-
-<style>
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--ds-text);
-  }
-
-  .form-group small {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
-    color: var(--ds-text-subtle);
-  }
-</style>
+    <div class="form-group">
+      <label for="description">{t('settings.hierarchyLevels.description')}</label>
+      <Textarea
+        id="description"
+        placeholder={t('settings.hierarchyLevels.descriptionPlaceholder')}
+        bind:value={formData.description}
+        rows={3}
+      />
+    </div>
+  {/if}
+{/snippet}
