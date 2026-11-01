@@ -56,7 +56,6 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 | Jira Automation | Built-in event-driven actions |
 | Jira Service Management | SLAs, queues, approvals, and a customer portal |
 | Jira Assets / Insight | Asset and CMDB register |
-| Confluence | Workspace knowledge base pages |
 | Xray / Zephyr | Test cases, test sets, test runs, and reports |
 | Marketplace apps | Built-in modules, packs, and plugins (extensible via WASM runtime) |
 
