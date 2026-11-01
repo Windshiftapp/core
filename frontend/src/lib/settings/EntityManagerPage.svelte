@@ -41,8 +41,14 @@
    *   onOpenCreate?: (items: any[]) => void,
    *   onOpenEdit?: (item: any) => void,
    *   confirmDeleteMessage: (item: any) => string,
+   *   onValidate?: () => string | null,
+   *   actionItems?: ((item: any, helpers: { edit: (item: any) => void, remove: (item: any) => void, items: any[], reload: () => void }) => any[]) | null,
+   *   actionTriggerTestid?: ((item: any) => string) | null,
+   *   confirmTestid?: string,
+   *   errorTestid?: string,
    *   canActOn?: (item: any) => boolean,
    *   rowTestid?: (item: any) => string,
+   *   rowAttrs?: (item: any) => Record<string, any>,
    *   actionTestidPrefix?: string,
    *   createTitle?: string,
    *   editTitle?: string,
@@ -51,7 +57,7 @@
    *   submitDisabled?: () => boolean,
    *   onAfterSave?: () => void,
    *   onAfterDelete?: () => void,
-   *   onError?: (err: any, phase: 'load' | 'save' | 'delete', item: any) => void,
+   *   onError?: (err: any, phase: 'load' | 'save' | 'delete', item: any) => boolean | void,
    *   errorLabels?: { load?: string, save?: string, delete?: string },
    *   formFields: import('svelte').Snippet,
    *   actionsCell?: import('svelte').Snippet<[any, any]> | null,
@@ -79,8 +85,14 @@
     onOpenCreate = undefined,
     onOpenEdit = undefined,
     confirmDeleteMessage,
+    onValidate = undefined,
+    actionItems = null,
+    actionTriggerTestid = null,
+    confirmTestid = 'entity-form-confirm',
+    errorTestid = undefined,
     canActOn = () => true,
     rowTestid = undefined,
+    rowAttrs = undefined,
     actionTestidPrefix = 'entity',
     createTitle = t('common.create'),
     editTitle = t('common.edit'),
@@ -105,8 +117,8 @@
   let editingItem = $state(null);
 
   function reportError(err, phase) {
-    if (onError) {
-      onError(err, phase, editingItem);
+    // Returning false lets the scaffold fall back to its own error banner.
+    if (onError && onError(err, phase, editingItem) !== false) {
       return;
     }
     const fallback = {
@@ -114,7 +126,7 @@
       save: t('dialogs.alerts.failedToSave', { error: title }),
       delete: t('dialogs.alerts.failedToDelete', { error: title }),
     }[phase];
-    error = errorLabels[phase] || fallback;
+    error = err?.message || errorLabels[phase] || fallback;
   }
 
   async function reload() {
@@ -123,7 +135,6 @@
       error = null;
       items = (await load()) ?? [];
     } catch (err) {
-      console.error(`Failed to load ${title}:`, err);
       reportError(err, 'load');
     } finally {
       loading = false;
@@ -151,6 +162,11 @@
 
   async function save() {
     if (saving || submitDisabled()) return;
+    const validationError = onValidate?.();
+    if (validationError) {
+      error = validationError;
+      return;
+    }
     saving = true;
     try {
       if (editingItem) {
@@ -162,7 +178,6 @@
       closeForm();
       onAfterSave?.();
     } catch (err) {
-      console.error(`Failed to save ${title}:`, err);
       reportError(err, 'save');
     } finally {
       saving = false;
@@ -183,10 +198,22 @@
       await reload();
       onAfterDelete?.();
     } catch (err) {
-      console.error(`Failed to delete ${title}:`, err);
       reportError(err, 'delete');
     }
   }
+
+  // Pages that keep their own row dropdown still need the scaffold's open/delete
+  // flow, so the builder receives the helpers.
+  const resolvedRowAttrs = $derived((item) => ({
+    ...(rowTestid ? { 'data-testid': rowTestid(item) } : {}),
+    ...(rowAttrs ? rowAttrs(item) : {}),
+  }));
+
+  const resolvedActionItems = $derived(
+    actionItems
+      ? (item) => actionItems(item, { edit: startEdit, remove: deleteItem, items, reload })
+      : null
+  );
 
   function defaultActions(item) {
     return [
@@ -229,7 +256,7 @@
 </PageHeader>
 
 {#if error}
-  <div class="error">{error}</div>
+  <div class="error" data-testid={errorTestid}>{error}</div>
 {/if}
 
 <DataTable
@@ -239,7 +266,9 @@
   {emptyMessage}
   {emptyDescription}
   {emptyIcon}
-  rowAttrs={rowTestid ? (item) => ({ 'data-testid': rowTestid(item) }) : undefined}
+  rowAttrs={resolvedRowAttrs}
+  actionItems={resolvedActionItems}
+  {actionTriggerTestid}
   {...cellSnippets}
 >
   {#snippet actions(item)}
@@ -249,6 +278,8 @@
         remove: deleteItem,
         saving,
         extraData,
+        items,
+        reload,
       })}
     {:else if canActOn(item)}
       <EntityRowActions actions={defaultActions(item)} />
@@ -265,6 +296,7 @@
     {saving}
     confirmLabel={editingItem ? t('common.update') : t('common.create')}
     submitId={editingItem ? editSubmitId : createSubmitId}
+    {confirmTestid}
   >
     {#snippet fields()}
       {@render formFields()}
