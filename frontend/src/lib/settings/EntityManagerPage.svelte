@@ -45,6 +45,7 @@
    *   actionItems?: ((item: any, helpers: { edit: (item: any) => void, remove: (item: any) => void, items: any[], reload: () => void }) => any[]) | null,
    *   actionTriggerTestid?: ((item: any) => string) | null,
    *   confirmTestid?: string,
+   *   formMaxWidth?: string,
    *   errorTestid?: string,
    *   canActOn?: (item: any) => boolean,
    *   rowTestid?: (item: any) => string,
@@ -91,6 +92,7 @@
     actionItems = null,
     actionTriggerTestid = null,
     confirmTestid = 'entity-form-confirm',
+    formMaxWidth = 'max-w-lg',
     errorTestid = undefined,
     canActOn = () => true,
     rowTestid = undefined,
@@ -307,6 +309,7 @@
       confirmLabel={editingItem ? t('common.update') : t('common.create')}
       submitId={editingItem ? editSubmitId : createSubmitId}
       {confirmTestid}
+      maxWidth={formMaxWidth}
     >
       {#snippet fields()}
         {#if formFields}{@render formFields()}{/if}
