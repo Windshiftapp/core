@@ -7,7 +7,6 @@
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import Button from '../components/Button.svelte';
-  import Input from '../components/Input.svelte';
   import Select from '../components/Select.svelte';
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -202,25 +201,27 @@
       </div>
 
       <!-- Date Range -->
+      {#snippet startDateLabel()}<Calendar class="w-4 h-4 inline-block mr-1" />{t('common.startDate')}{/snippet}
+      {#snippet endDateLabel()}<Calendar class="w-4 h-4 inline-block mr-1" />{t('common.endDate')}{/snippet}
       <div class="grid grid-cols-2 gap-4">
-        <div>
-          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.startDate')}</Label>
-          <Input
-            id="iteration-start-date-input"
-            type="date"
-            bind:value={formData.start_date}
-            required
-          />
-        </div>
-        <div>
-          <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.endDate')}</Label>
-          <Input
-            id="iteration-end-date-input"
-            type="date"
-            bind:value={formData.end_date}
-            required
-          />
-        </div>
+        <TextField
+          labelSnippet={startDateLabel}
+          labelColor="default"
+          labelClass="mb-1.5"
+          id="iteration-start-date-input"
+          type="date"
+          bind:value={formData.start_date}
+          required
+        />
+        <TextField
+          labelSnippet={endDateLabel}
+          labelColor="default"
+          labelClass="mb-1.5"
+          id="iteration-end-date-input"
+          type="date"
+          bind:value={formData.end_date}
+          required
+        />
       </div>
 
       <!-- Status -->

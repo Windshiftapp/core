@@ -21,7 +21,7 @@
   import Badge from '../../components/Badge.svelte';
   import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import Input from '../../components/Input.svelte';
+  import TextField from '../../components/TextField.svelte';
   import Label from '../../components/Label.svelte';
   import Select from '../../components/Select.svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
@@ -655,32 +655,32 @@
           size="small"
         />
       </div>
-      <div class="flex w-[calc(50%-0.5rem)] flex-col gap-1 sm:w-40">
-        <Label for="analytics-start-date" size="xs" color="subtle">
-          {t('analytics.from')}
-        </Label>
-        <Input
-          id="analytics-start-date"
-          type="date"
-          size="small"
-          max={endDate}
-          bind:value={startDate}
-          onchange={handleDateEdit}
-        />
-      </div>
-      <div class="flex w-[calc(50%-0.5rem)] flex-col gap-1 sm:w-40">
-        <Label for="analytics-end-date" size="xs" color="subtle">
-          {t('analytics.to')}
-        </Label>
-        <Input
-          id="analytics-end-date"
-          type="date"
-          size="small"
-          min={startDate}
-          bind:value={endDate}
-          onchange={handleDateEdit}
-        />
-      </div>
+      <TextField
+        class="flex w-[calc(50%-0.5rem)] flex-col gap-1 sm:w-40"
+        label={t('analytics.from')}
+        id="analytics-start-date"
+        labelSize="xs"
+        labelColor="subtle"
+        labelClass=""
+        type="date"
+        size="small"
+        max={endDate}
+        bind:value={startDate}
+        onchange={handleDateEdit}
+      />
+      <TextField
+        class="flex w-[calc(50%-0.5rem)] flex-col gap-1 sm:w-40"
+        label={t('analytics.to')}
+        id="analytics-end-date"
+        labelSize="xs"
+        labelColor="subtle"
+        labelClass=""
+        type="date"
+        size="small"
+        min={startDate}
+        bind:value={endDate}
+        onchange={handleDateEdit}
+      />
     </div>
   </Card>
 

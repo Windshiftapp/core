@@ -15,7 +15,6 @@
   import HelpCircle from '@lucide/svelte/icons/help-circle';
   import Button from '../components/Button.svelte';
   import SetDetailShell from './SetDetailShell.svelte';
-  import Input from '../components/Input.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
@@ -683,27 +682,29 @@
 
                             {:else if cond.condition_type === 'field_value'}
                               <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.fieldIdentifier')}</Label>
-                                  <Input
-                                    type="text"
-                                    placeholder="e.g. priority, custom_field_name"
-                                    value={cond.config?.field_identifier || ''}
-                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'field_identifier', e.currentTarget.value)}
-                                    size="small"
-                                  />
-                                </div>
-                                <div>
-                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.pattern')}</Label>
-                                  <Input
-                                    type="text"
-                                    placeholder="e.g. ^(high|critical)$"
-                                    value={cond.config?.pattern || ''}
-                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'pattern', e.currentTarget.value)}
-                                    size="small"
-                                    class="font-mono"
-                                  />
-                                </div>
+                                <TextField
+                                  label={t('conditionSets.fieldIdentifier')}
+                                  labelColor="default"
+                                  labelSize="xs"
+                                  labelClass="mb-1"
+                                  type="text"
+                                  placeholder="e.g. priority, custom_field_name"
+                                  value={cond.config?.field_identifier || ''}
+                                  oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'field_identifier', e.currentTarget.value)}
+                                  size="small"
+                                />
+                                <TextField
+                                  label={t('conditionSets.pattern')}
+                                  labelColor="default"
+                                  labelSize="xs"
+                                  labelClass="mb-1"
+                                  type="text"
+                                  placeholder="e.g. ^(high|critical)$"
+                                  value={cond.config?.pattern || ''}
+                                  oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'pattern', e.currentTarget.value)}
+                                  size="small"
+                                  inputClass="font-mono"
+                                />
                               </div>
 
                             {:else if cond.condition_type === 'script'}
@@ -736,8 +737,11 @@
                             <!-- Error message (validator mode only) -->
                             {#if (cond.mode || 'condition') === 'validator'}
                               <div>
-                                <Label color="default" class="text-xs mb-1">{t('conditionSets.errorMessage')}</Label>
-                                <Input
+                                <TextField
+                                  label={t('conditionSets.errorMessage')}
+                                  labelColor="default"
+                                  labelSize="xs"
+                                  labelClass="mb-1"
                                   type="text"
                                   placeholder={t('conditionSets.errorMessagePlaceholder')}
                                   value={cond.error_message || ''}

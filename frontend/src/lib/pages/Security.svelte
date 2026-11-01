@@ -741,9 +741,11 @@
 			</div>
 
 			<div>
-				<Label for="token-expiry" color="default" class="mb-1">Last valid date (optional)</Label>
-				<Input
+				<TextField
+					label="Last valid date (optional)"
 					id="token-expiry"
+					labelColor="default"
+					labelClass="mb-1"
 					type="date"
 					value={newTokenExpiry}
 					oninput={(e) => setNewTokenExpiry(/** @type {HTMLInputElement} */ (e.target).value)}

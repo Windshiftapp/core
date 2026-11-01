@@ -366,15 +366,16 @@
     </div>
 
     <!-- Target Branch (optional) -->
-    <div>
-      <Label>Target Branch / Commit <span class="font-normal" style="color: var(--ds-text-subtle);">(optional)</span></Label>
-      <Input
-        type="text"
-        bind:value={targetCommitish}
-        placeholder="main"
-        size="small"
-      />
-    </div>
+    {#snippet targetBranchLabel()}
+      Target Branch / Commit <span class="font-normal" style="color: var(--ds-text-subtle);">(optional)</span>
+    {/snippet}
+    <TextField
+      labelSnippet={targetBranchLabel}
+      type="text"
+      bind:value={targetCommitish}
+      placeholder="main"
+      size="small"
+    />
 
     <!-- Draft / Pre-release checkboxes -->
     {#if selectedProviderType === 'gitlab'}

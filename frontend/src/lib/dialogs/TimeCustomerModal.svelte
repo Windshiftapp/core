@@ -1,7 +1,6 @@
 <script>
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
-  import Input from '../components/Input.svelte';
   import FileInput from '../components/FileInput.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
@@ -111,10 +110,13 @@
       </h3>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Label required class="mb-2">{t('organization.organizationName')}</Label>
-          <Input id={nameInputId} bind:value={formData.name} required />
-        </div>
+        <TextField
+          label={t('organization.organizationName')}
+          id={nameInputId}
+          labelClass="mb-2"
+          required
+          bind:value={formData.name}
+        />
 
         <div>
           <TextField label={t('organization.email')} type="email" bind:value={formData.email} />
