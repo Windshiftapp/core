@@ -136,7 +136,7 @@ Want to build from source? See [BUILD.md](BUILD.md). For local development and c
 
 ## Contributing
 
-Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback.
+Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback. Contributions require a signed, one-time [CLA](CLA.md) — see the [contributing guide](CONTRIBUTING.md) for details.
 
 We are especially interested in early bug reports and real-world feedback about OIDC providers.
 

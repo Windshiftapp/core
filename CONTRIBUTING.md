@@ -4,6 +4,13 @@ Thanks for your interest in contributing! See the [README](README.md) for a proj
 
 > **Note:** Development and contributions happen here on GitHub. Please fork, clone, and open pull requests against this repository.
 
+> **Important:** We can only merge contributions covered by a signed
+> [Contributor License Agreement](CLA.md). It is a one-time, open-source-friendly
+> signature: you keep ownership of your work, and you grant us the rights we need
+> to ship Windshift under both the AGPL and our commercial license. The CLA bot
+> prompts you on your first PR, but please sign it early — we cannot merge an
+> unsigned PR, so signing first saves you from doing the work before finding out.
+
 ## Prerequisites
 
 - **Go**: the exact version declared in `go.mod`
@@ -117,7 +124,9 @@ npm run format      # auto-format
 Pull requests are welcome here on [GitHub](https://github.com/Windshiftapp/core). Fork the repository, open a PR against `main`, and describe *what* changed and *why*. Reference related issues if applicable.
 
 1. Push your branch and open a PR against `main`.
-2. CI will run automatically:
+2. Sign the [CLA](CLA.md). The CLA bot comments on your PR with the exact comment
+   to post; unsigned PRs cannot be merged.
+3. CI will run automatically:
    - **Go**: lint, vulnerability checks, and production build
    - **Frontend**: lint, type checks, and bundle size check
    - **Private tests**: maintained and run from the adjacent `core-tests`
@@ -150,7 +159,22 @@ kept out of the core repository.
 
 ## Contributor License Agreement
 
-By submitting a pull request you agree to the [CLA](CLA.md). The project is dual-licensed under the **AGPL v3.0** and the **Windshift Commercial License**.
+Windshift is dual-licensed under the **AGPL v3.0** and the **Windshift
+Commercial License**. That dual licensing is what keeps the open-source core
+available while funding its development, and it is why we ask every contributor
+to sign our [Contributor License Agreement](CLA.md).
+
+- **It is a one-time signature** per person, covering all of your contributions.
+- **You keep ownership** of your contributions. The CLA only grants us the rights
+  we need to distribute and relicense them.
+- **It must be signed before merge.** When you open your first PR, the CLA bot
+  posts the exact comment to reply with. Until it is signed, the PR cannot be
+  merged.
+- **It is not a copyright assignment**, and it does not change the license your
+  contributions are released under — the core stays AGPL.
+
+If you would rather not sign, that is completely fine. Please open an issue
+describing the change instead, and we will consider implementing it ourselves.
 
 ## Code of Conduct
 
