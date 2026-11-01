@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,6 +162,9 @@ func (s *ItemCRUDService) deleteSingleWithAuthorization(itemID int, metadata ite
 		if err := s.deleteItemRelationsTx(tx, itemID); err != nil {
 			return err
 		}
+		if err := s.repo.ReserveDeletedItemNumbers(tx, []*models.Item{root}, deleteActorUserID(metadata)); err != nil {
+			return err
+		}
 		return s.repo.Delete(tx, itemID)
 	})
 	if err != nil {
@@ -248,6 +252,11 @@ func (s *ItemCRUDService) deleteWithAuthorization(itemID int, metadata itemevent
 				return err
 			}
 		}
+		// Retire the highest removed number across the whole subtree so the
+		// allocator cannot reissue a key the delete just freed.
+		if err := s.repo.ReserveDeletedItemNumbers(tx, items, deleteActorUserID(metadata)); err != nil {
+			return err
+		}
 		// Remove children first so the foreign key cannot bypass their cleanup.
 		for i := len(items) - 1; i >= 0; i-- {
 			id := items[i].ID
@@ -299,6 +308,19 @@ func (s *ItemCRUDService) stampEmailTrackingCompletedTx(tx database.Tx, itemIDs 
 		return fmt.Errorf("stamp email tracking completed for deleted items: %w", err)
 	}
 	return nil
+}
+
+// deleteActorUserID extracts the deleting user for key-reservation provenance.
+// System, integration, and agent actors have no user row, so they leave NULL.
+func deleteActorUserID(metadata itemevents.Metadata) int {
+	if metadata.ActorKind != "user" {
+		return 0
+	}
+	id, err := strconv.Atoi(metadata.ActorRef)
+	if err != nil || id <= 0 {
+		return 0
+	}
+	return id
 }
 
 func (s *ItemCRUDService) deleteItemRelationsTx(tx database.Tx, itemID int) error {
